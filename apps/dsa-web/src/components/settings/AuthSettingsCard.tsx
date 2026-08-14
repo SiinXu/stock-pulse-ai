@@ -5,7 +5,8 @@ import { getParsedApiError, isParsedApiError, type ParsedApiError } from '../../
 import { useAuth } from '../../hooks';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
-import { Badge, Button, Checkbox, CredentialInput } from '../common';
+import { Badge, Button, Checkbox } from '../common';
+import { CredentialInput } from '../security';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 

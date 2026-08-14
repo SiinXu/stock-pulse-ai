@@ -2,7 +2,7 @@
 
 组合压力测试 API 为 [#158](https://github.com/SiinXu/stock-pulse-ai/issues/158)
 提供只读的确定性因子冲击，并关联 [#210](https://github.com/SiinXu/stock-pulse-ai/issues/210)
-的组合风险语义。历史路径重放、Monte Carlo、完整工具重估和 Web 可视化不在本轮范围内。
+的组合风险语义。历史路径重放、Monte Carlo 和完整工具重估仍不在范围内；Web 已提供确定性情景入口。
 
 ## API 与输入契约
 
@@ -17,6 +17,10 @@ POST /api/v1/portfolio/stress-test
 market/sector/FX 百分比冲击限制为 `[-100, 100]`，rate 冲击限制为
 `[-1000, 1000]` bp；错误单位、额外字段、非有限数字、超量 map/冲击以及组合后低于
 `-100%` 的回报都会被拒绝。快照超过 512 个持仓行时，也会在构造响应前返回稳定的客户端错误。
+
+## Web 入口
+
+打开 `/portfolio?tab=insights&view=stress`，可直接运行预设情景，也可配置自定义市场、行业、汇率和利率冲击。行业冲击支持填写目标行业及 `symbol -> sector` 映射。界面展示组合现值、压力后价值、PnL、覆盖持仓数和主要输家/赢家，并明确保留 `partial / unavailable / empty_portfolio` 状态与限制说明。当前 Web 不提供逐标的 beta override 编辑器；缺失 beta 仍按服务端单位 beta 规则处理并披露限制。
 
 ## 估值语义
 

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
         get_registered_field_keys,
         get_runtime_config,
         is_masked_secret_placeholder,
+        LLM_CHANNEL_FIELD_KEY_RE,
         is_reserved_hermes_name,
         llm_channel_map,
         log_safe_exception,
@@ -94,7 +95,12 @@ class _SystemConfigCoreMethods:
         }
         configured_notification_channels = self._detect_configured_notification_channels()
         registered_keys = set(get_registered_field_keys())
-        all_keys = set(config_map.keys()) | registered_keys
+        # Keep the no-schema service contract available to internal consumers,
+        # while avoiding dormant built-in LLM templates that were registered
+        # only to make the documented inventory explicit.
+        all_keys = set(config_map.keys()) | {
+            key for key in registered_keys if not LLM_CHANNEL_FIELD_KEY_RE.match(key)
+        }
         if include_schema:
             all_keys = EffectiveConfigResolver.get_schema_config_keys(config_map, registered_keys)
 

@@ -1,6 +1,6 @@
 # Portfolio-Level Multi-Symbol Analysis
 
-Backend entry for analyzing a **list of symbols as one portfolio** ([#128](https://github.com/SiinXu/stock-pulse-ai/issues/128)).
+Service and Web entry for analyzing a **list of symbols as one portfolio** ([#128](https://github.com/SiinXu/stock-pulse-ai/issues/128)).
 
 This is not a stack of per-symbol conclusions. The service builds a synthetic
 equal/custom-weight snapshot in the **existing portfolio holdings shape**, then
@@ -82,9 +82,13 @@ Cash is zero and holdings PnL is not modeled. For synthetic baskets, health mark
 Invalid `scenario_id` returns HTTP 400; unexpected stress runtime failures degrade
 only the stress block.
 
+## Web entry
+
+Open `/portfolio?tab=insights&view=basket`. Enter up to 20 symbols and choose whether to include the deterministic stress block. The view preserves `ok / partial / unavailable` states and displays correlation, concentration, VaR, health, stance distribution, and degraded symbols. It does not launch new per-symbol LLM runs or write the synthetic basket to a real account ledger.
+
 ## Out of scope (follow-up)
 
-- Web “Analyze Portfolio / Watchlist” button and full report page
+- A standalone long-form portfolio report and persisted report history
 - CLI `--portfolio` mode beyond the API
 - Notification channel templates for portfolio-level summaries
 - Persisting basket health rows into the account-keyed daily health store

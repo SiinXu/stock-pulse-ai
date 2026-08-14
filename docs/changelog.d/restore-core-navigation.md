@@ -1,0 +1,1 @@
+- [Fixed] Restore Agent to primary navigation and route unavailable Agent users directly to model sources, with cloud/API aliases in command search.

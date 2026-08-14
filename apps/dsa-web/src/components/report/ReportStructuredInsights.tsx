@@ -100,7 +100,7 @@ const PhaseDecisionCard: React.FC<{
 
   return (
     <Card
-      variant="bordered"
+      level="interactive"
       padding="md"
       className="text-left"
       data-testid="report-phase-decision"
@@ -156,7 +156,7 @@ const AttributionCard: React.FC<{
 
   return (
     <Card
-      variant="bordered"
+      level="interactive"
       padding="md"
       className="text-left"
       data-testid="report-signal-attribution"
@@ -272,7 +272,7 @@ const StrategySynthesisCard: React.FC<{
 
   return (
     <Card
-      variant="bordered"
+      level="interactive"
       padding="md"
       className="text-left md:col-span-2"
       data-testid="report-strategy-synthesis"
@@ -424,7 +424,7 @@ const CommitteeDeliberationCard: React.FC<{
 
   return (
     <Card
-      variant="bordered"
+      level="interactive"
       padding="md"
       className="text-left md:col-span-2"
       data-testid="report-committee-deliberation"

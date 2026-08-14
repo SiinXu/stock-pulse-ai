@@ -1,5 +1,5 @@
 import type React from 'react';
-import { Input } from './Input';
+import { Input } from '../common/Input';
 
 export type CredentialPurpose =
   | 'admin-current-password'

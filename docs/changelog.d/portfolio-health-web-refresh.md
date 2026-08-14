@@ -1,0 +1,5 @@
+- [Added] Add Portfolio Insights views for health refresh, basket analysis, stress testing, and rebalancing guidance with explicit partial and unavailable states.
+- [Added] Add preview-first Futu OpenD position imports to the Web Portfolio import wizard.
+- [Added] Add a read-only Runtime Capabilities view to Advanced Settings, including Agent deployment context without exposing registry writes or an ineffective Chat selector.
+- [Changed] Register or explicitly hide every documented environment key so Settings metadata covers all 591 `.env.example` entries without inference debt.
+- [Changed] Tighten Web component, native-form-control, and theme-token contracts while preserving existing user workflows.

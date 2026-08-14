@@ -327,3 +327,45 @@ describe('agentApi.getChatSessionMessages', () => {
     expect(result.session_state.selected_skill_ids).toBeNull();
   });
 });
+
+describe('agentApi.getModels', () => {
+  beforeEach(() => {
+    mockPost.mockReset();
+    mockGet.mockReset();
+  });
+
+  it('loads configured Agent deployments as read-only runtime data', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        models: [{
+          deployment_id: 'primary-agent',
+          deployment_name: 'Primary Agent',
+          model: 'provider/model',
+          provider: 'provider',
+          source: 'AGENT_LITELLM_MODEL',
+          api_base: null,
+          is_primary: true,
+          is_fallback: false,
+        }],
+      },
+    });
+
+    const result = await agentApi.getModels();
+
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/agent/models');
+    expect(result.models[0]).toMatchObject({ deployment_id: 'primary-agent', is_primary: true });
+  });
+
+  it('rejects malformed deployment records', async () => {
+    mockGet.mockResolvedValue({
+      data: { models: [{ deployment_id: 'missing-fields' }] },
+    });
+
+    await expect(agentApi.getModels()).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'AgentModelsResponse' });
+      return true;
+    });
+  });
+});

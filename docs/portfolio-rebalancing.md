@@ -1,6 +1,6 @@
 # 组合再平衡与风险调整仓位区间
 
-对应 Issue [#237](https://github.com/SiinXu/stock-pulse-ai/issues/237)、[#126](https://github.com/SiinXu/stock-pulse-ai/issues/126) 的后端 V1。
+对应 Issue [#237](https://github.com/SiinXu/stock-pulse-ai/issues/237)、[#126](https://github.com/SiinXu/stock-pulse-ai/issues/126) 的确定性服务与 Web V1。
 
 本能力输出**确定性、可解释**的再平衡建议与单票仓位权重区间，**不会**自动下单、改写账本或替代个人判断。
 
@@ -37,6 +37,10 @@
 ## Agent
 
 `PortfolioAgent` 注入确定性基座；`post_process` 以服务结果覆盖自由生成的 `rebalance_suggestions`，LLM 仅可润色叙述。
+
+## Web 入口
+
+打开 `/portfolio?tab=insights&view=rebalance`。可选择 `conservative / moderate / aggressive` 风险偏好并设置漂移阈值；界面展示当前风险摘要、目标模型、限制说明和每条 add/reduce/hold/exit 建议。`insufficient_data` 会明确拒绝生成建议，操作不会写入账本或自动下单。
 
 ## 回滚
 

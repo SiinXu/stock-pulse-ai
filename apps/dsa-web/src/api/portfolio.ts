@@ -16,6 +16,7 @@ import type {
   PortfolioDeleteResponse,
   PortfolioEventCreatedResponse,
   PortfolioFxRefreshResponse,
+  PortfolioFutuImportRequest,
   PortfolioImportBrokerListResponse,
   PortfolioImportCommitResponse,
   PortfolioImportParseResponse,
@@ -34,15 +35,19 @@ import type { components } from '../types/api.generated';
 type OpenApiPortfolioSnapshot = components['schemas']['PortfolioSnapshotResponse'];
 type OpenApiPortfolioAccountItem = components['schemas']['PortfolioAccountItem'];
 type OpenApiPaperTradeCreated = components['schemas']['PaperTradeCreatedResponse'];
+type OpenApiPortfolioFutuImportRequest = components['schemas']['PortfolioFutuImportRequest'];
 type _AssertSnapshotFields = keyof OpenApiPortfolioSnapshot;
 type _AssertAccountFields = keyof OpenApiPortfolioAccountItem;
 type _AssertPaperTradeFields = keyof OpenApiPaperTradeCreated;
+type _AssertFutuImportFields = keyof OpenApiPortfolioFutuImportRequest;
 const _snapshotFieldAnchor: _AssertSnapshotFields = 'total_equity';
 const _accountFieldAnchor: _AssertAccountFields = 'base_currency';
 const _paperTradeFieldAnchor: _AssertPaperTradeFields = 'price_source';
+const _futuImportFieldAnchor: _AssertFutuImportFields = 'operation_id';
 void _snapshotFieldAnchor;
 void _accountFieldAnchor;
 void _paperTradeFieldAnchor;
+void _futuImportFieldAnchor;
 
 const portfolioAccountItemSchema = z.object({
   id: z.number(), name: z.string(), market: z.string(), baseCurrency: z.string(), isActive: z.boolean(),
@@ -558,6 +563,42 @@ export const portfolioApi = {
         'Idempotency-Key': operationId,
       },
     });
+    const parsed = parseCamelCasePayload<PortfolioImportCommitResponse>(response.data, portfolioImportCommitResponseSchema, 'PortfolioImportCommitResponse');
+    if (!Array.isArray(parsed.errors)) return { ...parsed, errors: [] };
+    return parsed;
+  },
+
+  async previewFutuImport(asOf?: string): Promise<PortfolioImportParseResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/portfolio/imports/futu/preview',
+      undefined,
+      { params: asOf ? { as_of: asOf } : {} },
+    );
+    const parsed = parseCamelCasePayload<PortfolioImportParseResponse>(response.data, portfolioImportParseResponseSchema, 'PortfolioImportParseResponse');
+    return {
+      ...parsed,
+      records: Array.isArray(parsed.records) ? parsed.records : [],
+      errors: Array.isArray(parsed.errors) ? parsed.errors : [],
+      failedRows: Array.isArray(parsed.failedRows)
+        ? parsed.failedRows.map((row) => ({
+          ...row,
+          source: row.source && typeof row.source === 'object' ? row.source : {},
+        }))
+        : [],
+    };
+  },
+
+  async commitFutuImport(payload: PortfolioFutuImportRequest): Promise<PortfolioImportCommitResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/portfolio/imports/futu',
+      {
+        account_id: payload.accountId,
+        dry_run: payload.dryRun,
+        operation_id: payload.operationId,
+        as_of: payload.asOf,
+      },
+      { headers: { 'Idempotency-Key': payload.operationId } },
+    );
     const parsed = parseCamelCasePayload<PortfolioImportCommitResponse>(response.data, portfolioImportCommitResponseSchema, 'PortfolioImportCommitResponse');
     if (!Array.isArray(parsed.errors)) return { ...parsed, errors: [] };
     return parsed;

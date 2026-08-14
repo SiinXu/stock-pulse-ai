@@ -37,7 +37,7 @@ Most people only need **01 + 02 + 03 + 08 + 11** in the first week.
 | [03 Analysis workbench](03-analysis-workbench_EN.md) | Start analysis, task progress, history and compare |
 | [04 Market review](04-market-review_EN.md) | Trigger review, read review history |
 | [05 Agent chat](05-agent-chat_EN.md) | Multi-turn Q&A and strategy selection |
-| [06 Signal center](06-signals_EN.md) | Suggestion pool, rules, delivery, review (**not** in primary sidebar; bell / palette / `/signals`) |
+| [06 Signal center](06-signals_EN.md) | Primary workspace for signals, rules, delivery history, and review |
 | [07 Portfolio](07-portfolio_EN.md) | Sidebar Portfolio; accounts, bookkeeping, import, risk, one-click analysis |
 | [08 Reading reports](08-reading-reports_EN.md) | How to read a stock report |
 | [09 Backtest](09-backtest_EN.md) | Post-hoc checks on historical AI advice |

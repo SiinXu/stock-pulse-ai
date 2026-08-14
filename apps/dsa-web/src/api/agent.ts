@@ -16,6 +16,8 @@ type OpenApiResearchResponse = components['schemas']['ResearchResponse'];
 type OpenApiSkillsResponse = components['schemas']['SkillsResponse'];
 type OpenApiSessionsResponse = components['schemas']['SessionsResponse'];
 type OpenApiSessionMessagesResponse = components['schemas']['SessionMessagesResponse'];
+type OpenApiAgentModelsResponse = components['schemas']['AgentModelsResponse'];
+type OpenApiAgentModelDeployment = components['schemas']['AgentModelDeployment'];
 
 type _AssertChatFields = keyof OpenApiChatResponse;
 type _AssertResearchFields = keyof OpenApiResearchResponse;
@@ -28,12 +30,16 @@ const _skillsFieldAnchor: _AssertSkillsFields = 'default_skill_id';
 const _sessionsFieldAnchor: _AssertSessionsFields = 'sessions';
 const _messagesFieldAnchor: _AssertMessagesFields = 'messages';
 const _messagesStateFieldAnchor: _AssertMessagesFields = 'session_state';
+const _agentModelsFieldAnchor: keyof OpenApiAgentModelsResponse = 'models';
+const _agentModelFieldAnchor: keyof OpenApiAgentModelDeployment = 'deployment_id';
 void _chatFieldAnchor;
 void _researchFieldAnchor;
 void _skillsFieldAnchor;
 void _sessionsFieldAnchor;
 void _messagesFieldAnchor;
 void _messagesStateFieldAnchor;
+void _agentModelsFieldAnchor;
+void _agentModelFieldAnchor;
 
 export interface ChatStreamOptions {
   signal?: AbortSignal;
@@ -116,6 +122,9 @@ export interface ResearchResponse {
   error?: string | null;
 }
 
+export type AgentModelDeployment = OpenApiAgentModelDeployment;
+export type AgentModelsResponse = OpenApiAgentModelsResponse;
+
 /**
  * Agent plain JSON responses stay snake_case (no toCamelCase) so valid payloads
  * remain byte-identical to the pre-validation path used by Chat UI.
@@ -188,6 +197,21 @@ const sessionMessagesResponseSchema = z.object({
   turn_identity_supported: z.boolean().optional(),
 }).passthrough();
 
+const agentModelDeploymentSchema = z.object({
+  deployment_id: z.string().min(1),
+  model: z.string().min(1),
+  provider: z.string().min(1),
+  source: z.string().min(1),
+  api_base: z.string().nullable().optional(),
+  deployment_name: z.string().nullable().optional(),
+  is_primary: z.boolean(),
+  is_fallback: z.boolean(),
+}).passthrough();
+
+const agentModelsResponseSchema = z.object({
+  models: z.array(agentModelDeploymentSchema),
+}).passthrough();
+
 function parseSnakeCasePayload<T>(
   data: unknown,
   schema: z.ZodTypeAny,
@@ -219,6 +243,14 @@ function parseSnakeCasePayload<T>(
 }
 
 export const agentApi = {
+  async getModels(): Promise<AgentModelsResponse> {
+    const response = await apiClient.get<Record<string, unknown>>('/api/v1/agent/models');
+    return parseSnakeCasePayload<AgentModelsResponse>(
+      response.data,
+      agentModelsResponseSchema,
+      'AgentModelsResponse',
+    );
+  },
   // Deep Research can take up to ~180s. The server persists session-bound
   // runs, including when the page stops waiting for the HTTP response.
   async research(payload: ResearchRequest): Promise<ResearchResponse> {

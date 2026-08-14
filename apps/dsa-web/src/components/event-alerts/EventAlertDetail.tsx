@@ -17,7 +17,7 @@ const EventAlertDetail: React.FC<EventAlertDetailProps> = ({ item = null }) => {
   const categoryLabels = EVENT_CATEGORY_LABELS[language];
   if (!item) {
     return (
-      <Card title={text.detailTitle} variant="bordered" padding="md">
+      <Card title={text.detailTitle} level="interactive" padding="md">
         <p className="text-sm text-secondary-text" data-testid="event-alert-detail-empty">{text.selectPrompt}</p>
       </Card>
     );
@@ -32,7 +32,7 @@ const EventAlertDetail: React.FC<EventAlertDetailProps> = ({ item = null }) => {
   if (item.inWatchlist) bits.push(text.inWatchlist);
   const affectedSummary = bits.length ? bits.join(' · ') : text.notInHoldingsOrWatchlist;
   return (
-    <Card title={text.detailTitle} subtitle={item.target} variant="bordered" padding="md" data-testid={`event-alert-detail-${item.id}`}>
+    <Card title={text.detailTitle} eyebrow={item.target} level="interactive" padding="md" data-testid={`event-alert-detail-${item.id}`}>
       <div className="space-y-4" data-testid="event-alert-detail">
         <div className="flex flex-wrap items-center gap-2">
           <Badge variant={item.impactGrade === 'major' ? 'danger' : 'default'}>{item.impactGrade === 'major' ? text.gradeMajor : item.impactGrade === 'routine' ? text.gradeRoutine : text.gradeUnclassified}</Badge>

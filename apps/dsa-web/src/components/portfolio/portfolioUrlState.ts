@@ -11,8 +11,10 @@ import {
 } from '../../utils/urlState';
 
 /** Primary portfolio workspace tabs. Default (positions) is omitted from the URL. */
-export const PORTFOLIO_TAB_VALUES = ['positions', 'ledger', 'risk'] as const;
+export const PORTFOLIO_TAB_VALUES = ['positions', 'ledger', 'risk', 'insights'] as const;
 export type PortfolioTab = (typeof PORTFOLIO_TAB_VALUES)[number];
+export const PORTFOLIO_INSIGHTS_VIEW_VALUES = ['health', 'basket', 'stress', 'rebalance'] as const;
+export type PortfolioInsightsView = (typeof PORTFOLIO_INSIGHTS_VIEW_VALUES)[number];
 
 /**
  * Portfolio shareable URL schema.
@@ -40,6 +42,12 @@ export const portfolioUrlSchema = defineUrlStateSchema({
     name: 'tab',
     values: PORTFOLIO_TAB_VALUES,
     default: 'positions',
+    history: 'replace',
+  }),
+  view: enumParam({
+    name: 'view',
+    values: PORTFOLIO_INSIGHTS_VIEW_VALUES,
+    default: 'health',
     history: 'replace',
   }),
   /** Position row identity: `${accountId}-${symbol}-${market}`. */

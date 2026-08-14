@@ -1,7 +1,8 @@
 import { memo, useState } from 'react';
 import type React from 'react';
 import { Trash2 } from 'lucide-react';
-import { Badge, Button, CredentialInput, IconButton, Input, Select, Textarea, TimePicker } from '../common';
+import { Badge, Button, IconButton, Input, Select, Textarea, TimePicker } from '../common';
+import { CredentialInput } from '../security';
 import type { SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getSettingsHelpContent } from '../../locales/settingsHelp';

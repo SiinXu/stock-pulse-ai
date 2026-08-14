@@ -26,7 +26,7 @@ const AgentUnavailableEmptyState: React.FC<AgentUnavailableEmptyStateProps> = ({
       <Link
         to={buildSettingsHref({
           section: SETTINGS_SECTION_IDS.aiModels,
-          view: SETTINGS_VIEW_IDS.aiModels.taskRouting,
+          view: SETTINGS_VIEW_IDS.aiModels.connections,
         })}
         className="inline-flex min-h-11 items-center justify-center rounded-lg border border-[var(--settings-border)] bg-[var(--nav-active-bg)] px-4 py-2 text-sm font-medium text-foreground"
       >

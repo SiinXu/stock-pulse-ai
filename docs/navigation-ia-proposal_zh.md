@@ -1,6 +1,6 @@
 # 导航信息架构（IA）— 目标方案提案
 
-**状态**：阶段 2 B0/B1 按 [\#873](https://github.com/SiinXu/stock-pulse-ai/issues/873) 脊柱实施中（Today · Research · Signals · Portfolio · Settings；Agent 降级）。下方 A–D 选项保留作历史上下文。  
+**状态**：阶段 2 B0/B1 后续调整保留两个核心工作区（Today · Research · Agent · Signals · Portfolio · Settings）；上下文页和管理员专属路由继续留在一级侧栏之外。下方 A–D 选项保留作历史上下文。
 **Issue**：[\#368](https://github.com/SiinXu/stock-pulse-ai/issues/368)  
 **设计输入**：[\#873](https://github.com/SiinXu/stock-pulse-ai/issues/873)  
 **配套 PR**：审计基线仅含机械卫生；chrome 批次单独合入
@@ -27,7 +27,7 @@
 | `/portfolio` | 组合 / 持仓 | 是 | |
 | `/chat` | Agent 对话 | 是 | 路径为兼容保留；标签为 Agent |
 | `/settings` | 设置 | 是 | 用量嵌套为 section |
-| `/signals` | 信号中心 | **否**（铃铛 / 面板 / 首页） | 信号 + 告警 + 复盘单例 |
+| `/signals` | 信号中心 | 是 | 信号 + 告警 + 复盘单例 |
 | `/approvals` | 人工审批 | **否**（首页 / 面板） | 需管理员认证 |
 | `/stocks/:stockCode` | 个股工作区 | **否**（内容页） | |
 | `/login` | 登录 | 独立 | 保留 `?redirect=` |
@@ -49,16 +49,18 @@
 
 | 类型 | 路径 / 入口 | 判断 |
 | --- | --- | --- |
-| 可达但侧栏无链 | `/signals`、`/approvals`、`/stocks/:code` | **有意**（铃铛 / 首页 / 内容页） |
+| 可达但侧栏无链 | `/approvals`、`/notifications`、`/stocks/:code`、`/event-alerts`、`/portfolio/performance`、`/research/report-compare` | **有意**（首页 / 铃铛 / 所属工作区 / 内容上下文） |
 | 有链但死链 | — | 机械卫生后产品导航与命令面板未发现 |
 | 无路由页面模块 | `AlertsPage` 等 | 经 `/signals` 与遗留重定向承载 |
 | 深链允许列表缺口（机械 PR 已修） | `/research/skill-outcomes` | 曾被标为 `unsupported_route`；现已允许 |
 
 ### 1.4 主导航（已落地形态）
 
-顺序：**首页 → 研究（分组）→ 组合 → Agent → 设置**。
+顺序：**首页 → 研究（分组）→ Agent → 信号中心 → 组合 → 设置**。
 
-研究子项：**大盘复盘 → 发现 → 分析工作台 → 回测 → 技能后验**。
+研究子项：**大盘复盘 → 发现 → 分析工作台 → 回测 → 事件日历 → 金融计算器 → 技能后验**。
+
+Agent 是一级工作区。人工审批继续通过首页和命令面板进入，因为它受管理员认证控制。
 
 研究子项标签统一使用 `layout.nav.*` 命名空间（机械对齐）。
 
@@ -78,11 +80,11 @@
 
 ## 2. 目标架构选项 — 需要决策
 
-Issue #368 描述的任务导向目标 IA 与当前五域 Shell 已部分重合。剩余决策主要在**深度**、**信号/审批入口**、以及首页/Agent/设置扩展幅度。
+Issue #368 描述的任务导向目标 IA 与当前六域 Shell 已部分重合。剩余决策主要在**深度**、**信号/审批入口**、以及首页/Agent/设置扩展幅度。
 
-### 选项 A — 稳定当前 Shell（默认推荐）
+### 选项 A — 稳定可见的核心 Shell（当前）
 
-**形态**：保持五主域；信号走铃铛/面板；审批走首页/面板；不新增顶级域。
+**形态**：保持六个一级域，Agent 与信号中心常驻；审批继续走首页/命令面板；上下文详情页不提升为顶级域。
 
 | 优点 | 缺点 |
 | --- | --- |

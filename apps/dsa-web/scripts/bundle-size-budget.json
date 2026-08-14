@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-14",
-  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1273) (js-entry, locale-ja, locale-de, locale-ko, locale-fr, locale-es, locale-zh-TW, locale-id, locale-ms). Headroom: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other named +400.",
+  "baselineNote": "Remeasured the intentional Settings registry and localized Portfolio Insights delivery. Named chunks retain the repository convention of measured gzip + 400 B headroom; the Portfolio locale feature chunk has its own fail-closed rule.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -13,9 +13,9 @@
     {
       "id": "IntelligenceSourcesPanel",
       "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 248056,
-      "measuredGzipBytes": 247656,
-      "note": "Local production-build remasure after merging origin/main; measured 247656 B + 400 B retained headroom."
+      "maxGzipBytes": 249812,
+      "measuredGzipBytes": 249412,
+      "note": "Remeasured after explicit Settings metadata coverage reached 591/591; measured 249412 B + 400 B retained headroom."
     },
     {
       "id": "js-entry",
@@ -27,58 +27,58 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 164741,
-      "measuredGzipBytes": 164341,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 164341 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 165256,
+      "measuredGzipBytes": 164856,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 164856 B + 400 B headroom."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 157714,
-      "measuredGzipBytes": 157314,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 157314 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 159266,
+      "measuredGzipBytes": 158866,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 158866 B + 400 B headroom."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 157591,
-      "measuredGzipBytes": 157191,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 157191 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 158252,
+      "measuredGzipBytes": 157852,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 157852 B + 400 B headroom."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 157327,
-      "measuredGzipBytes": 156927,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 156927 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 159211,
+      "measuredGzipBytes": 158811,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 158811 B + 400 B headroom."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 152948,
-      "measuredGzipBytes": 152548,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 152548 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 154992,
+      "measuredGzipBytes": 154592,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 154592 B + 400 B headroom."
     },
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 149991,
-      "measuredGzipBytes": 149591,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 149591 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 151021,
+      "measuredGzipBytes": 150621,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 150621 B + 400 B headroom."
     },
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 142787,
-      "measuredGzipBytes": 142387,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 142387 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 144269,
+      "measuredGzipBytes": 143869,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 143869 B + 400 B headroom."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 142996,
-      "measuredGzipBytes": 142596,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 142596 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 144492,
+      "measuredGzipBytes": 144092,
+      "note": "Remeasured after localized Portfolio Insights and Runtime Capabilities copy; measured 144092 B + 400 B headroom."
     },
     {
       "id": "vendor-charts",
@@ -113,9 +113,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10861,
-      "measuredGzipBytes": 10461,
-      "note": "Combined production-build measurement after merge train 20260813-03 (#1149 #1240 #1157 #1227 #1218 #1236 #1265). Each member is individually within the previous budget; the icon set grows cumulatively because each adds a small number of distinct Lucide icons. Measured 10461 B with 400 B headroom, matching the IntelligenceSourcesPanel convention."
+      "maxGzipBytes": 11274,
+      "measuredGzipBytes": 10874,
+      "note": "Remeasured after Portfolio Insights and Runtime Capabilities controls; measured 10874 B + 400 B headroom."
     },
     {
       "id": "vendor-misc",
@@ -153,6 +153,13 @@
       "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
     },
     {
+      "id": "portfolio-feature-translations",
+      "match": "assets/portfolioFutuImportTranslations-*.js",
+      "maxGzipBytes": 32543,
+      "measuredGzipBytes": 32143,
+      "note": "Shared, lazily loaded localized copy for Portfolio health, insights, and Futu import; measured 32143 B + 400 B headroom."
+    },
+    {
       "id": "PortfolioRiskMetricsPanel",
       "match": "assets/PortfolioRiskMetricsPanel-*.js",
       "maxGzipBytes": 10654,
@@ -162,9 +169,9 @@
     {
       "id": "PortfolioPage",
       "match": "assets/PortfolioPage-*.js",
-      "maxGzipBytes": 26601,
-      "measuredGzipBytes": 26401,
-      "note": "GitHub Actions Linux measurement after committee insights were split behind a dynamic import; the route retains only Vite dependency-map hashes. Measured 26401 B on the PR/main synthetic merge + 200 B headroom."
+      "maxGzipBytes": 30442,
+      "measuredGzipBytes": 30042,
+      "note": "Remeasured after the Portfolio Insights URL tab and preview-first Futu import host wiring; feature views remain split into dedicated chunks. Measured 30042 B + 400 B headroom."
     },
     {
       "id": "DecisionSignalsPage",

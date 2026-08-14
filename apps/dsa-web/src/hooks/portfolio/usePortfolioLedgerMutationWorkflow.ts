@@ -20,8 +20,8 @@ type OperationAttempt = {
   operationId: string;
 };
 
-type MutationKind = 'trade' | 'paperTrade' | 'cash' | 'corporate' | 'csv';
-type LedgerMutationKind = Exclude<MutationKind, 'csv'>;
+type MutationKind = 'trade' | 'paperTrade' | 'cash' | 'corporate' | 'csv' | 'futu';
+type LedgerMutationKind = Exclude<MutationKind, 'csv' | 'futu'>;
 type TradeCommand = Omit<PortfolioTradeCreateRequest, 'operationId'>;
 type PaperTradeCommand = Omit<PaperTradeCreateRequest, 'operationId'>;
 type CashCommand = Omit<PortfolioCashLedgerCreateRequest, 'operationId'>;
@@ -32,6 +32,12 @@ type CsvCommitCommand = {
   broker: string;
   file: File;
   dryRun: boolean;
+};
+
+type FutuCommitCommand = {
+  accountId: number;
+  dryRun: boolean;
+  asOf?: string;
 };
 
 type UsePortfolioLedgerMutationWorkflowOptions = {
@@ -54,6 +60,7 @@ const OPERATION_SCOPES: Record<MutationKind, string> = {
   cash: 'portfolio-cash',
   corporate: 'portfolio-corporate',
   csv: 'portfolio-csv',
+  futu: 'portfolio-futu',
 };
 
 function resolveOperationAttempt(
@@ -75,7 +82,7 @@ export function usePortfolioLedgerMutationWorkflow({
   const [paperTradeRefreshIncomplete, setPaperTradeRefreshIncomplete] = useState(false);
   const [cashSubmitting, setCashSubmitting] = useState(false);
   const [corpSubmitting, setCorpSubmitting] = useState(false);
-  const [csvCommitting, setCsvCommitting] = useState(false);
+  const [importCommitting, setImportCommitting] = useState(false);
 
   const attemptsRef = useRef<Record<MutationKind, OperationAttempt | null>>({
     trade: null,
@@ -83,6 +90,7 @@ export function usePortfolioLedgerMutationWorkflow({
     cash: null,
     corporate: null,
     csv: null,
+    futu: null,
   });
   const pendingRef = useRef<Record<MutationKind, boolean>>({
     trade: false,
@@ -90,6 +98,7 @@ export function usePortfolioLedgerMutationWorkflow({
     cash: false,
     corporate: false,
     csv: false,
+    futu: false,
   });
   const csvFileIdentityRef = useRef({
     nextToken: 1,
@@ -255,7 +264,7 @@ export function usePortfolioLedgerMutationWorkflow({
       },
     };
     const attempt = getAttempt('csv', identity);
-    setCsvCommitting(true);
+    setImportCommitting(true);
 
     try {
       const result = await portfolioApi.commitCsvImport(
@@ -276,7 +285,34 @@ export function usePortfolioLedgerMutationWorkflow({
       }
     } finally {
       pendingRef.current.csv = false;
-      setCsvCommitting(false);
+      setImportCommitting(false);
+    }
+  }, [getAttempt]);
+
+  const commitFutu = useCallback(async (
+    command: FutuCommitCommand,
+    onCommitted: (result: PortfolioImportCommitResponse) => void,
+  ): Promise<void> => {
+    if (pendingRef.current.futu) return;
+    pendingRef.current.futu = true;
+    const attempt = getAttempt('futu', command);
+    setImportCommitting(true);
+
+    try {
+      const result = await portfolioApi.commitFutuImport({
+        ...command,
+        operationId: attempt.operationId,
+      });
+      onCommitted(result);
+      if (result.failedCount > 0) {
+        attemptsRef.current.futu = null;
+      }
+      if (!command.dryRun) {
+        await projectionRef.current.refreshPortfolioData();
+      }
+    } finally {
+      pendingRef.current.futu = false;
+      setImportCommitting(false);
     }
   }, [getAttempt]);
 
@@ -287,12 +323,13 @@ export function usePortfolioLedgerMutationWorkflow({
     paperTradeRefreshIncomplete,
     cashSubmitting,
     corpSubmitting,
-    csvCommitting,
+    importCommitting,
     submitTrade,
     submitPaperTrade,
     submitCash,
     submitCorporateAction,
     commitCsv,
+    commitFutu,
     retryPaperTradeRefresh: refreshPaperProjection,
   };
 }

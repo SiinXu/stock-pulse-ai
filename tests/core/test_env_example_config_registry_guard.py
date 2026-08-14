@@ -41,13 +41,8 @@ _ENV_EXAMPLE = Path(__file__).resolve().parents[2] / ".env.example"
 _DOCUMENTED_ENV_ASSIGNMENT_RE = re.compile(r"^\s*#?\s*([A-Z][A-Z0-9_]*)=")
 
 # ---------------------------------------------------------------------------
-# Temporary debt baseline (issue #1023). CLEANUP PLAN:
-#   - Tasks 2/3/4: register keys in config_registry_parts/*; live unregistered
-#     shrinks automatically. Optionally remove retired keys from BASELINE and
-#     recompute BASELINE_SHA256; lower MAX_COUNT when acknowledging progress.
-#   - Tasks 5-10: long-tail cleanup until unregistered is empty and MAX is 0.
-# DO NOT expand BASELINE / raise HARD_CEILING / rewrite BASELINE_SHA256 to make
-# CI green for a new key — register the key instead.
+# Historical debt membership remains pinned for auditability. Live debt is now
+# required to stay at zero; new documented keys must be registered directly.
 # ---------------------------------------------------------------------------
 TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_BASELINE = frozenset({
     "AKSHARE_PRIORITY",
@@ -223,7 +218,7 @@ TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_BASELINE_SHA256 = (
 TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_HARD_CEILING = 243
 
 # Recorded max for current debt length. Only decrease when debt is retired.
-TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_MAX_COUNT = 161
+TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_MAX_COUNT = 0
 
 
 def _documented_env_example_keys() -> set[str]:

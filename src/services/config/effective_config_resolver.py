@@ -15,6 +15,7 @@ from typing import Any, Dict, Optional, Set, Tuple
 
 from src.core.config_registry import (
     LLM_CHANNEL_FIELD_KEY_RE,
+    WEB_SETTINGS_HIDDEN_FROM_UI,
     get_registered_field_keys,
 )
 
@@ -119,18 +120,24 @@ class EffectiveConfigResolver:
         Ordinary settings must be registry-backed. LLM channel detail keys are
         kept only as editor support data for channels declared in LLM_CHANNELS.
         """
-        keys = set(registered_keys)
+        keys = {
+            key
+            for key in registered_keys
+            if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
+        }
         channel_names = {
             segment.strip().upper()
             for segment in config_map.get("LLM_CHANNELS", "").split(",")
             if segment.strip()
         }
-        if not channel_names:
-            return keys
-
         for key in config_map:
             match = LLM_CHANNEL_FIELD_KEY_RE.match(key)
-            if match and match.group(1) in channel_names:
+            if (
+                match
+                and match.group(1) in channel_names
+                and key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            ):
                 keys.add(key)
 
         return keys

@@ -138,6 +138,7 @@ describe('page skeleton Patterns', () => {
 
     render(<Harness />);
     const overview = screen.getByRole('tab', { name: 'Overview' });
+    expect(overview).toHaveClass('rounded-none');
     overview.focus();
     fireEvent.keyDown(overview, { key: 'ArrowRight' });
     const risk = screen.getByRole('tab', { name: 'Risk' });

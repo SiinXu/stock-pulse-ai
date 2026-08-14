@@ -1,6 +1,6 @@
 # Portfolio Rebalancing & Risk-Adjusted Position Bands
 
-Backend-only V1 for issues [#237](https://github.com/SiinXu/stock-pulse-ai/issues/237) and [#126](https://github.com/SiinXu/stock-pulse-ai/issues/126).
+Deterministic service and Web V1 for issues [#237](https://github.com/SiinXu/stock-pulse-ai/issues/237) and [#126](https://github.com/SiinXu/stock-pulse-ai/issues/126).
 
 This feature produces **deterministic, explainable suggestions** for portfolio rebalancing and single-name weight bands. It does **not** execute trades, write the ledger, or replace personal judgment.
 
@@ -76,10 +76,13 @@ Optional environment keys (defaults work without configuration):
 
 `PortfolioAgent` injects the service payload as a **Deterministic Rebalancing Base**. When present, `post_process` overwrites free-form LLM `rebalance_suggestions` with the base, and stores `deterministic_rebalancing` for downstream consumers. The model may polish narrative text only.
 
+## Web entry
+
+Open `/portfolio?tab=insights&view=rebalance`. Select `conservative`, `moderate`, or `aggressive` risk tolerance and set the drift threshold. The view shows the current risk summary, target model, limitations, and each add/reduce/hold/exit suggestion. `insufficient_data` remains an explicit refusal; no action writes the ledger or executes a trade.
+
 ## Non-goals / fences
 
-- Web / PortfolioPage UI — follow-up (see #790 / remaining #237 surface work).
-- Complete multi-goal planning UI for user risk preference input — follow-up.
+- Complete multi-goal planning beyond the shipped risk-tolerance and drift controls.
 - What-if tax/cost optimizers.
 
 ## Rollback

@@ -1,10 +1,10 @@
 # Portfolio Risk Metrics (V0)
 
-Backend-only risk metrics for held portfolios ([#239](https://github.com/SiinXu/stock-pulse-ai/issues/239)).
+Risk-metrics API and Web V1 surface for held portfolios ([#239](https://github.com/SiinXu/stock-pulse-ai/issues/239)).
 
 This page documents formulas, assumptions, and honesty rules for
-`GET /api/v1/portfolio/risk-metrics`. A Web Portfolio surface is intentionally
-out of scope for V0 (PortfolioPage is owned by a separate refactor track).
+`GET /api/v1/portfolio/risk-metrics`. V0 established the backend calculation
+contract; the current Web V1 exposes its read-only visualization on Portfolio.
 
 ## Scope
 

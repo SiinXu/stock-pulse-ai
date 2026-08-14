@@ -1,6 +1,6 @@
 # 多标的组合级分析
 
-对**一组标的**做组合层面分析（而非逐个结论堆叠）的后端入口（[#128](https://github.com/SiinXu/stock-pulse-ai/issues/128)）。
+对**一组标的**做组合层面分析（而非逐个结论堆叠）的服务与 Web 入口（[#128](https://github.com/SiinXu/stock-pulse-ai/issues/128)）。
 
 服务将标的列表构造成与现有持仓快照**同构**的合成权重快照，并复用：
 
@@ -43,9 +43,13 @@ POST /api/v1/analysis/portfolio
 
 合成 basket 的 health 将 `cash_ratio` / `pnl` 标为 unavailable；非法 `scenario_id` 返回 HTTP 400。
 
+## Web 入口
+
+打开 `/portfolio?tab=insights&view=basket`。输入最多 20 个代码后可选择是否叠加压力测试；结果按 `ok / partial / unavailable` 显示相关性、集中度、VaR、健康、立场分布与缺数标的。该视图不会触发新的逐股 LLM 分析，也不会把合成 basket 写入真实账户账本。
+
 ## 范围外（后续）
 
-- Web「分析组合 / 自选」按钮与完整报告页
+- 独立的组合长报告与持久化报告历史
 - CLI `--portfolio` 模式
 - 组合级摘要通知模板
 - 将 basket 健康结果写入账户日度健康存储

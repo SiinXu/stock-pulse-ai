@@ -30,6 +30,7 @@ import { DecisionSignalOutcomeRunPanel } from '../../components/decision-signals
 import { DecisionSignalOutcomeStatsCard } from '../../components/decision-signals/DecisionSignalOutcomeStatsCard';
 import { DecisionSignalCalibrationBreakdown } from '../../components/decision-signals/DecisionSignalCalibrationBreakdown';
 import { DecisionSignalProfileCalibration } from '../../components/decision-signals/DecisionSignalProfileCalibration';
+import { DecisionSignalScopeControl } from '../../components/decision-signals/DecisionSignalScopeControl';
 import type {
   DecisionSignalOutcomeStatsResponse,
   DecisionSignalProfileCalibration as DecisionSignalProfileCalibrationData,
@@ -210,6 +211,11 @@ const DecisionSignalCreateDrawerStory = () => {
       />
     </>
   );
+};
+
+const DecisionSignalScopeControlStory = () => {
+  const [scope, setScope] = useState<'all' | 'holdings' | 'watchlist'>('all');
+  return <DecisionSignalScopeControl value={scope} onChange={setScope} />;
 };
 
 const DecisionSignalOutcomeRunPanelStory = () => <DecisionSignalOutcomeRunPanel onCompleted={() => undefined} />;
@@ -921,6 +927,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'timeline-tooltip': TimelineTooltipStory,
   'decision-signal-timeline': DecisionSignalTimelineStory,
   'decision-signal-create-drawer': DecisionSignalCreateDrawerStory,
+  'decision-signal-scope-control': DecisionSignalScopeControlStory,
   'decision-signal-outcome-run-panel': DecisionSignalOutcomeRunPanelStory,
   'decision-signal-outcome-stats-card': DecisionSignalOutcomeStatsCardStory,
   'decision-signal-calibration-breakdown': DecisionSignalCalibrationBreakdownStory,

@@ -56,6 +56,8 @@ const {
   deleteCorporateAction,
   parseCsvImport,
   commitCsvImport,
+  previewFutuImport,
+  commitFutuImport,
   createAccount,
   updateAccount,
   deleteAccount,
@@ -83,6 +85,8 @@ const {
   deleteCorporateAction: vi.fn(),
   parseCsvImport: vi.fn(),
   commitCsvImport: vi.fn(),
+  previewFutuImport: vi.fn(),
+  commitFutuImport: vi.fn(),
   createAccount: vi.fn(),
   updateAccount: vi.fn(),
   deleteAccount: vi.fn(),
@@ -120,6 +124,8 @@ vi.mock('../../api/portfolio', () => ({
     deleteCorporateAction,
     parseCsvImport,
     commitCsvImport,
+    previewFutuImport,
+    commitFutuImport,
     createAccount,
     updateAccount,
     deleteAccount,
@@ -413,6 +419,33 @@ describe('PortfolioPage FX refresh', () => {
       dryRun: true,
       errors: [],
     });
+    previewFutuImport.mockResolvedValue({
+      broker: 'futu',
+      recordCount: 1,
+      skippedCount: 0,
+      errorCount: 0,
+      records: [{
+        tradeDate: '2026-08-06',
+        symbol: 'HK00700',
+        side: 'buy',
+        quantity: 100,
+        price: 520,
+        fee: 0,
+        tax: 0,
+        dedupHash: 'futu-hash',
+      }],
+      errors: [],
+      failedRows: [],
+    });
+    commitFutuImport.mockResolvedValue({
+      accountId: 1,
+      recordCount: 1,
+      insertedCount: 1,
+      duplicateCount: 0,
+      failedCount: 0,
+      dryRun: true,
+      errors: [],
+    });
     createAccount.mockResolvedValue({ id: 1 });
     deleteAccount.mockResolvedValue({ deleted: 1 });
     analyzePosition.mockResolvedValue({
@@ -521,7 +554,7 @@ describe('PortfolioPage FX refresh', () => {
   }
 
   async function openCsvImportWizardAndReachConfirm(file: File) {
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     expect(await screen.findByRole('region', { name: '导入持仓向导' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     expect(screen.getByLabelText('选择 CSV / Excel')).toHaveAttribute('data-control', 'file-input');
@@ -536,6 +569,17 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     expect(screen.getByRole('button', { name: '提交导入' })).toBeInTheDocument();
+  }
+
+  async function openFutuImportWizardAndPreview(asOf = '2026-08-06') {
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
+    const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    fireEvent.click(within(wizard).getByRole('radio', { name: 'Futu OpenD' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.change(within(wizard).getByLabelText('合成成交日期'), { target: { value: asOf } });
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    await waitFor(() => expect(previewFutuImport).toHaveBeenCalledWith(asOf));
+    return wizard;
   }
 
   it('uses the shared page shell and keeps the overview separate from positions', async () => {
@@ -852,7 +896,7 @@ describe('PortfolioPage FX refresh', () => {
     await waitForInitialLoad();
     await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
 
     expect(within(wizard).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
@@ -881,7 +925,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
     await waitForInitialLoad();
 
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     const source = screen.getByLabelText('或粘贴表格文本');
@@ -928,7 +972,7 @@ describe('PortfolioPage FX refresh', () => {
 
     renderPortfolioPage();
     await waitForInitialLoad();
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
     const file = new File(['not-a-real-workbook'], 'trades.xlsx', {
@@ -958,7 +1002,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
     await waitForInitialLoad();
 
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     const file = new File(['bad'], 'bad.csv', { type: 'text/csv' });
@@ -2366,6 +2410,92 @@ describe('PortfolioPage FX refresh', () => {
         dateTo: undefined,
       }));
     });
+  });
+
+  it('requires a Futu preview before commit and blocks duplicate submissions', async () => {
+    const pendingCommit = createDeferred<{
+      accountId: number;
+      recordCount: number;
+      insertedCount: number;
+      duplicateCount: number;
+      failedCount: number;
+      dryRun: boolean;
+      errors: string[];
+    }>();
+    commitFutuImport.mockReturnValueOnce(pendingCommit.promise);
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({ accountId: 1, costMethod: 'fifo', includeRealtime: false }));
+    const wizard = await openFutuImportWizardAndPreview();
+
+    expect(commitFutuImport).not.toHaveBeenCalled();
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    const commitButton = within(wizard).getByRole('button', { name: '提交导入' });
+    expect(commitButton).toBeEnabled();
+    fireEvent.click(commitButton);
+    fireEvent.click(commitButton);
+
+    await waitFor(() => expect(commitFutuImport).toHaveBeenCalledTimes(1));
+    expect(commitFutuImport).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: 1,
+      asOf: '2026-08-06',
+      dryRun: true,
+      operationId: expect.stringMatching(/^portfolio-futu-/),
+    }));
+
+    await act(async () => {
+      pendingCommit.resolve({
+        accountId: 1,
+        recordCount: 1,
+        insertedCount: 1,
+        duplicateCount: 0,
+        failedCount: 0,
+        dryRun: true,
+        errors: [],
+      });
+      await pendingCommit.promise;
+    });
+    expect(await within(wizard).findByText('CSV 预演结果')).toBeInTheDocument();
+  });
+
+  it('keeps an empty Futu preview visible but disables commit', async () => {
+    previewFutuImport.mockResolvedValueOnce({
+      broker: 'futu',
+      recordCount: 0,
+      skippedCount: 0,
+      errorCount: 0,
+      records: [],
+      errors: [],
+      failedRows: [],
+    });
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    const wizard = await openFutuImportWizardAndPreview();
+    expect(await within(wizard).findByText(/没有符合导入条件/)).toBeInTheDocument();
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+
+    expect(within(wizard).getByRole('button', { name: '提交导入' })).toBeDisabled();
+    expect(commitFutuImport).not.toHaveBeenCalled();
+  });
+
+  it('shows a Futu preview failure without retrying or exposing commit', async () => {
+    previewFutuImport.mockRejectedValueOnce(
+      createApiError(createParsedApiError({ title: 'OpenD 不可用', message: '请启动 Futu OpenD' })),
+    );
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    const wizard = await openFutuImportWizardAndPreview();
+    expect(await screen.findByText('OpenD 不可用')).toBeInTheDocument();
+    expect(previewFutuImport).toHaveBeenCalledTimes(1);
+    expect(within(wizard).getByRole('button', { name: '下一步' })).toBeDisabled();
+    expect(commitFutuImport).not.toHaveBeenCalled();
   });
 
   it('reuses a failed CSV commit operation and keeps result mode separate from the checkbox', async () => {

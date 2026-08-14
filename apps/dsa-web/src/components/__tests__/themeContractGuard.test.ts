@@ -26,6 +26,7 @@ const MAX_LEGACY_HOME_PRICE_RAW_HUE_DEFINITIONS = 0;
 const MAX_HARDCODED_HOME_PRICE_CSS_VAR_REFS = 0;
 const MAX_PARALLEL_PRICE_TOKEN_DEFINITIONS = 0;
 const MAX_PACK_FORBIDDEN_OVERRIDES = 0;
+const MAX_COMMON_PAGE_TOKEN_REFS = 0;
 
 function lineOf(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -139,6 +140,23 @@ function findHardcodedHomePriceRefs(sources: Record<string, string>): Finding[] 
   return findings;
 }
 
+function findCommonPageTokenRefs(sources: Record<string, string>): Finding[] {
+  const findings: Finding[] = [];
+  const pattern = /var\(--(?:home|settings|login|chat|backtest)-[\w-]+/g;
+  for (const [file, raw] of Object.entries(sources)) {
+    if (!file.includes('/common/')) continue;
+    const source = maskComments(raw);
+    for (const match of source.matchAll(pattern)) {
+      findings.push({
+        file,
+        line: lineOf(source, match.index ?? 0),
+        token: match[0].slice(4),
+      });
+    }
+  }
+  return findings;
+}
+
 function findMissingPackSelectors(indexCss: string): string[] {
   const source = maskComments(indexCss);
   const missing: string[] = [];
@@ -233,6 +251,12 @@ describe('theme contract guard', () => {
     expect(refs).toEqual([]);
   });
 
+  it('forbids shared common components from depending on page token families', () => {
+    const refs = findCommonPageTokenRefs(productionCssAndTsx);
+    expect(refs.length).toBeLessThanOrEqual(MAX_COMMON_PAGE_TOKEN_REFS);
+    expect(refs).toEqual([]);
+  });
+
   it('wires badge-trend classes to direction tokens', () => {
     expect(indexCss).toMatch(/\.badge-trend-up\s*\{[^}]*var\(--price-up\)/s);
     expect(indexCss).toMatch(/\.badge-trend-down\s*\{[^}]*var\(--price-down\)/s);
@@ -269,5 +293,10 @@ describe('theme contract guard', () => {
 }
 `);
     expect(darkOverride.map(({ token }) => token)).toEqual(['--price-up', '--price-down']);
+
+    const commonPageRefs = findCommonPageTokenRefs({
+      '../../components/common/Example.tsx': "return <div style={{ color: 'var(--login-text)' }} />;",
+    });
+    expect(commonPageRefs.map(({ token }) => token)).toEqual(['--login-text']);
   });
 });

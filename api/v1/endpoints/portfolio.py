@@ -872,11 +872,7 @@ def commit_futu_import(
         description=PORTFOLIO_IDEMPOTENCY_KEY_DESCRIPTION,
     ),
 ) -> PortfolioImportCommitResponse:
-    """Import live Futu positions via the shared trade-record commit path.
-
-    Portfolio Web UI for this action is a follow-up; this endpoint is the backend
-    seam for API clients and future UI wiring.
-    """
+    """Import live Futu positions via the shared trade-record commit path."""
     importer = PortfolioImportService()
     try:
         result = importer.import_futu_positions(

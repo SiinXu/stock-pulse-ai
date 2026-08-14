@@ -26,6 +26,7 @@ type PortfolioWorkspaceTabsProps = {
   language: UiLanguage;
   activeTab: PortfolioTab;
   onTabChange: (tab: PortfolioTab) => void;
+  insightsLabel: string;
   eventType: PortfolioEventType;
   eventLoading: boolean;
   eventPage: number;
@@ -42,6 +43,7 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
   language,
   activeTab,
   onTabChange,
+  insightsLabel,
   eventType,
   eventLoading,
   eventPage,
@@ -62,6 +64,7 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
         { value: 'positions', label: text.positionsTitle },
         { value: 'ledger', label: text.eventLog },
         { value: 'risk', label: text.tabRisk },
+        { value: 'insights', label: insightsLabel },
       ]}
     />
 

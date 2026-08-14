@@ -74,7 +74,7 @@ Idempotency-Key: optional-client-key
 
 OpenD 不可达或配置无效时返回 **503**，`error=futu_opend_unavailable`，并给出可操作错误信息；该请求不会写入任何部分成交。
 
-> **Web UI：** 组合页导入按钮为后续工作。设置页已暴露 OpenD 连接字段；当前可通过 API / 自动化调用导入。
+> **Web UI：** 在组合页选择具体账户，打开“导入持仓”向导并选择 **Futu OpenD**。向导必须先成功预览，才会允许预演或实际提交；空持仓和 OpenD 连接错误不会写入账本。
 
 ## 降级与安全
 

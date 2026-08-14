@@ -150,7 +150,7 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
 
   return (
     <Card
-      variant="bordered"
+      level="interactive"
       padding="md"
       className="text-left"
       data-testid="report-strata"

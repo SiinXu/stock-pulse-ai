@@ -143,7 +143,7 @@ describe('Alert', () => {
   });
 });
 
-describe('legacy surface and state adapters', () => {
+describe('surface and state adapters', () => {
   it('maps existing components onto the authoritative contracts', () => {
     const { rerender } = render(
       <Card data-testid="card">Card content</Card>,
@@ -151,11 +151,7 @@ describe('legacy surface and state adapters', () => {
 
     expect(screen.getByTestId('card')).toHaveAttribute('data-surface-level', 'section');
 
-    rerender(<Card data-testid="card" variant="bordered">Card content</Card>);
-    expect(screen.getByTestId('card')).toHaveAttribute('data-surface-level', 'interactive');
-    expect(screen.getByTestId('card')).not.toHaveClass('terminal-card', 'gradient-border-card');
-
-    rerender(<Card data-testid="card" variant="gradient">Card content</Card>);
+    rerender(<Card data-testid="card" level="interactive">Card content</Card>);
     expect(screen.getByTestId('card')).toHaveAttribute('data-surface-level', 'interactive');
     expect(screen.getByTestId('card')).not.toHaveClass('terminal-card', 'gradient-border-card');
 

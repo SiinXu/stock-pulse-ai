@@ -92,7 +92,7 @@ describe('settingsInformationArchitecture', () => {
     expect(viewLabel('system_security', 'extensions', 'en')).toBe('Extensions');
     expect(viewLabel('system_security', 'extensions', 'zh')).toBe('已加载扩展');
     expect(getDefaultView('system_security')).toBe('runtime');
-    expect(getSectionViews('advanced').map((view) => view.id)).toEqual(['raw_config', 'diagnostics', 'backup']);
+    expect(getSectionViews('advanced').map((view) => view.id)).toEqual(['raw_config', 'diagnostics', 'capabilities', 'backup']);
     expect(getDefaultView('advanced')).toBe('raw_config');
   });
 
@@ -135,7 +135,7 @@ describe('settingsInformationArchitecture', () => {
     expect(sectionViewToLegacy('ai_models', 'connections')).toEqual({ category: 'ai_model', sub: null });
     // Top-level Advanced renders its own aggregated card; the legacy mapping
     // must never resurrect a providers sub.
-    for (const view of ['raw_config', 'diagnostics', 'backup']) {
+    for (const view of ['raw_config', 'diagnostics', 'capabilities', 'backup']) {
       expect(sectionViewToLegacy('advanced', view)).toEqual({ category: 'ai_model', sub: null });
     }
     expect(sectionViewToLegacy('notifications', 'channels')).toEqual({ category: 'notification', sub: 'channels' });

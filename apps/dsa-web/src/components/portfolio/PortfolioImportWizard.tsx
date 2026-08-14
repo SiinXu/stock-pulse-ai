@@ -11,6 +11,7 @@ import type {
   PortfolioImportCommitResponse,
   PortfolioImportFailedRow,
   PortfolioImportParseResponse,
+  PortfolioImportSource,
   PortfolioImportTradeItem,
 } from '../../types/portfolio';
 import {
@@ -22,6 +23,7 @@ import {
 } from './portfolioImportFailedRows';
 import { formatUiText } from '../../i18n/uiText';
 import type { UiLanguage } from '../../i18n/uiText';
+import { PORTFOLIO_FUTU_IMPORT_TEXT } from '../../locales/portfolioFutuImport';
 import {
   ApiErrorAlert,
   Button,
@@ -32,7 +34,9 @@ import {
   FileInput,
   IconButton,
   InlineAlert,
+  Input,
   PageHeader,
+  SegmentedControl,
   Select,
   StickyActionBar,
   Textarea,
@@ -54,6 +58,8 @@ type PortfolioImportWizardProps = {
   fileText: PortfolioFileText;
   language: UiLanguage;
   writableAccountId: number | undefined;
+  importSource: PortfolioImportSource;
+  setImportSource: (source: PortfolioImportSource) => void;
   brokers: PortfolioImportBrokerItem[];
   selectedBroker: string;
   setSelectedBroker: (broker: string) => void;
@@ -61,17 +67,19 @@ type PortfolioImportWizardProps = {
   csvFile: File | null;
   setCsvFile: (file: File | null) => void;
   csvInputRef: React.RefObject<HTMLInputElement | null>;
-  csvDryRun: boolean;
-  setCsvDryRun: (value: boolean) => void;
-  csvParsing: boolean;
-  csvCommitting: boolean;
-  csvError: ParsedApiError | null;
-  setCsvError: (error: ParsedApiError | null) => void;
-  csvParseResult: PortfolioImportParseResponse | null;
-  setCsvParseResult: (result: PortfolioImportParseResponse | null) => void;
-  csvCommitResult: PortfolioImportCommitResponse | null;
-  setCsvCommitResult: (result: PortfolioImportCommitResponse | null) => void;
-  onParse: (file?: File) => Promise<void> | void;
+  futuAsOf: string;
+  setFutuAsOf: (value: string) => void;
+  importDryRun: boolean;
+  setImportDryRun: (value: boolean) => void;
+  importParsing: boolean;
+  importCommitting: boolean;
+  importError: ParsedApiError | null;
+  setImportError: (error: ParsedApiError | null) => void;
+  importParseResult: PortfolioImportParseResponse | null;
+  setImportParseResult: (result: PortfolioImportParseResponse | null) => void;
+  importCommitResult: PortfolioImportCommitResponse | null;
+  setImportCommitResult: (result: PortfolioImportCommitResponse | null) => void;
+  onPreview: (file?: File) => Promise<void> | void;
   onCommit: () => Promise<void> | void;
   onClose: () => void;
   commonCancelLabel: string;
@@ -87,6 +95,8 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
   fileText,
   language,
   writableAccountId,
+  importSource,
+  setImportSource,
   brokers,
   selectedBroker,
   setSelectedBroker,
@@ -94,17 +104,19 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
   csvFile,
   setCsvFile,
   csvInputRef,
-  csvDryRun,
-  setCsvDryRun,
-  csvParsing,
-  csvCommitting,
-  csvError,
-  setCsvError,
-  csvParseResult,
-  setCsvParseResult,
-  csvCommitResult,
-  setCsvCommitResult,
-  onParse,
+  futuAsOf,
+  setFutuAsOf,
+  importDryRun,
+  setImportDryRun,
+  importParsing,
+  importCommitting,
+  importError,
+  setImportError,
+  importParseResult,
+  setImportParseResult,
+  importCommitResult,
+  setImportCommitResult,
+  onPreview,
   onCommit,
   onClose,
   commonCancelLabel,
@@ -112,12 +124,13 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
 }) => {
   const [step, setStep] = useState<ImportWizardStep>('format');
   const [pasteText, setPasteText] = useState('');
-  const busy = csvParsing || csvCommitting;
+  const futuText = PORTFOLIO_FUTU_IMPORT_TEXT[language];
+  const busy = importParsing || importCommitting;
 
   const stepIndex = IMPORT_WIZARD_STEPS.indexOf(step);
   const stepLabels: Record<ImportWizardStep, string> = {
     format: text.importWizardStepFormat,
-    upload: text.importWizardStepUpload,
+    upload: importSource === 'futu' ? futuText.previewStep : text.importWizardStepUpload,
     mapping: text.importWizardStepMapping,
     validate: text.importWizardStepValidate,
     confirm: text.importWizardStepConfirm,
@@ -157,10 +170,10 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
   ], [text.code, text.quantity, text.side, text.tradeDate, text.tradePrice]);
 
   const failedRows = useMemo<PortfolioImportFailedRow[]>(
-    () => (csvParseResult?.failedRows && csvParseResult.failedRows.length > 0
-      ? csvParseResult.failedRows
+    () => (importParseResult?.failedRows && importParseResult.failedRows.length > 0
+      ? importParseResult.failedRows
       : []),
-    [csvParseResult],
+    [importParseResult],
   );
 
   const failedRowColumns = useMemo<DataTableColumn<PortfolioImportFailedRow>[]>(() => [
@@ -187,17 +200,26 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
     text.importWizardFailedRowReason,
   ]);
 
-  const canAdvanceFromFormat = Boolean(selectedBroker) && brokers.length > 0;
-  const canAdvanceFromUpload = Boolean(csvFile) || pasteText.trim().length > 0;
+  const canAdvanceFromFormat = importSource === 'futu'
+    || (Boolean(selectedBroker) && brokers.length > 0);
+  const canAdvanceFromUpload = importSource === 'futu'
+    || Boolean(csvFile)
+    || pasteText.trim().length > 0;
   const hasParseErrors = Boolean(
-    csvParseResult
-    && (csvParseResult.errorCount > 0 || failedRows.length > 0),
+    importParseResult
+    && (importParseResult.errorCount > 0 || failedRows.length > 0),
   );
   const hasPartialCommit = Boolean(
-    csvCommitResult
-    && !csvCommitResult.dryRun
-    && csvCommitResult.failedCount > 0
-    && csvCommitResult.insertedCount > 0,
+    importCommitResult
+    && !importCommitResult.dryRun
+    && importCommitResult.failedCount > 0
+    && importCommitResult.insertedCount > 0,
+  );
+  const canCommitImport = Boolean(
+    writableAccountId
+    && importParseResult
+    && (importSource === 'file' || importParseResult.recordCount > 0)
+    && (importSource === 'futu' || (selectedBroker && csvFile)),
   );
 
   const downloadFailedRows = () => {
@@ -216,19 +238,24 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
     }
     if (step === 'upload') {
       if (!canAdvanceFromUpload) return;
+      if (importSource === 'futu') {
+        setStep('mapping');
+        void onPreview();
+        return;
+      }
       let fileToParse = csvFile;
       if (!fileToParse && pasteText.trim()) {
         fileToParse = buildPastedCsvFile(pasteText.trim());
         setCsvFile(fileToParse);
-        setCsvParseResult(null);
-        setCsvCommitResult(null);
+        setImportParseResult(null);
+        setImportCommitResult(null);
       }
       setStep('mapping');
-      if (fileToParse) void onParse(fileToParse);
+      if (fileToParse) void onPreview(fileToParse);
       return;
     }
     if (step === 'mapping') {
-      if (!csvParseResult) return;
+      if (!importParseResult) return;
       setStep('validate');
       return;
     }
@@ -248,8 +275,8 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
 
   const handleFileChange = (file: File | null) => {
     setCsvFile(file);
-    setCsvParseResult(null);
-    setCsvCommitResult(null);
+    setImportParseResult(null);
+    setImportCommitResult(null);
     if (file) setPasteText('');
   };
 
@@ -257,24 +284,29 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
     setPasteText(value);
     if (value.trim()) {
       setCsvFile(buildPastedCsvFile(value));
-      setCsvParseResult(null);
-      setCsvCommitResult(null);
+      setImportParseResult(null);
+      setImportCommitResult(null);
       if (csvInputRef.current) csvInputRef.current.value = '';
     } else if (!csvInputRef.current?.files?.length) {
       setCsvFile(null);
-      setCsvParseResult(null);
-      setCsvCommitResult(null);
+      setImportParseResult(null);
+      setImportCommitResult(null);
     }
   };
 
   const handleReparse = async () => {
+    if (importSource === 'futu') {
+      setImportCommitResult(null);
+      await onPreview();
+      return;
+    }
     let fileToParse = csvFile;
     if (!fileToParse && pasteText.trim()) {
       fileToParse = buildPastedCsvFile(pasteText.trim());
       setCsvFile(fileToParse);
     }
-    setCsvCommitResult(null);
-    await onParse(fileToParse ?? undefined);
+    setImportCommitResult(null);
+    await onPreview(fileToParse ?? undefined);
   };
 
   return (
@@ -328,32 +360,63 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
         aria-busy={busy}
         className="m-0 min-w-0 space-y-3 border-0 p-0"
       >
-        {brokerLoadWarning ? (
+        {importSource === 'file' && brokerLoadWarning ? (
           <InlineAlert variant="warning" size="compact" message={brokerLoadWarning} />
         ) : null}
 
         {step === 'format' ? (
           <Card padding="md" className="space-y-3">
-            <p className="text-sm text-secondary-text">{text.importWizardFormatHelp}</p>
-            <Select
-              label={text.broker}
-              value={selectedBroker}
-              onChange={(value) => {
-                setSelectedBroker(value);
-                setCsvCommitResult(null);
-                setCsvParseResult(null);
-              }}
-              disabled={busy || brokers.length === 0}
-              options={brokers.map((item) => ({
-                value: item.broker,
-                label: formatBrokerLabel(item.broker, item.displayName, language),
-              }))}
+            <SegmentedControl
+              value={importSource}
+              semantics="single-select"
+              ariaLabel={futuText.sourceLabel}
+              onChange={setImportSource}
+              options={[
+                { value: 'file', label: futuText.fileSource },
+                { value: 'futu', label: futuText.futuSource },
+              ]}
             />
+            <p className="text-sm text-secondary-text">
+              {importSource === 'futu' ? futuText.futuDescription : futuText.fileDescription}
+            </p>
+            {importSource === 'file' ? (
+              <Select
+                label={text.broker}
+                value={selectedBroker}
+                onChange={(value) => {
+                  setSelectedBroker(value);
+                  setImportCommitResult(null);
+                  setImportParseResult(null);
+                }}
+                disabled={busy || brokers.length === 0}
+                options={brokers.map((item) => ({
+                  value: item.broker,
+                  label: formatBrokerLabel(item.broker, item.displayName, language),
+                }))}
+              />
+            ) : null}
           </Card>
         ) : null}
 
         {step === 'upload' ? (
           <Card padding="md" className="space-y-3">
+            {importSource === 'futu' ? (
+              <>
+                <p className="text-sm text-secondary-text">{futuText.futuDescription}</p>
+                <Input
+                  type="date"
+                  label={futuText.futuAsOf}
+                  hint={futuText.futuAsOfHint}
+                  value={futuAsOf}
+                  onChange={(event) => {
+                    setFutuAsOf(event.target.value);
+                    setImportParseResult(null);
+                    setImportCommitResult(null);
+                  }}
+                />
+              </>
+            ) : (
+              <>
             <div className="grid gap-1">
               <span className="block text-xs text-muted-text">{text.csvFile}</span>
               <Button
@@ -405,42 +468,48 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
               rows={8}
               className="font-mono text-xs"
             />
+              </>
+            )}
           </Card>
         ) : null}
 
         {step === 'mapping' ? (
           <Card padding="md" className="space-y-3">
-            <p className="text-sm text-secondary-text">{text.importWizardMappingHelp}</p>
+            <p className="text-sm text-secondary-text">
+              {importSource === 'futu' ? futuText.futuDescription : text.importWizardMappingHelp}
+            </p>
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="secondary"
                 size="comfortable"
-                disabled={!selectedBroker || (!csvFile && !pasteText.trim()) || csvCommitting}
-                isLoading={csvParsing}
-                loadingText={text.parsing}
+                disabled={importSource === 'file'
+                  ? (!selectedBroker || (!csvFile && !pasteText.trim()) || importCommitting)
+                  : importCommitting}
+                isLoading={importParsing}
+                loadingText={importSource === 'futu' ? futuText.previewing : text.parsing}
                 onClick={() => void handleReparse()}
               >
-                {text.parseFile}
+                {importSource === 'futu' ? futuText.preview : text.parseFile}
               </Button>
             </div>
-            {csvParseResult ? (
+            {importParseResult ? (
               <>
                 <InlineAlert
-                  variant={getCsvParseVariant(csvParseResult)}
+                  variant={getCsvParseVariant(importParseResult)}
                   size="compact"
-                  title={text.csvParseResult}
+                  title={importSource === 'futu' ? futuText.previewResult : text.csvParseResult}
                   message={formatUiText(text.csvParseSummary, {
-                    valid: csvParseResult.recordCount,
-                    skipped: csvParseResult.skippedCount,
-                    errors: csvParseResult.errorCount,
+                    valid: importParseResult.recordCount,
+                    skipped: importParseResult.skippedCount,
+                    errors: importParseResult.errorCount,
                   })}
                 />
-                {csvParseResult.records.length > 0 ? (
+                {importParseResult.records.length > 0 ? (
                   <DataTable<PortfolioImportTradeItem>
                     caption={text.importWizardMappingTitle}
                     columns={mappingColumns}
-                    rows={csvParseResult.records.slice(0, 50)}
+                    rows={importParseResult.records.slice(0, 50)}
                     getRowKey={(row, index) => `${row.dedupHash}-${index}`}
                     emptyState={{
                       title: text.importWizardMappingEmpty,
@@ -452,7 +521,7 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
                   <InlineAlert
                     variant="warning"
                     size="compact"
-                    message={text.importWizardMappingEmpty}
+                    message={importSource === 'futu' ? futuText.previewEmpty : text.importWizardMappingEmpty}
                   />
                 )}
               </>
@@ -460,7 +529,7 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
               <InlineAlert
                 variant="info"
                 size="compact"
-                message={text.importWizardMappingEmpty}
+                message={importSource === 'futu' ? futuText.previewRequired : text.importWizardMappingEmpty}
               />
             )}
           </Card>
@@ -469,19 +538,19 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
         {step === 'validate' ? (
           <Card padding="md" className="space-y-3">
             <p className="text-sm text-secondary-text">{text.importWizardValidateHelp}</p>
-            {csvParseResult ? (
+            {importParseResult ? (
               <InlineAlert
-                variant={getCsvParseVariant(csvParseResult)}
+                variant={getCsvParseVariant(importParseResult)}
                 size="compact"
-                title={text.csvParseResult}
+                title={importSource === 'futu' ? futuText.previewResult : text.csvParseResult}
                 message={formatUiText(text.csvParseSummary, {
-                  valid: csvParseResult.recordCount,
-                  skipped: csvParseResult.skippedCount,
-                  errors: csvParseResult.errorCount,
+                  valid: importParseResult.recordCount,
+                  skipped: importParseResult.skippedCount,
+                  errors: importParseResult.errorCount,
                 })}
               />
             ) : null}
-            {hasParseErrors && csvParseResult ? (
+            {hasParseErrors && importParseResult ? (
               <div className="space-y-2">
                 <h3 className="text-sm font-semibold text-foreground">{text.importWizardRowErrors}</h3>
                 {failedRows.length > 0 ? (
@@ -495,9 +564,9 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
                     minWidth="wide"
                   />
                 ) : null}
-                {csvParseResult.errors.length > 0 ? (
+                {importParseResult.errors.length > 0 ? (
                   <ul className="max-h-48 list-disc space-y-1 overflow-auto pl-5 text-xs text-secondary-text">
-                    {csvParseResult.errors.map((error) => (
+                    {importParseResult.errors.map((error) => (
                       <li key={error}>{error}</li>
                     ))}
                   </ul>
@@ -528,6 +597,12 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
                   </Button>
                 </div>
               </div>
+            ) : importSource === 'futu' && importParseResult?.recordCount === 0 ? (
+              <InlineAlert
+                variant="warning"
+                size="compact"
+                message={futuText.previewEmpty}
+              />
             ) : (
               <InlineAlert
                 variant="success"
@@ -544,11 +619,18 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
             {!writableAccountId ? (
               <InlineAlert variant="warning" size="compact" message={text.selectAccountWrite} />
             ) : null}
+            {!importParseResult || (importSource === 'futu' && importParseResult.recordCount <= 0) ? (
+              <InlineAlert
+                variant="warning"
+                size="compact"
+                message={importSource === 'futu' ? futuText.previewRequired : text.importWizardMappingEmpty}
+              />
+            ) : null}
             <Checkbox
-              id="csv-dry-run"
-              checked={csvDryRun}
+              id="import-dry-run"
+              checked={importDryRun}
               onChange={(event) => {
-                setCsvDryRun(event.target.checked);
+                setImportDryRun(event.target.checked);
               }}
               containerClassName="min-h-11 text-xs text-secondary"
               label={<span className="text-xs font-normal text-secondary-text">{text.dryRun}</span>}
@@ -557,33 +639,33 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
               type="button"
               variant="secondary"
               size="comfortable"
-              disabled={!selectedBroker || !csvFile || !writableAccountId || csvParsing}
-              isLoading={csvCommitting}
+              disabled={!canCommitImport || importParsing}
+              isLoading={importCommitting}
               loadingText={text.submitting}
               onClick={() => void onCommit()}
             >
               {text.commitImport}
             </Button>
-            {csvCommitResult ? (
+            {importCommitResult ? (
               <>
                 <InlineAlert
-                  variant={getCsvCommitVariant(csvCommitResult, csvCommitResult.dryRun)}
+                  variant={getCsvCommitVariant(importCommitResult, importCommitResult.dryRun)}
                   size="compact"
                   title={
                     hasPartialCommit
                       ? text.importWizardPartialTitle
-                      : (csvCommitResult.dryRun ? text.csvDryResult : text.csvCommitResult)
+                      : (importCommitResult.dryRun ? text.csvDryResult : text.csvCommitResult)
                   }
                   message={formatUiText(text.csvCommitSummary, {
-                    mode: csvCommitResult.dryRun ? text.dryCheck : text.actualWrite,
-                    inserted: csvCommitResult.insertedCount,
-                    duplicates: csvCommitResult.duplicateCount,
-                    failed: csvCommitResult.failedCount,
+                    mode: importCommitResult.dryRun ? text.dryCheck : text.actualWrite,
+                    inserted: importCommitResult.insertedCount,
+                    duplicates: importCommitResult.duplicateCount,
+                    failed: importCommitResult.failedCount,
                   })}
                 />
-                {csvCommitResult.errors.length > 0 ? (
+                {importCommitResult.errors.length > 0 ? (
                   <ul className="max-h-48 list-disc space-y-1 overflow-auto pl-5 text-xs text-secondary-text">
-                    {csvCommitResult.errors.map((error) => (
+                    {importCommitResult.errors.map((error) => (
                       <li key={error}>{error}</li>
                     ))}
                   </ul>
@@ -610,8 +692,8 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
           </Card>
         ) : null}
 
-        {csvError ? (
-          <ApiErrorAlert error={csvError} onDismiss={() => setCsvError(null)} />
+        {importError ? (
+          <ApiErrorAlert error={importError} onDismiss={() => setImportError(null)} />
         ) : null}
       </fieldset>
 
@@ -634,10 +716,10 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
               busy
               || (step === 'format' && !canAdvanceFromFormat)
               || (step === 'upload' && !canAdvanceFromUpload)
-              || (step === 'mapping' && !csvParseResult)
+              || (step === 'mapping' && !importParseResult)
             }
-            isLoading={step === 'mapping' && csvParsing}
-            loadingText={text.parsing}
+            isLoading={step === 'mapping' && importParsing}
+            loadingText={importSource === 'futu' ? futuText.previewing : text.parsing}
             onClick={goNext}
           >
             {text.importWizardNext}

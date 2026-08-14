@@ -16,7 +16,26 @@ import {
 import { AlertTriggerHistory } from './AlertTriggerHistory';
 import EventAlertsDiscoveryEntry from './EventAlertsDiscoveryEntry';
 import { useAlertsWorkspaceUrlState } from './useAlertsWorkspaceUrlState';
-import { ApiErrorAlert, AppPage, Button, Card, DataTable, type DataTableColumn, InlineAlert, Loading, Modal, PageHeader, Pagination, Select, TabPanel, Tabs, Toolbar } from '../common';
+import {
+  ApiErrorAlert,
+  AppPage,
+  Button,
+  Card,
+  DataTable,
+  type DataTableColumn,
+  getTabPanelId,
+  IconButton,
+  InlineAlert,
+  Loading,
+  Modal,
+  PageHeader,
+  Pagination,
+  SegmentedControl,
+  Select,
+  TabPanel,
+  Tabs,
+  Toolbar,
+} from '../common';
 import type {
   AlertNotificationItem,
   AlertRuleCreateRequest,
@@ -724,15 +743,16 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
         onValueChange={(view) => setActiveView(view as AlertsView)}
         aria-label={text.title}
       /> : activeView !== 'rules' ? (
-        <Tabs
+        <SegmentedControl
           id={internalTabsId}
           value={activeView}
-          items={[
-            { id: 'history', label: ALERT_TRIGGER_TEXT[language].title },
-            { id: 'notifications', label: text.notificationAttempts },
+          options={[
+            { value: 'history', label: ALERT_TRIGGER_TEXT[language].title },
+            { value: 'notifications', label: text.notificationAttempts },
           ]}
-          onValueChange={(view) => setActiveView(view as AlertsView)}
-          aria-label={text.notificationAttempts}
+          onChange={(view) => setActiveView(view as AlertsView)}
+          ariaLabel={t('decisionSignals.tab.history')}
+          getPanelId={(view) => getTabPanelId(internalTabsId, view)}
         />
       ) : null}
 
@@ -810,7 +830,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
           className="space-y-4"
         >
           {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
-          <Card title={text.notificationAttempts} subtitle={text.notificationResults} variant="bordered" padding="md">
+          <Card title={text.notificationAttempts} description={text.notificationResults} level="interactive" padding="md">
             <Toolbar
               aria-label={text.notificationAttempts}
               className="mb-3"
@@ -871,17 +891,16 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
                       })}
                     </span>
                   ) : null}
-                  <Button
+                  <IconButton
                     type="button"
                     size="default"
-                    variant="secondary"
+                    variant="ghost"
+                    aria-label={controlsText.refresh}
                     onClick={() => void loadNotifications(notificationsPage)}
                     isLoading={notificationsLoading}
-                    loadingText={text.loadingNotifications}
                   >
-                    <RefreshCw className="h-4 w-4" aria-hidden="true" />
-                    {controlsText.refresh}
-                  </Button>
+                    <RefreshCw aria-hidden="true" />
+                  </IconButton>
                 </>
               )}
             />

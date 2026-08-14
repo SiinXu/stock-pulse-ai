@@ -3,8 +3,8 @@
 The portfolio stress-test API provides read-only deterministic factor shocks
 for [#158](https://github.com/SiinXu/stock-pulse-ai/issues/158), with related
 portfolio-risk context from [#210](https://github.com/SiinXu/stock-pulse-ai/issues/210).
-Historical replay, Monte Carlo simulation, full instrument revaluation, and Web
-visualization remain out of scope.
+Historical replay, Monte Carlo simulation, and full instrument revaluation remain
+out of scope. The Web now exposes the deterministic preset flow.
 
 ## API
 
@@ -18,6 +18,10 @@ POST /api/v1/portfolio/stress-test
 parameterized template and must use `POST` with both `target_sector` and a
 caller-supplied `sector_map`; the service does not fabricate classifications.
 `POST` requires exactly one of `scenario_id` and `custom_shocks`.
+
+## Web entry
+
+Open `/portfolio?tab=insights&view=stress` to run a preset or configure custom market, sector, FX, and rate shocks. Sector shocks accept a target sector and a `symbol -> sector` map. The view shows current and stressed portfolio value, P&L, positions used, top losers/winners, and the explicit `partial / unavailable / empty_portfolio` states with limitations. Per-symbol beta overrides are not exposed in the current Web view; missing beta continues to use the service's disclosed unit-beta fallback.
 
 Shocks are a discriminated union:
 

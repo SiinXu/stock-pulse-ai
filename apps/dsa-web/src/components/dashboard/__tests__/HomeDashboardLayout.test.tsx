@@ -74,7 +74,7 @@ describe('HomeDashboardLayout', () => {
   });
 
   it('surfaces storage write failures in status text and the live announcement', () => {
-    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    const setItem = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
       throw new DOMException('The quota has been exceeded.', 'QuotaExceededError');
     });
     try {

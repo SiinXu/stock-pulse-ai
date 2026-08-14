@@ -53,10 +53,12 @@ describe('LoginPage', () => {
 
     expect(await screen.findByText('两次输入的密码不一致')).toBeInTheDocument();
     expect(login).not.toHaveBeenCalled();
-    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('data-appearance', 'default');
+    expect(screen.getByLabelText('管理员密码')).toHaveAttribute('data-size', 'primary');
     expect(screen.getByLabelText('管理员密码')).toHaveAttribute('name', 'stockpulse-admin-new-password');
     expect(screen.getByLabelText('管理员密码')).toHaveAttribute('autocomplete', 'new-password');
-    expect(screen.getByLabelText('确认密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute('data-appearance', 'default');
+    expect(screen.getByLabelText('确认密码')).toHaveAttribute('data-size', 'primary');
     expect(screen.getByLabelText('确认密码')).toHaveAttribute('name', 'stockpulse-admin-new-password-confirmation');
     expect(screen.getByLabelText('确认密码')).toHaveAttribute('autocomplete', 'new-password');
   });
@@ -74,7 +76,8 @@ describe('LoginPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '授权进入工作台' }));
 
     await waitFor(() => expect(navigate).toHaveBeenCalledWith(APP_ROUTE_PATHS.settings, { replace: true }));
-    expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-appearance', 'login');
+    expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-appearance', 'default');
+    expect(screen.getByLabelText('登录密码')).toHaveAttribute('data-size', 'primary');
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('name', 'stockpulse-admin-current-password');
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('autocomplete', 'current-password');
   });

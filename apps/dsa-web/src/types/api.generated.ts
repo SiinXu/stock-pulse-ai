@@ -2719,9 +2719,6 @@ export interface paths {
         /**
          * Import Futu OpenD real positions into a portfolio account
          * @description Import live Futu positions via the shared trade-record commit path.
-         *
-         *     Portfolio Web UI for this action is a follow-up; this endpoint is the backend
-         *     seam for API clients and future UI wiring.
          */
         post: operations["commit_futu_import_api_v1_portfolio_imports_futu_post"];
         delete?: never;

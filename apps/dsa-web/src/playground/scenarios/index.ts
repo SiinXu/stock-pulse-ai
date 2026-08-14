@@ -9,6 +9,7 @@ import { SETTINGS_SCENARIOS } from './settingsScenarios';
 import { SKILL_OUTCOME_SCENARIOS } from './skillOutcomeScenarios';
 import { WORKSPACE_SCENARIOS } from './workspaceScenarios';
 import { SCREENING_SCENARIOS } from './screeningScenarios';
+import { REPORT_COMPONENT_SCENARIOS } from './reportComponentScenarios';
 
 type ChartScenarioId = 'kline-chart' | 'risk-heatmap';
 type ValuationScenarioId = 'dcf-sensitivity-panel' | 'peer-valuation-canvas';
@@ -108,6 +109,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...SKILL_OUTCOME_SCENARIOS,
   ...WORKSPACE_SCENARIOS,
   ...SETTINGS_SCENARIOS,
+  ...REPORT_COMPONENT_SCENARIOS,
   ...SCREENING_SCENARIOS,
   ...LAZY_CHART_SCENARIOS,
   ...LAZY_VALUATION_SCENARIOS,

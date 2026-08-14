@@ -164,7 +164,7 @@ describe('CommandPalette', () => {
     expect(screen.getByRole('option', { name: '今日' })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.keyDown(input, { key: 'ArrowUp' });
-    expect(screen.getByRole('option', { name: '再评估与统计' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: '复盘' })).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onNavigate).toHaveBeenCalledWith('/signals?tab=review');
   });
@@ -249,6 +249,16 @@ describe('CommandPalette', () => {
 
     fireEvent.change(input, { target: { value: '模型来源' } });
     expect(screen.getByRole('group', { name: '设置' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('option', { name: /AI 与模型 · 模型来源/ }));
+    expect(onNavigate).toHaveBeenCalledWith('/settings?section=ai_models&view=connections');
+  });
+
+  it('finds model sources using cloud and API terminology', async () => {
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    fireEvent.change(input, { target: { value: '云端模型' } });
     fireEvent.click(screen.getByRole('option', { name: /AI 与模型 · 模型来源/ }));
     expect(onNavigate).toHaveBeenCalledWith('/settings?section=ai_models&view=connections');
   });

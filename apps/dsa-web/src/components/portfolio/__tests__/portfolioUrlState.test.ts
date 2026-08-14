@@ -13,6 +13,7 @@ describe('portfolioUrlSchema', () => {
     expect(readParams(portfolioUrlSchema, '')).toEqual({
       account: null,
       tab: 'positions',
+      view: 'health',
       selected: null,
       page: 1,
     });
@@ -25,6 +26,7 @@ describe('portfolioUrlSchema', () => {
     )).toEqual({
       account: 7,
       tab: 'ledger',
+      view: 'health',
       selected: '7-AAPL-us',
       page: 3,
     });
@@ -34,8 +36,24 @@ describe('portfolioUrlSchema', () => {
     expect(readParams(portfolioUrlSchema, '?account=0&tab=admin&page=abc')).toEqual({
       account: null,
       tab: 'positions',
+      view: 'health',
       selected: null,
       page: 1,
+    });
+  });
+
+  it('round-trips the insights tab and nested view for refresh and Back restoration', () => {
+    const written = writeParams(
+      portfolioUrlSchema,
+      { tab: 'insights', view: 'stress' },
+      { search: '?account=7' },
+    );
+    expect(written.search).toContain('tab=insights');
+    expect(written.search).toContain('view=stress');
+    expect(readParams(portfolioUrlSchema, written.search)).toMatchObject({
+      account: 7,
+      tab: 'insights',
+      view: 'stress',
     });
   });
 
@@ -63,8 +81,8 @@ describe('portfolioUrlSchema', () => {
   it('omits default tab and page from the URL', () => {
     const result = writeParams(
       portfolioUrlSchema,
-      { tab: 'positions', page: 1, account: null, selected: null },
-      { search: '?tab=risk&page=4&account=9&selected=x' },
+      { tab: 'positions', view: 'health', page: 1, account: null, selected: null },
+      { search: '?tab=insights&view=stress&page=4&account=9&selected=x' },
     );
     expect(result.search).toBe('');
   });

@@ -1,6 +1,6 @@
-# Portfolio Health Score (V2 backend contract)
+# Portfolio Health Score (V2)
 
-This backend-only feature provides a deterministic portfolio structure score and actionable insights. It references [#151](https://github.com/SiinXu/stock-pulse-ai/issues/151) but does not close it: a visible Portfolio Health page, observable daily update path, and trend consumer remain unimplemented.
+This feature provides a deterministic portfolio structure score and actionable insights. The Web Portfolio > Insights > Health view now reads stored snapshots and provides an explicit refresh action; a trend consumer remains unimplemented.
 
 The score is a structural metric, not investment advice. An LLM may rewrite insight text only; it cannot change scores, bands, thresholds, severity, symbols, or evidence.
 
@@ -12,6 +12,14 @@ The score is a structural metric, not investment advice. An LLM may rewrite insi
 | `POST` | `/api/v1/portfolio/health/refresh` | Explicitly compute; `persist=true` performs one atomic health upsert |
 
 Both accept `account_id`, `as_of`, and `cost_method=fifo|avg`. POST also accepts `persist`; `persist=false` is a true preview with zero writes.
+
+## Web interaction
+
+- Empty and unavailable states in the Home health widget open `/portfolio?tab=insights&view=health`, where the refresh action actually exists.
+- The Portfolio Health view reads the stored snapshot for the current account and cost method. POST is called only after the user selects “Refresh health score”, with `persist=true` for today’s snapshot.
+- A read 404 becomes “not generated”; `partial` shows a non-comparable diagnostic score and coverage; `unavailable`, empty portfolio, and request failures remain distinct and never become zero scores.
+- The refresh action is disabled while active and duplicate submissions are rejected. Changing account or cost method reloads the matching snapshot.
+- The Web API boundary uses generated OpenAPI anchors plus Zod validation. Non-finite scores and response shape drift surface as validation errors.
 
 Refresh calls `PortfolioService.preview_portfolio_snapshot()` once, then passes that exact immutable mapping to `PortfolioRiskMetricsService`. It does not materialize portfolio position/lot/daily caches. GET returns 404 when no stored result exists. If the migration is absent, storage access returns the sanitized `portfolio_health_migration_required` 503 and does not create tables at request time.
 

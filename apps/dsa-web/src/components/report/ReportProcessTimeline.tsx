@@ -40,7 +40,7 @@ export const ReportProcessTimeline: React.FC<ReportProcessTimelineProps> = ({
   }
 
   return (
-    <Card variant="bordered" padding="none" className="text-left">
+    <Card level="interactive" padding="none" className="text-left">
       <details data-testid="report-process-timeline" className="group">
         <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
           <div className="flex min-w-0 items-center gap-3">

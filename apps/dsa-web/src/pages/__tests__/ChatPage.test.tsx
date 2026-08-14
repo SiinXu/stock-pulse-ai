@@ -275,7 +275,7 @@ function renderChat(ui: React.ReactElement, initialEntries: string[] = ['/chat']
 
 
 describe('ChatPage', () => {
-  it('links an unavailable Agent directly to task routing', async () => {
+  it('links an unavailable Agent directly to model sources', async () => {
     mockGetSetupStatus.mockResolvedValue({
       isComplete: false,
       readyForSmoke: true,
@@ -297,7 +297,7 @@ describe('ChatPage', () => {
     const settingsLink = await screen.findByRole('link', { name: '前往设置' });
     expect(settingsLink).toHaveAttribute(
       'href',
-      '/settings?section=ai_models&view=task_routing',
+      '/settings?section=ai_models&view=connections',
     );
   });
 

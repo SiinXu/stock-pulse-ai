@@ -38,6 +38,7 @@ flowchart TB
   A --> C[Holdings table]
   A --> D[Event ledger: trades/cash/corporate]
   A --> E[CSV import]
+  A --> H[Insights: health/basket/stress/rebalance]
   C --> F[One-click analysis]
   C --> G[AI suggestion or Signal jump]
 ```
@@ -62,6 +63,19 @@ Typical columns: code, qty, cost, last, value, floating P&L, analyze action, opt
 
 - AI cells may load asynchronously; empty when no active signal is normal.  
 - **Analyze** opens a Workbench job—it does not render a full report inside Portfolio.
+
+### Portfolio insights
+
+Open the **Insights** tab or use `/portfolio?tab=insights`. The nested view is stored in the URL so refresh and browser Back/Forward return to the same task; Health, Stress test, and Rebalance also inherit the current account and cost method.
+
+| View | Use | Boundary |
+| --- | --- | --- |
+| Health | Read or explicitly refresh the portfolio health score | `partial / unavailable` remain visible; Home links to this real action |
+| Basket | Analyze 1–20 symbols as a synthetic basket for correlation, concentration, VaR, and existing stances | Does not start new per-symbol LLM runs or write an account |
+| Stress test | Run deterministic preset or custom instantaneous shocks against current holdings | Not historical replay, Monte Carlo, or a trade instruction |
+| Rebalance | Generate read-only weight guidance from risk tolerance and drift | Explicitly refuses insufficient data; never trades or writes the ledger |
+
+Health, stress, and rebalance use the selected account scope. Basket uses the symbols and optional weights entered in that view. Read limitations before relying on any partial result caused by missing history, quotes, or valuations.
 
 ## First bookkeeping (five steps)
 
@@ -97,11 +111,11 @@ Ledger filters by date/code/direction are common. Deletes usually confirm; some 
 
 ## Spreadsheet import
 
-1. Open the import wizard and pick the broker format.  
-2. Upload **CSV or Excel (.xlsx)**, or paste table text.  
+1. Open the import wizard and choose a broker file or **Futu OpenD connection**.
+2. File import accepts **CSV or Excel (.xlsx)** or pasted table text; Futu reads eligible real long-equity positions from the configured OpenD.
 3. Review the mapping preview, then validation: rejected rows show line numbers and reasons.  
 4. Download the **failed-rows CSV** to correct bad data; invalid rows are rejected explicitly and never written silently.  
-5. **Dry-run** first, then commit only when the preview looks right.  
+5. **Dry-run/preview** first, then commit only when the preview looks right. Changing Futu input or the synthetic date invalidates the preview and requires another one.
 6. Re-submit prefers idempotency—avoid double books when the UI says duplicates were skipped.
 
 

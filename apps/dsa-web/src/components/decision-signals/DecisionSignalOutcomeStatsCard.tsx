@@ -46,7 +46,7 @@ export const DecisionSignalOutcomeStatsCard: React.FC<Props> = ({
   return (
     <Card
       title={t('decisionSignals.statsTitle')}
-      subtitle={t('decisionSignals.statsDescription')}
+      description={t('decisionSignals.statsDescription')}
       padding="md"
       headerRight={<Badge variant="default" size="sm">{t('decisionSignals.scopeGlobal')}</Badge>}
     >

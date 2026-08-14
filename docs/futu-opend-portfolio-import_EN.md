@@ -74,7 +74,7 @@ Response shape matches CSV import commit (`inserted_count`, `duplicate_count`, `
 
 When OpenD is unreachable or configuration is invalid, the API returns **503** with `error=futu_opend_unavailable` and an actionable message. No partial trades are written for that request.
 
-> **Web UI:** Portfolio page controls for this endpoint are intentionally a follow-up. Settings expose OpenD connection fields; import can be called via API / automation.
+> **Web UI:** Select a concrete account on the Portfolio page, open **Import positions**, and choose **Futu OpenD**. The wizard requires a successful preview before dry-run or commit; empty positions and OpenD connection failures never write to the ledger.
 
 ## Degradation and safety
 

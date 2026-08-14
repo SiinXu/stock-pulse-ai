@@ -358,7 +358,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
 
   return (
     <div className="space-y-4 animate-fade-in">
-      <Card variant="gradient" padding="md">
+      <Card level="interactive" padding="md">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/12 text-primary">
@@ -392,7 +392,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
           )}
         />
       ) : items.length === 0 ? (
-        <Card variant="bordered" padding="md">
+        <Card level="interactive" padding="md">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-semibold text-foreground">{t('stockTrend.moreEmptyTitle')}</h3>
@@ -425,7 +425,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
             />
           </div>
 
-          <Card variant="bordered" padding="md">
+          <Card level="interactive" padding="md">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-base font-semibold text-foreground">{t('stockTrend.records')}</h3>

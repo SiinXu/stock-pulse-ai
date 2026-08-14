@@ -7,7 +7,6 @@ interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   children: React.ReactNode;
   variant?: BadgeVariant;
   size?: 'sm' | 'md';
-  glow?: boolean;
   className?: string;
   style?: React.CSSProperties;
 }
@@ -24,13 +23,12 @@ const variantStyles: Record<BadgeVariant, string> = {
 };
 
 /**
- * Badge component with multiple variants and optional compatibility elevation.
+ * Badge component with semantic status variants.
  */
 export const Badge: React.FC<BadgeProps> = ({
   children,
   variant = 'default',
   size = 'sm',
-  glow = false,
   className = '',
   style,
   ...rest
@@ -50,7 +48,6 @@ export const Badge: React.FC<BadgeProps> = ({
         'inline-flex items-center gap-1 rounded-full border font-medium tracking-normal backdrop-blur-sm',
         sizeStyles,
         variantStyles[variant],
-        glow && 'shadow-soft-card',
         className,
       )}
     >

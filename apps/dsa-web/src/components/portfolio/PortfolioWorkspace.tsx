@@ -21,6 +21,8 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
 import { PORTFOLIO_FILE_TEXT, PORTFOLIO_TEXT } from '../../locales/portfolio';
+import { PORTFOLIO_FUTU_IMPORT_TEXT } from '../../locales/portfolioFutuImport';
+import { PORTFOLIO_INSIGHTS_TEXT } from '../../locales/portfolioInsights';
 import type { PortfolioAnalysisTaskPanelController } from './PortfolioAnalysisTaskPanel';
 import {
   formatCashDirectionLabel,
@@ -65,10 +67,11 @@ import {
 import { usePortfolioLedgerMutationWorkflow } from '../../hooks/portfolio/usePortfolioLedgerMutationWorkflow';
 import { usePortfolioHoldingSignals } from '../../hooks/portfolio/usePortfolioHoldingSignals';
 import { usePortfolioLedgerEntryForms } from '../../hooks/portfolio/usePortfolioLedgerEntryForms';
-import { usePortfolioCsvImportSession } from '../../hooks/portfolio/usePortfolioCsvImportSession';
+import { usePortfolioImportSession } from '../../hooks/portfolio/usePortfolioImportSession';
 import {
   buildPositionRowKey,
   portfolioUrlSchema,
+  type PortfolioInsightsView,
   type PortfolioTab,
 } from './portfolioUrlState';
 import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
@@ -85,6 +88,7 @@ import { buildPortfolioRiskHeatmapCells } from './buildPortfolioRiskHeatmapCells
 const PortfolioRiskMetricsPanel = lazy(
   () => import('../portfolio-risk/PortfolioRiskMetricsPanel'),
 );
+const PortfolioInsightsPanel = lazy(() => import('../portfolio-insights/PortfolioInsightsPanel'));
 const PortfolioAnalysisTaskPanel = lazy(() => import('./PortfolioAnalysisTaskPanel'));
 const PortfolioImportWizard = lazy(() => import('./PortfolioImportWizard'));
 const PortfolioWorkspaceTabs = lazy(() => import('./PortfolioWorkspaceTabs'));
@@ -99,7 +103,9 @@ const PortfolioWorkspace: React.FC = () => {
     ready: true,
   });
   const text = PORTFOLIO_TEXT[language];
+  const importText = PORTFOLIO_FUTU_IMPORT_TEXT[language];
   const fileText = PORTFOLIO_FILE_TEXT[language];
+  const insightsText = PORTFOLIO_INSIGHTS_TEXT[language];
   const decisionActionLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
 
   // Set page title
@@ -128,6 +134,7 @@ const PortfolioWorkspace: React.FC = () => {
   searchParamsRef.current = searchParams;
   setSearchParamsRef.current = setSearchParams;
   const activeTab = urlState.tab as PortfolioTab;
+  const activeInsightsView = urlState.view as PortfolioInsightsView;
   const selectedPositionKey = urlState.selected;
   const ledgerPageFromUrl = urlState.page ?? 1;
   const [showCreateAccount, setShowCreateAccount] = useState(false);
@@ -218,7 +225,12 @@ const PortfolioWorkspace: React.FC = () => {
     patchPortfolioUrl({
       tab,
       ...(tab === 'ledger' ? {} : { page: 1 }),
+      ...(tab === 'insights' ? {} : { view: 'health' }),
     }, 'replace');
+  }, [patchPortfolioUrl]);
+
+  const setActiveInsightsView = useCallback((view: PortfolioInsightsView) => {
+    patchPortfolioUrl({ view }, 'push');
   }, [patchPortfolioUrl]);
 
   const setSelectedPositionKey = useCallback((key: string | null) => {
@@ -367,7 +379,7 @@ const PortfolioWorkspace: React.FC = () => {
     paperTradeRefreshIncomplete,
     cashSubmitting,
     corpSubmitting,
-    csvCommitting,
+    importCommitting,
     retryPaperTradeRefresh,
   } = mutation;
 
@@ -399,23 +411,26 @@ const PortfolioWorkspace: React.FC = () => {
     handleCorporateSubmit,
   } = ledgerForms;
 
-  const csvSession = usePortfolioCsvImportSession({
+  const importSession = usePortfolioImportSession({
     text,
     writableAccountId,
     setWriteWarning,
     commitCsv: mutation.commitCsv,
+    commitFutu: mutation.commitFutu,
   });
   const {
-    csvModalOpen, setCsvModalOpen,
+    importModalOpen, setImportModalOpen,
+    importSource, setImportSource,
     brokers, selectedBroker, setSelectedBroker,
     csvFile, setCsvFile,
-    csvDryRun, setCsvDryRun,
-    csvParsing, csvError, setCsvError,
-    csvParseResult, setCsvParseResult,
-    csvCommitResult, setCsvCommitResult,
+    futuAsOf, setFutuAsOf,
+    importDryRun, setImportDryRun,
+    importParsing, importError, setImportError,
+    importParseResult, setImportParseResult,
+    importCommitResult, setImportCommitResult,
     brokerLoadWarning, csvInputRef,
-    loadBrokers, handleParseCsv, handleCommitCsv,
-  } = csvSession;
+    loadBrokers, handlePreviewImport, handleCommitImport,
+  } = importSession;
 
   useEffect(() => {
     void loadAccounts();
@@ -874,13 +889,15 @@ const PortfolioWorkspace: React.FC = () => {
 
   return (
     <AppPage className="portfolio-page space-y-4">
-      {csvModalOpen ? (
+      {importModalOpen ? (
         <Suspense fallback={<Loading />}>
           <PortfolioImportWizard
           text={text}
           fileText={fileText}
           language={language}
           writableAccountId={writableAccountId}
+          importSource={importSource}
+          setImportSource={setImportSource}
           brokers={brokers}
           selectedBroker={selectedBroker}
           setSelectedBroker={setSelectedBroker}
@@ -888,21 +905,23 @@ const PortfolioWorkspace: React.FC = () => {
           csvFile={csvFile}
           setCsvFile={setCsvFile}
           csvInputRef={csvInputRef}
-          csvDryRun={csvDryRun}
-          setCsvDryRun={setCsvDryRun}
-          csvParsing={csvParsing}
-          csvCommitting={csvCommitting}
-          csvError={csvError}
-          setCsvError={setCsvError}
-          csvParseResult={csvParseResult}
-          setCsvParseResult={setCsvParseResult}
-          csvCommitResult={csvCommitResult}
-          setCsvCommitResult={setCsvCommitResult}
-          onParse={handleParseCsv}
-          onCommit={handleCommitCsv}
+          futuAsOf={futuAsOf}
+          setFutuAsOf={setFutuAsOf}
+          importDryRun={importDryRun}
+          setImportDryRun={setImportDryRun}
+          importParsing={importParsing}
+          importCommitting={importCommitting}
+          importError={importError}
+          setImportError={setImportError}
+          importParseResult={importParseResult}
+          setImportParseResult={setImportParseResult}
+          importCommitResult={importCommitResult}
+          setImportCommitResult={setImportCommitResult}
+          onPreview={handlePreviewImport}
+          onCommit={handleCommitImport}
           onClose={() => {
-            setCsvError(null);
-            setCsvModalOpen(false);
+            setImportError(null);
+            setImportModalOpen(false);
           }}
           commonCancelLabel={t('common.cancel')}
           commonCloseLabel={t('common.close')}
@@ -1230,19 +1249,19 @@ const PortfolioWorkspace: React.FC = () => {
           </Surface>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Card variant="gradient" padding="md">
+            <Card level="interactive" padding="md">
               <p className="text-sm text-secondary">{text.totalEquity}</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalEquity, snapshot?.currency || 'CNY', language)}</p>
             </Card>
-            <Card variant="gradient" padding="md">
+            <Card level="interactive" padding="md">
               <p className="text-sm text-secondary">{text.totalMarketValue}</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalMarketValue, snapshot?.currency || 'CNY', language)}</p>
             </Card>
-            <Card variant="gradient" padding="md">
+            <Card level="interactive" padding="md">
               <p className="text-sm text-secondary">{text.totalCash}</p>
               <p className="mt-1 text-2xl font-semibold text-foreground">{formatMoney(snapshot?.totalCash, snapshot?.currency || 'CNY', language)}</p>
             </Card>
-            <Card variant="gradient" padding="md">
+            <Card level="interactive" padding="md">
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm text-secondary">{text.fxStatus}</p>
                 <Button
@@ -1312,6 +1331,7 @@ const PortfolioWorkspace: React.FC = () => {
           language={language}
           activeTab={activeTab}
           onTabChange={setActiveTab}
+          insightsLabel={insightsText.tabLabel}
           eventType={eventType}
           eventLoading={eventLoading}
           eventPage={eventPage}
@@ -1388,7 +1408,7 @@ const PortfolioWorkspace: React.FC = () => {
         />
       ) : null}
 
-      {activeTab !== 'ledger' ? (
+      {activeTab !== 'ledger' && activeTab !== 'insights' ? (
       <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3" data-testid="portfolio-tab-risk">
         <Card padding="md">
           <h3 className="text-sm font-semibold text-foreground mb-2">{text.drawdownMonitor}</h3>
@@ -1450,7 +1470,7 @@ const PortfolioWorkspace: React.FC = () => {
       </section>
       ) : null}
 
-      {hasAccounts && activeTab !== 'ledger' ? (
+      {hasAccounts && activeTab !== 'ledger' && activeTab !== 'insights' ? (
         <>
           <Suspense fallback={<Loading />}>
             <PortfolioRiskMetricsPanel
@@ -1466,6 +1486,17 @@ const PortfolioWorkspace: React.FC = () => {
             </Card>
           </section>
         </>
+      ) : null}
+
+      {hasAccounts && activeTab === 'insights' ? (
+        <Suspense fallback={<Loading />}>
+          <PortfolioInsightsPanel
+            view={activeInsightsView}
+            onViewChange={setActiveInsightsView}
+            accountId={queryAccountId}
+            costMethod={costMethod}
+          />
+        </Suspense>
       ) : null}
 
       <div className="flex flex-wrap gap-2">
@@ -1488,7 +1519,7 @@ const PortfolioWorkspace: React.FC = () => {
         )}
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setCashModalOpen(true)} disabled={!writableAccountId}>{text.enterCash}</Button>
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setCorpModalOpen(true)} disabled={!writableAccountId}>{text.enterCorporate}</Button>
-        <Button type="button" variant="secondary" size="comfortable" className="text-xs" onClick={() => setCsvModalOpen(true)}>{text.csvImport}</Button>
+        <Button type="button" variant="secondary" size="comfortable" className="text-xs" onClick={() => setImportModalOpen(true)}>{importText.openImport}</Button>
         <Button type="button" variant="secondary" size="comfortable" onClick={() => setEventModalOpen(true)}>{text.eventLog}</Button>
       </div>
 

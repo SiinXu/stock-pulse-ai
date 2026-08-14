@@ -47,15 +47,6 @@
   --radius: 0.75rem;
   --radius-dot: 9999px;
   --overlay-sheet-footer-toast-offset: 5rem;
-  --settings-switch-on-start: 255 255 127;
-  --settings-switch-on-end: 127 255 127;
-  --settings-switch-off: 234 235 232;
-  --trend-up-border: 221 249 220;
-  --trend-up-bg: 235 255 235;
-  --trend-up-text: 65 184 61;
-  --trend-down-border: 253 216 222;
-  --trend-down-bg: 254 236 239;
-  --trend-down-text: 233 53 83;
   --mask-opaque: #000;
   --elevated: 0 0% 100%;
   --hover: 80 7% 95%;
@@ -69,12 +60,6 @@
   --home-cool-surface-strong: 214 38% 97%;
   --portfolio-control-border: 218 22% 82%;
 
-  --color-cyan: hsl(var(--primary));
-  --color-cyan-dim: hsl(var(--primary) / 0.8);
-  --color-cyan-glow: hsl(var(--primary) / 0.18);
-  --color-purple: 74 5% 42%;
-  --color-purple-dim: 74 5% 34%;
-  --color-purple-glow: hsl(74 5% 42% / 0.14);
   --color-success: 118 50% 42%;
   --color-warning: 50 90% 42%;
   --color-danger: 345 79% 58%;
@@ -82,7 +67,6 @@
   --color-danger-alert-border: 345 79% 58%;
   --color-danger-alert-bg: 345 79% 58%;
   /* Tailwind-compatible accent colors (Light theme) */
-  --color-cyan-400: 118 50% 42%;
   --color-emerald-400: 118 50% 42%;
   --color-red-400: 345 79% 58%;
   --color-amber-400: 50 90% 42%;
@@ -90,18 +74,6 @@
   --success: var(--color-success);
   --warning: var(--color-warning);
   --danger: var(--color-danger);
-
-  /* Sentiment indicator colors (Fear & Greed Index) - Adjustable via CSS */
-  --sentiment-greed: var(--color-cyan);
-  --sentiment-neutral: var(--color-purple);
-  --sentiment-fear: var(--color-danger);
-
-  /* Legacy sentiment effect tokens retained for compatibility. */
-  --glow-spread: 5px;
-  --glow-intensity: 0.1;
-  --sentiment-greed-glow: hsl(var(--sentiment-greed) / var(--glow-intensity));
-  --sentiment-neutral-glow: hsl(var(--sentiment-neutral) / var(--glow-intensity));
-  --sentiment-fear-glow: hsl(var(--sentiment-fear) / var(--glow-intensity));
 
   --bg-base: hsl(var(--background));
   --bg-card: hsl(var(--card));
@@ -133,8 +105,6 @@
 
   /* Compatibility preservation */
   --border-accent: hsl(var(--primary) / 0.7);
-  --border-purple: hsl(var(--foreground) / 0.1);
-  --border-cyan: hsl(var(--primary));
   --text-primary: hsl(var(--foreground));
   --text-secondary-text: hsl(var(--secondary-text));
   --text-muted-text: hsl(var(--muted-text));
@@ -230,7 +200,6 @@
   --home-rail-border: hsl(var(--border));
   --home-rail-bg: linear-gradient(180deg, hsl(var(--neutral-white) / 0.98), hsl(80 7% 97% / 0.98));
   --home-rail-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.04);
-  --home-history-glow: hsl(var(--primary) / 0.14);
   --autocomplete-hover-bg: hsl(var(--primary));
 
   /* Shadows (using HSL format) */
@@ -281,7 +250,6 @@
   --settings-secondary-bg: hsl(80 7% 96% / 0.98);
   --settings-secondary-border-hover: hsl(var(--primary) / 0.42);
   --settings-secondary-bg-hover: hsl(var(--primary) / 0.1);
-  --settings-glow-hover: hsl(var(--primary) / 0.28);
   --settings-skeleton-strong: hsl(80 7% 88% / 0.92);
   --settings-skeleton-soft: hsl(80 7% 93% / 0.96);
   --input-surface-bg: var(--bg-card);
@@ -310,10 +278,6 @@
   --backtest-border-dim: hsl(var(--foreground) / 0.05);
   --backtest-border-subtle: hsl(var(--foreground) / 0.06);
   --backtest-border-light: hsl(var(--foreground) / 0.10);
-  --backtest-border-cyan-soft: hsl(var(--primary) / 0.40);
-  --backtest-bg-cyan-subtle: hsl(var(--primary) / 0.10);
-  --backtest-shadow-cyan-glow: 0 0 8px hsl(var(--primary) / 0.15);
-  --backtest-shadow-cyan-glow-strong: 0 0 4px hsl(var(--primary) / 0.60);
   --backtest-spinner-track: hsl(var(--primary) / 0.20);
   --backtest-spinner-head: hsl(var(--primary));
   --backtest-table-bg: hsl(var(--card) / 0.72);
@@ -322,23 +286,10 @@
   --login-bg-main: hsl(120 7% 97%);
   --login-bg-card: hsl(var(--neutral-white) / 0.86);
   --login-border-card: hsl(80 7% 82% / 0.9);
-  --login-border-input: hsl(80 7% 84% / 0.9);
-  --login-border-focus: hsl(var(--primary) / 0.48);
-  --login-error-text: hsl(var(--destructive));
-  --login-error-bg: hsl(var(--destructive) / 0.1);
-  --login-error-border: hsl(var(--destructive) / 0.2);
   --login-text-primary: hsl(60 3% 8%);
   --login-text-secondary: hsl(74 5% 38%);
   --login-text-muted: hsl(74 4% 52% / 0.9);
   --login-accent-soft: hsl(var(--primary) / 0.08);
-  --login-accent-border: hsl(80 7% 78% / 0.72);
-  --login-accent-text: hsl(60 3% 14%);
-  --login-accent-glow: hsl(var(--primary) / 0.18);
-  --login-button-text: hsl(0 0% 100%);
-  --login-label-text: hsl(60 3% 12%);
-  --login-hint-text: hsl(74 4% 45% / 0.9);
-  --login-input-icon: hsl(74 5% 42% / 0.86);
-  --login-input-toggle-ring: hsl(var(--primary) / 0.22);
 }
 
 /*
@@ -421,19 +372,6 @@
   --hover: 75 4% 16%;
   --secondary-text: 75 5% 72%;
   --muted-text: 75 4% 55%;
-  --trend-up-border: 39 86 36;
-  --trend-up-bg: 26 58 24;
-  --trend-up-text: 150 219 148;
-  --trend-down-border: 116 6 24;
-  --trend-down-bg: 78 4 16;
-  --trend-down-text: 248 119 141;
-
-  --color-cyan: hsl(var(--primary));
-  --color-cyan-dim: hsl(var(--primary) / 0.8);
-  --color-cyan-glow: hsl(var(--primary) / 0.4);
-  --color-purple: 75 5% 62%;
-  --color-purple-dim: 75 5% 52%;
-  --color-purple-glow: hsl(75 5% 62% / 0.2);
   --color-success: 118 50% 72%;
   --color-warning: 50 88% 72%;
   --color-danger: 350 89% 72%;
@@ -442,7 +380,6 @@
   --color-danger-alert-bg: 350 89% 72%;
   --autocomplete-hover-bg: hsl(var(--primary));
   /* Tailwind-compatible accent colors (Dark theme) */
-  --color-cyan-400: 118 50% 72%;
   --color-emerald-400: 118 50% 72%;
   --color-red-400: 350 89% 72%;
   --color-amber-400: 50 88% 72%;
@@ -450,18 +387,6 @@
   --success: var(--color-success);
   --warning: var(--color-warning);
   --danger: var(--color-danger);
-
-  /* Sentiment indicator colors (Dark theme) - Adjustable via CSS */
-  --sentiment-greed: var(--color-cyan);
-  --sentiment-neutral: var(--color-purple);
-  --sentiment-fear: var(--color-danger);
-
-  /* Legacy dark-theme sentiment effect tokens retained for compatibility. */
-  --glow-spread: 8px;
-  --glow-intensity: 0.18;
-  --sentiment-greed-glow: hsl(var(--sentiment-greed) / var(--glow-intensity));
-  --sentiment-neutral-glow: hsl(var(--sentiment-neutral) / var(--glow-intensity));
-  --sentiment-fear-glow: hsl(var(--sentiment-fear) / var(--glow-intensity));
 
   --bg-base: hsl(var(--background));
   --bg-card: hsl(var(--card));
@@ -492,8 +417,6 @@
 
   /* Compatibility preservation */
   --border-accent: hsl(var(--primary) / 0.8);
-  --border-purple: hsl(var(--foreground) / 0.12);
-  --border-cyan: hsl(var(--primary));
   --text-primary: hsl(var(--foreground));
   --text-secondary-text: hsl(var(--secondary-text));
   --text-muted-text: hsl(var(--muted-text));
@@ -591,7 +514,6 @@
   --settings-secondary-bg: hsl(var(--neutral-white) / 0.03);
   --settings-secondary-border-hover: hsl(var(--primary) / 0.34);
   --settings-secondary-bg-hover: hsl(var(--primary) / 0.1);
-  --settings-glow-hover: hsl(var(--primary) / 0.28);
   --settings-skeleton-strong: hsl(var(--neutral-white) / 0.1);
   --settings-skeleton-soft: hsl(var(--neutral-white) / 0.06);
   --input-surface-bg: var(--bg-card);
@@ -620,10 +542,6 @@
   --backtest-border-dim: hsl(var(--foreground) / 0.06);
   --backtest-border-subtle: hsl(var(--foreground) / 0.08);
   --backtest-border-light: hsl(var(--foreground) / 0.12);
-  --backtest-border-cyan-soft: hsl(var(--primary) / 0.40);
-  --backtest-bg-cyan-subtle: hsl(var(--primary) / 0.10);
-  --backtest-shadow-cyan-glow: 0 0 8px hsl(var(--primary) / 0.25);
-  --backtest-shadow-cyan-glow-strong: 0 0 4px hsl(var(--primary) / 0.75);
   --backtest-spinner-track: hsl(var(--primary) / 0.25);
   --backtest-spinner-head: hsl(var(--primary));
   --backtest-table-bg: hsl(var(--card) / 0.82);
@@ -632,23 +550,10 @@
   --login-bg-main: hsl(60 3% 8%);
   --login-bg-card: hsl(70 4% 11%);
   --login-border-card: hsl(var(--neutral-white) / 0.06);
-  --login-border-input: hsl(var(--neutral-white) / 0.1);
-  --login-border-focus: hsl(var(--primary) / 0.5);
-  --login-error-text: hsl(var(--destructive));
-  --login-error-bg: hsl(var(--destructive) / 0.1);
-  --login-error-border: hsl(var(--destructive) / 0.2);
   --login-text-primary: hsl(0 0% 100%);
   --login-text-secondary: hsl(75 5% 72%);
   --login-text-muted: hsl(75 4% 55%);
   --login-accent-soft: hsl(var(--primary) / 0.08);
-  --login-accent-border: hsl(var(--primary) / 0.28);
-  --login-accent-text: hsl(var(--primary) / 0.92);
-  --login-accent-glow: hsl(var(--primary) / 0.2);
-  --login-button-text: hsl(60 3% 8%);
-  --login-label-text: hsl(0 0% 100%);
-  --login-hint-text: hsl(75 5% 62%);
-  --login-input-icon: hsl(var(--primary) / 0.88);
-  --login-input-toggle-ring: hsl(var(--primary) / 0.24);
 }
 
 /*
@@ -740,74 +645,6 @@ body:has(> [data-overlay-root="sheet"]) > [data-overlay-root="toast"] {
   transition: stroke-dashoffset 0.8s ease-out;
 }
 
-/* ============ Sentiment-based Gauge Colors ============ */
-/* Data attribute selectors for theme-aware sentiment colors */
-
-/* Greed sentiment (score >= 60) */
-[data-sentiment="greed"] {
-  --current-sentiment: var(--sentiment-greed);
-}
-
-/* Neutral sentiment (40 <= score < 60) */
-[data-sentiment="neutral"] {
-  --current-sentiment: var(--sentiment-neutral);
-}
-
-/* Fear sentiment (score < 40) */
-[data-sentiment="fear"] {
-  --current-sentiment: var(--sentiment-fear);
-}
-
-[data-sentiment-stroke="greed"] {
-  stroke: var(--sentiment-greed) !important;
-}
-
-[data-sentiment-stroke="neutral"] {
-  stroke: var(--sentiment-neutral) !important;
-}
-
-[data-sentiment-stroke="fear"] {
-  stroke: var(--sentiment-fear) !important;
-}
-
-/* Apply to gradient stops */
-[data-sentiment-gradient="greed"] stop {
-  stop-color: var(--sentiment-greed);
-}
-
-[data-sentiment-gradient="neutral"] stop {
-  stop-color: var(--sentiment-neutral);
-}
-
-[data-sentiment-gradient="fear"] stop {
-  stop-color: var(--sentiment-fear);
-}
-
-/* Apply to text elements */
-[data-sentiment-text="greed"] {
-  color: var(--sentiment-greed) !important;
-}
-
-[data-sentiment-text="neutral"] {
-  color: var(--sentiment-neutral) !important;
-}
-
-[data-sentiment-text="fear"] {
-  color: var(--sentiment-fear) !important;
-}
-
-[data-sentiment-label="greed"] {
-  color: var(--sentiment-greed) !important;
-}
-
-[data-sentiment-label="neutral"] {
-  color: var(--sentiment-neutral) !important;
-}
-
-[data-sentiment-label="fear"] {
-  color: var(--sentiment-fear) !important;
-}
-
 /* ============ Input Styles ============ */
 .input-surface {
   background: var(--input-surface-bg);
@@ -868,19 +705,6 @@ body:has(> [data-overlay-root="sheet"]) > [data-overlay-root="toast"] {
 .input-focus-ring:focus-within {
   border-color: var(--input-surface-border-focus);
   box-shadow: var(--input-surface-shadow, var(--shadow-soft-card)), var(--input-surface-focus-ring);
-}
-
-.input-appearance-login {
-  --input-surface-bg: var(--login-input-surface);
-  --input-surface-border: var(--login-input-border);
-  --input-surface-border-hover: var(--login-input-border-hover);
-  --input-surface-border-focus: var(--login-input-border-focus);
-  --input-surface-focus-ring: var(--login-input-focus-ring);
-  --input-surface-text: var(--login-input-text);
-  --input-surface-placeholder: var(--login-input-placeholder);
-  --input-surface-caret: var(--login-input-caret);
-  --input-surface-fill: var(--login-input-fill);
-  --input-surface-shadow: var(--login-input-shadow, var(--shadow-soft-card));
 }
 
 /* ============ Badge Styles ============ */

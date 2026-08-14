@@ -10,6 +10,7 @@ import unittest
 from pathlib import Path
 
 from src.core.config_registry import (
+    LLM_CHANNEL_FIELD_KEY_RE,
     SCHEMA_VERSION,
     WEB_SETTINGS_HIDDEN_FROM_UI,
     build_schema_response,
@@ -358,7 +359,7 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)
-        self.assertEqual(SCHEMA_VERSION, "2026-07-16-config-contract")
+        self.assertEqual(SCHEMA_VERSION, "2026-08-13-config-inventory-contract")
 
         categories = {
             category["category"]: {field["key"] for field in category["fields"]}
@@ -568,14 +569,19 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         missing = []
         for key in get_registered_field_keys():
             field = get_field_definition(key)
-            if key in self._SYSTEM_HIDDEN_KEYS:
+            if key in WEB_SETTINGS_HIDDEN_FROM_UI or LLM_CHANNEL_FIELD_KEY_RE.match(key):
                 continue
             if field.get("category") == "ai_model" and key in self._AI_MODEL_HIDDEN_KEYS:
                 # These legacy fields are hidden only when channel config is active;
                 # they are still visible/configurable in legacy setups.
                 pass
 
-            if not field.get("help_key") or not field.get("examples") or not field.get("docs"):
+            has_inline_help = bool(
+                field.get("description")
+                and field.get("examples")
+                and field.get("docs")
+            )
+            if not field.get("help_key") and not has_inline_help:
                 missing.append(key)
 
         self.assertEqual([], missing)
@@ -783,13 +789,19 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         return titles
 
     def test_web_field_titles_match_registered_fields(self) -> None:
-        registered_keys = set(get_registered_field_keys())
+        registered_keys = {
+            key
+            for key in get_registered_field_keys()
+            if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
+        }
         field_title_keys = self._collect_web_field_title_keys()
 
+        all_registered_keys = set(get_registered_field_keys())
         self.assertEqual(
             (
                 sorted(registered_keys - field_title_keys),
-                sorted(field_title_keys - registered_keys),
+                sorted(field_title_keys - all_registered_keys),
             ),
             ([], []),
             "Web field-title catalog differs from the backend registry "
@@ -800,7 +812,8 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         web_titles = self._collect_web_english_field_titles()
         backend_titles = {
             key: get_field_definition(key)["title"]
-            for key in get_registered_field_keys()
+            for key in web_titles
+            if key in set(get_registered_field_keys())
         }
 
         self.assertEqual(

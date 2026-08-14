@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
 import { lazy, useState, type ReactNode } from 'react';
-import { Button } from '../../components/common';
+import { Button, Surface } from '../../components/common';
+import { CredentialInput } from '../../components/security';
 import { AuthSettingsCard } from '../../components/settings/AuthSettingsCard';
 import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard';
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
@@ -33,6 +34,7 @@ import { SettingsErrorSummary } from '../../components/settings/SettingsErrorSum
 import { SettingsField } from '../../components/settings/SettingsField';
 import { SettingsHelpButton } from '../../components/settings/SettingsHelpButton';
 import { SettingsLoading } from '../../components/settings/SettingsLoading';
+import { RuntimeCapabilitiesPanel } from '../../components/settings/RuntimeCapabilitiesPanel';
 import { SettingsSectionNav, SettingsViewTabs } from '../../components/settings/SettingsNavigation';
 import { SettingsPanelErrorBoundary } from '../../components/settings/SettingsPanelErrorBoundary';
 import { SettingsSectionCard } from '../../components/settings/SettingsSectionCard';
@@ -156,6 +158,25 @@ const DataProvidersPanelStory = () => {
   );
 };
 
+const CredentialInputStory = () => {
+  const { text } = useStoryText();
+  const { scenario } = usePlaygroundScenario();
+  const [value, setValue] = useState('fixture-secret');
+  return (
+    <Surface className="max-w-lg">
+      <CredentialInput
+        purpose="provider-secret"
+        label={text.fieldLabel}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        allowTogglePassword
+        iconType="key"
+        disabled={scenario === 'states'}
+      />
+    </Surface>
+  );
+};
+
 const DataProviderRuntimeStatusPanelStory = () => <DataProviderRuntimeStatusPanel />;
 
 const FirstRunWizardStory = () => {
@@ -209,6 +230,8 @@ const IntelligentImportStory = () => {
   const [value, setValue] = useState('600519,AAPL');
   return <IntelligentImport stockListValue={value} configVersion="fixture-v1" maskToken={MASK_TOKEN} onMerged={setValue} />;
 };
+
+const RuntimeCapabilitiesPanelStory = () => <RuntimeCapabilitiesPanel />;
 
 const LLMChannelEditorStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -572,6 +595,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'ai-overview-matrix': AiOverviewMatrixStory,
   'auth-settings-card': AuthSettingsCard,
   'change-password-card': ChangePasswordCard,
+  'credential-input': CredentialInputStory,
   'data-providers-panel': DataProvidersPanelStory,
   'data-provider-runtime-status-panel': DataProviderRuntimeStatusPanelStory,
   'first-run-wizard': FirstRunWizardStory,
@@ -595,6 +619,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'notification-channels-panel': NotificationChannelsPanelStory,
   'notification-test-panel': NotificationTestPanelStory,
   'provider-quick-links': ProviderQuickLinksStory,
+  'runtime-capabilities-panel': RuntimeCapabilitiesPanelStory,
   'settings-alert': SettingsAlertStory,
   'settings-configuration-summary': SettingsConfigurationSummaryStory,
   'settings-error-summary': SettingsErrorSummaryStory,

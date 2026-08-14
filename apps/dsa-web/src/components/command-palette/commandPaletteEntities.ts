@@ -36,6 +36,10 @@ function includesQuery(haystack: string, query: string): boolean {
   return query.length === 0 || haystack.includes(query);
 }
 
+const SETTINGS_VIEW_SEARCH_ALIASES: Readonly<Record<string, string>> = {
+  'ai_models/connections': 'cloud model cloud api api model provider model service 云端模型 云模型 api 模型 模型服务 服务商',
+};
+
 function takeLimited(items: CommandPaletteEntity[], limit = COMMAND_PALETTE_RESULT_LIMIT): CommandPaletteEntity[] {
   return items.slice(0, limit);
 }
@@ -152,7 +156,15 @@ export function buildSettingsEntities(
 
     for (const view of section.views) {
       const viewName = view.label[language];
-      const searchText = [sectionId, sectionName, view.id, viewName, 'settings', '设置']
+      const searchText = [
+        sectionId,
+        sectionName,
+        view.id,
+        viewName,
+        SETTINGS_VIEW_SEARCH_ALIASES[`${sectionId}/${view.id}`] ?? '',
+        'settings',
+        '设置',
+      ]
         .join(' ')
         .toLocaleLowerCase();
       if (!includesQuery(searchText, normalizedQuery)) continue;

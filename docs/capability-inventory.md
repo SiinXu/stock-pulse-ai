@@ -161,6 +161,16 @@ a second compatibility decision.
 Consumers must branch on `schema_version`, tolerate new records and nullable
 states, and treat source errors as unknown.
 
+## Web read-only view
+
+Settings exposes the live inventory under **Advanced -> Capabilities**. The view
+calls only `GET /api/v1/capabilities`, preserves partial/source states, and shows
+the Agent deployment/model list as read-only runtime context. It does not imply
+that selecting a deployment changes Chat requests.
+
+The Web view intentionally does not expose registration, update, retirement,
+dependency resolution, task routing, or other control-plane actions. Those
+write-side and diagnostic endpoints remain operator/API-only.
 
 ## Write-side registry (control plane)
 
@@ -238,4 +248,3 @@ under issue #204.
   startup/enable/reload
 - Product UI for capability installation, enablement, and governance
 - Optional budget-limited ensemble/vote mode
-

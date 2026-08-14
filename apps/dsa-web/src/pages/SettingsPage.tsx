@@ -28,6 +28,7 @@ import {
   LLMChannelEditor,
   LLMConfigModeBanner,
   NotificationTestPanel,
+  RuntimeCapabilitiesPanel,
   NOTIFICATION_FIELD_GROUP_ORDER,
   getNotificationFieldGroupId,
   getNotificationFieldOrder,
@@ -1725,6 +1726,9 @@ const SettingsPage: React.FC = () => {
                   </form>
                 ) : null}
               </SettingsSectionCard>
+            ) : null}
+            {isTopLevelAdvanced && activeView === 'capabilities' ? (
+              <RuntimeCapabilitiesPanel />
             ) : null}
             {activeCategory === 'ai_model' && !isAiOverview && !isAiLocalModels && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
               <section className="space-y-4" aria-labelledby="model-access-heading" data-testid="model-access-section">

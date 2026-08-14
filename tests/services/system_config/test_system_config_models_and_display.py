@@ -1539,9 +1539,11 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("sk-key-1", rendered)
         self.assertNotIn("sk-key-2", rendered)
         self.assertNotIn("LLM_UNUSED_API_KEY", items)
+        self.assertNotIn("LLM_OPENAI_API_KEY", items)
+        self.assertNotIn("LLM_OPENAI_API_KEY", items_without_schema)
         self.assertNotIn("DATABASE_PATH", items)
 
-    def test_get_config_without_schema_keeps_unregistered_env_keys(self) -> None:
+    def test_get_config_without_schema_keeps_operator_only_keys_for_internal_consumers(self) -> None:
         self._rewrite_env(
             "STOCK_LIST=600519,000001",
             "DATABASE_PATH=./custom/stock_analysis.db",
@@ -1553,4 +1555,5 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
 
         self.assertEqual(items["DATABASE_PATH"]["value"], "./custom/stock_analysis.db")
         self.assertEqual(items["SQLITE_WAL_ENABLED"]["value"], "true")
+        self.assertIn("STOCK_LIST", items)
         self.assertNotIn("schema", items["DATABASE_PATH"])

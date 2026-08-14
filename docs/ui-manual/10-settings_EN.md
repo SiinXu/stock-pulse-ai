@@ -134,6 +134,7 @@ On desktop, the category navigation uses a compact sidebar so the active setting
 | Auth & security | Login protection / admin password |
 | Version & updates | Desktop updates / build id |
 | Advanced · config backup | Export before reinstall; import on recovery |
+| Advanced · Capabilities | Read-only live capability sources, executable state, and Agent model deployments |
 | Advanced · diagnostics | Troubleshooting |
 
 ### Agent behavior presets
@@ -143,6 +144,10 @@ On desktop, the category navigation uses a compact sidebar so the active setting
 Selecting a preset opens confirmation without mutating the draft. Review every old/new value plus step/timeout, memory, Critic, and multi-strategy cost effects. Confirmation submits all changes as one Agent Settings batch for autosave. Cancel, Escape, focus, and hover write nothing. After failure or conflict, discard that preset draft before retrying or loading the server version.
 
 Presets enable Agent and clear “Agent acknowledged off,” but do not change credentials, skill lists, global Deep Research budgets, Risk Agent veto, or HITL approval policy. The default surface shows essentials; Advanced preserves the registry-owned runtime, skills, research, memory/context, and other semantic groups.
+
+### Runtime capabilities (read-only)
+
+**Advanced -> Capabilities** shows capabilities discovered by the current service process, source state, and the Agent deployment/model runtime configuration. This is an observation surface: it does not mutate the registry or change the model used by Chat. Registration, update, retirement, dependency resolution, and task-routing control-plane actions remain operator/API-only.
 
 ### Scheduling
 

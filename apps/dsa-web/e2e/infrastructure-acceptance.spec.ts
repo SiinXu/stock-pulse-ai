@@ -1528,10 +1528,13 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(APP_ROUTE_PATHS.signals);
 
     await expect(page.getByRole('heading', { name: '信号中心' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '信号流', exact: true })).toBeVisible();
+    const feedTab = page.getByRole('tab', { name: '信号', exact: true });
+    await expect(feedTab).toBeVisible();
+    await expect.poll(() => feedTab.evaluate((element) => getComputedStyle(element).borderRadius))
+      .toBe('0px');
     await expect(page.getByRole('tab', { name: '规则', exact: true })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '推送历史', exact: true })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '再评估与统计', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '历史', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: '复盘', exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: '持仓', exact: true }).click();
     await expect(page.getByRole('button', { name: '持仓', exact: true }))
@@ -1547,7 +1550,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     }));
     await expect(page.getByRole('button', { name: '创建告警规则' })).toBeVisible();
 
-    await page.getByRole('tab', { name: '推送历史', exact: true }).click();
+    await page.getByRole('tab', { name: '历史', exact: true }).click();
     await expect(page).toHaveURL(buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       tab: SIGNAL_CENTER_TAB_VALUES.history,
@@ -1556,7 +1559,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('tab', { name: '通知尝试记录', exact: true })).toBeVisible();
     await expect(page.getByRole('group', { name: '信号范围' })).toHaveCount(0);
 
-    await page.getByRole('tab', { name: '再评估与统计', exact: true }).click();
+    await page.getByRole('tab', { name: '复盘', exact: true }).click();
     await expect(page).toHaveURL(buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       tab: SIGNAL_CENTER_TAB_VALUES.review,
@@ -1618,7 +1621,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       view: null,
       keep: 'yes',
     });
-    await expect(page.getByRole('tab', { name: '再评估与统计', exact: true }))
+    await expect(page.getByRole('tab', { name: '复盘', exact: true }))
       .toHaveAttribute('aria-selected', 'true');
   });
 
@@ -1700,6 +1703,57 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goForward();
     await expect(page).toHaveURL(buildSignalCenterHref({ stock: 'MSFT' }));
     await expect(page.getByRole('button', { name: '当前查看：MSFT' })).toBeVisible();
+  });
+
+  test('16f active nested controls stay visible at 390px', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockSignalCenterCollections(page);
+    await login(page);
+    await page.goto(buildSignalCenterHref({
+      tab: SIGNAL_CENTER_TAB_VALUES.history,
+      history: SIGNAL_CENTER_HISTORY_VALUES.notifications,
+    }));
+
+    const notificationTab = page.getByRole('tab', { name: '通知尝试记录', exact: true });
+    await expect(notificationTab).toHaveAttribute('aria-selected', 'true');
+    const signalHistoryVisibility = await notificationTab.evaluate((element) => {
+      const item = element.getBoundingClientRect();
+      const container = element.parentElement?.getBoundingClientRect();
+      return container ? {
+        left: item.left >= container.left,
+        right: item.right <= container.right,
+      } : { left: false, right: false };
+    });
+    expect(signalHistoryVisibility).toEqual({ left: true, right: true });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
+
+    await page.evaluate(() => {
+      localStorage.setItem('dsa.uiLanguage', 'en');
+      localStorage.setItem('dsa-settings-mode', 'expert');
+    });
+    await page.goto('/settings?section=advanced&view=capabilities');
+
+    const capabilities = page.getByRole('radio', { name: 'Capabilities', exact: true });
+    await expect(capabilities).toHaveAttribute('aria-checked', 'true');
+    const settingsVisibility = await capabilities.evaluate((element) => {
+      const item = element.getBoundingClientRect();
+      const scrollContainer = element.parentElement;
+      const container = scrollContainer?.getBoundingClientRect();
+      return container && scrollContainer ? {
+        left: item.left >= container.left,
+        right: item.right <= container.right,
+        itemLeft: item.left,
+        itemRight: item.right,
+        containerLeft: container.left,
+        containerRight: container.right,
+        scrollLeft: scrollContainer.scrollLeft,
+        scrollWidth: scrollContainer.scrollWidth,
+        clientWidth: scrollContainer.clientWidth,
+      } : { left: false, right: false };
+    });
+    expect(settingsVisibility, JSON.stringify(settingsVisibility))
+      .toMatchObject({ left: true, right: true });
+    await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth)).toBe(390);
   });
 
   test('17 Portfolio timeout-after-commit retry reuses the operation ID and creates only one ledger row', async ({ page }) => {

@@ -463,10 +463,10 @@ function openStockContextModal() {
 
 function openSignalsView(name: '全部信号' | '当前股票' | '股票信号时间线' | '信号表现统计') {
   if (name === '信号表现统计') {
-    fireEvent.click(screen.getByRole('tab', { name: '再评估与统计' }));
+    fireEvent.click(screen.getByRole('tab', { name: '复盘' }));
     return;
   }
-  const feedTab = screen.getByRole('tab', { name: '信号流' });
+  const feedTab = screen.getByRole('tab', { name: '信号' });
   if (feedTab.getAttribute('aria-selected') !== 'true') fireEvent.click(feedTab);
   fireEvent.click(screen.getByRole('tab', { name }));
 }
@@ -954,7 +954,7 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     expect(await screen.findByText('暂无告警规则')).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: '创建告警规则' })).toHaveLength(1);
 
-    fireEvent.click(screen.getByRole('tab', { name: '推送历史' }));
+    fireEvent.click(screen.getByRole('tab', { name: '历史' }));
 
     await waitFor(() => expect(window.location.search).toBe(new URL(buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
@@ -972,7 +972,7 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     }), window.location.origin).search));
     expect(screen.getByRole('tabpanel', { name: '通知尝试记录' })).toBeVisible();
 
-    fireEvent.click(screen.getByRole('tab', { name: '再评估与统计' }));
+    fireEvent.click(screen.getByRole('tab', { name: '复盘' }));
     expect(screen.queryByRole('group', { name: '信号范围' })).not.toBeInTheDocument();
     expect(await screen.findByText('当前统计为全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票过滤。')).toBeInTheDocument();
   });
@@ -981,11 +981,11 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     renderPage();
 
     const signalCenterTabs = await screen.findByRole('tablist', { name: '信号中心' });
-    const feedTab = within(signalCenterTabs).getByRole('tab', { name: '信号流' });
+    const feedTab = within(signalCenterTabs).getByRole('tab', { name: '信号' });
     feedTab.focus();
     fireEvent.keyDown(feedTab, { key: 'End' });
 
-    const reviewTab = within(signalCenterTabs).getByRole('tab', { name: '再评估与统计' });
+    const reviewTab = within(signalCenterTabs).getByRole('tab', { name: '复盘' });
     await waitFor(() => expect(reviewTab).toHaveAttribute('aria-selected', 'true'));
     expect(reviewTab).toHaveFocus();
     expect(document.getElementById(reviewTab.getAttribute('aria-controls') ?? ''))
@@ -994,18 +994,59 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     fireEvent.keyDown(reviewTab, { key: 'Home' });
     await waitFor(() => expect(feedTab).toHaveAttribute('aria-selected', 'true'));
 
-    const feedTabs = screen.getByRole('tablist', { name: '信号流' });
+    const feedTabs = screen.getByRole('tablist', { name: '信号' });
     const allSignalsTab = within(feedTabs).getByRole('tab', { name: '全部信号' });
     allSignalsTab.focus();
     fireEvent.keyDown(allSignalsTab, { key: 'End' });
 
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('view'))
       .toBe(SIGNAL_FEED_VIEW_VALUES.timeline));
-    const selectedTimelineTab = within(screen.getByRole('tablist', { name: '信号流' }))
+    const selectedTimelineTab = within(screen.getByRole('tablist', { name: '信号' }))
       .getByRole('tab', { name: '股票信号时间线' });
     await waitFor(() => expect(selectedTimelineTab).toHaveAttribute('aria-selected', 'true'));
     expect(selectedTimelineTab).toHaveFocus();
     expect(screen.queryByRole('group', { name: '信号范围' })).not.toBeInTheDocument();
+  });
+
+  it('keeps primary navigation stable and gives nested views lower visual emphasis', async () => {
+    renderPage();
+
+    const primaryTabs = await screen.findByRole('tablist', { name: '信号中心' });
+    const scopeControl = screen.getByRole('group', { name: '信号范围' });
+    expect(
+      primaryTabs.compareDocumentPosition(scopeControl) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).not.toBe(0);
+
+    const feedViews = screen.getByRole('tablist', { name: '信号' });
+    expect(feedViews).toHaveClass('segmented-control');
+    expect(within(scopeControl).getAllByRole('button')).toHaveLength(3);
+    expect(within(scopeControl).getByRole('button', { name: '全部' }))
+      .toHaveAttribute('data-size', 'compact');
+    expect(scopeControl.querySelector('[data-indicator="selected"]')).toBeNull();
+    expect(screen.getByRole('button', { name: '刷新' })).toHaveAttribute('data-control', 'icon-button');
+
+    fireEvent.click(within(primaryTabs).getByRole('tab', { name: '历史' }));
+    const historyViews = await screen.findByRole('tablist', { name: '历史' });
+    expect(historyViews).toHaveClass('segmented-control');
+  });
+
+  it('exposes the page refresh request as an accessible loading state', async () => {
+    renderPage();
+    await screen.findByText('贵州茅台');
+    const refreshRequest = createDeferred<DecisionSignalListResponse>();
+    vi.mocked(decisionSignalsApi.list).mockReturnValueOnce(refreshRequest.promise);
+
+    const refreshButton = screen.getByRole('button', { name: '刷新' });
+    fireEvent.click(refreshButton);
+
+    await waitFor(() => expect(refreshButton).toHaveAttribute('aria-busy', 'true'));
+    expect(refreshButton).toBeDisabled();
+
+    await act(async () => {
+      refreshRequest.resolve(listResponse());
+    });
+    await waitFor(() => expect(refreshButton).not.toHaveAttribute('aria-busy'));
+    expect(refreshButton).toBeEnabled();
   });
 
   it('loads active signals by default', async () => {
@@ -1021,7 +1062,7 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     });
     expect(screen.getByText('贵州茅台')).toBeInTheDocument();
     openSignalsView('信号表现统计');
-    expect(screen.getByRole('tabpanel', { name: '再评估与统计' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: '复盘' })).toBeVisible();
     expect(await screen.findByRole('heading', { name: '全局后验结果' })).toBeInTheDocument();
     await waitFor(() => expect(decisionSignalsApi.listOutcomes).toHaveBeenCalledWith(
       expect.objectContaining({ page: 1, pageSize: 20 }),
@@ -2722,7 +2763,7 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
       SIGNAL_CENTER_ROUTE_QUERY_KEYS.tab,
     )).toBe(SIGNAL_CENTER_TAB_VALUES.review));
     expect(new URLSearchParams(window.location.search).get('view')).toBe('timeline');
-    expect(screen.getByRole('tabpanel', { name: '再评估与统计' })).toBeVisible();
+    expect(screen.getByRole('tabpanel', { name: '复盘' })).toBeVisible();
 
     act(() => window.history.back());
     await waitFor(() => expect(new URLSearchParams(window.location.search).get(

@@ -100,6 +100,15 @@ GET /api/v1/capabilities?domain=data&domain=tool
 消费者必须根据 `schema_version` 分支，容忍新增记录和可空状态，并把来源错误
 视为未知。
 
+## Web 只读界面
+
+设置页在 **高级 -> 运行能力** 提供实时清单。该界面只调用
+`GET /api/v1/capabilities`，保留 partial 和各来源状态，并把 Agent
+deployment/model 列表作为只读运行上下文展示；它不表示选择某个 deployment
+会改变 Chat 请求。
+
+Web 有意不暴露登记、更新、下线、依赖解析、任务路由等控制面操作。写入侧及
+诊断端点仍只面向操作员/API。
 
 ## 写入侧注册表（控制面）
 
@@ -149,4 +158,3 @@ GET /api/v1/capabilities?domain=data&domain=tool
 - 启动/启用/热重载路径上把全部扩展类迁移到写入侧契约
 - 能力安装/启用/治理的产品 UI
 - 可选、有预算上限的 ensemble/vote 模式
-

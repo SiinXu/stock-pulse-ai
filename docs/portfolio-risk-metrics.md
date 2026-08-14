@@ -1,9 +1,9 @@
 # 组合风险指标（V0）
 
-面向已持仓组合的后端风险指标（[#239](https://github.com/SiinXu/stock-pulse-ai/issues/239)）。
+面向已持仓组合的风险指标 API 与 Web V1 界面（[#239](https://github.com/SiinXu/stock-pulse-ai/issues/239)）。
 
 本文档说明 `GET /api/v1/portfolio/risk-metrics` 的公式、假设与财务诚实规则。
-Web 组合页可视化不在 V0 范围（PortfolioPage 由独立重构 PR 占用）。
+V0 先定义后端计算契约；现有 Web V1 已在组合页提供对应的只读可视化。
 
 ## 范围
 

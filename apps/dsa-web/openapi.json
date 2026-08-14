@@ -49807,7 +49807,7 @@
     },
     "/api/v1/portfolio/imports/futu": {
       "post": {
-        "description": "Import live Futu positions via the shared trade-record commit path.\n\nPortfolio Web UI for this action is a follow-up; this endpoint is the backend\nseam for API clients and future UI wiring.",
+        "description": "Import live Futu positions via the shared trade-record commit path.",
         "operationId": "commit_futu_import_api_v1_portfolio_imports_futu_post",
         "parameters": [
           {

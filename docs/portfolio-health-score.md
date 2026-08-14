@@ -1,6 +1,6 @@
-# 组合健康分（V2 后端合同）
+# 组合健康分（V2）
 
-本功能提供确定性的组合结构评分与可执行洞察。它仅引用 [#151](https://github.com/SiinXu/stock-pulse-ai/issues/151)，不会关闭该 Issue：可见的 Portfolio Health 页面、可观察的每日更新链路和趋势消费端仍未交付。
+本功能提供确定性的组合结构评分与可执行洞察。Web 的 Portfolio > 洞察 > 健康视图提供已存快照读取和显式刷新入口；趋势消费端仍未交付。
 
 健康分是组合结构度量，不是投资建议。LLM 最多只能润色洞察文案，不能修改分数、分档、阈值、严重级别、标的或证据。
 
@@ -12,6 +12,14 @@
 | `POST` | `/api/v1/portfolio/health/refresh` | 显式计算；`persist=true` 只执行一次原子健康快照 upsert |
 
 两者都接受 `account_id`、`as_of`、`cost_method=fifo|avg`。POST 另接受 `persist`；`persist=false` 是真正零写入的预览。
+
+## Web 交互
+
+- Home 健康分组件的空态和不可用状态会直接打开 `/portfolio?tab=insights&view=health`，不会再指向不存在的刷新操作。
+- Portfolio 健康视图按当前账户与成本口径读取已存快照。用户点击“刷新健康分”后，Web 才调用 POST，并固定使用 `persist=true` 保存今日快照。
+- 读取 404 显示“尚未生成”；`partial` 显示不可跨日比较的诊断分与覆盖率；`unavailable`、空组合和请求失败均保持独立状态，不会填充零分。
+- 刷新按钮在请求期间禁用，并拒绝重复提交。切换账户或成本口径会重新读取对应快照。
+- 响应在 Web API 边界经过 OpenAPI 类型锚点和 Zod 校验；非有限分数或结构漂移会作为响应校验错误展示。
 
 刷新只调用一次 `PortfolioService.preview_portfolio_snapshot()`，并把同一个不可变 mapping 传给 `PortfolioRiskMetricsService`。它不会物化组合 position/lot/daily cache。GET 无数据时返回 404；缺少迁移时返回脱敏的 `portfolio_health_migration_required` 503，仓储不会在请求期建表。
 

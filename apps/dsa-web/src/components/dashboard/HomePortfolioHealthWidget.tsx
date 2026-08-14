@@ -50,7 +50,7 @@ export const HomePortfolioHealthWidget: React.FC<HomePortfolioHealthWidgetProps>
     };
   }, [load, refreshKey]);
 
-  const openPortfolio = () => navigate(APP_ROUTE_PATHS.portfolio);
+  const openPortfolio = () => navigate(`${APP_ROUTE_PATHS.portfolio}?tab=insights&view=health`);
 
   return (
     <Section

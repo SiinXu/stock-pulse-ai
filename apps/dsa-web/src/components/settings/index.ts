@@ -19,6 +19,7 @@ export * from './SettingsHelpButton';
 export * from './SettingsLoading';
 export * from './SettingsPanelErrorBoundary';
 export * from './SettingsSectionCard';
+export * from './RuntimeCapabilitiesPanel';
 export * from './SettingsErrorSummary';
 export * from './FirstRunWizard';
 export * from './ModelFallbackEditor';
