@@ -102,6 +102,8 @@ class AnalysisService:
         use_memory: Optional[bool] = None,
         request_context: Optional[AnalysisRequestContext] = None,
         *,
+        enable_debate: Optional[bool] = None,
+        debate_max_rounds: Optional[int] = None,
         strict_skill_selection: bool = False,
     ) -> Optional[Dict[str, Any]]:
         """
@@ -149,13 +151,27 @@ class AnalysisService:
             # Get configuration
             config = get_config()
             normalized_report_language = normalize_report_language(report_language, default="")
-            if normalized_report_language or use_memory is not None:
+            need_config_copy = (
+                bool(normalized_report_language)
+                or use_memory is not None
+                or enable_debate is not None
+                or debate_max_rounds is not None
+            )
+            if need_config_copy:
                 # Copy once before mutating so the shared singleton is untouched.
                 config = copy.copy(config)
             if normalized_report_language:
                 config.report_language = normalized_report_language
             if use_memory is not None:
                 config.decision_memory_enabled = bool(use_memory)
+            if enable_debate is not None:
+                config.debate_enabled = bool(enable_debate)
+            if debate_max_rounds is not None:
+                try:
+                    rounds = int(debate_max_rounds)
+                except (TypeError, ValueError):
+                    rounds = 2
+                config.debate_max_rounds = max(1, min(3, rounds))
             
             # Create an analysis pipeline
             pipeline = StockAnalysisPipeline(

@@ -101,8 +101,12 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
-| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内反思循环（类型化教训；默认 false） |
-| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限 |
+| `DEBATE_ENABLED` | `false` | 是 | 模板中注释; Optional structured Bull-Bear debate stage before Decision (default false, Issue #117) |
+| `DEBATE_MAX_ROUNDS` | `2` | 是 | 模板中注释; Debate rounds 1-3 |
+| `DEBATE_TEMPERATURE` | `0.4` | 是 | 模板中注释; Debate LLM temperature |
+| `DEBATE_MODEL` | empty | 是 | 模板中注释; Optional debate model name |
+| `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; 可选运行内/轨迹反思循环（类型化教训；默认 false） |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释; 单次反思 LLM 调用上限（0–64） |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释; 反思后运行内修订次数上限 |
 | `AGENT_POSTMORTEM_ENABLED` | `false` | 是 | 模板中注释; 可选已解析预测后验复盘（默认 false） |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 是 | 模板中注释; 单批后验 LLM 调用上限 |
@@ -133,6 +137,14 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
 | `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
+| `MULTI_MODEL_CONSENSUS_ENABLED` | `false` | 是 | 模板中注释; 传统分析路径多模型共识对比（默认关闭；Issue #154） |
+| `MULTI_MODEL_CONSENSUS_MODELS` | 空 | 是 | 模板中注释; 可选的逗号分隔 LiteLLM 模型列表 |
+| `MULTI_MODEL_CONSENSUS_PRESET` | 空 | 是 | 模板中注释; 模型列表为空时可选 `fast` / `quality` |
+| `MULTI_MODEL_CONSENSUS_MAX_MODELS` | `3` | 是 | 模板中注释; 单次对比最大模型数（2–5） |
+| `MULTI_MODEL_CONSENSUS_MAX_COST_USD` | 空 | 是 | 模板中注释; 有限 USD 预算：空=仅 MAX_MODELS；0=关闭扇出；正值=硬限制最多 2 个模型（暂无实时计价）；拒绝 NaN/±Inf |
+| `AGENT_DISAGREEMENT_HANDLING` | `false` | 是 | 模板中注释; 结构化分歧记录/交叉校验/分裂裁决（默认关闭） |
+| `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释; 高分歧升级阈值 |
+| `AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD` | `0.55` | 是 | 模板中注释; 交叉校验触发阈值 |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
@@ -146,6 +158,10 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_MAX_TOKENS` | `1500` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_TOTAL_TOOL_CALLS` | `16` | 是 | 模板中注释 |
 | `AGENT_PLANNING_ON_STEP_FAILURE` | `replan` | 是 | 模板中注释 |
+
+| `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; 即时步骤批评（默认关闭；#1094） |
+| `AGENT_META_REVIEW_ENABLED` | `false` | 是 | 模板中注释; 跨运行离线 meta-review（默认关闭） |
+| `AGENT_META_REVIEW_MIN_EPISODES` | `30` | 是 | 模板中注释; meta-review 样本阈值 |
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
@@ -158,6 +174,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
+| `MARKET_REGIME_ENABLED` | `true` | 是 | 模板中注释; 启用可解释规则市场状态检测 |
+| `MARKET_REGIME_OVERRIDE` | 空 | 是 | 模板中注释; 可选强制市场状态标签 |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
 | `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释; Independent per-sub-agent timeout cap in seconds (0 disables it; a positive value such as 180 enables a hard cap for ... |
 | `AGENT_TOOL_TIMEOUT_S` | `120` | 是 | 模板中注释; Agent runtime guards (enabled by default; set an individual numeric value to 0 to disable that guard) Timeout for one... |
@@ -196,6 +214,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ANTHROPIC_TEMPERATURE` | `0.7` | 是 | 模板中注释; Legacy Claude sampling temperature (0.0-1.0); prefer LLM_TEMPERATURE for new setups. |
 | `ASTRBOT_TOKEN` | `空` | 是 | 模板中注释; Optional for AstrBot Webhook requiring Bearer Token |
 | `ASTRBOT_URL` | `空` | 是 | 模板中注释; AstrBot Configuration |
+| `AUDIT_EXPORT_ENABLED` | `false` | 是 | 模板中注释 |
+| `AUDIT_INCLUDE_RAW_ARTIFACTS` | `false` | 是 | 模板中注释 |
 | `BACKTEST_ENABLED` | `true` | 是 | =================================== Backtesting configuration (optional) =================================== Enable b... |
 | `BACKTEST_ENGINE_VERSION` | `v1` | 是 | Backtesting engine version (used to differentiate results when backtesting logic is upgraded). |
 | `BACKTEST_EVAL_WINDOW_DAYS` | `10` | 是 | Backtesting evaluation window (trading days) |
@@ -275,6 +295,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `EVENT_TRIGGER_MAX_PER_DAY` | `20` | 是 | 模板中注释 |
 | `EVENT_TRIGGER_MAX_PER_HOUR` | `5` | 是 | 模板中注释 |
 | `EVENT_TRIGGERED_ANALYSIS_ENABLED` | `false` | 是 | 模板中注释; Event-triggered deep analysis (issues #129/#152) |
+| `EVIDENCE_CHAIN_ENABLED` | `true` | 是 | 模板中注释; Evidence chain + auditable report package (#986 / #127) |
 | `FAILURE_NOTIFY_ENABLED` | `空` | 是 | 模板中注释; Optional: short failure IM for GitHub Actions Daily Analysis (#850) |
 | `FEISHU_APP_ID` | `xxxx` | 是 | Feishu app configuration (for App Bot active push / Stream Bot / Cloud Docs; does not directly enable group Webhook p... |
 | `FEISHU_APP_SECRET` | `xxxx` | 是 | App Bot push also requires FEISHU_CHAT_ID; prefer FEISHU_WEBHOOK_URL for simple group delivery. |
