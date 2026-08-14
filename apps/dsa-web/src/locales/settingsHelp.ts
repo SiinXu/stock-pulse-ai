@@ -1,13 +1,18 @@
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
+import { getFieldTitle } from '../utils/systemConfigI18n';
 import { normalizeUiLanguage } from '../utils/uiLanguage';
 import settingsHelpEnUS from './settingsHelp.en';
 import settingsHelpZhCN from './settingsHelp.zh';
-import type { SettingsHelpContent, SettingsHelpMap } from './settingsHelpTypes';
+import type {
+  SettingsHelpContent,
+  SettingsHelpDefinition,
+  SettingsHelpSourceMap,
+} from './settingsHelpTypes';
 
 export type { SettingsHelpContent } from './settingsHelpTypes';
 
-const SETTINGS_HELP_MAPS: Record<UiLanguage, SettingsHelpMap> = createUiLanguageRecord(
+const SETTINGS_HELP_MAPS: Record<UiLanguage, SettingsHelpSourceMap> = createUiLanguageRecord(
   'locales.settingsHelp.SETTINGS_HELP_MAPS',
   { zh: settingsHelpZhCN, en: settingsHelpEnUS },
 );
@@ -34,7 +39,12 @@ export function getSettingsHelpContent(
   const localized = SETTINGS_HELP_MAPS[language][helpKey]
     ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
   if (localized) {
-    return localized;
+    const fieldKey = helpKey.split('.').pop() ?? helpKey;
+    return {
+      ...localized,
+      title: localized.title
+        ?? getFieldTitle(fieldKey, SETTINGS_HELP_FALLBACK_TITLES[language], language),
+    };
   }
 
   if (fallbackDescription) {
@@ -50,9 +60,9 @@ export function getSettingsHelpContent(
 function findSettingsHelpByFieldKey(
   fieldKey: string,
   language: UiLanguage,
-): SettingsHelpContent | null {
+): SettingsHelpDefinition | null {
   const suffix = `.${fieldKey}`;
-  let match: SettingsHelpContent | null = null;
+  let match: SettingsHelpDefinition | null = null;
 
   for (const [helpKey, content] of Object.entries(SETTINGS_HELP_MAPS[language])) {
     if (!helpKey.endsWith(suffix)) {

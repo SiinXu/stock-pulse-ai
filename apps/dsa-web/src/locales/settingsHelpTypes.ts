@@ -1,7 +1,7 @@
 import type { SystemConfigDocLink } from '../types/systemConfig';
 
-export interface SettingsHelpContent {
-  title: string;
+export interface SettingsHelpDefinition {
+  title?: string;
   summary?: string;
   usage?: string;
   valueNotes?: string[];
@@ -12,4 +12,9 @@ export interface SettingsHelpContent {
   docs?: SystemConfigDocLink[];
 }
 
+export interface SettingsHelpContent extends SettingsHelpDefinition {
+  title: string;
+}
+
 export type SettingsHelpMap = Record<string, SettingsHelpContent>;
+export type SettingsHelpSourceMap = Record<string, SettingsHelpDefinition>;
