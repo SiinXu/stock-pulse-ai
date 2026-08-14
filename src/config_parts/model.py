@@ -142,6 +142,9 @@ class Config:
     evidence_chain_enabled: bool = True
     audit_export_enabled: bool = False
     audit_include_raw_artifacts: bool = False
+    # === Research asset pack export (Issues #988 / #1140) — default off ===
+    research_pack_export_enabled: bool = False
+    research_pack_max_zip_bytes: int = 24 * 1024 * 1024
 
     # === Durable security-audit trail (Issue #535) ===
     # Time retention and hard row capacity for privileged-operation events.

@@ -289,6 +289,26 @@ def test_resolve_many_missing_id(tmp_path: Path) -> None:
     assert results[0].ready is False
 
 
+def test_resolve_many_retired_id_is_reported_once(tmp_path: Path) -> None:
+    """A requested retired id resolves to capability_retired only, never a duplicate."""
+
+    service, _ = _service(tmp_path)
+    service.register(_llm_payload(capability_id="llm:old"))
+    service.retire("llm:old")
+
+    results = resolve_many(
+        ["llm:old", "llm:missing"],
+        write_snapshot=service.list_entries(include_retired=True),
+        active_only=True,
+    )
+
+    assert [item.capability_id for item in results] == ["llm:missing", "llm:old"]
+    by_id = {item.capability_id: item for item in results}
+    assert by_id["llm:old"].reason_code == "capability_retired"
+    assert by_id["llm:old"].ready is False
+    assert by_id["llm:missing"].reason_code == "capability_not_found"
+
+
 def test_audit_completion_failure_after_write_is_distinct(tmp_path: Path) -> None:
     store = CapabilityWriteStore(tmp_path / "registry.json", clock=lambda: FIXED_NOW)
 

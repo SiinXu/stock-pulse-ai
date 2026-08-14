@@ -149,8 +149,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_PLANNING_PROPOSAL_TIMEOUT_SECONDS` | `30` | 是 | 模板中注释 |
 | `AGENT_PLANNING_STRATEGY` | `template` | 是 | 模板中注释 |
 | `AGENT_PORTFOLIO_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
-| `AGENT_RESEARCH_PERSONA` | `空` | 是 | 模板中注释; 可选研究立场预设（默认关闭）：`rational_analyst`、`risk_guardian` 或 `long_term_compounder` |
-| `AGENT_RESEARCH_PERSONA_CUSTOM` | `空` | 是 | 模板中注释; 可选自定义研究立场；持久化内容优先使用个人投资框架的 `research_stance` |
+| `AGENT_RESEARCH_PERSONA` | `空` | 是 | 模板中注释; Optional research-stance persona (default off): rational_analyst \| risk_guardian \| long_term_compounder |
+| `AGENT_RESEARCH_PERSONA_CUSTOM` | `空` | 是 | 模板中注释; Optional custom research-stance text; prefer framework research_stance for durable custom text. |
 | `AGENT_RISK_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_RISK_OVERRIDE` | `true` | 是 | 模板中注释; Whether the risk-control agent may reject buy signals (enabled by default) |
 | `AGENT_SKILLS` | `空` | 是 |  |
@@ -604,6 +604,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `REPRO_SEED` | `0` | 是 | 模板中注释 |
 | `RESEARCH_API_ENABLED` | `false` | 是 | 模板中注释; Read-only research API for stratified conclusions (Issue #1143; default off) Authenticated GET /api/v1/research/concl... |
 | `RESEARCH_API_RATE_LIMIT_PER_MINUTE` | `60` | 是 | 模板中注释 |
+| `RESEARCH_PACK_EXPORT_ENABLED` | `false` | 是 | 模板中注释; One-click research asset pack (report + decision card + evidence refs + redacted trace) |
+| `RESEARCH_PACK_MAX_ZIP_BYTES` | `25165824` | 是 | 模板中注释; clamped between 1 MiB and 64 MiB |
 | `RESEARCH_PRESENTATION_PROFILE` | `balanced` | 是 | 模板中注释; Research presentation profile (emphasis/order only; same evidence, full risk disclosure): conservative = risks first ... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |

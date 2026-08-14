@@ -28146,6 +28146,98 @@
         "title": "ResearchGapItem",
         "type": "object"
       },
+      "ResearchPackJsonEnvelope": {
+        "additionalProperties": false,
+        "description": "JSON companion when callers need metadata without assembling ZIP bytes.",
+        "properties": {
+          "byte_length": {
+            "minimum": 0.0,
+            "title": "Byte Length",
+            "type": "integer"
+          },
+          "meta": {
+            "additionalProperties": true,
+            "title": "Meta",
+            "type": "object"
+          },
+          "progress": {
+            "items": {
+              "$ref": "#/components/schemas/ResearchPackProgressStage"
+            },
+            "title": "Progress",
+            "type": "array"
+          },
+          "root_dirname": {
+            "maxLength": 120,
+            "minLength": 1,
+            "title": "Root Dirname",
+            "type": "string"
+          },
+          "schema_version": {
+            "const": "research-pack-v1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          },
+          "zip_included": {
+            "default": false,
+            "title": "Zip Included",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "schema_version",
+          "meta",
+          "truncated",
+          "byte_length",
+          "root_dirname"
+        ],
+        "title": "ResearchPackJsonEnvelope",
+        "type": "object"
+      },
+      "ResearchPackProgressStage": {
+        "additionalProperties": false,
+        "properties": {
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "running",
+              "completed",
+              "skipped",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "status"
+        ],
+        "title": "ResearchPackProgressStage",
+        "type": "object"
+      },
       "ResearchRequest": {
         "properties": {
           "question": {
@@ -46459,6 +46551,143 @@
           }
         },
         "summary": "获取历史报告关联新闻",
+        "tags": [
+          "History"
+        ]
+      }
+    },
+    "/api/v1/history/{record_id}/research-pack": {
+      "get": {
+        "description": "One-click ZIP (or JSON metadata envelope) containing redacted report, decision card, evidence refs, signals, and reasoning trace. Default off. format=json does not assemble ZIP bytes; format=zip returns the package.",
+        "operationId": "exportResearchPack",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "string"
+            }
+          },
+          {
+            "description": "zip returns the downloadable package; json returns metadata only (no ZIP assembly)",
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "default": "zip",
+              "description": "zip returns the downloadable package; json returns metadata only (no ZIP assembly)",
+              "enum": [
+                "zip",
+                "json"
+              ],
+              "title": "Format",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Language for brief-card and README copy (en or zh)",
+            "in": "query",
+            "name": "language",
+            "required": false,
+            "schema": {
+              "default": "en",
+              "description": "Language for brief-card and README copy (en or zh)",
+              "title": "Language",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResearchPackJsonEnvelope"
+                }
+              },
+              "application/zip": {
+                "schema": {
+                  "format": "binary",
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Research pack ZIP or JSON envelope"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Export research asset package for an analysis history record",
         "tags": [
           "History"
         ]

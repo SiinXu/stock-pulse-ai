@@ -43,6 +43,7 @@ from api.v1.endpoints import (
     portfolio_stress_test,
     reasoning_trace,
     report_export,
+    research_pack,
     research,
     report_version_compare,
     scheduled_tasks,
@@ -110,6 +111,12 @@ router.include_router(
 router.include_router(evidence_pack.router, prefix="/history", tags=["EvidencePack"])
 router.include_router(evidence_pack.analysis_alias_router, prefix="/analysis", tags=["EvidencePack"])
 
+
+router.include_router(
+    research_pack.router,
+    prefix="/history",
+    tags=["History"],
+)
 
 router.include_router(
     report_version_compare.router,

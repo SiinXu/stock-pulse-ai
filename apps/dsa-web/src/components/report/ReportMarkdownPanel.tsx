@@ -25,6 +25,7 @@ import { ShareImageButton } from './ShareImageButton';
 
 const ReasoningTraceExportControls = lazy(() => import('./ReasoningTraceExportControls'));
 const EvidencePackExportControls = lazy(() => import('./EvidencePackExportControls'));
+const ResearchPackExportControls = lazy(() => import('./ResearchPackExportControls'));
 
 export interface ReportMarkdownPanelProps {
   recordId: number;
@@ -255,6 +256,7 @@ export const ReportMarkdownPanel: React.FC<ReportMarkdownPanelProps> = ({
 
       <Suspense fallback={false}>
         <EvidencePackExportControls
+        <ResearchPackExportControls
           recordId={recordId}
           disabled={isLoading}
           className="mb-4"
