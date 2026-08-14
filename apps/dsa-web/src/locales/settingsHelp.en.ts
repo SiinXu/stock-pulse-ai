@@ -1545,6 +1545,15 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
     notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
   },
+
+  'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
+    title: 'Analysis Quality Gate',
+    summary: 'Binds factual claims in the analysis conclusion to input evidence using the offline agent-eval dimensions.',
+  },
+  'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
+    title: 'Quality Gate Failure Policy',
+    summary: 'Choose annotate (default) or intercept when ungrounded factual claims are found.',
+  },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
     summary: 'Controls the token budget and timeout for Deep Research.',

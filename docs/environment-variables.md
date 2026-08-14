@@ -628,6 +628,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `RESEARCH_PACK_MAX_ZIP_BYTES` | `25165824` | 是 | 模板中注释; clamped between 1 MiB and 64 MiB |
 | `RESEARCH_PRESENTATION_PROFILE` | `balanced` | 是 | 模板中注释; Research presentation profile (emphasis/order only; same evidence, full risk disclosure): conservative = risks first ... |
 | `RISK_GATE_PROFILE` | `balanced` | 是 | 模板中注释; Mandatory Risk Manager profile before final buy/hold/sell recommendations |
+| `ANALYSIS_QUALITY_GATE_ENABLED` | `true` | 是 | 模板中注释; 管线质量门：结论事实绑定输入证据（默认开启） |
+| `ANALYSIS_QUALITY_GATE_ON_FAILURE` | `annotate` | 是 | 模板中注释; 未绑定事实时 annotate（默认）或 intercept |
 | `RSS_NEWS_FEED_URLS` | `https://www.sec.gov/news/pressreleases.rss,https://feeds.example.com/market.atom` | 是 | 模板中注释; Optional RSS/Atom market-news feeds for the on-demand search pipeline (issue #271) |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | `8` | 是 | 模板中注释; Per-feed pull timeout in seconds (1-30, default 8) |
 | `RUN_IMMEDIATELY` | `true` | 是 | Whether to immediately execute an analysis when the non-time mode is started (true/false) |
