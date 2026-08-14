@@ -19,12 +19,19 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from enum import Enum
 from math import isfinite
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from src.agent.protocols import AgentContext, AgentOpinion, normalize_decision_signal
+from src.agent.risk_override_context import (
+    append_info_quality_gate_evidence,
+    apply_info_quality_risk_evidence,
+    bounded_confidence as _bounded_confidence,
+    dashboard_risk_sources as _dashboard_risk_sources,
+    is_stale_risk_evidence as _is_stale_risk_evidence,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -473,8 +480,6 @@ def build_risk_context_for_exit(
     info_quality_risk_enabled: bool = True,
 ) -> AgentContext:
     """Project real dashboard/runtime evidence into one final-action context."""
-    if type(info_quality_risk_enabled) is not bool:
-        raise TypeError("info_quality_risk_enabled must be bool")
     ctx = AgentContext(query="", stock_code=str(stock_code or "")[:32])
     signal = normalize_decision_signal(current_signal)
     ctx.add_opinion(AgentOpinion(
@@ -595,31 +600,12 @@ def build_risk_context_for_exit(
         except ValueError:
             ctx.set_data("risk_evidence_invalid", True)
 
-    # Issue #123: grade C is deterministic risk evidence (trusted info-quality-v1 only).
-    info_quality = (
-        dashboard.get("info_quality") if isinstance(dashboard, Mapping) else None
+    raw = apply_info_quality_risk_evidence(
+        ctx,
+        dashboard,
+        raw,
+        enabled=info_quality_risk_enabled,
     )
-    grade = ""
-    schema_version = ""
-    if isinstance(info_quality, Mapping):
-        grade = str(info_quality.get("grade") or "").strip().upper()
-        schema_version = str(info_quality.get("schema_version") or "").strip()
-    if (
-        info_quality_risk_enabled
-        and grade == "C"
-        and schema_version == "info-quality-v1"
-    ):
-        ctx.set_data("info_quality_grade", "C")
-        ctx.add_risk_flag(
-            "info_quality",
-            "information quality grade C",
-            severity="high",
-        )
-        raw = dict(raw)
-        if "signal_adjustment" not in raw:
-            raw["signal_adjustment"] = "buy_to_hold"
-        if "risk_level" not in raw:
-            raw["risk_level"] = "high"
 
     if raw or risk_signal not in {"", "hold"}:
         ctx.add_opinion(AgentOpinion(
@@ -629,46 +615,6 @@ def build_risk_context_for_exit(
             raw_data=raw,
         ))
     return ctx
-
-
-def _is_stale_risk_evidence(value: str, *, maximum_age_hours: int = 24) -> bool:
-    """Return whether a valid risk-evidence timestamp is older than the limit."""
-    parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return datetime.now(timezone.utc) - parsed.astimezone(timezone.utc) > timedelta(
-        hours=maximum_age_hours
-    )
-
-
-def _dashboard_risk_sources(
-    dashboard: Optional[Mapping[str, Any]],
-) -> Tuple[Mapping[str, Any], ...]:
-    if not isinstance(dashboard, Mapping):
-        return ()
-    sources: List[Mapping[str, Any]] = [dashboard]
-    for key in ("risk", "risk_assessment", "risk_manager_input"):
-        value = dashboard.get(key)
-        if isinstance(value, Mapping):
-            sources.append(value)
-    nested = dashboard.get("dashboard")
-    if isinstance(nested, Mapping):
-        sources.append(nested)
-        for key in ("risk", "risk_assessment", "risk_manager_input"):
-            value = nested.get(key)
-            if isinstance(value, Mapping):
-                sources.append(value)
-    return tuple(sources)
-
-
-def _bounded_confidence(value: Any) -> float:
-    try:
-        parsed = float(value)
-    except (TypeError, ValueError):
-        return 0.0
-    if not isfinite(parsed):
-        return 0.0
-    return max(0.0, min(1.0, parsed))
 
 
 def _risk_override_reason(
@@ -920,9 +866,7 @@ def _collect_gate_evidence(
     if plan.risk_level_high:
         codes.append("high_risk_evidence")
         reasons.append("high_risk_evidence")
-    if str(ctx.get_data("info_quality_grade") or "").strip().upper() == "C":
-        codes.append("info_quality_grade_c")
-        reasons.append("info_quality_grade_c")
+    append_info_quality_gate_evidence(ctx, codes, reasons)
 
     thresholds = _PORTFOLIO_RISK_THRESHOLDS[profile]
     exposure, exposure_invalid = _unit_interval_fact(ctx, "portfolio_exposure")
