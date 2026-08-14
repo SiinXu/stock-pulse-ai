@@ -205,13 +205,6 @@
       "measuredGzipBytes": 13970
     },
     {
-      "id": "settingsTranslations",
-      "match": "assets/settingsTranslations-*.js",
-      "maxGzipBytes": 15319,
-      "measuredGzipBytes": 14919,
-      "note": "Remeasured overflowing settingsTranslations gzip from CI web-gate after reflection i18n (#1254); overflowing rule only, +400 headroom retained."
-    },
-    {
       "id": "css-entry",
       "match": "assets/index-*.css",
       "maxGzipBytes": 28791,

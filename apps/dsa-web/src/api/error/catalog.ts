@@ -8,6 +8,7 @@ import {
   docsUrlForPath,
   type TaxonomyAction,
 } from './taxonomy';
+import { EVIDENCE_EXPORT_ERROR_SOURCES } from './evidenceExportErrors';
 import type {
   ApiErrorCategory,
   ErrorRemediation,
@@ -62,6 +63,10 @@ export const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
       message: 'Export is refused while administrator authentication is disabled (HTTP 403). Enable authentication and sign in first.',
     },
   }),
+  ...Object.fromEntries(Object.entries(EVIDENCE_EXPORT_ERROR_SOURCES).map(([code, copy]) => [
+    code,
+    createUiLanguageRecord(`api.error.STABLE_ERROR_TEXT.${code}`, copy),
+  ])),
   research_pack_export_disabled: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.research_pack_export_disabled", {
     zh: { title: '研报资产包导出未启用', message: '请在设置 → Agent 行为 → 执行中开启「研报资产包导出」（RESEARCH_PACK_EXPORT_ENABLED），保存后重试。' },
     en: { title: 'Research pack export is disabled', message: 'Enable Research Pack Export (RESEARCH_PACK_EXPORT_ENABLED) under Settings → Agent Behavior → Execution, save, then try again.' },

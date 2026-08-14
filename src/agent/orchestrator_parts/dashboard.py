@@ -93,6 +93,10 @@ class _DashboardMethods:
             ctx.meta["skills_requested"] = requested_skills or []
             ctx.meta["strategies_requested"] = requested_skills or []
             ctx.meta["report_language"] = normalize_report_language(context.get("report_language", "zh"))
+            if "enable_debate" in context:
+                ctx.meta["enable_debate"] = context.get("enable_debate")
+            if "debate_max_rounds" in context:
+                ctx.meta["debate_max_rounds"] = context.get("debate_max_rounds")
             instrument_type = context.get("instrument_type") or context.get("asset_type")
             if isinstance(instrument_type, str) and instrument_type.strip():
                 ctx.meta["instrument_type"] = instrument_type.strip()
@@ -104,6 +108,9 @@ class _DashboardMethods:
             market_structure_context = context.get("market_structure_context")
             if isinstance(market_structure_context, dict) and market_structure_context:
                 ctx.meta["market_structure_context"] = dict(market_structure_context)
+            market_regime_context = context.get("market_regime_context")
+            if isinstance(market_regime_context, dict) and market_regime_context:
+                ctx.meta["market_regime_context"] = dict(market_regime_context)
             analysis_context_pack_summary = context.get("analysis_context_pack_summary")
             if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
                 ctx.meta["analysis_context_pack_summary"] = analysis_context_pack_summary
@@ -499,15 +506,37 @@ class _DashboardMethods:
         base_opinion = self._select_base_opinion(ctx)
         application = ctx.meta.get("risk_override_application")
         risk_applied = isinstance(application, RiskOverrideApplication) and application.applied
+        strategy_synthesis = self._collect_strategy_synthesis(ctx, {})
+        handling = (
+            strategy_synthesis.get("disagreement_handling")
+            if isinstance(strategy_synthesis, dict)
+            else None
+        )
+        if not isinstance(handling, dict):
+            handling = ctx.meta.get("disagreement_handling")
+        disagreement_applied = (
+            not risk_applied
+            and isinstance(handling, dict)
+            and handling.get("enabled") is True
+            and handling.get("high_disagreement") is True
+        )
+        pre_constraint_signal = normalize_decision_signal(
+            payload.get("decision_type")
+            or (base_opinion.signal if base_opinion else "hold")
+        )
         decision_type = (
             application.post_risk_signal.value
             if risk_applied
-            else normalize_decision_signal(
-                payload.get("decision_type")
-                or (base_opinion.signal if base_opinion else "hold")
-            )
+            else "hold"
+            if disagreement_applied
+            else pre_constraint_signal
         )
         confidence = float(base_opinion.confidence if base_opinion is not None else 0.5)
+        if disagreement_applied:
+            cap = (handling.get("policy") or {}).get("confidence_cap")
+            if isinstance(cap, (int, float)) and not isinstance(cap, bool):
+                confidence = min(confidence, max(0.0, min(1.0, float(cap))))
+        signal_constrained = risk_applied or disagreement_applied
         if base_opinion is None:
             payload[_PRESENTATION_CONFIDENCE_FLAG] = True
         sentiment_score = payload.get("sentiment_score")
@@ -515,7 +544,7 @@ class _DashboardMethods:
             sentiment_score = int(sentiment_score)
         except (TypeError, ValueError):
             sentiment_score = _estimate_sentiment_score(decision_type, confidence)
-        if risk_applied:
+        if signal_constrained:
             sentiment_score = _adjust_sentiment_score(sentiment_score, decision_type)
 
         dashboard_block = payload.get("dashboard")
@@ -576,14 +605,17 @@ class _DashboardMethods:
                 trend_prediction = "待结合更多阶段结果确认"
 
         operation_advice_raw = payload.get("operation_advice")
-        if risk_applied:
+        if signal_constrained:
             pre_risk_advice = _normalize_operation_advice_value(
                 operation_advice_raw,
-                application.from_signal.value,
+                application.from_signal.value
+                if risk_applied
+                else pre_constraint_signal,
             )
             operation_advice = _adjust_operation_advice(
                 pre_risk_advice,
                 decision_type,
+                source="disagreement" if disagreement_applied else "risk",
             )
         else:
             operation_advice = _normalize_operation_advice_value(
@@ -592,7 +624,7 @@ class _DashboardMethods:
             )
 
         existing_position = core.get("position_advice")
-        if risk_applied:
+        if signal_constrained:
             position_advice = _post_risk_position_advice(decision_type)
         else:
             position_advice = (
@@ -678,7 +710,7 @@ class _DashboardMethods:
         core["one_sentence"] = _truncate_text(one_sentence, 60)
         if not core.get("time_sensitivity"):
             core["time_sensitivity"] = "本周内"
-        if risk_applied:
+        if signal_constrained:
             core["signal_type"] = {
                 "hold": "🟡持有观望",
                 "sell": "🔴卖出信号",
@@ -691,7 +723,7 @@ class _DashboardMethods:
         if "action_checklist" not in battle:
             battle["action_checklist"] = []
         position_strategy = battle.get("position_strategy")
-        if risk_applied:
+        if signal_constrained:
             position_strategy = (
                 dict(position_strategy)
                 if isinstance(position_strategy, dict)
@@ -725,6 +757,26 @@ class _DashboardMethods:
         if strategy_synthesis:
             dashboard_block["strategy_synthesis"] = strategy_synthesis
 
+        # Structured disagreement handling (#246 / #193): never silently drop.
+        dashboard_block.pop("disagreement_handling", None)
+        handling = None
+        if isinstance(strategy_synthesis, dict):
+            handling = strategy_synthesis.get("disagreement_handling")
+        if not isinstance(handling, dict):
+            meta_handling = ctx.meta.get("disagreement_handling")
+            if isinstance(meta_handling, dict):
+                handling = meta_handling
+        if isinstance(handling, dict) and handling.get("enabled"):
+            from src.agent.disagreement_handling import public_disagreement_handling_payload
+
+            public = public_disagreement_handling_payload(handling)
+            if public is not None:
+                dashboard_block["disagreement_handling"] = public
+                if isinstance(strategy_synthesis, dict) and "disagreement_handling" not in strategy_synthesis:
+                    strategy_synthesis = dict(strategy_synthesis)
+                    strategy_synthesis["disagreement_handling"] = public
+                    dashboard_block["strategy_synthesis"] = strategy_synthesis
+
         # Committee deliberation section (#545): additive, only when mode active.
         # Strip any model-authored committee payload; deterministic builder only.
         dashboard_block.pop("committee_deliberation", None)
@@ -744,6 +796,27 @@ class _DashboardMethods:
                 "[Orchestrator] investment committee report section failed",
                 exc,
                 error_code="agent_committee_report_section_failed",
+                level=logging.WARNING,
+            )
+
+        # Bull-Bear debate section (#117): additive product surface; never silent-drop.
+        try:
+            from src.agent.bull_bear_debate import (
+                DEBATE_META_KEY,
+                apply_debate_to_dashboard,
+                get_debate_record,
+            )
+
+            apply_debate_to_dashboard(
+                dashboard_block,
+                get_debate_record(ctx) or ctx.meta.get(DEBATE_META_KEY),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Report projection failure is logged while the primary decision remains authoritative.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] bull-bear debate report section failed",
+                exc,
+                error_code="agent_bull_bear_debate_report_section_failed",
                 level=logging.WARNING,
             )
 
@@ -812,7 +885,7 @@ class _DashboardMethods:
         payload["key_points"] = key_points
         payload["risk_warning"] = risk_warning
         payload["dashboard"] = dashboard_block
-        if risk_applied:
+        if signal_constrained:
             for opinion in reversed(ctx.opinions):
                 if opinion.agent_name == "decision":
                     opinion.signal = decision_type

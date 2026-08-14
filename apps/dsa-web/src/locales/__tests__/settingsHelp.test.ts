@@ -48,6 +48,17 @@ describe('fallback model settings help', () => {
     expect(content?.summary).toBe('Backend-provided summary');
   });
 
+  it('uses field-specific descriptions for shared market-regime help', () => {
+    const description = 'Field-specific market-regime guidance';
+    const content = getSettingsHelpContent(
+      'settings.agent.market_regime',
+      description,
+      'en-US',
+    );
+
+    expect(content?.summary).toBe(description);
+  });
+
   it.each(['zh-CN', 'en-US'])('uses StockPulse branding in user-facing settings help for %s', (locale) => {
     const generationHelp = getSettingsHelpContent('settings.ai_model.GENERATION_BACKEND', undefined, locale);
     const alphaSiftHelp = getSettingsHelpContent('settings.data_source.ALPHASIFT_ENABLED', undefined, locale);

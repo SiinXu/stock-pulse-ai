@@ -109,6 +109,8 @@ EXPECTED_ARGUMENT_DEFAULTS = {
     "check_notify": False,
     "debug": False,
     "dry_run": False,
+    "enable_debate": None,
+    "debate_max_rounds": None,
     "force_run": False,
     "host": None,
     "market_review": False,
@@ -206,6 +208,10 @@ def test_moved_cli_functions_keep_facade_metadata_and_globals() -> None:
         (["main.py"], {}),
         (["main.py", "--dry-run"], {"dry_run": True}),
         (["main.py", "--portfolio", "futu"], {"portfolio": "futu"}),
+        (
+            ["main.py", "--enable-debate", "--debate-max-rounds", "2"],
+            {"enable_debate": True, "debate_max_rounds": 2},
+        ),
         (
             ["main.py", "--serve-only", "--host", "0.0.0.0", "--port", "9000"],
             {"serve_only": True, "host": "0.0.0.0", "port": 9000},

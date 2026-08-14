@@ -418,6 +418,8 @@ class AnalysisApiService:
             report_language=getattr(request, "report_language", None),
             skills=getattr(request, "skills", None),
             use_memory=getattr(request, "use_memory", None),
+            enable_debate=getattr(request, "enable_debate", None),
+            debate_max_rounds=getattr(request, "debate_max_rounds", None),
         )
         try:
             submission = AnalysisSubmissionService(
@@ -536,6 +538,8 @@ class AnalysisApiService:
                 analysis_phase=request.analysis_phase,
                 report_language=getattr(request, "report_language", None),
                 use_memory=getattr(request, "use_memory", None),
+                enable_debate=getattr(request, "enable_debate", None),
+                debate_max_rounds=getattr(request, "debate_max_rounds", None),
             )
 
             if result is None:

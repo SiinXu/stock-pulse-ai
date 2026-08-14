@@ -20,6 +20,7 @@ if TYPE_CHECKING:
         check_content_integrity,
         format_daily_market_context_prompt_section,
         format_market_phase_prompt_section,
+        format_market_regime_prompt_section,
         format_market_structure_prompt_section,
         get_chip_unavailable_text,
         get_no_data_text,
@@ -53,6 +54,8 @@ class GeminiAnalyzer:
         progress_callback: Optional[Callable[[int, str], None]] = None,
         stream_progress_callback: Optional[Callable[[int], None]] = None,
         analysis_context_pack_summary: Optional[str] = None,
+        model_override: Optional[str] = None,
+        disable_model_fallback: bool = False,
     ) -> AnalysisResult:
         """
         分析单只股票
@@ -248,8 +251,9 @@ class GeminiAnalyzer:
 
             config = self._get_runtime_config()
             backend_id, _fallback_backend_id = self._resolve_generation_backend_config()
-            model_name = config.litellm_model or "unknown"
-            if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS:
+            effective_model_override = str(model_override or "").strip() or None
+            model_name = effective_model_override or config.litellm_model or "unknown"
+            if backend_id in LOCAL_CLI_GENERATION_BACKEND_IDS and not effective_model_override:
                 model_name = backend_id
                 legacy_audit_context["transport"] = backend_id
             logger.info(f"========== AI 分析 {name}({code}) ==========")
@@ -271,6 +275,10 @@ class GeminiAnalyzer:
                 "temperature": config.llm_temperature,
                 "max_output_tokens": 8192,
             }
+            if effective_model_override:
+                generation_config["model_override"] = effective_model_override
+            if disable_model_fallback:
+                generation_config["disable_model_fallback"] = True
 
             logger.info(f"[LLM调用] 开始调用 {model_name}...")
             _emit_progress(68, f"{name}：LLM 已接收请求，等待响应")
@@ -560,6 +568,12 @@ class GeminiAnalyzer:
         )
         if market_structure_section:
             prompt += market_structure_section
+        market_regime_section = format_market_regime_prompt_section(
+            context.get("market_regime_context"),
+            report_language=report_language,
+        )
+        if market_regime_section:
+            prompt += market_regime_section
         if isinstance(analysis_context_pack_summary, str) and analysis_context_pack_summary:
             prompt += analysis_context_pack_summary
         decision_memory_prompt = context.get("decision_memory_reflection_prompt")
