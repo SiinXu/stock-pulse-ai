@@ -125,6 +125,7 @@ from src.agent.orchestrator_parts.dashboard import (
     _dashboard_content_json,
 )
 from src.agent.orchestrator_parts.execution import _ExecutionMethods
+from src.agent.orchestrator_parts import disagreement as _disagreement
 from src.agent.orchestrator_parts.pipeline import _PipelineMethods
 
 if TYPE_CHECKING:

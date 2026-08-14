@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from src.agent import critic as _critic
 from src.agent.chat_context import build_agent_chat_tool_registry
 from src.agent.disagreement import build_agent_disagreement_summary
+from src.agent.orchestrator_parts import disagreement as _disagreement
 from src.agent.protocols import (
     AgentContext,
     AgentRunStats,
@@ -1462,90 +1463,9 @@ class _PipelineMethods:
 
     def _prepare_decision_context(self, ctx: AgentContext) -> None:
         """Populate low-sensitivity summaries consumed by DecisionAgent."""
-        ctx.meta["agent_disagreement_summary"] = build_agent_disagreement_summary(
-            ctx,
-            risk_override_enabled=getattr(self.config, "agent_risk_override", True),
+        _disagreement.prepare_decision_disagreement_context(
+            ctx, self.config, summary_builder=build_agent_disagreement_summary,
         )
-        if not getattr(self.config, "agent_disagreement_handling", False):
-            return
-
-        from dataclasses import replace
-
-        from src.agent.disagreement_handling import (
-            apply_disagreement_handling_to_synthesis,
-            disagreement_handling_thresholds,
-            merge_role_disagreement_into_handling,
-            public_disagreement_handling_payload,
-        )
-
-        high_threshold, medium_threshold = disagreement_handling_thresholds(self.config)
-        role_summary = ctx.meta.get("agent_disagreement_summary")
-        if not isinstance(role_summary, dict):
-            role_summary = None
-
-        consensus_data = ctx.get_data("skill_consensus")
-        synthesis = None
-        if isinstance(consensus_data, dict):
-            candidate = consensus_data.get("strategy_synthesis")
-            if isinstance(candidate, dict) and candidate:
-                synthesis = candidate
-            else:
-                raw_data = consensus_data.get("raw_data")
-                if isinstance(raw_data, dict):
-                    candidate = raw_data.get("strategy_synthesis")
-                    if isinstance(candidate, dict) and candidate:
-                        synthesis = candidate
-
-        handling = None
-        if isinstance(synthesis, dict) and synthesis:
-            updated = apply_disagreement_handling_to_synthesis(
-                synthesis,
-                role_summary=role_summary,
-                high_confidence_threshold=high_threshold,
-                medium_confidence_threshold=medium_threshold,
-            )
-            handling = updated.get("disagreement_handling")
-            if isinstance(consensus_data, dict):
-                consensus_data = dict(consensus_data)
-                consensus_data["strategy_synthesis"] = updated
-                if updated.get("final_signal"):
-                    consensus_data["signal"] = updated["final_signal"]
-                if isinstance(updated.get("confidence"), (int, float)):
-                    consensus_data["confidence"] = updated["confidence"]
-                raw_data = consensus_data.get("raw_data")
-                if isinstance(raw_data, dict):
-                    raw_data = dict(raw_data)
-                    raw_data["strategy_synthesis"] = updated
-                    consensus_data["raw_data"] = raw_data
-                ctx.set_data("skill_consensus", consensus_data)
-            if (
-                isinstance(handling, dict)
-                and handling.get("verdict_mode") == "split"
-                and updated.get("final_signal")
-            ):
-                for idx, opinion in enumerate(list(ctx.opinions)):
-                    if getattr(opinion, "agent_name", "") != "skill_consensus":
-                        continue
-                    raw = dict(opinion.raw_data) if isinstance(opinion.raw_data, dict) else {}
-                    raw["strategy_synthesis"] = updated
-                    ctx.opinions[idx] = replace(
-                        opinion,
-                        signal=str(updated["final_signal"]),
-                        confidence=float(updated.get("confidence") or opinion.confidence or 0.0),
-                        raw_data=raw,
-                    )
-                    break
-        else:
-            handling = merge_role_disagreement_into_handling(
-                None,
-                role_summary,
-                high_confidence_threshold=high_threshold,
-                medium_confidence_threshold=medium_threshold,
-            )
-
-        public = public_disagreement_handling_payload(handling)
-        if public is not None:
-            ctx.meta["disagreement_handling"] = public
 
     def _record_critic_budget_skip(
         self,
