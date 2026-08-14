@@ -24,6 +24,7 @@ from api.v1.endpoints import (
     candidate_discovery,
     config_profiles,
     decision_signals,
+    evidence_pack,
     health,
     history,
     investment_framework,
@@ -105,6 +106,11 @@ router.include_router(
     prefix="/history",
     tags=["History"],
 )
+
+# Evidence chain + auditable package export (Issues #986 / #127).
+router.include_router(evidence_pack.router, prefix="/history", tags=["EvidencePack"])
+router.include_router(evidence_pack.analysis_alias_router, prefix="/analysis", tags=["EvidencePack"])
+
 
 router.include_router(
     research_pack.router,

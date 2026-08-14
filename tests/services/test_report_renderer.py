@@ -135,6 +135,35 @@ class TestReportRenderer(unittest.TestCase):
         self.assertIn("作战计划", out)
         self.assertNotIn("盘中决策护栏", out)
 
+    def test_render_surfaces_debate_and_never_fakes_unavailable_synthesis(self) -> None:
+        debate = {
+            "enabled": True,
+            "status": "data_unavailable",
+            "rounds_completed": 0,
+            "max_rounds": 1,
+            "rounds": [],
+            "contention_points": [],
+            "synthesis": None,
+        }
+        r = _make_result(
+            dashboard={
+                "core_conclusion": {"one_sentence": "Wait for evidence"},
+                "intelligence": {"risk_alerts": []},
+                "battle_plan": {"sniper_points": {"stop_loss": "110"}},
+                "bull_bear_debate": debate,
+            },
+            report_language="en",
+        )
+
+        markdown = render("markdown", [r], summary_only=False)
+        wechat = render("wechat", [r], summary_only=False)
+
+        self.assertIn("Bull-Bear Debate", markdown)
+        self.assertIn("data_unavailable", markdown)
+        self.assertIn("Bull-Bear Debate", wechat)
+        self.assertIn("data_unavailable", wechat)
+        self.assertNotIn("Synthesis: Hold", markdown)
+
     def test_render_surfaces_active_research_persona(self) -> None:
         r = _make_result(
             dashboard={
@@ -1367,6 +1396,56 @@ class TestDecisionFirstLayeredReading(unittest.TestCase):
         assert wechat_brief is not None
         self.assertNotIn("Evidence Strata", wechat_brief)
 
+    def test_multi_model_section_respects_modes_and_unassessed_presentation(self) -> None:
+        from src.agent.multi_model_consensus import build_multi_model_comparison
+        from src.services.report_export_service import export_report
+
+        r = self._layered_result()
+        r.dashboard["multi_model_comparison"] = build_multi_model_comparison(
+            [
+                {
+                    "model_id": "model-a",
+                    "model_version": "model-a",
+                    "provider": "test",
+                    "status": "failed",
+                    "signal": None,
+                    "score_band": None,
+                    "confidence": None,
+                }
+            ],
+            requested_models=["model-a", "model-b"],
+        )
+
+        outputs = {
+            mode: render(
+                "markdown",
+                [r],
+                summary_only=False,
+                extra_context={"report_mode": mode},
+            )
+            for mode in ("brief", "standard", "research")
+        }
+        brief = outputs["brief"]
+        standard = outputs["standard"]
+        research = outputs["research"]
+        assert brief is not None and standard is not None and research is not None
+        self.assertIn("### 🃏", brief)
+        self.assertNotIn("多模型共识对比", brief)
+        self.assertIn("已省略", brief)
+        for output in (standard, research):
+            self.assertIn("多模型共识对比", output)
+            self.assertIn("一致度**: 未评估", output)
+            self.assertGreater(output.find("多模型共识对比"), output.find("### 🃏"))
+
+        artifact = export_report(
+            standard,
+            "md",
+            filename_stem="multi-model-mode-contract",
+        )
+        exported = artifact.content.decode("utf-8")
+        self.assertIn("多模型共识对比", exported)
+        self.assertIn("一致度**: 未评估", exported)
+
     def test_notification_brief_report_forces_brief_mode_despite_config(self) -> None:
         """ReportType.BRIEF path must keep push density when REPORT_MODE is research."""
         from src.formatters import markdown_to_plain_text
@@ -1377,6 +1456,14 @@ class TestDecisionFirstLayeredReading(unittest.TestCase):
             r = self._layered_result()
             r.code = str(600519 + i)
             r.name = "贵州茅台"
+            r.dashboard["multi_model_comparison"] = {
+                "enabled": True,
+                "status": "insufficient",
+                "consensus_level": "insufficient",
+                "consensus_score": None,
+                "agreement_table": [],
+                "disagreement_handling": {"points": []},
+            }
             results.append(r)
 
         cfg = _make_renderer_config(True)
@@ -1408,6 +1495,7 @@ class TestDecisionFirstLayeredReading(unittest.TestCase):
         assert out is not None
         self.assertIn("🃏", out)
         self.assertNotIn("证据分层", out)
+        self.assertNotIn("多模型共识对比", out)
         plain = markdown_to_plain_text(out)
         self.assertLessEqual(
             len(plain),

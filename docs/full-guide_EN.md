@@ -891,6 +891,7 @@ P3 itself did not add API/Web/Bot parameters, persist fields into history/task s
 
 Before `DecisionAgent` runs, the multi-agent pipeline builds an internal low-sensitivity `agent_disagreement_summary` that summarizes directional disagreement across prior Agent opinions, risk-override evidence, whether risk override is enabled by the current `AGENT_RISK_OVERRIDE` setting, and non-critical stage degradation. The summary only contains agent name, signal, confidence, conflict type, decision path hint, low-sensitivity risk-control state, and degraded-stage markers. It does not include reasoning, raw data, raw error text, tokens, or private payloads.
 - `AGENT_MULTI_STRATEGY_DELIBERATION=false` — multi-strategy deliberation cluster (default off).
+- `AGENT_DISAGREEMENT_HANDLING=false` — structured disagreement handling (default off): record points, dual-layer cross-validation, and high-disagreement split verdict on final products.
 
 This is currently only internal Prompt input plumbing for `DecisionAgent`: the summary is stored in runtime `ctx.meta`, is not injected through Agent pre-fetched data, and does not add public API fields, Web/Desktop display, history/task-status/report metadata, dashboard schema, or final explanation fields. `risk_level=high` is risk evidence only and does not trigger override by itself; the summary and final `_apply_risk_override()` share the same override predicate and respect `AGENT_RISK_OVERRIDE=false`. Non-critical degraded stages reuse the orchestrator contract for `intel`, `risk`, and specialist/skill agents, so a remaining single directional opinion is not described as multi-agent consensus. User-visible final explanation output for #1904 remains a later phase.
 
@@ -1363,6 +1364,30 @@ A-share ETFs are identified as a distinct instrument type and take the **ETF ana
 
 Representative regression codes: `510300`, `510050`, `159915`, `159919`, `512880`. Validation-layer ETF false-positive calibration is documented in `docs/data-validation-layer.md` and Issue #185.
 
+### Multi-Model Consensus Comparison (optional)
+
+Default **off**. When `MULTI_MODEL_CONSENSUS_ENABLED=true`, the legacy stock analysis path can run the **same shared data snapshot** across 2–3 models sequentially (explicit list, `fast`/`quality` preset, or primary + fallbacks; sequential by default because the shared analyzer is not thread-safe), then attach a structured product payload:
+
+- Agreement table: action / score band / key risks per model
+- Consensus level + agreement score (not a blended trading signal)
+- Disagreement points using the same low-sensitivity point contract as multi-agent disagreement handling (`source` / `kind` / `severity` / `participants` / `sides` / `summary_key`)
+- Hard honesty rules: **no majority vote**, **no averaging** of opposing directions; high disagreement stays visible; single-model failure degrades to the surviving result with `single_model_fallback` annotation
+- With fewer than two usable conclusions, the agreement score is explicitly **Not evaluated** instead of a misleading `0`; `NaN` and `±Inf` are rejected in budgets, confidence metrics, and shared snapshots
+- `brief` keeps only the Decision Card, key risk, and explicit omission notice; the full comparison is limited to `standard` / `research`, history export, and non-brief notifications so push budgets remain bounded
+- Model id / version / provider identities are recorded under `dashboard.multi_model_comparison.trace` and each LLM diagnostic run uses `call_type=multi_model_consensus`
+
+```bash
+MULTI_MODEL_CONSENSUS_ENABLED=true
+MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash
+# or: MULTI_MODEL_CONSENSUS_PRESET=fast
+MULTI_MODEL_CONSENSUS_MAX_MODELS=3
+# MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05
+# Budget rules: empty = MAX_MODELS only; 0 = close multi-model fan-out;
+# positive (no live pricing yet) = hard-cap to 2 models and record skipped models.
+```
+
+Agent multi-agent mode is unchanged by this flag. Related multi-agent disagreement handling remains a separate surface (Issues #246 / #193 / PR #1205).
+
 ### Multi-Model Switching
 
 Configure multiple models, system auto-switches:
@@ -1812,6 +1837,11 @@ The global Critic retry budget is fixed at one per run, and the same target cann
 `StrategyEngine` remains the sole owner of Skill evidence partitioning and `strategy_synthesis` at the existing Decision boundary. The Critic is read-only, has no ToolSurface, and cannot author the final investment decision. Its verdict, reasons, missing evidence, requested/executed targets, budget consumption, and retry status are recorded in internal `AgentContext.meta`, `StageResult.meta`, and `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events. This does not expand persisted runtime facts or public Chat metadata.
 
 Cost boundary: an eligible enabled Multi run adds at most one Critic LLM call. Only a `retry` verdict adds at most one whitelist-stage LLM/tool rerun. Both remain bounded by the existing `AGENT_ORCHESTRATOR_TIMEOUT_S` remaining budget, and their timeouts exclude the minimum reserved for Decision. Disable or remove `AGENT_CRITIC_ENABLED` to roll back; no data migration or cleanup is required.
+
+### Structured Bull-Bear debate
+
+`DEBATE_ENABLED=false` (default) preserves existing behavior. When `true`, only non-Chat Native Multi analysis inserts an optional structured Bull-Bear debate stage before Decision (1–3 rounds of multi-party stances, contention points, and non-authoritative synthesis). Results land on `dashboard.bull_bear_debate`, Markdown/WeChat reports, and DecisionSignal metadata (`debate_summary`/`debate_rounds`) and must not be silently dropped. Bounded by `DEBATE_MAX_ROUNDS`, per-debate LLM-turn budgets, and residual `AGENT_ORCHESTRATOR_TIMEOUT_S` wall-clock budget. Contention points use disagreement vocabulary (`source=debate`) and never majority vote. A non-empty `DEBATE_MODEL` is consumed as the LiteLLM route for every debate call; request context may override `enable_debate` and `debate_max_rounds`. Provider failure or the absence of a complete two-sided round produces an explicit `data_unavailable` record without a `hold` opinion, fabricated synthesis, or false verification hit. Rollback: disable or remove `DEBATE_ENABLED`.
+
 ### Hard per-mode budgets (#1121 / #125)
 
 Each run mode (`quick` / `standard` / `full` / `specialist` / chat) has hard caps for LLM turns, tool calls, and estimated USD cost (optional token ceiling via `AGENT_MODE_BUDGET_MAX_TOKENS`). Consumption is tracked on a shared `mode_budget` account and exposed in diagnostics (`ctx.meta["mode_budget"]` / `result.budget_snapshot`). On breach the run terminates with `success=false` and an explicit reason (`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`). Existing residual wall-clock skips remain `budget_skip` / `timeout` and record into the same snapshot — there is a single budget concept, not a parallel system. Configure via `AGENT_MODE_BUDGET_*` (see `.env.example`).

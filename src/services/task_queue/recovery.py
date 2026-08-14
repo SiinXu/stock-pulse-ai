@@ -226,6 +226,8 @@ class _TaskQueueRecoveryMethods:
                 skills=copy.deepcopy(metadata.get("skills")),
                 report_language=metadata.get("report_language"),
                 use_memory=metadata.get("use_memory"),
+                enable_debate=metadata.get("enable_debate"),
+                debate_max_rounds=metadata.get("debate_max_rounds"),
                 request_context=None,
                 strict_skill_selection=bool(
                     metadata.get("strict_skill_selection", False)

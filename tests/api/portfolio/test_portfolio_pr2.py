@@ -65,8 +65,18 @@ class PortfolioPr2TestCase(unittest.TestCase):
             encoding="utf-8",
         )
 
-        os.environ["ENV_FILE"] = str(self.env_path)
-        os.environ["DATABASE_PATH"] = str(self.db_path)
+        # Config loads every key from this temporary dotenv into os.environ.
+        # Restore the complete mapping so later tests cannot inherit those keys.
+        self._env_patcher = patch.dict(
+            os.environ,
+            {
+                "ENV_FILE": str(self.env_path),
+                "DATABASE_PATH": str(self.db_path),
+            },
+            clear=False,
+        )
+        self._env_patcher.start()
+        self.addCleanup(self._env_patcher.stop)
         Config.reset_instance()
         DatabaseManager.reset_instance()
 
@@ -81,8 +91,6 @@ class PortfolioPr2TestCase(unittest.TestCase):
     def tearDown(self) -> None:
         DatabaseManager.reset_instance()
         Config.reset_instance()
-        os.environ.pop("ENV_FILE", None)
-        os.environ.pop("DATABASE_PATH", None)
         self._board_fetch_patcher.stop()
         self.temp_dir.cleanup()
 
