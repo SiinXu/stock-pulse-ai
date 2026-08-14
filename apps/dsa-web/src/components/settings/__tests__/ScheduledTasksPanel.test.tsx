@@ -1,9 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { UI_TEXT } from '../../../i18n/uiText';
+import { createDeferred } from '../../../test-utils';
 import ScheduledTasksPanel from '../ScheduledTasksPanel';
 
 const HISTORY_ASSERT_TIMEOUT_MS = 5_000;
@@ -362,15 +364,10 @@ describe('ScheduledTasksPanel', () => {
   }, HISTORY_FLOW_TIMEOUT_MS);
 
   it('shows an empty history and uses the API limit contract for load more and refresh', async () => {
-    let resolveEmptyHistory: () => void = () => undefined;
+    const emptyHistory = createDeferred<{ total: number; items: [] }>();
     vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 1, items: [scheduledTask] });
     vi.mocked(scheduledTasksApi.listRuns)
-      .mockImplementationOnce(async () => {
-        await new Promise<void>((resolve) => {
-          resolveEmptyHistory = resolve;
-        });
-        return { total: 0, items: [] };
-      })
+      .mockImplementationOnce(() => emptyHistory.promise)
       .mockResolvedValueOnce({ total: 11, items: [buildRun('run-1')] })
       .mockResolvedValueOnce({
         total: 2,
@@ -381,7 +378,11 @@ describe('ScheduledTasksPanel', () => {
         items: [buildRun('run-1'), buildRun('run-2')],
       });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    render(
+      <StrictMode>
+        <ScheduledTasksPanel t={t} language="en" />
+      </StrictMode>,
+    );
 
     await screen.findByText('AAPL risk check');
     fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-1'));
@@ -390,12 +391,20 @@ describe('ScheduledTasksPanel', () => {
       'task-1',
       { limit: 10 },
     ));
-    await act(async () => resolveEmptyHistory());
-    expect(await screen.findByText(
-      'No run history',
+    expect(screen.getByTestId('settings-scheduled-task-history-toggle-task-1')).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByText(UI_TEXT.en['settings.scheduledTasksHistoryLoading'])).toBeInTheDocument();
+    await act(async () => {
+      emptyHistory.resolve({ total: 0, items: [] });
+    });
+    const history = await screen.findByTestId(
+      'settings-scheduled-task-history-task-1',
       undefined,
       { timeout: HISTORY_ASSERT_TIMEOUT_MS },
-    )).toBeInTheDocument();
+    );
+    expect(within(history).getByText(UI_TEXT.en['settings.scheduledTasksHistoryEmpty'])).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', {
       name: 'Refresh run history for “AAPL risk check”',
