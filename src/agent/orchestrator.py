@@ -36,6 +36,7 @@ from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeou
 from dataclasses import dataclass, field, fields as dataclass_fields
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from src.agent import bull_bear_debate as _debate
 from src.agent import critic as _critic
 from src.agent.chat_context import (
     build_agent_chat_market_context,
@@ -125,6 +126,8 @@ from src.agent.orchestrator_parts.dashboard import (
     _dashboard_content_json,
 )
 from src.agent.orchestrator_parts.execution import _ExecutionMethods
+from src.agent.orchestrator_parts import disagreement as _disagreement
+from src.agent.orchestrator_parts.critic_revision import _CriticRevisionRunner
 from src.agent.orchestrator_parts.pipeline import _PipelineMethods
 
 if TYPE_CHECKING:
@@ -144,6 +147,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     _ApprovalRiskSource,
     _ApprovalService,
     _critic,
+    _debate,
     AgentContext,
     _apply_risk_manager_gate,
     _authorize_risk_gate_bypass,
@@ -214,6 +218,7 @@ NON_CRITICAL_BASE_STAGES = frozenset({
     "intel",
     "risk",
     _critic.CRITIC_STAGE_NAME,
+    _debate.DEBATE_STAGE_NAME,
 })
 _PREPARED_DECISION_TYPE_INSERTED = "_prepared_dashboard_decision_type_inserted"
 
@@ -296,10 +301,18 @@ class AgentOrchestrator:
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
         self.skill_manager = skill_manager
         self.config = config
+        from src.agent.disagreement_handling import disagreement_handling_thresholds
+
+        high_threshold, medium_threshold = disagreement_handling_thresholds(config)
         self.strategy_engine = StrategyEngine(
             deliberation_enabled=bool(
                 getattr(config, "agent_multi_strategy_deliberation", False)
             ),
+            disagreement_handling_enabled=bool(
+                getattr(config, "agent_disagreement_handling", False)
+            ),
+            disagreement_high_confidence_threshold=high_threshold,
+            disagreement_medium_confidence_threshold=medium_threshold,
         )
         self.runtime_guard_policy = (
             runtime_guard_policy or RuntimeGuardPolicy.from_sources(config)
@@ -417,7 +430,7 @@ def _adjust_sentiment_score(score: int, signal: str) -> int:
     return max(low, min(high, score))
 
 
-def _adjust_operation_advice(advice: str, signal: str) -> str:
+def _adjust_operation_advice(advice: str, signal: str, *, source: str = "risk") -> str:
     """Normalize action wording to the overridden decision signal."""
     mapping = {
         "buy": "买入",
@@ -428,6 +441,8 @@ def _adjust_operation_advice(advice: str, signal: str) -> str:
         return advice
     if advice == mapping[signal]:
         return advice
+    if source == "disagreement":
+        return f"{mapping[signal]}（原建议因高分歧下调）"
     return f"{mapping[signal]}（原建议已被风控下调）"
 
 

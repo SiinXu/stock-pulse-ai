@@ -958,6 +958,29 @@ class _ConfigLoadingMethods:
                 minimum=1,
                 maximum=2,
             ),
+            agent_step_critique_enabled=parse_env_bool(
+                os.getenv('AGENT_STEP_CRITIQUE_ENABLED'),
+                False,
+            ),
+            debate_enabled=parse_env_bool(
+                os.getenv('DEBATE_ENABLED'),
+                False,
+            ),
+            debate_max_rounds=parse_env_int(
+                os.getenv('DEBATE_MAX_ROUNDS'),
+                2,
+                field_name='DEBATE_MAX_ROUNDS',
+                minimum=1,
+                maximum=3,
+            ),
+            debate_temperature=parse_env_float(
+                os.getenv('DEBATE_TEMPERATURE'),
+                0.4,
+                field_name='DEBATE_TEMPERATURE',
+                minimum=0.0,
+                maximum=1.5,
+            ),
+            debate_model=(os.getenv('DEBATE_MODEL') or '').strip(),
             agent_reflection_enabled=parse_env_bool(
                 os.getenv('AGENT_REFLECTION_ENABLED'),
                 False,
@@ -967,6 +990,18 @@ class _ConfigLoadingMethods:
                 1,
                 field_name='AGENT_REFLECTION_LLM_BUDGET',
                 minimum=0,
+                maximum=64,  # MAX_REFLECTION_LLM_CALL_BUDGET
+            ),
+            agent_meta_review_enabled=parse_env_bool(
+                os.getenv('AGENT_META_REVIEW_ENABLED'),
+                False,
+            ),
+            agent_meta_review_min_episodes=parse_env_int(
+                os.getenv('AGENT_META_REVIEW_MIN_EPISODES'),
+                30,
+                field_name='AGENT_META_REVIEW_MIN_EPISODES',
+                minimum=1,
+                maximum=50000,
             ),
             agent_reflection_max_revise=parse_env_int(
                 os.getenv('AGENT_REFLECTION_MAX_REVISE'),
@@ -991,6 +1026,35 @@ class _ConfigLoadingMethods:
             agent_investment_committee_mode=parse_env_bool(
                 os.getenv('AGENT_INVESTMENT_COMMITTEE_MODE'),
                 False,
+            ),
+            multi_model_consensus_enabled=parse_env_bool(
+                os.getenv('MULTI_MODEL_CONSENSUS_ENABLED'),
+                False,
+            ),
+            multi_model_consensus_models=[
+                part.strip()
+                for part in (os.getenv('MULTI_MODEL_CONSENSUS_MODELS') or '').split(',')
+                if part.strip()
+            ],
+            multi_model_consensus_preset=(
+                os.getenv('MULTI_MODEL_CONSENSUS_PRESET') or ''
+            ).strip().lower(),
+            multi_model_consensus_max_models=parse_env_int(
+                os.getenv('MULTI_MODEL_CONSENSUS_MAX_MODELS'),
+                3,
+                field_name='MULTI_MODEL_CONSENSUS_MAX_MODELS',
+                minimum=2,
+                maximum=5,
+            ),
+            multi_model_consensus_max_cost_usd=(
+                _parse_env_finite_float(
+                    os.getenv('MULTI_MODEL_CONSENSUS_MAX_COST_USD'),
+                    0.0,
+                    field_name='MULTI_MODEL_CONSENSUS_MAX_COST_USD',
+                    minimum=0,
+                )
+                if (os.getenv('MULTI_MODEL_CONSENSUS_MAX_COST_USD') or '').strip()
+                else None
             ),
             agent_research_persona=(
                 (os.getenv('AGENT_RESEARCH_PERSONA') or '').strip().lower()
@@ -1045,6 +1109,23 @@ class _ConfigLoadingMethods:
                 os.getenv('RISK_GATE_PROFILE')
             ),
             agent_multi_strategy_deliberation=os.getenv('AGENT_MULTI_STRATEGY_DELIBERATION', 'false').lower() == 'true',
+            agent_disagreement_handling=parse_env_bool(
+                os.getenv('AGENT_DISAGREEMENT_HANDLING'), default=False
+            ),
+            agent_disagreement_high_confidence_threshold=parse_env_float(
+                os.getenv('AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD'),
+                0.7,
+                field_name='AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD',
+                minimum=0.0,
+                maximum=1.0,
+            ),
+            agent_disagreement_medium_confidence_threshold=parse_env_float(
+                os.getenv('AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD'),
+                0.55,
+                field_name='AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD',
+                minimum=0.0,
+                maximum=1.0,
+            ),
             agent_deep_research_budget=parse_env_int(
                 os.getenv('AGENT_DEEP_RESEARCH_BUDGET'),
                 30000,
@@ -1187,6 +1268,8 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_SKILL_ROUTING')
                 or os.getenv('AGENT_STRATEGY_ROUTING', 'auto')
             ).lower(),
+            market_regime_enabled=os.getenv('MARKET_REGIME_ENABLED', 'true').lower() == 'true',
+            market_regime_override=(os.getenv('MARKET_REGIME_OVERRIDE') or '').strip().lower(),
             agent_context_compression_enabled=parse_env_bool(
                 os.getenv('AGENT_CONTEXT_COMPRESSION_ENABLED'),
                 default=False,
@@ -1838,6 +1921,15 @@ class _ConfigLoadingMethods:
                 field_name='REASONING_TRACE_EXPORT_MAX_CHARS',
                 minimum=10_000,
                 maximum=2_000_000,
+            ),
+            evidence_chain_enabled=parse_env_bool(
+                os.getenv('EVIDENCE_CHAIN_ENABLED'), default=True
+            ),
+            audit_export_enabled=parse_env_bool(
+                os.getenv('AUDIT_EXPORT_ENABLED'), default=False
+            ),
+            audit_include_raw_artifacts=parse_env_bool(
+                os.getenv('AUDIT_INCLUDE_RAW_ARTIFACTS'), default=False
             ),
             research_pack_export_enabled=parse_env_bool(
                 os.getenv('RESEARCH_PACK_EXPORT_ENABLED'), default=False

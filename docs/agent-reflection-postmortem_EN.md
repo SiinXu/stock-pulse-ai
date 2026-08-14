@@ -40,7 +40,7 @@ Entry: `src/agent/evolution/reflection.py` (`run_reflection_loop`, etc.).
 
 1. Default **off** (`AGENT_REFLECTION_ENABLED=false`).
 2. When enabled, emits typed lessons onto `ctx.meta["reflection_result"]`.
-3. Optional LLM critique limited by `AGENT_REFLECTION_LLM_BUDGET` (default 1).
+3. Optional LLM critique limited by `AGENT_REFLECTION_LLM_BUDGET` (default 1, max 64).
 4. Optional in-run revise limited by `AGENT_REFLECTION_MAX_REVISE` (default 1).
 5. Soul / ToolSurface identity is snapshotted and re-asserted after the path.
 
@@ -60,7 +60,7 @@ Entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`, `run_po
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `AGENT_REFLECTION_ENABLED` | `false` | Enable run-local reflection |
-| `AGENT_REFLECTION_LLM_BUDGET` | `1` | Max LLM calls per reflection loop |
+| `AGENT_REFLECTION_LLM_BUDGET` | `1` | Max LLM calls per reflection loop (0-64) |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | Max in-run revise passes |
 | `AGENT_POSTMORTEM_ENABLED` | `false` | Enable resolved-forecast post-mortem |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | Max LLM calls per resolution batch |

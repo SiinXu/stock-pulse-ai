@@ -678,6 +678,102 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
         "warning_codes": [],
     },
+    "DEBATE_ENABLED": {
+        "title": "Structured Bull-Bear Debate",
+        "description": (
+            "Optional structured Bull vs Bear debate stage before Decision in Native Multi "
+            "analysis. Surfaces multi-party stances, contention points, and a non-authoritative "
+            "synthesis on final products. Default off; does not change single-pass behavior."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 631,
+        "help_key": "settings.agent.DEBATE",
+        "examples": ["DEBATE_ENABLED=false", "DEBATE_ENABLED=true"],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DEBATE_MAX_ROUNDS": {
+        "title": "Debate Max Rounds",
+        "description": "Maximum Bull-Bear debate rounds when DEBATE_ENABLED is true (1-3).",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "2",
+        "options": [],
+        "validation": {"min": 1, "max": 3},
+        "display_order": 632,
+        "help_key": "settings.agent.DEBATE",
+        "examples": ["DEBATE_MAX_ROUNDS=2"],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DEBATE_TEMPERATURE": {
+        "title": "Debate Temperature",
+        "description": "Sampling temperature for Bull-Bear debate LLM turns (0-1.5).",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0.4",
+        "options": [],
+        "validation": {"min": 0, "max": 1.5},
+        "display_order": 633,
+        "help_key": "settings.agent.DEBATE",
+        "examples": ["DEBATE_TEMPERATURE=0.4"],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "DEBATE_MODEL": {
+        "title": "Debate Model",
+        "description": "Optional dedicated model name for debate turns. Empty uses the agent primary route.",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 634,
+        "help_key": "settings.agent.DEBATE",
+        "examples": ["DEBATE_MODEL="],
+        "docs": [
+            {
+                "label": "Bull-Bear debate configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_REFLECTION_ENABLED": {
         "title": "Run-local Reflection Loop",
         "description": (
@@ -694,7 +790,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 65,
+        "display_order": 66,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_ENABLED=false",
@@ -711,7 +807,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "AGENT_REFLECTION_LLM_BUDGET": {
         "title": "Reflection LLM Call Budget",
         "description": (
-            "Maximum LLM calls for one run-local reflection loop (default 1). "
+            "Maximum LLM calls for one run-local reflection loop (default 1, max 64). "
             "Budget exhaustion records an explicit budget skip; it does not silently "
             "continue as a successful reflection."
         ),
@@ -723,8 +819,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_editable": True,
         "default_value": "1",
         "options": [],
-        "validation": {"min": 0},
-        "display_order": 66,
+        "validation": {"min": 0, "max": 64},
+        "display_order": 65,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_LLM_BUDGET=1",
@@ -853,6 +949,70 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-reflection-postmortem_EN.md",
             },
         ],
+        "warning_codes": [],
+    },
+    "AGENT_STEP_CRITIQUE_ENABLED": {
+        "title": "Step Critique",
+        "description": (
+            "Default-off immediate (in-loop) step critique after tool failure or "
+            "contradictory observations. Emits typed ReflectionLesson values and "
+            "standardizes replan reason codes; never mutates Agent Soul or ToolSurface."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 726,
+        "help_key": "settings.agent.multi_level_reflection",
+        "examples": ["AGENT_STEP_CRITIQUE_ENABLED=false", "AGENT_STEP_CRITIQUE_ENABLED=true"],
+        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
+        "warning_codes": [],
+    },
+    "AGENT_META_REVIEW_ENABLED": {
+        "title": "Meta Review",
+        "description": (
+            "Default-off offline meta-review that aggregates episode lessons into a "
+            "human-readable report. Never auto-edits Soul, ToolSurface, or runtime config."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 731,
+        "help_key": "settings.agent.multi_level_reflection",
+        "examples": ["AGENT_META_REVIEW_ENABLED=false", "AGENT_META_REVIEW_ENABLED=true"],
+        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
+        "warning_codes": [],
+    },
+    "AGENT_META_REVIEW_MIN_EPISODES": {
+        "title": "Review Minimum",
+        "description": (
+            "Minimum episode samples before meta-review emits recommended actions "
+            "(default 30). Below threshold records threshold_not_met."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 1, "max": 50000},
+        "display_order": 732,
+        "help_key": "settings.agent.multi_level_reflection",
+        "examples": ["AGENT_META_REVIEW_MIN_EPISODES=30", "AGENT_META_REVIEW_MIN_EPISODES=10"],
+        "docs": [{"label": "Multi-level reflection", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-multi-level-reflection_EN.md"}],
         "warning_codes": [],
     },
     "AGENT_INVESTMENT_COMMITTEE_MODE": {
@@ -1034,6 +1194,70 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "help_key": "settings.agent.AGENT_MULTI_STRATEGY_DELIBERATION",
         "examples": ["AGENT_MULTI_STRATEGY_DELIBERATION=false", "AGENT_MULTI_STRATEGY_DELIBERATION=true"],
         "docs": [{"label": "Multi-strategy contract", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multi-strategy-contract.md"}],
+        "warning_codes": [],
+    },
+    "AGENT_DISAGREEMENT_HANDLING": {
+        "title": "Structured Disagreement Handling",
+        "description": "Enable structured multi-agent disagreement recording, dual-layer cross-validation, and split-verdict escalation. High disagreement forces a conservative hold and remains visible on final products. Default off.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 65,
+        "help_key": "settings.agent.AGENT_DISAGREEMENT_HANDLING",
+        "examples": ["AGENT_DISAGREEMENT_HANDLING=false", "AGENT_DISAGREEMENT_HANDLING=true"],
+        "docs": [{"label": "Multi-strategy contract", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multi-strategy-contract.md"}],
+        "warning_codes": [],
+    },
+    "AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD": {
+        "title": "Disagreement High-Confidence Threshold",
+        "description": "Confidence threshold for elevating directional disagreement to split-verdict escalation (0-1).",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0.7",
+        "options": [],
+        "validation": {"min": 0, "max": 1},
+        "display_order": 66,
+        "help_key": "settings.agent.AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD",
+        "examples": ["AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD=0.7"],
+        "docs": [
+            {
+                "label": "Multi-strategy contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multi-strategy-contract.md",
+            }
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD": {
+        "title": "Disagreement Medium-Confidence Threshold",
+        "description": "Confidence threshold for requesting dual-layer cross-validation before final synthesis (0-1).",
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0.55",
+        "options": [],
+        "validation": {"min": 0, "max": 1},
+        "display_order": 67,
+        "help_key": "settings.agent.AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD",
+        "examples": ["AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD=0.55"],
+        "docs": [
+            {
+                "label": "Multi-strategy contract",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/multi-strategy-contract.md",
+            }
+        ],
         "warning_codes": [],
     },
 
@@ -1935,7 +2159,68 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "MARKET_REGIME_ENABLED": {
+        "title": "Market Regime",
+        "description": "Enable explainable rule-based market regime detection and adaptive analysis focus. When unclear, labels unknown instead of forcing a side.",
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 681,
+        "help_key": "settings.agent.market_regime",
+        "examples": [
+            "MARKET_REGIME_ENABLED=true",
+            "MARKET_REGIME_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Market Regime Detection",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/market-regime.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MARKET_REGIME_OVERRIDE": {
+        "title": "Regime Override",
+        "description": "Optional forced regime label (trending_up/trending_down/sideways/volatile/unknown). Empty uses automatic rule-based detection.",
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"label": "Auto (rules)", "value": ""},
+            {"label": "Trending up", "value": "trending_up"},
+            {"label": "Trending down", "value": "trending_down"},
+            {"label": "Sideways", "value": "sideways"},
+            {"label": "Volatile", "value": "volatile"},
+            {"label": "Unknown", "value": "unknown"},
+        ],
+        "validation": {},
+        "display_order": 682,
+        "help_key": "settings.agent.market_regime",
+        "examples": [
+            "MARKET_REGIME_OVERRIDE=",
+            "MARKET_REGIME_OVERRIDE=trending_up",
+            "MARKET_REGIME_OVERRIDE=unknown",
+        ],
+        "docs": [
+            {
+                "label": "Market Regime Detection",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/market-regime.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_CONTEXT_COMPRESSION_ENABLED": {
+
         "title": "Agent Context Compression",
         "description": "Enable rolling compression of visible Agent chat history. Default is off to preserve existing behavior.",
         "category": "agent",
@@ -2883,6 +3168,39 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "EVIDENCE_CHAIN_ENABLED": {
+        "title": "Evidence Chain",
+        "description": "Build conclusion→evidence links from persisted history. Default on. Missing evidence is marked explicitly; sensitive values are redacted.",
+        "category": "agent", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "true", "options": [], "validation": {},
+        "display_order": 726, "help_key": "settings.agent.evidence_chain_export",
+        "examples": ["EVIDENCE_CHAIN_ENABLED=true", "EVIDENCE_CHAIN_ENABLED=false"],
+        "docs": [{"label": "Evidence chain & audit package (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/evidence-chain-audit-package_EN.md"}],
+        "warning_codes": [],
+    },
+    "AUDIT_EXPORT_ENABLED": {
+        "title": "Audit Package Export",
+        "description": "Master switch for redacted auditable report-package ZIP/JSON export. Default off. Requires administrator authentication.",
+        "category": "agent", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "false", "options": [], "validation": {},
+        "display_order": 727, "help_key": "settings.agent.evidence_chain_export",
+        "examples": ["AUDIT_EXPORT_ENABLED=false", "AUDIT_EXPORT_ENABLED=true"],
+        "docs": [{"label": "Evidence chain & audit package (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/evidence-chain-audit-package_EN.md"}],
+        "warning_codes": [],
+    },
+    "AUDIT_INCLUDE_RAW_ARTIFACTS": {
+        "title": "Audit Package Include Raw Artifacts",
+        "description": "When true, audit package may include raw intermediate artifacts (still redacted). Default false.",
+        "category": "agent", "data_type": "boolean", "ui_control": "switch",
+        "is_sensitive": False, "is_required": False, "is_editable": True,
+        "default_value": "false", "options": [], "validation": {},
+        "display_order": 728, "help_key": "settings.agent.evidence_chain_export",
+        "examples": ["AUDIT_INCLUDE_RAW_ARTIFACTS=false", "AUDIT_INCLUDE_RAW_ARTIFACTS=true"],
+        "docs": [{"label": "Evidence chain & audit package (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/evidence-chain-audit-package_EN.md"}],
+        "warning_codes": [],
+    },
 
 
     "RESEARCH_PACK_EXPORT_ENABLED": {
@@ -3279,6 +3597,158 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "docs": [
             {"label": "Reasoning trace export (EN)", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export_EN.md"},
             {"label": "推理轨迹导出（中文）", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/reasoning-trace-export.md"},
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_ENABLED": {
+        "title": "Multi-Model Consensus Comparison",
+        "description": (
+            "Default-off. When enabled, the legacy stock analysis path may run the "
+            "same shared data snapshot across 2–3 models sequentially, then attach "
+            "structured consensus degree and disagreement points to the product. "
+            "Disagreements are never averaged into a synthetic middle signal. "
+            "Requires at least two resolvable models (explicit list, preset, or "
+            "primary + fallbacks). Higher token/cost usage when enabled."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 726,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_ENABLED=false",
+            "MULTI_MODEL_CONSENSUS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: environment variables",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_MODELS": {
+        "title": "Multi-Model Consensus Model List",
+        "description": (
+            "Optional comma-separated LiteLLM model ids for multi-model comparison. "
+            "When empty, models are resolved from MULTI_MODEL_CONSENSUS_PRESET or "
+            "LITELLM_MODEL + LITELLM_FALLBACK_MODELS."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "text",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 727,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_MODELS=deepseek/deepseek-chat,gemini/gemini-2.0-flash",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_PRESET": {
+        "title": "Multi-Model Consensus Preset",
+        "description": (
+            "Optional preset when MULTI_MODEL_CONSENSUS_MODELS is empty: "
+            "fast (up to 2 models) or quality (up to max models)."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [
+            {"value": "", "label": "None (primary + fallbacks)"},
+            {"value": "fast", "label": "Fast consensus"},
+            {"value": "quality", "label": "Quality consensus"},
+        ],
+        "validation": {},
+        "display_order": 728,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_PRESET=fast",
+            "MULTI_MODEL_CONSENSUS_PRESET=quality",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_MAX_MODELS": {
+        "title": "Multi-Model Consensus Max Models",
+        "description": "Hard cap on models per comparison run (2–5, default 3).",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "3",
+        "options": [],
+        "validation": {"min": 2, "max": 5},
+        "display_order": 729,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_MAX_MODELS=3",
+            "MULTI_MODEL_CONSENSUS_MAX_MODELS=2",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "MULTI_MODEL_CONSENSUS_MAX_COST_USD": {
+        "title": "Multi-Model Consensus Max Cost USD",
+        "description": (
+            "Optional USD budget constraint for multi-model comparison. "
+            "Empty: no USD constraint (MAX_MODELS only). "
+            "0 or negative: multi-model fan-out is closed. "
+            "Positive (without live pricing): hard-cap fan-out to 2 models and "
+            "record skipped models. Never invents majority consensus under budget pressure."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {"min": 0},
+        "display_order": 730,
+        "help_key": "settings.agent.multi_model_consensus",
+        "examples": [
+            "MULTI_MODEL_CONSENSUS_MAX_COST_USD=0.05",
+        ],
+        "docs": [
+            {
+                "label": "Full guide: multi-model consensus",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide_EN.md",
+            },
         ],
         "warning_codes": [],
     },

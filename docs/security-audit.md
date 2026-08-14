@@ -61,7 +61,7 @@ reload intent remain in the event. Values are never included.
 | MCP auth / tool list / tool call / cancel | `mcp.auth` / `mcp.request` | Connected |
 | Local OCR worker accept/reject | `local_process.execute` (`local_process.ocr`) | Connected |
 | Local CLI subprocess accept/reject | `local_process.execute` (`local_process.cli`) | Connected |
-| Analysis evidence-package export (#127) | — | Out of scope (separate product) |
+| Analysis evidence-package export (#127 / #986) | `audit_package.export` / `evidence_chain.export` | Connected (see docs/evidence-chain-audit-package_EN.md) |
 
 Export/import/rollback metadata carries only bounded config version, flags, and
 byte length—never raw `.env` content or secret values. Auth policy/password

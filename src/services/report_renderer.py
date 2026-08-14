@@ -28,6 +28,9 @@ from src.report_language import (
     localize_chip_health,
     localize_conflict_severity,
     localize_consensus_level,
+    localize_disagreement_resolution,
+    localize_disagreement_verdict_mode,
+    normalize_disagreement_handling_payload,
     localize_operation_advice,
     localize_strategy_signal,
     localize_strategy_skill,
@@ -403,6 +406,7 @@ def render(
                     bool((merged_dashboard.get("strategy_synthesis") or {})),
                     bool((merged_dashboard.get("committee_deliberation") or {})),
                     bool((merged_dashboard.get("battle_plan") or {})),
+                    bool((merged_dashboard.get("multi_model_comparison") or {})),
                     bool(strata_public),
                 ]
             )
@@ -518,6 +522,9 @@ def render(
         "localize_strategy_conflict_description": localize_strategy_conflict_description,
         "localize_strategy_synthesis_summary": localize_strategy_synthesis_summary,
         "localize_consensus_level": localize_consensus_level,
+        "localize_disagreement_verdict_mode": localize_disagreement_verdict_mode,
+        "localize_disagreement_resolution": localize_disagreement_resolution,
+        "normalize_disagreement_handling_payload": normalize_disagreement_handling_payload,
         "localize_conflict_severity": localize_conflict_severity,
         "normalize_strategy_synthesis_payload": normalize_strategy_synthesis_payload,
         "strategy_invalid_opinion_count": strategy_invalid_opinion_count,

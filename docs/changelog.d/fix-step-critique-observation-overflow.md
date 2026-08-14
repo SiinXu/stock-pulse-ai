@@ -1,0 +1,1 @@
+- [Fixed] Plan execution no longer aborts with a generic loop error when retained step observations exceed the immediate-critique window (Refs #1094).

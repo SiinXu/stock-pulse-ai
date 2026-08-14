@@ -36,11 +36,13 @@ from src.agent.planning.observations import compact_observation_summary
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stock_scope import resolve_stock_scope
 from src.services.security_audit_service import get_security_audit_service
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 
 CancelledCheck = Callable[[], bool]
+ReflectionComplete = Callable[[str, str], str]
+REFLECTION_MAX_TOKENS = 800
 
 
 def _resolve_config(config: Any = None) -> Any:
@@ -148,6 +150,10 @@ def run_with_planning(
     started = time.perf_counter()
     scope_resolution = resolve_stock_scope(task, context)
     effective_context = dict(scope_resolution.effective_context or {})
+    # Bind the resolved product Config so multi-level reflection (Issue #1094)
+    # can read enable flags on the real AgentExecutor planning path. Without
+    # this, step critique stays library-only even when AGENT_STEP_CRITIQUE_* is on.
+    effective_context["config"] = cfg
     available_tools = list(executor.tool_registry.list_names())
 
     try:
@@ -263,10 +269,20 @@ def run_with_planning(
         "phase": "execution",
         "proposal_applied": True,
     }
+    # Harvest multi-level reflection artifacts written onto context during replan.
+    _merge_reflection_context(planning_metadata, effective_context)
     plan_tool_log = _tool_calls_log_from_execution(exec_result)
 
     if not exec_result.success:
         reason = exec_result.reason or exec_result.status or "plan_execution_failed"
+        _maybe_attach_end_of_run_reflection(
+            planning_metadata,
+            executor=executor,
+            config=cfg,
+            context=effective_context,
+            success=False,
+            tool_calls_log=plan_tool_log,
+        )
         return AgentResult(
             success=False,
             error=f"Plan execution terminated: {reason}",
@@ -324,7 +340,235 @@ def run_with_planning(
         "synthesis_success": bool(result.success),
         "product_duration_ms": max(0, int((time.perf_counter() - started) * 1000)),
     }
+    _maybe_attach_end_of_run_reflection(
+        result.planning_metadata,
+        executor=executor,
+        config=cfg,
+        context=effective_context,
+        success=bool(result.success),
+        tool_calls_log=result.tool_calls_log,
+    )
     return result
+
+
+def _merge_reflection_context(
+    planning_metadata: Dict[str, Any],
+    context: Optional[Dict[str, Any]],
+) -> None:
+    """Copy step-critique / replan taxonomy fields from loop context into metadata."""
+    if not isinstance(context, dict):
+        return
+    kinds = context.get("replan_reason_kinds")
+    if isinstance(kinds, list) and kinds:
+        planning_metadata["replan_reason_kinds"] = [
+            str(item) for item in kinds if str(item).strip()
+        ][:8]
+    step_payload = context.get("step_critique_result")
+    if isinstance(step_payload, dict):
+        planning_metadata["step_critique_result"] = step_payload
+
+
+def _maybe_attach_end_of_run_reflection(
+    planning_metadata: Dict[str, Any],
+    *,
+    executor: Any,
+    config: Any,
+    context: Optional[Dict[str, Any]],
+    success: bool,
+    tool_calls_log: Optional[Sequence[Dict[str, Any]]] = None,
+) -> None:
+    """Attach one bounded trajectory reflection to planning metadata.
+
+    Default-off via ``agent_reflection_enabled``. Fail-soft: a reflection
+    provider/validation failure is explicit in metadata but never changes the
+    already-computed Agent result. Episode persistence remains owned by #1210's
+    single end-of-run finalizer so this hook cannot create duplicate episodes.
+    """
+    if getattr(config, "agent_reflection_enabled", False) is not True:
+        return
+    try:
+        from src.agent.evolution.budget import budget_from_config
+        from src.agent.evolution.multilevel import run_trajectory_layer
+        from src.agent.evolution.reflection import REFLECTION_META_KEY
+        from src.agent.evolution.step_critique import STEP_CRITIQUE_META_KEY
+    except Exception as exc:  # broad-exception: fallback_recorded - reflection is optional
+        log_safe_exception(
+            logger,
+            "End-of-run reflection imports failed",
+            exc,
+            error_code="agent_reflection_import_failed",
+            level=logging.INFO,
+        )
+        planning_metadata["reflection_result"] = _reflection_error_payload(
+            "Trajectory reflection could not be loaded."
+        )
+        return
+
+    class _Ctx:
+        meta: Dict[str, Any]
+        opinions: List[Any]
+        risk_flags: List[Any]
+        stock_code: Optional[str]
+
+    ctx = _Ctx()
+    ctx.opinions = []
+    ctx.risk_flags = []
+    ctx.stock_code = None
+    run_id = None
+    episode_id = None
+    if isinstance(context, dict):
+        run_id = context.get("run_id") or context.get("analysis_history_id")
+        episode_id = context.get("episode_id")
+        ctx.stock_code = context.get("stock_code")
+        # Seed immediate-layer payload if the plan loop already wrote it.
+        step_payload = context.get(STEP_CRITIQUE_META_KEY) or planning_metadata.get(
+            STEP_CRITIQUE_META_KEY
+        )
+        ctx.meta = {
+            "run_id": run_id,
+            "episode_id": episode_id,
+            "run_success": success,
+            "planning_outcome": {
+                "status": planning_metadata.get("status"),
+                "reason": planning_metadata.get("reason"),
+                "observation_replans": planning_metadata.get(
+                    "observation_replans", 0
+                ),
+            },
+            "degraded_stages": list(context.get("degraded_stages") or []),
+        }
+        if isinstance(step_payload, dict):
+            ctx.meta[STEP_CRITIQUE_META_KEY] = step_payload
+            if step_payload.get("replan_reasons"):
+                ctx.meta["replan_reason_kinds"] = list(step_payload["replan_reasons"])
+    else:
+        ctx.meta = {
+            "run_id": run_id,
+            "episode_id": episode_id,
+            "run_success": success,
+        }
+
+    ctx.meta["trajectory_summary"] = _reflection_trajectory_summary(
+        tool_calls_log
+    )
+
+    try:
+        multi = run_trajectory_layer(
+            ctx,
+            config=config,
+            seed_from_immediate=True,
+            budget=budget_from_config(
+                config,
+                attr="agent_reflection_llm_budget",
+                default=1,
+            ),
+            llm_complete=_reflection_llm_complete(executor, config),
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - optional end reflection
+        log_safe_exception(
+            logger,
+            "End-of-run trajectory reflection failed",
+            exc,
+            error_code="agent_reflection_trajectory_failed",
+            level=logging.INFO,
+        )
+        planning_metadata["reflection_result"] = _reflection_error_payload(
+            "Trajectory reflection was unavailable."
+        )
+        return
+
+    if multi.trajectory is not None:
+        planning_metadata[REFLECTION_META_KEY] = multi.trajectory
+    if multi.episode_lessons:
+        planning_metadata["episode_lessons"] = list(multi.episode_lessons)
+    if multi.replan_reason_kinds:
+        planning_metadata.setdefault(
+            "replan_reason_kinds", list(multi.replan_reason_kinds)
+        )
+
+def _reflection_error_payload(reason: str) -> Dict[str, Any]:
+    """Expose optional reflection failure without changing the run outcome."""
+    return {
+        "lessons": [],
+        "revised": False,
+        "terminate_reason": "error",
+        "status": "error",
+        "episode_id": None,
+        "prediction_id": None,
+        "run_id": None,
+        "strategy_note": None,
+        "llm_budget_total": 0,
+        "llm_budget_consumed": 0,
+        "llm_budget_remaining": 0,
+        "validation_status": "error",
+        "skip_reason": reason,
+    }
+
+
+def _reflection_trajectory_summary(
+    tool_calls_log: Optional[Sequence[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """Build bounded, redacted evidence for the trajectory critic."""
+    summary: List[Dict[str, Any]] = []
+    for row in list(tool_calls_log or [])[:64]:
+        if not isinstance(row, dict):
+            continue
+        tool = row.get("tool") or row.get("tool_name")
+        if not isinstance(tool, str) or not tool.strip():
+            continue
+        raw_success = row.get("ok", row.get("success"))
+        if type(raw_success) is not bool:
+            continue
+        summary.append(
+            {
+                "tool": sanitize_diagnostic_text(tool, max_length=128),
+                "success": raw_success,
+                "error_code": sanitize_diagnostic_text(
+                    row.get("error_code"), max_length=64
+                )
+                or None,
+                "summary": sanitize_diagnostic_text(
+                    row.get("summary"), max_length=300
+                ),
+            }
+        )
+    return summary
+
+
+def _reflection_llm_complete(
+    executor: Any,
+    config: Any,
+) -> ReflectionComplete:
+    """Adapt the real executor provider to the strict reflection callback."""
+
+    def _complete(system_prompt: str, user_prompt: str) -> str:
+        adapter = getattr(executor, "llm_adapter", None)
+        call = getattr(adapter, "call_completion", None)
+        if not callable(call):
+            raise RuntimeError("reflection provider is unavailable")
+        timeout = float(
+            getattr(config, "agent_planning_proposal_timeout_seconds", 30.0)
+            or 30.0
+        )
+        timeout = max(0.1, min(timeout, 30.0))
+        response = call(
+            [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            tools=None,
+            temperature=0.0,
+            max_tokens=REFLECTION_MAX_TOKENS,
+            timeout=timeout,
+        )
+        if str(getattr(response, "provider", "") or "").lower() == "error":
+            raise RuntimeError("reflection provider returned an error")
+        content = getattr(response, "content", None)
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError("reflection provider returned no text")
+        return content
+
+    return _complete
 
 
 def _open_plan_tool_session(

@@ -1,6 +1,8 @@
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
+import { EVIDENCE_EXPORT_FIELD_TITLES } from '../i18n/evidenceExportErrorTranslations';
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
+import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
 
 const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
@@ -57,6 +59,7 @@ const categoryDescriptionMap: Record<UiLanguage, Partial<Record<SystemConfigCate
 });
 
 const fieldTitleMapZh = {
+  ...REFLECTION_FIELD_TITLE_MAP_ZH,
   STOCK_LIST: '自选股列表',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API 地址',
@@ -273,6 +276,7 @@ const fieldTitleMapZh = {
   DECISION_MEMORY_MIN_AGE_DAYS: '决策记忆最小天数',
   DECISION_MEMORY_MIN_SAMPLES: '决策记忆最小样本数',
   REASONING_TRACE_EXPORT_ENABLED: '推理轨迹导出',
+  ...EVIDENCE_EXPORT_FIELD_TITLES.zh,
   REASONING_TRACE_EXPORT_MAX_CHARS: '推理轨迹导出最大字符数',
   RESEARCH_PACK_EXPORT_ENABLED: '研报资产包导出',
   RESEARCH_PACK_MAX_ZIP_BYTES: '研报资产包 ZIP 上限（字节）',
@@ -282,6 +286,12 @@ const fieldTitleMapZh = {
   PREDICTION_EXTRACT_ENABLED: '预测记录抽取',
   AGENT_CRITIC_ENABLED: '有界 Multi-Agent Critic',
   AGENT_CRITIC_MAX_ITERS: 'Critic 最大修订轮次',
+  MARKET_REGIME_ENABLED: '市场状态',
+  MARKET_REGIME_OVERRIDE: '状态强制值',
+  DEBATE_ENABLED: '结构化多空辩论',
+  DEBATE_MAX_ROUNDS: '辩论最大轮数',
+  DEBATE_TEMPERATURE: '辩论温度',
+  DEBATE_MODEL: '辩论模型',
   AGENT_REFLECTION_ENABLED: '运行内反思循环',
   AGENT_REFLECTION_LLM_BUDGET: '反思 LLM 调用预算',
   AGENT_REFLECTION_MAX_REVISE: '反思最大修订次数',
@@ -289,6 +299,9 @@ const fieldTitleMapZh = {
   AGENT_POSTMORTEM_LLM_BUDGET: '复盘批次 LLM 预算',
   AGENT_POSTMORTEM_SKIP_CLEAN_HITS: '跳过准确命中的复盘',
   AGENT_MULTI_STRATEGY_DELIBERATION: '多策略合议',
+  AGENT_DISAGREEMENT_HANDLING: '分歧处理',
+  AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD: '高分歧阈值',
+  AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD: '复核阈值',
   AGENT_RISK_OVERRIDE: '风控 Agent 否决',
   RISK_GATE_PROFILE: '风控经理档位',
   AGENT_SKILL_AUTOWEIGHT: '策略自动加权',
@@ -402,6 +415,11 @@ const fieldTitleMapZh = {
   ANTHROPIC_TEMPERATURE: 'Anthropic 温度参数',
   ANTHROPIC_MAX_TOKENS: 'Anthropic 最大输出 Token 数',
   AGENT_INVESTMENT_COMMITTEE_MODE: '投委会模式',
+  MULTI_MODEL_CONSENSUS_ENABLED: '多模型共识对比',
+  MULTI_MODEL_CONSENSUS_MODELS: '多模型共识模型列表',
+  MULTI_MODEL_CONSENSUS_PRESET: '多模型共识预设',
+  MULTI_MODEL_CONSENSUS_MAX_MODELS: '多模型共识最大模型数',
+  MULTI_MODEL_CONSENSUS_MAX_COST_USD: '多模型共识成本上限（USD）',
   AGENT_RESEARCH_PERSONA: '研究立场预设',
   AGENT_RESEARCH_PERSONA_CUSTOM: '自定义研究立场',
   FEISHU_CHAT_ID: '飞书会话 ID',
@@ -493,6 +511,7 @@ type SystemConfigFieldTitleKey = keyof typeof fieldTitleMapZh;
 // the translation source inventory, while the Settings UI still prefers the
 // live backend schema title when the selected UI language is English.
 const fieldTitleMapEn = {
+  ...REFLECTION_FIELD_TITLE_MAP_EN,
   STOCK_LIST: 'Stock List',
   TUSHARE_TOKEN: 'Tushare Token',
   TUSHARE_HTTP_URL: 'Tushare Pro API URL',
@@ -709,6 +728,7 @@ const fieldTitleMapEn = {
   DECISION_MEMORY_MIN_AGE_DAYS: 'Decision Memory Min Age (Days)',
   DECISION_MEMORY_MIN_SAMPLES: 'Decision Memory Min Samples',
   REASONING_TRACE_EXPORT_ENABLED: 'Reasoning Trace Export',
+  ...EVIDENCE_EXPORT_FIELD_TITLES.en,
   REASONING_TRACE_EXPORT_MAX_CHARS: 'Reasoning Trace Max Chars',
   RESEARCH_PACK_EXPORT_ENABLED: 'Research Pack Export',
   RESEARCH_PACK_MAX_ZIP_BYTES: 'Research Pack Max ZIP Bytes',
@@ -718,6 +738,12 @@ const fieldTitleMapEn = {
   PREDICTION_EXTRACT_ENABLED: 'Prediction Extraction',
   AGENT_CRITIC_ENABLED: 'Bounded Multi-Agent Critic',
   AGENT_CRITIC_MAX_ITERS: 'Critic Max Revision Rounds',
+  MARKET_REGIME_ENABLED: 'Market Regime',
+  MARKET_REGIME_OVERRIDE: 'Regime Override',
+  DEBATE_ENABLED: 'Structured Bull-Bear Debate',
+  DEBATE_MAX_ROUNDS: 'Debate Max Rounds',
+  DEBATE_TEMPERATURE: 'Debate Temperature',
+  DEBATE_MODEL: 'Debate Model',
   AGENT_REFLECTION_ENABLED: 'Run-local Reflection Loop',
   AGENT_REFLECTION_LLM_BUDGET: 'Reflection LLM Call Budget',
   AGENT_REFLECTION_MAX_REVISE: 'Reflection Max Revise Passes',
@@ -725,6 +751,9 @@ const fieldTitleMapEn = {
   AGENT_POSTMORTEM_LLM_BUDGET: 'Post-mortem Batch LLM Budget',
   AGENT_POSTMORTEM_SKIP_CLEAN_HITS: 'Skip Post-mortem on Clean Hits',
   AGENT_MULTI_STRATEGY_DELIBERATION: 'Multi-Strategy Deliberation',
+  AGENT_DISAGREEMENT_HANDLING: 'Structured Disagreement Handling',
+  AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD: 'Disagreement High-Confidence Threshold',
+  AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD: 'Disagreement Medium-Confidence Threshold',
   AGENT_RISK_OVERRIDE: 'Risk Agent Override',
   RISK_GATE_PROFILE: 'Risk Manager Profile',
   AGENT_SKILL_AUTOWEIGHT: 'Auto-Weight Strategies',
@@ -838,6 +867,11 @@ const fieldTitleMapEn = {
   ANTHROPIC_TEMPERATURE: 'Anthropic Temperature',
   ANTHROPIC_MAX_TOKENS: 'Anthropic Max Tokens',
   AGENT_INVESTMENT_COMMITTEE_MODE: 'Investment Committee Mode',
+  MULTI_MODEL_CONSENSUS_ENABLED: 'Multi-Model Consensus Comparison',
+  MULTI_MODEL_CONSENSUS_MODELS: 'Multi-Model Consensus Model List',
+  MULTI_MODEL_CONSENSUS_PRESET: 'Multi-Model Consensus Preset',
+  MULTI_MODEL_CONSENSUS_MAX_MODELS: 'Multi-Model Consensus Max Models',
+  MULTI_MODEL_CONSENSUS_MAX_COST_USD: 'Multi-Model Consensus Max Cost USD',
   AGENT_RESEARCH_PERSONA: 'Research Persona Preset',
   AGENT_RESEARCH_PERSONA_CUSTOM: 'Custom Research Stance',
   FEISHU_CHAT_ID: 'Feishu Chat ID',
@@ -1155,6 +1189,12 @@ const fieldDescriptionMap: Record<string, string> = {
   DECISION_PROFILE_CALIBRATION_ENABLED: '默认关闭。开启后在决策信号后验统计中追加决策风格校准分组；关闭时响应保持兼容，不改变评估与持久化。',
   PREDICTION_EXTRACT_ENABLED: '默认关闭。开启后从结构化决策字段抽取 PredictionRecord 草稿（研究/质量运营）；散文不会变成可验证声明，失败不阻断分析。',
   AGENT_CRITIC_ENABLED: '在 Native Multi 的 Decision 前启用一次无工具 Critic；仅可消耗一次全局预算重试已进入的 intelligence 或目录内 skill 阶段。',
+  MARKET_REGIME_ENABLED: '启用可解释的规则型市场状态识别和自适应分析重点；证据不足时返回 unknown，不强行判断方向。',
+  MARKET_REGIME_OVERRIDE: '可选的市场状态强制值；留空时使用自动规则识别，仅建议在诊断时设置。',
+  DEBATE_ENABLED: '可选的 Decision 前 Bull vs Bear 结构化辩论（默认关闭，仅 Native Multi 非 Chat）。',
+  DEBATE_MAX_ROUNDS: '启用辩论时的最大轮数（1–3）。',
+  DEBATE_TEMPERATURE: '辩论 LLM 采样温度（0–1.5）。',
+  DEBATE_MODEL: '可选辩论模型名；设置后使用专用路由，为空使用 Agent 主路由。',
   AGENT_RISK_OVERRIDE: '控制 legacy 风险计划是否直接执行下调；不可关闭的最终动作裁决仍独立运行。',
   RISK_GATE_PROFILE: '选择最终建议发布前不可关闭的风控裁决档位；非法值会阻止启动。',
   AGENT_SKILL_AUTOWEIGHT: "根据回测表现自动调整策略权重。",

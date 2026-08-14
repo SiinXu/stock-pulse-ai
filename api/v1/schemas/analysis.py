@@ -87,6 +87,18 @@ class AnalyzeRequest(BaseModel):
         validation_alias=AliasChoices("use_memory", "useMemory"),
         description="本次分析是否注入历史决策复盘；未传时使用全局 DECISION_MEMORY_ENABLED",
     )
+    enable_debate: Optional[bool] = Field(
+        None,
+        validation_alias=AliasChoices("enable_debate", "enableDebate"),
+        description="本次分析是否启用结构化 Bull-Bear 辩论；未传时使用全局 DEBATE_ENABLED",
+    )
+    debate_max_rounds: Optional[int] = Field(
+        None,
+        ge=1,
+        le=3,
+        validation_alias=AliasChoices("debate_max_rounds", "debateMaxRounds"),
+        description="本次分析辩论轮数覆盖（1-3）；未传时使用全局 DEBATE_MAX_ROUNDS",
+    )
 
     model_config = ConfigDict(json_schema_extra={
         "example": {
@@ -100,7 +112,9 @@ class AnalyzeRequest(BaseModel):
             "selection_source": "autocomplete",
             "notify": True,
             "report_language": "zh",
-            "skills": ["bull_trend"]
+            "skills": ["bull_trend"],
+            "enable_debate": False,
+            "debate_max_rounds": 2,
         }
     })
 

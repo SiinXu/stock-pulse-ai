@@ -7,9 +7,12 @@ import logging
 import time
 from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
+from src.agent import bull_bear_debate as _debate
 from src.agent import critic as _critic
 from src.agent.chat_context import build_agent_chat_tool_registry
 from src.agent.disagreement import build_agent_disagreement_summary
+from src.agent.orchestrator_parts import disagreement as _disagreement
+from src.agent.orchestrator_parts.critic_revision import _CriticRevisionRunner
 from src.agent.protocols import (
     AgentContext,
     AgentRunStats,
@@ -46,6 +49,7 @@ NON_CRITICAL_BASE_STAGES = frozenset({
     "intel",
     "risk",
     _critic.CRITIC_STAGE_NAME,
+    _debate.DEBATE_STAGE_NAME,
 })
 
 
@@ -140,255 +144,19 @@ class _PipelineMethods:
             + _OPTIONAL_STAGE_MARGIN_S
         )
 
-        def _remaining_optional_budget_s() -> Optional[float]:
-            if not timeout_s:
-                return None
-            return max(0.0, timeout_s - (time.time() - t0))
-
-        def _record_optional_stage(stage_result: StageResult) -> None:
-            stats.record_stage(stage_result)
-            all_tool_calls.extend(
-                tc for tc in (stage_result.meta.get("tool_calls_log") or [])
-            )
-            models_used.extend(stage_result.meta.get("models_used", []))
-
-        def _run_critic_revision(
-            source: Any,
-            target: str,
-            started_trace: Dict[str, Any],
-        ) -> tuple[StageResult, Dict[str, Any]]:
-            stage_name = str(source.agent_name or "")
-            if progress_callback:
-                progress_callback(stream_event(
-                    "critic_retry_start",
-                    stage=stage_name,
-                    retry_target=target,
-                    **_critic.trace_event_fields(started_trace),
-                ))
-
-            before = _critic.snapshot_target_evidence(ctx, target)
-            started_elapsed_s = time.time() - t0
-            remaining_s = _remaining_optional_budget_s()
-            timeout_budget_s = (
-                max(
-                    0.0,
-                    remaining_s
-                    - _DECISION_BUDGET_RESERVE_S
-                    - _OPTIONAL_STAGE_MARGIN_S,
-                )
-                if remaining_s is not None
-                else None
-            )
-            try:
-                revision_result, revision_ctx = self._execute_isolated_stage(
-                    source,
-                    _critic.build_retry_seed(ctx, target),
-                    stage_name=stage_name,
-                    progress_callback=progress_callback,
-                    timeout_seconds=self._resolve_stage_timeout_seconds(
-                        stage_name,
-                        timeout_budget_s,
-                    ),
-                    cancelled_check=cancelled_check,
-                )
-                _propagate_agent_soul_composition(revision_ctx, ctx)
-                if not isinstance(revision_result, StageResult):
-                    raise TypeError(
-                        "Critic revision stage returned an invalid result"
-                    )
-                if (
-                    revision_result.status == StageStatus.COMPLETED
-                    and not _critic.retry_produced_evidence(
-                        revision_ctx,
-                        target,
-                        strategy_engine=self.strategy_engine,
-                    )
-                ):
-                    revision_result.status = StageStatus.FAILED
-                    revision_result.error = AGENT_EXECUTION_FAILURE_MESSAGE
-                    revision_result.failure_reason = (
-                        StageFailureReason.STAGE_FAILURE
-                    )
-                if revision_result.status == StageStatus.COMPLETED:
-                    self._commit_stage_context(ctx, revision_ctx)
-            except TimeoutError as exc:
-                log_safe_exception(
-                    logger,
-                    "[Orchestrator] Critic revision timed out",
-                    exc,
-                    error_code="agent_critic_retry_timeout",
-                    level=logging.WARNING,
-                    context={"stage": stage_name},
-                )
-                revision_result = StageResult(
-                    stage_name=stage_name,
-                    status=StageStatus.FAILED,
-                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
-                    failure_reason=StageFailureReason.TIMEOUT,
-                    meta={
-                        "runtime_guard_event": (
-                            "critic_retry_exception_captured"
-                        )
-                    },
-                )
-            except Exception as exc:  # broad-exception: fallback_recorded - Optional bounded revision becomes a fail-soft diagnostic.
-                log_safe_exception(
-                    logger,
-                    "[Orchestrator] Critic revision failed",
-                    exc,
-                    error_code="agent_critic_retry_failed",
-                    level=logging.WARNING,
-                    context={"stage": stage_name},
-                )
-                revision_result = StageResult(
-                    stage_name=stage_name,
-                    status=StageStatus.FAILED,
-                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
-                    failure_reason=StageFailureReason.STAGE_FAILURE,
-                    meta={
-                        "runtime_guard_event": (
-                            "critic_retry_exception_captured"
-                        )
-                    },
-                )
-
-            elapsed_now_s = time.time() - t0
-            if revision_result.meta.get("runtime_guard_event") in {
-                "critic_retry_exception_captured",
-                "stage_timeout",
-            }:
-                revision_result.duration_s = round(
-                    max(0.0, elapsed_now_s - started_elapsed_s),
-                    2,
-                )
-            completed = revision_result.status == StageStatus.COMPLETED
-            _critic.finish_retry(ctx, completed=completed)
-            trace = _critic.append_revision_round(
-                ctx,
-                target=target,
-                before=before,
-                after=_critic.snapshot_target_evidence(ctx, target),
-                status="completed" if completed else "failed",
-            )
-            revision_result.meta["critic_retry"] = (
-                _critic.trace_event_fields(trace)
-            )
-            _record_optional_stage(revision_result)
-            if progress_callback:
-                progress_callback(stream_event(
-                    "critic_retry_done",
-                    stage=stage_name,
-                    status=revision_result.status.value,
-                    duration=revision_result.duration_s,
-                    retry_target=target,
-                    **_critic.trace_event_fields(trace),
-                ))
-            if revision_result.status == StageStatus.FAILED:
-                self._record_degraded_stage(ctx, stage_name, revision_result)
-            return revision_result, trace
-
-        def _run_critic_recheck() -> tuple[StageResult, Optional[str], Dict[str, Any]]:
-            recheck_agent = self._prepare_agent(_critic.BoundedCriticAgent(
-                tool_registry=self._tool_registry_for_context(ctx),
-                llm_adapter=self.llm_adapter,
-                skill_instructions=self.skill_instructions,
-                technical_skill_policy=self.technical_skill_policy,
-            ))
-            recheck_agent.max_steps = _critic.CRITIC_MAX_STEPS
-            remaining_s = _remaining_optional_budget_s()
-            timeout_budget_s = (
-                max(
-                    0.0,
-                    remaining_s
-                    - _DECISION_BUDGET_RESERVE_S
-                    - _OPTIONAL_STAGE_MARGIN_S,
-                )
-                if remaining_s is not None
-                else None
-            )
-            if progress_callback:
-                progress_callback(stream_event(
-                    "stage_start",
-                    stage=_critic.CRITIC_STAGE_NAME,
-                    message="Rechecking Critic convergence...",
-                ))
-            try:
-                recheck_result, recheck_ctx = self._execute_isolated_stage(
-                    recheck_agent,
-                    ctx,
-                    stage_name=_critic.CRITIC_STAGE_NAME,
-                    progress_callback=progress_callback,
-                    timeout_seconds=self._resolve_stage_timeout_seconds(
-                        _critic.CRITIC_STAGE_NAME,
-                        timeout_budget_s,
-                    ),
-                    cancelled_check=cancelled_check,
-                )
-                _propagate_agent_soul_composition(recheck_ctx, ctx)
-                if not isinstance(recheck_result, StageResult):
-                    raise TypeError("Critic recheck returned an invalid result")
-                if recheck_result.status == StageStatus.COMPLETED:
-                    self._commit_stage_context(ctx, recheck_ctx)
-                    trace = _critic.get_critic_trace(ctx) or {}
-                    verdict = str(trace.get("verdict") or "")
-                else:
-                    verdict = None
-                    trace = _critic.mark_convergence_unavailable(
-                        ctx,
-                        "Critic convergence recheck did not complete; the "
-                        "revision remains unverified.",
-                    )
-            except Exception as exc:  # broad-exception: fallback_recorded - Optional convergence recheck fails soft with an explicit limitation.
-                log_safe_exception(
-                    logger,
-                    "[Orchestrator] Critic recheck failed",
-                    exc,
-                    error_code="agent_critic_recheck_failed",
-                    level=logging.WARNING,
-                )
-                recheck_result = StageResult(
-                    stage_name=_critic.CRITIC_STAGE_NAME,
-                    status=StageStatus.FAILED,
-                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
-                    failure_reason=StageFailureReason.STAGE_FAILURE,
-                )
-                verdict = None
-                trace = _critic.mark_convergence_unavailable(
-                    ctx,
-                    "Critic convergence recheck failed; the revision remains "
-                    "unverified.",
-                )
-
-            if (
-                recheck_result.status == StageStatus.COMPLETED
-                and verdict in {"pass", "fail_soft"}
-            ):
-                trace = _critic.finalize_convergence(
-                    ctx,
-                    recheck_verdict=verdict,
-                )
-            recheck_result.meta["critic"] = _critic.trace_event_fields(trace)
-            _record_optional_stage(recheck_result)
-            if progress_callback:
-                progress_callback(stream_event(
-                    "stage_done",
-                    stage=_critic.CRITIC_STAGE_NAME,
-                    status=recheck_result.status.value,
-                    duration=recheck_result.duration_s,
-                ))
-                if verdict == "retry":
-                    progress_callback(stream_event(
-                        "critic_verdict",
-                        stage=_critic.CRITIC_STAGE_NAME,
-                        **_critic.trace_event_fields(trace),
-                    ))
-            if recheck_result.status == StageStatus.FAILED:
-                self._record_degraded_stage(
-                    ctx,
-                    _critic.CRITIC_STAGE_NAME,
-                    recheck_result,
-                )
-            return recheck_result, verdict, trace
+        critic_revision_runner = _CriticRevisionRunner(
+            self,
+            ctx,
+            stats=stats,
+            all_tool_calls=all_tool_calls,
+            models_used=models_used,
+            started_at=t0,
+            timeout_seconds=timeout_s,
+            decision_budget_reserve_seconds=_DECISION_BUDGET_RESERVE_S,
+            optional_stage_margin_seconds=_OPTIONAL_STAGE_MARGIN_S,
+            progress_callback=progress_callback,
+            cancelled_check=cancelled_check,
+        )
 
         while index < len(agents):
             agent = agents[index]
@@ -635,6 +403,10 @@ class _PipelineMethods:
                     agents.insert(index, critic_agent)
                     continue
 
+            if _debate.maybe_insert_before_decision(
+                self, agents, index, ctx, stats, timeout_s, remaining_budget, _OPTIONAL_STAGE_REQUIRED_S, progress_callback):
+                continue
+
             stage_name = str(agent.agent_name or "")
             observed_entries = stage_entry_counts.get(stage_name, 0) + 1
             stage_entry_limit = self.runtime_guard_policy.max_stage_entries
@@ -689,21 +461,7 @@ class _PipelineMethods:
                     message=f"Starting {agent.agent_name} analysis...",
                 ))
 
-            remaining_timeout_s = (
-                max(0.0, timeout_s - elapsed_s)
-                if timeout_s
-                else None
-            )
-            if (
-                _critic.is_critic_stage(stage_name)
-                and remaining_timeout_s is not None
-            ):
-                remaining_timeout_s = max(
-                    0.0,
-                    remaining_timeout_s
-                    - _DECISION_BUDGET_RESERVE_S
-                    - _OPTIONAL_STAGE_MARGIN_S,
-                )
+            remaining_timeout_s = _debate.reserve_optional_stage_timeout(stage_name, timeout_s, elapsed_s, _critic.is_critic_stage(stage_name), _DECISION_BUDGET_RESERVE_S, _OPTIONAL_STAGE_MARGIN_S)
             effective_stage_timeout_s = self._resolve_stage_timeout_seconds(
                 stage_name,
                 remaining_timeout_s,
@@ -826,6 +584,7 @@ class _PipelineMethods:
                 ):
                     critic_trace = _critic.finalize_convergence(ctx)
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
+            _debate.commit_pipeline_stage_result(ctx, result, stage_name)
             stats.record_stage(result)
             all_tool_calls.extend(
                 tc for tc in (result.meta.get("tool_calls_log") or [])
@@ -968,7 +727,9 @@ class _PipelineMethods:
                             ),
                         )
                     )
-                    remaining_s = _remaining_optional_budget_s()
+                    remaining_s = (
+                        critic_revision_runner.remaining_optional_budget_s()
+                    )
                     if not mode_budget_ok:
                         critic_trace = _critic.mark_retry_unavailable(
                             ctx,
@@ -1009,7 +770,7 @@ class _PipelineMethods:
                             **_critic.trace_event_fields(started_trace),
                         ))
                     retry_attempted = True
-                    revision_result, critic_trace = _run_critic_revision(
+                    revision_result, critic_trace = critic_revision_runner.run_revision(
                         retry_source,
                         retry_target,
                         started_trace,
@@ -1037,7 +798,9 @@ class _PipelineMethods:
                     recheck_mode_ok, recheck_mode_reason = (
                         _critic.mode_budget_allows_optional_work(ctx)
                     )
-                    recheck_remaining_s = _remaining_optional_budget_s()
+                    recheck_remaining_s = (
+                        critic_revision_runner.remaining_optional_budget_s()
+                    )
                     if not recheck_mode_ok:
                         critic_trace = _critic.mark_convergence_unavailable(
                             ctx,
@@ -1056,7 +819,7 @@ class _PipelineMethods:
                         break
 
                     recheck_result, recheck_verdict, critic_trace = (
-                        _run_critic_recheck()
+                        critic_revision_runner.run_recheck()
                     )
                     elapsed_s = time.time() - t0
                     if cancelled_check is not None and cancelled_check():
@@ -1679,9 +1442,8 @@ class _PipelineMethods:
 
     def _prepare_decision_context(self, ctx: AgentContext) -> None:
         """Populate low-sensitivity summaries consumed by DecisionAgent."""
-        ctx.meta["agent_disagreement_summary"] = build_agent_disagreement_summary(
-            ctx,
-            risk_override_enabled=getattr(self.config, "agent_risk_override", True),
+        _disagreement.prepare_decision_disagreement_context(
+            ctx, self.config, summary_builder=build_agent_disagreement_summary,
         )
 
     def _record_critic_budget_skip(
@@ -1715,6 +1477,13 @@ class _PipelineMethods:
                 stage=_critic.CRITIC_STAGE_NAME,
                 **_critic.trace_event_fields(trace),
             ))
+
+    def _record_debate_budget_skip(
+        self, ctx: AgentContext, stats: AgentRunStats, *,
+        settings: Optional[Dict[str, Any]] = None, progress_callback: Optional[Callable],
+    ) -> None:
+        """Fail soft on debate without spending Decision's reserved wall-clock budget."""
+        _debate.apply_pipeline_budget_skip(self, ctx, stats, settings=settings, progress_callback=progress_callback)
 
     def _record_degraded_stage(
         self,

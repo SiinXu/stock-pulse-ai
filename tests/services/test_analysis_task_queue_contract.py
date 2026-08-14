@@ -176,7 +176,12 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         ]
         self.assertEqual(
             [field.name for field in fields(AnalysisTaskCoalescingContract)],
-            [*legacy_field_names, "strict_skill_selection"],
+            [
+                *legacy_field_names,
+                "strict_skill_selection",
+                "enable_debate",
+                "debate_max_rounds",
+            ],
         )
 
         legacy_values = [
@@ -195,6 +200,32 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         contract = AnalysisTaskCoalescingContract(*legacy_values)
 
         self.assertFalse(contract.strict_skill_selection)
+        self.assertIsNone(contract.enable_debate)
+        self.assertIsNone(contract.debate_max_rounds)
+
+    def test_debate_coalescing_fields_normalize_without_truthy_string_drift(self) -> None:
+        base = {
+            "stock_code": "600519",
+            "report_type": "detailed",
+            "analysis_phase": "auto",
+        }
+        disabled = AnalysisTaskCoalescingContract.from_metadata({
+            **base,
+            "enable_debate": "false",
+            "debate_max_rounds": "3",
+        })
+        invalid = AnalysisTaskCoalescingContract.from_metadata({
+            **base,
+            "enable_debate": "not-a-bool",
+            "debate_max_rounds": float("inf"),
+        })
+
+        self.assertIsNotNone(disabled)
+        self.assertFalse(disabled.enable_debate)
+        self.assertEqual(disabled.debate_max_rounds, 3)
+        self.assertIsNotNone(invalid)
+        self.assertIsNone(invalid.enable_debate)
+        self.assertIsNone(invalid.debate_max_rounds)
 
     def test_batch_submit_rolls_back_when_executor_submit_fails(self) -> None:
         class FailingExecutor:

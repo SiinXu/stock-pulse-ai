@@ -738,9 +738,14 @@ class TestEnvExampleWebSettingsCoverage(unittest.TestCase):
 class TestSettingsFieldTitleContract(unittest.TestCase):
     """The Web field-title catalog must cover the backend registry exactly."""
 
-    _FIELD_TITLE_FILE = (
+    _WEB_ROOT = Path(__file__).resolve().parents[1] / "apps/dsa-web/src"
+    _FIELD_TITLE_FILES = (
+        _WEB_ROOT / "utils/systemConfigI18n.ts",
+        _WEB_ROOT / "i18n/reflectionSettingsCopy.ts",
+    )
+    _FEATURE_FIELD_TITLE_FILE = (
         Path(__file__).resolve().parents[1]
-        / "apps/dsa-web/src/utils/systemConfigI18n.ts"
+        / "apps/dsa-web/src/i18n/evidenceExportErrorTranslations.ts"
     )
     _FIELD_TITLE_MAP_RE = re.compile(
         r"const fieldTitleMapZh = \{\n(?P<body>.*?)\n\} as const;",
@@ -750,36 +755,57 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         r"const fieldTitleMapEn = \{\n(?P<body>.*?)\n\} satisfies",
         flags=re.DOTALL,
     )
+    _FEATURE_FIELD_TITLE_MAP_RE = re.compile(
+        r"export const EVIDENCE_EXPORT_FIELD_TITLES = \{\n"
+        r"  zh: \{\n(?P<zh>.*?)\n  \},\n"
+        r"  en: \{\n(?P<en>.*?)\n  \},\n"
+        r"\} as const;",
+        flags=re.DOTALL,
+    )
     _FIELD_TITLE_KEY_RE = re.compile(
-        r"^\s{2}([A-Z][A-Z0-9_]*)\s*:",
+        r"^\s+([A-Z][A-Z0-9_]*)\s*:",
         flags=re.MULTILINE,
     )
     _FIELD_TITLE_EN_ENTRY_RE = re.compile(
-        r"^\s{2}([A-Z][A-Z0-9_]*)\s*:\s*'([^']*)',$",
+        r"^\s+([A-Z][A-Z0-9_]*)\s*:\s*'([^']*)',$",
         flags=re.MULTILINE,
     )
 
     @classmethod
     def _collect_web_field_title_keys(cls) -> set[str]:
-        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
-        match = cls._FIELD_TITLE_MAP_RE.search(content)
-        if match is None:
-            raise AssertionError("Unable to locate fieldTitleMapZh in systemConfigI18n.ts")
-        keys = cls._FIELD_TITLE_KEY_RE.findall(match.group("body"))
+        keys = []
+        for path in cls._FIELD_TITLE_FILES:
+            content = path.read_text(encoding="utf-8")
+            match = cls._FIELD_TITLE_MAP_RE.search(content)
+            if match is None:
+                raise AssertionError(f"Unable to locate fieldTitleMapZh in {path}")
+            keys.extend(cls._FIELD_TITLE_KEY_RE.findall(match.group("body")))
+        feature_content = cls._FEATURE_FIELD_TITLE_FILE.read_text(encoding="utf-8")
+        feature_match = cls._FEATURE_FIELD_TITLE_MAP_RE.search(feature_content)
+        if feature_match is None:
+            raise AssertionError("Unable to locate EVIDENCE_EXPORT_FIELD_TITLES")
+        keys.extend(cls._FIELD_TITLE_KEY_RE.findall(feature_match.group("zh")))
         if len(keys) != len(set(keys)):
-            raise AssertionError("fieldTitleMapZh contains duplicate field keys")
+            raise AssertionError("Composed field-title catalog contains duplicate field keys")
         return set(keys)
 
     @classmethod
     def _collect_web_english_field_titles(cls) -> dict[str, str]:
-        content = cls._FIELD_TITLE_FILE.read_text(encoding="utf-8")
-        match = cls._FIELD_TITLE_EN_MAP_RE.search(content)
-        if match is None:
-            raise AssertionError("Unable to locate fieldTitleMapEn in systemConfigI18n.ts")
-        entries = cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body"))
+        entries = []
+        for path in cls._FIELD_TITLE_FILES:
+            content = path.read_text(encoding="utf-8")
+            match = cls._FIELD_TITLE_EN_MAP_RE.search(content)
+            if match is None:
+                raise AssertionError(f"Unable to locate fieldTitleMapEn in {path}")
+            entries.extend(cls._FIELD_TITLE_EN_ENTRY_RE.findall(match.group("body")))
+        feature_content = cls._FEATURE_FIELD_TITLE_FILE.read_text(encoding="utf-8")
+        feature_match = cls._FEATURE_FIELD_TITLE_MAP_RE.search(feature_content)
+        if feature_match is None:
+            raise AssertionError("Unable to locate EVIDENCE_EXPORT_FIELD_TITLES")
+        entries.extend(cls._FIELD_TITLE_EN_ENTRY_RE.findall(feature_match.group("en")))
         titles = dict(entries)
         if len(entries) != len(titles):
-            raise AssertionError("fieldTitleMapEn contains duplicate field keys")
+            raise AssertionError("Composed English field-title catalog contains duplicate field keys")
         return titles
 
     def test_web_field_titles_match_registered_fields(self) -> None:
@@ -823,9 +849,13 @@ class TestSettingsHelpContract(unittest.TestCase):
     # Help entries were split per language (#477); the aggregator
     # settingsHelp.ts now only re-exports, so the literal key map lives in the
     # per-language sources.
-    _SETTINGS_HELP_FILES = (
+    _LANGUAGE_HELP_FILES = (
         _LOCALE_DIR / "settingsHelp.en.ts",
         _LOCALE_DIR / "settingsHelp.zh.ts",
+    )
+    _SETTINGS_HELP_FILES = (
+        *_LANGUAGE_HELP_FILES,
+        _LOCALE_DIR.parent / "i18n/reflectionSettingsCopy.ts",
     )
 
     @classmethod
@@ -853,6 +883,25 @@ class TestSettingsHelpContract(unittest.TestCase):
         registry_help_keys = self._collect_registry_help_keys()
         missing = sorted(registry_help_keys - locale_keys)
         self.assertEqual(missing, [], f"Registry help keys missing locale: {missing}")
+
+    def test_market_regime_fields_share_help_contract(self) -> None:
+        help_key = "settings.agent.market_regime"
+        expected_titles = {
+            "MARKET_REGIME_ENABLED": "Market Regime",
+            "MARKET_REGIME_OVERRIDE": "Regime Override",
+        }
+        for field_key, title in expected_titles.items():
+            definition = get_field_definition(field_key)
+            self.assertEqual(definition["title"], title)
+            self.assertEqual(definition["help_key"], help_key)
+
+        for path in self._LANGUAGE_HELP_FILES:
+            content = path.read_text(encoding="utf-8")
+            self.assertEqual(
+                len(re.findall(rf"^\s*'{re.escape(help_key)}'\s*:\s*\{{", content, re.MULTILINE)),
+                1,
+                f"{path.name} must define the shared market-regime help exactly once",
+            )
 
     def test_locale_help_keys_are_registry_or_llm_channel_internal(self) -> None:
         registry_help_keys = self._collect_registry_help_keys()
