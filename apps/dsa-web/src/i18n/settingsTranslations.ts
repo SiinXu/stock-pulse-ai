@@ -186,21 +186,27 @@ const SETTINGS_FIELD_TRANSLATIONS = {
   },
 } as const;
 
+function mergeSettingsTranslations<L extends keyof typeof SETTINGS_FIELD_TRANSLATIONS>(
+  language: L,
+) {
+  return {
+    ...MODEL[language],
+    ...REFLECTION[language],
+    ...DATA_RUNTIME[language],
+    ...BACKTEST[language],
+    ...CAPABILITY[language],
+    ...SETTINGS_FIELD_TRANSLATIONS[language],
+  };
+}
+
 /** Shared settings translations kept outside the per-locale application chunks. */
 export const SETTINGS_TRANSLATIONS = {
-  de: { ...MODEL.de, ...REFLECTION.de, ...DATA_RUNTIME.de, ...BACKTEST.de, ...CAPABILITY.de, ...SETTINGS_FIELD_TRANSLATIONS.de },
-  es: { ...MODEL.es, ...REFLECTION.es, ...DATA_RUNTIME.es, ...BACKTEST.es, ...CAPABILITY.es, ...SETTINGS_FIELD_TRANSLATIONS.es },
-  fr: { ...MODEL.fr, ...REFLECTION.fr, ...DATA_RUNTIME.fr, ...BACKTEST.fr, ...CAPABILITY.fr, ...SETTINGS_FIELD_TRANSLATIONS.fr },
-  id: { ...MODEL.id, ...REFLECTION.id, ...DATA_RUNTIME.id, ...BACKTEST.id, ...CAPABILITY.id, ...SETTINGS_FIELD_TRANSLATIONS.id },
-  ja: { ...MODEL.ja, ...REFLECTION.ja, ...DATA_RUNTIME.ja, ...BACKTEST.ja, ...CAPABILITY.ja, ...SETTINGS_FIELD_TRANSLATIONS.ja },
-  ko: { ...MODEL.ko, ...REFLECTION.ko, ...DATA_RUNTIME.ko, ...BACKTEST.ko, ...CAPABILITY.ko, ...SETTINGS_FIELD_TRANSLATIONS.ko },
-  ms: { ...MODEL.ms, ...REFLECTION.ms, ...DATA_RUNTIME.ms, ...BACKTEST.ms, ...CAPABILITY.ms, ...SETTINGS_FIELD_TRANSLATIONS.ms },
-  "zh-TW": {
-    ...MODEL["zh-TW"],
-    ...REFLECTION["zh-TW"],
-    ...DATA_RUNTIME["zh-TW"],
-    ...BACKTEST["zh-TW"],
-    ...CAPABILITY["zh-TW"],
-    ...SETTINGS_FIELD_TRANSLATIONS["zh-TW"],
-  },
-} as const;
+  get de() { return mergeSettingsTranslations('de'); },
+  get es() { return mergeSettingsTranslations('es'); },
+  get fr() { return mergeSettingsTranslations('fr'); },
+  get id() { return mergeSettingsTranslations('id'); },
+  get ja() { return mergeSettingsTranslations('ja'); },
+  get ko() { return mergeSettingsTranslations('ko'); },
+  get ms() { return mergeSettingsTranslations('ms'); },
+  get 'zh-TW'() { return mergeSettingsTranslations('zh-TW'); },
+};

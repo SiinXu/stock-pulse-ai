@@ -990,7 +990,7 @@ class TestDocumentedInventoryCompletionContract(unittest.TestCase):
                 self.assertEqual(definition["ui_control"], "number")
 
     def test_dynamic_runtime_defaults_stay_unset_in_settings(self) -> None:
-        for key in ("MARKDOWN_TO_IMAGE_CHANNELS", "SNAPSHOT_SOURCE_PRIORITY"):
+        for key in ("MARKDOWN_TO_IMAGE_CHANNELS", "SNAPSHOT_SOURCE_PRIORITY", "SOCIAL_SENTIMENT_API_KEY"):
             with self.subTest(key=key):
                 self.assertEqual(
                     INVENTORY_COMPLETION_FIELD_DEFINITIONS[key]["default_value"],

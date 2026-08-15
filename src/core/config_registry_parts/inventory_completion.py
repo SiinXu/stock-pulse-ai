@@ -283,7 +283,7 @@ INVENTORY_COMPLETION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "PROVIDER_HEALTH_WINDOW_SIZE": _integer("Provider Health Window Size", "Recent outcomes used for provider health scoring.", "data_source", "20", 720, minimum=1),
     "PYTDX_PRIORITY": _integer("Pytdx Priority", "Daily-data provider priority; lower values run earlier.", "data_source", "2", 721, maximum=99, warning_codes=["restart_required"]),
     "SNAPSHOT_SOURCE_PRIORITY": _text("Snapshot Source Priority", "Optional AlphaSift full-market snapshot override. Leave empty to derive the source order from configured credentials.", "data_source", "", 722),
-    "SOCIAL_SENTIMENT_API_KEY": _text("Social Sentiment API Key", "Optional credential for US social-sentiment intelligence.", "data_source", "sk_live_your_key_here", 723, sensitive=True),
+    "SOCIAL_SENTIMENT_API_KEY": _text("Social Sentiment API Key", "Optional credential for US social-sentiment intelligence.", "data_source", "", 723, sensitive=True),
     "SOCIAL_SENTIMENT_API_URL": _text("Social Sentiment API URL", "Endpoint for optional social-sentiment intelligence.", "data_source", "https://api.adanos.org", 724),
     "TUSHARE_PRIORITY": _integer("Tushare Compatibility Priority", "Compatibility value; the runtime promotes an initialized Tushare provider to priority -1 and otherwise uses 2.", "data_source", "2", 725, maximum=99, warning_codes=["restart_required"]),
     "YFINANCE_PRIORITY": _integer("YFinance Priority", "Daily-data provider priority for eligible routes.", "data_source", "4", 726, maximum=99, warning_codes=["restart_required"]),

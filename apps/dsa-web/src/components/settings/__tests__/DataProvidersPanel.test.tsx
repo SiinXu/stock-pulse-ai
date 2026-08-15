@@ -126,6 +126,17 @@ describe('DataProvidersPanel', () => {
     expect(within(pytdxCard).getByText('未配置')).toBeInTheDocument();
   });
 
+  it('does not treat an explicit Pytdx priority as configuration without servers', () => {
+    renderPanel([
+      buildItem('PYTDX_HOST', '127.0.0.1', false),
+      buildItem('PYTDX_PORT', '7709', false),
+      buildItem('PYTDX_PRIORITY', '2', true),
+    ]);
+
+    const pytdxCard = screen.getByRole('button', { name: /Pytdx/ });
+    expect(within(pytdxCard).getByText('未配置')).toBeInTheDocument();
+  });
+
   it('honors configured overrides for externally managed providers', () => {
     renderPanel([buildItem('ALPHASIFT_INSTALL_SPEC', '')], { alphasift: true });
 

@@ -1,7 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw } from 'lucide-react';
 import { agentApi, type AgentModelDeployment } from '../../api/agent';
 import {
   capabilitiesApi,
@@ -17,7 +16,6 @@ import {
   Badge,
   Button,
   DataTable,
-  IconButton,
   SummaryStrip,
   type DataTableColumn,
 } from '../common';
@@ -136,7 +134,7 @@ export function RuntimeCapabilitiesPanel() {
   const capabilityColumns = useMemo<readonly DataTableColumn<CapabilityItem>[]>(() => [
     {
       id: 'id',
-      header: 'ID',
+      header: capabilityTitle,
       rowHeader: true,
       cell: (item) => (
         <div className="min-w-0">
@@ -175,7 +173,7 @@ export function RuntimeCapabilitiesPanel() {
         );
       },
     },
-  ], [text]);
+  ], [capabilityTitle, text]);
 
   const modelColumns = useMemo<readonly DataTableColumn<AgentModelDeployment>[]>(() => [
     {
@@ -241,15 +239,15 @@ export function RuntimeCapabilitiesPanel() {
             {capabilities?.partial ? (
               <Badge variant="warning">{text.runtimeCapabilitiesPartial}</Badge>
             ) : null}
-            <IconButton
-              aria-label={capabilityReloadLabel}
-              tooltip={capabilityReloadLabel}
+            <Button
               variant="outline"
+              size="default"
+              aria-label={capabilityReloadLabel}
               isLoading={capabilitiesLoading}
               onClick={reloadCapabilities}
             >
-              <RefreshCw aria-hidden="true" />
-            </IconButton>
+              {text.reload}
+            </Button>
           </div>
         )}
       >
@@ -331,15 +329,15 @@ export function RuntimeCapabilitiesPanel() {
       <SettingsSectionCard
         title={agentModelsTitle}
         actions={(
-          <IconButton
-            aria-label={modelReloadLabel}
-            tooltip={modelReloadLabel}
+          <Button
             variant="outline"
+            size="default"
+            aria-label={modelReloadLabel}
             isLoading={modelsLoading}
             onClick={reloadModels}
           >
-            <RefreshCw aria-hidden="true" />
-          </IconButton>
+            {text.reload}
+          </Button>
         )}
       >
         {modelsError && models ? (

@@ -62,7 +62,7 @@ export const DATA_PROVIDERS: DataProvider[] = [
     id: 'pytdx',
     label: 'Pytdx',
     keys: ['PYTDX_HOST', 'PYTDX_PORT', 'PYTDX_SERVERS', 'PYTDX_PRIORITY'],
-    configuredKeys: ['PYTDX_HOST', 'PYTDX_SERVERS', 'PYTDX_PRIORITY'],
+    configuredKeys: ['PYTDX_HOST', 'PYTDX_SERVERS'],
   },
   {
     id: 'baostock',
