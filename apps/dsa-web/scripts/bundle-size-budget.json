@@ -25,6 +25,13 @@
       "note": "Remeasured from GitHub web-gate gzip after merging origin/main (#1273); overflowing named rule only, fixed headroom retained."
     },
     {
+      "id": "settings-translations",
+      "match": "assets/settingsTranslations-*.js",
+      "maxGzipBytes": 13843,
+      "measuredGzipBytes": 13443,
+      "note": "Measured after merging origin/main into the Web capability and Settings audit branch; fixed 400 B headroom retained without widening the default JS budget."
+    },
+    {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
       "maxGzipBytes": 164741,
@@ -113,9 +120,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10861,
-      "measuredGzipBytes": 10461,
-      "note": "Combined production-build measurement after merge train 20260813-03 (#1149 #1240 #1157 #1227 #1218 #1236 #1265). Each member is individually within the previous budget; the icon set grows cumulatively because each adds a small number of distinct Lucide icons. Measured 10461 B with 400 B headroom, matching the IntelligenceSourcesPanel convention."
+      "maxGzipBytes": 11277,
+      "measuredGzipBytes": 10877,
+      "note": "Measured after merging origin/main into the Web capability and Settings audit branch; distinct Lucide icons added by reachable Web controls increase the shared icon chunk, with fixed 400 B headroom retained."
     },
     {
       "id": "vendor-misc",

@@ -518,6 +518,8 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         "BACKTEST_MIN_AGE_DAYS",
         "BACKTEST_ENGINE_VERSION",
         "BACKTEST_NEUTRAL_BAND_PCT",
+        "BACKTEST_COMMISSION_BPS",
+        "BACKTEST_SLIPPAGE_BPS",
         # PR3 Phase 3: Report + Notification Route
         "REPORT_SUMMARY_ONLY",
         "REPORT_SHOW_LLM_MODEL",

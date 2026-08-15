@@ -128,12 +128,19 @@ class _AnalysisResultStageMixin:
                     attach_risk_gate_result,
                     build_agent_runtime_facts,
                 )
+                from src.services.info_quality_grading import (
+                    read_info_quality_feature_flag,
+                )
 
                 gate_ctx = build_risk_context_for_exit(
                     stock_code=code,
                     current_signal=dash.get("decision_type", "hold"),
                     dashboard=dash,
                     runtime_facts=runtime_facts,
+                    info_quality_risk_enabled=read_info_quality_feature_flag(
+                        getattr(self, "config", None),
+                        "forced_conclusion_enabled",
+                    ),
                 )
                 gate_result = apply_risk_manager_gate_from_config(
                     gate_ctx,
@@ -323,6 +330,40 @@ class _AnalysisResultStageMixin:
             report_type=report_type,
             use_existing_action=(previous_advice == current_advice),
             align_with_score=(previous_advice == current_advice),
+        )
+
+    def _apply_info_quality_constraints(
+        self,
+        result: AnalysisResult,
+        *,
+        analysis_context_pack_overview: Optional[Dict[str, Any]] = None,
+        enforce_action_downgrade: bool = True,
+    ) -> List[str]:
+        """Attach info-quality grade and forced conclusion; optionally block weak Pass."""
+        if result is None:
+            return []
+        from src.services.info_quality_grading import (
+            apply_info_quality_constraints,
+            read_info_quality_feature_flag,
+        )
+
+        config = getattr(self, "config", None)
+        grading_enabled = read_info_quality_feature_flag(
+            config,
+            "info_quality_grading_enabled",
+        )
+        forced_enabled = read_info_quality_feature_flag(
+            config,
+            "forced_conclusion_enabled",
+        )
+        return apply_info_quality_constraints(
+            result,
+            analysis_context_pack_overview=analysis_context_pack_overview,
+            grading_enabled=grading_enabled,
+            forced_conclusion_enabled=forced_enabled,
+            enforce_action_downgrade=enforce_action_downgrade and forced_enabled,
+            report_language=getattr(result, "report_language", None)
+            or getattr(config, "report_language", "zh"),
         )
 
     @staticmethod

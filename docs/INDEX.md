@@ -128,6 +128,7 @@
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
+| [分析质量门](analysis-quality-gate.md) | 管线内禁止无中生有事实的质量门，复用 agent-eval 维度；annotate/intercept（#887） |
 | [预测 vs 实际跟踪归属](prediction-vs-actual-tracking.md) | #449→#1107：框架由 Agent Evolution Epic 承接；展示/适配器残留见子 issue |
 | [性能基线与剖析](performance-baseline.md) | 关键路径离线基线（数据/分析/报告）、可关闭 span 采集与 cProfile 入口（#227） |
 | [插件开发指南](plugin-development-guide_zh.md) | 六个扩展点的统一入口：是什么/为什么、信任模型、10 分钟 quickstart、官方示例与专题链接（[English](plugin-development-guide.md)） |

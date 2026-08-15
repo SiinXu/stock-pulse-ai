@@ -13,6 +13,13 @@ from sqlalchemy import and_, select
 from data_provider.base import canonical_stock_code, normalize_stock_code
 from src.config import get_config
 from src.core.backtest_engine import OVERALL_SENTINEL_CODE, BacktestEngine, EvaluationConfig
+from src.core.backtest_methodology import (
+    SAMPLE_SPLIT_FULL,
+    CostModelConfig,
+    build_methodology_statement,
+    engine_version_for_cost_model,
+    normalize_sample_split,
+)
 from src.market.phase_summary import (
     extract_market_phase_summary,
     normalize_analysis_phase_bucket,
@@ -21,6 +28,10 @@ from src.market.phase_summary import (
 from src.repositories.backtest_repo import BacktestRepository
 from src.repositories.stock_repo import StockRepository
 from src.schemas.decision_action import build_action_fields
+from src.services.backtest_summary_methods import (
+    SkillOpinionPerformanceService as SkillOpinionPerformanceService,
+    _BacktestSummaryMethods,
+)
 from src.services.stock_code_utils import resolve_daily_stock_identity
 from src.services.stock_daily_window_resolver import (
     resolve_historical_daily_bar_date,
@@ -48,7 +59,7 @@ class BacktestValidationError(ValueError):
         self.params: Dict[str, Any] = dict(params or {})
 
 
-class BacktestService:
+class BacktestService(_BacktestSummaryMethods):
     """Service layer to run and query backtests."""
 
     MAX_DYNAMIC_SUMMARY_ROWS = 2000
@@ -92,13 +103,16 @@ class BacktestService:
             min_age_days = getattr(config, "backtest_min_age_days", 14)
         min_age_days = self._validate_min_age_days(min_age_days)
 
-        engine_version = str(getattr(config, "backtest_engine_version", "v1") or "v1")
+        cost_model = self._resolve_cost_model(config)
+        engine_version = self._resolve_engine_version(config, cost_model)
         neutral_band_pct = float(getattr(config, "backtest_neutral_band_pct", 2.0))
 
         eval_config = EvaluationConfig(
             eval_window_days=int(eval_window_days),
             neutral_band_pct=neutral_band_pct,
             engine_version=engine_version,
+            commission_bps=cost_model.commission_bps,
+            slippage_bps=cost_model.slippage_bps,
         )
 
         limit_int = self._validate_run_limit(limit)
@@ -349,6 +363,12 @@ class BacktestService:
                 analysis_date_to=analysis_date_to,
             )
 
+        methodology = build_methodology_statement(
+            cost_model=cost_model,
+            engine_version=engine_version,
+            eval_window_days=int(eval_window_days),
+            metric_source="analysis_advice",
+        )
         applied_config = {
             "code": diagnostic_code,
             "force": bool(force),
@@ -357,6 +377,9 @@ class BacktestService:
             "limit": limit_int,
             "engine_version": engine_version,
             "neutral_band_pct": float(neutral_band_pct),
+            "commission_bps": float(cost_model.commission_bps),
+            "slippage_bps": float(cost_model.slippage_bps),
+            "round_trip_cost_pct": float(cost_model.round_trip_cost_pct),
             "analysis_date_from": analysis_date_from.isoformat() if analysis_date_from else None,
             "analysis_date_to": analysis_date_to.isoformat() if analysis_date_to else None,
         }
@@ -379,6 +402,8 @@ class BacktestService:
             has_matching_analysis=has_matching_analysis,
             aligned_existing_result_dates=aligned_existing_result_dates,
         )
+        diagnostics["cost_model"] = cost_model.to_dict()
+        diagnostics["methodology"] = methodology
 
         return {
             "processed": processed,
@@ -388,6 +413,7 @@ class BacktestService:
             "errors": errors,
             "applied_eval_window_days": int(eval_window_days),
             "applied_config": applied_config,
+            "methodology": methodology,
             "message": diagnostics.get("message"),
             "diagnostics": diagnostics,
         }
@@ -711,7 +737,8 @@ class BacktestService:
         analysis_phase: Optional[str] = None,
     ) -> Dict[str, Any]:
         config = get_config()
-        engine_version = str(getattr(config, "backtest_engine_version", "v1"))
+        cost_model = self._resolve_cost_model(config)
+        engine_version = self._resolve_engine_version(config, cost_model)
         code = self._normalize_code(code)
 
         phase_bucket = self._normalize_phase_filter(analysis_phase)
@@ -771,14 +798,34 @@ class BacktestService:
         analysis_date_from: Optional[date] = None,
         analysis_date_to: Optional[date] = None,
         analysis_phase: Optional[str] = None,
+        sample_split: Optional[str] = None,
+        split_date: Optional[date] = None,
     ) -> Optional[Dict[str, Any]]:
         config = get_config()
-        engine_version = str(getattr(config, "backtest_engine_version", "v1"))
+        cost_model = self._resolve_cost_model(config)
+        engine_version = self._resolve_engine_version(config, cost_model)
         code = self._normalize_code(code)
         lookup_code = OVERALL_SENTINEL_CODE if scope == "overall" else code
+        try:
+            split_cfg = normalize_sample_split(sample_split, split_date)
+        except ValueError as exc:
+            raise BacktestValidationError(
+                str(exc),
+                code="invalid_sample_split",
+                params={
+                    "sample_split": sample_split,
+                    "split_date": split_date.isoformat() if split_date else None,
+                },
+            ) from exc
 
         phase_bucket = self._normalize_phase_filter(analysis_phase)
-        if analysis_date_from is not None or analysis_date_to is not None or phase_bucket is not None:
+        needs_dynamic = (
+            analysis_date_from is not None
+            or analysis_date_to is not None
+            or phase_bucket is not None
+            or split_cfg.mode != SAMPLE_SPLIT_FULL
+        )
+        if needs_dynamic:
             if eval_window_days is None:
                 eval_window_days = self._infer_eval_window_for_query(
                     code=code,
@@ -827,18 +874,27 @@ class BacktestService:
                     (row, snapshot)
                     for row, snapshot in rows_with_context
                     if self._phase_bucket_from_snapshot(snapshot) == phase_bucket
+                    and split_cfg.includes(getattr(row, "analysis_date", None))
                 ]
-                phase_counts = self._phase_counts_from_contexts([snapshot for _, snapshot in filtered_pairs])
+                phase_counts = self._phase_counts_from_contexts(
+                    [snapshot for _, snapshot in filtered_pairs]
+                )
                 filtered_rows = [row for row, _ in filtered_pairs]
-                return self._build_dynamic_summary(
-                    rows=filtered_rows,
-                    scope=scope,
-                    code=lookup_code,
-                    eval_window_days=int(eval_window_days) if eval_window_days is not None else None,
+                return self._attach_methodology(
+                    self._build_dynamic_summary(
+                        rows=filtered_rows,
+                        scope=scope,
+                        code=lookup_code,
+                        eval_window_days=int(eval_window_days) if eval_window_days is not None else None,
+                        engine_version=engine_version,
+                        max_rows=self.MAX_DYNAMIC_SUMMARY_ROWS,
+                        phase_breakdown=phase_counts["phase_breakdown"],
+                        raw_phase_counts=phase_counts["raw_phase_counts"],
+                    ),
+                    cost_model=cost_model,
+                    sample_split=split_cfg,
                     engine_version=engine_version,
-                    max_rows=self.MAX_DYNAMIC_SUMMARY_ROWS,
-                    phase_breakdown=phase_counts["phase_breakdown"],
-                    raw_phase_counts=phase_counts["raw_phase_counts"],
+                    eval_window_days=eval_window_days,
                 )
             rows = self.repo.list_results(
                 code=code,
@@ -847,13 +903,22 @@ class BacktestService:
                 analysis_date_from=analysis_date_from,
                 analysis_date_to=analysis_date_to,
             )
-            return self._build_dynamic_summary(
-                rows=rows,
-                scope=scope,
-                code=lookup_code,
-                eval_window_days=int(eval_window_days) if eval_window_days is not None else None,
+            rows = [
+                row for row in rows if split_cfg.includes(getattr(row, "analysis_date", None))
+            ]
+            return self._attach_methodology(
+                self._build_dynamic_summary(
+                    rows=rows,
+                    scope=scope,
+                    code=lookup_code,
+                    eval_window_days=int(eval_window_days) if eval_window_days is not None else None,
+                    engine_version=engine_version,
+                    max_rows=self.MAX_DYNAMIC_SUMMARY_ROWS,
+                ),
+                cost_model=cost_model,
+                sample_split=split_cfg,
                 engine_version=engine_version,
-                max_rows=self.MAX_DYNAMIC_SUMMARY_ROWS,
+                eval_window_days=eval_window_days,
             )
 
         summary = self.repo.get_summary(
@@ -864,38 +929,14 @@ class BacktestService:
         )
         if summary is None:
             return None
-        return self._summary_to_dict(summary)
-
-    def get_global_summary(self, *, eval_window_days: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """Return overall backtest metrics normalized for Agent memory consumers."""
-        return self._normalize_learning_summary(
-            self.get_summary(scope="overall", code=None, eval_window_days=eval_window_days)
+        return self._attach_methodology(
+            self._summary_to_dict(summary),
+            cost_model=cost_model,
+            sample_split=split_cfg,
+            engine_version=engine_version,
+            eval_window_days=eval_window_days,
         )
 
-    def get_stock_summary(self, code: str, *, eval_window_days: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """Return per-stock backtest metrics normalized for Agent memory consumers."""
-        return self._normalize_learning_summary(
-            self.get_summary(scope="stock", code=code, eval_window_days=eval_window_days)
-        )
-
-    def get_skill_summary(self, skill_id: str, *, eval_window_days: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """Return skill-like summary metrics for Agent memory consumers.
-
-        The current backtest storage layer only persists overall / per-stock rollups.
-        Re-using the overall rollup here would fabricate skill-specific performance
-        and mislead auto-weighting. Until real skill-tagged summaries exist, return
-        ``None`` so downstream callers fall back to neutral weighting.
-        """
-        return None
-
-    def get_strategy_summary(self, strategy_id: str, *, eval_window_days: Optional[int] = None) -> Optional[Dict[str, Any]]:
-        """Compatibility wrapper for legacy strategy-based callers."""
-        summary = self.get_skill_summary(strategy_id, eval_window_days=eval_window_days)
-        if summary is None:
-            return None
-        normalized = dict(summary)
-        normalized["strategy_id"] = strategy_id
-        return normalized
 
     def _infer_eval_window_for_query(
         self,
@@ -1323,45 +1364,29 @@ class BacktestService:
             "diagnostics": json.loads(row.diagnostics_json) if row.diagnostics_json else {},
         }
 
-    @staticmethod
-    def _normalize_learning_summary(summary: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-        """Normalize summary metrics to the ratio-based shape expected by Agent memory."""
-        if summary is None:
-            return None
 
-        normalized = dict(summary)
-        normalized["win_rate"] = BacktestService._pct_to_ratio(summary.get("win_rate_pct"), default=0.5)
-        normalized["direction_accuracy"] = BacktestService._pct_to_ratio(
-            summary.get("direction_accuracy_pct"),
-            default=0.5,
+    @staticmethod
+    def _resolve_engine_version(config: Any, cost_model: CostModelConfig) -> str:
+        return engine_version_for_cost_model(
+            str(getattr(config, "backtest_engine_version", "v1") or "v1"),
+            cost_model,
         )
 
-        avg_return_pct = summary.get("avg_simulated_return_pct")
-        if avg_return_pct is None:
-            avg_return_pct = summary.get("avg_stock_return_pct")
-        normalized["avg_return"] = BacktestService._pct_to_ratio(avg_return_pct, default=0.0)
-        return normalized
-
     @staticmethod
-    def _pct_to_ratio(value: Optional[float], default: float = 0.0) -> float:
+    def _resolve_cost_model(config: Any) -> CostModelConfig:
         try:
-            return float(value) / 100.0
+            commission = float(getattr(config, "backtest_commission_bps", 0.0) or 0.0)
         except (TypeError, ValueError):
-            return default
+            commission = 0.0
+        try:
+            slippage = float(getattr(config, "backtest_slippage_bps", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            slippage = 0.0
+        try:
+            return CostModelConfig(commission_bps=commission, slippage_bps=slippage)
+        except ValueError:
+            return CostModelConfig()
 
-    @staticmethod
-    def _actual_movement_from_return(value: Optional[float]) -> Optional[str]:
-        if value is None:
-            return None
-        try:
-            actual_return = float(value)
-        except (TypeError, ValueError):
-            return None
-        if actual_return > 0:
-            return "up"
-        if actual_return < 0:
-            return "down"
-        return "flat"
 
     @staticmethod
     def _build_dynamic_summary(

@@ -1050,6 +1050,46 @@ class _StockAnalysisStageMixin:
                     report_type=report_type.value,
                     previous_operation_advice=action_source_advice,
                 )
+                info_quality_adjustments = self._apply_info_quality_constraints(
+                    result,
+                    analysis_context_pack_overview=analysis_context_pack_overview,
+                )
+                if info_quality_adjustments:
+                    logger.info(
+                        "[info_quality] Applied constraints for %s: %s",
+                        code,
+                        info_quality_adjustments,
+                    )
+                    self._refresh_decision_action_for_final_result(
+                        result,
+                        report_type=report_type.value,
+                        previous_operation_advice=action_source_advice,
+                    )
+
+                # Pipeline quality gate: bind conclusion facts to input evidence (#887).
+                from src.services.analysis_quality_gate import (
+                    apply_analysis_quality_gate,
+                )
+
+                quality_gate = apply_analysis_quality_gate(
+                    result,
+                    config=self.config,
+                    analysis_context_pack_overview=analysis_context_pack_overview
+                    if isinstance(analysis_context_pack_overview, dict)
+                    else None,
+                    market_snapshot=getattr(result, "market_snapshot", None),
+                    fundamental_context=fundamental_context
+                    if isinstance(fundamental_context, dict)
+                    else None,
+                    technical_context=trend_result,
+                )
+                if quality_gate.verdict.value not in {"pass", "skipped"}:
+                    logger.info(
+                        "[analysis_quality_gate] stock path %s verdict=%s action=%s",
+                        code,
+                        quality_gate.verdict.value,
+                        quality_gate.action_taken,
+                    )
 
             analyze_output = AnalyzeStageOutput.from_result(result)
             analysis_succeeded = analyze_output.analysis_success

@@ -18,6 +18,7 @@ from api.v1.schemas.backtest import (
     PerformanceMetrics,
 )
 from api.v1.schemas.common import ErrorResponse
+from src.core.backtest_methodology import VALID_SAMPLE_SPLITS
 from src.services.backtest_service import BacktestService, BacktestValidationError
 from src.storage import DatabaseManager
 from src.utils.sanitize import log_safe_exception
@@ -27,6 +28,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 BacktestAnalysisPhaseQuery = Literal["premarket", "intraday", "postmarket", "unknown"]
+BacktestSampleSplitQuery = Literal["full", "in_sample", "out_of_sample"]
 
 
 def _validate_analysis_date_range(
@@ -176,10 +178,27 @@ def get_overall_performance(
     analysis_date_from: Optional[date] = Query(None, description="分析日期起始（含）"),
     analysis_date_to: Optional[date] = Query(None, description="分析日期结束（含）"),
     analysis_phase: Optional[BacktestAnalysisPhaseQuery] = Query(None, description="分析阶段过滤：premarket/intraday/postmarket/unknown"),
+    sample_split: BacktestSampleSplitQuery = Query(
+        "full",
+        description="Sample split: full | in_sample | out_of_sample",
+    ),
+    split_date: Optional[date] = Query(
+        None,
+        description="Required when sample_split is in_sample or out_of_sample",
+    ),
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> PerformanceMetrics:
     try:
         _validate_analysis_date_range(analysis_date_from, analysis_date_to)
+        if sample_split not in VALID_SAMPLE_SPLITS:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "invalid_sample_split",
+                    "message": "sample_split must be full, in_sample, or out_of_sample",
+                    "params": {"sample_split": sample_split},
+                },
+            )
         service = BacktestService(db_manager)
         summary = service.get_summary(
             scope="overall",
@@ -188,6 +207,8 @@ def get_overall_performance(
             analysis_date_from=analysis_date_from,
             analysis_date_to=analysis_date_to,
             analysis_phase=analysis_phase,
+            sample_split=sample_split,
+            split_date=split_date,
         )
         if summary is None:
             raise HTTPException(
@@ -229,6 +250,14 @@ def get_stock_performance(
     analysis_date_from: Optional[date] = Query(None, description="分析日期起始（含）"),
     analysis_date_to: Optional[date] = Query(None, description="分析日期结束（含）"),
     analysis_phase: Optional[BacktestAnalysisPhaseQuery] = Query(None, description="分析阶段过滤：premarket/intraday/postmarket/unknown"),
+    sample_split: BacktestSampleSplitQuery = Query(
+        "full",
+        description="Sample split: full | in_sample | out_of_sample",
+    ),
+    split_date: Optional[date] = Query(
+        None,
+        description="Required when sample_split is in_sample or out_of_sample",
+    ),
     db_manager: DatabaseManager = Depends(get_database_manager),
 ) -> PerformanceMetrics:
     try:
@@ -241,6 +270,8 @@ def get_stock_performance(
             analysis_date_from=analysis_date_from,
             analysis_date_to=analysis_date_to,
             analysis_phase=analysis_phase,
+            sample_split=sample_split,
+            split_date=split_date,
         )
         if summary is None:
             raise HTTPException(
@@ -262,4 +293,63 @@ def get_stock_performance(
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": "查询单股表现失败"},
+        )
+
+
+@router.get(
+    "/skills/{skill_id}/performance",
+    response_model=PerformanceMetrics,
+    responses={
+        200: {"description": "YAML skill / strategy backtest-style metrics"},
+        400: {"description": "请求参数错误", "model": ErrorResponse},
+        404: {"description": "无技能后验汇总", "model": ErrorResponse},
+        500: {"description": "服务器错误", "model": ErrorResponse},
+    },
+    summary="获取技能策略回测风格表现",
+    description=(
+        "Return skill-scoped metrics isomorphic to analysis-advice PerformanceMetrics. "
+        "Sourced from attributable skill-opinion outcomes for YAML strategies/skills. "
+        "Includes methodology limitations; not a return promise."
+    ),
+)
+def get_skill_performance(
+    skill_id: str,
+    eval_window_days: Optional[int] = Query(
+        None,
+        ge=1,
+        le=120,
+        description="Preferred evaluation window; mapped onto skill horizons 1d/3d/5d/10d",
+    ),
+    db_manager: DatabaseManager = Depends(get_database_manager),
+) -> PerformanceMetrics:
+    try:
+        service = BacktestService(db_manager)
+        summary = service.get_skill_summary(
+            skill_id,
+            eval_window_days=eval_window_days,
+        )
+        if summary is None:
+            raise HTTPException(
+                status_code=404,
+                detail={
+                    "error": "not_found",
+                    "message": f"No skill-opinion outcomes for skill_id={skill_id}",
+                },
+            )
+        return PerformanceMetrics(**summary)
+    except BacktestValidationError as exc:
+        raise _http_validation_error(exc)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log_safe_exception(
+            logger,
+            "Skill backtest performance query failed",
+            exc,
+            error_code="internal_error",
+            context={"skill_id": skill_id},
+        )
+        raise HTTPException(
+            status_code=500,
+            detail={"error": "internal_error", "message": "查询技能回测表现失败"},
         )

@@ -205,6 +205,9 @@ class _ChatMethods:
             attach_risk_gate_result,
             build_agent_runtime_facts,
         )
+        from src.services.info_quality_grading import (
+            read_info_quality_feature_flag,
+        )
 
         chat_dashboard = (
             orch_result.dashboard if isinstance(orch_result.dashboard, dict) else None
@@ -221,6 +224,10 @@ class _ChatMethods:
             current_signal=signal,
             dashboard=chat_dashboard,
             runtime_facts=orch_result.runtime_facts,
+            info_quality_risk_enabled=read_info_quality_feature_flag(
+                config,
+                "forced_conclusion_enabled",
+            ),
         )
         gate_result = apply_risk_manager_gate_from_config(
             gate_ctx,

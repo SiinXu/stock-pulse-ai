@@ -657,6 +657,14 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     impact: ['Controls when cross-source WARN evidence is written to run diagnostics.'],
     notes: ['Comparison is observational and fail-open on comparison errors.'],
   },
+  'settings.data_source.INFO_QUALITY_GRADING_ENABLED': {
+    title: 'Information Quality Grading',
+    summary: 'Derive A/B/C grades from validation evidence and context-pack block statuses.',
+  },
+  'settings.data_source.FORCED_CONCLUSION_ENABLED': {
+    title: 'Forced Conclusion Structure',
+    summary: 'Require an explicit Pass / Fail / Watch conclusion constrained by information quality.',
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: 'Feishu Webhook URL',
     summary: 'Sends analysis reports to a Feishu group through a custom bot webhook.',
@@ -1503,6 +1511,17 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     impact: ['Adds one Critic LLM call and, only after a retry verdict, at most one stage rerun.'],
     notes: ['Invalid output and unavailable retry targets fail closed to fail_soft without spending retry budget.'],
   },
+  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
+    title: 'Critic Max Revision Rounds',
+    summary: 'Caps Critic revision rounds after material evidence gaps.',
+    usage: 'Use 1 for one revision, or 2 for a recheck and second target.',
+    valueNotes: [
+      'Allowed range is 1–2; the default is 1.',
+      'Changed evidence never proves convergence; only an explicit post-revision Critic pass does.',
+    ],
+    impact: ['Bounds optional Critic revision cost while preserving Decision budget.'],
+    notes: ['Reaching the round limit without an explicit pass remains not_converged and retains the Critic limitations.'],
+  },
   'settings.agent.DEBATE': {
     title: 'Bull-Bear debate',
     summary: 'Configure the optional debate stage, limits, and dedicated model.',
@@ -1536,6 +1555,15 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     ],
     impact: ['Affects the published action for every final buy, hold, or sell recommendation.'],
     notes: ['A one-shot approval may retain the original action only with an approval ID and structured audit record.'],
+  },
+
+  'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
+    title: 'Analysis Quality Gate',
+    summary: 'Binds factual claims in the analysis conclusion to input evidence using the offline agent-eval dimensions.',
+  },
+  'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
+    title: 'Quality Gate Failure Policy',
+    summary: 'Choose annotate (default) or intercept when ungrounded factual claims are found.',
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',

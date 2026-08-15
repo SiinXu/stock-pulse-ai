@@ -16,7 +16,7 @@ from unittest.mock import patch
 import pandas as pd
 
 from data_provider.base import normalize_stock_code
-from src.config import Config
+from src.config import Config, get_config
 from src.core.backtest_engine import OVERALL_SENTINEL_CODE
 from src.repositories.backtest_repo import BacktestRepository
 from src.services.backtest_service import BacktestService
@@ -2112,7 +2112,7 @@ class BacktestServiceTestCase(unittest.TestCase):
         self.assertEqual(summary["scope"], "overall")
         self.assertEqual(summary["win_count"], 1)
 
-    def test_agent_learning_summary_helpers_keep_skill_rollups_neutral_until_supported(self) -> None:
+    def test_agent_learning_summary_helpers_keep_skill_rollups_neutral_without_outcomes(self) -> None:
         service = BacktestService(self.db)
         service.run_backtest(code="600519", force=False, eval_window_days=3, min_age_days=0, limit=10)
 
@@ -2126,13 +2126,145 @@ class BacktestServiceTestCase(unittest.TestCase):
         self.assertAlmostEqual(global_summary["win_rate"], 1.0)
         self.assertAlmostEqual(global_summary["direction_accuracy"], 1.0)
         self.assertAlmostEqual(global_summary["avg_return"], 0.10)
+        self.assertIn("methodology", global_summary)
+        self.assertFalse(global_summary["methodology"]["is_return_promise"])
 
         self.assertIsNotNone(stock_summary)
         self.assertEqual(stock_summary["code"], "600519")
         self.assertAlmostEqual(stock_summary["win_rate"], 1.0)
 
+        # Without skill-opinion outcome samples, skill rollups stay unavailable.
         self.assertIsNone(skill_summary)
         self.assertIsNone(strategy_summary)
+
+    def test_run_backtest_attaches_methodology_and_explicit_cost_echo(self) -> None:
+        service = BacktestService(self.db)
+        stats = service.run_backtest(
+            code="600519",
+            force=False,
+            eval_window_days=3,
+            min_age_days=0,
+            limit=10,
+        )
+        applied = stats["applied_config"]
+        self.assertIn("commission_bps", applied)
+        self.assertIn("slippage_bps", applied)
+        self.assertIn("round_trip_cost_pct", applied)
+        methodology = stats["methodology"]
+        self.assertFalse(methodology["is_return_promise"])
+        self.assertEqual(
+            methodology["look_ahead_policy"],
+            "forward_only_after_resolved_start_session",
+        )
+        self.assertEqual(methodology["survivorship_policy"], "analyzed_universe_only")
+
+    def test_skill_summary_maps_opinion_outcomes_to_isomorphic_metrics(self) -> None:
+        from unittest.mock import patch
+
+        service = BacktestService(self.db)
+        fake_stats = {
+            "engine_version": "skill-opinion-outcome-v1",
+            "minimum_evaluated_sample_size": 30,
+            "buckets": [
+                {
+                    "skill_id": "bull_trend",
+                    "horizon": "10d",
+                    "engine_version": "skill-opinion-outcome-v1",
+                    "total": 40,
+                    "pending": 2,
+                    "evaluated": 30,
+                    "observational": 5,
+                    "unable": 3,
+                    "hit": 18,
+                    "miss": 12,
+                    "sample_sufficient": True,
+                    "sample_status": "sufficient",
+                    "hit_rate_pct": 60.0,
+                    "miss_rate_pct": 40.0,
+                    "avg_directional_return_pct": 1.25,
+                    "unable_rate_pct": 7.5,
+                }
+            ],
+        }
+        with patch(
+            "src.services.backtest_service.SkillOpinionPerformanceService.get_stats",
+            return_value=fake_stats,
+        ):
+            summary = service.get_skill_summary("bull_trend", eval_window_days=10)
+
+        self.assertIsNotNone(summary)
+        assert summary is not None
+        self.assertEqual(summary["scope"], "skill")
+        self.assertEqual(summary["skill_id"], "bull_trend")
+        self.assertEqual(summary["total_evaluations"], 30)
+        self.assertEqual(summary["completed_count"], 30)
+        self.assertEqual(summary["win_count"], 18)
+        self.assertEqual(summary["loss_count"], 12)
+        self.assertEqual(summary["neutral_count"], 5)
+        self.assertAlmostEqual(summary["win_rate_pct"], 60.0)
+        self.assertAlmostEqual(summary["direction_accuracy_pct"], 60.0)
+        self.assertAlmostEqual(summary["avg_stock_return_pct"], 1.25)
+        self.assertAlmostEqual(summary["avg_simulated_return_pct"], 1.25)
+        self.assertAlmostEqual(summary["win_rate"], 0.6)
+        self.assertFalse(summary["methodology"]["is_return_promise"])
+        self.assertEqual(
+            summary["methodology"]["metric_source"],
+            "skill_opinion_outcomes",
+        )
+        with patch(
+            "src.services.backtest_service.SkillOpinionPerformanceService.get_stats",
+            return_value=fake_stats,
+        ):
+            strategy = service.get_strategy_summary("bull_trend", eval_window_days=10)
+        self.assertIsNotNone(strategy)
+        assert strategy is not None
+        self.assertEqual(strategy["strategy_id"], "bull_trend")
+        self.assertEqual(strategy["win_count"], 18)
+
+    def test_skill_summary_uses_evaluated_count_for_sample_gates(self) -> None:
+        from unittest.mock import patch
+
+        service = BacktestService(self.db)
+        fake_stats = {
+            "engine_version": "skill-opinion-outcome-v1",
+            "minimum_evaluated_sample_size": 30,
+            "buckets": [
+                {
+                    "skill_id": "bull_trend",
+                    "horizon": "10d",
+                    "engine_version": "skill-opinion-outcome-v1",
+                    "total": 40,
+                    "pending": 32,
+                    "evaluated": 5,
+                    "observational": 1,
+                    "unable": 2,
+                    "hit": 4,
+                    "miss": 1,
+                    "sample_sufficient": False,
+                    "sample_status": "observational",
+                    "hit_rate_pct": None,
+                    "miss_rate_pct": None,
+                    "avg_directional_return_pct": None,
+                    "unable_rate_pct": None,
+                }
+            ],
+        }
+        with patch(
+            "src.services.backtest_service.SkillOpinionPerformanceService.get_stats",
+            return_value=fake_stats,
+        ):
+            summary = service.get_skill_summary("bull_trend", eval_window_days=10)
+
+        self.assertIsNotNone(summary)
+        assert summary is not None
+        self.assertEqual(summary["total_evaluations"], 5)
+        self.assertEqual(summary["completed_count"], 5)
+        self.assertIsNone(summary["win_rate_pct"])
+        self.assertIsNone(summary["direction_accuracy_pct"])
+        self.assertNotIn("win_rate", summary)
+        self.assertNotIn("direction_accuracy", summary)
+        self.assertFalse(summary["diagnostics"]["sample_sufficient"])
+        self.assertLess(summary["total_evaluations"], 30)
 
     def test_get_recent_evaluations(self) -> None:
         """Verify get_recent_evaluations returns correct paginated results."""
@@ -2645,6 +2777,98 @@ class BacktestServiceTestCase(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "analysis_phase must be one of"):
             service.get_summary(code=None, scope="overall", analysis_phase="banana")
+
+    def test_phase_and_sample_split_share_the_same_row_set(self) -> None:
+        self._seed_analysis(
+            query_id="q2",
+            analysis_date=date(2024, 1, 5),
+            created_at=datetime(2024, 1, 5, 0, 0, 0),
+            operation_advice="买入",
+            trend_prediction="看多",
+            start_close=100.0,
+            forward_bars=[
+                StockDaily(code="600519", date=date(2024, 1, 6), high=101.0, low=95.0, close=96.0),
+            ],
+            phase="intraday",
+        )
+        self._seed_analysis(
+            query_id="q3",
+            analysis_date=date(2024, 1, 10),
+            created_at=datetime(2024, 1, 10, 0, 0, 0),
+            operation_advice="买入",
+            trend_prediction="看多",
+            start_close=100.0,
+            forward_bars=[
+                StockDaily(code="600519", date=date(2024, 1, 11), high=101.0, low=95.0, close=96.0),
+            ],
+            phase="intraday",
+        )
+
+        service = BacktestService(self.db)
+        service.run_backtest(code="600519", force=False, eval_window_days=1, min_age_days=0, limit=20)
+
+        summary = service.get_summary(
+            scope="stock",
+            code="600519",
+            eval_window_days=1,
+            analysis_phase="intraday",
+            sample_split="in_sample",
+            split_date=date(2024, 1, 8),
+        )
+        self.assertIsNotNone(summary)
+        assert summary is not None
+        self.assertEqual(summary["total_evaluations"], 1)
+        self.assertEqual(summary["diagnostics"]["phase_breakdown"]["intraday"], 1)
+        self.assertEqual(summary["diagnostics"]["phase_breakdown"]["premarket"], 0)
+        self.assertEqual(summary["diagnostics"]["raw_phase_counts"]["intraday"], 1)
+        self.assertEqual(
+            sum(summary["diagnostics"]["phase_breakdown"].values()),
+            summary["total_evaluations"],
+        )
+
+    def test_cost_model_change_does_not_reuse_prior_net_returns(self) -> None:
+        service = BacktestService(self.db)
+        first = service.run_backtest(
+            code="600519",
+            force=False,
+            eval_window_days=3,
+            min_age_days=0,
+            limit=10,
+        )
+        self.assertEqual(first["saved"], 1)
+        self.assertEqual(first["applied_config"]["engine_version"], "v1")
+        self.assertEqual(first["methodology"]["cost_model"]["commission_bps"], 0.0)
+
+        prior_summary = service.get_summary(scope="stock", code="600519", eval_window_days=3)
+        self.assertIsNotNone(prior_summary)
+        assert prior_summary is not None
+        prior_return = prior_summary["avg_simulated_return_pct"]
+
+        config = get_config()
+        config.backtest_commission_bps = 50.0
+        config.backtest_slippage_bps = 50.0
+
+        mismatched = service.get_summary(scope="stock", code="600519", eval_window_days=3)
+        self.assertIsNone(mismatched)
+
+        rerun = service.run_backtest(
+            code="600519",
+            force=False,
+            eval_window_days=3,
+            min_age_days=0,
+            limit=10,
+        )
+        self.assertEqual(rerun["saved"], 1)
+        self.assertNotEqual(rerun["applied_config"]["engine_version"], "v1")
+        self.assertEqual(rerun["methodology"]["cost_model"]["commission_bps"], 50.0)
+        self.assertEqual(rerun["methodology"]["cost_model"]["slippage_bps"], 50.0)
+
+        updated = service.get_summary(scope="stock", code="600519", eval_window_days=3)
+        self.assertIsNotNone(updated)
+        assert updated is not None
+        self.assertEqual(updated["engine_version"], rerun["applied_config"]["engine_version"])
+        self.assertEqual(updated["methodology"]["cost_model"]["commission_bps"], 50.0)
+        self.assertNotEqual(updated["avg_simulated_return_pct"], prior_return)
 
     def test_multi_stock_summaries(self) -> None:
         """Verify separate summaries for multiple stocks + correct overall aggregate."""

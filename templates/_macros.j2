@@ -19,6 +19,10 @@
 {%- set risk_alerts = intel.get('risk_alerts') or [] -%}
 {%- set risk_warning = result.risk_warning or '' -%}
 {%- set risk_manager = result.risk_gate_result if result.risk_gate_result else {} -%}
+{%- set raw_info_quality = dashboard.get('info_quality') -%}
+{%- set info_quality = raw_info_quality if raw_info_quality is mapping else {} -%}
+{%- set raw_forced_conclusion = dashboard.get('forced_conclusion') -%}
+{%- set forced_conclusion = raw_forced_conclusion if raw_forced_conclusion is mapping else {} -%}
 {%- set time_sensitivity = core.get('time_sensitivity') or '' -%}
 {%- set stop_loss = sniper.get('stop_loss') if sniper else none -%}
 {%- set take_profit = sniper.get('take_profit') if sniper else none -%}
@@ -58,6 +62,10 @@
 {% if risk_manager and risk_manager.get('schema_version') == 'risk-manager-result/v1' %}- **🛡️ {{ labels.risk_manager_heading }}**: {{ labels.risk_verdict_label }} `{{ risk_manager.get('verdict') }}` · {{ risk_manager.get('original_action') }} → **{{ risk_manager.get('final_action') }}** · {{ labels.risk_profile_label }} `{{ risk_manager.get('profile') }}`{% if risk_manager.get('authorized_bypass_id') %} · approval `{{ risk_manager.get('authorized_bypass_id') }}`{% endif %}
 {% endif -%}
 {% if one_sentence %}- **{{ labels.one_sentence_label }}**: {{ one_sentence }}
+{% endif -%}
+{% if info_quality.get('grade') %}- **{{ labels.info_quality_grade_label }}**: `{{ info_quality.get('grade') }}`{% if info_quality.get('dimensions') is mapping %} · source={{ info_quality.dimensions.get('source_reliability', 'n/a') }} · time={{ info_quality.dimensions.get('timeliness', 'n/a') }} · consistency={{ info_quality.dimensions.get('consistency', 'n/a') }}{% endif %}
+{% endif -%}
+{% if forced_conclusion.get('stance') %}- **{{ labels.forced_conclusion_stance_label }}**: `{{ forced_conclusion.get('stance') }}`{% if forced_conclusion.get('uncertainty') %} · {{ labels.forced_conclusion_uncertainty_label }}{% endif %}
 {% endif -%}
 {% if e.localized_trend_prediction %}- **{{ labels.trend_label }}**: {{ e.localized_trend_prediction }}
 {% endif -%}

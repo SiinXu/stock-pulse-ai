@@ -679,6 +679,14 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     impact: ['控制跨源 WARN 证据写入运行诊断的时机。'],
     notes: ['比对为观测性逻辑，比对异常 fail-open。'],
   },
+  'settings.data_source.INFO_QUALITY_GRADING_ENABLED': {
+    title: '信息质量分级',
+    summary: '基于校验证据与上下文包块状态推导 A/B/C 信息质量等级。',
+  },
+  'settings.data_source.FORCED_CONCLUSION_ENABLED': {
+    title: '强制结论结构',
+    summary: '要求报告给出受信息质量约束的 Pass / Fail / Watch 强制结论。',
+  },
   'settings.notification.FEISHU_WEBHOOK_URL': {
     title: '飞书群机器人 Webhook',
     summary: '配置飞书自定义群机器人，用于把分析报告推送到指定飞书群。',
@@ -1546,6 +1554,17 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     impact: ['增加一次 Critic LLM 调用；仅在 retry verdict 下最多再执行一次目标阶段。'],
     notes: ['非法输出或不可用重试目标会 fail-closed 为 fail_soft，且不消耗重试预算。'],
   },
+  'settings.agent.AGENT_CRITIC_MAX_ITERS': {
+    title: 'Critic 最大修订轮次',
+    summary: 'Critic 发现重要证据缺口后，限制受控白名单修订的轮次。',
+    usage: '设为 1 执行一次保守修订；设为 2 可在复查后允许第二个不同目标。',
+    valueNotes: [
+      '允许范围为 1–2，默认 1。',
+      '证据发生变化不代表收敛；只有修订后的 Critic 显式 pass 才代表收敛。',
+    ],
+    impact: ['在保留 Decision 预算的同时限制可选 Critic 修订成本。'],
+    notes: ['达到轮次上限仍无显式 pass 时保持 not_converged，并保留 Critic 限制项。'],
+  },
   'settings.agent.DEBATE': {
     title: '多空辩论',
     summary: '配置可选辩论阶段、限制与专用模型。',
@@ -1579,6 +1598,15 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     ],
     impact: ['影响所有最终 buy、hold、sell 建议的发布动作。'],
     notes: ['一次性人工授权可保留原始动作，但必须留下审批 ID 与结构化审计记录。'],
+  },
+
+  'settings.agent.ANALYSIS_QUALITY_GATE_ENABLED': {
+    title: '分析质量门',
+    summary: '用与离线 agent-eval 相同的维度，把结论中的事实性声明绑定到输入证据。',
+  },
+  'settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE': {
+    title: '质量门失败策略',
+    summary: '发现未绑定事实时选择 annotate（默认）或 intercept。',
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',

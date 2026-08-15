@@ -381,6 +381,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | Soft absolute PE bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `200` | Optional |
 | `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | Soft absolute PB bound: values at or above this are marked suspect (warn) and kept; hard feed extremes still reject. | `50` | Optional |
 | `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | Relative multi-provider field divergence threshold; excess difference records a warn with attribution while keeping values. | `0.05` | Optional |
+| `INFO_QUALITY_GRADING_ENABLED` | Derive A/B/C grades from validation evidence and context-pack statuses; disabling it removes grade metadata and grade-driven prompt rules. | `true` | Optional |
+| `FORCED_CONCLUSION_ENABLED` | Attach Pass/Fail/Watch conclusions and enable grade-driven action/Risk Manager constraints; disabling it keeps grades visible without changing actions. | `true` | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `8.0` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call; market-structure industry/concept rankings share this budget | `8.0` | Optional |
@@ -1565,10 +1567,22 @@ Set the following variables in `.env` (all optional, have defaults):
 | `BACKTEST_MIN_AGE_DAYS` | `14` | Only backtest records older than N days to avoid incomplete data |
 | `BACKTEST_ENGINE_VERSION` | `v1` | Engine version, used to distinguish results when logic is updated |
 | `BACKTEST_NEUTRAL_BAND_PCT` | `2.0` | Neutral band threshold (%), ±2% treated as range-bound |
+| `BACKTEST_COMMISSION_BPS` | `0` | Explicit commission in basis points **per side** for long simulated returns |
+| `BACKTEST_SLIPPAGE_BPS` | `0` | Explicit slippage in basis points **per side**; round-trip cost % = `2 × (commission + slippage) / 100` |
 
 ### Auto-run
 
 Backtesting triggers automatically after the daily analysis flow completes (non-blocking; failures do not affect notifications). It can also be triggered manually via API.
+
+### Methodology notes (research honesty)
+
+- Metrics are **historical simulations only** — not return promises and not live fills.
+- Look-ahead protection: evaluation uses forward bars after the resolved start session.
+- Survivorship: the universe is symbols that already have analysis history in this installation.
+- Sample split: performance APIs accept `sample_split=full|in_sample|out_of_sample` with `split_date` for in/out-of-sample labeling.
+- Cost model: non-zero commission/slippage is bound into the stored `engine_version` identity so previously completed net returns are not rolled up under a new cost disclosure; re-run the backtest after changing bps.
+- Currency: percent returns are currency-agnostic; absolute prices are never summed across quote currencies without FX normalization.
+- YAML skill/strategy metrics: `GET /api/v1/backtest/skills/{skill_id}/performance` (and agent `get_skill_backtest_summary`) map skill-opinion outcomes onto the same public percentage fields as analysis-advice backtests.
 
 ### Evaluation Metrics
 
@@ -1576,10 +1590,11 @@ Backtesting triggers automatically after the daily analysis flow completes (non-
 |--------|-------------|
 | `direction_accuracy_pct` | Direction prediction accuracy (expected direction matches actual) |
 | `win_rate_pct` | Win rate (wins / (wins + losses), excludes neutral) |
-| `avg_stock_return_pct` | Average stock return percentage |
-| `avg_simulated_return_pct` | Average simulated execution return (including SL/TP exits) |
+| `avg_stock_return_pct` | Average stock return percentage (gross of costs) |
+| `avg_simulated_return_pct` | Average simulated execution return after explicit commission/slippage |
 | `stop_loss_trigger_rate` | Stop-loss trigger rate (only counts records with SL configured) |
 | `take_profit_trigger_rate` | Take-profit trigger rate (only counts records with TP configured) |
+| `methodology` | Structured limitations block (`is_return_promise=false`) |
 
 ---
 
@@ -1830,7 +1845,7 @@ A: Check if Actions is enabled, and if cron expression is correct (note it's UTC
 
 The Critic can return only `pass`, `retry`, or `fail_soft`. Under the current contract, `retry` must name exactly one fixed-whitelist target and include at least one bounded reason: `intelligence` (mapped to an already-entered `intel` stage) or `skill:<id>` (the id must exist in the current Skill catalog and that Skill stage must already have entered during this run). A `fail_soft` verdict must include at least one reason or missing-evidence item so Decision receives an explicit limitation. Malformed or unknown output, an unexplained non-pass verdict, a missing catalog Skill, a stage that did not enter, or insufficient remaining pipeline time fails closed to `fail_soft` without spending retry budget. When the remaining time cannot cover both optional Critic/retry work and Decision's 15-second minimum, the optional work yields with a `budget_skipped` or `unavailable` trace and Decision still runs at its existing authority boundary.
 
-The global Critic retry budget is fixed at one per run, and the same target cannot repeat. The whitelist retry uses a dedicated one-shot budget path; it does not relax `AGENT_MAX_STAGE_ENTRIES` or create a general stage re-entry mechanism. The retry removes the target's prior opinion/data in an isolated context and replaces shared context atomically only when it returns `COMPLETED` with new target evidence. A failure, timeout, or evidence-free completion preserves the first stage context, result, and telemetry and passes the limitation to Decision.
+The global Critic revision-round budget is controlled by `AGENT_CRITIC_MAX_ITERS` (default 1, hard cap 2); the same target is not re-entered. Each revision records its before/after evidence diff and the Critic findings that triggered it under `critic_trace.revision_rounds`. Changed evidence proves only that revision occurred, not convergence; only an explicit post-revision Critic `pass` marks `converged`. When a revision is not rechecked, the recheck fails, or another revision is still requested, Critic reasons and missing_evidence are projected into dashboard `phase_decision.data_limitations` instead of being dropped silently. After explicit convergence, only a short revision note and revision-round summary are projected, without restating stale gap opinions. Optional revisions and rechecks remain gated by residual `AGENT_ORCHESTRATOR_TIMEOUT_S` budget and, when present, per-mode hard budgets (#1213), reserving at least one LLM turn for Decision before they start. The whitelist retry uses a dedicated bounded budget path; it does not relax `AGENT_MAX_STAGE_ENTRIES` or create a general stage re-entry mechanism. The retry removes the target's prior opinion/data in an isolated context and replaces shared context atomically only when it returns `COMPLETED` with new target evidence. A failure, timeout, or evidence-free completion preserves the first stage context, result, and telemetry and passes the limitation to Decision.
 
 `StrategyEngine` remains the sole owner of Skill evidence partitioning and `strategy_synthesis` at the existing Decision boundary. The Critic is read-only, has no ToolSurface, and cannot author the final investment decision. Its verdict, reasons, missing evidence, requested/executed targets, budget consumption, and retry status are recorded in internal `AgentContext.meta`, `StageResult.meta`, and `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events. This does not expand persisted runtime facts or public Chat metadata.
 

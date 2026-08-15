@@ -440,6 +440,8 @@ stock-pulse-ai/
 | `DATA_VALIDATION_FUND_PE_SUSPECT_ABS` | PE 软合理性上界：达到该绝对值标记为可疑（warn）并保留；硬极限仍为 reject。 | `200` | 可选 |
 | `DATA_VALIDATION_FUND_PB_SUSPECT_ABS` | PB 软合理性上界：达到该绝对值标记为可疑（warn）并保留；硬极限仍为 reject。 | `50` | 可选 |
 | `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` | 多数据源同一字段的相对差异阈值；超阈值记 warning 并保留归因，不丢弃数值。 | `0.05` | 可选 |
+| `INFO_QUALITY_GRADING_ENABLED` | 基于校验层与上下文包状态推导 A/B/C 信息质量等级；关闭时不生成等级元数据或等级提示规则。 | `true` | 可选 |
+| `FORCED_CONCLUSION_ENABLED` | 要求报告与 DecisionSignal 附带 Pass/Fail/Watch 结论，并启用等级驱动的动作/Risk Manager 约束；关闭时等级仍可见但不改变动作。 | `true` | 可选 |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | 基本面聚合总开关；关闭时仅返回 `not_supported` 块，不改变原分析链路 | `true` | 可选 |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | 基本面阶段总时延预算（秒） | `8.0` | 可选 |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | 单能力源调用超时（秒）；市场结构行业/概念排行也复用该预算 | `8.0` | 可选 |
@@ -1695,10 +1697,22 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 | `BACKTEST_MIN_AGE_DAYS` | `14` | 仅回测 N 天前的记录，避免数据不完整 |
 | `BACKTEST_ENGINE_VERSION` | `v1` | 引擎版本号，升级逻辑时用于区分结果 |
 | `BACKTEST_NEUTRAL_BAND_PCT` | `2.0` | 中性区间阈值（%），±2% 内视为震荡 |
+| `BACKTEST_COMMISSION_BPS` | `0` | 显式佣金（基点/单边），用于多头模拟收益 |
+| `BACKTEST_SLIPPAGE_BPS` | `0` | 显式滑点（基点/单边）；往返成本% = `2 × (佣金+滑点) / 100` |
 
 ### 自动运行
 
 回测在每日分析流程完成后自动触发（非阻塞，失败不影响通知推送）。也可通过 API 手动触发。
+
+### 方法学说明（研究诚实）
+
+- 指标仅为**历史模拟**，不是收益承诺，也不是真实成交。
+- 前视偏差防护：仅使用解析后起始交易日后的前向行情。
+- 幸存者偏差：股票宇宙限于本机已有分析历史的标的。
+- 样本内外：表现 API 支持 `sample_split=full|in_sample|out_of_sample` 与 `split_date`。
+- 成本模型：非零佣金/滑点会绑定进存储的 `engine_version` 身份，避免把旧净收益和新成本披露混在同一汇总；变更 bps 后需重新跑回测。
+- 跨币种：百分比收益币种无关；绝对价格不会在未做汇率归一时跨币种加总。
+- YAML 技能/策略：`GET /api/v1/backtest/skills/{skill_id}/performance`（及 Agent 工具 `get_skill_backtest_summary`）将 skill-opinion 后验映射为与人工策略同构的公开百分比字段。
 
 ### 评估指标
 
@@ -1706,10 +1720,11 @@ P5 的 outcome engine 整体统计卡片现在位于 `/signals?tab=review`；详
 |------|------|
 | `direction_accuracy_pct` | 方向预测准确率（预期方向与实际一致） |
 | `win_rate_pct` | 胜率（胜 / (胜+负)，不含中性） |
-| `avg_stock_return_pct` | 平均股票收益率 |
-| `avg_simulated_return_pct` | 平均模拟执行收益率（含止盈止损退出） |
+| `avg_stock_return_pct` | 平均股票收益率（毛收益） |
+| `avg_simulated_return_pct` | 平均模拟执行收益率（扣减显式佣金/滑点后） |
 | `stop_loss_trigger_rate` | 止损触发率（仅统计配置了止损的记录） |
 | `take_profit_trigger_rate` | 止盈触发率（仅统计配置了止盈的记录） |
+| `methodology` | 结构化方法学限制块（`is_return_promise=false`） |
 
 ---
 
@@ -1951,7 +1966,7 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 
 Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同下必须且只能指定一个固定白名单目标，并至少提供一条有界 reason：`intelligence`（映射已进入的 `intel` Stage）或 `skill:<id>`（`id` 必须存在于当前 Skill catalog，且该 Skill Stage 已在本次 run 中进入）。`fail_soft` 必须至少提供一条 reason 或 missing-evidence，使 Decision 收到明确 limitation。非法/未知输出、没有解释的非 pass verdict、目录中不存在的 Skill、未进入的 Stage 或不足的剩余 Pipeline 时间都会 fail-closed 为 `fail_soft`，且不会消耗 retry budget。若剩余时间不能同时覆盖可选 Critic/重试和 Decision 的最低 15 秒预算，可选工作会让出预算并留下 `budget_skipped` 或 `unavailable` trace；Decision 仍按既有权威边界执行。
 
-每条 run 的全局 Critic retry budget 固定为 1，同一目标不会重复。白名单重试走独立的一次性预算路径，不会放宽 `AGENT_MAX_STAGE_ENTRIES` 或建立通用 Stage 重入机制。重试在隔离 context 中移除目标的旧 opinion/data；只有返回 `COMPLETED` 且产生新目标 evidence 时才原子替换共享 context。失败、超时或无新 evidence 时保留首次 Stage 的 context、结果和 telemetry，并把限制交给 Decision。
+每条 run 的全局 Critic 修订轮次由 `AGENT_CRITIC_MAX_ITERS` 控制（默认 1，硬上限 2）；同一目标不会重复进入。每轮修订的 before/after 证据差异与触发该轮的 Critic 意见写入 `critic_trace.revision_rounds`。证据发生变化只证明修订已执行，不能直接证明收敛；只有修订后的 Critic 复核明确返回 `pass` 才标记 `converged`。未复核、复核失败或仍要求修订时，Critic reasons / missing_evidence 会投影到 dashboard `phase_decision.data_limitations`，不会静默丢弃；明确收敛时仅保留简短修订说明与 revision_round 摘要，不再复述旧缺口意见。可选修订和复核仍受 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算与（若存在）每模式 hard budget（#1213）约束，并在启动前为 Decision 预留最少一次 LLM turn。白名单重试走独立的有界预算路径，不会放宽 `AGENT_MAX_STAGE_ENTRIES` 或建立通用 Stage 重入机制。重试在隔离 context 中移除目标的旧 opinion/data；只有返回 `COMPLETED` 且产生新目标 evidence 时才原子替换共享 context。失败、超时或无新 evidence 时保留首次 Stage 的 context、结果和 telemetry，并把限制交给 Decision。
 
 `StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
 

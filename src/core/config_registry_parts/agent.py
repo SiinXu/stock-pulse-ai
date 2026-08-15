@@ -636,7 +636,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "AGENT_CRITIC_ENABLED": {
         "title": "Bounded Multi-Agent Critic",
-        "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request at most one retry of an already-entered intelligence or catalog-backed skill stage.",
+        "description": "Run one tool-free evidence Critic before Decision in Native Multi analysis. The Critic may request controlled whitelist revision rounds of already-entered intelligence or catalog-backed skill stages.",
         "category": "agent",
         "data_type": "boolean",
         "ui_control": "switch",
@@ -658,6 +658,24 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
             },
         ],
+        "warning_codes": [],
+    },
+    "AGENT_CRITIC_MAX_ITERS": {
+        "title": "Critic Max Revision Rounds",
+        "description": "Maximum controlled revision rounds after the Critic finds material gaps (default 1, hard cap 2). Each round may re-run one whitelist stage and records a revision diff in the Critic trace. Only an explicit recheck pass marks convergence; optional work yields to Decision and per-mode budgets.",
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "1",
+        "options": [],
+        "validation": {"min": 1, "max": 2},
+        "display_order": 64,
+        "help_key": "settings.agent.AGENT_CRITIC_MAX_ITERS",
+        "examples": ["AGENT_CRITIC_MAX_ITERS=1", "AGENT_CRITIC_MAX_ITERS=2"],
+        "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
         "warning_codes": [],
     },
     "DEBATE_ENABLED": {
@@ -772,7 +790,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 64,
+        "display_order": 66,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_ENABLED=false",
@@ -831,7 +849,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "1",
         "options": [],
         "validation": {"min": 0},
-        "display_order": 66,
+        "display_order": 67,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_REFLECTION_MAX_REVISE=1",
@@ -861,7 +879,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "false",
         "options": [],
         "validation": {},
-        "display_order": 67,
+        "display_order": 68,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_ENABLED=false",
@@ -890,7 +908,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "8",
         "options": [],
         "validation": {"min": 0},
-        "display_order": 68,
+        "display_order": 69,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_LLM_BUDGET=8",
@@ -919,7 +937,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "default_value": "true",
         "options": [],
         "validation": {},
-        "display_order": 69,
+        "display_order": 70,
         "help_key": "settings.agent.REFLECTION_POSTMORTEM",
         "examples": [
             "AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true",
@@ -1156,6 +1174,84 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             {
                 "label": "风控经理闸门",
                 "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/risk-manager-gate.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "ANALYSIS_QUALITY_GATE_ENABLED": {
+        "title": "Analysis Quality Gate",
+        "description": (
+            "Run the pipeline quality gate that binds factual claims in the "
+            "conclusion to input evidence using the same factuality / "
+            "boundary_honesty dimensions as the offline agent-eval suite. "
+            "Default on; disable only for diagnostics."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "true",
+        "options": [],
+        "validation": {},
+        "display_order": 630,
+        "help_key": "settings.agent.ANALYSIS_QUALITY_GATE_ENABLED",
+        "examples": [
+            "ANALYSIS_QUALITY_GATE_ENABLED=true",
+            "ANALYSIS_QUALITY_GATE_ENABLED=false",
+        ],
+        "docs": [
+            {
+                "label": "Analysis quality gate",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate_EN.md",
+            },
+            {
+                "label": "分析质量门",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate.md",
+            },
+            {
+                "label": "Agent eval dimensions",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-eval-dimensions_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "ANALYSIS_QUALITY_GATE_ON_FAILURE": {
+        "title": "Quality Gate Failure Policy",
+        "description": (
+            "When ungrounded factual claims are found: annotate demotes them "
+            "to model opinion (default); intercept fails the analysis result. "
+            "Gate-internal errors always fail closed to annotate."
+        ),
+        "category": "agent",
+        "data_type": "string",
+        "ui_control": "select",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "annotate",
+        "options": [
+            {"label": "Annotate (default)", "value": "annotate"},
+            {"label": "Intercept", "value": "intercept"},
+        ],
+        "validation": {
+            "enum": ["annotate", "intercept"],
+        },
+        "display_order": 631,
+        "help_key": "settings.agent.ANALYSIS_QUALITY_GATE_ON_FAILURE",
+        "examples": [
+            "ANALYSIS_QUALITY_GATE_ON_FAILURE=annotate",
+            "ANALYSIS_QUALITY_GATE_ON_FAILURE=intercept",
+        ],
+        "docs": [
+            {
+                "label": "Analysis quality gate",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate_EN.md",
+            },
+            {
+                "label": "分析质量门",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/analysis-quality-gate.md",
             },
         ],
         "warning_codes": [],

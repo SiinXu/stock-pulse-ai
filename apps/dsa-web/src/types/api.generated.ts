@@ -910,6 +910,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/backtest/skills/{skill_id}/performance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 获取技能策略回测风格表现
+         * @description Return skill-scoped metrics isomorphic to analysis-advice PerformanceMetrics. Sourced from attributable skill-opinion outcomes for YAML strategies/skills. Includes methodology limitations; not a return promise.
+         */
+        get: operations["get_skill_performance_api_v1_backtest_skills__skill_id__performance_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/calculators/compound-growth": {
         parameters: {
             query?: never;
@@ -5988,6 +6008,12 @@ export interface components {
              */
             code?: string | null;
             /**
+             * Commission Bps
+             * @description Commission cost in basis points per side applied to simulated long returns
+             * @default 0
+             */
+            commission_bps: number;
+            /**
              * Engine Version
              * @description Effective backtest engine version label
              */
@@ -6018,6 +6044,91 @@ export interface components {
              * @description Neutral outcome band percentage
              */
             neutral_band_pct: number;
+            /**
+             * Round Trip Cost Pct
+             * @description Total round-trip cost percentage deducted from long simulated returns
+             * @default 0
+             */
+            round_trip_cost_pct: number;
+            /**
+             * Slippage Bps
+             * @description Slippage cost in basis points per side applied to simulated long returns
+             * @default 0
+             */
+            slippage_bps: number;
+        };
+        /**
+         * BacktestMethodology
+         * @description Research-honesty methodology block. Never a return promise.
+         */
+        BacktestMethodology: {
+            /** Cost Model */
+            cost_model?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Currency Policy
+             * @default percent_returns_currency_agnostic;absolute_prices_not_aggregated_across_currencies
+             */
+            currency_policy: string;
+            /**
+             * Disclaimer
+             * @description Primary user-facing limitation statement (historical simulation only)
+             */
+            disclaimer: string;
+            /** Disclaimer Codes */
+            disclaimer_codes?: string[];
+            /**
+             * Engine Version
+             * @description Engine version label for the run/summary
+             */
+            engine_version: string;
+            /**
+             * Eval Window Days
+             * @description Evaluation window when known
+             */
+            eval_window_days?: number | null;
+            /**
+             * Is Return Promise
+             * @description Always false. Metrics must not be presented as guaranteed future returns.
+             * @default false
+             */
+            is_return_promise: boolean;
+            /** Limitations */
+            limitations?: string[];
+            /**
+             * Look Ahead Policy
+             * @description Look-ahead bias protection policy
+             * @default forward_only_after_resolved_start_session
+             */
+            look_ahead_policy: string;
+            /**
+             * Metric Source
+             * @description analysis_advice | skill_opinion_outcomes
+             * @default analysis_advice
+             */
+            metric_source: string;
+            /**
+             * Return Units
+             * @default percent_relative
+             */
+            return_units: string;
+            /** Sample Split */
+            sample_split?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Survivorship Policy
+             * @description Survivorship bias disclosure policy
+             * @default analyzed_universe_only
+             */
+            survivorship_policy: string;
+            /**
+             * Version
+             * @description Methodology contract version
+             * @default v1
+             */
+            version: string;
         };
         /** BacktestResultItem */
         BacktestResultItem: {
@@ -6185,6 +6296,8 @@ export interface components {
              * @description 空结果或降级时的诊断说明
              */
             message?: string | null;
+            /** @description Methodology limitations; historical simulation only, not a return promise */
+            methodology?: components["schemas"]["BacktestMethodology"] | null;
             /**
              * Processed
              * @description 候选记录数
@@ -11449,12 +11562,19 @@ export interface components {
             long_count: number;
             /** Loss Count */
             loss_count: number;
+            /** @description Methodology limitations; never a return promise */
+            methodology?: components["schemas"]["BacktestMethodology"] | null;
             /** Neutral Count */
             neutral_count: number;
             /** Neutral Rate Pct */
             neutral_rate_pct?: number | null;
             /** Scope */
             scope: string;
+            /**
+             * Skill Id
+             * @description Present when scope=skill (YAML skill / strategy metrics)
+             */
+            skill_id?: string | null;
             /** Stop Loss Trigger Rate */
             stop_loss_trigger_rate?: number | null;
             /** Take Profit Trigger Rate */
@@ -21261,6 +21381,10 @@ export interface operations {
                 analysis_date_to?: string | null;
                 /** @description 分析阶段过滤：premarket/intraday/postmarket/unknown */
                 analysis_phase?: ("premarket" | "intraday" | "postmarket" | "unknown") | null;
+                /** @description Sample split: full | in_sample | out_of_sample */
+                sample_split?: "full" | "in_sample" | "out_of_sample";
+                /** @description Required when sample_split is in_sample or out_of_sample */
+                split_date?: string | null;
             };
             header?: never;
             path?: never;
@@ -21326,6 +21450,10 @@ export interface operations {
                 analysis_date_to?: string | null;
                 /** @description 分析阶段过滤：premarket/intraday/postmarket/unknown */
                 analysis_phase?: ("premarket" | "intraday" | "postmarket" | "unknown") | null;
+                /** @description Sample split: full | in_sample | out_of_sample */
+                sample_split?: "full" | "in_sample" | "out_of_sample";
+                /** @description Required when sample_split is in_sample or out_of_sample */
+                split_date?: string | null;
             };
             header?: never;
             path: {
@@ -21468,6 +21596,67 @@ export interface operations {
             };
             /** @description 请求参数错误 */
             400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description 服务器错误 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_skill_performance_api_v1_backtest_skills__skill_id__performance_get: {
+        parameters: {
+            query?: {
+                /** @description Preferred evaluation window; mapped onto skill horizons 1d/3d/5d/10d */
+                eval_window_days?: number | null;
+            };
+            header?: never;
+            path: {
+                skill_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description YAML skill / strategy backtest-style metrics */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerformanceMetrics"];
+                };
+            };
+            /** @description 请求参数错误 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 无技能后验汇总 */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

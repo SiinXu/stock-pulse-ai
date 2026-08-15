@@ -97,6 +97,9 @@ class Config:
     data_validation_fund_pb_suspect_abs: float = 50.0
     # Multi-provider relative divergence threshold (WARN with attribution).
     data_validation_cross_source_rel_threshold: float = 0.05
+    # Issue #123: information quality grade + forced conclusion (Pass/Fail/Watch).
+    info_quality_grading_enabled: bool = True
+    forced_conclusion_enabled: bool = True
     plugin_data_provider_auto_bind_enabled: bool = False
 
     # === AlphaSift optional stock screening integration ===
@@ -338,6 +341,7 @@ class Config:
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
+    agent_critic_max_iters: int = 1  # Max controlled revision rounds after Critic findings (hard-capped at 2)
     # Multi-level reflection (#1094) plus encyclopedia run-local reflection / post-mortem.
     # Immediate and meta LLM budgets stay code constants (default 0); trajectory reuses
     # AGENT_REFLECTION_LLM_BUDGET (0-64). Default off.
@@ -376,6 +380,9 @@ class Config:
     agent_skill_agent_timeout_s: float = 0
     agent_risk_override: bool = True  # Allow risk agent to veto buy signals
     risk_gate_profile: str = "balanced"  # Mandatory final-action risk profile
+    # Pipeline quality gate: factual claims must bind to input evidence (#887).
+    analysis_quality_gate_enabled: bool = True
+    analysis_quality_gate_on_failure: str = "annotate"  # annotate | intercept
     agent_multi_strategy_deliberation: bool = False  # Default-off multi-strategy deliberation
     # Structured disagreement handling / cross-validation / split-verdict (default off).
     agent_disagreement_handling: bool = False
@@ -505,6 +512,8 @@ class Config:
     backtest_min_age_days: int = 14
     backtest_engine_version: str = "v1"
     backtest_neutral_band_pct: float = 2.0
+    backtest_commission_bps: float = 0.0
+    backtest_slippage_bps: float = 0.0
 
     # Log Configuration
     log_dir: str = "./logs"  # Log file directory

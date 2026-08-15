@@ -133,6 +133,64 @@ BACKTEST_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "BACKTEST_COMMISSION_BPS": {
+        "title": "Backtest Commission Bps",
+        "description": (
+            "Commission cost in basis points per side applied to long simulated returns. "
+            "Default 0 is an explicit zero-friction assumption, not hidden costs."
+        ),
+        "category": "backtest",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 10000.0},
+        "display_order": 55,
+        "help_key": "settings.backtest.eval_params",
+        "examples": [
+            "BACKTEST_COMMISSION_BPS=5",
+            "BACKTEST_SLIPPAGE_BPS=10",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "BACKTEST_SLIPPAGE_BPS": {
+        "title": "Backtest Slippage Bps",
+        "description": (
+            "Slippage cost in basis points per side applied to long simulated returns. "
+            "Round-trip cost is 2 × (commission_bps + slippage_bps) / 100 percent."
+        ),
+        "category": "backtest",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0.0, "max": 10000.0},
+        "display_order": 56,
+        "help_key": "settings.backtest.eval_params",
+        "examples": [
+            "BACKTEST_SLIPPAGE_BPS=10",
+            "BACKTEST_COMMISSION_BPS=5",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：回测配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#回测功能",
+            },
+        ],
+        "warning_codes": [],
+    },
     "PAPER_PORTFOLIO_INITIAL_CASH": {
         "title": "Paper Portfolio Initial Cash",
         "description": (

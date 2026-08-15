@@ -101,6 +101,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CONTEXT_COMPRESSION_TRIGGER_TOKENS` | `空` | 是 | 模板中注释; Historical token threshold that triggers compression; leave empty to use the current profile preset |
 | `AGENT_CONTEXT_PROTECTED_TURNS` | `空` | 是 | 模板中注释; Preserve the most recent N user turns and the replies that follow them verbatim during compression; leave empty to us... |
 | `AGENT_CRITIC_ENABLED` | `false` | 是 | 模板中注释; Optional bounded Critic for Native Multi analysis (default false) |
+| `AGENT_CRITIC_MAX_ITERS` | `1` | 是 | 模板中注释; Controlled revision rounds after Critic findings (default 1, hard cap 2); only an explicit recheck pass marks converg... |
 | `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep-research tool token budget and timeout (seconds) for Agent analysis paths that enable deep research. |
 | `AGENT_DEEP_RESEARCH_TIMEOUT` | `180` | 是 | 模板中注释 |
@@ -194,6 +195,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ANALYSIS_PARALLEL_FETCH_ENABLED` | `true` | 是 | 模板中注释; Parallel dependency-free market-input pulls inside one stock analysis (realtime / chip / money-flow / fundamental) |
 | `ANALYSIS_PARALLEL_FETCH_MAX_CONCURRENT` | `3` | 是 | 模板中注释 |
 | `ANALYSIS_PARALLEL_FETCH_PER_PROVIDER_LIMIT` | `1` | 是 | 模板中注释 |
+| `ANALYSIS_QUALITY_GATE_ENABLED` | `true` | 是 | 模板中注释 |
+| `ANALYSIS_QUALITY_GATE_ON_FAILURE` | `annotate` | 是 | 模板中注释 |
 | `ANSPIRE_API_KEYS` | `空` | 是 | Anspire Open API keys (supports multiple comma-separated values) Get keys from: https://open.anspire.cn/ When no high... |
 | `ANSPIRE_LLM_BASE_URL` | `https://open-gateway.anspire.cn/v6` | 是 | 模板中注释 |
 | `ANSPIRE_LLM_ENABLED` | `true` | 是 | 模板中注释 |
@@ -207,11 +210,13 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `ASTRBOT_URL` | `空` | 是 | 模板中注释; AstrBot Configuration |
 | `AUDIT_EXPORT_ENABLED` | `false` | 是 | 模板中注释 |
 | `AUDIT_INCLUDE_RAW_ARTIFACTS` | `false` | 是 | 模板中注释 |
+| `BACKTEST_COMMISSION_BPS` | `0` | 是 | Explicit friction model (basis points per side) |
 | `BACKTEST_ENABLED` | `true` | 是 | =================================== Backtesting configuration (optional) =================================== Enable b... |
 | `BACKTEST_ENGINE_VERSION` | `v1` | 是 | Backtesting engine version (used to differentiate results when backtesting logic is upgraded). |
 | `BACKTEST_EVAL_WINDOW_DAYS` | `10` | 是 | Backtesting evaluation window (trading days) |
 | `BACKTEST_MIN_AGE_DAYS` | `14` | 是 | Only retrieve historical analysis records of N days ago (to avoid incomplete data for that day/recently) |
 | `BACKTEST_NEUTRAL_BAND_PCT` | `2.0` | 是 | Neutral-band threshold (%); for example, 2 treats -2% through +2% as neutral/sideways. |
+| `BACKTEST_SLIPPAGE_BPS` | `0` | 是 |  |
 | `BAOSTOCK_PRIORITY` | `3` | 是 | 模板中注释; Baostock (China) - default: 3 |
 | `BIAS_THRESHOLD` | `5.0` | 是 | 模板中注释; Bias-ratio threshold (%); when deviation from MA5 exceeds this value, strong-trend stocks use a 1.5x threshold before... |
 | `BOCHA_API_KEYS` | `your_bocha_key_here` | 是 | 模板中注释; =================================== Search engine configuration (for fetching stock news) |
@@ -305,6 +310,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `FEISHU_WEBHOOK_SECRET` | `your_feishu_webhook_secret` | 是 | 模板中注释; Feishu group robot Webhook security configuration (only used in Webhook push mode) |
 | `FEISHU_WEBHOOK_URL` | `https://open.feishu.cn/open-apis/bot/v2/hook/your_key_here` | 是 | 模板中注释; Method Two: Feishu Robot (Choose one of two) Method 2a — Group Custom Robot Webhook In Feishu group -> Settings -> Gr... |
 | `FINNHUB_API_KEY` | `空` | 是 | 模板中注释; Finnhub (optional, US stock data source, free tier 60 calls/min) Get: https://finnhub.io/register |
+| `FORCED_CONCLUSION_ENABLED` | `true` | 是 | 模板中注释; Forced Pass/Fail/Watch conclusion on reports and DecisionSignal metadata |
 | `FUNDAMENTAL_CACHE_MAX_ENTRIES` | `256` | 是 | 模板中注释 |
 | `FUNDAMENTAL_CACHE_TTL_SECONDS` | `120` | 是 | 模板中注释 |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | `8.0` | 是 | 模板中注释 |
@@ -336,6 +342,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `INDICATOR_RSI_PERIODS` | `6,12,24` | 是 | 模板中注释 |
 | `INDUSTRY_PROVIDER` | `none` | 是 | 模板中注释; AlphaSift industry/concept provider default closed; enable akshare to provide more sector information for theme_heat,... |
 | `INDUSTRY_PROVIDER_MAX_BOARDS` | `80` | 是 | 模板中注释 |
+| `INFO_QUALITY_GRADING_ENABLED` | `true` | 是 | 模板中注释; Information quality grading (A/B/C) consumes data_quality_evidence.v1 and AnalysisContextPack block statuses; it does... |
 | `KRONOS_ENABLED` | `false` | 是 | Optional local Kronos K-line forecasting Agent Tool |
 | `KRONOS_MODEL_SIZE` | `mini` | 是 |  |
 | `KRONOS_WEIGHTS_DIR` | `/absolute/path/to/kronos-weights` | 是 | 模板中注释 |
