@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
   "description": "Annotated high-risk Web i18n key inventory for issue #882. nativeReviewStatus is a provenance marker, not a CI gate. PRODUCT_SOURCE locales (zh/en) are product provenance; translated locales stay PENDING_NATIVE_REVIEW until a named native financial reviewer + date are recorded in languageReview.",
-  "generatedAt": "2026-08-13",
+  "generatedAt": "2026-08-15",
   "source": "apps/dsa-web/scripts/high-risk-i18n-audit.json category selectors against live UI_TRANSLATION_KEYS",
-  "count": 367,
-  "sha256": "2c8392ba743f55a40153b7a953b8bd6a53a9de46fad560a458b0dac6b44306ce",
-  "keySetSha256": "ce7f30b9f2d67829b72eb0bcca2c2d973c9679ddc44bf82fc9f909414479a801",
+  "count": 369,
+  "sha256": "c4d68ff232d43672d6e2626f2386947a2fa7ad1b5f017ecedce85b0cc015d9fb",
+  "keySetSha256": "0027f44b9f18e6fa0e9a632ec3d92e3cdcc9cb8e68e27e19bf289fc8616bb2fd",
   "categoryCounts": {
     "trading_action": 18,
     "risk": 75,
     "authentication": 90,
     "credential": 43,
-    "error": 158,
+    "error": 160,
     "disclaimer": 3
   },
   "decisionLinkedCount": 95,
@@ -1087,6 +1087,24 @@
     },
     {
       "key": "api.error.STABLE_ERROR_TEXT.portfolio_busy.title",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message",
+      "categories": [
+        "error"
+      ],
+      "productSourceVerdict": "RETAIN_PRODUCT_SOURCE",
+      "decisionId": null,
+      "nativeReviewStatus": "PENDING_NATIVE_REVIEW"
+    },
+    {
+      "key": "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title",
       "categories": [
         "error"
       ],

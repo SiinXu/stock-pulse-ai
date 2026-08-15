@@ -127,6 +127,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.password_required.title": "パスワードが必要です",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.message": "もう一つの変更は処理中です。すぐにもう一度試してみて。",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.title": "ポートフォリオ台帳は忙しいです",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message": "プレビュー後にFutuのポジションが変更されました。インポートする前に、現在のポジションをもう一度プレビューしてください。",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title": "ポジションのプレビュー期限が切れました",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message": "関連する売りエントリーを修正して、もう一度やり直してください。",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "売却量が利用可能な保有数を上回る",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "しばらく待ってから、もう一度お試しください。",

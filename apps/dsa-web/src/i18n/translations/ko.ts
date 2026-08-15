@@ -127,6 +127,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.password_required.title": "비밀번호 필요",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.message": "또 다른 변경 사항이 처리 중입니다. 곧 다시 시도해 보세요.",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.title": "포트폴리오 원장을 처리 중입니다",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message": "미리보기 후 Futu 포지션이 변경되었습니다. 가져오기 전에 현재 포지션을 다시 미리보세요.",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title": "포지션 미리보기가 만료되었습니다",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message": "관련 매도 항목을 수정하고 다시 시도하세요.",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "매도 수량이 보유 가능한 보유량을 초과할 수 있습니다",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "잠시 기다렸다가 다시 시도해 보세요.",

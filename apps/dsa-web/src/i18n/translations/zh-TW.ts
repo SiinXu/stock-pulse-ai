@@ -127,6 +127,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.password_required.title": "請輸入密碼",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.message": "另一筆變更正在處理，請稍後重試。",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.title": "持倉賬本正忙",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message": "Futu 持倉在預覽後發生變化，請重新預覽目前持倉後再匯入。",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title": "持倉預覽已過期",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message": "修正對應賣出流水後再試。",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "賣出數量超過可用持倉",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "請稍後再試。",

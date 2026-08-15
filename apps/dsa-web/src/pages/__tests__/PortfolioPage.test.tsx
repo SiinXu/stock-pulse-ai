@@ -1194,14 +1194,17 @@ describe('PortfolioPage FX refresh', () => {
   });
 
   it('returns a stale Futu commit to the preview step before allowing another commit', async () => {
-    commitFutuImport.mockRejectedValueOnce(createApiError(createParsedApiError({
-      title: 'Preview expired',
-      message: 'Preview the current positions before importing.',
-      rawMessage: 'Preview the current positions before importing.',
-      status: 409,
-      category: 'http_error',
-      code: 'portfolio_import_preview_stale',
-    })));
+    commitFutuImport.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          error: 'portfolio_import_preview_stale',
+          message: 'Futu position snapshot changed: diagnostic hash mismatch',
+          category: 'config_conflict',
+          severity: 'warning',
+        },
+      },
+    });
     renderPortfolioPage();
     await waitForInitialLoad();
     chooseOption(screen.getAllByRole('combobox')[0], '1');
@@ -1221,8 +1224,8 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
     fireEvent.click(within(wizard).getByRole('button', { name: '提交导入' }));
 
-    expect(await screen.findByText('Preview the current positions before importing.'))
-      .toBeInTheDocument();
+    expect(await screen.findByText('持仓预览已过期')).toBeInTheDocument();
+    expect(screen.getByText(/Futu 持仓在预览后发生变化/)).toBeInTheDocument();
     expect(within(wizard).getByRole('button', { name: '预览持仓' })).toBeInTheDocument();
     expect(within(wizard).queryByRole('button', { name: '提交导入' })).not.toBeInTheDocument();
   });

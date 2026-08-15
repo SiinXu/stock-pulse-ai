@@ -3,7 +3,6 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createApiError, createParsedApiError } from '../../../api/error';
 import type { PortfolioFutuImportPreviewResponse } from '../../../types/portfolio';
 import type { PortfolioText } from '../types';
 import type { PortfolioImportText } from '../../../locales/portfolioImport';
@@ -154,20 +153,26 @@ describe('usePortfolioImportSession', () => {
       resolvePreview(preview);
     });
 
-    session.commitFutu.mockRejectedValueOnce(createApiError(createParsedApiError({
-      title: 'Preview expired',
-      message: 'Preview the current positions before importing.',
-      rawMessage: 'Preview the current positions before importing.',
-      status: 409,
-      category: 'http_error',
-      code: 'portfolio_import_preview_stale',
-    })));
+    session.commitFutu.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          error: 'portfolio_import_preview_stale',
+          message: 'Futu position snapshot changed: diagnostic hash mismatch',
+          category: 'config_conflict',
+          severity: 'warning',
+        },
+      },
+    });
     let outcome: 'preview_stale' | void = undefined;
     await act(async () => {
       outcome = await session.result.current.handleCommit();
     });
     expect(outcome).toBe('preview_stale');
     expect(session.result.current.error?.code).toBe('portfolio_import_preview_stale');
+    expect(session.result.current.error?.title).toBe('持仓预览已过期');
+    expect(session.result.current.error?.message).toContain('重新预览');
+    expect(session.result.current.error?.rawMessage).toContain('diagnostic hash mismatch');
     expect(session.result.current.previewResult).toBeNull();
     expect(session.result.current.previewSnapshotId).toBeUndefined();
   });

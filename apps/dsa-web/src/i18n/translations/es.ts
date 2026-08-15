@@ -127,6 +127,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.password_required.title": "Se requiere contraseña",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.message": "Se está tramitando otro cambio. Inténtalo de nuevo en breve.",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.title": "El libro mayor de cartera está ocupado",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message": "Las posiciones de Futu cambiaron después de la vista previa. Vuelva a previsualizar las posiciones actuales antes de importarlas.",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title": "La vista previa de posiciones ha caducado",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message": "Corrige la entrada de venta relacionada y vuelve a intentarlo.",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "La cantidad de venta supera las tenencias disponibles",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "Espera un momento y vuelve a intentarlo.",

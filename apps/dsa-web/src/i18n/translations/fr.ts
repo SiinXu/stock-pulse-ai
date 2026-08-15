@@ -127,6 +127,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.password_required.title": "Mot de passe requis",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.message": "Un autre changement est en cours de traitement. Essayez à nouveau sous peu.",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.title": "Le registre de portefeuille est chargé",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message": "Les positions Futu ont changé après l’aperçu. Prévisualisez de nouveau les positions actuelles avant de les importer.",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title": "L’aperçu des positions a expiré",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message": "Corrigez l’entrée de vente associée et réessayez.",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "La quantité vendue dépasse les avoirs disponibles",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "Patientez un instant, puis réessayez.",

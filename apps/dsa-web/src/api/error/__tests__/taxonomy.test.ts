@@ -38,6 +38,14 @@ describe('error taxonomy', () => {
     });
   });
 
+  it('requires a new preview for stale Futu import snapshots', () => {
+    expect(ERROR_CODE_TAXONOMY.portfolio_import_preview_stale).toEqual({
+      category: 'config_conflict',
+      severity: 'warning',
+      defaultAction: 'none',
+    });
+  });
+
   it('falls back to internal for unknown codes', () => {
     const unknown = classifyErrorCode('brand_new_code_not_registered');
     expect(unknown.category).toBe('internal');

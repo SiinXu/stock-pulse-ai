@@ -127,6 +127,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.password_required.title": "Kata laluan diperlukan",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.message": "Satu lagi perubahan sedang diproses. Cuba lagi sebentar lagi.",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.title": "Lejar portfolio sibuk",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message": "Kedudukan Futu berubah selepas pratonton. Pratonton semula kedudukan semasa sebelum mengimport.",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title": "Pratonton kedudukan telah tamat tempoh",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message": "Betulkan entri jual yang berkaitan dan cuba lagi.",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "Kuantiti jual melebihi pegangan yang tersedia",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "Tunggu sebentar dan cuba lagi.",

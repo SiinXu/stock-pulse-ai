@@ -127,6 +127,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "api.error.STABLE_ERROR_TEXT.password_required.title": "Passwort erforderlich",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.message": "Eine weitere Änderung wird gerade verarbeitet. Versuchen Sie es gleich noch einmal.",
   "api.error.STABLE_ERROR_TEXT.portfolio_busy.title": "Das Portfolio-Ledger ist beschäftigt",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message": "Die Futu-Positionen haben sich nach der Vorschau geändert. Zeigen Sie die aktuellen Positionen vor dem Import erneut in der Vorschau an.",
+  "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title": "Die Positionsvorschau ist abgelaufen",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.message": "Korrigiere den zugehörigen Verkaufseintrag und versuche es erneut.",
   "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title": "Die Verkaufsmenge übersteigt die verfügbaren Bestände",
   "api.error.STABLE_ERROR_TEXT.rate_limited.message": "Warten Sie einen Moment und versuchen Sie es erneut.",

@@ -200,6 +200,16 @@ export const STABLE_ERROR_TEXT: Record<string, StableErrorText> = {
     zh: { title: '持仓账本正忙', message: '另一笔变更正在处理，请稍后重试。' },
     en: { title: 'Portfolio ledger is busy', message: 'Another change is being processed. Try again shortly.' },
   }),
+  portfolio_import_preview_stale: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale", {
+    zh: {
+      title: '持仓预览已过期',
+      message: 'Futu 持仓在预览后发生变化，请重新预览当前持仓后再导入。',
+    },
+    en: {
+      title: 'Position preview expired',
+      message: 'Futu positions changed after preview. Preview the current positions again before importing.',
+    },
+  }),
   idempotency_conflict: createUiLanguageRecord("api.error.STABLE_ERROR_TEXT.idempotency_conflict", {
     zh: { title: '提交标识冲突', message: '同一操作标识已用于不同内容，请刷新后重新提交。' },
     en: { title: 'Submission identifier conflict', message: 'This operation identifier was already used for different content. Refresh and submit again.' },

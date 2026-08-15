@@ -26,6 +26,37 @@ describe('stable API error contract', () => {
     expect(english.traceId).toBe('trace-1');
   });
 
+  it('turns a stale Futu preview envelope into preview-again guidance', () => {
+    const parsed = parseApiError({
+      response: {
+        status: 409,
+        data: {
+          error: 'portfolio_import_preview_stale',
+          message: 'Futu position snapshot changed: diagnostic hash mismatch',
+          category: 'config_conflict',
+          severity: 'warning',
+        },
+      },
+    });
+
+    expect(parsed).toMatchObject({
+      code: 'portfolio_import_preview_stale',
+      status: 409,
+      taxonomyCategory: 'config_conflict',
+      taxonomySeverity: 'warning',
+    });
+    expect(parsed.title).toBe('持仓预览已过期');
+    expect(parsed.message).toContain('重新预览');
+    expect(parsed.rawMessage).toContain('diagnostic hash mismatch');
+
+    const english = getParsedApiError(parsed, 'en');
+    expect(english.title).toBe('Position preview expired');
+    expect(english.message).toBe(
+      'Futu positions changed after preview. Preview the current positions again before importing.',
+    );
+    expect(english.message).not.toContain('diagnostic hash mismatch');
+  });
+
   it('renders the llm_not_configured first-run remedy copy from the stable catalog', () => {
     const parsed = parseApiError({
       response: {
