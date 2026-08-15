@@ -1,0 +1,1 @@
+- [Changed] Clarify Signal Center navigation with straight primary tabs, compact scope filters, icon-only refresh actions, and mobile-visible nested views.

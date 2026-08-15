@@ -194,7 +194,7 @@ describe('SidebarNav', () => {
 
     await screen.findByRole('link', { name: '发现' });
     const hrefs = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
-    expect(hrefs.slice(0, 12)).toEqual([
+    expect(hrefs.slice(0, 13)).toEqual([
       APP_ROUTE_PATHS.home,
       APP_ROUTE_PATHS.research,
       APP_ROUTE_PATHS.researchMarket,
@@ -204,6 +204,7 @@ describe('SidebarNav', () => {
       APP_ROUTE_PATHS.eventCalendar,
       APP_ROUTE_PATHS.calculators,
       APP_ROUTE_PATHS.researchSkillOutcomes,
+      APP_ROUTE_PATHS.agent,
       APP_ROUTE_PATHS.signals,
       APP_ROUTE_PATHS.portfolio,
       APP_ROUTE_PATHS.settings,
@@ -312,7 +313,7 @@ describe('SidebarNav', () => {
       .toHaveAttribute('href', APP_ROUTE_PATHS.researchDiscover);
   });
 
-  it('does not surface the Agent completion badge after Agent leaves primary nav', () => {
+  it('keeps Agent visible in primary navigation and surfaces its completion badge', () => {
     completionBadgeState.value = true;
 
     render(
@@ -321,9 +322,8 @@ describe('SidebarNav', () => {
       </MemoryRouter>,
     );
 
-    // Agent is demoted to command-palette-only (#873); primary chrome has no Agent link/badge.
-    expect(screen.queryByRole('link', { name: 'Agent' })).not.toBeInTheDocument();
-    expect(screen.queryByTestId('chat-completion-badge')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Agent' })).toHaveAttribute('href', APP_ROUTE_PATHS.agent);
+    expect(screen.getByTestId('chat-completion-badge')).toBeInTheDocument();
   });
 
   it('moves theme and language controls into the collapsed profile menu', () => {

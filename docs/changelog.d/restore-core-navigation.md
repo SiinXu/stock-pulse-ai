@@ -1,0 +1,1 @@
+- [Fixed] Restore Agent and Signal Center as persistent desktop and mobile navigation entries while keeping contextual routes in their owning workflows.

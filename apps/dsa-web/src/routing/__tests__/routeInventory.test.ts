@@ -12,13 +12,51 @@ import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../routes';
  * Mechanical route inventory for Navigation IA (#368 / #873).
  * Keep this table aligned with App.tsx + APPLICATION_NAVIGATION_ITEMS.
  */
+const PRIMARY_NAV_ROUTES = [
+  APP_ROUTE_PATHS.home,
+  APP_ROUTE_PATHS.research,
+  APP_ROUTE_PATHS.researchMarket,
+  APP_ROUTE_PATHS.researchDiscover,
+  APP_ROUTE_PATHS.researchAnalysis,
+  APP_ROUTE_PATHS.researchBacktest,
+  APP_ROUTE_PATHS.eventCalendar,
+  APP_ROUTE_PATHS.calculators,
+  APP_ROUTE_PATHS.researchSkillOutcomes,
+  APP_ROUTE_PATHS.agent,
+  APP_ROUTE_PATHS.signals,
+  APP_ROUTE_PATHS.portfolio,
+  APP_ROUTE_PATHS.settings,
+] as const;
+
+const COMMAND_ENTRY_ROUTES = [
+  APP_ROUTE_PATHS.approvals,
+] as const;
+
+const CONTEXT_ENTRY_ROUTES = [
+  APP_ROUTE_PATHS.notifications,
+  APP_ROUTE_PATHS.stockDetails,
+  APP_ROUTE_PATHS.eventAlerts,
+  APP_ROUTE_PATHS.portfolioPerformance,
+  APP_ROUTE_PATHS.researchReportCompare,
+] as const;
+
+const STANDALONE_ROUTES = [
+  APP_ROUTE_PATHS.login,
+  APP_ROUTE_PATHS.playground,
+  APP_ROUTE_PATHS.playgroundRender,
+] as const;
+
 const CANONICAL_SHELL_ROUTES = [
   APP_ROUTE_PATHS.home,
   APP_ROUTE_PATHS.agent,
   APP_ROUTE_PATHS.portfolio,
   APP_ROUTE_PATHS.signals,
   APP_ROUTE_PATHS.approvals,
+  APP_ROUTE_PATHS.notifications,
   APP_ROUTE_PATHS.stockDetails,
+  APP_ROUTE_PATHS.eventAlerts,
+  APP_ROUTE_PATHS.portfolioPerformance,
+  APP_ROUTE_PATHS.researchReportCompare,
   APP_ROUTE_PATHS.research,
   APP_ROUTE_PATHS.researchMarket,
   APP_ROUTE_PATHS.researchDiscover,
@@ -45,6 +83,7 @@ const PRIMARY_NAV_TARGETS = APPLICATION_NAVIGATION_ITEMS.flatMap((item) => [
 
 describe('navigation IA route inventory', () => {
   it('keeps every primary-nav target on a canonical shell route', () => {
+    expect(PRIMARY_NAV_TARGETS).toEqual(PRIMARY_NAV_ROUTES);
     for (const target of PRIMARY_NAV_TARGETS) {
       expect(CANONICAL_SHELL_ROUTES).toContain(target);
     }
@@ -54,8 +93,7 @@ describe('navigation IA route inventory', () => {
     for (const [legacyPath] of LEGACY_REDIRECT_MAP) {
       expect(PRIMARY_NAV_TARGETS).not.toContain(legacyPath);
     }
-    // Agent is demoted from the primary spine (#873) but remains a shell route.
-    expect(PRIMARY_NAV_TARGETS).not.toContain(APP_ROUTE_PATHS.agent);
+    expect(PRIMARY_NAV_TARGETS).toContain(APP_ROUTE_PATHS.agent);
     expect(PRIMARY_NAV_TARGETS).not.toContain(APP_ROUTE_PATHS.approvals);
     expect(PRIMARY_NAV_TARGETS).not.toContain(APP_ROUTE_PATHS.stockDetails);
     expect(PRIMARY_NAV_TARGETS).not.toContain(APP_ROUTE_PATHS.playground);
@@ -76,23 +114,23 @@ describe('navigation IA route inventory', () => {
     );
   });
 
-  it('lists reachable surfaces that intentionally stay outside the primary sidebar', () => {
+  it('classifies every canonical route by its discoverability contract', () => {
     const sidebarLinked = new Set(PRIMARY_NAV_TARGETS);
-    const reachableOutsideSidebar = [
-      APP_ROUTE_PATHS.agent,
-      APP_ROUTE_PATHS.approvals,
-      APP_ROUTE_PATHS.stockDetails,
-      APP_ROUTE_PATHS.eventAlerts,
-      APP_ROUTE_PATHS.portfolioPerformance,
-      APP_ROUTE_PATHS.login,
-      APP_ROUTE_PATHS.playground,
-    ];
-    for (const path of reachableOutsideSidebar) {
+    for (const path of [...COMMAND_ENTRY_ROUTES, ...CONTEXT_ENTRY_ROUTES, ...STANDALONE_ROUTES]) {
       expect(sidebarLinked.has(path)).toBe(false);
     }
+
+    const classifiedRoutes = [
+      ...PRIMARY_NAV_ROUTES,
+      ...COMMAND_ENTRY_ROUTES,
+      ...CONTEXT_ENTRY_ROUTES,
+      ...STANDALONE_ROUTES,
+    ];
+    expect(new Set(classifiedRoutes).size).toBe(classifiedRoutes.length);
+    expect([...classifiedRoutes].sort()).toEqual(Object.values(APP_ROUTE_PATHS).sort());
   });
 
-  it('keeps command-palette page hrefs on canonical routes and includes demoted surfaces', () => {
+  it('keeps command-palette page hrefs on canonical routes and includes secondary surfaces', () => {
     const paletteHrefs = listCommandPalettePages().map((page) => page.href);
     for (const href of paletteHrefs) {
       const path = href.split('?')[0] ?? href;
@@ -105,7 +143,6 @@ describe('navigation IA route inventory', () => {
     expect(paletteHrefs).toContain(APP_ROUTE_PATHS.agent);
     expect(paletteHrefs).toContain(APP_ROUTE_PATHS.approvals);
     expect(COMMAND_PALETTE_SECONDARY_PAGES.map((page) => page.to)).toEqual([
-      APP_ROUTE_PATHS.agent,
       APP_ROUTE_PATHS.approvals,
     ]);
   });

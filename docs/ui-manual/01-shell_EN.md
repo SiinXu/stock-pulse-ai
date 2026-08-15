@@ -45,7 +45,7 @@ flowchart TB
 
 | Region | Typical place | Meaning |
 | --- | --- | --- |
-| Primary nav | Left / top | Catalog: Home, Research, Portfolio, Agent, Settings |
+| Primary nav | Left / top | Catalog: Home, Research, Agent, Signal Center, Portfolio, Settings |
 | Main content | Center | The page you are using |
 | Notification bell | Desktop sidebar footer, beside the profile entry | New signals / alerts |
 | Command palette | Shortcut or search box | Universal jump |
@@ -54,16 +54,17 @@ Desktop and Web share the same information architecture; desktop-only windows fo
 
 ---
 
-## Five primary domains
+## Six primary domains
 
-These five top-level items match the product navigation:
+These six top-level items keep the core workspaces visible:
 
 | Nav label | Route(s) | What is inside | Manual |
 | --- | --- | --- | --- |
 | **Home** | `/` | Today focus, todos, configuration gaps | [02](02-home_EN.md) |
 | **Research** | `/research` | Overview and the tools in the table below | [03](03-analysis-workbench_EN.md) / [04](04-market-review_EN.md) / [09](09-backtest_EN.md) |
-| **Portfolio** | `/portfolio` | Holdings bookkeeping (page title often **Holdings**) | [07](07-portfolio_EN.md) |
 | **Agent** | `/chat` | Multi-turn chat (page title often **Ask stock**) | [05](05-agent-chat_EN.md) |
+| **Signal Center** | `/signals` | AI signals, rules, trigger and notification history, review | [06](06-signals_EN.md) |
+| **Portfolio** | `/portfolio` | Holdings bookkeeping (page title often **Holdings**) | [07](07-portfolio_EN.md) |
 | **Settings** | `/settings` | Models, data sources, notifications, security | [10](10-settings_EN.md) |
 
 On expanded desktop navigation and in the mobile drawer, the **Research** label
@@ -85,8 +86,8 @@ tools, without a duplicate **Research overview** child. On the compact rail,
 
 | Surface | How to open |
 | --- | --- |
-| **Signal Center** `/signals` | Notification bell, command palette, Home focus rows; see [06](06-signals_EN.md) |
 | **Human approvals** `/approvals` | **Not** in the primary sidebar; open via the Home **Review human approvals** control when administrator sign-in is enabled (labels as in UI); contract: `docs/human-approvals_EN.md` |
+| **Notification Center** `/notifications` | Notification bell → View all |
 | **Stock workspace** | Type a code in the palette, or open `/stocks/<code>` (example: `/stocks/600519`) |
 | **Login** `/login` | When admin auth is on; protected pages use `?redirect=` |
 

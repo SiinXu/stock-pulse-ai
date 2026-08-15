@@ -29,7 +29,7 @@ import {
 } from '../navigation';
 
 describe('application navigation descriptor', () => {
-  it('converges to the #873 primary spine with Signals first-class and Agent demoted', () => {
+  it('keeps the core workspaces, including Agent and Signals, in primary navigation', () => {
     expect(APPLICATION_NAVIGATION_ITEMS.map((item) => [
       item.key,
       item.kind,
@@ -37,6 +37,7 @@ describe('application navigation descriptor', () => {
     ])).toEqual([
       ['home', 'link', APP_ROUTE_PATHS.home],
       ['research', 'group', APP_ROUTE_PATHS.research],
+      ['agent', 'link', APP_ROUTE_PATHS.agent],
       ['signals', 'link', APP_ROUTE_PATHS.signals],
       ['portfolio', 'link', APP_ROUTE_PATHS.portfolio],
       ['settings', 'link', APP_ROUTE_PATHS.settings],
@@ -55,7 +56,6 @@ describe('application navigation descriptor', () => {
       ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes, 'layout.nav.skillOutcomes'],
     ]);
     expect(COMMAND_PALETTE_SECONDARY_PAGES.map(({ key, to }) => [key, to])).toEqual([
-      ['agent', APP_ROUTE_PATHS.agent],
       ['approvals', APP_ROUTE_PATHS.approvals],
     ]);
   });
@@ -76,7 +76,7 @@ describe('application navigation descriptor', () => {
     expect(new Set(targets).size).toBe(targets.length);
     expect(keys).not.toContain('more');
     expect(keys).not.toContain('usage');
-    expect(keys).not.toContain('agent');
+    expect(keys).toContain('agent');
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.usage);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.screening);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.backtest);
@@ -84,10 +84,10 @@ describe('application navigation descriptor', () => {
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.alerts);
     expect(targets).not.toContain('/more');
     expect(targets).toContain(APP_ROUTE_PATHS.signals);
-    expect(targets).not.toContain(APP_ROUTE_PATHS.agent);
+    expect(targets).toContain(APP_ROUTE_PATHS.agent);
   });
 
-  it('derives command-palette pages from the same graph with secondary demoted surfaces', () => {
+  it('derives command-palette pages from the same graph with secondary surfaces', () => {
     const analysisHref = `${APP_ROUTE_PATHS.researchAnalysis}?segment=tasks`;
     const pages = listCommandPalettePages({ analysisHref });
     expect(pages.map((page) => [page.id, page.href])).toEqual([
@@ -100,10 +100,10 @@ describe('application navigation descriptor', () => {
       ['research-event-calendar', APP_ROUTE_PATHS.eventCalendar],
       ['research-calculators', APP_ROUTE_PATHS.calculators],
       ['research-skill-outcomes', APP_ROUTE_PATHS.researchSkillOutcomes],
+      ['agent', APP_ROUTE_PATHS.agent],
       ['signals', APP_ROUTE_PATHS.signals],
       ['portfolio', APP_ROUTE_PATHS.portfolio],
       ['settings', APP_ROUTE_PATHS.settings],
-      ['agent', APP_ROUTE_PATHS.agent],
       ['approvals', APP_ROUTE_PATHS.approvals],
     ]);
     const sidebarTargets = new Set(
@@ -113,7 +113,7 @@ describe('application navigation descriptor', () => {
       ]),
     );
     for (const page of pages) {
-      if (page.id === 'agent' || page.id === 'approvals') {
+      if (page.id === 'approvals') {
         expect(sidebarTargets.has(page.href)).toBe(false);
       } else if (page.id === 'research-analysis') {
         expect(page.href).toBe(analysisHref);

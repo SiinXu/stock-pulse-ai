@@ -164,7 +164,7 @@ describe('CommandPalette', () => {
     expect(screen.getByRole('option', { name: '今日' })).toHaveAttribute('aria-selected', 'true');
 
     fireEvent.keyDown(input, { key: 'ArrowUp' });
-    expect(screen.getByRole('option', { name: '再评估与统计' })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('option', { name: '复盘' })).toHaveAttribute('aria-selected', 'true');
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onNavigate).toHaveBeenCalledWith('/signals?tab=review');
   });

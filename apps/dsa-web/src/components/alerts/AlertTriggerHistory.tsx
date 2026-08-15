@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useEffect, useRef } from 'react';
 import { Activity, RefreshCw } from 'lucide-react';
-import { Badge, Button, Card, DataTable, type DataTableColumn, Pagination } from '../common';
+import { Badge, Card, DataTable, type DataTableColumn, IconButton, Pagination } from '../common';
 import type { AlertTriggerItem } from '../../types/alerts';
 import { getMarketPhaseSummaryLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -145,10 +145,16 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
           </span>
         ) : null}
         {onRefresh ? (
-          <Button type="button" size="default" variant="secondary" onClick={onRefresh} isLoading={isLoading} loadingText={text.loading}>
-            <RefreshCw className="h-4 w-4" aria-hidden="true" />
-            {controlsText.refresh}
-          </Button>
+          <IconButton
+            type="button"
+            size="default"
+            variant="ghost"
+            aria-label={controlsText.refresh}
+            onClick={onRefresh}
+            isLoading={isLoading}
+          >
+            <RefreshCw aria-hidden="true" />
+          </IconButton>
         ) : null}
       </div>
       <DataTable<AlertTriggerItem>

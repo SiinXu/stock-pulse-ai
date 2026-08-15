@@ -12,12 +12,13 @@ Please set expectations kindly:
 
 ---
 
-## Not in the primary sidebar
+## Open Signal Center
 
-Signal Center is **not** one of the five primary domains (Home / Research / Portfolio / Agent / Settings). Open it via:
+Signal Center is a primary workspace with a persistent sidebar or mobile-drawer entry. Contextual entry points remain available:
 
 | Way | How |
 | --- | --- |
+| Primary navigation | Sidebar / mobile drawer → Signal Center |
 | Notification bell | Top bell → “View all” or a single notification |
 | Command palette | `Cmd/Ctrl + K`, search “signal” |
 | URL | `/signals` |
@@ -28,7 +29,7 @@ Signal Center is **not** one of the five primary domains (Home / Research / Port
 
 | Link | Opens |
 | --- | --- |
-| `/signals?tab=feed` | Feed |
+| `/signals?tab=feed` | Signals |
 | `/signals?tab=rules` | Rules |
 | `/signals?tab=rules&createRule=1` | Rules and start create |
 | `/signals?tab=history` | Delivery / trigger history |
@@ -46,21 +47,23 @@ Legacy `/decision-signals` and `/alerts` usually redirect. Old bookmarks often s
 
 ```mermaid
 flowchart LR
-  Reports[Analysis / Agent] --> Feed
+  Reports[Analysis / Agent] --> Signals
   Rules --> History
-  Feed --> Review
+  Signals --> Review
 ```
 
 | Tab | Job | When |
 | --- | --- | --- |
-| **Feed** | Browse / filter / close / feedback | Daily glance |
+| **Signals** | Browse / filter / close / feedback | Daily glance |
 | **Rules** | Price and condition alerts | You want pings |
 | **History** | Did notify fire? | Phone silent |
-| **Review & stats** | Post-hoc scorecard | Weekend |
+| **Review** | Reassess and inspect the post-hoc scorecard | Weekend |
 
 ---
 
-## Feed: daily drawer
+The primary tabs stay directly below the page header. Inside **Signals**, a compact segmented control switches between All signals, Current stock, and Stock signal timeline. **History** uses the same lower-emphasis control for trigger history and notification attempts. All / Holdings / Watchlist scope appears only inside the Signals or Rules content it affects, so primary navigation does not move when the active view changes.
+
+## Signals: daily drawer
 
 **Beginner filters**
 
@@ -114,7 +117,7 @@ Triage order: history for a trigger → Settings **test push** if channel failed
 
 ---
 
-## Review & stats
+## Review
 
 Weekend honesty tool, not a face-slap machine.
 
