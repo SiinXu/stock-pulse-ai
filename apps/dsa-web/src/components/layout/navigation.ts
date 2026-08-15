@@ -6,7 +6,6 @@ import {
   Activity,
   BarChart3,
   BellRing,
-  BriefcaseBusiness,
   Calculator,
   CalendarDays,
   ClipboardCheck,
@@ -16,6 +15,7 @@ import {
   MessageSquareQuote,
   Search,
   Settings2,
+  WalletCards,
 } from 'lucide-react';
 import type { UiTextKey } from '../../i18n/uiText';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
@@ -119,7 +119,7 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
     to: APP_ROUTE_PATHS.signals,
     icon: BellRing,
   },
-  { kind: 'link', key: 'portfolio', labelKey: 'layout.nav.portfolio', to: APP_ROUTE_PATHS.portfolio, icon: BriefcaseBusiness },
+  { kind: 'link', key: 'portfolio', labelKey: 'layout.nav.portfolio', to: APP_ROUTE_PATHS.portfolio, icon: WalletCards },
   { kind: 'link', key: 'settings', labelKey: 'layout.nav.settings', to: APP_ROUTE_PATHS.settings, icon: Settings2 },
 ];
 

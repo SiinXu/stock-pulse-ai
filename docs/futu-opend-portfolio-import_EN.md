@@ -55,6 +55,8 @@ Preview (no writes):
 POST /api/v1/portfolio/imports/futu/preview?as_of=2026-08-06
 ```
 
+The preview response includes a 64-character SHA-256 `snapshot_id`, derived from the synthetic buy date and normalized positions. Position ordering does not change the identity.
+
 Commit:
 
 ```http
@@ -66,15 +68,18 @@ Idempotency-Key: optional-client-key
   "account_id": 1,
   "dry_run": false,
   "as_of": "2026-08-06",
-  "operation_id": "optional-client-key"
+  "operation_id": "optional-client-key",
+  "expected_snapshot_id": "<preview snapshot_id>"
 }
 ```
 
 Response shape matches CSV import commit (`inserted_count`, `duplicate_count`, `failed_count`, `errors`).
 
+`expected_snapshot_id` is additive and optional for existing API callers; the Web import wizard always sends it. Before any write, the backend fetches OpenD again. A changed position set returns **409** with `error=portfolio_import_preview_stale`, writes no trades, and requires a new preview.
+
 When OpenD is unreachable or configuration is invalid, the API returns **503** with `error=futu_opend_unavailable` and an actionable message. No partial trades are written for that request.
 
-> **Web UI:** Portfolio page controls for this endpoint are intentionally a follow-up. Settings expose OpenD connection fields; import can be called via API / automation.
+> **Web UI:** Select a specific Portfolio account, open **Import positions → Futu OpenD**, confirm the synthetic buy date, preview, then commit. Settings expose the OpenD connection fields under data sources.
 
 ## Degradation and safety
 

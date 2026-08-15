@@ -3,6 +3,7 @@
 // Lazy workspace-tab surface for the Portfolio route.
 
 import type React from 'react';
+import { lazy, Suspense } from 'react';
 import { RefreshCw } from 'lucide-react';
 import type { UiLanguage } from '../../i18n/uiText';
 import { formatUiText } from '../../i18n/uiText';
@@ -10,6 +11,7 @@ import type { PortfolioText } from '../../hooks/portfolio/types';
 import type { PortfolioEventType } from '../../hooks/portfolio/usePortfolioProjectionSession';
 import type {
   PortfolioCashLedgerListItem,
+  PortfolioCostMethod,
   PortfolioCorporateActionListItem,
   PortfolioTradeListItem,
 } from '../../types/portfolio';
@@ -18,14 +20,23 @@ import {
   formatCorporateActionLabel,
   formatSideLabel,
 } from '../../utils/portfolioFormat';
-import { Button, Card, EmptyState, IconButton, SegmentedControl } from '../common';
-import type { PortfolioTab } from './portfolioUrlState';
+import { Button, Card, EmptyState, IconButton, Loading, SegmentedControl } from '../common';
+import type { PortfolioInsightView, PortfolioTab } from './portfolioUrlState';
+
+const PortfolioInsightsWorkspace = lazy(
+  () => import('../portfolio-insights/PortfolioInsightsWorkspace'),
+);
 
 type PortfolioWorkspaceTabsProps = {
   text: PortfolioText;
   language: UiLanguage;
   activeTab: PortfolioTab;
+  activeInsightView: PortfolioInsightView;
+  insightsLabel: string;
   onTabChange: (tab: PortfolioTab) => void;
+  onInsightViewChange: (view: PortfolioInsightView) => void;
+  accountId?: number;
+  costMethod: PortfolioCostMethod;
   eventType: PortfolioEventType;
   eventLoading: boolean;
   eventPage: number;
@@ -41,7 +52,12 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
   text,
   language,
   activeTab,
+  activeInsightView,
+  insightsLabel,
   onTabChange,
+  onInsightViewChange,
+  accountId,
+  costMethod,
   eventType,
   eventLoading,
   eventPage,
@@ -62,6 +78,7 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
         { value: 'positions', label: text.positionsTitle },
         { value: 'ledger', label: text.eventLog },
         { value: 'risk', label: text.tabRisk },
+        { value: 'insights', label: insightsLabel },
       ]}
     />
 
@@ -135,6 +152,17 @@ const PortfolioWorkspaceTabs: React.FC<PortfolioWorkspaceTabsProps> = ({
           </div>
         </div>
       </Card>
+    ) : null}
+
+    {activeTab === 'insights' ? (
+      <Suspense fallback={<Loading />}>
+        <PortfolioInsightsWorkspace
+          activeView={activeInsightView}
+          onViewChange={onInsightViewChange}
+          accountId={accountId}
+          costMethod={costMethod}
+        />
+      </Suspense>
     ) : null}
   </>
 );

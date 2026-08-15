@@ -305,6 +305,14 @@ class PortfolioImportParseResponse(BaseModel):
     )
 
 
+class PortfolioFutuImportPreviewResponse(PortfolioImportParseResponse):
+    snapshot_id: str = Field(
+        ...,
+        pattern=r"^[0-9a-f]{64}$",
+        description="Stable identity for the normalized live positions shown in this preview",
+    )
+
+
 class PortfolioImportCommitResponse(BaseModel):
     account_id: int
     record_count: int
@@ -335,6 +343,14 @@ class PortfolioFutuImportRequest(BaseModel):
     as_of: Optional[date] = Field(
         None,
         description="Synthetic buy trade date for imported positions; defaults to today",
+    )
+    expected_snapshot_id: Optional[str] = Field(
+        None,
+        pattern=r"^[0-9a-f]{64}$",
+        description=(
+            "Optional preview identity. When provided, import succeeds only if the live "
+            "positions still match the confirmed preview."
+        ),
     )
 
 

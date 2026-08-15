@@ -16,6 +16,8 @@ import type {
   PortfolioDeleteResponse,
   PortfolioEventCreatedResponse,
   PortfolioFxRefreshResponse,
+  PortfolioFutuImportPreviewResponse,
+  PortfolioFutuImportRequest,
   PortfolioImportBrokerListResponse,
   PortfolioImportCommitResponse,
   PortfolioImportParseResponse,
@@ -34,15 +36,23 @@ import type { components } from '../types/api.generated';
 type OpenApiPortfolioSnapshot = components['schemas']['PortfolioSnapshotResponse'];
 type OpenApiPortfolioAccountItem = components['schemas']['PortfolioAccountItem'];
 type OpenApiPaperTradeCreated = components['schemas']['PaperTradeCreatedResponse'];
+type OpenApiPortfolioFutuImportRequest = components['schemas']['PortfolioFutuImportRequest'];
+type OpenApiPortfolioFutuImportPreview = components['schemas']['PortfolioFutuImportPreviewResponse'];
 type _AssertSnapshotFields = keyof OpenApiPortfolioSnapshot;
 type _AssertAccountFields = keyof OpenApiPortfolioAccountItem;
 type _AssertPaperTradeFields = keyof OpenApiPaperTradeCreated;
+type _AssertFutuImportFields = keyof OpenApiPortfolioFutuImportRequest;
+type _AssertFutuPreviewFields = keyof OpenApiPortfolioFutuImportPreview;
 const _snapshotFieldAnchor: _AssertSnapshotFields = 'total_equity';
 const _accountFieldAnchor: _AssertAccountFields = 'base_currency';
 const _paperTradeFieldAnchor: _AssertPaperTradeFields = 'price_source';
+const _futuImportFieldAnchor: _AssertFutuImportFields = 'expected_snapshot_id';
+const _futuPreviewFieldAnchor: _AssertFutuPreviewFields = 'snapshot_id';
 void _snapshotFieldAnchor;
 void _accountFieldAnchor;
 void _paperTradeFieldAnchor;
+void _futuImportFieldAnchor;
+void _futuPreviewFieldAnchor;
 
 const portfolioAccountItemSchema = z.object({
   id: z.number(), name: z.string(), market: z.string(), baseCurrency: z.string(), isActive: z.boolean(),
@@ -167,6 +177,9 @@ const portfolioImportParseResponseSchema = z.object({
   records: z.array(portfolioImportTradeItemSchema).optional(),
   errors: z.array(z.string()).optional(),
   failedRows: z.array(portfolioImportFailedRowSchema).optional(),
+}).passthrough();
+const portfolioFutuImportPreviewResponseSchema = portfolioImportParseResponseSchema.extend({
+  snapshotId: z.string().regex(/^[0-9a-f]{64}$/),
 }).passthrough();
 const portfolioImportCommitResponseSchema = z.object({
   accountId: z.number(), recordCount: z.number(), insertedCount: z.number(), duplicateCount: z.number(),
@@ -559,6 +572,51 @@ export const portfolioApi = {
       },
     });
     const parsed = parseCamelCasePayload<PortfolioImportCommitResponse>(response.data, portfolioImportCommitResponseSchema, 'PortfolioImportCommitResponse');
+    if (!Array.isArray(parsed.errors)) return { ...parsed, errors: [] };
+    return parsed;
+  },
+
+  async previewFutuImport(asOf?: string): Promise<PortfolioFutuImportPreviewResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/portfolio/imports/futu/preview',
+      undefined,
+      { params: asOf ? { as_of: asOf } : {} },
+    );
+    const parsed = parseCamelCasePayload<PortfolioFutuImportPreviewResponse>(
+      response.data,
+      portfolioFutuImportPreviewResponseSchema,
+      'PortfolioFutuImportPreviewResponse',
+    );
+    return {
+      ...parsed,
+      records: Array.isArray(parsed.records) ? parsed.records : [],
+      errors: Array.isArray(parsed.errors) ? parsed.errors : [],
+      failedRows: Array.isArray(parsed.failedRows)
+        ? parsed.failedRows.map((row) => ({
+          ...row,
+          source: row.source && typeof row.source === 'object' ? row.source : {},
+        }))
+        : [],
+    };
+  },
+
+  async commitFutuImport(payload: PortfolioFutuImportRequest): Promise<PortfolioImportCommitResponse> {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/portfolio/imports/futu',
+      {
+        account_id: payload.accountId,
+        dry_run: payload.dryRun,
+        operation_id: payload.operationId,
+        as_of: payload.asOf,
+        expected_snapshot_id: payload.expectedSnapshotId,
+      },
+      { headers: { 'Idempotency-Key': payload.operationId } },
+    );
+    const parsed = parseCamelCasePayload<PortfolioImportCommitResponse>(
+      response.data,
+      portfolioImportCommitResponseSchema,
+      'PortfolioImportCommitResponse',
+    );
     if (!Array.isArray(parsed.errors)) return { ...parsed, errors: [] };
     return parsed;
   },

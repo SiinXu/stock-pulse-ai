@@ -5,6 +5,7 @@ export type PortfolioSide = 'buy' | 'sell';
 export type PortfolioAccountType = 'real' | 'paper';
 export type PortfolioCashDirection = 'in' | 'out';
 export type PortfolioCorporateActionType = 'cash_dividend' | 'split_adjustment';
+export type PortfolioImportSource = 'file' | 'futu';
 
 export interface PortfolioAccountItem {
   id: number;
@@ -410,6 +411,10 @@ export interface PortfolioImportParseResponse {
   failedRows?: PortfolioImportFailedRow[];
 }
 
+export interface PortfolioFutuImportPreviewResponse extends PortfolioImportParseResponse {
+  snapshotId: string;
+}
+
 export interface PortfolioImportCommitResponse {
   accountId: number;
   recordCount: number;
@@ -418,6 +423,14 @@ export interface PortfolioImportCommitResponse {
   failedCount: number;
   dryRun: boolean;
   errors: string[];
+}
+
+export interface PortfolioFutuImportRequest {
+  accountId: number;
+  dryRun: boolean;
+  operationId: string;
+  asOf?: string;
+  expectedSnapshotId: string;
 }
 
 export interface PortfolioImportBrokerItem {

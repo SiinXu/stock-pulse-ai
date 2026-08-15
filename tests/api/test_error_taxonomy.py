@@ -84,6 +84,17 @@ def test_research_pack_codes_preserve_remediation_semantics() -> None:
     )
 
 
+def test_portfolio_import_preview_stale_requires_a_new_preview() -> None:
+    preview_stale = classify_error_code("portfolio_import_preview_stale")
+
+    assert (
+        preview_stale.category,
+        preview_stale.severity,
+        preview_stale.default_action,
+    ) == ("config_conflict", "warning", "none")
+    assert preview_stale.docs_path is None
+
+
 def test_error_body_attaches_taxonomy_without_replacing_error_code() -> None:
     body = error_body("llm_not_configured", "No model configured", params={"hint": "configure"})
     assert body["error"] == "llm_not_configured"

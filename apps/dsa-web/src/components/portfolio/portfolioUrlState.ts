@@ -11,14 +11,19 @@ import {
 } from '../../utils/urlState';
 
 /** Primary portfolio workspace tabs. Default (positions) is omitted from the URL. */
-export const PORTFOLIO_TAB_VALUES = ['positions', 'ledger', 'risk'] as const;
+export const PORTFOLIO_TAB_VALUES = ['positions', 'ledger', 'risk', 'insights'] as const;
 export type PortfolioTab = (typeof PORTFOLIO_TAB_VALUES)[number];
+
+/** Secondary views inside the Portfolio insights workspace. */
+export const PORTFOLIO_INSIGHT_VIEW_VALUES = ['health', 'basket', 'stress', 'rebalance'] as const;
+export type PortfolioInsightView = (typeof PORTFOLIO_INSIGHT_VIEW_VALUES)[number];
 
 /**
  * Portfolio shareable URL schema.
  *
  * History policy (encoded on each field; callers may override per write):
  * - tab / page → replace (filter-like refinement)
+ * - insight view → push so Back / Forward restores the previous workflow
  * - account → replace by default; user-driven account switches pass history:'push'
  *   so browser Back restores the prior account view (existing unit contract)
  * - selected position row → push (Back restores prior selection)
@@ -41,6 +46,13 @@ export const portfolioUrlSchema = defineUrlStateSchema({
     values: PORTFOLIO_TAB_VALUES,
     default: 'positions',
     history: 'replace',
+  }),
+  view: enumParam({
+    name: 'view',
+    values: PORTFOLIO_INSIGHT_VIEW_VALUES,
+    default: 'health',
+    history: 'push',
+    omitDefault: false,
   }),
   /** Position row identity: `${accountId}-${symbol}-${market}`. */
   selected: optionalStringParam({

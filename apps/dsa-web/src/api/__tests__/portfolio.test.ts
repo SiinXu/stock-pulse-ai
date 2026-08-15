@@ -242,6 +242,88 @@ describe('portfolioApi idempotent mutations', () => {
       },
     });
   });
+
+  it('previews Futu positions and commits the exact confirmed snapshot', async () => {
+    post
+      .mockResolvedValueOnce({
+        data: {
+          broker: 'futu',
+          record_count: 1,
+          skipped_count: 0,
+          error_count: 0,
+          records: [{
+            trade_date: '2026-08-15',
+            symbol: 'AAPL',
+            side: 'buy',
+            quantity: 2,
+            price: 200,
+            fee: 0,
+            tax: 0,
+            dedup_hash: 'dedup-1',
+          }],
+          errors: [],
+          failed_rows: [],
+          snapshot_id: 'a'.repeat(64),
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          account_id: 7,
+          record_count: 1,
+          inserted_count: 1,
+          duplicate_count: 0,
+          failed_count: 0,
+          dry_run: false,
+          errors: [],
+        },
+      });
+
+    const preview = await portfolioApi.previewFutuImport('2026-08-15');
+    await portfolioApi.commitFutuImport({
+      accountId: 7,
+      asOf: '2026-08-15',
+      dryRun: false,
+      operationId: 'portfolio-futu-1',
+      expectedSnapshotId: preview.snapshotId,
+    });
+
+    expect(post.mock.calls[0]).toEqual([
+      '/api/v1/portfolio/imports/futu/preview',
+      undefined,
+      { params: { as_of: '2026-08-15' } },
+    ]);
+    expect(post.mock.calls[1]).toEqual([
+      '/api/v1/portfolio/imports/futu',
+      {
+        account_id: 7,
+        dry_run: false,
+        operation_id: 'portfolio-futu-1',
+        as_of: '2026-08-15',
+        expected_snapshot_id: 'a'.repeat(64),
+      },
+      { headers: { 'Idempotency-Key': 'portfolio-futu-1' } },
+    ]);
+  });
+
+  it('rejects a malformed Futu preview snapshot ID', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        broker: 'futu',
+        record_count: 0,
+        skipped_count: 0,
+        error_count: 0,
+        records: [],
+        errors: [],
+        failed_rows: [],
+        snapshot_id: 'not-a-sha256',
+      },
+    });
+
+    await expect(portfolioApi.previewFutuImport()).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
+  });
 });
 
 describe('portfolioApi snapshot money-math validation', () => {

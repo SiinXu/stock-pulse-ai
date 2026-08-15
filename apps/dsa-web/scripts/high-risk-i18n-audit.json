@@ -135,7 +135,7 @@
     ],
     "blocksCiOnPendingNativeReview": false,
     "identicalBaselinePolicy": "shrink-only; high-risk review work must not grow identicalToEnglish.baseline.json",
-    "inventoryGeneratedAt": "2026-08-13",
+    "inventoryGeneratedAt": "2026-08-15",
     "changeWorkflow": [
       "Edit product source (zh/en) or a locale bundle for an audited high-risk key.",
       "If the key set or selectors change, refresh category snapshots and regenerate high-risk-i18n-keys.json via npm run i18n:high-risk -- --write-key-inventory.",
@@ -148,21 +148,21 @@
   },
   "keyInventory": {
     "path": "apps/dsa-web/scripts/high-risk-i18n-keys.json",
-    "count": 367,
-    "sha256": "2c8392ba743f55a40153b7a953b8bd6a53a9de46fad560a458b0dac6b44306ce",
-    "keySetSha256": "ce7f30b9f2d67829b72eb0bcca2c2d973c9679ddc44bf82fc9f909414479a801",
+    "count": 369,
+    "sha256": "c4d68ff232d43672d6e2626f2386947a2fa7ad1b5f017ecedce85b0cc015d9fb",
+    "keySetSha256": "0027f44b9f18e6fa0e9a632ec3d92e3cdcc9cb8e68e27e19bf289fc8616bb2fd",
     "decisionLinkedCount": 95
   },
   "reviewPasses": [
     {
-      "id": "product-source-high-risk-pass-2026-08-12",
+      "id": "product-source-high-risk-pass-2026-08-15",
       "kind": "PRODUCT_SOURCE_SEMANTIC_PASS",
-      "reviewer": "issue-882-worker@stock-pulse-ai",
-      "reviewedAt": "2026-08-12",
+      "reviewer": "portfolio-insight-workflows@stock-pulse-ai",
+      "reviewedAt": "2026-08-15",
       "scope": "Full audited high-risk key inventory (trading_action, risk, authentication, credential, error, disclaimer) against zh/en product source and existing decision evidence. Translated bundles were inventoried and left PENDING_NATIVE_REVIEW.",
-      "summary": "High-risk keys annotated after merging evidence-chain/audit-export and research-pack error pairs. Eight evidence-chain/audit-export title/message pairs and six research-pack title/message pairs were added as product-source retain entries. The evidence-chain/audit-export pairs use concise settings and authentication guidance while preserving distinct stable codes and refusal semantics. 95 remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
+      "summary": "High-risk keys annotated after merging evidence-chain/audit-export, research-pack, and stale Futu preview error pairs. The stale-preview title and message direct users to preview current positions again without exposing the internal code or suggesting a blind retry. 95 keys remain linked to recorded semantic decisions with candidate revisions. Remaining product-source keys retain current zh/en wording. No locale was upgraded to NATIVE_REVIEWED because no named native financial reviewer completed a language pass. Identical-to-English baseline was not expanded.",
       "claimsNativeApproval": false,
-      "keyCount": 367,
+      "keyCount": 369,
       "categoryConclusions": [
         {
           "category": "trading_action",
@@ -187,7 +187,7 @@
         {
           "category": "error",
           "verdict": "RETAIN_PRODUCT_SOURCE_WITH_PENDING_NATIVE",
-          "notes": "Stable error title/message pairs keep internal codes separate from display copy. The four evidence-chain/audit-export codes (evidence_chain_disabled, evidence_chain_auth_required, audit_export_disabled, audit_export_auth_required) use concise settings or authentication guidance without collapsing disabled and authentication-required failures. The three research-pack codes (research_pack_export_disabled, research_pack_auth_required, research_pack_limit_exceeded) explain disabled authentication, a disabled export gate, and the configured size limit without implying success or silently bypassing refusal. Locale naturalness remains PENDING_NATIVE_REVIEW."
+          "notes": "Stable error title/message pairs keep internal codes separate from display copy. Evidence-chain, audit-export, and research-pack errors retain distinct refusal and remediation semantics. The stale Futu preview pair explicitly requires previewing the current positions again before import and does not offer a blind retry. Locale naturalness remains PENDING_NATIVE_REVIEW."
         },
         {
           "category": "disclaimer",
@@ -195,7 +195,7 @@
           "notes": "Disclaimer keys preserve research-only scope, no-investment-advice language, and user responsibility. Highest priority for future native financial review."
         }
       ],
-      "inventoryKeySetSha256": "ce7f30b9f2d67829b72eb0bcca2c2d973c9679ddc44bf82fc9f909414479a801"
+      "inventoryKeySetSha256": "0027f44b9f18e6fa0e9a632ec3d92e3cdcc9cb8e68e27e19bf289fc8616bb2fd"
     }
   ],
   "languageReview": {
@@ -574,19 +574,19 @@
         }
       ],
       "snapshot": {
-        "keyCount": 158,
-        "keySetSha256": "5bb65e37186143e62cc1edbc17c45fc3cf7d68eeb6929ed84d187cc3a1d4c70e",
+        "keyCount": 160,
+        "keySetSha256": "df7530bbc89200124afcd168d86d0f3f3c2fc7381a69314dc2cff3239e2f86f4",
         "bundleSha256": {
-          "zh": "62e3ef53eb4c74d1d5368a554a1b60948408e61a50b29ea5c4a9b7492cf4c287",
-          "zh-TW": "dc0b4e56695183c0a48938c22d227bb1139891c116b2cd6a33343cf5690735f5",
-          "en": "24aa604cce5ac4a8ceb7d60f58a7385bc5d64efe9ab74e115f2aed8e640d07f7",
-          "ja": "7fe064c29632c91de2b271d43e64ad26556eab69ec20030872091e4aea421ca4",
-          "ko": "fd5a13697f2baa926d457c0afe763e92ef8ad35e5b00d5128e7f5695bf866690",
-          "de": "a7d3c25e5a302e10f8ac11f981892ff7c62f9f904ce03eb497d759d804553e15",
-          "es": "fa9b8891e2f550c7091ea9b0d1d23431db2a70970a6ac0a6f2c7c49413b7bcd7",
-          "ms": "66f6aee57abc452bbf5db2ccc49b1ea81abb6ad332a3f621747f439d4ac143e1",
-          "fr": "21fc3d78f8eb6019b1432716a665e4c592d58e677aba05ab9d70a243b5084675",
-          "id": "c40998f9e991998f7552296475d8c3a9e2b43c02714793f3f3f9982ca39648e7"
+          "zh": "cb8b4e85978eead1def9d9e715b8a9315ce2e85e09d5e725ff35f7b5dca021bf",
+          "zh-TW": "456871b91a8a45616c83815ab797a058b02f1594c0842f5c640fba98e28743c2",
+          "en": "c8b84a5e3fb66396f11a56d8adfeb0f3b4d3e294027462f6d4eae2ef8bfab308",
+          "ja": "c951d004883c9722b2c1a27c066d5e28da6528703b4bf4813cd138daeacdca7b",
+          "ko": "ef8b69febaa8b62e4e5c4098596af98d8537b12e59aa98a6effe5792b4764032",
+          "de": "b50c6a788daaec8b1aee2bdf6ebacd13a551e06c22cddcf96e4a905718ae3568",
+          "es": "9ac0ed1b9bea0087fe50833a3cd003f4ccbd1f367776d8f7ee00e3f9d1d00114",
+          "ms": "cc3afc2b94712a3ff0249a9a2d3e0ef77b39ae43172d1054ba537226bfd8b92c",
+          "fr": "03232f0b29c4aa595b9c491558e08c33c06a84e5ee8cffccdc515655c1100682",
+          "id": "548fee80a51ff407b8a91877a0b4b2fe7f79a108467fd694df5f29796e40e03c"
         }
       }
     },
@@ -743,6 +743,7 @@
         "password_mismatch",
         "password_required",
         "portfolio_busy",
+        "portfolio_import_preview_stale",
         "portfolio_oversell",
         "rate_limited",
         "reasoning_trace_auth_required",
@@ -948,6 +949,10 @@
         "portfolio_busy": [
           "api.error.STABLE_ERROR_TEXT.portfolio_busy.title",
           "api.error.STABLE_ERROR_TEXT.portfolio_busy.message"
+        ],
+        "portfolio_import_preview_stale": [
+          "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.title",
+          "api.error.STABLE_ERROR_TEXT.portfolio_import_preview_stale.message"
         ],
         "portfolio_oversell": [
           "api.error.STABLE_ERROR_TEXT.portfolio_oversell.title",

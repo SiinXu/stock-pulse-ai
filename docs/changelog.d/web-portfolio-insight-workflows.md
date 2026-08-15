@@ -1,0 +1,3 @@
+- [Added] Expose Portfolio Health, multi-symbol basket analysis, stress tests, and suggestion-only rebalancing as account-aware URL views (Refs #128, #151, #158, #237, #1008, #1058).
+- [Added] Add Futu OpenD as a preview-first Portfolio import source with snapshot-bound commit and stale-preview rejection (Refs #161).
+- [Fixed] Route the Home Portfolio Health empty state to an executable refresh workflow while preserving partial, unavailable, refusal, and evidence states.

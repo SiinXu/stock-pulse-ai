@@ -7,6 +7,7 @@ from src.utils.sanitize import log_safe_exception
 
 import hashlib
 import io
+import json
 import logging
 from dataclasses import dataclass
 from datetime import date
@@ -34,6 +35,58 @@ logger = logging.getLogger(__name__)
 LIVE_POSITION_IMPORT_SOURCES: Dict[str, str] = {
     "futu": "Futu OpenD",
 }
+
+
+class PortfolioImportPreviewStaleError(RuntimeError):
+    """Raised when live positions no longer match the confirmed preview."""
+
+
+def _canonical_number(value: Any) -> str:
+    return f"{float(value or 0.0):.8f}"
+
+
+def _build_futu_snapshot_id(
+    *,
+    effective_as_of: date,
+    records: List[Dict[str, Any]],
+    skipped_count: int,
+    error_count: int,
+) -> str:
+    projected_records = [
+        {
+            "currency": str(item.get("currency") or ""),
+            "fee": _canonical_number(item.get("fee")),
+            "market": str(item.get("market") or ""),
+            "note": str(item.get("note") or ""),
+            "price": _canonical_number(item.get("price")),
+            "quantity": _canonical_number(item.get("quantity")),
+            "side": str(item.get("side") or ""),
+            "symbol": str(item.get("symbol") or "").upper(),
+            "tax": _canonical_number(item.get("tax")),
+            "trade_date": str(item.get("trade_date") or effective_as_of.isoformat()),
+            "trade_uid": str(item.get("trade_uid") or ""),
+        }
+        for item in records
+    ]
+    projected_records.sort(
+        key=lambda item: json.dumps(item, sort_keys=True, separators=(",", ":"))
+    )
+    payload = {
+        "as_of": effective_as_of.isoformat(),
+        "broker": "futu",
+        "error_count": error_count,
+        "record_count": len(projected_records),
+        "records": projected_records,
+        "skipped_count": skipped_count,
+    }
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
+
 
 @dataclass(frozen=True)
 class CsvParserSpec:
@@ -162,9 +215,16 @@ class PortfolioImportService:
             positions = fetch_futu_positions()
         except FutuPositionFetchError:
             raise
-        records = positions_to_import_records(positions, as_of=as_of)
+        effective_as_of = as_of or date.today()
+        records = positions_to_import_records(positions, as_of=effective_as_of)
         return {
             "broker": "futu",
+            "snapshot_id": _build_futu_snapshot_id(
+                effective_as_of=effective_as_of,
+                records=records,
+                skipped_count=0,
+                error_count=0,
+            ),
             "record_count": len(records),
             "skipped_count": 0,
             "error_count": 0,
@@ -180,6 +240,7 @@ class PortfolioImportService:
         dry_run: bool = False,
         operation_id: Optional[str] = None,
         as_of: Optional[date] = None,
+        expected_snapshot_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Import Futu real positions through the existing trade-record commit path.
 
@@ -188,6 +249,13 @@ class PortfolioImportService:
         :class:`FutuPositionFetchError` and never write partial ledger state.
         """
         preview = self.preview_futu_positions(as_of=as_of)
+        if (
+            expected_snapshot_id is not None
+            and preview["snapshot_id"] != expected_snapshot_id
+        ):
+            raise PortfolioImportPreviewStaleError(
+                "Futu positions changed after preview; preview the current positions before importing"
+            )
         return self.commit_trade_records(
             account_id=account_id,
             broker="futu",
