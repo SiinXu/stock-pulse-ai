@@ -45,16 +45,14 @@ export const Switch: React.FC<SwitchProps> = ({
     <span
       className={cn(
         'relative inline-flex h-6 w-10 shrink-0 items-center rounded-full transition-colors',
-        checked
-          ? 'bg-[linear-gradient(211deg,rgb(var(--settings-switch-on-start))_0%,rgb(var(--settings-switch-on-end))_100%)]'
-          : 'bg-[rgb(var(--settings-switch-off))]',
+        checked ? 'bg-primary' : 'bg-muted',
       )}
       data-testid={visualTestId}
       aria-hidden="true"
     >
       <span
         className={cn(
-          'inline-block h-5 w-5 rounded-full bg-white transition-transform',
+          'inline-block h-5 w-5 rounded-full bg-background shadow-soft-card transition-transform',
           checked ? 'translate-x-4' : 'translate-x-0.5',
         )}
       />

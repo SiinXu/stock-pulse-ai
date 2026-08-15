@@ -79,7 +79,7 @@ const DecisionSignalFeedListSection: React.FC<DecisionSignalFeedListSectionProps
 
   return (
     <div className="space-y-5">
-      <Card padding="sm" variant="bordered">
+      <Card padding="sm" level="interactive">
         <ResponsiveFilterPanel
           className="xl:grid xl:grid-cols-[minmax(0,3fr)_minmax(0,5fr)] xl:items-end xl:gap-2 xl:space-y-0 [&>div.hidden]:justify-center [&>div.hidden>div]:flex-none"
           filterLabel={t('decisionSignals.filter')}

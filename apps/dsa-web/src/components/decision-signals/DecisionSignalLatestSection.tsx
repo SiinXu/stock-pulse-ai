@@ -41,7 +41,7 @@ const DecisionSignalLatestSection: React.FC<DecisionSignalLatestSectionProps> = 
   return (
     <Card
       title={t('decisionSignals.latestTitle')}
-      subtitle={t('decisionSignals.latestDescription')}
+      description={t('decisionSignals.latestDescription')}
       padding="md"
       headerRight={activeStockContext ? (
         <Badge variant="info" size="sm">{t('decisionSignals.scopeCurrentStock', { stock: activeStockLabel ?? activeStockContext.code })}</Badge>

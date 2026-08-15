@@ -16,6 +16,7 @@ import {
   EmptyState,
   IconButton,
   PageHeader,
+  Select,
   StatePanel,
   Surface,
 } from '../components/common';
@@ -234,26 +235,22 @@ const PersonalPerformancePage: React.FC = () => {
       {!loading && !error && paperAccounts.length > 0 ? (
         <div className="flex flex-col gap-4">
           <Surface level="interactive" className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <label className="text-sm font-medium" htmlFor="paper-account-select">
-              {text.selectAccount}
-            </label>
-            <select
+            <Select
               id="paper-account-select"
-              className="min-h-11 rounded-md border border-border bg-background px-2 py-1 text-sm"
-              value={accountId ?? ''}
-              onChange={(event) => {
-                const next = Number(event.target.value);
+              label={text.selectAccount}
+              value={String(accountId ?? '')}
+              className="w-full max-w-sm [&>div]:w-full sm:w-auto"
+              onChange={(value) => {
+                const next = Number(value);
                 if (Number.isFinite(next)) {
                   void onAccountChange(next);
                 }
               }}
-            >
-              {paperAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  {account.name} (#{account.id})
-                </option>
-              ))}
-            </select>
+              options={paperAccounts.map((account) => ({
+                value: String(account.id),
+                label: `${account.name} (#${account.id})`,
+              }))}
+            />
             {report ? (
               <span className="text-xs text-secondary-text">
                 {formatUiText(text.formulaVersion, { version: report.formulaVersion })}

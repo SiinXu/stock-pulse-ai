@@ -83,7 +83,7 @@ export const Tabs = forwardRef<
             disabled={item.disabled}
             data-control="tab"
             className={cn(
-              'control-hit-target relative inline-flex h-9 shrink-0 items-center justify-center border-b-2 px-3 text-sm tracking-normal transition-colors motion-reduce:transition-none',
+              'control-hit-target relative inline-flex h-9 shrink-0 items-center justify-center rounded-none border-b-2 px-3 text-sm tracking-normal transition-colors motion-reduce:transition-none',
               'focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-primary/25',
               'disabled:cursor-not-allowed disabled:opacity-50',
               selected

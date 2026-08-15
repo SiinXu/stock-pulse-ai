@@ -15,3 +15,4 @@ export * from './MarketReviewReportView';
 export * from './ShareImageButton';
 export * from './ReportRiskGateBanner';
 export * from './reportRiskGateUtils';
+export * from './ScoreGauge';

@@ -16,8 +16,6 @@ export interface InputProps extends Omit<React.InputHTMLAttributes<HTMLInputElem
   hint?: string;
   error?: string;
   trailingAction?: React.ReactNode;
-  /** Selects a scoped visual appearance for the input. */
-  appearance?: 'default' | 'login';
   /** Enables the built-in password visibility toggle. */
   allowTogglePassword?: boolean;
   /** Controls the leading icon style. */
@@ -47,7 +45,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
   className = '',
   id,
   trailingAction,
-  appearance = 'default',
   allowTogglePassword,
   iconType = 'none',
   passwordVisible,
@@ -84,8 +81,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const isPasswordInput = inputType === 'password';
   const isVisibilityControlled = typeof passwordVisible === 'boolean';
-  const isLoginAppearance = appearance === 'login';
-  const resolvedSize = size ?? (isLoginAppearance ? 'primary' : 'comfortable');
+  const resolvedSize = size ?? 'comfortable';
   const visible = isVisibilityControlled ? passwordVisible : isPasswordVisible;
   const effectiveType = isPasswordInput && allowTogglePassword && visible ? 'text' : inputType;
 
@@ -95,7 +91,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
         <Lock
           className={cn(
             'h-4 w-4',
-            isLoginAppearance ? 'text-[var(--login-input-icon)]' : 'text-muted-text/55'
+            'text-muted-text/55'
           )}
         />
       );
@@ -105,7 +101,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
         <Key
           className={cn(
             'h-4 w-4',
-            isLoginAppearance ? 'text-[var(--login-input-icon)]' : 'text-muted-text/55'
+            'text-muted-text/55'
           )}
         />
       );
@@ -132,13 +128,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
       size="default"
       tooltip={false}
       className={cn(
-        isLoginAppearance
-          ? visible
-            ? 'text-[var(--login-text-secondary)] focus-visible:ring-[var(--login-input-toggle-ring)]'
-            : 'text-[var(--login-input-icon)] hover:text-[var(--login-text-secondary)] focus-visible:ring-[var(--login-input-toggle-ring)]'
-          : visible
-            ? 'text-warning'
-            : 'text-muted-text hover:text-warning focus-visible:ring-primary/30'
+        visible
+          ? 'text-warning'
+          : 'text-muted-text hover:text-warning focus-visible:ring-primary/30'
       )}
       onClick={() => {
         const nextVisible = !visible;
@@ -164,9 +156,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
       hintId={hintId}
       errorId={errorId}
       className={fieldClassName}
-      labelClassName={isLoginAppearance ? 'text-[var(--login-label-text)]' : undefined}
-      hintClassName={isLoginAppearance ? 'text-[var(--login-hint-text)]' : undefined}
-      errorClassName={isLoginAppearance ? 'text-[var(--login-error-text)]' : undefined}
     >
       <div
         className="control-input-target relative flex items-center"
@@ -189,16 +178,14 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(({
           aria-invalid={ariaInvalid}
           style={inputStyle}
           data-control="input"
-          data-appearance={appearance}
+          data-appearance="default"
           data-size={resolvedSize}
           className={cn(
-            isLoginAppearance
-              ? 'input-surface input-focus-ring input-appearance-login w-full rounded-xl border bg-transparent px-4 text-base transition-[color,background-color,border-color,box-shadow] duration-150 focus:outline-none motion-reduce:transition-none sm:text-sm'
-              : 'w-full rounded-lg border border-border bg-transparent px-3 text-base text-foreground placeholder:text-muted-text transition-[color,background-color,border-color,box-shadow] duration-150 focus:outline-none focus:border-muted-text motion-reduce:transition-none sm:text-xs',
+            'w-full rounded-lg border border-border bg-transparent px-3 text-base text-foreground placeholder:text-muted-text transition-[color,background-color,border-color,box-shadow] duration-150 focus:outline-none focus:border-muted-text motion-reduce:transition-none sm:text-xs',
             INPUT_SIZE_STYLES[resolvedSize],
-            error ? (isLoginAppearance ? 'border-danger/30' : 'border-danger/40 focus:border-danger') : '',
-            leadingIcon ? (isLoginAppearance ? 'pl-10' : 'pl-9') : '',
-            finalTrailingAction ? (isLoginAppearance ? 'pr-12' : 'pr-9') : '',
+            error ? 'border-danger/40 focus:border-danger' : '',
+            leadingIcon ? 'pl-9' : '',
+            finalTrailingAction ? 'pr-9' : '',
             'disabled:cursor-not-allowed disabled:opacity-60',
             className,
           )}

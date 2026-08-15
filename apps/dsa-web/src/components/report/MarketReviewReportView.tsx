@@ -21,7 +21,8 @@ import {
 } from '../../utils/marketReview';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
-import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, ScoreGauge, Spinner, useClipboard } from '../common';
+import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, Spinner, useClipboard } from '../common';
+import { ScoreGauge } from './ScoreGauge';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
 import { ShareImageButton } from './ShareImageButton';
@@ -418,7 +419,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
 
   return (
     <div className={`animate-fade-in space-y-4 pb-8 ${className}`}>
-      <Card variant="gradient" padding="md" className="home-report-hero text-left">
+      <Card level="interactive" padding="md" className="home-report-hero text-left">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
             <div className="mb-2 inline-flex items-center gap-2 text-xs font-semibold text-secondary-text">
@@ -494,7 +495,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       {summary ? (
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {insightCards.map(({ icon: Icon, label, value }) => (
-            <Card key={label} variant="bordered" padding="sm" className="text-left">
+            <Card key={label} level="interactive" padding="sm" className="text-left">
               <div className="flex items-start gap-3">
                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />
@@ -528,7 +529,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {structuredMarketData.length > 0 ? (
-        <Card variant="bordered" padding="md" className="text-left">
+        <Card level="interactive" padding="md" className="text-left">
           <div className="mb-3 flex items-center gap-2">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <BarChart3 className="h-4 w-4" aria-hidden="true" />
@@ -662,14 +663,14 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : null}
 
       {isLoading ? (
-        <Card variant="bordered" padding="md" className="text-left">
+        <Card level="interactive" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <Spinner size="lg" label={chromeText.loadingReport} />
             <p className="mt-4 text-sm text-secondary-text">{chromeText.loadingReport}</p>
           </div>
         </Card>
       ) : error ? (
-        <Card variant="bordered" padding="md" className="text-left">
+        <Card level="interactive" padding="md" className="text-left">
           <div className="flex h-64 flex-col items-center justify-center">
             <ApiErrorAlert error={error} className="w-full max-w-lg" />
           </div>
@@ -677,7 +678,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       ) : (
         <div data-testid="market-review-report" className="space-y-4">
           {sections.map(({ id, title, content: sectionContent, icon: Icon }) => (
-            <Card key={id} variant="bordered" padding="md" className="text-left">
+            <Card key={id} level="interactive" padding="md" className="text-left">
               <div className="mb-3 flex items-center gap-2">
                 <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Icon className="h-4 w-4" aria-hidden="true" />

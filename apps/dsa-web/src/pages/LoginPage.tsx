@@ -2,7 +2,8 @@ import type React from 'react';
 import { useState, useEffect } from 'react';
 import { motion } from "motion/react";
 import { TrendingUp } from "lucide-react";
-import { Button, CredentialInput } from '../components/common';
+import { Button } from '../components/common';
+import { CredentialInput } from '../components/security';
 import { UiLanguageToggle } from '../components/i18n/UiLanguageToggle';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import type { ParsedApiError } from '../api/error';
@@ -123,7 +124,7 @@ const LoginPage: React.FC = () => {
               <CredentialInput
                 id="password"
                 purpose={isFirstTime ? 'admin-new-password' : 'admin-current-password'}
-                appearance="login"
+                size="primary"
                 allowTogglePassword
                 iconType="password"
                 label={isFirstTime ? t('login.adminPassword') : t('login.loginPassword')}
@@ -143,7 +144,7 @@ const LoginPage: React.FC = () => {
                 <CredentialInput
                   id="passwordConfirm"
                   purpose="admin-new-password-confirmation"
-                  appearance="login"
+                  size="primary"
                   allowTogglePassword
                   iconType="password"
                   label={t('login.confirmPassword')}

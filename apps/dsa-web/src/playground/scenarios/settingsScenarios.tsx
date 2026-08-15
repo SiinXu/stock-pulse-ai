@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
 import { lazy, useState, type ReactNode } from 'react';
-import { Button } from '../../components/common';
+import { Button, Surface } from '../../components/common';
+import { CredentialInput } from '../../components/security';
 import { AuthSettingsCard } from '../../components/settings/AuthSettingsCard';
 import { ChangePasswordCard } from '../../components/settings/ChangePasswordCard';
 import { DataProvidersPanel } from '../../components/settings/DataProvidersPanel';
@@ -153,6 +154,25 @@ const DataProvidersPanelStory = () => {
       issueByKey={{}}
       onChange={(key, value) => setItems((current) => current.map((item) => item.key === key ? { ...item, value } : item))}
     />
+  );
+};
+
+const CredentialInputStory = () => {
+  const { text } = useStoryText();
+  const { scenario } = usePlaygroundScenario();
+  const [value, setValue] = useState('fixture-secret');
+  return (
+    <Surface className="max-w-lg">
+      <CredentialInput
+        purpose="provider-secret"
+        label={text.fieldLabel}
+        value={value}
+        onChange={(event) => setValue(event.target.value)}
+        allowTogglePassword
+        iconType="key"
+        disabled={scenario === 'states'}
+      />
+    </Surface>
   );
 };
 
@@ -572,6 +592,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'ai-overview-matrix': AiOverviewMatrixStory,
   'auth-settings-card': AuthSettingsCard,
   'change-password-card': ChangePasswordCard,
+  'credential-input': CredentialInputStory,
   'data-providers-panel': DataProvidersPanelStory,
   'data-provider-runtime-status-panel': DataProviderRuntimeStatusPanelStory,
   'first-run-wizard': FirstRunWizardStory,

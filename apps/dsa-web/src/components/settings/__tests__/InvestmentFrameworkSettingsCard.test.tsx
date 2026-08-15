@@ -643,11 +643,11 @@ describe('InvestmentFrameworkSettingsCard', () => {
     fireEvent.change(remountedInput, { target: { value: 'valuation-new' } });
     fireEvent.blur(remountedInput);
 
-    expect(screen.getByLabelText('根节点')).toHaveValue('valuation-new');
+    expect(screen.getByLabelText('根节点')).toHaveAttribute('data-value', 'valuation-new');
     const rootNode = screen.getByTestId('framework-node-0');
     const targetSelect = within(rootNode)
       .getAllByRole('combobox')
-      .find((element) => (element as HTMLSelectElement).value === 'valuation');
+      .find((element) => element.getAttribute('data-value') === 'valuation');
     expect(targetSelect).toBeDefined();
   });
 
@@ -663,11 +663,11 @@ describe('InvestmentFrameworkSettingsCard', () => {
     fireEvent.blur(nodeIdInput);
 
     expect(screen.getByLabelText('节点 2 的 ID')).toHaveValue('valuation');
-    expect(screen.getByLabelText('根节点')).toHaveValue('root');
+    expect(screen.getByLabelText('根节点')).toHaveAttribute('data-value', 'root');
     const rootNode = screen.getByTestId('framework-node-0');
     const targetSelect = within(rootNode)
       .getAllByRole('combobox')
-      .find((element) => (element as HTMLSelectElement).value === 'valuation');
+      .find((element) => element.getAttribute('data-value') === 'valuation');
     expect(targetSelect).toBeDefined();
   });
 

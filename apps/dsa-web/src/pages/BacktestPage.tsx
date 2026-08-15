@@ -125,9 +125,9 @@ function outcomeBadge(outcome: string | undefined, language: UiLanguage) {
   if (!outcome) return <Badge variant="default">--</Badge>;
   switch (outcome) {
     case 'win':
-      return <Badge variant="success" glow>{labels.win}</Badge>;
+      return <Badge variant="success">{labels.win}</Badge>;
     case 'loss':
-      return <Badge variant="danger" glow>{labels.loss}</Badge>;
+      return <Badge variant="danger">{labels.loss}</Badge>;
     case 'neutral':
       return <Badge variant="warning">{labels.neutral}</Badge>;
     default:
@@ -235,7 +235,7 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
   const total = Number(metrics.totalEvaluations);
   const skipped = Math.max(total - completed, insufficient);
   return (
-    <Card variant="gradient" padding="md" className="animate-fade-in">
+    <Card level="interactive" padding="md" className="animate-fade-in">
       <div className="mb-3">
         <span className="label-uppercase">{title}</span>
       </div>

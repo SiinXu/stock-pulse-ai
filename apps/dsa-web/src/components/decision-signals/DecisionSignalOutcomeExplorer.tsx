@@ -259,9 +259,9 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
   return (
     <Card
       title={text.outcomeExplorerTitle}
-      subtitle={text.outcomeExplorerDescription}
+      description={text.outcomeExplorerDescription}
       padding="md"
-      variant="bordered"
+      level="interactive"
       headerRight={(
         <Button
           type="button"

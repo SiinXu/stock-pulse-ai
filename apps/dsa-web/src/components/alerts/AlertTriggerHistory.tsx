@@ -135,7 +135,7 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
     },
   ];
   return (
-    <Card title={text.title} subtitle={text.subtitle} variant="bordered" padding="md">
+    <Card title={text.title} description={text.subtitle} level="interactive" padding="md">
       <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
         {lastUpdated ? (
           <span className="text-xs text-muted-text">

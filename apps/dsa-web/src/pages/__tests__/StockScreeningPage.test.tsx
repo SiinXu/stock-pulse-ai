@@ -506,7 +506,7 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText(/来源 last_good_cache\.leader_stocks · 置信 65% · 回退/)).toBeInTheDocument();
 
     const analyzeButton = screen.getByRole('button', { name: '分析 中际旭创' });
-    expect(analyzeButton).toHaveClass('min-h-11', 'min-w-11');
+    expect(analyzeButton).toHaveClass('control-hit-target');
     fireEvent.click(analyzeButton);
     expect(navigate).toHaveBeenCalledWith('/?stock=300000');
   });

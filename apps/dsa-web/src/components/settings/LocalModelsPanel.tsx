@@ -617,7 +617,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       return (
         <Card
           key={model.id}
-          variant="bordered"
+          level="interactive"
           padding="sm"
           title={localizedName}
           headerRight={recommended ? <Badge variant="info"><Star className="h-3 w-3" aria-hidden="true" />{text.recommended}</Badge> : null}
@@ -751,7 +751,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     return (
       <Card
         key={modelId}
-        variant="bordered"
+        level="interactive"
         padding="sm"
         title={model.displayName}
         headerRight={<Badge variant="history">{text.imported}</Badge>}

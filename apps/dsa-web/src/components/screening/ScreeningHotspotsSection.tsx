@@ -10,7 +10,7 @@ import {
 import type { AlphaSiftHotspot, AlphaSiftHotspotDetail } from '../../api/alphasift';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import { getUiListSeparator } from '../../utils/uiLocale';
-import { Button, InlineAlert, Surface } from '../common';
+import { Button, InlineAlert, Pressable, Surface } from '../common';
 import { MiniSparkline } from './MiniSparkline';
 import {
   formatHotspotMetric,
@@ -132,14 +132,13 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
               const iconMeta = getHotspotIcon(item.name || item.topic);
               const Icon = iconMeta.icon;
               return (
-              <button
+              <Pressable
                 key={`${item.topic}-${item.rank ?? ''}`}
                 className={`group relative min-h-28 overflow-hidden rounded-lg border px-3 py-3 text-left transition-all ${
                   selected
                     ? 'border-warning/50 bg-gradient-to-br from-warning/10 via-card to-card shadow-soft-card ring-1 ring-warning/20'
                     : 'border-border/80 bg-card hover:-translate-y-0.5 hover:border-warning/40 hover:shadow-soft-card'
                 }`}
-                type="button"
                 onClick={() => onSelectHotspot(item.topic)}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -173,7 +172,7 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
                 <div className="absolute bottom-3 right-3 opacity-95 transition-transform group-hover:scale-105">
                   <MiniSparkline score={item.heatScore} selected={selected} />
                 </div>
-              </button>
+              </Pressable>
               );
             })}
           </div>
@@ -268,17 +267,16 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
                               {stock.role || text.conceptStock}
                             </span>
                             {stock.code ? (
-                              <button
+                              <Button
                                 type="button"
+                                variant="ghost"
+                                size="compact"
                                 aria-label={formatUiText(text.analyzeStock, { stock: stock.name || stock.code })}
-                                className="inline-flex min-h-11 min-w-11 items-center justify-center text-xs font-semibold text-primary"
                                 onClick={() => onAnalyzeStock(stock)}
                               >
-                                <span className="inline-flex h-7 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 transition-colors hover:border-primary hover:bg-primary/15 hover:text-foreground">
-                                  <Play className="h-3 w-3" />
-                                  {text.analyze}
-                                </span>
-                              </button>
+                                <Play className="h-3 w-3" />
+                                {text.analyze}
+                              </Button>
                             ) : null}
                           </div>
                         </div>

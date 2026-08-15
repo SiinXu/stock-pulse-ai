@@ -45,6 +45,23 @@ describe('SelectionChip', () => {
     expect(chip).toHaveAccessibleName('AAPL Apple Incorporated');
   });
 
+  it('supports compact selection filters without a trailing indicator', () => {
+    render(
+      <SelectionChip
+        selected
+        size="compact"
+        showSelectionIndicator={false}
+        label="Holdings"
+      />,
+    );
+
+    const chip = screen.getByRole('button', { name: 'Holdings' });
+    expect(chip).toHaveAttribute('aria-pressed', 'true');
+    expect(chip).toHaveAttribute('data-size', 'compact');
+    expect(chip).toHaveClass('min-h-7', 'rounded-md', 'text-xs');
+    expect(chip.querySelector('[data-indicator="selected"]')).toBeNull();
+  });
+
   it('allows multi-part, multi-line content under one accessible command', () => {
     render(
       <SelectionChip
