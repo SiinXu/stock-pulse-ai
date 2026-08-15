@@ -199,7 +199,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'report-scenario-sensitivity-panel', 'ReportScenarioSensitivityPanel', 'components/chat/ReportScenarioSensitivityPanel.tsx', ['default']),
   entry('reports', 'chat-session-sidebar', 'ChatSessionSidebar', 'components/chat/ChatSessionSidebar.tsx', ['default', 'loading', 'empty', 'error']),
   entry('reports', 'chat-thinking-details', 'ChatThinkingDetails', 'components/chat/ChatThinkingDetails.tsx', ['default']),
-  entry('reports', 'chat-thinking-toggle', 'ChatThinkingToggle', 'components/chat/ChatThinkingDetails.tsx', ['interactive']),
+  entry('reports', 'chat-thinking-toggle', 'ChatThinkingToggle', 'components/chat/ChatThinkingToggle.tsx', ['interactive']),
 
   entry('runFlow', 'run-flow-event-list', 'RunFlowEventList', 'components/run-flow/RunFlowEventList.tsx', ['default', 'empty']),
   entry('runFlow', 'run-flow-graph', 'RunFlowGraph', 'components/run-flow/RunFlowGraph.tsx', ['default', 'interactive']),

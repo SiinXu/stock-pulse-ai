@@ -46,7 +46,7 @@ Web 运行流面板与报告页将既有 `/flow` 快照中的 agent 事件投影
 - 不生成模型旁白；attrs 缺失时对应层为空
 - 客户端对敏感 key 做与服务端一致的脱敏
 
-报告页以可折叠「思考过程」区块加载历史 flow 快照；无 agent 事件时自动隐藏。问股 Chat 对 stage 进度行同样只展开 SSE 真实字段。
+报告页以可折叠「思考过程」区块加载历史 flow 快照；无 agent 事件时自动隐藏。问股 Chat 按 SSE 原始顺序展示公开 stage / tool 事件，只把最后一个已收到的实时事件标为当前，失败与超时保持可见；恢复历史会话时仅展示服务端实际持久化的有界、脱敏工具记录，不重建未保存的实时阶段，也不生成模型旁白。
 
 **#1125 切换位：** `apps/dsa-web/src/components/run-flow/processTimelineModel.ts` 中 `TRACE_EVENT_SOURCE` 在统一 run-trace 落地前保持 `run_flow`；#1125 交付后切换常量并实现 `unified_trace` 分支，不另建事件源。
 

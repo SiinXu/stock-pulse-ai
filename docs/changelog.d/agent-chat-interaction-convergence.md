@@ -1,0 +1,1 @@
+- [Changed] Agent chat now presents real live and persisted execution events with semantic status, accessible disclosures, visible failures, and direct cloud, local-model, or non-Agent setup paths (Refs #865 #877 #878 #1296).

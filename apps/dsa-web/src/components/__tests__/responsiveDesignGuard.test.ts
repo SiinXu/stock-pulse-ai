@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import tailwindConfigSource from '../../../tailwind.config.js?raw';
 import marketReviewSource from '../report/MarketReviewReportView.tsx?raw';
 import reportOverviewSource from '../report/ReportOverview.tsx?raw';
+import chatEmptyMessagesSource from '../chat/ChatEmptyMessages.tsx?raw';
 import { productionCssAndTsxSources } from './productionSourceInventory';
 
 const productionSources = productionCssAndTsxSources;
@@ -49,13 +50,12 @@ describe('responsive design guard', () => {
     expect(indexCssSource).not.toContain('--nav-item-height: 2.25rem;');
   });
 
-  it('keeps quick-question buttons at least 44px tall', () => {
-    const quickQuestionRule = indexCssSource.match(/\.quick-question-btn\s*\{[^}]+\}/)?.[0];
-    const disabledRule = indexCssSource.match(/\.quick-question-btn:disabled\s*\{[^}]+\}/)?.[0];
-    expect(quickQuestionRule).toContain('min-height: 2.75rem;');
-    expect(indexCssSource).toContain('.quick-question-btn:not(:disabled):hover');
-    expect(disabledRule).toContain('cursor: not-allowed;');
-    expect(disabledRule).toContain('opacity: 0.5;');
+  it('keeps quick questions on the shared Button hit-target contract', () => {
+    expect(chatEmptyMessagesSource).toContain('<Button');
+    expect(chatEmptyMessagesSource).toContain('variant="outline"');
+    expect(chatEmptyMessagesSource).toContain('size="comfortable"');
+    expect(chatEmptyMessagesSource).not.toContain('quick-question-btn');
+    expect(indexCssSource).not.toContain('.quick-question-btn');
   });
 
   it('expands compact control hit targets whenever any pointer is coarse', () => {

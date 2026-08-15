@@ -12,26 +12,43 @@ function LocationProbe() {
 }
 
 describe('AgentUnavailableEmptyState', () => {
-  it('uses the shared Button and opens the actionable Model Sources path', () => {
+  it('offers cloud, local, and non-Agent paths through shared buttons', () => {
     render(
       <MemoryRouter initialEntries={['/agent']}>
         <UiLanguageProvider initialLanguage="en">
           <AgentUnavailableEmptyState
             title="Agent unavailable"
             description="Configure a model source first."
-            actionLabel="Open model sources"
+            actionLabel="Configure cloud model"
+            localActionLabel="Use a local model"
+            analysisActionLabel="Analysis workbench"
           />
           <LocationProbe />
         </UiLanguageProvider>
       </MemoryRouter>,
     );
 
-    const action = screen.getByRole('button', { name: 'Open model sources' });
-    expect(action).toHaveAttribute('data-control', 'button');
-    fireEvent.click(action);
+    const cloudAction = screen.getByRole('button', { name: 'Configure cloud model' });
+    const localAction = screen.getByRole('button', { name: 'Use a local model' });
+    const analysisAction = screen.getByRole('button', { name: 'Analysis workbench' });
+    [cloudAction, localAction, analysisAction].forEach((action) => {
+      expect(action).toHaveAttribute('data-control', 'button');
+    });
+    expect(cloudAction.parentElement).toHaveClass('gap-x-2', 'gap-y-4');
+
+    fireEvent.click(cloudAction);
 
     expect(screen.getByTestId('location')).toHaveTextContent(
       '/settings?section=ai_models&view=connections',
     );
+
+    fireEvent.click(localAction);
+
+    expect(screen.getByTestId('location')).toHaveTextContent(
+      '/settings?section=ai_models&view=connections',
+    );
+
+    fireEvent.click(analysisAction);
+    expect(screen.getByTestId('location')).toHaveTextContent('/research/analysis');
   });
 });

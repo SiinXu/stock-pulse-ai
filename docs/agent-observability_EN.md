@@ -46,7 +46,7 @@ The Web run-flow panel and report pages project agent events from the existing `
 - No model-authored "why" prose — empty when attrs are absent
 - Client-side redaction mirrors server sanitize rules for sensitive keys
 
-Report pages mount a collapsible reasoning/process section that loads the history flow snapshot and hides when no agent events exist. Chat live progress expands stage rows the same way using SSE fields only.
+Report pages mount a collapsible reasoning/process section that loads the history flow snapshot and hides when no agent events exist. Chat preserves the public stage/tool SSE event order, marks only the latest received live event as current, and keeps failures and timeouts visible. Restored chat history shows only bounded, redacted tool records actually persisted by the server; it does not reconstruct unsaved live stages or generate model-authored narration.
 
 **#1125 switch point:** `TRACE_EVENT_SOURCE` in `apps/dsa-web/src/components/run-flow/processTimelineModel.ts` stays `run_flow` until the unified run-trace surface lands. When #1125 ships, flip the constant and implement the `unified_trace` branch without inventing a third event bus.
 
