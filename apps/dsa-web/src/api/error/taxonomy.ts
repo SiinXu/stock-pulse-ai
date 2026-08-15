@@ -105,6 +105,7 @@ export const ERROR_CODE_TAXONOMY: Readonly<Record<string, ErrorClassification>> 
   password_mismatch: entry('credential', 'error', 'retry'),
   password_required: entry('credential', 'error', 'retry'),
   portfolio_busy: entry('busy', 'warning', 'retry'),
+  portfolio_import_preview_stale: entry('config_conflict', 'warning', 'none'),
   portfolio_oversell: entry('validation', 'error', 'none'),
   private_dns_address: entry('outbound_policy', 'error', 'settings', { docsPath: 'docs/local-only-mode.md', href: SETTINGS_OVERVIEW }),
   private_ip_blocked: entry('outbound_policy', 'error', 'settings', { docsPath: 'docs/local-only-mode.md', href: SETTINGS_OVERVIEW }),

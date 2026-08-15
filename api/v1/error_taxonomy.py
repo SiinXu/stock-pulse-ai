@@ -117,6 +117,7 @@ ERROR_CODE_TAXONOMY: Mapping[str, ErrorClassification] = {
     "unsupported_content_type": _entry("validation", "error", "none"),
     "file_too_large": _entry("validation", "error", "none"),
     "portfolio_oversell": _entry("validation", "error", "none"),
+    "portfolio_import_preview_stale": _entry("config_conflict", "warning", "none"),
     "duplicate_task": _entry("busy", "warning", "none"),
     "duplicate_market_review": _entry("busy", "warning", "none"),
     "scheduler_busy": _entry("busy", "warning", "retry"),
