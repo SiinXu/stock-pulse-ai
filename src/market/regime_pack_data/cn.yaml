@@ -1,0 +1,35 @@
+# Trading-regime pack: China A-shares (SSE / SZSE / BSE).
+# Versioned static reference facts; not a live legal or regulatory authority.
+schema_version: 1
+market: cn
+pack_version: v1
+sessions:
+  timezone: Asia/Shanghai
+  zh: >-
+    常规交易时段 09:30-11:30、13:00-15:00（当地时间）；开盘集合竞价
+    09:15-09:25，收盘集合竞价 14:57-15:00；法定节假日休市，具体以交易所日历为准。
+  en: >-
+    Regular sessions 09:30-11:30 and 13:00-15:00 local time; opening call
+    auction 09:15-09:25 and closing call auction 14:57-15:00; closed on PRC
+    public holidays per the exchange calendar.
+halts:
+  zh: >-
+    实行每日涨跌停制度：主板 ±10%，创业板/科创板 ±20%，北交所 ±30%（新股与
+    特殊标的另有规则）；个股可因重大事项停牌，科创板/创业板设盘中临时停牌机制。
+  en: >-
+    Daily price limits apply: ±10% on main boards, ±20% on ChiNext/STAR, ±30%
+    on BSE (special rules for new listings); stocks can be suspended for
+    material announcements, and STAR/ChiNext have intraday temporary-halt
+    mechanisms.
+shorting:
+  zh: >-
+    禁止裸卖空；做空仅能通过融资融券标的的融券卖出实现，券源有限、约束较多。
+    实行 T+1：当日买入的股票当日不能卖出。
+  en: >-
+    Naked short selling is prohibited; short exposure is only available via
+    securities lending on the eligible margin-trading list, with limited
+    borrow supply. T+1 applies: shares bought today cannot be sold the same
+    day.
+settlement:
+  zh: 股票交收为 T+1。
+  en: Stock settlement is T+1.

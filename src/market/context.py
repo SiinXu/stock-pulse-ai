@@ -186,6 +186,12 @@ def get_market_role(stock_code: Optional[str], lang: str = "zh") -> str:
 def get_market_guidelines(stock_code: Optional[str], lang: str = "zh") -> str:
     """Return market-specific analysis guidelines for LLM prompt.
 
+    Includes the versioned trading-regime pack section (Issue #1141) so
+    session, halt/price-limit, and short-selling language is attached
+    automatically on market detection. Raises
+    :class:`src.market.regime_packs.RegimePackError` if packaged regime-pack
+    data is malformed (fail-loud by contract; no silent fallback).
+
     Args:
         stock_code: The stock code being analyzed.
         lang: 'zh' or 'en'.
@@ -193,6 +199,10 @@ def get_market_guidelines(stock_code: Optional[str], lang: str = "zh") -> str:
     Returns:
         Multi-line string with market-specific guidelines.
     """
+    from src.market.regime_packs import format_trading_regime_section
+
     market = detect_market(stock_code)
     lang_key = "en" if lang in ("en", "ko") else "zh"
-    return _MARKET_GUIDELINES.get(market, _MARKET_GUIDELINES["cn"])[lang_key]
+    base = _MARKET_GUIDELINES.get(market, _MARKET_GUIDELINES["cn"])[lang_key]
+    regime_section = format_trading_regime_section(market, lang_key)
+    return f"{base}\n{regime_section}"

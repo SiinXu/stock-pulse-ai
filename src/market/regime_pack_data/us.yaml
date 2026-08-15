@@ -1,0 +1,35 @@
+# Trading-regime pack: United States (NYSE / Nasdaq).
+# Versioned static reference facts; not a live legal or regulatory authority.
+schema_version: 1
+market: us
+pack_version: v1
+sessions:
+  timezone: America/New_York
+  zh: >-
+    常规交易时段 09:30-16:00（美东时间）；盘前约 04:00-09:30、盘后约
+    16:00-20:00，流动性较薄；部分节日前后为半日市（13:00 收盘），具体以交易所
+    日历为准。
+  en: >-
+    Regular session 09:30-16:00 Eastern Time; pre-market roughly 04:00-09:30
+    and after-hours roughly 16:00-20:00 with thinner liquidity; some holiday
+    eves are half days closing at 13:00 per the exchange calendar.
+halts:
+  zh: >-
+    无固定每日涨跌停；标普 500 下跌 7%/13%/20% 触发全市场熔断；个股适用
+    LULD（涨跌限制带）波动暂停机制，并可因待发布消息（如 T1）停牌。
+  en: >-
+    No fixed daily price limits; market-wide circuit breakers trigger on S&P
+    500 declines of 7%/13%/20%; individual stocks are subject to Limit
+    Up-Limit Down (LULD) volatility pauses and news-pending halts (e.g., T1).
+shorting:
+  zh: >-
+    卖空普遍可行但须先行借券（Reg SHO 定位要求）；个股单日跌幅达 10% 触发
+    卖空限制（SSR，提价规则），持续至次一交易日收盘。支持 T+0 日内交易。
+  en: >-
+    Short selling is broadly permitted subject to borrow availability and Reg
+    SHO locate requirements; a 10% intraday decline triggers the Short Sale
+    Restriction (SSR, an uptick-style rule) through the next trading day.
+    Same-day (T+0) trading is allowed.
+settlement:
+  zh: 股票交收为 T+1。
+  en: Stock settlement is T+1.
