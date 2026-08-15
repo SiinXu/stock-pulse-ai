@@ -70,8 +70,8 @@ export function shouldDelegateCurrentDocumentNavigation(
 }
 
 /**
- * Primary sidebar / mobile drawer graph for the #873 experience spine:
- * Today → Research → Signals → Portfolio → Settings.
+ * Primary sidebar / mobile drawer graph for the core experience spine:
+ * Today → Research → Agent → Signals → Portfolio → Settings.
  *
  * Paths come only from `routes.ts` (`APP_ROUTE_PATHS`). Command palette pages
  * must be derived via `listCommandPalettePages` so membership cannot drift.
@@ -106,6 +106,14 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
   },
   {
     kind: 'link',
+    key: 'agent',
+    labelKey: 'layout.nav.agent',
+    to: APP_ROUTE_PATHS.agent,
+    icon: MessageSquareQuote,
+    badge: 'completion',
+  },
+  {
+    kind: 'link',
     key: 'signals',
     labelKey: 'layout.nav.decisionSignals',
     to: APP_ROUTE_PATHS.signals,
@@ -117,16 +125,9 @@ export const APPLICATION_NAVIGATION_ITEMS: readonly ApplicationNavigationItem[] 
 
 /**
  * Reachable product pages indexed by Cmd+K but intentionally outside primary sidebar.
- * Agent is demoted from the #873 top-level spine; Approvals stay Home/palette entry.
+ * Approvals stays a conditional Home/palette entry because administrator auth owns access.
  */
 export const COMMAND_PALETTE_SECONDARY_PAGES: readonly ApplicationNavigationLink[] = [
-  {
-    kind: 'link',
-    key: 'agent',
-    labelKey: 'layout.nav.agent',
-    to: APP_ROUTE_PATHS.agent,
-    icon: MessageSquareQuote,
-  },
   {
     kind: 'link',
     key: 'approvals',

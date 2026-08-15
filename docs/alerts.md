@@ -417,7 +417,7 @@ P8 不新增规则类型、API、表结构或 worker 行为；它把 P0-P7 已�
 
 ### Web 与 Desktop
 
-Web 持久化规则的主要入口是统一信号中心 `/signals?tab=rules`：可以创建、编辑、启停、删除规则，执行一次性 dry-run 测试，配置默认/关闭/自定义秒数三种业务冷却策略，并在同页“推送历史”中查看触发历史、通知尝试和当前冷却状态。规则列表支持 All / Holdings / Watchlist scope；触发历史与通知尝试仍是全局记录，因此该 tab 不显示 scope 控件，但会保留 URL 中的 scope 上下文供返回规则或信号流时继续使用。旧 `/alerts` 会按原 `view` 参数重定向到对应 tab。批量规则的列表冷却状态是父规则摘要，子目标是否冷却以触发历史中的 `target` / `effective_target` 为准。
+Web 持久化规则的主要入口是统一信号中心 `/signals?tab=rules`：可以创建、编辑、启停、删除规则，执行一次性 dry-run 测试，配置默认/关闭/自定义秒数三种业务冷却策略，并在同页“历史”中查看触发历史、通知尝试和当前冷却状态。规则列表支持 All / Holdings / Watchlist scope；触发历史与通知尝试仍是全局记录，因此该 tab 不显示 scope 控件，但会保留 URL 中的 scope 上下文供返回规则或信号列表时继续使用。旧 `/alerts` 会按原 `view` 参数重定向到对应 tab。批量规则的列表冷却状态是父规则摘要，子目标是否冷却以触发历史中的 `target` / `effective_target` 为准。
 
 Desktop 不新增原生告警管理界面；桌面用户复用内置或外部 WebUI 的统一信号中心。Desktop 回滚不需要清理额外状态。
 

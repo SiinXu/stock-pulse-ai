@@ -212,12 +212,12 @@ Web 在“信号表现统计”卡片内，当响应包含 `profile_calibration`
 
 ## Web 展示
 
-Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会保留原查询参数并映射到信号流或“再评估与统计”，旧 `/alerts` 会映射到“规则”或“推送历史”，因此已有深链仍可继续使用。
+Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会保留原查询参数并映射到“信号”或“复盘”，旧 `/alerts` 会映射到“规则”或“历史”，因此已有深链仍可继续使用。
 
-- 顶层为“信号流 / 规则 / 推送历史 / 再评估与统计”四个 tab；规则、触发历史和通知尝试继续复用现有 Alert API 与组件，不新增后端数据契约。
-- `scope=all|holdings|watchlist` 可在同页切换并由 URL 表达；它作用于“全部信号”列表与规则列表，持仓范围分别复用 `holding_only=true` 和 `target_scope=portfolio_holdings`，自选范围复用现有 watchlist、stock-scoped 信号查询与 `target_scope=watchlist`。当前股票子视图、推送历史和再评估统计使用各自的股票或全局口径，因此不显示 scope 控件；切换 tab 时仍保留 scope 上下文，返回列表后继续生效。
+- 顶层为“信号 / 规则 / 历史 / 复盘”四个短标签 tab；“信号”内部以低视觉权重的分段控件切换全部信号、当前股票和股票信号时间线，“历史”内部以同一模式切换触发历史和通知尝试。规则、触发历史和通知尝试继续复用现有 Alert API 与组件，不新增后端数据契约。
+- `scope=all|holdings|watchlist` 可在同页切换并由 URL 表达；它作用于“全部信号”列表与规则列表，且控件放在对应 tab panel 内，不会推动顶层导航改变位置。持仓范围分别复用 `holding_only=true` 和 `target_scope=portfolio_holdings`，自选范围复用现有 watchlist、stock-scoped 信号查询与 `target_scope=watchlist`。当前股票子视图、历史和复盘使用各自的股票或全局口径，因此不显示 scope 控件；切换 tab 时仍保留 scope 上下文，返回列表后继续生效。
 - 最后访问的合法 scope/tab/filter 在当前浏览器会话中恢复，显式 URL 始终优先。`scope=all&tab=feed` 这类显式默认值会保留为所有权标记，只有裸 `/signals` 才触发会话恢复。自选列表先读取每个标的第一页并根据服务端 `total` 确定可达页，再以共享的六请求上限读取确实需要的后续页；被新筛选取代的旧请求不会继续派发，因此重叠刷新也不能叠加突破上限。超大 URL 页码不会直接放大为无界请求集合。
-- 信号流为空时主行动是“创建第一条规则”，会在同页切换到规则 tab 并打开现有规则表单。
+- 信号列表为空时主行动是“创建第一条规则”，会在同页切换到规则 tab 并打开现有规则表单。
 - 默认查询 `status=active`。
 - 页面顶部提供“创建信号”入口，打开手工创建抽屉：可录入基础字段（代码、名称、市场、动作、置信度、周期、市场阶段、风格）、交易计划（入场上/下沿、止损、目标价、失效条件、观察条件、过期日）和解释字段（理由、风险、催化、证据）。来源固定为 `source_type=manual`、`trigger_source=web_manual`，不会伪装成分析、Agent、告警或大盘复盘。抽屉内提供实时预览和客户端校验（必填股票代码/市场/动作，置信度限定 0–1，价格须为正，入场下沿不高于上沿）。提交前对规范化后的完整内容生成确定性 `web_manual:<hash>` trace_id，作为 source-less 手工信号的去重键：完全相同的草稿再次提交命中去重（`created=false`），任意字段变化即视为新信号（`created=true`）。创建 active 方向性信号可能触发服务端使同标的相反 active 信号失效，成功后刷新列表、统计与当前股票的 latest/时间线。草稿在关闭并重新打开抽屉后保留，去重命中或请求失败时保留，仅在创建成功后清空。
 - 页面顶部提供页面级“当前股票”主路径，独立于高级列表筛选。用户提交主股票、选择自动补全候选或点击候选 chip 后，latest active 与时间线共用同一个已应用股票上下文；只修改输入草稿不会触发 latest 或时间线查询。
@@ -230,7 +230,7 @@ Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会�
 - 时间线 status filter 只支持 `all` 与 `active`：`all` 不传 `status`，`active` 传 `status=active`。P1 不提供 terminal status filter，也不做前端 terminal 过滤。
 - 时间线支持 profile filter，复用 list API 的 server-side `decision_profile` 查询；`unknown` 只用于筛选和展示 legacy `NULL` 行。普通高级列表不新增 profile filter。
 - 信号表现统计保持全局已复盘 outcome 口径，不等于当前可见信号数量，也不随当前股票或高级列表筛选变化；当已复盘样本数为 0 时，Web 显示零样本空状态而不是一组 `0/-` 指标。
-- “再评估与统计”同时提供全局后验结果列表，直接使用后端 outcome list 的周期、结果、评估状态、引擎版本和信号 ID 筛选及服务端分页；每行复用详情中的 outcome/status 展示，并可打开对应信号详情。筛选保留在页面状态中，打开和关闭详情抽屉不会清空。
+- “复盘”同时提供重新评估与全局后验结果列表，直接使用后端 outcome list 的周期、结果、评估状态、引擎版本和信号 ID 筛选及服务端分页；每行复用详情中的 outcome/status 展示，并可打开对应信号详情。筛选保留在页面状态中，打开和关闭详情抽屉不会清空。
 - 统计卡片内提供“运行后验”入口，按安全默认参数触发 `POST /api/v1/decision-signals/outcomes/run`：固定 `status=active`、`force=false`、`limit=100`，只补算 active 信号中缺失或可重试的 outcome，不会重算全部或强制覆盖，避免误触发大批量重算或反复请求数据源。触发前需二次确认；运行同步返回后展示 `evaluated`/`created`/`updated`/`skipped` 汇总与引擎版本，并把本次运行追加到“最近运行”会话列表（仅前端会话内保留，后端无运行历史）。运行期间禁用触发并由 in-flight 守卫防重复提交，失败时展示错误与 trace，成功后刷新后验统计。
 - Web 展示优先读取正式 `decision_profile` 字段，只有字段缺失时才回退 legacy metadata；历史缺失或非法 profile 的信号显示为 `unknown`，不会误标为 `balanced`。
 - 卡片、详情、组合摘要和时间线统一以顶层 `action` 决定方向，并读取 `presentation` 的 confidence、summary、risk、timestamp；`presentation.action` 只作为同值派生镜像返回。时间线 rank、颜色和 tooltip 不再各自解释方向，排序与持仓等价代码匹配只按 canonical timestamp 选择最新信号。

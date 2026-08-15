@@ -18,12 +18,14 @@ import {
   AppPage,
   Button,
   ConfirmDialog,
+  IconButton,
   InlineAlert,
   PageHeader,
-  SelectionChip,
+  SegmentedControl,
   TabPanel,
   Tabs,
   ToastViewport,
+  getTabPanelId,
 } from '../components/common';
 import { useRouteFocusTarget } from '../components/routing';
 import { DecisionSignalCreateDrawer } from '../components/decision-signals/DecisionSignalCreateDrawer';
@@ -32,6 +34,7 @@ import DecisionSignalFeedListSection from '../components/decision-signals/Decisi
 import DecisionSignalLatestSection from '../components/decision-signals/DecisionSignalLatestSection';
 import DecisionSignalReassessPanel from '../components/decision-signals/DecisionSignalReassessPanel';
 import DecisionSignalReviewSection from '../components/decision-signals/DecisionSignalReviewSection';
+import DecisionSignalScopeControl from '../components/decision-signals/DecisionSignalScopeControl';
 import DecisionSignalStockContextModal from '../components/decision-signals/DecisionSignalStockContextModal';
 import DecisionSignalTimelineSection from '../components/decision-signals/DecisionSignalTimelineSection';
 import {
@@ -208,10 +211,10 @@ const DecisionSignalsPage: React.FC = () => {
   const activeFeedView = activeView === SIGNAL_FEED_VIEW_VALUES.stats
     ? SIGNAL_FEED_VIEW_VALUES.signals
     : activeView;
-  const scopeControlVisible = (
+  const feedScopeControlVisible = (
     signalCenterTab === SIGNAL_CENTER_TAB_VALUES.feed
     && activeFeedView === SIGNAL_FEED_VIEW_VALUES.signals
-  ) || signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules;
+  );
   const updateDecisionSignalSearchParams = useCallback((
     values: DecisionSignalSearchValues,
     replace = true,
@@ -1217,21 +1220,20 @@ const DecisionSignalsPage: React.FC = () => {
                   ? t('decisionSignals.stockContextCurrent', { stock: activeStockLabel })
                   : t('decisionSignals.stockContextTitle')}
               </Button>
-              <Button
+              <IconButton
                 type="button"
-                variant="secondary"
+                variant="ghost"
                 size="comfortable"
+                aria-label={t('decisionSignals.refresh')}
                 onClick={() => {
                   void loadSignals();
                   void loadOutcomeStats();
                 }}
                 disabled={loading}
                 isLoading={loading}
-                loadingText={t('decisionSignals.refresh')}
               >
-                <RefreshCw className="h-4 w-4" />
-                {t('decisionSignals.refresh')}
-              </Button>
+                <RefreshCw aria-hidden="true" />
+              </IconButton>
             </>
           ) : undefined}
         />
@@ -1260,27 +1262,6 @@ const DecisionSignalsPage: React.FC = () => {
           onCandidateSelect={handleCandidateSelect}
         />
 
-        {scopeControlVisible ? (
-          <div
-            role="group"
-            aria-label={t('decisionSignals.scopeLabel')}
-            className="flex flex-wrap items-center gap-2"
-          >
-            {([
-              { value: SIGNAL_CENTER_SCOPE_VALUES.all, label: t('decisionSignals.scopeAll') },
-              { value: SIGNAL_CENTER_SCOPE_VALUES.holdings, label: t('decisionSignals.scopeHoldings') },
-              { value: SIGNAL_CENTER_SCOPE_VALUES.watchlist, label: t('decisionSignals.scopeWatchlist') },
-            ] as const).map((option) => (
-              <SelectionChip
-                key={option.value}
-                label={option.label}
-                selected={signalCenterScope === option.value}
-                onClick={() => setSignalCenterScope(option.value)}
-              />
-            ))}
-          </div>
-        ) : null}
-
         <Tabs
           id={SIGNAL_CENTER_TABS_ID}
           value={signalCenterTab}
@@ -1301,17 +1282,25 @@ const DecisionSignalsPage: React.FC = () => {
           data-signal-center-tab="feed"
           className="space-y-4"
         >
-          <Tabs
+          <SegmentedControl
             id={SIGNAL_FEED_TABS_ID}
             value={activeFeedView}
-            items={[
-              { id: SIGNAL_FEED_VIEW_VALUES.signals, label: t('decisionSignals.scopeAllSignals') },
-              { id: SIGNAL_FEED_VIEW_VALUES.latest, label: t('decisionSignals.stockContextTitle') },
-              { id: SIGNAL_FEED_VIEW_VALUES.timeline, label: t('decisionSignals.timelineTitle') },
+            options={[
+              { value: SIGNAL_FEED_VIEW_VALUES.signals, label: t('decisionSignals.scopeAllSignals') },
+              { value: SIGNAL_FEED_VIEW_VALUES.latest, label: t('decisionSignals.stockContextTitle') },
+              { value: SIGNAL_FEED_VIEW_VALUES.timeline, label: t('decisionSignals.timelineTitle') },
             ]}
-            onValueChange={(view) => setActiveView(view as DecisionSignalsView)}
-            aria-label={t('decisionSignals.tab.feed')}
+            onChange={(view) => setActiveView(view as DecisionSignalsView)}
+            ariaLabel={t('decisionSignals.tab.feed')}
+            getPanelId={(view) => getTabPanelId(SIGNAL_FEED_TABS_ID, view)}
           />
+
+          {feedScopeControlVisible ? (
+            <DecisionSignalScopeControl
+              value={signalCenterScope}
+              onChange={setSignalCenterScope}
+            />
+          ) : null}
 
           <TabPanel
             tabsId={SIGNAL_FEED_TABS_ID}
@@ -1415,15 +1404,21 @@ const DecisionSignalsPage: React.FC = () => {
           activeValue={signalCenterTab}
         >
           {signalCenterTab === SIGNAL_CENTER_TAB_VALUES.rules ? (
-            <AlertsWorkspace
-              embedded
-              scope={signalCenterScope}
-              activeView="rules"
-              onActiveViewChange={handleAlertsViewChange}
-              createRuleRequested={signalCenterState.createRule}
-              onCreateRuleRequestHandled={handleCreateRuleRequestHandled}
-              ruleStock={ruleStock}
-            />
+            <div className="space-y-5">
+              <DecisionSignalScopeControl
+                value={signalCenterScope}
+                onChange={setSignalCenterScope}
+              />
+              <AlertsWorkspace
+                embedded
+                scope={signalCenterScope}
+                activeView="rules"
+                onActiveViewChange={handleAlertsViewChange}
+                createRuleRequested={signalCenterState.createRule}
+                onCreateRuleRequestHandled={handleCreateRuleRequestHandled}
+                ruleStock={ruleStock}
+              />
+            </div>
           ) : null}
         </TabPanel>
 

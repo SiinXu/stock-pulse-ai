@@ -1,6 +1,6 @@
 # Navigation Information Architecture — Target Proposal
 
-**Status**: Phase 2 B0/B1 implementing against [#873](https://github.com/SiinXu/stock-pulse-ai/issues/873) spine (Today · Research · Signals · Portfolio · Settings; Agent demoted). Historical A–D options retained below for context.  
+**Status**: Phase 2 B0/B1 follow-up keeps both core workspaces visible (Today · Research · Agent · Signals · Portfolio · Settings). Contextual and administrator-only routes remain outside the primary sidebar. Historical A–D options are retained below for context.
 **Issue**: [#368](https://github.com/SiinXu/stock-pulse-ai/issues/368)  
 **Design input**: [#873](https://github.com/SiinXu/stock-pulse-ai/issues/873)  
 **Companion PR**: mechanical label / redirect / palette hygiene only for the audit baseline; chrome batches land separately
@@ -27,7 +27,7 @@ This document records the **current-state audit** and **target IA options** so t
 | `/portfolio` | Portfolio / holdings | Yes | |
 | `/chat` | Agent chat | Yes | Path kept for deep-link compatibility; label is Agent |
 | `/settings` | Settings | Yes | Usage nested as section |
-| `/signals` | Signal Center | **No** (bell / palette / Home) | Single instance for signals + alerts + review |
+| `/signals` | Signal Center | Yes | Single instance for signals + alerts + review |
 | `/approvals` | Human approvals | **No** (Home / palette) | Admin auth gated |
 | `/stocks/:stockCode` | Stock workspace | **No** (content page) | |
 | `/login` | Login | Standalone | `?redirect=` deep-link preserve |
@@ -49,18 +49,18 @@ This document records the **current-state audit** and **target IA options** so t
 
 | Kind | Path / entry | Assessment |
 | --- | --- | --- |
-| Reachable, unlinked in sidebar | `/signals`, `/approvals`, `/stocks/:code` | **Intentional** (bell / Home / content page) |
+| Reachable, unlinked in sidebar | `/approvals`, `/notifications`, `/stocks/:code`, `/event-alerts`, `/portfolio/performance`, `/research/report-compare` | **Intentional** (Home / bell / owning workspace / content context) |
 | Linked but dead | — | None found in product nav or command palette after mechanical hygiene |
 | Dead page modules without routes | `AlertsPage` re-export shell | Routed via `/signals` + legacy redirect only |
 | Deep-link allowlist gap (fixed in mechanical PR) | `/research/skill-outcomes` | Was rejected as `unsupported_route`; now allowed |
 
 ### 1.4 Primary nav (target after #873 B0/B1)
 
-Order: **Today (`layout.nav.home`) → Research (group) → Signals → Portfolio → Settings**.
+Order: **Today (`layout.nav.home`) → Research (group) → Agent → Signals → Portfolio → Settings**.
 
 Research children order: **Market review → Discover → Analysis Workbench → Backtest → Calculators → Skill outcomes**.
 
-Agent and Approvals: command-palette secondary only (not primary sidebar). Sidebar + Cmd+K pages share `listCommandPalettePages` / `APPLICATION_NAVIGATION_ITEMS` in `navigation.ts`; path constants remain `routes.ts` only.
+Agent is a primary workspace. Approvals remains a command-palette secondary page with a Home entry because administrator authentication governs access. Sidebar + Cmd+K pages share `listCommandPalettePages` / `APPLICATION_NAVIGATION_ITEMS` in `navigation.ts`; path constants remain `routes.ts` only.
 
 Labels for Research children use the `layout.nav.*` key namespace (mechanical alignment).
 
@@ -80,11 +80,11 @@ No speculative domain regrouping (e.g. moving Signal Center under Home, Settings
 
 ## 2. Target architecture options — DECISION NEEDED
 
-Issue #368 describes a task-oriented target IA that already partially matches the shipped five-domain shell. Remaining decisions are about **depth**, **where Signals/Approvals live**, and **how far Home/Agent/Settings should expand**.
+Issue #368 describes a task-oriented target IA that already partially matches the shipped six-domain shell. Remaining decisions are about **depth**, **where Signals/Approvals live**, and **how far Home/Agent/Settings should expand**.
 
-### Option A — Stabilize current shell (recommended default)
+### Option A — Stabilize the visible core shell (current)
 
-**Shape**: keep five primary domains; Signals via bell/palette; Approvals via Home/palette; no new top-level domains.
+**Shape**: keep six primary domains with Agent and Signals visible; Approvals remains available through Home/palette; no contextual detail route becomes a top-level domain.
 
 | Pros | Cons |
 | --- | --- |

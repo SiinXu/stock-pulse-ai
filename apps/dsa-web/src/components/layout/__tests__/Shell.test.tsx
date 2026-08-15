@@ -118,11 +118,11 @@ beforeEach(() => {
 });
 
 describe('Shell', () => {
-  it('renders the shared navigation and profile controls for the #873 spine', () => {
+  it('renders the shared core navigation and profile controls', () => {
     renderShell();
 
     expect(screen.getByRole('link', { name: '信号中心' })).toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Agent' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Agent' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'StockPulse' }).length).toBeGreaterThan(0);
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
