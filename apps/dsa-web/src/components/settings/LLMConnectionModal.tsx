@@ -5,8 +5,9 @@ import type {
   LlmConnectionFieldSchema,
   LlmProviderCatalogEntry,
 } from '../../types/systemConfig';
-import { Button, CredentialInput, InlineAlert, Input, Modal, SearchableSelect, Select } from '../common';
+import { Button, InlineAlert, Input, Modal, SearchableSelect, Select } from '../common';
 import type { SearchableSelectOption } from '../common';
+import { CredentialInput } from '../security';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { MODEL_ACCESS_TEXT, localizeModelAccessIssue } from '../../locales/settingsModelAccess';

@@ -137,7 +137,7 @@ export const ReportDecisionCard: React.FC<ReportDecisionCardProps> = ({
 
   return (
     <Card
-      variant="bordered"
+      level="interactive"
       padding={compact ? 'sm' : 'md'}
       className="text-left"
       data-testid="report-decision-card"

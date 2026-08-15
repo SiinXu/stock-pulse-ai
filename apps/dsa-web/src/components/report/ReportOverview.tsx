@@ -5,7 +5,8 @@ import type {
   ReportStrategy,
   ReportSummary as ReportSummaryType,
 } from '../../types/analysis';
-import { Badge, Button, Card, ScoreGauge } from '../common';
+import { Badge, Button, Card } from '../common';
+import { ScoreGauge } from './ScoreGauge';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
 import { formatDateTime } from '../../utils/format';
 import {
@@ -276,7 +277,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
         {/* Left side: Stock information and conclusions */}
         <div className="lg:col-span-2 space-y-5">
           {/* Stock Header */}
-          <Card variant="gradient" padding="md" className="home-report-hero">
+          <Card level="interactive" padding="md" className="home-report-hero">
             <div className="mb-5 flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-3">
@@ -361,7 +362,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
             {/* Trading Recommendations */}
             <Card
-              variant="bordered"
+              level="interactive"
               padding="sm"
               hoverable
               className="home-insight-card"
@@ -384,7 +385,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
 
             {/* Trend prediction */}
             <Card
-              variant="bordered"
+              level="interactive"
               padding="sm"
               hoverable
               className="home-insight-card"
@@ -407,7 +408,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
           </div>
 
           {preparedRelatedBoards.length > 0 && (
-            <Card variant="bordered" padding="sm" className="min-w-0 max-w-full text-left">
+            <Card level="interactive" padding="sm" className="min-w-0 max-w-full text-left">
               <section aria-label={text.relatedBoards} className="min-w-0 max-w-full">
                 <div className="mb-3 flex min-w-0 items-baseline gap-2">
                   <span className="label-uppercase">{text.boardLinkage}</span>
@@ -425,7 +426,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
         {/* Right side: Sentiment indicators / Watchlist actions */}
         <div className="flex h-full flex-col space-y-4">
           {watchlist && meta.reportType !== 'market_review' && (
-            <Card variant="bordered" padding="sm">
+            <Card level="interactive" padding="sm">
               <div className="text-center space-y-3">
                 <span className="label-uppercase">{t('report.watchlist')}</span>
                 <div className="text-xs text-muted-text font-mono">{meta.stockCode}</div>
@@ -444,7 +445,7 @@ export const ReportOverview: React.FC<ReportOverviewProps> = ({
               </div>
             </Card>
           )}
-          <Card variant="bordered" padding="md" className="home-rail-card flex-1 !overflow-visible">
+          <Card level="interactive" padding="md" className="home-rail-card flex-1 !overflow-visible">
             <div className="text-center">
               <h3 className="mb-5 text-sm font-medium tracking-wide text-foreground">{text.marketSentiment}</h3>
               <ScoreGauge score={summary.sentimentScore} size="lg" language={reportLanguage} />

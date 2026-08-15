@@ -13,7 +13,6 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
   isLoading?: boolean;
   /** Custom loading text. */
   loadingText?: string;
-  glow?: boolean;
 }
 
 const BUTTON_SIZE_STYLES = {
@@ -35,7 +34,7 @@ const BUTTON_VARIANT_STYLES = {
 } as const;
 
 /**
- * Button component with multiple variants and terminal-inspired styling.
+ * Button component with shared variants and density sizes.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   children,
@@ -43,15 +42,12 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
   size = 'comfortable',
   isLoading = false,
   loadingText,
-  glow = false,
   className = '',
   disabled,
   type = 'button',
   ...props
 }, ref) => {
   const { t } = useUiLanguage();
-  const emphasisStyles = glow ? 'shadow-soft-card hover:shadow-soft-card-strong' : '';
-
   return (
     <button
       {...props}
@@ -68,7 +64,6 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(({
         'disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:transform-none',
         BUTTON_SIZE_STYLES[size],
         BUTTON_VARIANT_STYLES[variant],
-        emphasisStyles,
         className,
       )}
       disabled={disabled || isLoading}

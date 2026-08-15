@@ -10,13 +10,13 @@ import type {
 import type { UiTextKey } from '../../i18n/uiText';
 import {
   Button,
-  CredentialInput,
   InlineAlert,
   Input,
   Modal,
   Select,
   Textarea,
 } from '../common';
+import { CredentialInput } from '../security';
 import { SettingsSwitch } from './SettingsSwitch';
 
 type PluginSettingsModalProps = {

@@ -66,7 +66,7 @@ const EventAlertList: React.FC<EventAlertListProps> = ({
   ) : (
     <DataTable<EventAlertDisplayItem> {...commonTableProps} />
   );
-  return <Card title={text.listTitle} variant="bordered" padding="md">{table}</Card>;
+  return <Card title={text.listTitle} level="interactive" padding="md">{table}</Card>;
 };
 
 export default EventAlertList;

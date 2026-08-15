@@ -10,7 +10,7 @@ import type {
   InvestmentFrameworkEvaluationDimension,
 } from '../../types/investmentFramework';
 import type { UiTextKey } from '../../i18n/uiText';
-import { Button, ConfirmDialog, Modal } from '../common';
+import { Button, ConfirmDialog, Input, Modal, Select, Textarea } from '../common';
 import LineListTextarea from './LineListTextarea';
 import { SettingsAlert } from './SettingsAlert';
 import {
@@ -37,9 +37,6 @@ type NodeRenameSession = {
   rootReferencesNode: boolean;
   branchReferences: Array<{ nodeIndex: number; branchIndex: number }>;
 };
-
-const fieldClass =
-  'w-full rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-sm text-foreground outline-none transition-[border-color,background-color] focus:border-[var(--settings-border-strong)]';
 
 function moveItem<T>(items: T[], from: number, to: number): T[] {
   if (to < 0 || to >= items.length) return items;
@@ -295,25 +292,21 @@ const InvestmentFrameworkStructuredEditor: React.FC<
         ) : null}
 
         {nodes.length ? (
-          <label className="block space-y-1" htmlFor="investment-framework-root">
-            <span className="text-sm font-medium text-foreground">
-              {t('settings.frameworkRootNode')}
-            </span>
-            <select
-              id="investment-framework-root"
-              className={fieldClass}
-              value={content.rootNodeId ?? ''}
-              disabled={disabled}
-              onChange={(event) => onChange({ ...content, rootNodeId: event.target.value || null })}
-            >
-              <option value="">{t('settings.frameworkSelectRoot')}</option>
-              {nodes.map((node, index) => (
-                <option key={`${node.nodeId}-${index}`} value={node.nodeId}>
-                  {node.nodeId || t('settings.frameworkUnnamedNode', { number: index + 1 })}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select
+            id="investment-framework-root"
+            label={t('settings.frameworkRootNode')}
+            value={content.rootNodeId ?? ''}
+            disabled={disabled}
+            className="w-full [&>div]:w-full"
+            onChange={(value) => onChange({ ...content, rootNodeId: value || null })}
+            options={[
+              { value: '', label: t('settings.frameworkSelectRoot') },
+              ...nodes.map((node, index) => ({
+                value: node.nodeId,
+                label: node.nodeId || t('settings.frameworkUnnamedNode', { number: index + 1 }),
+              })),
+            ]}
+          />
         ) : (
           <p className="rounded-lg border border-dashed settings-border px-3 py-4 text-xs text-muted-text">
             {t('settings.frameworkDecisionTreeEmpty')}
@@ -383,32 +376,22 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-secondary-text">
-                      {t('settings.frameworkNodeId')}
-                    </span>
-                    <input
-                      className={fieldClass}
-                      aria-label={t('settings.frameworkNodeIdAria', { number: nodeIndex + 1 })}
-                      value={node.nodeId}
-                      disabled={disabled}
-                      onFocus={() => beginNodeRename(nodeIndex)}
-                      onBlur={() => finishNodeRename(nodeIndex)}
-                      onChange={(event) => updateNodeIdDraft(nodeIndex, event.target.value)}
-                    />
-                  </label>
-                  <label className="block space-y-1">
-                    <span className="text-xs font-medium text-secondary-text">
-                      {t('settings.frameworkNodeQuestion')}
-                    </span>
-                    <input
-                      className={fieldClass}
-                      aria-label={t('settings.frameworkNodeQuestionAria', { number: nodeIndex + 1 })}
-                      value={node.question}
-                      disabled={disabled}
-                      onChange={(event) => updateNode(nodeIndex, { question: event.target.value })}
-                    />
-                  </label>
+                  <Input
+                    label={t('settings.frameworkNodeId')}
+                    aria-label={t('settings.frameworkNodeIdAria', { number: nodeIndex + 1 })}
+                    value={node.nodeId}
+                    disabled={disabled}
+                    onFocus={() => beginNodeRename(nodeIndex)}
+                    onBlur={() => finishNodeRename(nodeIndex)}
+                    onChange={(event) => updateNodeIdDraft(nodeIndex, event.target.value)}
+                  />
+                  <Input
+                    label={t('settings.frameworkNodeQuestion')}
+                    aria-label={t('settings.frameworkNodeQuestionAria', { number: nodeIndex + 1 })}
+                    value={node.question}
+                    disabled={disabled}
+                    onChange={(event) => updateNode(nodeIndex, { question: event.target.value })}
+                  />
                 </div>
 
                 {nodeIssues.length ? (
@@ -425,74 +408,60 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                         key={branchIndex}
                         className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 p-3 lg:grid-cols-[1fr_10rem_1fr_auto]"
                       >
-                        <label className="block space-y-1">
-                          <span className="text-xs text-muted-text">
-                            {t('settings.frameworkBranchCondition', { number: branchIndex + 1 })}
-                          </span>
-                          <input
-                            className={fieldClass}
-                            value={branch.condition}
+                        <Input
+                          label={t('settings.frameworkBranchCondition', { number: branchIndex + 1 })}
+                          value={branch.condition}
+                          disabled={disabled}
+                          onChange={(event) => updateBranch(nodeIndex, branchIndex, {
+                            condition: event.target.value,
+                          })}
+                        />
+                        <Select
+                          label={t('settings.frameworkBranchDestination')}
+                          value={usesTarget ? 'target' : 'outcome'}
+                          disabled={disabled}
+                          className="w-full [&>div]:w-full"
+                          onChange={(value) => updateBranch(
+                            nodeIndex,
+                            branchIndex,
+                            value === 'target'
+                              ? { targetNodeId: '', outcome: null }
+                              : { targetNodeId: null, outcome: '' },
+                          )}
+                          options={[
+                            { value: 'outcome', label: t('settings.frameworkBranchOutcome') },
+                            { value: 'target', label: t('settings.frameworkBranchTarget') },
+                          ]}
+                        />
+                        {usesTarget ? (
+                          <Select
+                            label={t('settings.frameworkBranchTarget')}
+                            value={branch.targetNodeId ?? ''}
+                            disabled={disabled}
+                            className="w-full [&>div]:w-full"
+                            onChange={(value) => updateBranch(nodeIndex, branchIndex, {
+                              targetNodeId: value,
+                              outcome: null,
+                            })}
+                            options={[
+                              { value: '', label: t('settings.frameworkSelectTarget') },
+                              ...nodes.map((targetNode) => ({
+                                value: targetNode.nodeId,
+                                label: targetNode.nodeId,
+                              })),
+                            ]}
+                          />
+                        ) : (
+                          <Input
+                            label={t('settings.frameworkBranchOutcome')}
+                            value={branch.outcome ?? ''}
                             disabled={disabled}
                             onChange={(event) => updateBranch(nodeIndex, branchIndex, {
-                              condition: event.target.value,
+                              targetNodeId: null,
+                              outcome: event.target.value,
                             })}
                           />
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="text-xs text-muted-text">
-                            {t('settings.frameworkBranchDestination')}
-                          </span>
-                          <select
-                            className={fieldClass}
-                            value={usesTarget ? 'target' : 'outcome'}
-                            disabled={disabled}
-                            onChange={(event) => updateBranch(
-                              nodeIndex,
-                              branchIndex,
-                              event.target.value === 'target'
-                                ? { targetNodeId: '', outcome: null }
-                                : { targetNodeId: null, outcome: '' },
-                            )}
-                          >
-                            <option value="outcome">{t('settings.frameworkBranchOutcome')}</option>
-                            <option value="target">{t('settings.frameworkBranchTarget')}</option>
-                          </select>
-                        </label>
-                        <label className="block space-y-1">
-                          <span className="text-xs text-muted-text">
-                            {usesTarget
-                              ? t('settings.frameworkBranchTarget')
-                              : t('settings.frameworkBranchOutcome')}
-                          </span>
-                          {usesTarget ? (
-                            <select
-                              className={fieldClass}
-                              value={branch.targetNodeId ?? ''}
-                              disabled={disabled}
-                              onChange={(event) => updateBranch(nodeIndex, branchIndex, {
-                                targetNodeId: event.target.value,
-                                outcome: null,
-                              })}
-                            >
-                              <option value="">{t('settings.frameworkSelectTarget')}</option>
-                              {nodes.map((targetNode, targetIndex) => (
-                                <option key={`${targetNode.nodeId}-${targetIndex}`} value={targetNode.nodeId}>
-                                  {targetNode.nodeId}
-                                </option>
-                              ))}
-                            </select>
-                          ) : (
-                            <input
-                              className={fieldClass}
-                              value={branch.outcome ?? ''}
-                              disabled={disabled}
-                              onChange={(event) => updateBranch(nodeIndex, branchIndex, {
-                                targetNodeId: null,
-                                outcome: event.target.value,
-                              })}
-                            />
-                          )}
-                        </label>
+                        )}
                         <Button
                           type="button"
                           variant="danger-subtle"
@@ -647,73 +616,59 @@ const InvestmentFrameworkStructuredEditor: React.FC<
                 </div>
               </div>
               <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-[1fr_8rem]">
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-secondary-text">
-                    {t('settings.frameworkDimensionName')}
-                  </span>
-                  <input
-                    className={fieldClass}
-                    aria-label={t('settings.frameworkDimensionNameAria', { number: index + 1 })}
-                    value={dimension.name}
-                    disabled={disabled}
-                    onChange={(event) => updateDimension(index, { name: event.target.value })}
-                  />
-                </label>
-                <label className="block space-y-1">
-                  <span className="text-xs font-medium text-secondary-text">
-                    {t('settings.frameworkDimensionWeight')}
-                  </span>
-                  <input
-                    className={fieldClass}
-                    aria-label={t('settings.frameworkDimensionWeightAria', { number: index + 1 })}
-                    type="number"
-                    min={0}
-                    max={100}
-                    step="any"
-                    value={Number.isFinite(dimension.weight) ? dimension.weight : ''}
-                    disabled={disabled}
-                    onChange={(event) => updateDimension(index, {
-                      weight: event.target.value === '' ? Number.NaN : Number(event.target.value),
-                    })}
-                  />
-                </label>
-              </div>
-              <label className="mt-3 block space-y-1">
-                <span className="text-xs font-medium text-secondary-text">
-                  {t('settings.frameworkDimensionDescription')}
-                </span>
-                <textarea
-                  className={`${fieldClass} min-h-16`}
-                  value={dimension.description ?? ''}
+                <Input
+                  label={t('settings.frameworkDimensionName')}
+                  aria-label={t('settings.frameworkDimensionNameAria', { number: index + 1 })}
+                  value={dimension.name}
+                  disabled={disabled}
+                  onChange={(event) => updateDimension(index, { name: event.target.value })}
+                />
+                <Input
+                  label={t('settings.frameworkDimensionWeight')}
+                  aria-label={t('settings.frameworkDimensionWeightAria', { number: index + 1 })}
+                  type="number"
+                  min={0}
+                  max={100}
+                  step="any"
+                  value={Number.isFinite(dimension.weight) ? dimension.weight : ''}
                   disabled={disabled}
                   onChange={(event) => updateDimension(index, {
-                    description: event.target.value || null,
+                    weight: event.target.value === '' ? Number.NaN : Number(event.target.value),
                   })}
                 />
-              </label>
-              <label className="mt-3 block space-y-1">
-                <span className="text-xs font-medium text-secondary-text">
-                  {t('settings.frameworkDimensionCriteria')}
-                </span>
-                <span className="block text-xs text-muted-text">
-                  {t('settings.frameworkLimitUsage', {
+              </div>
+              <Textarea
+                fieldClassName="mt-3"
+                size="default"
+                label={t('settings.frameworkDimensionDescription')}
+                value={dimension.description ?? ''}
+                disabled={disabled}
+                onChange={(event) => updateDimension(index, {
+                  description: event.target.value || null,
+                })}
+              />
+              <LineListTextarea
+                fieldClassName="mt-3"
+                label={t('settings.frameworkDimensionCriteria')}
+                hint={(
+                  <>
+                    {t('settings.frameworkLimitUsage', {
                     current: dimension.criteria?.length ?? 0,
                     limit: INVESTMENT_FRAMEWORK_LIMITS.criteriaPerDimension,
-                  })}
-                  {' · '}
-                  {t('settings.frameworkRuleLengthHint', {
-                    limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
-                  })}
-                </span>
-                <LineListTextarea
-                  className={`${fieldClass} min-h-20`}
-                  aria-label={t('settings.frameworkDimensionCriteria')}
-                  values={dimension.criteria}
-                  disabled={disabled}
-                  placeholder={t('settings.frameworkListPlaceholder')}
-                  onValuesChange={(criteria) => updateDimension(index, { criteria })}
-                />
-              </label>
+                    })}
+                    {' · '}
+                    {t('settings.frameworkRuleLengthHint', {
+                      limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
+                    })}
+                  </>
+                )}
+                size="default"
+                aria-label={t('settings.frameworkDimensionCriteria')}
+                values={dimension.criteria}
+                disabled={disabled}
+                placeholder={t('settings.frameworkListPlaceholder')}
+                onValuesChange={(criteria) => updateDimension(index, { criteria })}
+              />
               {currentDimensionIssues.length ? (
                 <p
                   className="mt-2 text-xs text-danger"
@@ -756,115 +711,89 @@ const InvestmentFrameworkStructuredEditor: React.FC<
             }}
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-secondary-text">
-                  {t('settings.frameworkNodeId')}
-                </span>
-                <input
-                  className={fieldClass}
-                  aria-label={t('settings.frameworkNodeIdAria', { number: nodes.length + 1 })}
-                  value={newNodeDraft.nodeId}
-                  required
-                  onChange={(event) => setNewNodeDraft((current) => current ? ({
-                    ...current,
-                    nodeId: event.target.value,
-                  }) : current)}
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-secondary-text">
-                  {t('settings.frameworkNodeQuestion')}
-                </span>
-                <input
-                  className={fieldClass}
-                  aria-label={t('settings.frameworkNodeQuestionAria', { number: nodes.length + 1 })}
-                  value={newNodeDraft.question}
-                  required
-                  onChange={(event) => setNewNodeDraft((current) => current ? ({
-                    ...current,
-                    question: event.target.value,
-                  }) : current)}
-                />
-              </label>
+              <Input
+                label={t('settings.frameworkNodeId')}
+                aria-label={t('settings.frameworkNodeIdAria', { number: nodes.length + 1 })}
+                value={newNodeDraft.nodeId}
+                required
+                onChange={(event) => setNewNodeDraft((current) => current ? ({
+                  ...current,
+                  nodeId: event.target.value,
+                }) : current)}
+              />
+              <Input
+                label={t('settings.frameworkNodeQuestion')}
+                aria-label={t('settings.frameworkNodeQuestionAria', { number: nodes.length + 1 })}
+                value={newNodeDraft.question}
+                required
+                onChange={(event) => setNewNodeDraft((current) => current ? ({
+                  ...current,
+                  question: event.target.value,
+                }) : current)}
+              />
             </div>
 
             <div className="grid grid-cols-1 gap-2 rounded-lg border border-border/60 p-3 sm:grid-cols-3">
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">
-                  {t('settings.frameworkBranchCondition', { number: 1 })}
-                </span>
-                <input
-                  className={fieldClass}
-                  value={newNodeDraft.branches[0].condition}
-                  required
-                  onChange={(event) => setNewNodeDraft((current) => current ? ({
+              <Input
+                label={t('settings.frameworkBranchCondition', { number: 1 })}
+                value={newNodeDraft.branches[0].condition}
+                required
+                onChange={(event) => setNewNodeDraft((current) => current ? ({
+                  ...current,
+                  branches: [{ ...current.branches[0], condition: event.target.value }],
+                }) : current)}
+              />
+              <Select
+                label={t('settings.frameworkBranchDestination')}
+                value={newNodeDraft.branches[0].targetNodeId != null ? 'target' : 'outcome'}
+                className="w-full [&>div]:w-full"
+                onChange={(value) => setNewNodeDraft((current) => current ? ({
+                  ...current,
+                  branches: [{
+                    ...current.branches[0],
+                    ...(value === 'target'
+                      ? { targetNodeId: '', outcome: null }
+                      : { targetNodeId: null, outcome: '' }),
+                  }],
+                }) : current)}
+                options={[
+                  { value: 'outcome', label: t('settings.frameworkBranchOutcome') },
+                  { value: 'target', label: t('settings.frameworkBranchTarget') },
+                ]}
+              />
+              {newNodeDraft.branches[0].targetNodeId != null ? (
+                <Select
+                  label={t('settings.frameworkBranchTarget')}
+                  value={newNodeDraft.branches[0].targetNodeId ?? ''}
+                  className="w-full [&>div]:w-full"
+                  onChange={(value) => setNewNodeDraft((current) => current ? ({
                     ...current,
-                    branches: [{ ...current.branches[0], condition: event.target.value }],
+                    branches: [{
+                      ...current.branches[0],
+                      targetNodeId: value,
+                      outcome: null,
+                    }],
                   }) : current)}
+                  options={[
+                    { value: '', label: t('settings.frameworkSelectTarget') },
+                    ...nodes.map((node) => ({ value: node.nodeId, label: node.nodeId })),
+                  ]}
                 />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">
-                  {t('settings.frameworkBranchDestination')}
-                </span>
-                <select
-                  className={fieldClass}
-                  value={newNodeDraft.branches[0].targetNodeId != null ? 'target' : 'outcome'}
+              ) : (
+                <Input
+                  label={t('settings.frameworkBranchOutcome')}
+                  value={newNodeDraft.branches[0].outcome ?? ''}
+                  required
                   onChange={(event) => setNewNodeDraft((current) => current ? ({
                     ...current,
                     branches: [{
                       ...current.branches[0],
-                      ...(event.target.value === 'target'
-                        ? { targetNodeId: '', outcome: null }
-                        : { targetNodeId: null, outcome: '' }),
+                      targetNodeId: null,
+                      outcome: event.target.value,
                     }],
                   }) : current)}
-                >
-                  <option value="outcome">{t('settings.frameworkBranchOutcome')}</option>
-                  <option value="target">{t('settings.frameworkBranchTarget')}</option>
-                </select>
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs text-muted-text">
-                  {newNodeDraft.branches[0].targetNodeId != null
-                    ? t('settings.frameworkBranchTarget')
-                    : t('settings.frameworkBranchOutcome')}
-                </span>
-                {newNodeDraft.branches[0].targetNodeId != null ? (
-                  <select
-                    className={fieldClass}
-                    value={newNodeDraft.branches[0].targetNodeId ?? ''}
-                    required
-                    onChange={(event) => setNewNodeDraft((current) => current ? ({
-                      ...current,
-                      branches: [{
-                        ...current.branches[0],
-                        targetNodeId: event.target.value,
-                        outcome: null,
-                      }],
-                    }) : current)}
-                  >
-                    <option value="">{t('settings.frameworkSelectTarget')}</option>
-                    {nodes.map((node, index) => (
-                      <option key={`${node.nodeId}-${index}`} value={node.nodeId}>{node.nodeId}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <input
-                    className={fieldClass}
-                    value={newNodeDraft.branches[0].outcome ?? ''}
-                    required
-                    onChange={(event) => setNewNodeDraft((current) => current ? ({
-                      ...current,
-                      branches: [{
-                        ...current.branches[0],
-                        targetNodeId: null,
-                        outcome: event.target.value,
-                      }],
-                    }) : current)}
-                  />
-                )}
-              </label>
+                />
+              )}
             </div>
           </form>
         ) : null}
@@ -897,69 +826,51 @@ const InvestmentFrameworkStructuredEditor: React.FC<
             }}
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_8rem]">
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-secondary-text">
-                  {t('settings.frameworkDimensionName')}
-                </span>
-                <input
-                  className={fieldClass}
-                  aria-label={t('settings.frameworkDimensionNameAria', { number: dimensions.length + 1 })}
-                  value={newDimensionDraft.name}
-                  required
-                  onChange={(event) => setNewDimensionDraft((current) => current ? ({
-                    ...current,
-                    name: event.target.value,
-                  }) : current)}
-                />
-              </label>
-              <label className="block space-y-1">
-                <span className="text-xs font-medium text-secondary-text">
-                  {t('settings.frameworkDimensionWeight')}
-                </span>
-                <input
-                  className={fieldClass}
-                  aria-label={t('settings.frameworkDimensionWeightAria', { number: dimensions.length + 1 })}
-                  type="number"
-                  min={0}
-                  max={100}
-                  step="any"
-                  value={Number.isFinite(newDimensionDraft.weight) ? newDimensionDraft.weight : ''}
-                  required
-                  onChange={(event) => setNewDimensionDraft((current) => current ? ({
-                    ...current,
-                    weight: event.target.value === '' ? Number.NaN : Number(event.target.value),
-                  }) : current)}
-                />
-              </label>
-            </div>
-            <label className="block space-y-1">
-              <span className="text-xs font-medium text-secondary-text">
-                {t('settings.frameworkDimensionDescription')}
-              </span>
-              <textarea
-                className={`${fieldClass} min-h-16`}
-                value={newDimensionDraft.description ?? ''}
+              <Input
+                label={t('settings.frameworkDimensionName')}
+                aria-label={t('settings.frameworkDimensionNameAria', { number: dimensions.length + 1 })}
+                value={newDimensionDraft.name}
+                required
                 onChange={(event) => setNewDimensionDraft((current) => current ? ({
                   ...current,
-                  description: event.target.value || null,
+                  name: event.target.value,
                 }) : current)}
               />
-            </label>
-            <label className="block space-y-1">
-              <span className="text-xs font-medium text-secondary-text">
-                {t('settings.frameworkDimensionCriteria')}
-              </span>
-              <LineListTextarea
-                className={`${fieldClass} min-h-20`}
-                aria-label={t('settings.frameworkDimensionCriteria')}
-                values={newDimensionDraft.criteria}
-                placeholder={t('settings.frameworkListPlaceholder')}
-                onValuesChange={(criteria) => setNewDimensionDraft((current) => current ? ({
+              <Input
+                label={t('settings.frameworkDimensionWeight')}
+                aria-label={t('settings.frameworkDimensionWeightAria', { number: dimensions.length + 1 })}
+                type="number"
+                min={0}
+                max={100}
+                step="any"
+                value={Number.isFinite(newDimensionDraft.weight) ? newDimensionDraft.weight : ''}
+                required
+                onChange={(event) => setNewDimensionDraft((current) => current ? ({
                   ...current,
-                  criteria,
+                  weight: event.target.value === '' ? Number.NaN : Number(event.target.value),
                 }) : current)}
               />
-            </label>
+            </div>
+            <Textarea
+              size="default"
+              label={t('settings.frameworkDimensionDescription')}
+              value={newDimensionDraft.description ?? ''}
+              onChange={(event) => setNewDimensionDraft((current) => current ? ({
+                ...current,
+                description: event.target.value || null,
+              }) : current)}
+            />
+            <LineListTextarea
+              size="default"
+              label={t('settings.frameworkDimensionCriteria')}
+              aria-label={t('settings.frameworkDimensionCriteria')}
+              values={newDimensionDraft.criteria}
+              placeholder={t('settings.frameworkListPlaceholder')}
+              onValuesChange={(criteria) => setNewDimensionDraft((current) => current ? ({
+                ...current,
+                criteria,
+              }) : current)}
+            />
           </form>
         ) : null}
       </Modal>

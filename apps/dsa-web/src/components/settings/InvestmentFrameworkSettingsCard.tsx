@@ -20,8 +20,11 @@ import {
   ConfirmDialog,
   EmptyState,
   IconButton,
+  Input,
   Modal,
+  Pressable,
   StatePanel,
+  Textarea,
 } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
@@ -364,9 +367,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
     setBasicsDraft(null);
   };
 
-  const fieldClass =
-    'w-full rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-sm text-foreground outline-none transition-[border-color,background-color] focus:border-[var(--settings-border-strong)]';
-
   return (
     <SettingsSectionCard
       title={t('settings.frameworkTitle')}
@@ -436,8 +436,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
               ) : null}
 
               <section className="rounded-xl border settings-border bg-background/20 p-2">
-                <button
-                  type="button"
+                <Pressable
                   className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[var(--settings-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={t('settings.frameworkBasics')}
                   aria-haspopup="dialog"
@@ -454,7 +453,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                     </span>
                   </span>
                   <ChevronRight className="h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
-                </button>
+                </Pressable>
               </section>
 
               <InvestmentFrameworkStructuredEditor
@@ -477,19 +476,14 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 emptyLabel={t('settings.frameworkPreviewEmpty')}
               />
 
-              <label className="block space-y-1" htmlFor="investment-framework-change-summary">
-                <span className="text-sm font-medium text-foreground">
-                  {t('settings.frameworkChangeSummaryLabel')}
-                </span>
-                <input
-                  id="investment-framework-change-summary"
-                  className={fieldClass}
-                  value={changeSummary}
-                  disabled={isSubmitting}
-                  onChange={(event) => setChangeSummary(event.target.value)}
-                  maxLength={500}
-                />
-              </label>
+              <Input
+                id="investment-framework-change-summary"
+                label={t('settings.frameworkChangeSummaryLabel')}
+                value={changeSummary}
+                disabled={isSubmitting}
+                onChange={(event) => setChangeSummary(event.target.value)}
+                maxLength={500}
+              />
 
               {visibleValidationIssues.length ? (
                 <SettingsAlert
@@ -623,8 +617,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 >
                   {history.items.map((item) => (
                     <div key={item.version} role="listitem">
-                      <button
-                        type="button"
+                      <Pressable
                         aria-label={t('settings.frameworkHistoryVersion', {
                           version: item.version,
                         })}
@@ -659,7 +652,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                             </Badge>
                           ) : null}
                         </span>
-                      </button>
+                      </Pressable>
                     </div>
                   ))}
                 </div>
@@ -749,74 +742,60 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
       >
         {basicsDraft ? (
           <div className="space-y-4">
-            <label className="block space-y-1" htmlFor="investment-framework-title">
-              <span className="text-sm font-medium text-foreground">
-                {t('settings.frameworkNameLabel')}
-              </span>
-              <input
-                id="investment-framework-title"
-                className={fieldClass}
-                value={basicsDraft.title}
-                disabled={isSubmitting}
-                onChange={(event) => setBasicsDraft((current) => current ? ({
-                  ...current,
-                  title: event.target.value,
-                }) : current)}
-                required
-              />
-            </label>
+            <Input
+              id="investment-framework-title"
+              label={t('settings.frameworkNameLabel')}
+              value={basicsDraft.title}
+              disabled={isSubmitting}
+              onChange={(event) => setBasicsDraft((current) => current ? ({
+                ...current,
+                title: event.target.value,
+              }) : current)}
+              required
+            />
 
-            <label className="block space-y-1" htmlFor="investment-framework-description">
-              <span className="text-sm font-medium text-foreground">
-                {t('settings.frameworkDescLabel')}
-              </span>
-              <textarea
-                id="investment-framework-description"
-                className={`${fieldClass} min-h-20`}
-                value={basicsDraft.description ?? ''}
-                disabled={isSubmitting}
-                onChange={(event) => setBasicsDraft((current) => current ? ({
-                  ...current,
-                  description: event.target.value || null,
-                }) : current)}
-              />
-            </label>
+            <Textarea
+              id="investment-framework-description"
+              size="default"
+              label={t('settings.frameworkDescLabel')}
+              value={basicsDraft.description ?? ''}
+              disabled={isSubmitting}
+              onChange={(event) => setBasicsDraft((current) => current ? ({
+                ...current,
+                description: event.target.value || null,
+              }) : current)}
+            />
 
-            <label className="block space-y-1" htmlFor="investment-framework-free-form">
-              <span className="text-sm font-medium text-foreground">
-                {t('settings.frameworkFreeFormLabel')}
-              </span>
-              <textarea
-                id="investment-framework-free-form"
-                className={`${fieldClass} min-h-28`}
-                value={basicsDraft.freeFormRules ?? ''}
-                disabled={isSubmitting}
-                onChange={(event) => setBasicsDraft((current) => current ? ({
-                  ...current,
-                  freeFormRules: event.target.value || null,
-                }) : current)}
-                placeholder={t('settings.frameworkFreeFormPlaceholder')}
-              />
-            </label>
+            <Textarea
+              id="investment-framework-free-form"
+              label={t('settings.frameworkFreeFormLabel')}
+              value={basicsDraft.freeFormRules ?? ''}
+              disabled={isSubmitting}
+              onChange={(event) => setBasicsDraft((current) => current ? ({
+                ...current,
+                freeFormRules: event.target.value || null,
+              }) : current)}
+              placeholder={t('settings.frameworkFreeFormPlaceholder')}
+            />
 
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-              <label className="block space-y-1" htmlFor="investment-framework-risk-rules">
-                <span className="text-sm font-medium text-foreground">
-                  {t('settings.frameworkRiskRulesLabel')}
-                </span>
-                <span className="block text-xs text-muted-text">
-                  {t('settings.frameworkLimitUsage', {
-                    current: basicsDraft.riskRules?.length ?? 0,
-                    limit: INVESTMENT_FRAMEWORK_LIMITS.riskRules,
-                  })}
-                  {' · '}
-                  {t('settings.frameworkRuleLengthHint', {
-                    limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
-                  })}
-                </span>
+              <div className="min-w-0">
                 <LineListTextarea
                   id="investment-framework-risk-rules"
-                  className={`${fieldClass} min-h-20`}
+                  size="default"
+                  label={t('settings.frameworkRiskRulesLabel')}
+                  hint={(
+                    <>
+                      {t('settings.frameworkLimitUsage', {
+                    current: basicsDraft.riskRules?.length ?? 0,
+                    limit: INVESTMENT_FRAMEWORK_LIMITS.riskRules,
+                      })}
+                      {' · '}
+                      {t('settings.frameworkRuleLengthHint', {
+                        limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
+                      })}
+                    </>
+                  )}
                   aria-label={t('settings.frameworkRiskRulesLabel')}
                   values={basicsDraft.riskRules}
                   disabled={isSubmitting}
@@ -835,24 +814,24 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                     {riskRuleIssues.map(formatValidationIssue).join(' · ')}
                   </span>
                 ) : null}
-              </label>
-              <label className="block space-y-1" htmlFor="investment-framework-tracking">
-                <span className="text-sm font-medium text-foreground">
-                  {t('settings.frameworkTrackingLabel')}
-                </span>
-                <span className="block text-xs text-muted-text">
-                  {t('settings.frameworkLimitUsage', {
-                    current: basicsDraft.trackingCriteria?.length ?? 0,
-                    limit: INVESTMENT_FRAMEWORK_LIMITS.trackingCriteria,
-                  })}
-                  {' · '}
-                  {t('settings.frameworkRuleLengthHint', {
-                    limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
-                  })}
-                </span>
+              </div>
+              <div className="min-w-0">
                 <LineListTextarea
                   id="investment-framework-tracking"
-                  className={`${fieldClass} min-h-20`}
+                  size="default"
+                  label={t('settings.frameworkTrackingLabel')}
+                  hint={(
+                    <>
+                      {t('settings.frameworkLimitUsage', {
+                    current: basicsDraft.trackingCriteria?.length ?? 0,
+                    limit: INVESTMENT_FRAMEWORK_LIMITS.trackingCriteria,
+                      })}
+                      {' · '}
+                      {t('settings.frameworkRuleLengthHint', {
+                        limit: INVESTMENT_FRAMEWORK_LIMITS.ruleLength,
+                      })}
+                    </>
+                  )}
                   aria-label={t('settings.frameworkTrackingLabel')}
                   values={basicsDraft.trackingCriteria}
                   disabled={isSubmitting}
@@ -871,7 +850,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                     {trackingCriteriaIssues.map(formatValidationIssue).join(' · ')}
                   </span>
                 ) : null}
-              </label>
+              </div>
             </div>
           </div>
         ) : null}

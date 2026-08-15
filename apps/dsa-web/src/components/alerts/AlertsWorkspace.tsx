@@ -810,7 +810,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
           className="space-y-4"
         >
           {notificationsError ? <ApiErrorAlert error={notificationsError} onDismiss={() => setNotificationsError(null)} /> : null}
-          <Card title={text.notificationAttempts} subtitle={text.notificationResults} variant="bordered" padding="md">
+          <Card title={text.notificationAttempts} description={text.notificationResults} level="interactive" padding="md">
             <Toolbar
               aria-label={text.notificationAttempts}
               className="mb-3"

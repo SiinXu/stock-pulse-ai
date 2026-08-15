@@ -5,9 +5,16 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const REQUIRED_LOGIN_TOKENS = [
-  '--login-button-text',
-  '--login-label-text',
-  '--login-hint-text',
+  '--login-bg-main',
+  '--login-bg-card',
+  '--login-border-card',
+  '--login-text-primary',
+  '--login-text-secondary',
+  '--login-text-muted',
+  '--login-accent-soft',
+];
+
+const REMOVED_INPUT_PAGE_TOKENS = [
   '--login-input-icon',
   '--login-input-toggle-ring',
 ];
@@ -23,6 +30,9 @@ describe('login theme tokens', () => {
     for (const token of REQUIRED_LOGIN_TOKENS) {
       expect(rootBlock).toContain(token);
     }
+    for (const token of REMOVED_INPUT_PAGE_TOKENS) {
+      expect(rootBlock).not.toContain(token);
+    }
   });
 
   it('defines all login-specific tokens in the dark theme block', () => {
@@ -34,6 +44,9 @@ describe('login theme tokens', () => {
 
     for (const token of REQUIRED_LOGIN_TOKENS) {
       expect(darkBlock).toContain(token);
+    }
+    for (const token of REMOVED_INPUT_PAGE_TOKENS) {
+      expect(darkBlock).not.toContain(token);
     }
   });
 });

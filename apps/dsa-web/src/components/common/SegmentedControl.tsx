@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useId } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import { cn } from '../../utils/cn';
 import { getTabId } from './tabIds';
 
@@ -33,16 +33,22 @@ export function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
   const generatedId = useId();
   const usesTabSemantics = semantics === 'tabs';
+  const triggerRefs = useRef(new Map<T, HTMLButtonElement>());
+  const optionValues = options.map((option) => option.value).join('\u0000');
+
+  useLayoutEffect(() => {
+    triggerRefs.current.get(value)?.scrollIntoView?.({
+      behavior: 'auto',
+      block: 'nearest',
+      inline: 'nearest',
+    });
+  }, [optionValues, value]);
 
   const selectOption = (index: number) => {
     const option = options[index];
     if (!option || option.disabled) return;
     onChange(option.value);
-    requestAnimationFrame(() => {
-      document.getElementById(
-        id ? getTabId(id, option.value) : `${generatedId}-${option.value}`,
-      )?.focus();
-    });
+    triggerRefs.current.get(option.value)?.focus();
   };
 
   const moveSelection = (currentIndex: number, direction: 1 | -1) => {
@@ -68,7 +74,7 @@ export function SegmentedControl<T extends string>({
       role={usesTabSemantics ? 'tablist' : 'radiogroup'}
       aria-label={ariaLabel}
       className={cn(
-        'segmented-control inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full p-1',
+        'segmented-control inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full p-1 scroll-px-1',
         className,
       )}
     >
@@ -77,6 +83,10 @@ export function SegmentedControl<T extends string>({
         return (
           <button
             key={option.value}
+            ref={(node) => {
+              if (node) triggerRefs.current.set(option.value, node);
+              else triggerRefs.current.delete(option.value);
+            }}
             id={id ? getTabId(id, option.value) : `${generatedId}-${option.value}`}
             type="button"
             role={usesTabSemantics ? 'tab' : 'radio'}

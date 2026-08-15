@@ -14,7 +14,7 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { buildDeepLink } from '../../utils/deepLink';
-import { Button, DataTable, Select, Surface, type DataTableColumn } from '../common';
+import { Button, DataTable, Input, Select, Surface, Textarea, type DataTableColumn } from '../common';
 import type { DiscoveryScreeningText } from './screeningText';
 
 const POLL_MS = 1500;
@@ -243,80 +243,64 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
         <p className="mt-2 text-xs text-secondary-text">{text.discoveryDisclaimer}</p>
       </div>
 
-      <label className="block space-y-1">
-        <span className="text-xs font-semibold text-secondary-text">{text.discoveryQuery}</span>
-        <textarea
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          rows={3}
-          maxLength={500}
-          disabled={loading}
-          placeholder={text.discoveryQueryPlaceholder}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-        />
-      </label>
+      <Textarea
+        label={text.discoveryQuery}
+        value={query}
+        onChange={(event) => setQuery(event.target.value)}
+        rows={3}
+        maxLength={500}
+        disabled={loading}
+        placeholder={text.discoveryQueryPlaceholder}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <label className="space-y-1">
-          <span className="text-xs font-semibold text-secondary-text">{text.discoveryUniverse}</span>
-          <Select
-            value={universe}
-            onChange={(value) => setUniverse(value as DiscoveryUniverse)}
-            options={universeOptions}
-            disabled={loading}
-            ariaLabel={text.discoveryUniverse}
-            className="w-full [&>div]:w-full"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold text-secondary-text">{text.discoveryPage}</span>
-          <input
-            type="number"
-            min={1}
-            value={page}
-            disabled={loading}
-            onChange={(event) => setPage(Math.max(1, Number(event.target.value) || 1))}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold text-secondary-text">{text.discoveryPageSize}</span>
-          <input
-            type="number"
-            min={1}
-            max={100}
-            value={pageSize}
-            disabled={loading}
-            onChange={(event) => setPageSize(Math.min(100, Math.max(1, Number(event.target.value) || 50)))}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          />
-        </label>
-        <label className="space-y-1">
-          <span className="text-xs font-semibold text-secondary-text">{text.discoveryMaxResults}</span>
-          <input
-            type="number"
-            min={1}
-            max={30}
-            value={maxResults}
-            disabled={loading}
-            onChange={(event) => setMaxResults(Math.min(30, Math.max(1, Number(event.target.value) || 10)))}
-            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-          />
-        </label>
+        <Select
+          label={text.discoveryUniverse}
+          value={universe}
+          onChange={(value) => setUniverse(value as DiscoveryUniverse)}
+          options={universeOptions}
+          disabled={loading}
+          ariaLabel={text.discoveryUniverse}
+          className="w-full [&>div]:w-full"
+        />
+        <Input
+          label={text.discoveryPage}
+          type="number"
+          min={1}
+          value={page}
+          disabled={loading}
+          onChange={(event) => setPage(Math.max(1, Number(event.target.value) || 1))}
+        />
+        <Input
+          label={text.discoveryPageSize}
+          type="number"
+          min={1}
+          max={100}
+          value={pageSize}
+          disabled={loading}
+          onChange={(event) => setPageSize(Math.min(100, Math.max(1, Number(event.target.value) || 50)))}
+        />
+        <Input
+          label={text.discoveryMaxResults}
+          type="number"
+          min={1}
+          max={30}
+          value={maxResults}
+          disabled={loading}
+          onChange={(event) => setMaxResults(Math.min(30, Math.max(1, Number(event.target.value) || 10)))}
+        />
       </div>
 
-      <label className="block max-w-xs space-y-1">
-        <span className="text-xs font-semibold text-secondary-text">{text.discoveryProviderBudget}</span>
-        <input
-          type="number"
-          min={0}
-          max={50}
-          value={maxProviderCalls}
-          disabled={loading}
-          onChange={(event) => setMaxProviderCalls(Math.min(50, Math.max(0, Number(event.target.value) || 0)))}
-          className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm"
-        />
-      </label>
+      <Input
+        fieldClassName="max-w-xs"
+        label={text.discoveryProviderBudget}
+        type="number"
+        min={0}
+        max={50}
+        value={maxProviderCalls}
+        disabled={loading}
+        onChange={(event) => setMaxProviderCalls(Math.min(50, Math.max(0, Number(event.target.value) || 0)))}
+      />
 
       <div className="flex flex-wrap items-center gap-2">
         <Button type="button" variant="primary" onClick={() => void handleRun()} disabled={loading}>

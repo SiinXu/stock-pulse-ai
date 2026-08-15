@@ -385,7 +385,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
   return (
     <Card
       title={text.title}
-      subtitle={formatUiText(text.subtitle, { total })}
+      description={formatUiText(text.subtitle, { total })}
       headerRight={(
         <div className="flex w-full max-w-full flex-col items-stretch gap-2 sm:items-end">
           {isDesktop ? (
@@ -459,7 +459,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
           />
         </div>
       )}
-      variant="bordered"
+      level="interactive"
       padding="md"
       className="flex flex-col [&>div:first-child]:flex-col [&>div:first-child]:items-stretch sm:[&>div:first-child]:flex-row sm:[&>div:first-child]:items-start"
     >

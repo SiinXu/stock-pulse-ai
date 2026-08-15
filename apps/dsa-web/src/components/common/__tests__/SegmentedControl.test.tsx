@@ -20,6 +20,7 @@ describe('SegmentedControl', () => {
 
     expect(screen.getByRole('tab', { name: 'Left' })).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('tab', { name: 'Left' })).toHaveClass('segmented-control-tab', 'min-h-6');
+    expect(screen.getByRole('tablist', { name: 'View' })).toHaveClass('scroll-px-1');
     fireEvent.click(screen.getByRole('tab', { name: 'Right' }));
     expect(onChange).toHaveBeenCalledWith('right');
   });
@@ -100,5 +101,30 @@ describe('SegmentedControl', () => {
 
     fireEvent.keyDown(middle, { key: 'End' });
     expect(onChange).toHaveBeenLastCalledWith('last');
+  });
+
+  it('keeps the selected option visible on mount and controlled value changes', () => {
+    const scrollIntoView = vi.fn();
+    HTMLElement.prototype.scrollIntoView = scrollIntoView;
+    const props = {
+      options: [
+        { value: 'first', label: 'First' },
+        { value: 'last', label: 'Last' },
+      ],
+      onChange: () => undefined,
+      ariaLabel: 'View',
+    };
+    const { rerender } = render(<SegmentedControl {...props} value="first" />);
+
+    expect(scrollIntoView).toHaveBeenLastCalledWith({
+      behavior: 'auto',
+      block: 'nearest',
+      inline: 'nearest',
+    });
+
+    scrollIntoView.mockClear();
+    rerender(<SegmentedControl {...props} value="last" />);
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('tab', { name: 'Last' })).toHaveAttribute('aria-selected', 'true');
   });
 });

@@ -226,7 +226,7 @@ export const TaskPanel: React.FC<TaskPanelProps> = ({
 
   return (
     <Card
-      variant="bordered"
+      level="interactive"
       padding="none"
       className={`overflow-hidden ${className}`}
     >

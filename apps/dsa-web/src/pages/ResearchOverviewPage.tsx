@@ -107,7 +107,7 @@ const ResearchOverviewPage: React.FC = () => {
           return (
             <li key={destination.key} className="min-w-0">
               <Card
-                variant="bordered"
+                level="interactive"
                 padding="lg"
                 className="flex h-full flex-col"
               >

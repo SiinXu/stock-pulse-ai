@@ -17,7 +17,6 @@ import {
   Checkbox,
   Collapsible,
   ConfirmDialog,
-  CredentialInput,
   DataTable,
   DatePicker,
   DateRangePicker,
@@ -35,7 +34,6 @@ import {
   JsonViewer,
   Loading,
   Modal,
-  NotificationPanel,
   PageHeader,
   Pagination,
   Popover,
@@ -43,7 +41,6 @@ import {
   Progress,
   ResponsiveFilterPanel,
   ResponsiveRail,
-  ScoreGauge,
   ScrollArea,
   SearchableSelect,
   SearchInput,
@@ -217,7 +214,7 @@ const ButtonStory = () => {
       <Surface className="flex flex-wrap items-center gap-3">
         <Button variant="primary" disabled>{text.primaryAction}</Button>
         <Button variant="secondary" isLoading loadingText={text.loadingAction}>{text.secondaryAction}</Button>
-        <Button variant="outline" glow>{text.outlineAction}</Button>
+        <Button variant="outline">{text.outlineAction}</Button>
       </Surface>
     );
   }
@@ -343,11 +340,6 @@ const SearchInputStory = () => {
   );
 };
 
-const NotificationPanelStory = () => {
-  const text = useSampleText();
-  return <NotificationPanel title={text.notificationTitle} emptyText={text.notificationEmpty} filterLabel={text.filter} />;
-};
-
 const CommonSurfaceStory = () => {
   const text = useSampleText();
   return (
@@ -431,9 +423,9 @@ const AlertStory = () => {
 const CardStory = () => {
   const text = useSampleText();
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
-      {(['default', 'bordered', 'gradient'] as const).map((variant) => (
-        <Card key={variant} variant={variant} title={variant} subtitle={text.preview}>
+    <div className="grid gap-4 lg:grid-cols-2">
+      {(['section', 'interactive'] as const).map((level) => (
+        <Card key={level} level={level} title={level} eyebrow={text.details} description={text.preview}>
           <p className="text-sm text-secondary-text">{text.preview}</p>
         </Card>
       ))}
@@ -838,25 +830,6 @@ const InputStory = () => {
   );
 };
 
-const CredentialInputStory = () => {
-  const text = useSampleText();
-  const { scenario } = usePlaygroundScenario();
-  const [value, setValue] = useState('fixture-secret');
-  return (
-    <Surface className="max-w-lg">
-      <CredentialInput
-        purpose="provider-secret"
-        label={text.fieldLabel}
-        value={value}
-        onChange={(event) => setValue(event.target.value)}
-        allowTogglePassword
-        iconType="key"
-        disabled={scenario === 'states'}
-      />
-    </Surface>
-  );
-};
-
 const DatePickerStory = () => {
   const text = useSampleText();
   const { scenario } = usePlaygroundScenario();
@@ -979,21 +952,6 @@ const CollapsibleStory = () => {
   return <Collapsible title={text.details} icon={<Info className="h-4 w-4" />} defaultOpen><p className="pt-2 text-sm text-secondary-text">{text.preview}</p></Collapsible>;
 };
 
-const ScoreGaugeStory = () => {
-  const text = useSampleText();
-  const { scenario } = usePlaygroundScenario();
-  const [score, setScore] = useState(68);
-  if (scenario === 'interactive') {
-    return (
-      <Surface className="flex flex-col items-center gap-5">
-        <ScoreGauge score={score} />
-        <input type="range" min="0" max="100" value={score} onChange={(event) => setScore(Number(event.target.value))} className="w-full max-w-sm accent-primary" aria-label={text.score} />
-      </Surface>
-    );
-  }
-  return <Surface className="flex flex-wrap items-end justify-center gap-8"><ScoreGauge score={24} size="sm" /><ScoreGauge score={52} size="md" /><ScoreGauge score={78} size="lg" /></Surface>;
-};
-
 const JsonViewerStory = () => {
   const { scenario } = usePlaygroundScenario();
   return <JsonViewer data={scenario === 'empty' ? null : { component: 'JsonViewer', enabled: true, score: 68, values: ['one', 'two'] }} maxHeight="320px" />;
@@ -1092,7 +1050,6 @@ export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   textarea: TextareaStory,
   'segmented-control': SegmentedControlStory,
   'search-input': SearchInputStory,
-  'notification-panel': NotificationPanelStory,
   surface: CommonSurfaceStory,
   section: SectionStory,
   'state-panel': StatePanelStory,
@@ -1123,7 +1080,6 @@ export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'toast-provider': ToastProviderStory,
   'page-header': PageHeaderStory,
   input: InputStory,
-  'credential-input': CredentialInputStory,
   'date-picker': DatePickerStory,
   'date-range-picker': DateRangePickerStory,
   'time-picker': TimePickerStory,
@@ -1135,7 +1091,6 @@ export const COMMON_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'scroll-area': ScrollAreaStory,
   'api-error-alert': ApiErrorAlertStory,
   collapsible: CollapsibleStory,
-  'score-gauge': ScoreGaugeStory,
   'json-viewer': JsonViewerStory,
   select: SelectStory,
   'searchable-select': SearchableSelectStory,

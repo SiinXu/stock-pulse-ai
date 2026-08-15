@@ -1,0 +1,1 @@
+- Changed Web controls to use consistent shared component semantics, domain ownership, and keyboard-accessible selection behavior.

@@ -5,13 +5,13 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Checkbox,
-  CredentialInput,
   InlineAlert,
   Input,
   Modal,
   Select,
   type SearchableSelectOption,
 } from '../common';
+import { CredentialInput } from '../security';
 import { systemConfigApi } from '../../api/systemConfig';
 import type {
   LLMCapabilityCheck,

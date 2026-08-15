@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useState } from 'react';
+import { Textarea } from '../common';
 
 type LineListTextareaProps = Omit<
-  React.TextareaHTMLAttributes<HTMLTextAreaElement>,
+  React.ComponentProps<typeof Textarea>,
   'defaultValue' | 'onChange' | 'value'
 > & {
   values: readonly string[] | undefined;
@@ -46,7 +47,7 @@ const LineListTextarea: React.FC<LineListTextareaProps> = ({
   }
 
   return (
-    <textarea
+    <Textarea
       {...props}
       value={draft}
       onChange={(event) => {

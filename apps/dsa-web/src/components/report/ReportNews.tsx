@@ -58,7 +58,7 @@ export const ReportNews: React.FC<ReportNewsProps> = ({ recordId, limit = 8, lan
   }
 
   return (
-    <Card variant="bordered" padding="md">
+    <Card level="interactive" padding="md">
       <DashboardPanelHeader
         eyebrow={text.newsFeed}
         title={text.relatedNews}

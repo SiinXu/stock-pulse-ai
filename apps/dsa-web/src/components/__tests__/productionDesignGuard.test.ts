@@ -106,9 +106,9 @@ const BUTTON_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAll
 const MAX_STATE_SURFACE_VISUAL_OVERRIDE_ALLOWANCES = 14;
 const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactButtonAllowance[]>([
   ['../common/Card.tsx', [{
-    line: 43,
+    line: 45,
     owner: 'UIUX-HARNESS',
-    removeWhen: 'All Card consumers migrate to semantic Surface ownership and the compatibility adapter is deleted.',
+    removeWhen: 'Card callers no longer require native className and style pass-through for layout-only concerns.',
     tokens: ['dynamic:className', 'style:dynamic:style'],
   }]],
   ['../common/EmptyState.tsx', [{
@@ -172,14 +172,14 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
   }]],
   ['../report/ReportOverview.tsx', [
     // Opening-element line numbers (not className line) for Card allowlist matches.
-    ...[363, 386].map((line) => ({
+    ...[364, 387].map((line) => ({
       line,
       owner: 'UIUX-HARNESS' as const,
       removeWhen: 'Report insight cards receive an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-insight-card'],
     })),
     {
-      line: 447,
+      line: 448,
       owner: 'UIUX-HARNESS',
       removeWhen: 'The report sentiment rail receives an owner-approved semantic Surface migration with light/dark visual QA.',
       tokens: ['home-rail-card'],

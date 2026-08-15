@@ -97,7 +97,7 @@ function buildPageNumbers(
 }
 
 /**
- * Pagination component with terminal-inspired styling.
+ * Pagination component with shared navigation controls.
  * Narrow containers collapse the page set; overflow never clips controls.
  */
 export const Pagination: React.FC<PaginationProps> = ({

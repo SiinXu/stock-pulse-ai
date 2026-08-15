@@ -60,7 +60,7 @@ const DecisionSignalTimelineSection: React.FC<DecisionSignalTimelineSectionProps
   return (
     <Card
       title={t('decisionSignals.timelineTitle')}
-      subtitle={t('decisionSignals.timelineDescription')}
+      description={t('decisionSignals.timelineDescription')}
       padding="md"
       headerRight={activeStockContext ? (
         <Badge variant="info" size="sm">{t('decisionSignals.scopeCurrentStock', { stock: activeStockLabel ?? activeStockContext.code })}</Badge>

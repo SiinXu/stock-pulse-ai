@@ -173,13 +173,12 @@ describe('Input', () => {
     expect(screen.getByRole('button', { name: '隐藏内容：OpenAI API Keys 2' })).toBeInTheDocument();
   });
 
-  it('supports the login appearance without affecting password toggle behavior', () => {
-    render(<Input label="登录密码" type="password" allowTogglePassword appearance="login" />);
+  it('keeps password toggle behavior at the primary semantic size', () => {
+    render(<Input label="登录密码" type="password" allowTogglePassword size="primary" />);
 
     const input = screen.getByLabelText('登录密码');
-    expect(input).toHaveAttribute('data-appearance', 'login');
+    expect(input).toHaveAttribute('data-appearance', 'default');
     expect(input).toHaveAttribute('data-size', 'primary');
-    expect(input).toHaveClass('input-appearance-login');
     expect(input).toHaveAttribute('type', 'password');
 
     fireEvent.click(screen.getByRole('button', { name: '显示内容' }));
