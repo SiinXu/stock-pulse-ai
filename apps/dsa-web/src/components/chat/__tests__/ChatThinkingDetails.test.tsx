@@ -126,6 +126,48 @@ describe('ChatThinkingDetails', () => {
     expect(screen.getByText('Completed')).toHaveAttribute('data-trace-status', 'success');
   });
 
+  it('keeps disclosure state on the same event when the visible list grows from failures to the full trace', () => {
+    const successStep = {
+      type: 'tool_done',
+      tool: 'lookup',
+      display_name: 'Lookup',
+      success: true,
+      duration: 0.2,
+      meta: { arguments: { q: 'ok' } },
+    };
+    const failedStep = {
+      type: 'tool_done',
+      tool: 'search',
+      display_name: 'Search',
+      success: false,
+      duration: 0.4,
+      meta: { arguments: { q: 'fail' } },
+    };
+
+    const { rerender } = render(
+      <ChatThinkingDetails t={t} mode="history" steps={[failedStep]} />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Search.*View details/ }));
+    expect(screen.getByText(/"q": "fail"/)).toBeVisible();
+    expect(screen.queryByText(/"q": "ok"/)).not.toBeInTheDocument();
+
+    rerender(
+      <ChatThinkingDetails t={t} mode="history" steps={[successStep, failedStep]} />,
+    );
+
+    expect(screen.getByText(/"q": "fail"/)).toBeVisible();
+    expect(screen.queryByText(/"q": "ok"/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Search.*View details/ })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /Lookup.*View details/ })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+  });
+
   it('keeps a newest completed live event successful while marking it current', () => {
     const { container } = render(
       <ChatThinkingDetails

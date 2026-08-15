@@ -9,10 +9,8 @@ import { ReportScenarioSensitivityPanel } from '../../components/chat/ReportScen
 import { getScenarioById, projectClientSensitivity } from '../../components/chat/scenarioLibrary'
 import { DEFAULT_WHAT_IF_DRAFT } from '../../components/chat/whatIfScenario';
 import { ChatSessionSidebar } from '../../components/chat/ChatSessionSidebar';
-import {
-  ChatThinkingDetails,
-  ChatThinkingToggle,
-} from '../../components/chat/ChatThinkingDetails';
+import { ChatThinkingDetails } from '../../components/chat/ChatThinkingDetails';
+import { ChatThinkingToggle } from '../../components/chat/ChatThinkingToggle';
 import { DeepResearchPanel } from '../../components/chat/DeepResearchPanel';
 import type { ChatSessionItem, SkillInfo } from '../../api/agent';
 import { createParsedApiError } from '../../api/error';

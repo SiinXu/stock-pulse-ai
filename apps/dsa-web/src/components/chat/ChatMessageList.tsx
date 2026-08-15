@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { lazy, memo, Suspense } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Check, Copy, Download, Sparkles } from 'lucide-react';
@@ -11,10 +11,11 @@ import {
   Surface,
 } from '../common';
 import { ChatEmptyMessages } from './ChatEmptyMessages';
-import {
-  ChatThinkingDetails,
-  ChatThinkingToggle,
-} from './ChatThinkingDetails';
+import { ChatThinkingToggle } from './ChatThinkingToggle';
+
+const ChatThinkingDetails = lazy(() =>
+  import('./ChatThinkingDetails').then((module) => ({ default: module.ChatThinkingDetails })),
+);
 import {
   getCurrentStageLabel,
   getMessageSkillLabel,
@@ -139,11 +140,13 @@ const ChatMessageBubble = memo(function ChatMessageBubble({
           />
         ) : null}
         {msg.role === 'assistant' && (isExpanded || failureSteps.length > 0) ? (
-          <ChatThinkingDetails
-            steps={isExpanded ? thinkingSteps : failureSteps}
-            t={t}
-            mode="history"
-          />
+          <Suspense fallback={null}>
+            <ChatThinkingDetails
+              steps={isExpanded ? thinkingSteps : failureSteps}
+              t={t}
+              mode="history"
+            />
+          </Suspense>
         ) : null}
         {msg.role === 'assistant' ? (
           <div>
@@ -292,7 +295,9 @@ export function ChatMessageList({
             </div>
             {progressSteps.length > 0 ? (
               <div className="mt-3 border-t border-border/60 pt-3">
-                <ChatThinkingDetails steps={progressSteps} t={t} mode="live" />
+                <Suspense fallback={null}>
+                  <ChatThinkingDetails steps={progressSteps} t={t} mode="live" />
+                </Suspense>
               </div>
             ) : null}
           </Surface>

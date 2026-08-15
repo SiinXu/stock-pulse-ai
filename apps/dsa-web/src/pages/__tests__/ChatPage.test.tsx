@@ -746,7 +746,7 @@ describe('ChatPage', () => {
 
     const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
     fireEvent.click(thinkingToggle);
-    const progressItem = screen.getByRole('button', { name: /get_daily_history/u });
+    const progressItem = await screen.findByRole('button', { name: /get_daily_history/u });
     expect(progressItem).toHaveClass('control-hit-target');
     expect(progressItem.closest('[data-trace-step]')).toHaveAttribute('data-trace-step', 'tool_done');
     expect(progressItem.closest('[data-trace-step]')?.querySelector('[data-trace-status]'))

@@ -137,6 +137,33 @@ function getTracePresentation(step: ProgressStep, isCurrent: boolean): TracePres
   };
 }
 
+function getTraceRowIdentity(step: ProgressStep): string {
+  return [
+    step.type,
+    step.tool ?? '',
+    step.display_name ?? '',
+    step.stage ?? '',
+    step.step ?? '',
+    step.success ?? '',
+    step.duration ?? '',
+    step.status ?? '',
+    step.message ?? '',
+    step.reason ?? '',
+    step.turn_id ?? '',
+    step.message_id ?? '',
+  ].join('\u0001');
+}
+
+function getTraceRowKeys(steps: ProgressStep[]): string[] {
+  const seen = new Map<string, number>();
+  return steps.map((step) => {
+    const base = getTraceRowIdentity(step);
+    const next = (seen.get(base) ?? 0) + 1;
+    seen.set(base, next);
+    return `${base}\u0001${next}`;
+  });
+}
+
 export function ChatThinkingDetails({
   steps,
   t,
@@ -147,13 +174,14 @@ export function ChatThinkingDetails({
   mode?: ChatTraceMode;
 }): React.ReactElement {
   const detailIdPrefix = useId();
-  const [expandedRows, setExpandedRows] = useState<Set<number>>(() => new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(() => new Set());
+  const rowKeys = getTraceRowKeys(steps);
 
-  const toggleRow = (index: number) => {
+  const toggleRow = (rowKey: string) => {
     setExpandedRows((current) => {
       const next = new Set(current);
-      if (next.has(index)) next.delete(index);
-      else next.add(index);
+      if (next.has(rowKey)) next.delete(rowKey);
+      else next.add(rowKey);
       return next;
     });
   };
@@ -161,13 +189,14 @@ export function ChatThinkingDetails({
   return (
     <div className="space-y-1.5 animate-fade-in" data-trace-mode={mode}>
       {steps.map((step, index) => {
+        const rowKey = rowKeys[index];
         const isCurrent = mode === 'live' && index === steps.length - 1;
         const presentation = getTracePresentation(step, isCurrent);
         const text = getStepText(step, t);
         const toolDetail = getToolDetail(step);
         const stageDetail = getStageDetail(step);
         const hasDetail = Boolean(toolDetail || stageDetail);
-        const isExpanded = expandedRows.has(index);
+        const isExpanded = expandedRows.has(rowKey);
         const detailId = `${detailIdPrefix}-detail-${index}`;
         const rowClassName = cn(
           'rounded-md border px-2 py-1.5 text-xs transition-[background-color,border-color,color] motion-reduce:transition-none',
@@ -196,7 +225,7 @@ export function ChatThinkingDetails({
 
         return (
           <div
-            key={index}
+            key={rowKey}
             className={rowClassName}
             data-trace-step={step.type}
             data-current={isCurrent ? 'true' : undefined}
@@ -208,7 +237,7 @@ export function ChatThinkingDetails({
                 aria-expanded={isExpanded}
                 aria-controls={detailId}
                 aria-label={`${text} · ${t('common.details')}`}
-                onClick={() => toggleRow(index)}
+                onClick={() => toggleRow(rowKey)}
               >
                 {content}
                 <ChevronRight
@@ -271,39 +300,5 @@ export function ChatThinkingDetails({
         );
       })}
     </div>
-  );
-}
-
-export function ChatThinkingToggle({
-  isExpanded,
-  summary,
-  onToggle,
-  thinkingProcessLabel,
-}: {
-  isExpanded: boolean;
-  summary: string;
-  onToggle: () => void;
-  thinkingProcessLabel: string;
-}): React.ReactElement {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      aria-expanded={isExpanded}
-      className="control-hit-target mb-2 flex w-full items-center gap-2 text-left text-xs text-muted-text transition-colors hover:text-secondary-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25 motion-reduce:transition-none"
-    >
-      <ChevronRight
-        className={cn(
-          'h-3 w-3 shrink-0 transition-transform motion-reduce:transition-none',
-          isExpanded && 'rotate-90',
-        )}
-        aria-hidden="true"
-      />
-      <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-        <span>{thinkingProcessLabel}</span>
-        <span aria-hidden="true" className="text-muted-text/50">·</span>
-        <span className="text-muted-text">{summary}</span>
-      </span>
-    </button>
   );
 }
