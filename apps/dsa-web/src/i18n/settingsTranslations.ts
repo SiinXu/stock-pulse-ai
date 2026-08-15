@@ -5,6 +5,7 @@ import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as MODEL } from './modelSourceLifec
 import { MULTI_LEVEL_REFLECTION_TRANSLATIONS as REFLECTION } from './multiLevelReflectionTranslations';
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DATA_RUNTIME } from './dataProviderRuntimeTranslations';
 import { BACKTEST_TRANSLATIONS as BACKTEST } from './backtestTranslations';
+import { SETTINGS_CAPABILITY_TRANSLATIONS as CAPABILITY } from './settingsCapabilityTranslations';
 
 const SETTINGS_FIELD_TRANSLATIONS = {
   de: {
@@ -187,18 +188,19 @@ const SETTINGS_FIELD_TRANSLATIONS = {
 
 /** Shared settings translations kept outside the per-locale application chunks. */
 export const SETTINGS_TRANSLATIONS = {
-  de: { ...MODEL.de, ...REFLECTION.de, ...DATA_RUNTIME.de, ...BACKTEST.de, ...SETTINGS_FIELD_TRANSLATIONS.de },
-  es: { ...MODEL.es, ...REFLECTION.es, ...DATA_RUNTIME.es, ...BACKTEST.es, ...SETTINGS_FIELD_TRANSLATIONS.es },
-  fr: { ...MODEL.fr, ...REFLECTION.fr, ...DATA_RUNTIME.fr, ...BACKTEST.fr, ...SETTINGS_FIELD_TRANSLATIONS.fr },
-  id: { ...MODEL.id, ...REFLECTION.id, ...DATA_RUNTIME.id, ...BACKTEST.id, ...SETTINGS_FIELD_TRANSLATIONS.id },
-  ja: { ...MODEL.ja, ...REFLECTION.ja, ...DATA_RUNTIME.ja, ...BACKTEST.ja, ...SETTINGS_FIELD_TRANSLATIONS.ja },
-  ko: { ...MODEL.ko, ...REFLECTION.ko, ...DATA_RUNTIME.ko, ...BACKTEST.ko, ...SETTINGS_FIELD_TRANSLATIONS.ko },
-  ms: { ...MODEL.ms, ...REFLECTION.ms, ...DATA_RUNTIME.ms, ...BACKTEST.ms, ...SETTINGS_FIELD_TRANSLATIONS.ms },
+  de: { ...MODEL.de, ...REFLECTION.de, ...DATA_RUNTIME.de, ...BACKTEST.de, ...CAPABILITY.de, ...SETTINGS_FIELD_TRANSLATIONS.de },
+  es: { ...MODEL.es, ...REFLECTION.es, ...DATA_RUNTIME.es, ...BACKTEST.es, ...CAPABILITY.es, ...SETTINGS_FIELD_TRANSLATIONS.es },
+  fr: { ...MODEL.fr, ...REFLECTION.fr, ...DATA_RUNTIME.fr, ...BACKTEST.fr, ...CAPABILITY.fr, ...SETTINGS_FIELD_TRANSLATIONS.fr },
+  id: { ...MODEL.id, ...REFLECTION.id, ...DATA_RUNTIME.id, ...BACKTEST.id, ...CAPABILITY.id, ...SETTINGS_FIELD_TRANSLATIONS.id },
+  ja: { ...MODEL.ja, ...REFLECTION.ja, ...DATA_RUNTIME.ja, ...BACKTEST.ja, ...CAPABILITY.ja, ...SETTINGS_FIELD_TRANSLATIONS.ja },
+  ko: { ...MODEL.ko, ...REFLECTION.ko, ...DATA_RUNTIME.ko, ...BACKTEST.ko, ...CAPABILITY.ko, ...SETTINGS_FIELD_TRANSLATIONS.ko },
+  ms: { ...MODEL.ms, ...REFLECTION.ms, ...DATA_RUNTIME.ms, ...BACKTEST.ms, ...CAPABILITY.ms, ...SETTINGS_FIELD_TRANSLATIONS.ms },
   "zh-TW": {
     ...MODEL["zh-TW"],
     ...REFLECTION["zh-TW"],
     ...DATA_RUNTIME["zh-TW"],
     ...BACKTEST["zh-TW"],
+    ...CAPABILITY["zh-TW"],
     ...SETTINGS_FIELD_TRANSLATIONS["zh-TW"],
   },
 } as const;

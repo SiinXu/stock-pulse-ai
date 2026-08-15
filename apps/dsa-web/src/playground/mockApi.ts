@@ -394,6 +394,51 @@ export function installPlaygroundApiMock(
   // they cover; every other route still falls through to the fixtures below.
   options.registerPriorityHandlers?.(mock, profile);
 
+  mock.onGet('/api/v1/capabilities').reply(() => responseFor(profile, {
+    schema_version: 'capability-inventory/v1',
+    partial: false,
+    sources: [{ source: 'tool', state: 'ok', generation: '1', as_of: FIXTURE_TIMESTAMP }],
+    items: [{
+      id: 'tool:market.quote',
+      domain: 'tool',
+      type: 'agent_tool',
+      owner: 'agent-tools',
+      provider: 'core',
+      version: '1',
+      source_generation: '1',
+      as_of: FIXTURE_TIMESTAMP,
+      registered: true,
+      executable: true,
+      display_name: 'Market quote',
+    }],
+    total: 1,
+    executable_count: 1,
+    non_executable_count: 0,
+    unknown_executable_count: 0,
+  }, {
+    schema_version: 'capability-inventory/v1',
+    partial: false,
+    sources: [],
+    items: [],
+    total: 0,
+    executable_count: 0,
+    non_executable_count: 0,
+    unknown_executable_count: 0,
+  }));
+
+  mock.onGet('/api/v1/agent/models').reply(() => responseFor(profile, {
+    models: [{
+      deployment_id: 'primary-agent',
+      deployment_name: 'Primary Agent',
+      model: 'fixture/analysis-model',
+      provider: 'fixture',
+      source: 'AGENT_LITELLM_MODEL',
+      api_base: null,
+      is_primary: true,
+      is_fallback: false,
+    }],
+  }, { models: [] }));
+
   mock.onGet('/api/v1/portfolio/accounts').reply(() => responseFor(profile, {
     accounts: [
       { id: 1, name: 'Primary fixture account', market: 'cn', baseCurrency: 'CNY', isActive: true },

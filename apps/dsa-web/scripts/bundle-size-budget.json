@@ -48,16 +48,16 @@
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 157327,
-      "measuredGzipBytes": 156927,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 156927 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 158025,
+      "measuredGzipBytes": 157625,
+      "note": "Re-measured after isolating the Settings capability translations in their own shared chunk. The locale wrapper measures 157625 B with 400 B headroom; capability copy remains governed by the default chunk budget."
     },
     {
       "id": "locale-es",
       "match": "assets/es-*.js",
-      "maxGzipBytes": 152948,
-      "measuredGzipBytes": 152548,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 152548 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 153779,
+      "measuredGzipBytes": 153379,
+      "note": "Re-measured after isolating the Settings capability translations in their own shared chunk. The locale wrapper measures 153379 B with 400 B headroom; capability copy remains governed by the default chunk budget."
     },
     {
       "id": "locale-zh-TW",
@@ -113,9 +113,9 @@
     {
       "id": "vendor-icons",
       "match": "assets/vendor-icons-*.js",
-      "maxGzipBytes": 10861,
-      "measuredGzipBytes": 10461,
-      "note": "Combined production-build measurement after merge train 20260813-03 (#1149 #1240 #1157 #1227 #1218 #1236 #1265). Each member is individually within the previous budget; the icon set grows cumulatively because each adds a small number of distinct Lucide icons. Measured 10461 B with 400 B headroom, matching the IntelligenceSourcesPanel convention."
+      "maxGzipBytes": 11274,
+      "measuredGzipBytes": 10874,
+      "note": "Re-measured after the lazy runtime-capabilities panel reused the shared RefreshCw icon. Measured 10874 B with the repository-standard 400 B headroom."
     },
     {
       "id": "vendor-misc",

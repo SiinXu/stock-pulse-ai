@@ -275,7 +275,7 @@ function renderChat(ui: React.ReactElement, initialEntries: string[] = ['/chat']
 
 
 describe('ChatPage', () => {
-  it('links an unavailable Agent directly to task routing', async () => {
+  it('renders a shared action for an unavailable Agent', async () => {
     mockGetSetupStatus.mockResolvedValue({
       isComplete: false,
       readyForSmoke: true,
@@ -294,11 +294,8 @@ describe('ChatPage', () => {
 
     renderChat(<ChatPage />);
 
-    const settingsLink = await screen.findByRole('link', { name: '前往设置' });
-    expect(settingsLink).toHaveAttribute(
-      'href',
-      '/settings?section=ai_models&view=task_routing',
-    );
+    const settingsAction = await screen.findByRole('button', { name: '前往设置' });
+    expect(settingsAction).toHaveAttribute('data-control', 'button');
   });
 
   it('localizes persisted failure messages and updates them when UI language changes', async () => {

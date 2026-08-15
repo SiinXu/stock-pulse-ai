@@ -30,6 +30,7 @@ _SECRET_EXACT: Final[frozenset[str]] = frozenset(
     {
         "LITELLM_CONFIG",
         "ALPHASIFT_INSTALL_SPEC",
+        "CUSTOM_WEBHOOK_URLS",
         "DINGTALK_WEBHOOK_URL",
         "PROXY_HOST",
     }

@@ -124,6 +124,26 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(payload["success"])
         self.assertEqual(mock_post.call_args[0][0], "https://saved.example.com/hook?key=savedsecret")
 
+    @patch("src.notification_sender.custom_webhook_sender.requests.post")
+    def test_test_custom_webhook_reuses_saved_urls_for_mask_token(self, mock_post) -> None:
+        saved_url = "https://saved.example.com/custom?access_token=savedsecret"
+        self._rewrite_env(f"CUSTOM_WEBHOOK_URLS={saved_url}")
+        mock_post.return_value = self._mock_http_response(200)
+
+        with self._notification_test_env():
+            payload = self.service.test_notification_channel(
+                channel="custom",
+                items=[{"key": "CUSTOM_WEBHOOK_URLS", "value": "******"}],
+                mask_token="******",
+                title="Test title",
+                content="hello",
+                timeout_seconds=3,
+            )
+
+        self.assertTrue(payload["success"])
+        self.assertEqual(mock_post.call_args.args[0], saved_url)
+        self.assertNotIn("savedsecret", str(payload))
+
     @patch("src.notification_sender.dingtalk_sender.safe_post")
     def test_test_dingtalk_channel_signs_draft_without_persisting(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200, {"errcode": 0})

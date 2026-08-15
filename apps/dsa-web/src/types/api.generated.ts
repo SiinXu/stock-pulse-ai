@@ -158,8 +158,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Get Agent Models
-         * @description Get configured Agent model deployments for frontend selection.
+         * List configured Agent model deployments
+         * @description Return read-only runtime model deployment metadata for diagnostics. Chat requests do not accept a deployment or model selection field.
          */
         get: operations["get_agent_models_api_v1_agent_models_get"];
         put?: never;

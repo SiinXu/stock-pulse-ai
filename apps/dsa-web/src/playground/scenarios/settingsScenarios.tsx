@@ -28,6 +28,7 @@ import { NotificationChannelsPanel } from '../../components/settings/Notificatio
 import { NotificationTestPanel } from '../../components/settings/NotificationTestPanel';
 import { buildNotificationEventRoutes } from '../../components/settings/notificationEventRoutes';
 import { ProviderQuickLinks } from '../../components/settings/ProviderQuickLinks';
+import { RuntimeCapabilitiesPanel } from '../../components/settings/RuntimeCapabilitiesPanel';
 import { SettingsAlert } from '../../components/settings/SettingsAlert';
 import { SettingsConfigurationSummary, SystemConfigSummary } from '../../components/settings/SettingsConfigurationSummary';
 import { SettingsErrorSummary } from '../../components/settings/SettingsErrorSummary';
@@ -177,6 +178,7 @@ const CredentialInputStory = () => {
 };
 
 const DataProviderRuntimeStatusPanelStory = () => <DataProviderRuntimeStatusPanel />;
+const RuntimeCapabilitiesPanelStory = () => <RuntimeCapabilitiesPanel />;
 
 const FirstRunWizardStory = () => {
   const { language, text } = useStoryText();
@@ -595,6 +597,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'credential-input': CredentialInputStory,
   'data-providers-panel': DataProvidersPanelStory,
   'data-provider-runtime-status-panel': DataProviderRuntimeStatusPanelStory,
+  'runtime-capabilities-panel': RuntimeCapabilitiesPanelStory,
   'first-run-wizard': FirstRunWizardStory,
   'generation-backend-status-panel': GenerationBackendStatusPanelStory,
   'kronos-status-panel': KronosStatusPanelStory,

@@ -220,6 +220,12 @@ vi.mock('../../api/analysis', () => ({
   },
 }));
 
+vi.mock('../../components/settings/RuntimeCapabilitiesPanel', () => ({
+  RuntimeCapabilitiesPanel: () => (
+    <div data-testid="runtime-capabilities-panel">Runtime capabilities</div>
+  ),
+}));
+
 vi.mock('../../api/alphasift', () => ({
   alphasiftApi: {
     enable: (...args: unknown[]) => alphasiftEnable(...args),

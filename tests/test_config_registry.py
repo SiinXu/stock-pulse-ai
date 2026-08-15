@@ -10,11 +10,15 @@ import unittest
 from pathlib import Path
 
 from src.core.config_registry import (
+    LLM_CHANNEL_FIELD_KEY_RE,
     SCHEMA_VERSION,
     WEB_SETTINGS_HIDDEN_FROM_UI,
     build_schema_response,
     get_field_definition,
     get_registered_field_keys,
+)
+from src.core.config_registry_parts.inventory_completion import (
+    INVENTORY_COMPLETION_FIELD_DEFINITIONS,
 )
 
 
@@ -358,7 +362,7 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)
-        self.assertEqual(SCHEMA_VERSION, "2026-07-16-config-contract")
+        self.assertEqual(SCHEMA_VERSION, "2026-08-15-config-inventory-contract")
 
         categories = {
             category["category"]: {field["key"] for field in category["fields"]}
@@ -570,14 +574,18 @@ class TestSettingsHelpMetadata(unittest.TestCase):
         missing = []
         for key in get_registered_field_keys():
             field = get_field_definition(key)
-            if key in self._SYSTEM_HIDDEN_KEYS:
+            if key in WEB_SETTINGS_HIDDEN_FROM_UI or LLM_CHANNEL_FIELD_KEY_RE.match(key):
                 continue
             if field.get("category") == "ai_model" and key in self._AI_MODEL_HIDDEN_KEYS:
                 # These legacy fields are hidden only when channel config is active;
                 # they are still visible/configurable in legacy setups.
                 pass
 
-            if not field.get("help_key") or not field.get("examples") or not field.get("docs"):
+            has_localized_help = bool(
+                field.get("help_key") and field.get("examples") and field.get("docs")
+            )
+            has_inline_help = bool(field.get("description"))
+            if not has_localized_help and not has_inline_help:
                 missing.append(key)
 
         self.assertEqual([], missing)
@@ -811,8 +819,18 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         return titles
 
     def test_web_field_titles_match_registered_fields(self) -> None:
-        registered_keys = set(get_registered_field_keys())
-        field_title_keys = self._collect_web_field_title_keys()
+        registered_keys = {
+            key
+            for key in get_registered_field_keys()
+            if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
+        }
+        field_title_keys = {
+            key
+            for key in self._collect_web_field_title_keys()
+            if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
+        }
 
         self.assertEqual(
             (
@@ -825,10 +843,17 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         )
 
     def test_web_english_field_titles_match_backend_schema_titles(self) -> None:
-        web_titles = self._collect_web_english_field_titles()
+        web_titles = {
+            key: title
+            for key, title in self._collect_web_english_field_titles().items()
+            if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
+        }
         backend_titles = {
             key: get_field_definition(key)["title"]
             for key in get_registered_field_keys()
+            if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
         }
 
         self.assertEqual(
@@ -914,6 +939,106 @@ class TestSettingsHelpContract(unittest.TestCase):
             if key not in registry_help_keys and not key.startswith(self._LLM_CHANNEL_HELP_PREFIX)
         )
         self.assertEqual(external_keys, [], f"Unexpected locale-only help keys: {external_keys}")
+
+
+class TestDocumentedInventoryCompletionContract(unittest.TestCase):
+    """Newly explicit documented fields have intentional Web placement."""
+
+    def test_every_inventory_field_is_visible_or_explicitly_hidden(self) -> None:
+        schema_keys = {
+            field["key"]
+            for category in build_schema_response()["categories"]
+            for field in category["fields"]
+        }
+
+        for key, definition in INVENTORY_COMPLETION_FIELD_DEFINITIONS.items():
+            with self.subTest(key=key):
+                hidden = key in WEB_SETTINGS_HIDDEN_FROM_UI or bool(
+                    LLM_CHANNEL_FIELD_KEY_RE.match(key)
+                )
+                self.assertEqual(key in schema_keys, not hidden)
+                self.assertNotEqual(definition["display_order"], 9000)
+
+    def test_inventory_controls_match_declared_types_and_sensitivity(self) -> None:
+        for key, definition in INVENTORY_COMPLETION_FIELD_DEFINITIONS.items():
+            with self.subTest(key=key):
+                data_type = definition["data_type"]
+                control = definition["ui_control"]
+                if data_type == "boolean":
+                    self.assertEqual(control, "switch")
+                if data_type in {"integer", "number"}:
+                    self.assertEqual(control, "number")
+                if control == "select":
+                    option_values = [
+                        option if isinstance(option, str) else option["value"]
+                        for option in definition["options"]
+                    ]
+                    self.assertEqual(option_values, definition["validation"]["enum"])
+                if definition["is_sensitive"]:
+                    self.assertEqual(control, "password")
+
+    def test_fractional_runtime_intervals_use_number_controls(self) -> None:
+        for key in (
+            "PROVIDER_CIRCUIT_COOLDOWN_SECONDS",
+            "PROVIDER_DAILY_CACHE_MEMORY_TTL_SECONDS",
+            "PROVIDER_DAILY_CACHE_PERSISTENT_TTL_SECONDS",
+            "PROVIDER_DAILY_CACHE_STALE_IF_ERROR_SECONDS",
+        ):
+            with self.subTest(key=key):
+                definition = INVENTORY_COMPLETION_FIELD_DEFINITIONS[key]
+                self.assertEqual(definition["data_type"], "number")
+                self.assertEqual(definition["ui_control"], "number")
+
+    def test_dynamic_runtime_defaults_stay_unset_in_settings(self) -> None:
+        for key in ("MARKDOWN_TO_IMAGE_CHANNELS", "SNAPSHOT_SOURCE_PRIORITY"):
+            with self.subTest(key=key):
+                self.assertEqual(
+                    INVENTORY_COMPLETION_FIELD_DEFINITIONS[key]["default_value"],
+                    "",
+                )
+
+    def test_import_time_provider_controls_warn_that_restart_is_required(self) -> None:
+        for key in (
+            "AKSHARE_PRIORITY",
+            "BAOSTOCK_PRIORITY",
+            "EFINANCE_CALL_TIMEOUT",
+            "EFINANCE_PRIORITY",
+            "LONGBRIDGE_PRIORITY",
+            "PYTDX_PRIORITY",
+            "YFINANCE_PRIORITY",
+        ):
+            with self.subTest(key=key):
+                self.assertIn(
+                    "restart_required",
+                    INVENTORY_COMPLETION_FIELD_DEFINITIONS[key]["warning_codes"],
+                )
+
+        self.assertIn("TUSHARE_PRIORITY", WEB_SETTINGS_HIDDEN_FROM_UI)
+
+    def test_provider_priority_defaults_match_runtime_fallbacks(self) -> None:
+        expected = {
+            "AKSHARE_PRIORITY": "1",
+            "BAOSTOCK_PRIORITY": "3",
+            "EFINANCE_PRIORITY": "0",
+            "LONGBRIDGE_PRIORITY": "5",
+            "PYTDX_PRIORITY": "2",
+            "TUSHARE_PRIORITY": "2",
+            "YFINANCE_PRIORITY": "4",
+        }
+
+        self.assertEqual(
+            {
+                key: INVENTORY_COMPLETION_FIELD_DEFINITIONS[key]["default_value"]
+                for key in expected
+            },
+            expected,
+        )
+
+    def test_custom_webhook_urls_use_the_sensitive_save_contract(self) -> None:
+        definition = get_field_definition("CUSTOM_WEBHOOK_URLS")
+        self.assertTrue(definition["is_sensitive"])
+        self.assertEqual(definition["ui_control"], "password")
+        self.assertEqual(definition["data_type"], "array")
 
 
 class TestSensitiveFieldsUsePasswordControl(unittest.TestCase):

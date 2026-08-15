@@ -35,6 +35,7 @@ class _ConfigMaskingE2EBase(unittest.TestCase):
             "AIHUBMIX_KEY=aihubmix-live-secret-value",
             "LONGBRIDGE_APP_KEY=longbridge-app-key-secret",
             "LONGBRIDGE_APP_SECRET=longbridge-app-secret-value",
+            "CUSTOM_WEBHOOK_URLS=https://hooks.example.test/services/custom-secret-value",
             "MCP_HTTP_SESSION_TOKEN_SHA256="
             "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
             "LLM_MAX_TOKENS=2048",
@@ -72,6 +73,7 @@ class TestConfigReadApiMasksSecrets(_ConfigMaskingE2EBase):
             "GEMINI_API_KEY",
             "PUSHOVER_USER_KEY",
             "AIHUBMIX_KEY",
+            "CUSTOM_WEBHOOK_URLS",
         ):
             with self.subTest(key=key):
                 self.assertIn(key, items)
@@ -84,6 +86,7 @@ class TestConfigReadApiMasksSecrets(_ConfigMaskingE2EBase):
             "gemini-live-secret-value",
             "pushover-user-secret-value",
             "aihubmix-live-secret-value",
+            "custom-secret-value",
         ):
             self.assertNotIn(secret, rendered)
 
@@ -140,6 +143,7 @@ class TestMaskTokenDoesNotClearSecrets(_ConfigMaskingE2EBase):
                 {"key": "GEMINI_API_KEY", "value": "******"},
                 {"key": "PUSHOVER_USER_KEY", "value": "******"},
                 {"key": "AIHUBMIX_KEY", "value": "******"},
+                {"key": "CUSTOM_WEBHOOK_URLS", "value": "******"},
                 {"key": "LONGBRIDGE_APP_SECRET", "value": "******"},
                 {"key": "SOCIAL_SENTIMENT_API_KEY", "value": "******"},
                 {"key": "STOCK_LIST", "value": "600519,300750"},
@@ -149,7 +153,7 @@ class TestMaskTokenDoesNotClearSecrets(_ConfigMaskingE2EBase):
         )
 
         self.assertTrue(response["success"])
-        self.assertEqual(response["skipped_masked_count"], 5)
+        self.assertEqual(response["skipped_masked_count"], 6)
         self.assertIn("STOCK_LIST", response["updated_keys"])
 
         after = self.manager.read_config_map()
@@ -158,6 +162,7 @@ class TestMaskTokenDoesNotClearSecrets(_ConfigMaskingE2EBase):
             "GEMINI_API_KEY",
             "PUSHOVER_USER_KEY",
             "AIHUBMIX_KEY",
+            "CUSTOM_WEBHOOK_URLS",
             "LONGBRIDGE_APP_SECRET",
             "SOCIAL_SENTIMENT_API_KEY",
         ):
@@ -171,6 +176,7 @@ class TestDiagnosticsAndExportDoNotLeakSecrets(_ConfigMaskingE2EBase):
         raw = {
             "PUSHOVER_USER_KEY": "pushover-user-secret-value",
             "AIHUBMIX_KEY": "aihubmix-live-secret-value",
+            "CUSTOM_WEBHOOK_URLS": "https://hooks.example.test/services/custom-secret-value",
             "LONGBRIDGE_APP_KEY": "longbridge-app-key-secret",
             "LLM_MAX_TOKENS": 2048,
             "STOCK_LIST": "600519",
@@ -178,6 +184,7 @@ class TestDiagnosticsAndExportDoNotLeakSecrets(_ConfigMaskingE2EBase):
         sanitized = sanitize_diagnostic_metadata(raw)
         self.assertEqual(sanitized.get("pushover_user_key"), "<redacted>")
         self.assertEqual(sanitized.get("aihubmix_key"), "<redacted>")
+        self.assertEqual(sanitized.get("custom_webhook_urls"), "<redacted>")
         self.assertEqual(sanitized.get("longbridge_app_key"), "<redacted>")
         self.assertEqual(sanitized.get("llm_max_tokens"), 2048)
         self.assertEqual(sanitized.get("stock_list"), "600519")
@@ -201,6 +208,7 @@ class TestDiagnosticsAndExportDoNotLeakSecrets(_ConfigMaskingE2EBase):
             "gemini-live-secret-value",
             "pushover-user-secret-value",
             "aihubmix-live-secret-value",
+            "custom-secret-value",
             "longbridge-app-key-secret",
             "longbridge-app-secret-value",
             "social-sentiment-secret",
@@ -211,6 +219,7 @@ class TestDiagnosticsAndExportDoNotLeakSecrets(_ConfigMaskingE2EBase):
             "GEMINI_API_KEY",
             "PUSHOVER_USER_KEY",
             "AIHUBMIX_KEY",
+            "CUSTOM_WEBHOOK_URLS",
             "LONGBRIDGE_APP_KEY",
             "LONGBRIDGE_APP_SECRET",
             "SOCIAL_SENTIMENT_API_KEY",

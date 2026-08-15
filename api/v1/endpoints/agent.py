@@ -171,9 +171,17 @@ class AgentModelsResponse(BaseModel):
     models: List[AgentModelDeployment]
 
 
-@router.get("/models", response_model=AgentModelsResponse)
+@router.get(
+    "/models",
+    response_model=AgentModelsResponse,
+    summary="List configured Agent model deployments",
+    description=(
+        "Return read-only runtime model deployment metadata for diagnostics. "
+        "Chat requests do not accept a deployment or model selection field."
+    ),
+)
 async def get_agent_models():
-    """Get configured Agent model deployments for frontend selection."""
+    """Get configured Agent model deployments for read-only diagnostics."""
     config = get_config()
     return AgentModelsResponse(
         models=[AgentModelDeployment(**item) for item in list_agent_model_deployments(config)]
