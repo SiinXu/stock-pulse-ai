@@ -78,6 +78,16 @@ describe('DataProvidersPanel', () => {
 
     const tushareCard = screen.getByRole('button', { name: /Tushare/ });
     expect(within(tushareCard).getByText('未配置')).toBeInTheDocument();
+    expect(tushareCard.parentElement).toHaveClass(
+      'grid-cols-1',
+      'sm:grid-cols-2',
+      'lg:grid-cols-3',
+    );
+    expect(
+      screen.getByRole('heading', { name: '提供方配置' }).compareDocumentPosition(
+        screen.getByTestId('data-runtime-status-panel-mock'),
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
 
     const tickflowCard = screen.getByRole('button', { name: /TickFlow/ });
     expect(within(tickflowCard).getByText('已配置')).toBeInTheDocument();
@@ -88,10 +98,39 @@ describe('DataProvidersPanel', () => {
     expect(isDataProviderKey('FUTU_OPEND_HOST')).toBe(false);
   });
 
+  it('routes newly registered provider settings through the provider directory', () => {
+    renderPanel([
+      buildItem('EFINANCE_PRIORITY', '0', false),
+      buildItem('FINNHUB_API_KEY', ''),
+      buildItem('LONGBRIDGE_APP_KEY', '******'),
+      buildItem('PROVIDER_CIRCUIT_BREAKER_ENABLED', 'true'),
+    ]);
+
+    expect(screen.getByRole('button', { name: /Efinance/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Finnhub/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Longbridge/ })).toBeInTheDocument();
+    expect(isDataProviderKey('PROVIDER_CIRCUIT_BREAKER_ENABLED')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: /Longbridge/ }));
+    const dialog = screen.getByRole('dialog', { name: 'Longbridge' });
+    expect(dialog.querySelector('#setting-LONGBRIDGE_APP_KEY')).not.toBeNull();
+  });
+
   it('does not treat inherited endpoint defaults as explicit configuration', () => {
     renderPanel([
       buildItem('PYTDX_HOST', '127.0.0.1', false),
       buildItem('PYTDX_PORT', '7709', false),
+    ]);
+
+    const pytdxCard = screen.getByRole('button', { name: /Pytdx/ });
+    expect(within(pytdxCard).getByText('未配置')).toBeInTheDocument();
+  });
+
+  it('does not treat an explicit Pytdx priority as configuration without servers', () => {
+    renderPanel([
+      buildItem('PYTDX_HOST', '127.0.0.1', false),
+      buildItem('PYTDX_PORT', '7709', false),
+      buildItem('PYTDX_PRIORITY', '2', true),
     ]);
 
     const pytdxCard = screen.getByRole('button', { name: /Pytdx/ });

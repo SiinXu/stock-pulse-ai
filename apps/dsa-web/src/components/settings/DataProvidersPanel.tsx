@@ -84,76 +84,76 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
   return (
     <>
       <div className="space-y-6">
-        <DataProviderRuntimeStatusPanel disabled={disabled} />
-
         <div className="space-y-4">
-        <p className="px-1 text-xs leading-5 text-secondary-text sm:text-sm">
-          {t('settings.dataDirectoryDescription')}
-        </p>
-
-        <h3 className="px-1 text-sm font-medium text-foreground">
-          {t('settings.dataDirectoryTitle')}
-        </h3>
-
-        <SearchInput
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={t('settings.dataDirectorySearchPlaceholder')}
-          aria-label={t('settings.dataDirectorySearchPlaceholder')}
-          wrapperClassName="w-full sm:max-w-sm"
-        />
-
-        <div className="flex flex-wrap gap-2" role="group" aria-label={t('settings.dataDirectoryDescription')}>
-          <SelectionChip
-            label={t('settings.dataDirectoryFilterAll')}
-            selected={configurationFilter === 'all'}
-            onClick={() => setConfigurationFilter('all')}
-          />
-          <SelectionChip
-            label={t('settings.providerConfigured')}
-            selected={configurationFilter === 'configured'}
-            onClick={() => setConfigurationFilter('configured')}
-          />
-          <SelectionChip
-            label={t('settings.providerUnconfigured')}
-            selected={configurationFilter === 'unconfigured'}
-            onClick={() => setConfigurationFilter('unconfigured')}
-          />
-        </div>
-
-        {visibleProviders.length === 0 ? (
-          <p className="px-1 text-sm text-secondary-text" role="status">
-            {t('settings.dataDirectoryNoMatches')}
+          <p className="px-1 text-xs leading-5 text-secondary-text sm:text-sm">
+            {t('settings.dataDirectoryDescription')}
           </p>
-        ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            {visibleProviders.map((provider) => {
-              const providerItems = itemsByProvider.get(provider.id) ?? [];
-              const configured = configuredOverrides?.[provider.id] ?? isProviderConfigured(
-                providerItems.filter((item) => provider.configuredKeys.includes(item.key)),
-              );
-              return (
-                <button
-                  key={provider.id}
-                  type="button"
-                  onClick={() => setOpenProviderId(provider.id)}
-                  className={cn(
-                    'flex items-center justify-between gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
-                  )}
-                >
-                  <span className="flex min-w-0 items-center gap-2">
-                    <Database className="h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
-                    <span className="truncate text-sm font-medium text-foreground">{provider.label}</span>
-                  </span>
-                  <Badge variant="default" size="sm" className="shrink-0">
-                    {configured ? t('settings.providerConfigured') : t('settings.providerUnconfigured')}
-                  </Badge>
-                </button>
-              );
-            })}
+
+          <h3 className="px-1 text-sm font-medium text-foreground">
+            {t('settings.dataDirectoryTitle')}
+          </h3>
+
+          <SearchInput
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('settings.dataDirectorySearchPlaceholder')}
+            aria-label={t('settings.dataDirectorySearchPlaceholder')}
+            wrapperClassName="w-full sm:max-w-sm"
+          />
+
+          <div className="flex flex-wrap gap-2" role="group" aria-label={t('settings.dataDirectoryDescription')}>
+            <SelectionChip
+              label={t('settings.dataDirectoryFilterAll')}
+              selected={configurationFilter === 'all'}
+              onClick={() => setConfigurationFilter('all')}
+            />
+            <SelectionChip
+              label={t('settings.providerConfigured')}
+              selected={configurationFilter === 'configured'}
+              onClick={() => setConfigurationFilter('configured')}
+            />
+            <SelectionChip
+              label={t('settings.providerUnconfigured')}
+              selected={configurationFilter === 'unconfigured'}
+              onClick={() => setConfigurationFilter('unconfigured')}
+            />
           </div>
-        )}
+
+          {visibleProviders.length === 0 ? (
+            <p className="px-1 text-sm text-secondary-text" role="status">
+              {t('settings.dataDirectoryNoMatches')}
+            </p>
+          ) : (
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleProviders.map((provider) => {
+                const providerItems = itemsByProvider.get(provider.id) ?? [];
+                const configured = configuredOverrides?.[provider.id] ?? isProviderConfigured(
+                  providerItems.filter((item) => provider.configuredKeys.includes(item.key)),
+                );
+                return (
+                  <button
+                    key={provider.id}
+                    type="button"
+                    onClick={() => setOpenProviderId(provider.id)}
+                    className={cn(
+                      'flex items-center justify-between gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
+                    )}
+                  >
+                    <span className="flex min-w-0 items-center gap-2">
+                      <Database className="h-4 w-4 shrink-0 text-muted-text" aria-hidden="true" />
+                      <span className="truncate text-sm font-medium text-foreground">{provider.label}</span>
+                    </span>
+                    <Badge variant="default" size="sm" className="shrink-0">
+                      {configured ? t('settings.providerConfigured') : t('settings.providerUnconfigured')}
+                    </Badge>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
+
+        <DataProviderRuntimeStatusPanel disabled={disabled} />
       </div>
 
       {openProvider ? (

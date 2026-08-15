@@ -1,0 +1,3 @@
+- [Added] Settings now exposes read-only runtime capabilities and effective Agent model deployments under Advanced, while Model Sources remains the setup path for cloud, local-service, and local-CLI runtimes (Refs #865 #877 #991).
+- [Changed] The Web configuration registry now explicitly classifies every documented environment key and masks custom webhook URL lists as sensitive configuration (Refs #1023 #1026).
+- [Changed] Provider-specific market data settings now open from the existing provider directory, while shared resilience and cache controls use a dedicated reliability group instead of the generic field list (Refs #1026).

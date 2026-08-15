@@ -1467,7 +1467,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(items["REPORT_SHOW_LLM_MODEL"]["value"], "false")
         self.assertFalse(items["REPORT_SHOW_LLM_MODEL"]["raw_value_exists"])
 
-    def test_get_config_with_schema_hides_unregistered_env_keys(self) -> None:
+    def test_get_config_with_schema_hides_operator_only_registry_keys(self) -> None:
         self._rewrite_env(
             "STOCK_LIST=600519,000001",
             "DATABASE_PATH=./custom/stock_analysis.db",

@@ -53,10 +53,10 @@ Save control is often on the top or bottom toolbar—scroll once on narrow scree
 
 ## AI & Models
 
-### Model Access (primary skill)
+### Model Sources (primary skill)
 
-1. **AI & Models → Model Access** (`section=ai_models&view=connections`).  
-2. **Add model service** — Anspire Open, AIHubMix, OpenAI-compatible, local Ollama, etc.  
+1. **AI & Models → Model Sources** (`section=ai_models&view=connections`).
+2. **Add model source** — Anspire Open, AIHubMix, OpenAI-compatible, local Ollama, etc.
 3. Paste **API key**; set **Base URL** when required.  
 4. **Fetch models** and select, or type console-enabled model names.  
 5. Set **primary analysis model**.  
@@ -91,7 +91,9 @@ section in place.
 
 ## Data sources
 
-News / search keys improve events and themes; technical-only runs may still work without them. Intel sources are often default-off. Provider panels show status and plugins when present.
+News / search keys improve events and themes; technical-only runs may still work without them. Intel sources are often default-off.
+
+Use **Data providers** to search for a provider and edit its credentials, priority, and provider-specific options. Efinance, AkShare, TickFlow, AlphaSift, Pytdx, Baostock, YFinance, Finnhub, Alpha Vantage, Longbridge, and social sentiment settings stay in that directory instead of the generic field list. Cross-provider prefetch, circuit-breaker, adaptive-ordering, and daily-cache controls remain grouped under **Market & intelligence → Provider reliability**; the runtime projection on the provider page is read-only.
 
 ## Notifications & alerts
 
@@ -135,6 +137,7 @@ On desktop, the category navigation uses a compact sidebar so the active setting
 | Version & updates | Desktop updates / build id |
 | Advanced · config backup | Export before reinstall; import on recovery |
 | Advanced · diagnostics | Troubleshooting |
+| Advanced · Capabilities | Read-only view of runtime capability registration and effective Agent model deployments; it cannot mutate the registry or select a model for one chat |
 
 ### Agent behavior presets
 

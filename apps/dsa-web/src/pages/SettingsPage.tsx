@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
 import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
@@ -120,6 +120,12 @@ import { isAgentExpertJsonKey } from '../components/settings/agentSetupPresets';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 import TokenUsagePage from '../components/usage/TokenUsagePage';
+
+const RuntimeCapabilitiesPanel = lazy(async () => {
+  const module = await import('../components/settings/RuntimeCapabilitiesPanel');
+  return { default: module.RuntimeCapabilitiesPanel };
+});
+
 // Routing fields whose options must be limited to channels the user has
 // actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
 const CHANNEL_ROUTING_FIELD_KEYS = new Set([
@@ -1725,6 +1731,11 @@ const SettingsPage: React.FC = () => {
                   </form>
                 ) : null}
               </SettingsSectionCard>
+            ) : null}
+            {isTopLevelAdvanced && activeView === 'capabilities' ? (
+              <Suspense fallback={<SettingsLoading />}>
+                <RuntimeCapabilitiesPanel />
+              </Suspense>
             ) : null}
             {activeCategory === 'ai_model' && !isAiOverview && !isAiLocalModels && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
               <section className="space-y-4" aria-labelledby="model-access-heading" data-testid="model-access-section">

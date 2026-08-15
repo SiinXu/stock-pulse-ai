@@ -806,7 +806,7 @@ export function registerSettingsPageOverviewTests(): void {
     },
   );
 
-  it('keeps Advanced operational status and raw configuration in page flow', () => {
+  it('keeps Advanced operational status and raw configuration in page flow', async () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'ai_model',
@@ -846,6 +846,13 @@ export function registerSettingsPageOverviewTests(): void {
     routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'diagnostics' });
     rerender(<SettingsPage />);
     expect(screen.getByTestId('settings-field-UNPLACED_AI_FIELD')).toBeInTheDocument();
+    expect(screen.queryByTestId('llm-config-mode-banner')).not.toBeInTheDocument();
+
+    // Capabilities tab: mounts the read-only runtime panel without raw fields.
+    routerSearchParamsMock.params = new URLSearchParams({ section: 'advanced', view: 'capabilities' });
+    rerender(<SettingsPage />);
+    expect(await screen.findByTestId('runtime-capabilities-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-field-UNPLACED_AI_FIELD')).not.toBeInTheDocument();
     expect(screen.queryByTestId('llm-config-mode-banner')).not.toBeInTheDocument();
   });
 

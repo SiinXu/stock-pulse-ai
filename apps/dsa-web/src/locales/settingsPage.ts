@@ -69,6 +69,21 @@ const zh = {
   taskMarketReviewModel: '大盘复盘模型',
   taskAgentModel: 'Agent 主要模型',
   taskVisionModel: 'Vision 模型',
+  runtimeCapabilitiesExecutable: '可执行',
+  runtimeCapabilitiesUnavailable: '不可用',
+  runtimeCapabilitiesDegraded: '降级',
+  runtimeCapabilitiesUnknown: '未知',
+  runtimeCapabilitiesPartial: '部分可用',
+  runtimeCapabilitiesSources: '能力来源',
+  runtimeCapabilitiesOwnerProvider: '所有者 / 提供方',
+  runtimeCapabilitiesRuntimeColumn: '运行状态',
+  runtimeCapabilitiesDeployment: '部署',
+  runtimeCapabilitiesModel: '模型',
+  runtimeCapabilitiesProviderSource: '提供方 / 来源',
+  runtimeCapabilitiesRole: '角色',
+  runtimeCapabilitiesPrimary: '主要',
+  runtimeCapabilitiesFallback: '备用',
+  runtimeCapabilitiesRuntime: '运行时',
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
@@ -137,6 +152,21 @@ const en: Record<keyof typeof zh, string> = {
   taskMarketReviewModel: 'Market review model',
   taskAgentModel: 'Agent primary model',
   taskVisionModel: 'Vision model',
+  runtimeCapabilitiesExecutable: 'Executable',
+  runtimeCapabilitiesUnavailable: 'Unavailable',
+  runtimeCapabilitiesDegraded: 'Degraded',
+  runtimeCapabilitiesUnknown: 'Unknown',
+  runtimeCapabilitiesPartial: 'Partial',
+  runtimeCapabilitiesSources: 'Capability sources',
+  runtimeCapabilitiesOwnerProvider: 'Owner / provider',
+  runtimeCapabilitiesRuntimeColumn: 'Runtime state',
+  runtimeCapabilitiesDeployment: 'Deployment',
+  runtimeCapabilitiesModel: 'Model',
+  runtimeCapabilitiesProviderSource: 'Provider / source',
+  runtimeCapabilitiesRole: 'Role',
+  runtimeCapabilitiesPrimary: 'Primary',
+  runtimeCapabilitiesFallback: 'Fallback',
+  runtimeCapabilitiesRuntime: 'Runtime',
 };
 
 export const SETTINGS_PAGE_TEXT: Record<UiLanguage, Record<keyof typeof zh, string>> = createUiLanguageRecord("locales.settingsPage.SETTINGS_PAGE_TEXT", { zh, en });

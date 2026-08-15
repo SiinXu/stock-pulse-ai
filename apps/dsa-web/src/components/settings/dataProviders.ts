@@ -23,6 +23,18 @@ export const DATA_PROVIDERS: DataProvider[] = [
     configuredKeys: ['TUSHARE_TOKEN'],
   },
   {
+    id: 'efinance',
+    label: 'Efinance',
+    keys: ['EFINANCE_PRIORITY', 'EFINANCE_CALL_TIMEOUT', 'ENABLE_EASTMONEY_PATCH'],
+    configuredKeys: ['EFINANCE_PRIORITY', 'EFINANCE_CALL_TIMEOUT', 'ENABLE_EASTMONEY_PATCH'],
+  },
+  {
+    id: 'akshare',
+    label: 'AkShare',
+    keys: ['AKSHARE_PRIORITY'],
+    configuredKeys: ['AKSHARE_PRIORITY'],
+  },
+  {
     id: 'tickflow',
     label: 'TickFlow',
     keys: [
@@ -37,14 +49,73 @@ export const DATA_PROVIDERS: DataProvider[] = [
   {
     id: 'alphasift',
     label: 'AlphaSift',
-    keys: ['ALPHASIFT_ENABLED', 'ALPHASIFT_INSTALL_SPEC'],
+    keys: [
+      'ALPHASIFT_ENABLED',
+      'ALPHASIFT_INSTALL_SPEC',
+      'SNAPSHOT_SOURCE_PRIORITY',
+      'INDUSTRY_PROVIDER',
+      'INDUSTRY_PROVIDER_MAX_BOARDS',
+    ],
     configuredKeys: ['ALPHASIFT_ENABLED'],
   },
   {
     id: 'pytdx',
     label: 'Pytdx',
-    keys: ['PYTDX_HOST', 'PYTDX_PORT', 'PYTDX_SERVERS'],
+    keys: ['PYTDX_HOST', 'PYTDX_PORT', 'PYTDX_SERVERS', 'PYTDX_PRIORITY'],
     configuredKeys: ['PYTDX_HOST', 'PYTDX_SERVERS'],
+  },
+  {
+    id: 'baostock',
+    label: 'Baostock',
+    keys: ['BAOSTOCK_PRIORITY'],
+    configuredKeys: ['BAOSTOCK_PRIORITY'],
+  },
+  {
+    id: 'yfinance',
+    label: 'YFinance',
+    keys: ['YFINANCE_PRIORITY'],
+    configuredKeys: ['YFINANCE_PRIORITY'],
+  },
+  {
+    id: 'finnhub',
+    label: 'Finnhub',
+    keys: ['FINNHUB_API_KEY'],
+    configuredKeys: ['FINNHUB_API_KEY'],
+  },
+  {
+    id: 'alphavantage',
+    label: 'Alpha Vantage',
+    keys: ['ALPHAVANTAGE_API_KEY'],
+    configuredKeys: ['ALPHAVANTAGE_API_KEY'],
+  },
+  {
+    id: 'longbridge',
+    label: 'Longbridge',
+    keys: [
+      'LONGBRIDGE_OAUTH_CLIENT_ID',
+      'LONGBRIDGE_OAUTH_TOKEN_CACHE_B64',
+      'LONGBRIDGE_APP_KEY',
+      'LONGBRIDGE_APP_SECRET',
+      'LONGBRIDGE_ACCESS_TOKEN',
+      'LONGBRIDGE_REGION',
+      'LONGBRIDGE_ENABLE_OVERNIGHT',
+      'LONGBRIDGE_PUSH_CANDLESTICK_MODE',
+      'LONGBRIDGE_PRINT_QUOTE_PACKAGES',
+      'LONGBRIDGE_PRIORITY',
+    ],
+    configuredKeys: [
+      'LONGBRIDGE_OAUTH_CLIENT_ID',
+      'LONGBRIDGE_OAUTH_TOKEN_CACHE_B64',
+      'LONGBRIDGE_APP_KEY',
+      'LONGBRIDGE_APP_SECRET',
+      'LONGBRIDGE_ACCESS_TOKEN',
+    ],
+  },
+  {
+    id: 'social_sentiment',
+    label: 'Social sentiment',
+    keys: ['SOCIAL_SENTIMENT_API_KEY', 'SOCIAL_SENTIMENT_API_URL'],
+    configuredKeys: ['SOCIAL_SENTIMENT_API_KEY'],
   },
 ];
 

@@ -153,6 +153,7 @@ export const SETTINGS_SECTIONS: SettingsSection[] = [
       // reads as Backend Status since developer fields moved to `diagnostics`.
       { id: 'raw_config', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.raw_config.label", { zh: '后端状态', en: 'Backend Status' }) },
       { id: 'diagnostics', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.diagnostics.label", { zh: '开发者诊断', en: 'Developer Diagnostics' }) },
+      { id: 'capabilities', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.capabilities.label", { zh: '运行能力', en: 'Capabilities' }) },
       { id: 'backup', label: createUiLanguageRecord("components.settings.settingsInformationArchitecture.SETTINGS_SECTIONS.advanced.views.backup.label", { zh: '配置备份', en: 'Config Backup' }) },
     ],
     defaultView: 'raw_config',

@@ -75,6 +75,40 @@ WEB_SETTINGS_HIDDEN_FROM_UI = {
     "SQLITE_BUSY_TIMEOUT_MS",
     "SQLITE_WRITE_RETRY_MAX",
     "SQLITE_WRITE_RETRY_BASE_DELAY",
+    # Startup, operator path, and development-only configuration is explicit in
+    # the registry but intentionally unavailable to the browser settings form.
+    "DSA_WEB_DEV_API_PROXY",
+    "PLUGINS_DIR",
+    "PLUGIN_STATE_PATH",
+    "ALPHASIFT_DAILY_CALL_TIMEOUT_SEC",
+    "ALPHASIFT_DAILY_HISTORY_CACHE_DIR",
+    "ALPHASIFT_DATA_DIR",
+    "ALPHASIFT_EASTMONEY_JITTER_SEC",
+    "ALPHASIFT_EASTMONEY_MIN_INTERVAL_SEC",
+    "ALPHASIFT_FALLBACK_SNAPSHOT_PATH",
+    "ALPHASIFT_INDUSTRY_PROVIDER_CACHE_DIR",
+    "ALPHASIFT_SNAPSHOT_CALL_TIMEOUT_SEC",
+    "ALPHASIFT_SOURCE_CALL_TIMEOUT_SEC",
+    "PROVIDER_DAILY_CACHE_DIR",
+    "LONGBRIDGE_CONNECTION_COOLDOWN_SECONDS",
+    "LONGBRIDGE_HTTP_URL",
+    "LONGBRIDGE_QUOTE_WS_URL",
+    "LONGBRIDGE_STATIC_INFO_TTL_SECONDS",
+    "LONGBRIDGE_TRADE_WS_URL",
+    # Compatibility aliases and indexed workflows require dedicated editors.
+    "DISCORD_CHANNEL_ID",
+    "EMAIL_GROUP_1",
+    "EMAIL_GROUP_2",
+    "OLLAMA_API_BASE",
+    "SHARE_IMAGE_XIAOHONGSHU_HANDLE",
+    "SHARE_IMAGE_XIAOHONGSHU_ID",
+    "SHARE_IMAGE_XIAOHONGSHU_QR_PATH",
+    "SHARE_IMAGE_XIAOHONGSHU_URL",
+    "STOCK_GROUP_1",
+    "STOCK_GROUP_2",
+    # The instance promotes configured Tushare to -1 and otherwise fixes it at
+    # 2, so the documented compatibility value is not an effective Web control.
+    "TUSHARE_PRIORITY",
     # Advanced resolver backpressure tuning remains environment-managed. The
     # primary enable/interval/batch/lease/attempt controls stay Web-editable.
     "PREDICTION_RESOLVE_FETCH_CONCURRENCY",

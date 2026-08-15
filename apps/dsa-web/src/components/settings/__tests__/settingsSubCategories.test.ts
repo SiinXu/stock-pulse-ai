@@ -54,6 +54,14 @@ describe('settingsSubCategories', () => {
         expect(provider.keys).toContain(key);
       }
     }
+    for (const key of [
+      'EFINANCE_PRIORITY',
+      'FINNHUB_API_KEY',
+      'LONGBRIDGE_APP_KEY',
+      'SOCIAL_SENTIMENT_API_KEY',
+    ]) {
+      expect(seen.has(key), key).toBe(true);
+    }
   });
 
   it('routes general + news data_source keys to the source tab', () => {
@@ -62,6 +70,7 @@ describe('settingsSubCategories', () => {
     expect(getSubCategoryOfKey('data_source', 'STOCK_INDEX_REMOTE_UPDATE_ENABLED')).toBe('source');
     expect(getSubCategoryOfKey('data_source', 'NEWS_MAX_AGE_DAYS')).toBe('source');
     expect(getSubCategoryOfKey('data_source', 'BIAS_THRESHOLD')).toBe('source');
+    expect(getSubCategoryOfKey('data_source', 'PROVIDER_CIRCUIT_BREAKER_ENABLED')).toBe('source');
   });
 
   it('routes notification keys to channels or rules', () => {

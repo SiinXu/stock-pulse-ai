@@ -39058,7 +39058,7 @@
     },
     "/api/v1/agent/models": {
       "get": {
-        "description": "Get configured Agent model deployments for frontend selection.",
+        "description": "Return read-only runtime model deployment metadata for diagnostics. Chat requests do not accept a deployment or model selection field.",
         "operationId": "get_agent_models_api_v1_agent_models_get",
         "responses": {
           "200": {
@@ -39072,7 +39072,7 @@
             "description": "Successful Response"
           }
         },
-        "summary": "Get Agent Models",
+        "summary": "List configured Agent model deployments",
         "tags": [
           "Agent"
         ]
