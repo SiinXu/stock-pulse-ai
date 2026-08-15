@@ -49,8 +49,7 @@ def test_repository_docs_aligned_under_default_fail_on() -> None:
     """Docs, defaults, and documented registry state must stay aligned."""
 
     assert main(["--fail-on", "default"]) == 0
-    # Registry debt is currently expected; all mode should fail until workers finish.
-    assert main(["--fail-on", "registry"]) == 1
+    assert main(["--fail-on", "registry"]) == 0
 
 
 def test_parse_env_example_captures_commented_keys(tmp_path: Path) -> None:
