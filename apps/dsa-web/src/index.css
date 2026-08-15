@@ -1257,72 +1257,6 @@ a {
     inset 0 1px 0 hsl(var(--neutral-white) / 0.06);
 }
 
-.chat-progress-item {
-  display: flex;
-  align-items: center;
-  gap: 0.55rem;
-  border: 0;
-  padding: 0.25rem 0;
-  font-size: 0.75rem;
-  line-height: 1.45;
-  transition:
-    border-color 0.2s ease,
-    background-color 0.2s ease,
-    color 0.2s ease;
-}
-
-.chat-progress-dot {
-  width: 0.5rem;
-  height: 0.5rem;
-  flex-shrink: 0;
-  border-radius: 9999px;
-  background: hsl(var(--muted-text) / 0.5);
-  box-shadow: 0 0 0 3px hsl(var(--muted-text) / 0.08);
-}
-
-.chat-progress-item-muted {
-  color: hsl(var(--muted-text));
-}
-
-.chat-progress-dot-muted {
-  background: hsl(var(--muted-text) / 0.55);
-  box-shadow: 0 0 0 3px hsl(var(--muted-text) / 0.08);
-}
-
-.chat-progress-item-thinking,
-.chat-progress-item-tool,
-.chat-progress-item-generating {
-  background: transparent;
-  color: hsl(var(--secondary-text));
-}
-
-.chat-progress-dot-thinking,
-.chat-progress-dot-tool,
-.chat-progress-dot-generating {
-  background: hsl(var(--primary) / 0.86);
-  box-shadow: 0 0 0 3px hsl(var(--primary) / 0.12);
-}
-
-.chat-progress-item-success {
-  background: transparent;
-  color: hsl(var(--success));
-}
-
-.chat-progress-dot-success {
-  background: hsl(var(--success));
-  box-shadow: 0 0 0 3px hsl(var(--success) / 0.12);
-}
-
-.chat-progress-item-danger {
-  background: transparent;
-  color: hsl(var(--destructive));
-}
-
-.chat-progress-dot-danger {
-  background: hsl(var(--destructive));
-  box-shadow: 0 0 0 3px hsl(var(--destructive) / 0.12);
-}
-
 .home-accent-pill-link {
   display: inline-flex;
   align-items: center;
@@ -2265,29 +2199,6 @@ a {
   border-radius: 0 0.75rem 0.75rem 0;
   padding: 0.5rem 1rem;
   color: var(--text-secondary-text);
-}
-
-/* Quick question button style */
-.quick-question-btn {
-  min-height: 2.75rem;
-  padding: 0.375rem 0.75rem;
-  border-radius: var(--radius);
-  font-size: 0.875rem;
-  background: hsl(var(--card) / 0.7);
-  border: 1px solid var(--border);
-  color: var(--text-secondary-text);
-  transition: all 0.2s ease;
-}
-
-.quick-question-btn:not(:disabled):hover {
-  color: hsl(var(--foreground));
-  border-color: hsl(var(--primary) / 0.4);
-  background: hsl(var(--primary) / 0.05);
-}
-
-.quick-question-btn:disabled {
-  cursor: not-allowed;
-  opacity: 0.5;
 }
 
 /* Session item styles */

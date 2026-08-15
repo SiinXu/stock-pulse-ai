@@ -188,9 +188,9 @@
     {
       "id": "ChatSendFeedback",
       "match": "assets/ChatSendFeedback-*.js",
-      "maxGzipBytes": 14348,
-      "measuredGzipBytes": 13948,
-      "note": "Restored named rule after merging origin/main (#1268); measured gzip + 400 B headroom."
+      "maxGzipBytes": 15169,
+      "measuredGzipBytes": 14769,
+      "note": "Measured after the Agent trace interaction convergence; 400 B headroom preserves the named chunk budget convention."
     },
     {
       "id": "screening",

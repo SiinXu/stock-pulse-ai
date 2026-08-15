@@ -53,7 +53,7 @@ UI may show casual samples. Prefer research-oriented phrasing:
 | Strategy expand | Choose a Skill | Beginners can skip |
 | Deep-research stock field | Scope a research question to a symbol | Supports code/name suggestions; suffix and manual-entry guidance is in the adjacent help tooltip |
 | Generate analysis | Heavier path | Costs more; use deliberately |
-| Thinking / reasoning pane | Intermediate traces | Reference only |
+| Execution trace | Backend-public stage and tool events | The latest live step is emphasized; completed traces collapse by default; failures and timeouts remain visible. This is not hidden chain-of-thought |
 | Context compression | Save tokens on long chats | Compact control row; check unsaved state after edits |
 
 ## Strategy / Skill — should you pick one?
@@ -66,9 +66,11 @@ Optional. Skills bias evidence emphasis (trend, quality, event, … as listed).
 
 ## When send fails
 
-1. Settings → model connection test.  
-2. If generation backend is local CLI, Agent **tools** may be limited—switch Agent path to a cloud-capable connection when tools are required.  
+1. **Configure cloud model** and **Open local model setup** both enter **AI & Models → Model Sources**. Add a source, then follow Test → Enable → Task Routing to confirm the Agent path.
+2. Local CLI backends cover report generation only and do not provide Agent tool calls. To continue without Agent, open the **Analysis Workbench** from the unavailable state.
 3. Network / rate limits: wait and retry once; read the on-page error.
+
+The execution trace preserves backend event order and never merges or invents steps. Live presentation marks only the newest received event as current. A restored session can show only the bounded, redacted tool records actually persisted by the server; it cannot reconstruct unsaved live stage transitions. Tool arguments and result previews remain on-demand disclosures, with long content scrolling inside its own region.
 
 ## Use cases
 

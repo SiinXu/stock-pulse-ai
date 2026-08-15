@@ -1,14 +1,25 @@
 import React, { memo } from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Check, ChevronRight, Copy, Download } from 'lucide-react';
-import { Badge, IconButton, ScrollArea } from '../common';
+import { Check, Copy, Download, Sparkles } from 'lucide-react';
+import {
+  Badge,
+  IconButton,
+  Progress,
+  ScrollArea,
+  StatusDot,
+  Surface,
+} from '../common';
 import { ChatEmptyMessages } from './ChatEmptyMessages';
 import {
   ChatThinkingDetails,
   ChatThinkingToggle,
 } from './ChatThinkingDetails';
-import { getCurrentStageLabel, getMessageSkillLabel } from './chatMessageMeta';
+import {
+  getCurrentStageLabel,
+  getMessageSkillLabel,
+  isProgressStepFailure,
+} from './chatMessageMeta';
 import { contentHasHypotheticalMarker } from './whatIfScenario';
 import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import { cn } from '../../utils/cn';
@@ -65,7 +76,9 @@ const ChatMessageBubble = memo(function ChatMessageBubble({
   const displayContent = getChatMessageDisplayContent(msg, language);
   const isHypothetical = contentHasHypotheticalMarker(displayContent)
     || contentHasHypotheticalMarker(msg.content);
-  const toolSteps = (msg.thinkingSteps || []).filter((s) => s.type === 'tool_done');
+  const thinkingSteps = msg.thinkingSteps || [];
+  const toolSteps = thinkingSteps.filter((s) => s.type === 'tool_done');
+  const failureSteps = thinkingSteps.filter(isProgressStepFailure);
   const totalDuration = toolSteps.reduce((sum, s) => sum + (s.duration || 0), 0);
   const thinkingSummary = t('chat.toolCalls', {
     count: toolSteps.length,
@@ -112,14 +125,7 @@ const ChatMessageBubble = memo(function ChatMessageBubble({
               className="chat-skill-badge shadow-none"
               aria-label={t('chat.skill', { name: skillLabel })}
             >
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 10V3L4 14h7v7l9-11h-7z"
-                />
-              </svg>
+              <Sparkles className="h-3 w-3" aria-hidden="true" />
               {skillLabel}
             </Badge>
           </div>
@@ -132,8 +138,12 @@ const ChatMessageBubble = memo(function ChatMessageBubble({
             thinkingProcessLabel={t('chat.thinkingProcess')}
           />
         ) : null}
-        {msg.role === 'assistant' && isExpanded && msg.thinkingSteps ? (
-          <ChatThinkingDetails steps={msg.thinkingSteps} t={t} />
+        {msg.role === 'assistant' && (isExpanded || failureSteps.length > 0) ? (
+          <ChatThinkingDetails
+            steps={isExpanded ? thinkingSteps : failureSteps}
+            t={t}
+            mode="history"
+          />
         ) : null}
         {msg.role === 'assistant' ? (
           <div>
@@ -205,6 +215,8 @@ export function ChatMessageList({
   messagesEndRef,
   onScroll,
 }: ChatMessageListProps): React.ReactElement {
+  const currentStageLabel = getCurrentStageLabel(progressSteps, t);
+
   return (
     <ScrollArea
       className="relative z-10 flex-1"
@@ -219,6 +231,8 @@ export function ChatMessageList({
           agentUnavailableTitle={t('chat.agentUnavailableTitle')}
           agentUnavailableDescription={t('chat.agentUnavailableDescription')}
           agentUnavailableAction={t('chat.agentUnavailableAction')}
+          agentUnavailableLocalAction={t('firstRun.ctaLocal')}
+          agentUnavailableAnalysisAction={t('layout.nav.analysis')}
           emptyTitle={t('chat.emptyTitle')}
           emptyDescription={t('chat.emptyDescription')}
           quickQuestions={quickQuestions}
@@ -244,27 +258,44 @@ export function ChatMessageList({
 
       {loading && (
         <div className="flex gap-4" data-testid="chat-live-progress">
-          <div className="w-8 h-8 rounded-full bg-elevated text-foreground flex items-center justify-center flex-shrink-0 text-xs font-bold">
+          <div className="chat-avatar-ai flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold">
             AI
           </div>
-          <details className="group live-progress min-w-50 max-w-[min(100%,48rem)] overflow-visible px-5 py-3">
-            <summary className="flex cursor-pointer list-none items-center gap-2.5 text-sm text-secondary-text">
-              <div className="relative w-4 h-4 flex-shrink-0">
-                <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
-                <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-              </div>
-              <span className="min-w-0 flex-1 text-secondary-text">
-                {getCurrentStageLabel(progressSteps, t)}
-              </span>
-              <ChevronRight
-                className="h-4 w-4 shrink-0 transition-transform group-open:rotate-90"
-                aria-hidden="true"
+          <Surface
+            level="interactive"
+            padding="sm"
+            className="min-w-0 flex-1 max-w-[min(100%,48rem)]"
+          >
+            <div className="flex items-start gap-2.5">
+              <StatusDot
+                tone="info"
+                pulse
+                aria-label={t('runFlow.status.running')}
+                className="mt-1 motion-reduce:animate-none"
               />
-            </summary>
-            <div className="mt-2">
-              <ChatThinkingDetails steps={progressSteps} t={t} />
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="min-w-0 flex-1 text-sm font-medium text-foreground">
+                    {currentStageLabel}
+                  </span>
+                  <Badge variant="info" className="shrink-0 shadow-none">
+                    {t('runFlow.status.running')}
+                  </Badge>
+                </div>
+                <Progress
+                  className="mt-2 h-1"
+                  label={currentStageLabel}
+                  valueText={t('runFlow.status.running')}
+                  tone="primary"
+                />
+              </div>
             </div>
-          </details>
+            {progressSteps.length > 0 ? (
+              <div className="mt-3 border-t border-border/60 pt-3">
+                <ChatThinkingDetails steps={progressSteps} t={t} mode="live" />
+              </div>
+            ) : null}
+          </Surface>
         </div>
       )}
 

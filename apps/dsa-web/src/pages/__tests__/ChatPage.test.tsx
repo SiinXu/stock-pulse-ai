@@ -275,7 +275,7 @@ function renderChat(ui: React.ReactElement, initialEntries: string[] = ['/chat']
 
 
 describe('ChatPage', () => {
-  it('renders a shared action for an unavailable Agent', async () => {
+  it('renders shared cloud, local, and non-Agent actions when Agent is unavailable', async () => {
     mockGetSetupStatus.mockResolvedValue({
       isComplete: false,
       readyForSmoke: true,
@@ -294,8 +294,12 @@ describe('ChatPage', () => {
 
     renderChat(<ChatPage />);
 
-    const settingsAction = await screen.findByRole('button', { name: '前往设置' });
-    expect(settingsAction).toHaveAttribute('data-control', 'button');
+    const cloudAction = await screen.findByRole('button', { name: '配置云端模型' });
+    const localAction = screen.getByRole('button', { name: '打开本地模型设置' });
+    const analysisAction = screen.getByRole('button', { name: '分析工作台' });
+    [cloudAction, localAction, analysisAction].forEach((action) => {
+      expect(action).toHaveAttribute('data-control', 'button');
+    });
   });
 
   it('localizes persisted failure messages and updates them when UI language changes', async () => {
@@ -707,7 +711,7 @@ describe('ChatPage', () => {
     expect(skillBadge).toHaveTextContent('趋势分析、均线金叉');
   });
 
-  it('renders compact borderless chat bubbles and plain progress rows', async () => {
+  it('renders compact borderless chat bubbles and semantic trace rows', async () => {
     mockStoreState.messages = [
       { id: 'user-1', role: 'user', content: '分析腾讯 hk00700' },
       {
@@ -743,8 +747,11 @@ describe('ChatPage', () => {
     const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
     fireEvent.click(thinkingToggle);
     const progressItem = screen.getByRole('button', { name: /get_daily_history/u });
-    expect(progressItem).toHaveClass('chat-progress-item', 'chat-progress-item-success');
-    expect(progressItem.querySelector('.lucide-chevron-right')).toHaveClass('text-muted-text/70');
+    expect(progressItem).toHaveClass('control-hit-target');
+    expect(progressItem.closest('[data-trace-step]')).toHaveAttribute('data-trace-step', 'tool_done');
+    expect(progressItem.closest('[data-trace-step]')?.querySelector('[data-trace-status]'))
+      .toHaveAttribute('data-trace-status', 'success');
+    expect(progressItem.querySelector('.lucide-chevron-right')).toHaveClass('text-muted-text');
   });
 
   it('renders hypothetical messages without warning rings', async () => {
@@ -782,25 +789,20 @@ describe('ChatPage', () => {
       },
     ];
 
-    const { container } = renderChat(<ChatPage />);
+    renderChat(<ChatPage />);
 
-    expect(await screen.findAllByText('risk failed')).toHaveLength(2);
-    const liveProgress = screen.getAllByText('risk failed')
-      .find((node) => node.closest('details.live-progress'))?.closest('details');
-    expect(liveProgress).not.toBeNull();
-    expect(liveProgress).not.toHaveAttribute('open');
-    fireEvent.click((liveProgress as HTMLElement).querySelector('summary') as HTMLElement);
-    expect(liveProgress).toHaveAttribute('open');
+    expect((await screen.findAllByText('risk failed')).length).toBeGreaterThanOrEqual(2);
+    const liveProgress = screen.getByTestId('chat-live-progress');
+    const liveStage = liveProgress.querySelector('[data-trace-step="stage_done"]');
+    expect(liveStage).toHaveAttribute('data-current', 'true');
+    expect(liveStage?.querySelector('[data-trace-status]'))
+      .toHaveAttribute('data-trace-status', 'danger');
 
-    const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
-    fireEvent.click(thinkingToggle);
-
-    const failedStage = screen.getAllByText('risk failed').find((node) =>
-      node.closest('.chat-progress-item'),
-    );
-    expect(failedStage).toBeDefined();
-    expect(failedStage?.closest('.chat-progress-item')).toHaveClass('chat-progress-item-danger');
-    expect(failedStage?.closest('.chat-progress-item')).not.toHaveClass('chat-progress-item-success');
+    const assistantBubble = screen.getByText('Partial answer').closest('.chat-message');
+    const persistedFailure = assistantBubble?.querySelector('[data-trace-step="stage_done"]');
+    expect(persistedFailure).toBeVisible();
+    expect(persistedFailure?.querySelector('[data-trace-status]'))
+      .toHaveAttribute('data-trace-status', 'danger');
   });
 
   it('renders pipeline budget skip progress without timeout severity', async () => {
@@ -824,15 +826,22 @@ describe('ChatPage', () => {
     expect(await screen.findAllByText('decision skipped: insufficient budget')).toHaveLength(2);
     expect(screen.queryByText('decision timed out')).not.toBeInTheDocument();
 
+    const liveProgress = screen.getByTestId('chat-live-progress');
+    const liveSkipped = liveProgress.querySelector('[data-trace-step="pipeline_budget_skipped"]');
+    expect(liveSkipped).toHaveAttribute('data-current', 'true');
+    expect(liveSkipped?.querySelector('[data-trace-status]'))
+      .toHaveAttribute('data-trace-status', 'warning');
+
     const thinkingToggle = container.querySelector('button[class*="mb-2"][class*="w-full"]') as HTMLButtonElement;
     fireEvent.click(thinkingToggle);
 
-    const budgetSkipped = screen.getAllByText('decision skipped: insufficient budget').find((node) =>
-      node.closest('.chat-progress-item'),
+    const assistantBubble = screen.getByText('Partial answer').closest('.chat-message');
+    const persistedSkipped = assistantBubble?.querySelector(
+      '[data-trace-step="pipeline_budget_skipped"]',
     );
-    expect(budgetSkipped).toBeDefined();
-    expect(budgetSkipped?.closest('.chat-progress-item')).toHaveClass('chat-progress-item-muted');
-    expect(budgetSkipped?.closest('.chat-progress-item')).not.toHaveClass('chat-progress-item-danger');
+    expect(persistedSkipped).toBeVisible();
+    expect(persistedSkipped?.querySelector('[data-trace-status]'))
+      .toHaveAttribute('data-trace-status', 'warning');
   });
 
   it('selects the default skill after loading skills', async () => {

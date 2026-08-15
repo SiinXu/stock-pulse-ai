@@ -17,6 +17,12 @@ export const isStageDoneSuccessful = (status?: string): boolean => {
   return ['completed', 'success', 'succeeded', 'done'].includes(normalized);
 };
 
+export function isProgressStepFailure(step: ProgressStep): boolean {
+  if (step.type === 'pipeline_timeout') return true;
+  if (step.type === 'tool_done') return step.success === false;
+  return step.type === 'stage_done' && !isStageDoneSuccessful(step.status);
+}
+
 export const getStageDoneLabel = (step: ProgressStep): string => {
   const stage = step.stage || 'stage';
   if (step.message) return step.message;
