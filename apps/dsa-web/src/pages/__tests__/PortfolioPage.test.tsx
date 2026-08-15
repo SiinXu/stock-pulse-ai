@@ -56,6 +56,8 @@ const {
   deleteCorporateAction,
   parseCsvImport,
   commitCsvImport,
+  previewFutuImport,
+  commitFutuImport,
   createAccount,
   updateAccount,
   deleteAccount,
@@ -65,6 +67,13 @@ const {
   getPortfolioRiskMetrics,
   getAnalysisStatus,
   getAnalysisTasks,
+  getPortfolioHealth,
+  refreshPortfolioHealth,
+  analyzeBasket,
+  listStressScenarios,
+  runStressPreset,
+  runStressCustom,
+  getRebalancing,
 } = vi.hoisted(() => ({
   getAccounts: vi.fn(),
   getSnapshot: vi.fn(),
@@ -83,6 +92,8 @@ const {
   deleteCorporateAction: vi.fn(),
   parseCsvImport: vi.fn(),
   commitCsvImport: vi.fn(),
+  previewFutuImport: vi.fn(),
+  commitFutuImport: vi.fn(),
   createAccount: vi.fn(),
   updateAccount: vi.fn(),
   deleteAccount: vi.fn(),
@@ -92,6 +103,13 @@ const {
   getPortfolioRiskMetrics: vi.fn(),
   getAnalysisStatus: vi.fn(),
   getAnalysisTasks: vi.fn(),
+  getPortfolioHealth: vi.fn(),
+  refreshPortfolioHealth: vi.fn(),
+  analyzeBasket: vi.fn(),
+  listStressScenarios: vi.fn(),
+  runStressPreset: vi.fn(),
+  runStressCustom: vi.fn(),
+  getRebalancing: vi.fn(),
 }));
 
 vi.mock('../../api/decisionSignals', () => ({
@@ -120,10 +138,29 @@ vi.mock('../../api/portfolio', () => ({
     deleteCorporateAction,
     parseCsvImport,
     commitCsvImport,
+    previewFutuImport,
+    commitFutuImport,
     createAccount,
     updateAccount,
     deleteAccount,
     analyzePosition,
+  },
+}));
+
+vi.mock('../../api/portfolioHealth', () => ({
+  portfolioHealthApi: {
+    getSummary: getPortfolioHealth,
+    refresh: refreshPortfolioHealth,
+  },
+}));
+
+vi.mock('../../api/portfolioInsights', () => ({
+  portfolioInsightsApi: {
+    analyzeBasket,
+    listStressScenarios,
+    runStressPreset,
+    runStressCustom,
+    getRebalancing,
   },
 }));
 
@@ -303,6 +340,157 @@ function makeRisk(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function makePortfolioHealth(options: {
+  accountId?: number | null;
+  costMethod?: 'fifo' | 'avg';
+  status?: 'ok' | 'partial' | 'empty_portfolio' | 'unavailable';
+} = {}) {
+  const status = options.status ?? 'ok';
+  const dimension = {
+    formula: 'test',
+    input: {},
+    reason: null,
+    score: status === 'unavailable' ? null : 80,
+    status: status === 'unavailable' ? 'unavailable' : 'ok',
+    statusMessage: status === 'unavailable' ? 'Metric unavailable' : 'Within threshold',
+  };
+  const weights = {
+    concentration: 0.25,
+    riskExposure: 0.25,
+    diversification: 0.2,
+    pnl: 0.15,
+    cashRatio: 0.15,
+  };
+  return {
+    accountId: options.accountId ?? null,
+    asOf: '2026-08-15',
+    band: status === 'ok' ? 'healthy' : null,
+    bands: [{ maxExclusive: 101, minInclusive: 80, name: 'healthy' }],
+    comparable: status === 'ok',
+    config: {
+      cashHighAlertPct: 50,
+      cashLowAlertPct: 2,
+      concentrationAlertPct: 35,
+      diversificationAlert: 0.35,
+      pnlLossAlertPct: -15,
+      source: 'shared_config',
+      varAlertPct: 5,
+      weights,
+    },
+    costMethod: options.costMethod ?? 'fifo',
+    coverageRatio: status === 'ok' ? 1 : 0.75,
+    currency: 'CNY',
+    dataQuality: {
+      fxStale: status === 'partial',
+      limitations: status === 'partial' ? ['fx_stale'] : [],
+      missingPriceSymbols: [],
+      partialReasons: status === 'partial' ? ['fx_stale'] : [],
+      status: status === 'empty_portfolio' ? 'empty' : status,
+    },
+    dimensions: {
+      concentration: dimension,
+      riskExposure: dimension,
+      diversification: dimension,
+      pnl: dimension,
+      cashRatio: dimension,
+    },
+    disclaimer: 'Research aid only.',
+    effectiveWeights: weights,
+    formulaVersion: 'portfolio_health_v2',
+    inputs: { totalCash: 1000, totalEquity: 10000, totalMarketValue: 9000 },
+    insights: [],
+    llmCanModifyScore: false,
+    partialScore: status === 'ok' ? null : 60,
+    persisted: true,
+    provenance: {
+      calculatedAt: '2026-08-15T12:00:00Z',
+      configHash: 'config',
+      riskHash: 'risk',
+      snapshotHash: 'snapshot',
+    },
+    score: status === 'ok' ? 85 : null,
+    scoreSource: 'rules',
+    status,
+    statusMessage: status === 'ok' ? 'Healthy' : `Portfolio health ${status}`,
+    unavailableDimensions: status === 'unavailable' ? ['risk_exposure'] : [],
+    weights,
+  };
+}
+
+function makeFutuPreview(snapshotId = 'snapshot-default', tradeDate = '2026-08-15') {
+  return {
+    broker: 'futu',
+    snapshotId,
+    recordCount: 1,
+    skippedCount: 0,
+    errorCount: 0,
+    records: [{
+      tradeDate,
+      symbol: 'AAPL',
+      side: 'buy',
+      quantity: 2,
+      price: 200,
+      fee: 0,
+      tax: 0,
+      currency: 'USD',
+      market: 'us',
+      sourceRow: 1,
+      dedupHash: `futu-aapl-${snapshotId}`,
+    }],
+    errors: [],
+    failedRows: [],
+  };
+}
+
+function makeUnavailableStressResult() {
+  return {
+    accountId: 1,
+    asOf: '2026-08-15',
+    calculatedAt: '2026-08-15T12:00:00Z',
+    snapshotId: 'a'.repeat(64),
+    snapshotVersion: 'portfolio_snapshot_v1',
+    costMethod: 'fifo',
+    currency: 'CNY',
+    status: 'unavailable',
+    statusMessage: '缺少可用价格，无法计算压力结果。',
+    portfolioValue: 0,
+    authoritativePortfolioValue: 0,
+    reconciliationDelta: 0,
+    positionsUsed: 0,
+    excludedPositionCount: 1,
+    excludedKnownMarketValue: 0,
+    excludedUnknownValueCount: 1,
+    excludedPositions: [{ symbol: 'AAPL', reason: 'missing_price' }],
+    simulationMethod: 'deterministic_factor_shock',
+    historicalReplayAvailable: false,
+    scenario: {
+      id: 'market_down_10',
+      name: '市场下跌 10%',
+      description: '确定性市场冲击',
+      category: 'market',
+      shocks: [{ factor: 'market', valuePct: -10 }],
+      requiresTargetSector: false,
+      availability: 'ready',
+      source: 'built_in',
+      version: 1,
+      scenarioHash: 'b'.repeat(64),
+      targetSector: null,
+    },
+    assumptions: { simplifiedAssumptions: [], dataSource: 'portfolio_snapshot' },
+    snapshotFxStale: false,
+    snapshotDataQuality: 'partial',
+    snapshotLimitations: ['missing_price'],
+    missingData: ['AAPL'],
+    portfolioPnl: null,
+    portfolioPnlPct: null,
+    stressedPortfolioValue: null,
+    positionImpacts: [],
+    topLosers: [],
+    topWinners: [],
+    concentration: { status: 'unavailable', statusMessage: 'missing_price' },
+  };
+}
+
 function makeDecisionSignal(overrides: Partial<DecisionSignalItem> = {}): DecisionSignalItem {
   return {
     id: 100,
@@ -413,6 +601,34 @@ describe('PortfolioPage FX refresh', () => {
       dryRun: true,
       errors: [],
     });
+    previewFutuImport.mockResolvedValue(makeFutuPreview());
+    commitFutuImport.mockResolvedValue({
+      accountId: 1,
+      recordCount: 1,
+      insertedCount: 0,
+      duplicateCount: 0,
+      failedCount: 0,
+      dryRun: true,
+      errors: [],
+    });
+    getPortfolioHealth.mockResolvedValue(null);
+    refreshPortfolioHealth.mockResolvedValue(makePortfolioHealth());
+    listStressScenarios.mockResolvedValue({
+      scenarios: [{
+        id: 'market_down_10',
+        name: '市场下跌 10%',
+        description: '确定性市场冲击',
+        category: 'market',
+        shocks: [{ factor: 'market', valuePct: -10 }],
+        requiresTargetSector: false,
+        availability: 'ready',
+        source: 'built_in',
+        version: 1,
+        scenarioHash: 'scenario-hash',
+      }],
+      simulationMethod: 'deterministic_factor_shock',
+      historicalReplayAvailable: false,
+    });
     createAccount.mockResolvedValue({ id: 1 });
     deleteAccount.mockResolvedValue({ deleted: 1 });
     analyzePosition.mockResolvedValue({
@@ -521,7 +737,7 @@ describe('PortfolioPage FX refresh', () => {
   }
 
   async function openCsvImportWizardAndReachConfirm(file: File) {
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     expect(await screen.findByRole('region', { name: '导入持仓向导' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     expect(screen.getByLabelText('选择 CSV / Excel')).toHaveAttribute('data-control', 'file-input');
@@ -624,6 +840,76 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.getByTestId('portfolio-tab-risk')).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('tab', { name: '持仓明细' }));
     await waitFor(() => expect(router.state.location.search).not.toContain('tab=risk'));
+  });
+
+  it('restores Portfolio insights from the URL and keeps workflow history navigable', async () => {
+    refreshPortfolioHealth.mockResolvedValueOnce(makePortfolioHealth({ accountId: 1 }));
+    const router = renderPortfolioPage('/portfolio?account=1&tab=insights&view=health');
+    await waitForInitialLoad();
+
+    expect(await screen.findByTestId('portfolio-health-panel')).toBeInTheDocument();
+    await waitFor(() => expect(getPortfolioHealth).toHaveBeenCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+    }));
+    expect(screen.queryByTestId('portfolio-tab-risk')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('portfolio-risk-heatmap-card')).not.toBeInTheDocument();
+    fireEvent.click(screen.getAllByRole('button', { name: '刷新健康度' })[0]);
+    await waitFor(() => expect(refreshPortfolioHealth).toHaveBeenCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+      persist: true,
+    }));
+    expect(await screen.findByText('健康度评分')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: '压力测试' }));
+    await waitFor(() => expect(router.state.location.search).toContain('view=stress'));
+    expect(await screen.findByTestId('portfolio-stress-panel')).toBeInTheDocument();
+    await waitFor(() => expect(listStressScenarios).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('tab', { name: '再平衡' }));
+    await waitFor(() => expect(router.state.location.search).toContain('view=rebalance'));
+    expect(await screen.findByTestId('portfolio-rebalance-panel')).toBeInTheDocument();
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => expect(router.state.location.search).toContain('view=stress'));
+    expect(await screen.findByTestId('portfolio-stress-panel')).toBeInTheDocument();
+
+    await act(async () => {
+      await router.navigate(1);
+    });
+    await waitFor(() => expect(router.state.location.search).toContain('view=rebalance'));
+    expect(await screen.findByTestId('portfolio-rebalance-panel')).toBeInTheDocument();
+  });
+
+  it('does not render zero-value stress KPIs when the backend reports unavailable', async () => {
+    runStressPreset.mockResolvedValueOnce(makeUnavailableStressResult());
+    renderPortfolioPage('/portfolio?account=1&tab=insights&view=stress');
+    await waitForInitialLoad();
+
+    fireEvent.click(await screen.findByRole('button', { name: '运行分析' }));
+
+    expect(await screen.findByText('缺少可用价格，无法计算压力结果。')).toBeInTheDocument();
+    expect(screen.queryByText('原组合市值')).not.toBeInTheDocument();
+    expect(screen.queryByText('压力损益')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '假设与限制' })).toBeInTheDocument();
+  });
+
+  it('retries the failed portfolio health refresh operation', async () => {
+    refreshPortfolioHealth
+      .mockRejectedValueOnce(new Error('health refresh unavailable'))
+      .mockResolvedValueOnce(makePortfolioHealth({ accountId: 1 }));
+    renderPortfolioPage('/portfolio?account=1&tab=insights&view=health');
+    await waitForInitialLoad();
+
+    const panel = await screen.findByTestId('portfolio-health-panel');
+    fireEvent.click(within(panel).getAllByRole('button', { name: '刷新健康度' })[0]);
+    fireEvent.click(await within(panel).findByRole('button', { name: '重试' }));
+
+    await waitFor(() => expect(refreshPortfolioHealth).toHaveBeenCalledTimes(2));
+    expect(await within(panel).findByText('健康度评分')).toBeInTheDocument();
   });
 
   it('clears account-scoped selection and ledger page when the account changes', async () => {
@@ -850,14 +1136,95 @@ describe('PortfolioPage FX refresh', () => {
 
     renderPortfolioPage();
     await waitForInitialLoad();
-    await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
+    expect(listImportBrokers).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    await waitFor(() => expect(listImportBrokers).toHaveBeenCalledTimes(1));
 
     expect(within(wizard).getByText('券商列表为空，暂时无法导入 CSV。')).toBeInTheDocument();
     expect(within(wizard).getByRole('combobox', { name: '券商' })).toBeDisabled();
     expect(within(wizard).getByRole('button', { name: '下一步' })).toBeDisabled();
+  });
+
+  it('binds Futu commit to the latest preview after the source date changes', async () => {
+    const secondPreview = createDeferred<ReturnType<typeof makeFutuPreview>>();
+    renderPortfolioPage();
+    await waitForInitialLoad();
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
+    const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    fireEvent.click(within(wizard).getByRole('radio', { name: 'Futu OpenD' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+
+    await waitFor(() => expect(previewFutuImport).toHaveBeenCalledTimes(1));
+    expect(await within(wizard).findByText(/snapshot-default/)).toBeInTheDocument();
+    fireEvent.click(within(wizard).getByRole('button', { name: '上一步' }));
+    previewFutuImport.mockImplementationOnce(() => secondPreview.promise);
+    const nextDate = chooseVisibleDate('合成买入日期');
+    expect(within(wizard).queryByText(/snapshot-default/)).not.toBeInTheDocument();
+
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    await waitFor(() => expect(previewFutuImport).toHaveBeenCalledTimes(2));
+    expect(within(wizard).getByRole('button', { name: '下一步' })).toBeDisabled();
+    await act(async () => {
+      secondPreview.resolve(makeFutuPreview('snapshot-latest', nextDate));
+      await secondPreview.promise;
+    });
+    expect(await within(wizard).findByText(/snapshot-latest/)).toBeInTheDocument();
+
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '提交导入' }));
+
+    await waitFor(() => expect(commitFutuImport).toHaveBeenCalledWith(expect.objectContaining({
+      accountId: 1,
+      asOf: nextDate,
+      dryRun: true,
+      expectedSnapshotId: 'snapshot-latest',
+      operationId: expect.any(String),
+    })));
+  });
+
+  it('returns a stale Futu commit to the preview step before allowing another commit', async () => {
+    commitFutuImport.mockRejectedValueOnce(createApiError(createParsedApiError({
+      title: 'Preview expired',
+      message: 'Preview the current positions before importing.',
+      rawMessage: 'Preview the current positions before importing.',
+      status: 409,
+      category: 'http_error',
+      code: 'portfolio_import_preview_stale',
+    })));
+    renderPortfolioPage();
+    await waitForInitialLoad();
+    chooseOption(screen.getAllByRole('combobox')[0], '1');
+    await waitFor(() => expect(getSnapshot).toHaveBeenLastCalledWith({
+      accountId: 1,
+      costMethod: 'fifo',
+      includeRealtime: false,
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
+    const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    fireEvent.click(within(wizard).getByRole('radio', { name: 'Futu OpenD' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    expect(await within(wizard).findByText(/snapshot-default/)).toBeInTheDocument();
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    fireEvent.click(within(wizard).getByRole('button', { name: '提交导入' }));
+
+    expect(await screen.findByText('Preview the current positions before importing.'))
+      .toBeInTheDocument();
+    expect(within(wizard).getByRole('button', { name: '预览持仓' })).toBeInTheDocument();
+    expect(within(wizard).queryByRole('button', { name: '提交导入' })).not.toBeInTheDocument();
   });
 
   it('keeps pasted CSV editable after row errors and reparses the corrected source', async () => {
@@ -881,7 +1248,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
     await waitForInitialLoad();
 
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     const source = screen.getByLabelText('或粘贴表格文本');
@@ -928,7 +1295,7 @@ describe('PortfolioPage FX refresh', () => {
 
     renderPortfolioPage();
     await waitForInitialLoad();
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
     const file = new File(['not-a-real-workbook'], 'trades.xlsx', {
@@ -958,7 +1325,7 @@ describe('PortfolioPage FX refresh', () => {
     renderPortfolioPage();
     await waitForInitialLoad();
 
-    fireEvent.click(screen.getByRole('button', { name: '券商 CSV 导入' }));
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
     await screen.findByRole('region', { name: '导入持仓向导' });
     fireEvent.click(screen.getByRole('button', { name: '下一步' }));
     const file = new File(['bad'], 'bad.csv', { type: 'text/csv' });

@@ -13,18 +13,20 @@ describe('portfolioUrlSchema', () => {
     expect(readParams(portfolioUrlSchema, '')).toEqual({
       account: null,
       tab: 'positions',
+      view: 'health',
       selected: null,
       page: 1,
     });
   });
 
-  it('parses account, tab, selected row, and ledger page', () => {
+  it('parses account, tab, insight view, selected row, and ledger page', () => {
     expect(readParams(
       portfolioUrlSchema,
-      '?account=7&tab=ledger&selected=7-AAPL-us&page=3&keep=yes',
+      '?account=7&tab=insights&view=stress&selected=7-AAPL-us&page=3&keep=yes',
     )).toEqual({
       account: 7,
-      tab: 'ledger',
+      tab: 'insights',
+      view: 'stress',
       selected: '7-AAPL-us',
       page: 3,
     });
@@ -34,9 +36,29 @@ describe('portfolioUrlSchema', () => {
     expect(readParams(portfolioUrlSchema, '?account=0&tab=admin&page=abc')).toEqual({
       account: null,
       tab: 'positions',
+      view: 'health',
       selected: null,
       page: 1,
     });
+  });
+
+  it('writes insight views with push history and keeps health explicit', () => {
+    const health = writeParams(
+      portfolioUrlSchema,
+      { tab: 'insights', view: 'health' },
+      { search: '?account=3' },
+    );
+    expect(health.history).toBe('push');
+    expect(health.search).toContain('tab=insights');
+    expect(health.search).toContain('view=health');
+
+    const stress = writeParams(
+      portfolioUrlSchema,
+      { view: 'stress' },
+      { search: health.search },
+    );
+    expect(stress.history).toBe('push');
+    expect(stress.search).toContain('view=stress');
   });
 
   it('writes tab/page with replace and selected with push; preserves unknown keys', () => {

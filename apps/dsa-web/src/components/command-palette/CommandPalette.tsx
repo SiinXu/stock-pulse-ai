@@ -3,7 +3,6 @@
 import {
   Activity,
   BarChart3,
-  BriefcaseBusiness,
   ClipboardCheck,
   FileText,
   GitBranch,
@@ -12,6 +11,7 @@ import {
   ShieldCheck,
   Sparkles,
   Wand2,
+  WalletCards,
 } from 'lucide-react';
 import {
   useEffect,
@@ -111,7 +111,7 @@ export function CommandPalette({
     { id: 'run-analysis', labelKey: 'home.startAnalysisTitle', href: analysisHref, icon: Sparkles },
     { id: 'create-rule', labelKey: 'decisionSignals.createFirstRule', href: buildSignalCenterHref({ createRule: true }), icon: ShieldCheck },
     { id: 'scope-all', labelKey: 'decisionSignals.scopeAllSignals', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.all }), icon: Activity },
-    { id: 'scope-holdings', labelKey: 'decisionSignals.scopeHoldings', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }), icon: BriefcaseBusiness },
+    { id: 'scope-holdings', labelKey: 'decisionSignals.scopeHoldings', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.holdings }), icon: WalletCards },
     { id: 'scope-watchlist', labelKey: 'decisionSignals.scopeWatchlist', href: buildSignalCenterHref({ scope: SIGNAL_CENTER_SCOPE_VALUES.watchlist }), icon: ClipboardCheck },
     { id: 'run-market-review', label: text.runMarketReview, href: buildResearchMarketHref({ action: RESEARCH_MARKET_ACTION_VALUES.run }), icon: BarChart3 },
     { id: 'review-signals', labelKey: 'decisionSignals.tab.review', href: buildSignalCenterHref({ tab: SIGNAL_CENTER_TAB_VALUES.review }), icon: Activity },

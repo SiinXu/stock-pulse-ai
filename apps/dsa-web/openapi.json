@@ -20938,6 +20938,63 @@
         "title": "PortfolioEventCreatedResponse",
         "type": "object"
       },
+      "PortfolioFutuImportPreviewResponse": {
+        "properties": {
+          "broker": {
+            "title": "Broker",
+            "type": "string"
+          },
+          "error_count": {
+            "title": "Error Count",
+            "type": "integer"
+          },
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "failed_rows": {
+            "description": "Structured rejected rows with original cells for client download",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioImportFailedRow"
+            },
+            "title": "Failed Rows",
+            "type": "array"
+          },
+          "record_count": {
+            "title": "Record Count",
+            "type": "integer"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioImportTradeItem"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "skipped_count": {
+            "title": "Skipped Count",
+            "type": "integer"
+          },
+          "snapshot_id": {
+            "description": "Stable identity for the normalized live positions shown in this preview",
+            "pattern": "^[0-9a-f]{64}$",
+            "title": "Snapshot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "broker",
+          "record_count",
+          "skipped_count",
+          "error_count",
+          "snapshot_id"
+        ],
+        "title": "PortfolioFutuImportPreviewResponse",
+        "type": "object"
+      },
       "PortfolioFutuImportRequest": {
         "properties": {
           "account_id": {
@@ -20963,6 +21020,19 @@
             "description": "Preview insert counts without writing trades",
             "title": "Dry Run",
             "type": "boolean"
+          },
+          "expected_snapshot_id": {
+            "anyOf": [
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional preview identity. When provided, import succeeds only if the live positions still match the confirmed preview.",
+            "title": "Expected Snapshot Id"
           },
           "operation_id": {
             "anyOf": [
@@ -51531,7 +51601,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/PortfolioImportParseResponse"
+                  "$ref": "#/components/schemas/PortfolioFutuImportPreviewResponse"
                 }
               }
             },

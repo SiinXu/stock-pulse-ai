@@ -104,6 +104,7 @@ class FutuImportApiTests(unittest.TestCase):
             self.assertEqual(body["broker"], "futu")
             self.assertEqual(body["record_count"], 1)
             self.assertEqual(body["records"][0]["symbol"], "AAPL")
+            self.assertRegex(body["snapshot_id"], r"^[0-9a-f]{64}$")
 
             commit = self.client.post(
                 "/api/v1/portfolio/imports/futu",
@@ -111,6 +112,7 @@ class FutuImportApiTests(unittest.TestCase):
                     "account_id": account_id,
                     "dry_run": False,
                     "as_of": "2026-08-06",
+                    "expected_snapshot_id": body["snapshot_id"],
                 },
             )
             self.assertEqual(commit.status_code, 200)
@@ -144,6 +146,56 @@ class FutuImportApiTests(unittest.TestCase):
         if error is None and isinstance(payload.get("detail"), dict):
             error = payload["detail"].get("error")
         self.assertEqual(error, "futu_opend_unavailable")
+
+    def test_changed_positions_return_preview_stale_without_writes(self) -> None:
+        account_id = self._create_account()
+        original = [
+            FutuPosition(
+                futu_acc_id=9,
+                futu_code="US.AAPL",
+                symbol="AAPL",
+                market="US",
+                quantity=3.0,
+                cost_price=180.0,
+                currency="USD",
+            )
+        ]
+        changed = [
+            FutuPosition(
+                futu_acc_id=9,
+                futu_code="US.AAPL",
+                symbol="AAPL",
+                market="US",
+                quantity=4.0,
+                cost_price=180.0,
+                currency="USD",
+            )
+        ]
+        with patch(
+            "src.services.portfolio_import_service.fetch_futu_positions",
+            side_effect=[original, changed],
+        ):
+            preview = self.client.post(
+                "/api/v1/portfolio/imports/futu/preview",
+                params={"as_of": "2026-08-06"},
+            ).json()
+            response = self.client.post(
+                "/api/v1/portfolio/imports/futu",
+                json={
+                    "account_id": account_id,
+                    "as_of": "2026-08-06",
+                    "expected_snapshot_id": preview["snapshot_id"],
+                },
+            )
+
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["error"], "portfolio_import_preview_stale")
+        snapshot = self.client.get(
+            "/api/v1/portfolio/snapshot",
+            params={"account_id": account_id, "as_of": "2026-08-06"},
+        )
+        self.assertEqual(snapshot.status_code, 200)
+        self.assertEqual(snapshot.json()["accounts"][0]["positions"], [])
 
 
 if __name__ == "__main__":

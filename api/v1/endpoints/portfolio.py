@@ -26,6 +26,7 @@ from api.v1.schemas.portfolio import (
     PortfolioDeleteResponse,
     PortfolioEventCreatedResponse,
     PortfolioFutuImportRequest,
+    PortfolioFutuImportPreviewResponse,
     PortfolioFxRefreshResponse,
     PortfolioImportBrokerListResponse,
     PortfolioImportCommitResponse,
@@ -42,7 +43,10 @@ from api.v1.schemas.portfolio import (
 )
 from data_provider.futu_position_fetcher import FutuPositionFetchError
 from src.services.task_queue import get_task_queue
-from src.services.portfolio_import_service import PortfolioImportService
+from src.services.portfolio_import_service import (
+    PortfolioImportPreviewStaleError,
+    PortfolioImportService,
+)
 from src.services.portfolio_risk_service import PortfolioRiskService
 from src.services.portfolio_service import (
     PortfolioBusyError,
@@ -822,18 +826,19 @@ def commit_csv_import(
 
 @router.post(
     "/imports/futu/preview",
-    response_model=PortfolioImportParseResponse,
+    response_model=PortfolioFutuImportPreviewResponse,
     responses={400: {"model": ErrorResponse}, 503: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
     summary="Preview Futu OpenD real positions as import trade records",
 )
 def preview_futu_import(
     as_of: Optional[date] = Query(None, description="Synthetic buy trade date; default today"),
-) -> PortfolioImportParseResponse:
+) -> PortfolioFutuImportPreviewResponse:
     importer = PortfolioImportService()
     try:
         parsed = importer.preview_futu_positions(as_of=as_of)
-        return PortfolioImportParseResponse(
+        return PortfolioFutuImportPreviewResponse(
             broker=parsed["broker"],
+            snapshot_id=parsed["snapshot_id"],
             record_count=parsed["record_count"],
             skipped_count=parsed["skipped_count"],
             error_count=parsed["error_count"],
@@ -884,8 +889,14 @@ def commit_futu_import(
             dry_run=body.dry_run,
             operation_id=_resolve_operation_id(body.operation_id, idempotency_key),
             as_of=body.as_of,
+            expected_snapshot_id=body.expected_snapshot_id,
         )
         return PortfolioImportCommitResponse(**result)
+    except PortfolioImportPreviewStaleError as exc:
+        raise _conflict_error(
+            error="portfolio_import_preview_stale",
+            message=str(exc),
+        )
     except FutuPositionFetchError as exc:
         raise api_error(503, "futu_opend_unavailable", str(exc))
     except PortfolioIdempotencyConflictError as exc:

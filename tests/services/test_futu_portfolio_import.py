@@ -12,7 +12,10 @@ from unittest.mock import patch
 
 from data_provider.futu_position_fetcher import FutuPosition, FutuPositionFetchError
 from src.config import Config
-from src.services.portfolio_import_service import PortfolioImportService
+from src.services.portfolio_import_service import (
+    PortfolioImportPreviewStaleError,
+    PortfolioImportService,
+)
 from src.services.portfolio_service import PortfolioService
 from src.storage import DatabaseManager
 
@@ -111,6 +114,59 @@ class FutuPortfolioImportServiceTests(unittest.TestCase):
             cost_method="fifo",
         )
         self.assertEqual(snapshot.get("positions") or [], [])
+
+    def test_preview_identity_is_stable_for_equivalent_position_order(self) -> None:
+        positions = self._sample_positions()
+        with patch(
+            "src.services.portfolio_import_service.fetch_futu_positions",
+            side_effect=[positions, list(reversed(positions))],
+        ):
+            first = self.importer.preview_futu_positions(as_of=date(2026, 8, 6))
+            second = self.importer.preview_futu_positions(as_of=date(2026, 8, 6))
+
+        self.assertEqual(first["snapshot_id"], second["snapshot_id"])
+
+    def test_stale_preview_never_writes_even_with_a_reused_operation_id(self) -> None:
+        original = self._sample_positions()
+        changed = [
+            FutuPosition(
+                futu_acc_id=101,
+                futu_code="US.AAPL",
+                symbol="AAPL",
+                market="US",
+                quantity=6.0,
+                cost_price=190.0,
+                currency="USD",
+            )
+        ]
+        with patch(
+            "src.services.portfolio_import_service.fetch_futu_positions",
+            side_effect=[original, original, changed],
+        ):
+            preview = self.importer.preview_futu_positions(as_of=date(2026, 8, 6))
+            first = self.importer.import_futu_positions(
+                account_id=self.account_id,
+                as_of=date(2026, 8, 6),
+                expected_snapshot_id=preview["snapshot_id"],
+                operation_id="futu-preview-bound-operation",
+            )
+            with self.assertRaises(PortfolioImportPreviewStaleError):
+                self.importer.import_futu_positions(
+                    account_id=self.account_id,
+                    as_of=date(2026, 8, 6),
+                    expected_snapshot_id=preview["snapshot_id"],
+                    operation_id="futu-preview-bound-operation",
+                )
+
+        self.assertEqual(first["inserted_count"], 2)
+        snapshot = self.service.get_portfolio_snapshot(
+            account_id=self.account_id,
+            as_of=date(2026, 8, 6),
+            cost_method="fifo",
+        )
+        accounts = snapshot.get("accounts") or []
+        symbols = {item["symbol"]: item for item in accounts[0].get("positions") or []}
+        self.assertEqual(float(symbols["AAPL"]["quantity"]), 5.0)
 
 
 if __name__ == "__main__":

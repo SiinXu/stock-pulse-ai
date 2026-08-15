@@ -37,7 +37,8 @@ flowchart TB
   A[Select account: all or one] --> B[Top KPI and risk]
   A --> C[Holdings table]
   A --> D[Event ledger: trades/cash/corporate]
-  A --> E[CSV import]
+  A --> E[Import wizard: file/paste/Futu]
+  A --> H[Insights: health/basket/stress/rebalance]
   C --> F[One-click analysis]
   C --> G[AI suggestion or Signal jump]
 ```
@@ -95,14 +96,31 @@ Paper trades currently exclude fees, taxes, and slippage; the ticket states this
 
 Ledger filters by date/code/direction are common. Deletes usually confirm; some deletes are blocked for consistency.
 
-## Spreadsheet import
+## Import positions
 
-1. Open the import wizard and pick the broker format.  
-2. Upload **CSV or Excel (.xlsx)**, or paste table text.  
+1. Open **Import positions** and choose **File or paste**. If local Futu OpenD is configured, you can choose **Futu OpenD** instead.
+2. For files, pick the broker format, then upload **CSV or Excel (.xlsx)** or paste table text. For Futu, confirm the synthetic buy date.
 3. Review the mapping preview, then validation: rejected rows show line numbers and reasons.  
 4. Download the **failed-rows CSV** to correct bad data; invalid rows are rejected explicitly and never written silently.  
 5. **Dry-run** first, then commit only when the preview looks right.  
 6. Re-submit prefers idempotency—avoid double books when the UI says duplicates were skipped.
+
+Futu also requires a preview. The preview includes a confirmed snapshot identity. Commit fetches OpenD again and verifies that identity; changed positions return `409 portfolio_import_preview_stale`, write no partial trades, and require a new preview.
+
+## Portfolio insights
+
+Open **Portfolio insights** to switch among four shareable views:
+
+| View | URL | Purpose |
+| --- | --- | --- |
+| Health | `/portfolio?tab=insights&view=health` | Read the stored snapshot or explicitly refresh the current account and cost method |
+| Basket analysis | `/portfolio?tab=insights&view=basket` | Compare correlation, concentration, historical risk, and shared exposure for a temporary symbol basket |
+| Stress test | `/portfolio?tab=insights&view=stress` | Replay the current portfolio with a registered deterministic scenario |
+| Rebalance | `/portfolio?tab=insights&view=rebalance` | Generate read-only suggestions and position bands for a selected risk tolerance; never place orders |
+
+Changing account or cost method immediately clears visible Health, Stress, and Rebalance results, and late responses cannot overwrite the new context. Assumptions, limitations, data quality, and provenance remain available in expandable evidence sections. Partial, unavailable, insufficient-data, and backend-refusal states stay explicit.
+
+Basket analysis is temporary and never writes the account. Stress and Rebalance use the current account context. Rebalancing never writes the ledger or triggers a real order.
 
 
 ## One-click analysis from holdings
@@ -134,6 +152,7 @@ Create Paper account → select it → open Paper trade → submit a buy with bl
 | Dry-run import | Preview without writing |
 | Paper account | A clearly labeled simulated book that never sends real orders |
 | Paper trade | A simulated fill written only to a Paper account; fees, taxes, and slippage are currently excluded |
+| Confirmed snapshot | Stable identity for a Futu preview; changed positions require a new preview before commit |
 
 ## Related
 

@@ -55,6 +55,8 @@ futu:{futu_acc_id}:{symbol}:{quantity:.8f}:{price:.8f}
 POST /api/v1/portfolio/imports/futu/preview?as_of=2026-08-06
 ```
 
+预览响应包含 64 位 SHA-256 `snapshot_id`。它由合成买入日期和规范化持仓内容生成，持仓顺序变化不会改变标识。
+
 提交：
 
 ```http
@@ -66,15 +68,18 @@ Idempotency-Key: optional-client-key
   "account_id": 1,
   "dry_run": false,
   "as_of": "2026-08-06",
-  "operation_id": "optional-client-key"
+  "operation_id": "optional-client-key",
+  "expected_snapshot_id": "<preview snapshot_id>"
 }
 ```
 
 响应字段与 CSV 导入提交一致（`inserted_count`、`duplicate_count`、`failed_count`、`errors`）。
 
+`expected_snapshot_id` 为加法兼容字段；旧 API 调用可省略。Web 导入向导始终携带该字段。后端会在写入前重新读取 OpenD；若持仓与预览不一致，返回 **409**、`error=portfolio_import_preview_stale`，不写入任何成交。用户必须重新预览后再提交。
+
 OpenD 不可达或配置无效时返回 **503**，`error=futu_opend_unavailable`，并给出可操作错误信息；该请求不会写入任何部分成交。
 
-> **Web UI：** 组合页导入按钮为后续工作。设置页已暴露 OpenD 连接字段；当前可通过 API / 自动化调用导入。
+> **Web UI：** 在组合页选择具体账户，打开 **导入持仓 → Futu OpenD**，确认合成买入日期，预览后再提交。设置页的数据源区域提供 OpenD 连接字段。
 
 ## 降级与安全
 

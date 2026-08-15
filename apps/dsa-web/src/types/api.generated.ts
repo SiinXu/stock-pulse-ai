@@ -12291,6 +12291,31 @@ export interface components {
             /** Id */
             id: number;
         };
+        /** PortfolioFutuImportPreviewResponse */
+        PortfolioFutuImportPreviewResponse: {
+            /** Broker */
+            broker: string;
+            /** Error Count */
+            error_count: number;
+            /** Errors */
+            errors?: string[];
+            /**
+             * Failed Rows
+             * @description Structured rejected rows with original cells for client download
+             */
+            failed_rows?: components["schemas"]["PortfolioImportFailedRow"][];
+            /** Record Count */
+            record_count: number;
+            /** Records */
+            records?: components["schemas"]["PortfolioImportTradeItem"][];
+            /** Skipped Count */
+            skipped_count: number;
+            /**
+             * Snapshot Id
+             * @description Stable identity for the normalized live positions shown in this preview
+             */
+            snapshot_id: string;
+        };
         /** PortfolioFutuImportRequest */
         PortfolioFutuImportRequest: {
             /**
@@ -12309,6 +12334,11 @@ export interface components {
              * @default false
              */
             dry_run: boolean;
+            /**
+             * Expected Snapshot Id
+             * @description Optional preview identity. When provided, import succeeds only if the live positions still match the confirmed preview.
+             */
+            expected_snapshot_id?: string | null;
             /**
              * Operation Id
              * @description Client-generated idempotency key scoped by operation type, account, and account owner. Replays use PORTFOLIO_IDEMPOTENCY_REPLAY_WINDOW_DAYS (seven days by default).
@@ -27837,7 +27867,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PortfolioImportParseResponse"];
+                    "application/json": components["schemas"]["PortfolioFutuImportPreviewResponse"];
                 };
             };
             /** @description Bad Request */
