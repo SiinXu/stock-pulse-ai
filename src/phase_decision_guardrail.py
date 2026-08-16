@@ -6,7 +6,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
-from src.analysis_context_pack_prompt import CORE_DEGRADED_STATUSES
+from src.analysis_context_pack.prompt import CORE_DEGRADED_STATUSES
 from src.market_phase_summary import render_market_phase_summary
 from src.report_language import localize_confidence_level, normalize_report_language
 
