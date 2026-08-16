@@ -1,0 +1,1 @@
+- [Chore] Govern optional OCR and report-export requirement files in the dependency lock policy and add a names-only pyproject ocr extra (Refs #167).
