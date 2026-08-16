@@ -29,6 +29,7 @@
     ".github/requirements-review.txt",
     "requirements-desktop.txt",
     "requirements-ocr.txt",
+    "requirements-report-export.txt",
     "build-constraints.txt"
   ],
   "exact_source_files": [
@@ -100,6 +101,16 @@
       "packages": [
         "Pillow",
         "pytesseract"
+      ],
+      "allow_other_packages": false
+    },
+    "requirements-report-export.txt": {
+      "constraint": "constraints.txt",
+      "includes": [],
+      "packages": [
+        "fpdf2",
+        "fonttools",
+        "markdown-it-py"
       ],
       "allow_other_packages": false
     }
