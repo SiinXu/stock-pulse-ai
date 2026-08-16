@@ -29,12 +29,7 @@ BASELINE_VERSION = 1
 
 # Legacy compatibility shims (facade module) -> canonical implementation package.
 LEGACY_FACADES: Mapping[str, str] = {
-    "src.market_context": "src.market.context",
-    "src.market_phase_prompt": "src.market.phase_prompt",
-    "src.market_phase_summary": "src.market.phase_summary",
-    "src.market_structure_prompt": "src.market.structure_prompt",
     "src.market_sector_analysis": "src.market.sector_analysis",
-    "src.market_analyzer": "src.market.analyzer",
     "src.analysis_context_pack_overview": "src.analysis_context_pack.overview",
     "src.analysis_context_pack_prompt": "src.analysis_context_pack.prompt",
 }
@@ -42,12 +37,7 @@ LEGACY_FACADES: Mapping[str, str] = {
 # Shim files that re-export the canonical package; they are not importers of
 # themselves for allowlist purposes.
 FACADE_DEFINITION_FILES: Mapping[str, str] = {
-    "src.market_context": "src/market_context.py",
-    "src.market_phase_prompt": "src/market_phase_prompt.py",
-    "src.market_phase_summary": "src/market_phase_summary.py",
-    "src.market_structure_prompt": "src/market_structure_prompt.py",
     "src.market_sector_analysis": "src/market_sector_analysis.py",
-    "src.market_analyzer": "src/market_analyzer.py",
     "src.analysis_context_pack_overview": "src/analysis_context_pack_overview.py",
     "src.analysis_context_pack_prompt": "src/analysis_context_pack_prompt.py",
 }
@@ -322,21 +312,21 @@ def run_self_tests() -> None:
         (root / "src" / "market").mkdir()
         (root / "scripts").mkdir()
 
-        (root / "src" / "market" / "context.py").write_text(
-            "def detect_market(code):\n    return 'cn'\n",
+        (root / "src" / "market" / "sector_analysis.py").write_text(
+            "def build_sector_analysis_payload(**kwargs):\n    return {}\n",
             encoding="utf-8",
         )
-        (root / "src" / "market_context.py").write_text(
-            "from src.market.context import detect_market\n",
+        (root / "src" / "market_sector_analysis.py").write_text(
+            "from src.market.sector_analysis import build_sector_analysis_payload\n",
             encoding="utf-8",
         )
         (root / "src" / "analyzer.py").write_text(
-            "from src.market_context import detect_market\n",
+            "from src.market_sector_analysis import build_sector_analysis_payload\n",
             encoding="utf-8",
         )
         (root / "src" / "services").mkdir()
         (root / "src" / "services" / "ok.py").write_text(
-            "from src.market.context import detect_market\n",
+            "from src.market.sector_analysis import build_sector_analysis_payload\n",
             encoding="utf-8",
         )
 
@@ -350,7 +340,7 @@ def run_self_tests() -> None:
         cases += 1
 
         (root / "src" / "new_caller.py").write_text(
-            "from src.market_context import detect_market\n",
+            "from src.market_sector_analysis import build_sector_analysis_payload\n",
             encoding="utf-8",
         )
         violations = collect_violations(root, baseline_path)
@@ -359,7 +349,7 @@ def run_self_tests() -> None:
         cases += 1
 
         (root / "src" / "attr_import.py").write_text(
-            "from src import market_context\n",
+            "from src import market_sector_analysis\n",
             encoding="utf-8",
         )
         violations = collect_violations(root, baseline_path)
@@ -369,7 +359,7 @@ def run_self_tests() -> None:
 
         (root / "tests").mkdir()
         (root / "tests" / "test_facade.py").write_text(
-            "from src.market_context import detect_market\n",
+            "from src.market_sector_analysis import build_sector_analysis_payload\n",
             encoding="utf-8",
         )
         hits = scan_repository(root)

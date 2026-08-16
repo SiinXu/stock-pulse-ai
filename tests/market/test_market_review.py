@@ -445,7 +445,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
     def test_run_market_review_jp_kr_persists_market_light_scores(self) -> None:
         notifier = self._make_notifier()
 
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         with patch.object(
             market_review_module.MarketAnalyzer,

@@ -16,6 +16,36 @@ from scripts.check_legacy_facade_imports import (
 )
 
 
+def test_legacy_facade_catalog_excludes_retired_market_shims():
+    """Deleted root-level market facades are no longer catalogued."""
+
+    retired = (
+        "src.market_analyzer",
+        "src.market_context",
+        "src.market_phase_prompt",
+        "src.market_phase_summary",
+        "src.market_regime_prompt",
+        "src.market_structure_prompt",
+    )
+    for name in retired:
+        assert name not in LEGACY_FACADES
+    leftover = {
+        "version": BASELINE_VERSION,
+        "facades": {
+            "src.market_analyzer": ["src/core/market_review.py"],
+        },
+    }
+    with tempfile.TemporaryDirectory(prefix="retired-market-baseline-") as tmp:
+        leftover_path = Path(tmp) / "leftover.json"
+        leftover_path.write_text(json.dumps(leftover), encoding="utf-8")
+        try:
+            load_baseline(leftover_path)
+        except BaselineError as exc:
+            assert "unknown facade" in str(exc)
+        else:
+            raise AssertionError("retired market facade was accepted")
+
+
 def test_legacy_facade_catalog_excludes_retired_notification_sender_shims():
     """The deleted notification_sender shim package is no longer catalogued."""
 

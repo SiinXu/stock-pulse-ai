@@ -8,12 +8,13 @@ from datetime import datetime
 from collections.abc import Mapping
 from typing import Any, Dict, List, Optional
 
-from src.core.trading_calendar import MarketPhase, build_market_phase_context, get_market_for_stock
-
-
 MARKET_PHASE_SUMMARY_KEY = "market_phase_summary"
 
-_ALLOWED_PHASES = tuple(phase.value for phase in MarketPhase)
+
+def _allowed_phases() -> tuple[str, ...]:
+    from src.core.trading_calendar import MarketPhase
+
+    return tuple(phase.value for phase in MarketPhase)
 _BOOLEAN_KEYS = ("is_trading_day", "is_market_open_now", "is_partial_bar")
 _INTEGER_KEYS = ("minutes_to_open", "minutes_to_close")
 _TEXT_KEYS = (
@@ -137,6 +138,8 @@ def rebuild_market_phase_summary_for_stock_code(
     helper recomputes those derived fields using the target market context while
     preserving non-derived source fields when possible.
     """
+    from src.core.trading_calendar import build_market_phase_context, get_market_for_stock
+
     summary = extract_market_phase_summary(context_snapshot)
     if not isinstance(summary, Mapping):
         return None
@@ -277,7 +280,7 @@ def _as_mapping(value: Any) -> Optional[Mapping[str, Any]]:
 
 def _safe_phase(value: Any) -> Optional[str]:
     text = _safe_text(value)
-    return text if text in _ALLOWED_PHASES else None
+    return text if text in _allowed_phases() else None
 
 
 def _source_label(value: Any, lang: str) -> Optional[str]:

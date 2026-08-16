@@ -28,8 +28,6 @@ from src.market_sector_analysis import (
     render_sector_analysis_prompt_context,
 )
 from src.search_service import SearchService
-from src.core.market_profile import get_profile, MarketProfile
-from src.core.market_strategy import get_market_strategy_blueprint
 from src.llm.backend_registry import (
     resolve_generation_backend_id,
     resolve_generation_fallback_backend_id,
@@ -159,7 +157,10 @@ class MarketAnalyzer:
         self.analyzer = analyzer
         self.data_manager = DataFetcherManager()
         self.region = region if region in ("cn", "us", "hk", "jp", "kr") else "cn"
-        self.profile: MarketProfile = get_profile(self.region)
+        from src.core.market_profile import get_profile
+        from src.core.market_strategy import get_market_strategy_blueprint
+
+        self.profile = get_profile(self.region)
         self.strategy = get_market_strategy_blueprint(self.region)
 
     def _log_context(self) -> str:

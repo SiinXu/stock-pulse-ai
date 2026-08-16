@@ -11,42 +11,8 @@
       "src/core/stages/persistence.py",
       "src/phase_decision_guardrail.py"
     ],
-    "src.market_analyzer": [
-      "src/core/market_review.py"
-    ],
-    "src.market_context": [
-      "src/agent/chat_context.py",
-      "src/agent/executor.py",
-      "src/agent/executor_parts/run.py",
-      "src/analyzer.py"
-    ],
-    "src.market_phase_prompt": [
-      "src/agent/agents/base_agent.py",
-      "src/agent/executor.py",
-      "src/agent/executor_parts/loop.py",
-      "src/analyzer.py"
-    ],
-    "src.market_phase_summary": [
-      "src/analysis_context_pack/overview.py",
-      "src/core/pipeline.py",
-      "src/core/stages/analysis.py",
-      "src/core/stages/analysis_agent.py",
-      "src/core/stages/analysis_context.py",
-      "src/core/stages/analysis_results.py",
-      "src/core/stages/analysis_stock.py",
-      "src/core/stages/persistence.py",
-      "src/notification.py",
-      "src/phase_decision_guardrail.py"
-    ],
     "src.market_sector_analysis": [
       "src/market/analyzer.py"
-    ],
-    "src.market_structure_prompt": [
-      "src/agent/agents/base_agent.py",
-      "src/agent/executor.py",
-      "src/agent/executor_parts/chat.py",
-      "src/agent/executor_parts/loop.py",
-      "src/analyzer.py"
     ]
   },
   "catalog": {
@@ -67,65 +33,11 @@
         "src/phase_decision_guardrail.py"
       ]
     },
-    "src.market_analyzer": {
-      "canonical": "src.market.analyzer",
-      "definition": "src/market_analyzer.py",
-      "importers": [
-        "src/core/market_review.py"
-      ]
-    },
-    "src.market_context": {
-      "canonical": "src.market.context",
-      "definition": "src/market_context.py",
-      "importers": [
-        "src/agent/chat_context.py",
-        "src/agent/executor.py",
-        "src/agent/executor_parts/run.py",
-        "src/analyzer.py"
-      ]
-    },
-    "src.market_phase_prompt": {
-      "canonical": "src.market.phase_prompt",
-      "definition": "src/market_phase_prompt.py",
-      "importers": [
-        "src/agent/agents/base_agent.py",
-        "src/agent/executor.py",
-        "src/agent/executor_parts/loop.py",
-        "src/analyzer.py"
-      ]
-    },
-    "src.market_phase_summary": {
-      "canonical": "src.market.phase_summary",
-      "definition": "src/market_phase_summary.py",
-      "importers": [
-        "src/analysis_context_pack/overview.py",
-        "src/core/pipeline.py",
-        "src/core/stages/analysis.py",
-        "src/core/stages/analysis_agent.py",
-        "src/core/stages/analysis_context.py",
-        "src/core/stages/analysis_results.py",
-        "src/core/stages/analysis_stock.py",
-        "src/core/stages/persistence.py",
-        "src/notification.py",
-        "src/phase_decision_guardrail.py"
-      ]
-    },
     "src.market_sector_analysis": {
       "canonical": "src.market.sector_analysis",
       "definition": "src/market_sector_analysis.py",
       "importers": [
         "src/market/analyzer.py"
-      ]
-    },
-    "src.market_structure_prompt": {
-      "canonical": "src.market.structure_prompt",
-      "definition": "src/market_structure_prompt.py",
-      "importers": [
-        "src/agent/agents/base_agent.py",
-        "src/agent/executor.py",
-        "src/agent/executor_parts/chat.py",
-        "src/agent/executor_parts/loop.py",
-        "src/analyzer.py"
       ]
     }
   }

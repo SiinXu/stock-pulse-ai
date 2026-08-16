@@ -51,17 +51,19 @@ Summary at the time this policy was introduced:
 
 | Legacy facade | Canonical module | Production importers | Facade definition |
 | --- | --- | --- | --- |
-| `src.market_context` | `src.market.context` | 4 | `src/market_context.py` |
-| `src.market_phase_prompt` | `src.market.phase_prompt` | 4 | `src/market_phase_prompt.py` |
-| `src.market_phase_summary` | `src.market.phase_summary` | 10 | `src/market_phase_summary.py` |
-| `src.market_structure_prompt` | `src.market.structure_prompt` | 5 | `src/market_structure_prompt.py` |
 | `src.market_sector_analysis` | `src.market.sector_analysis` | 1 | `src/market_sector_analysis.py` |
-| `src.market_analyzer` | `src.market.analyzer` | 1 | `src/market_analyzer.py` |
 | `src.analysis_context_pack_overview` | `src.analysis_context_pack.overview` | 2 | `src/analysis_context_pack_overview.py` |
 | `src.analysis_context_pack_prompt` | `src.analysis_context_pack.prompt` | 3 | `src/analysis_context_pack_prompt.py` |
 
-**Total allowlisted production importer rows: 30** (one file may appear under
+**Total allowlisted production importer rows: 6** (one file may appear under
 multiple facades).
+
+The root-level market shims (`src/market_analyzer.py`, `src/market_context.py`,
+`src/market_phase_prompt.py`, `src/market_phase_summary.py`,
+`src/market_regime_prompt.py`, `src/market_structure_prompt.py`) have been
+removed. Production and test imports use `src.market.*` only. The legacy
+facade guard no longer catalogues those paths; leftover baseline keys fail as
+unknown facades.
 
 The `src/notification_sender/` re-export shims have been removed. Production
 and test imports use `src.notification_parts.senders` only. The legacy facade

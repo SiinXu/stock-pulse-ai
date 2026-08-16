@@ -20,7 +20,7 @@ class TestMarketAnalyzerBypassFix:
         from src.core.market_strategy import get_market_strategy_blueprint
 
         with patch("src.analyzer.get_config") as mock_cfg, \
-             patch("src.market_analyzer.get_config") as mock_cfg2:
+             patch("src.market.analyzer.get_config") as mock_cfg2:
             cfg = MagicMock()
             cfg.litellm_model = "gemini/gemini-2.0-flash"
             cfg.litellm_fallback_models = []
@@ -39,7 +39,7 @@ class TestMarketAnalyzerBypassFix:
             mock_cfg2.return_value = cfg
 
             from src.analyzer import GeminiAnalyzer
-            from src.market_analyzer import MarketAnalyzer
+            from src.market.analyzer import MarketAnalyzer
 
             analyzer = GeminiAnalyzer.__new__(GeminiAnalyzer)
             analyzer._router = None
@@ -69,7 +69,7 @@ class TestMarketAnalyzerBypassFix:
 
     def test_generate_text_none_falls_back_to_template(self):
         """generate_market_review() falls back to template when generate_text returns None."""
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         overview = MarketOverview(
@@ -90,7 +90,7 @@ class TestMarketAnalyzerBypassFix:
 
     def test_generation_backend_config_error_does_not_template_fallback(self):
         from src.llm.generation_backend import GenerationError
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.analyzer._config_override.generation_backend = "codex"
@@ -108,7 +108,7 @@ class TestMarketAnalyzerBypassFix:
         )
 
         with patch.object(ma, "_generate_template_review", wraps=ma._generate_template_review) as template_review, \
-             patch("src.market_analyzer.record_llm_run") as mock_record_llm_run:
+             patch("src.market.analyzer.record_llm_run") as mock_record_llm_run:
             with pytest.raises(GenerationError) as exc_info:
                 ma.generate_market_review(overview, [])
 
@@ -125,7 +125,7 @@ class TestMarketAnalyzerBypassFix:
 
     def test_local_backend_execution_error_does_not_template_fallback(self):
         from src.llm.generation_backend import GenerationError, GenerationErrorCode
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.analyzer.generate_text.side_effect = GenerationError(
@@ -158,7 +158,7 @@ class TestMarketAnalyzerBypassFix:
         template_review.assert_not_called()
 
     def test_market_review_sanitizes_generation_failure_diagnostic(self):
-        from src.market_analyzer import MarketOverview
+        from src.market.analyzer import MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         secret = ma.config.gemini_api_keys[0]
@@ -167,7 +167,7 @@ class TestMarketAnalyzerBypassFix:
         )
         overview = MarketOverview(date="2026-03-05")
 
-        with patch("src.market_analyzer.record_llm_run") as mock_record_llm_run:
+        with patch("src.market.analyzer.record_llm_run") as mock_record_llm_run:
             with pytest.raises(RuntimeError):
                 ma.generate_market_review(overview, [])
 
@@ -176,7 +176,7 @@ class TestMarketAnalyzerBypassFix:
         assert "[REDACTED]" in diagnostic
 
     def test_market_review_fails_closed_when_analyzer_sanitizers_raise(self):
-        from src.market_analyzer import MarketOverview
+        from src.market.analyzer import MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         opaque_secret = "opaque configured value 8kT3"
@@ -193,7 +193,7 @@ class TestMarketAnalyzerBypassFix:
             ma.analyzer,
             "sanitize_generation_diagnostic",
             side_effect=RuntimeError("sanitizer unavailable"),
-        ), patch("src.market_analyzer.record_llm_run") as mock_record_llm_run:
+        ), patch("src.market.analyzer.record_llm_run") as mock_record_llm_run:
             with pytest.raises(RuntimeError):
                 ma.generate_market_review(overview, [])
 
@@ -225,7 +225,7 @@ class TestMarketAnalyzerBypassFix:
         assert diagnostic == "RotatingGenerationError: [REDACTED]"
 
     def test_backend_error_reuses_single_exception_snapshot(self):
-        from src.market_analyzer import MarketOverview
+        from src.market.analyzer import MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         error = RotatingGenerationError()
@@ -244,7 +244,7 @@ class TestMarketAnalyzerBypassFix:
             "sanitize_generation_diagnostic",
             side_effect=lambda value, **_kwargs: str(value),
         ) as analyzer_sanitizer, patch(
-            "src.market_analyzer.record_llm_run"
+            "src.market.analyzer.record_llm_run"
         ) as mock_record_llm_run:
             with pytest.raises(RotatingGenerationError):
                 ma.generate_market_review(overview, [])
@@ -257,7 +257,7 @@ class TestMarketAnalyzerBypassFix:
         assert diagnostic == "RotatingGenerationError: [REDACTED]"
 
     def test_backend_error_adds_snapshot_to_normal_redaction_lookup(self):
-        from src.market_analyzer import MarketOverview
+        from src.market.analyzer import MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         error = RotatingGenerationError()
@@ -276,7 +276,7 @@ class TestMarketAnalyzerBypassFix:
             "sanitize_generation_diagnostic",
             side_effect=lambda value, **_kwargs: str(value),
         ) as analyzer_sanitizer, patch(
-            "src.market_analyzer.record_llm_run"
+            "src.market.analyzer.record_llm_run"
         ) as mock_record_llm_run:
             with pytest.raises(RotatingGenerationError):
                 ma.generate_market_review(overview, [])
@@ -290,7 +290,7 @@ class TestMarketAnalyzerBypassFix:
 
     def test_generation_backend_config_error_without_analyzer_does_not_template_fallback(self):
         from src.llm.generation_backend import GenerationError
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         overview = MarketOverview(
             date="2026-03-05",
@@ -317,7 +317,7 @@ class TestMarketAnalyzerBypassFix:
             setattr(ma.config, attr_name, "codex")
 
             with patch.object(ma, "_generate_template_review", wraps=ma._generate_template_review) as template_review, \
-                 patch("src.market_analyzer.record_llm_run") as mock_record_llm_run:
+                 patch("src.market.analyzer.record_llm_run") as mock_record_llm_run:
                 with pytest.raises(GenerationError) as exc_info:
                     ma.generate_market_review(overview, [])
 
@@ -328,7 +328,7 @@ class TestMarketAnalyzerBypassFix:
 
     def test_market_review_uses_8192_max_tokens(self):
         """generate_market_review() should request a larger output budget to avoid truncation."""
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="复盘结果")
         overview = MarketOverview(
@@ -353,7 +353,7 @@ class TestMarketAnalyzerBypassFix:
         assert kwargs["temperature"] == 0.7
 
     def test_generate_template_review_uses_english_shell_for_cn_when_report_language_is_en(self):
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.config.report_language = "en"
@@ -390,7 +390,7 @@ class TestMarketAnalyzerBypassFix:
     def test_generate_template_review_uses_jp_title_for_english_fallback(self):
         from src.core.market_profile import JP_PROFILE
         from src.core.market_strategy import get_market_strategy_blueprint
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.region = "jp"
@@ -419,7 +419,7 @@ class TestMarketAnalyzerBypassFix:
     def test_generate_template_review_keeps_chinese_shell_for_us_when_report_language_is_default(self):
         from src.core.market_profile import US_PROFILE
         from src.core.market_strategy import get_market_strategy_blueprint
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.region = "us"
@@ -460,7 +460,7 @@ class TestMarketAnalyzerBypassFix:
     ):
         import src.core.market_profile as market_profile
         from src.core.market_strategy import get_market_strategy_blueprint
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.region = region
@@ -490,7 +490,7 @@ class TestMarketAnalyzerBypassFix:
         assert "今日A股市场整体呈现" not in zh_result
 
     def test_inject_data_into_review_matches_english_headings(self):
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         ma.config.report_language = "en"
@@ -539,7 +539,7 @@ Sector text.
         assert "| 1 | 煤炭 | -1.12% |" in result
 
     def test_inject_data_into_review_matches_reference_style_chinese_headings(self):
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         overview = MarketOverview(
@@ -611,7 +611,7 @@ Sector text.
         assert "算力产业链延续活跃" not in result
 
     def test_inject_data_into_review_appends_sector_block_when_heading_drifts(self):
-        from src.market_analyzer import MarketOverview
+        from src.market.analyzer import MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         overview = MarketOverview(
@@ -634,7 +634,7 @@ Sector text.
         assert "| 1 | 煤炭 | -1.12% |" in result
 
     def test_market_review_payload_sections_skip_top_report_title(self):
-        from src.market_analyzer import MarketAnalyzer
+        from src.market.analyzer import MarketAnalyzer
 
         ma = MarketAnalyzer.__new__(MarketAnalyzer)
         sections = ma._split_report_sections("""## 2026-06-03 大盘复盘
@@ -650,7 +650,7 @@ Sector text.
         assert all(section["title"] != "2026-06-03 大盘复盘" for section in sections)
 
     def test_news_block_renders_title_source_and_link_only(self):
-        from src.market_analyzer import MarketAnalyzer
+        from src.market.analyzer import MarketAnalyzer
 
         ma = MarketAnalyzer.__new__(MarketAnalyzer)
         ma.config = SimpleNamespace(report_language="zh")
@@ -681,7 +681,7 @@ Sector text.
         ) in result
 
     def test_news_block_uses_dash_when_source_metadata_missing(self):
-        from src.market_analyzer import MarketAnalyzer
+        from src.market.analyzer import MarketAnalyzer
 
         ma = MarketAnalyzer.__new__(MarketAnalyzer)
         ma.config = SimpleNamespace(report_language="zh")
@@ -699,7 +699,7 @@ Sector text.
         assert "| 1 | 政策利好带动板块活跃 |" not in result
 
     def test_news_block_uses_english_metadata_punctuation(self):
-        from src.market_analyzer import MarketAnalyzer
+        from src.market.analyzer import MarketAnalyzer
 
         ma = MarketAnalyzer.__new__(MarketAnalyzer)
         ma.config = SimpleNamespace(report_language="en")
@@ -722,7 +722,7 @@ Sector text.
         assert "（Reuters" not in result
 
     def test_review_prompt_caps_news_url_context(self):
-        from src.market_analyzer import MarketOverview
+        from src.market.analyzer import MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         long_url = "https://example.com/redirect?" + "utm_campaign=" + ("x" * 420)
@@ -745,7 +745,7 @@ Sector text.
         assert ("x" * 220) not in prompt
 
     def test_market_light_snapshot_marks_defensive_market_red(self):
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         overview = MarketOverview(
@@ -775,7 +775,7 @@ Sector text.
         assert any("亏钱效应" in reason for reason in snapshot["reasons"])
 
     def test_market_light_snapshot_uses_english_labels_and_reasons(self):
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         ma.config.report_language = "en"
@@ -807,7 +807,7 @@ Sector text.
 
     def test_market_light_snapshot_marks_us_without_breadth_as_partial(self):
         from src.core.market_profile import US_PROFILE
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         ma.region = "us"
@@ -837,7 +837,7 @@ Sector text.
         self, region, profile_name, index_code, index_name
     ):
         import src.core.market_profile as market_profile
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="review")
         ma.region = region
@@ -858,7 +858,7 @@ Sector text.
 
     def test_market_review_payload_omits_breadth_for_markets_without_stats(self):
         from src.core.market_profile import US_PROFILE
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="复盘结果")
         ma.region = "us"
@@ -885,7 +885,7 @@ Sector text.
         assert payload["indices"][0]["code"] == "SPX"
 
     def test_market_review_payload_omits_breadth_for_cn_market_without_available_stats(self):
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="复盘结果")
         payload = ma.build_market_review_payload(
@@ -910,7 +910,7 @@ Sector text.
         assert payload["indices"][0]["name"] == "上证指数"
 
     def test_market_review_payload_includes_breadth_only_when_stats_available(self):
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="复盘结果")
         payload = ma.build_market_review_payload(
@@ -938,7 +938,7 @@ Sector text.
         assert payload["breadth"]["total_amount"] == 12345.0
 
     def test_market_review_includes_concept_rankings_in_prompt_payload_and_tables(self):
-        from src.market_analyzer import MarketIndex, MarketOverview
+        from src.market.analyzer import MarketIndex, MarketOverview
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value="复盘结果")
         overview = MarketOverview(
@@ -971,7 +971,7 @@ Sector text.
     def test_us_english_indices_do_not_label_turnover_as_cny(self):
         from src.core.market_profile import US_PROFILE
         from src.core.market_strategy import get_market_strategy_blueprint
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.config.report_language = "en"
@@ -999,7 +999,7 @@ Sector text.
         assert "| S&P 500 | 5200.00 |" in result
 
     def test_indices_block_uses_configured_red_up_color_scheme(self):
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         ma.config.market_review_color_scheme = "red_up"
@@ -1019,7 +1019,7 @@ Sector text.
         assert "| 创业板指 | 2100.00 | ⚪ +0.00% |" in result
 
     def test_indices_block_keeps_green_up_default_color_scheme(self):
-        from src.market_analyzer import MarketOverview, MarketIndex
+        from src.market.analyzer import MarketOverview, MarketIndex
 
         ma = self._make_market_analyzer_with_mock_generate_text(return_value=None)
         overview = MarketOverview(
@@ -1040,7 +1040,7 @@ Sector text.
         import ast
         import pathlib
 
-        src = pathlib.Path("src/market_analyzer.py").read_text(encoding="utf-8")
+        src = pathlib.Path("src/market/analyzer.py").read_text(encoding="utf-8")
         tree = ast.parse(src)
         forbidden = {
             "_model", "_router", "_use_openai", "_use_anthropic",  # historical
