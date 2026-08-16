@@ -184,6 +184,9 @@ exclude = '''
 profile = "black"
 line_length = 120
 skip = [".git", "__pycache__", ".env", "venv", ".venv"]
+# Import roots treated as first-party during the src-package migration.
+# Shrinks to ["src"] at the single-package end-state (Refs #167).
+known_first_party = ["src", "api", "bot", "data_provider"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "test_*.py"]
