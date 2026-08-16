@@ -83,8 +83,8 @@ from src.notification_contracts import (
     is_feishu_static_env_configured,
 )
 from src.notification_noise import validate_notification_timezone
-from src.notification_sender.gotify_sender import resolve_gotify_message_endpoint
-from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
+from src.notification_parts.senders.gotify_sender import resolve_gotify_message_endpoint
+from src.notification_parts.senders.ntfy_sender import resolve_ntfy_endpoint
 from src.services.stock_list_parser import split_stock_list
 from src.services.generation_backend_status_service import GenerationBackendStatusService
 from src.services.config import (

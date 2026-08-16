@@ -144,7 +144,7 @@ class _SystemConfigNotificationMethods:
         content: str,
         timeout_seconds: float,
     ) -> Dict[str, Any]:
-        from src.notification_sender import (
+        from src.notification_parts.senders import (
             AstrbotSender,
             CustomWebhookSender,
             DiscordSender,
