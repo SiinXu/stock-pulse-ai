@@ -1,7 +1,7 @@
 # StockPulse universal Python dependency constraints
 # Generated file; do not edit by hand.
 # Resolver: uv==0.11.31
-# Source-SHA256: a02eed0c3de7bab47286e49d77d05da99c8cac5b9e3dbdfa4a41eb778c02b08a
+# Source-SHA256: 5be397c12e687164973528529e7865006cf0db9ebd608f467d6f016c385d39bd
 # Python-Minimum: 3.10
 # Exclude-Newer: 2026-07-27T04:06:13Z
 # Exclude-Newer-Packages: cryptography=2026-07-31T14:25:11Z,mcp=2026-07-29T00:00:00Z,mcp-types=2026-07-29T00:00:00Z
@@ -55,6 +55,8 @@ feedfinder2==0.0.4
 feedparser==6.0.12
 filelock==3.32.0
 flake8==7.3.0
+fonttools==4.63.0
+fpdf2==2.8.3
 frozenlist==1.8.0
 fsspec==2026.6.0
 futu-api==10.8.6808
@@ -173,6 +175,7 @@ pynacl==1.6.2
 pyparsing==3.3.2
 pypinyin==0.55.0
 pytdx==1.72
+pytesseract==0.3.13
 pytest==9.1.1
 pytest-cov==7.1.0
 pytest-timeout==2.4.0
