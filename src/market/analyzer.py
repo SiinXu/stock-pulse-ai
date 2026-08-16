@@ -159,7 +159,6 @@ class MarketAnalyzer:
         self.region = region if region in ("cn", "us", "hk", "jp", "kr") else "cn"
         from src.core.market_profile import get_profile
         from src.core.market_strategy import get_market_strategy_blueprint
-
         self.profile = get_profile(self.region)
         self.strategy = get_market_strategy_blueprint(self.region)
 
