@@ -34,8 +34,8 @@ from src.application_services import reset_application_services
 import src.notification as notification_module
 from src.notification import NotificationBuilder, NotificationChannel, NotificationService
 from src.notification_noise import reset_notification_noise_state
-from src.notification_sender.gotify_sender import resolve_gotify_message_endpoint
-from src.notification_sender.ntfy_sender import resolve_ntfy_endpoint
+from src.notification_parts.senders.gotify_sender import resolve_gotify_message_endpoint
+from src.notification_parts.senders.ntfy_sender import resolve_ntfy_endpoint
 from src.analyzer import AnalysisResult
 from bot.application_context import to_analysis_request_context
 from bot.models import BotMessage, ChatType
@@ -1055,7 +1055,7 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
         mock_post.assert_called_once()
         
     @mock.patch("src.notification.get_config")
-    @mock.patch("src.notification_sender.discord_sender.time.sleep", return_value=None)
+    @mock.patch("src.notification_parts.senders.discord_sender.time.sleep", return_value=None)
     @mock.patch("requests.post")
     def test_send_to_discord_via_notification_service_with_bot_requires_chunking(
         self,
@@ -2688,7 +2688,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         self.assertTrue(ok)
         mock_post.assert_called_once()
 
-    @mock.patch("src.notification_sender.pushplus_sender.time.sleep")
+    @mock.patch("src.notification_parts.senders.pushplus_sender.time.sleep")
     @mock.patch("src.notification.get_config")
     @mock.patch("requests.post")
     def test_send_to_pushplus_via_notification_service_requires_chunking(
