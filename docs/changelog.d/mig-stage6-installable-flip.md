@@ -1,0 +1,1 @@
+- [Changed] Make `src`, `api`, `bot`, and `data_provider` installable via `pip install -e . --no-deps`, reversing `packages = []` (ADR-012, Refs #167).
