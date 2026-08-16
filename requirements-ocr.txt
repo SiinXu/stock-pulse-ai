@@ -6,5 +6,5 @@
 # See docs/agent-ocr-tool_EN.md.
 -c constraints.txt
 
-Pillow>=10.0.0,<12
+Pillow>=10.0.0,<13
 pytesseract>=0.3.10,<0.4
