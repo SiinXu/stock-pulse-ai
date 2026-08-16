@@ -30,17 +30,6 @@ from src.report_language import (
     is_supported_report_language_value,
     normalize_report_language,
 )
-from src.notification_parts.route_config import parse_notification_route_channels
-from src.notification_parts.noise import (
-    NOTIFICATION_SEVERITIES,
-    is_supported_notification_severity,
-    parse_notification_quiet_hours,
-    validate_notification_timezone,
-)
-from src.notification_parts.contracts import (
-    is_feishu_app_bot_configured,
-    is_feishu_static_configured,
-)
 from src.utils.stock_list import split_stock_list
 from src.utils.sanitize import log_safe_exception
 from src.llm.backend_registry import (
@@ -259,6 +248,43 @@ for _config_part_name in (
 
 _config_model_module = _load_or_reload_config_part("src.config_parts.model")
 Config = _config_model_module.Config
+
+
+def _bind_notification_support_names() -> None:
+    """Expose notification helpers on this module without a module-level import.
+
+    Config mixin methods are rebound into ``src.config`` globals. Importing
+    ``src.notification_parts`` at module top-level would create a banned
+    ``src.config <-> src.notification_parts`` cycle because senders import
+    ``src.config``.
+    """
+
+    from src.notification_parts.route_config import parse_notification_route_channels
+    from src.notification_parts.noise import (
+        NOTIFICATION_SEVERITIES,
+        is_supported_notification_severity,
+        parse_notification_quiet_hours,
+        validate_notification_timezone,
+    )
+    from src.notification_parts.contracts import (
+        is_feishu_app_bot_configured,
+        is_feishu_static_configured,
+    )
+
+    globals().update(
+        {
+            "parse_notification_route_channels": parse_notification_route_channels,
+            "NOTIFICATION_SEVERITIES": NOTIFICATION_SEVERITIES,
+            "is_supported_notification_severity": is_supported_notification_severity,
+            "parse_notification_quiet_hours": parse_notification_quiet_hours,
+            "validate_notification_timezone": validate_notification_timezone,
+            "is_feishu_app_bot_configured": is_feishu_app_bot_configured,
+            "is_feishu_static_configured": is_feishu_static_configured,
+        }
+    )
+
+
+_bind_notification_support_names()
 _config_model_module._bind_config_facade(globals())
 
 

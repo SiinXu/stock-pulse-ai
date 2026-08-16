@@ -1,0 +1,1 @@
+- [Changed] Remove root-level notification compatibility shims; import `src.notification_parts.noise`, `src.notification_parts.contracts`, `src.notification_parts.capabilities`, and `src.notification_parts.route_config` (Refs #167).
