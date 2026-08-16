@@ -1,0 +1,1 @@
+- [Chore] Govern optional OCR and report-export requirement files in the dependency lock policy, add a names-only pyproject ocr extra, align the OCR Pillow range with the existing lock, and refresh the lock for pytesseract/fpdf2/fonttools (Refs #167).
