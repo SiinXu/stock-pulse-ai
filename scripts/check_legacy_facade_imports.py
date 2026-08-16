@@ -83,7 +83,7 @@ FACADE_DEFINITION_FILES: Mapping[str, str] = {
 }
 
 PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
-PRODUCTION_FILES = ("main.py", "server.py", "webui.py")
+PRODUCTION_FILES = ("main.py", "server.py")
 
 
 @dataclass(frozen=True, order=True)

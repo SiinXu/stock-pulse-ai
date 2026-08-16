@@ -34,7 +34,7 @@ NEXT_SECTION_RE = re.compile(r"^## \[", re.MULTILINE)
 
 PRODUCT_PREFIXES = (
     "src/", "api/", "bot/", "data_provider/", "apps/", "strategies/",
-    "templates/", "main.py", "server.py", "webui.py", "scripts/",
+    "templates/", "main.py", "server.py", "scripts/",
     ".github/workflows/",
 )
 IGNORE_PREFIXES = (
