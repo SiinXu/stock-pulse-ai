@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 import pytest
 import requests
 
-from src.notification_sender.custom_webhook_sender import CustomWebhookSender
+from src.notification_parts.senders.custom_webhook_sender import CustomWebhookSender
 from src.patches.eastmoney_patch import _is_eastmoney_request_url
 from src.security import outbound_policy, validate_public_reference_url
 from src.security.outbound_policy import (

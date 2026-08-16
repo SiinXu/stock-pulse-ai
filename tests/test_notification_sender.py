@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Unit tests for src.notification_sender module.
+Unit tests for src.notification_parts.senders module.
 
 Tests sender classes in isolation (config, request shape, error handling).
 Does not duplicate test_notification.py which tests NotificationService.send() flow.
@@ -23,7 +23,7 @@ import requests
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.config import Config
-from src.notification_sender import (
+from src.notification_parts.senders import (
     AstrbotSender,
     CustomWebhookSender,
     DiscordSender,
@@ -105,7 +105,7 @@ class TestDiscordSender(unittest.TestCase):
         sender = DiscordSender(cfg)
         self.assertFalse(sender._is_discord_configured())
 
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_webhook_success_builds_correct_payload(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(discord_webhook_url="https://discord.com/webhook/1")
@@ -117,7 +117,7 @@ class TestDiscordSender(unittest.TestCase):
         self.assertEqual(call_kw["json"]["content"], "content")
         self.assertIn("username", call_kw["json"])
 
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_webhook_http_error_returns_false(self, mock_post):
         mock_post.return_value = _response(400)
         cfg = _config(discord_webhook_url="https://discord.com/webhook/1")
@@ -125,7 +125,7 @@ class TestDiscordSender(unittest.TestCase):
         result = sender.send_to_discord("content")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_bot_success_uses_channel_url(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(discord_bot_token="TOKEN", discord_main_channel_id="CH123")
@@ -136,8 +136,8 @@ class TestDiscordSender(unittest.TestCase):
         call_kw = mock_post.call_args[1]
         self.assertEqual(call_kw["headers"]["Authorization"], "Bot TOKEN")
 
-    @mock.patch("src.notification_sender.discord_sender.time.sleep", return_value=None)
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.time.sleep", return_value=None)
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_webhook_long_content_sends_all_chunks(self, mock_post, mock_sleep):
         mock_post.return_value = _response(204)
         cfg = _config(discord_webhook_url="https://discord.com/webhook/1", discord_max_words=2000)
@@ -151,8 +151,8 @@ class TestDiscordSender(unittest.TestCase):
         payload_lengths = [len(call.kwargs["json"]["content"]) for call in mock_post.call_args_list]
         self.assertTrue(all(length <= 2000 for length in payload_lengths))
 
-    @mock.patch("src.notification_sender.discord_sender.time.sleep", return_value=None)
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.time.sleep", return_value=None)
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_webhook_long_content_retries_429_and_continues(self, mock_post, mock_sleep):
         mock_post.side_effect = [
             _response(204),
@@ -170,8 +170,8 @@ class TestDiscordSender(unittest.TestCase):
         self.assertEqual(mock_post.call_count, 5)
         mock_sleep.assert_any_call(0.0)
 
-    @mock.patch("src.notification_sender.discord_sender.time.sleep", return_value=None)
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.time.sleep", return_value=None)
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_webhook_long_content_does_not_short_circuit_after_failed_chunk(self, mock_post, _mock_sleep):
         mock_post.side_effect = [
             _response(204),
@@ -187,8 +187,8 @@ class TestDiscordSender(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(mock_post.call_count, 4)
 
-    @mock.patch("src.notification_sender.discord_sender.time.sleep", return_value=None)
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.time.sleep", return_value=None)
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_webhook_long_content_continues_after_request_exception(self, mock_post, _mock_sleep):
         cfg = _config(discord_webhook_url="https://discord.com/webhook/1", discord_max_words=2000)
         sender = DiscordSender(cfg)
@@ -206,8 +206,8 @@ class TestDiscordSender(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(mock_post.call_count, chunk_count + 2)
 
-    @mock.patch("src.notification_sender.discord_sender.time.sleep", return_value=None)
-    @mock.patch("src.notification_sender.discord_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.discord_sender.time.sleep", return_value=None)
+    @mock.patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_send_bot_clamps_configured_limit_to_discord_content_limit(self, mock_post, _mock_sleep):
         mock_post.return_value = _response(200)
         cfg = _config(
@@ -234,7 +234,7 @@ class TestWechatSender(unittest.TestCase):
         result = sender.send_to_wechat("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.wechat_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.wechat_sender.requests.post")
     def test_send_success_returns_true(self, mock_post):
         mock_post.return_value = _response(200, {"errcode": 0})
         cfg = _config(wechat_webhook_url="https://wechat.example/hook")
@@ -256,7 +256,7 @@ class TestWechatSender(unittest.TestCase):
         self.assertEqual(payload["msgtype"], "text")
         self.assertEqual(payload["text"]["content"], "plain")
 
-    @mock.patch("src.notification_sender.wechat_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.wechat_sender.requests.post")
     def test_send_wechat_image_over_limit_returns_false(self, mock_post):
         cfg = _config(wechat_webhook_url="https://wechat.example/hook")
         sender = WechatSender(cfg)
@@ -275,7 +275,7 @@ class TestFeishuSender(unittest.TestCase):
         result = sender.send_to_feishu("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_send_success_returns_true(self, mock_post):
         mock_post.return_value = _response(200, {"code": 0})
         cfg = _config(feishu_webhook_url="https://feishu.example/hook")
@@ -283,7 +283,7 @@ class TestFeishuSender(unittest.TestCase):
         result = sender.send_to_feishu("hello")
         self.assertTrue(result)
 
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_send_http_error_returns_false(self, mock_post):
         mock_post.return_value = _response(400)
         cfg = _config(feishu_webhook_url="https://feishu.example/hook")
@@ -291,8 +291,8 @@ class TestFeishuSender(unittest.TestCase):
         result = sender.send_to_feishu("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.feishu_sender.time.time", return_value=1700000000)
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.time.time", return_value=1700000000)
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_send_with_secret_and_keyword_builds_signed_payload(self, mock_post, _mock_time):
         mock_post.return_value = _response(200, {"code": 0})
         cfg = _config(
@@ -320,7 +320,7 @@ class TestFeishuSender(unittest.TestCase):
             "股票日报\nhello",
         )
 
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_send_uses_legacy_feishu_report_formatter(self, mock_post):
         mock_post.return_value = _response(200, {"code": 0})
         cfg = _config(feishu_webhook_url="https://feishu.example/hook")
@@ -345,7 +345,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertIn("[详情](https://example.com/report)", rendered)
         self.assertNotIn("| --- |", rendered)
 
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_send_error_response_returns_false(self, mock_post):
         mock_post.return_value = _response(200, {"code": 19024, "msg": "keyword not found"})
         cfg = _config(feishu_webhook_url="https://feishu.example/hook")
@@ -356,7 +356,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertFalse(result)
         self.assertEqual(mock_post.call_count, 2)
 
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_send_with_keyword_that_leaves_too_little_chunk_budget_returns_false(self, mock_post):
         cfg = _config(
             feishu_webhook_url="https://feishu.example/hook",
@@ -447,7 +447,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertEqual(mock_raw.call_args_list[0][0][1], "interactive")
         self.assertIn("**bold**", mock_raw.call_args_list[0][0][2])
 
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     @mock.patch.object(FeishuSender, "_app_send_raw", return_value=True)
     def test_webhook_takes_precedence_over_app_bot(self, mock_app_raw, mock_webhook_post):
         """When both webhook URL and App Bot credentials are configured, webhook is used."""
@@ -465,7 +465,7 @@ class TestFeishuSender(unittest.TestCase):
         mock_webhook_post.assert_called_once()
         mock_app_raw.assert_not_called()
 
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_webhook_does_not_require_sdk_when_app_bot_is_also_configured(self, mock_webhook_post):
         """Webhook precedence keeps SDK absence from breaking existing delivery."""
         mock_webhook_post.return_value = _response(200, {"code": 0})
@@ -477,7 +477,7 @@ class TestFeishuSender(unittest.TestCase):
         )
         sender = FeishuSender(cfg)
 
-        with mock.patch("src.notification_sender.feishu_sender.FEISHU_SDK_AVAILABLE", False), \
+        with mock.patch("src.notification_parts.senders.feishu_sender.FEISHU_SDK_AVAILABLE", False), \
              mock.patch.object(FeishuSender, "_ensure_app_client", side_effect=AssertionError("SDK should not be used")):
             result = sender.send_to_feishu("hello")
 
@@ -493,8 +493,8 @@ class TestFeishuSender(unittest.TestCase):
         )
         sender = FeishuSender(cfg)
 
-        with mock.patch("src.notification_sender.feishu_sender.FEISHU_SDK_AVAILABLE", False), \
-             self.assertLogs("src.notification_sender.feishu_sender", level="WARNING") as logs:
+        with mock.patch("src.notification_parts.senders.feishu_sender.FEISHU_SDK_AVAILABLE", False), \
+             self.assertLogs("src.notification_parts.senders.feishu_sender", level="WARNING") as logs:
             result = sender.send_to_feishu("hello")
 
         self.assertFalse(result)
@@ -562,7 +562,7 @@ class TestFeishuSender(unittest.TestCase):
         text_content = json.loads(second_call[0][2])
         self.assertIn("plain text", text_content["text"])
 
-    @mock.patch("src.notification_sender.feishu_sender.uuid_mod.uuid4", return_value="uuid-open-id")
+    @mock.patch("src.notification_parts.senders.feishu_sender.uuid_mod.uuid4", return_value="uuid-open-id")
     def test_app_bot_request_includes_receive_id_type(self, _mock_uuid4):
         """_app_send_raw request builder passes receive_id_type and request body fields."""
         cfg = _config(
@@ -585,7 +585,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertEqual(json.loads(req.request_body.content), {"text": "hi"})
         self.assertEqual(req.request_body.uuid, "uuid-open-id")
 
-    @mock.patch("src.notification_sender.feishu_sender.uuid_mod.uuid4")
+    @mock.patch("src.notification_parts.senders.feishu_sender.uuid_mod.uuid4")
     def test_app_bot_idempotency_uuid_per_call(self, mock_uuid4):
         """Each _app_send_raw invocation gets a fresh UUID."""
         cfg = _config(
@@ -606,7 +606,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertEqual(call1_req.request_body.uuid, "aaaa-bbbb-cccc")
         self.assertEqual(call2_req.request_body.uuid, "dddd-eeee-ffff")
 
-    @mock.patch("src.notification_sender.feishu_sender.time.sleep")
+    @mock.patch("src.notification_parts.senders.feishu_sender.time.sleep")
     def test_app_bot_retries_sdk_response_failure(self, mock_sleep):
         """_app_send_raw retries failed SDK responses and stops after success."""
         cfg = _config(
@@ -626,7 +626,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertEqual(create.call_count, 2)
         mock_sleep.assert_called_once()
 
-    @mock.patch("src.notification_sender.feishu_sender.time.sleep")
+    @mock.patch("src.notification_parts.senders.feishu_sender.time.sleep")
     def test_app_bot_retries_sdk_exception(self, mock_sleep):
         """_app_send_raw retries exceptions raised by the SDK create call."""
         cfg = _config(
@@ -643,7 +643,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertEqual(create.call_count, 2)
         mock_sleep.assert_called_once()
 
-    @mock.patch("src.notification_sender.feishu_sender.time.sleep")
+    @mock.patch("src.notification_parts.senders.feishu_sender.time.sleep")
     def test_app_bot_first_success_does_not_retry(self, mock_sleep):
         """_app_send_raw does not retry after the first successful SDK response."""
         cfg = _config(
@@ -660,8 +660,8 @@ class TestFeishuSender(unittest.TestCase):
         create.assert_called_once()
         mock_sleep.assert_not_called()
 
-    @mock.patch("src.notification_sender.feishu_sender.time.sleep")
-    @mock.patch("src.notification_sender.feishu_sender.CreateMessageRequest.builder", side_effect=RuntimeError("bad builder"))
+    @mock.patch("src.notification_parts.senders.feishu_sender.time.sleep")
+    @mock.patch("src.notification_parts.senders.feishu_sender.CreateMessageRequest.builder", side_effect=RuntimeError("bad builder"))
     def test_app_bot_builder_failure_does_not_retry(self, _mock_builder, mock_sleep):
         """Request builder failures are not treated as transient send failures."""
         cfg = _config(
@@ -682,7 +682,7 @@ class TestFeishuSender(unittest.TestCase):
     # send_feishu_file tests
     # ------------------------------------------------------------------
 
-    @mock.patch("src.notification_sender.feishu_sender.Path")
+    @mock.patch("src.notification_parts.senders.feishu_sender.Path")
     def test_send_feishu_file_returns_false_when_file_not_found(self, mock_path_cls):
         """send_feishu_file returns False when the file does not exist."""
         mock_path = mock_path_cls.return_value
@@ -692,8 +692,8 @@ class TestFeishuSender(unittest.TestCase):
         result = sender.send_feishu_file("/nonexistent/report.md")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.feishu_sender.Path")
-    @mock.patch("src.notification_sender.feishu_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.feishu_sender.Path")
+    @mock.patch("src.notification_parts.senders.feishu_sender.requests.post")
     def test_send_feishu_file_webhook_reads_file_and_sends_content(self, mock_post, mock_path_cls):
         """Webhook fallback reads the file and sends its content as a message."""
         mock_post.return_value = _response(200, {"code": 0})
@@ -712,7 +712,7 @@ class TestFeishuSender(unittest.TestCase):
         self.assertIn("📄 Markdown 文件内容: report_20260705.md", rendered)
         self.assertIn("**Test Report**", rendered)
 
-    @mock.patch("src.notification_sender.feishu_sender.Path")
+    @mock.patch("src.notification_parts.senders.feishu_sender.Path")
     def test_send_feishu_file_webhook_unreadable_file_returns_false(self, mock_path_cls):
         """Webhook fallback returns False when the file cannot be read."""
         mock_path = mock_path_cls.return_value
@@ -723,7 +723,7 @@ class TestFeishuSender(unittest.TestCase):
         result = sender.send_feishu_file("/tmp/protected.md")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.feishu_sender.Path")
+    @mock.patch("src.notification_parts.senders.feishu_sender.Path")
     def test_send_feishu_file_app_bot_missing_chat_id_returns_false(self, mock_path_cls):
         """App Bot mode returns False when chat_id is not configured."""
         mock_path = mock_path_cls.return_value
@@ -733,10 +733,10 @@ class TestFeishuSender(unittest.TestCase):
         result = sender.send_feishu_file("/tmp/report.md")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.feishu_sender._CreateFileRequestBody", create=True)
-    @mock.patch("src.notification_sender.feishu_sender._CreateFileRequest", create=True)
-    @mock.patch("src.notification_sender.feishu_sender.FEISHU_FILE_SDK_AVAILABLE", True)
-    @mock.patch("src.notification_sender.feishu_sender.Path")
+    @mock.patch("src.notification_parts.senders.feishu_sender._CreateFileRequestBody", create=True)
+    @mock.patch("src.notification_parts.senders.feishu_sender._CreateFileRequest", create=True)
+    @mock.patch("src.notification_parts.senders.feishu_sender.FEISHU_FILE_SDK_AVAILABLE", True)
+    @mock.patch("src.notification_parts.senders.feishu_sender.Path")
     def test_send_feishu_file_app_bot_uploads_file_and_sends_message(self, *_):
         """App Bot uploads the file via SDK and sends a file message."""
         mock_path = mock.MagicMock()
@@ -744,7 +744,7 @@ class TestFeishuSender(unittest.TestCase):
         mock_path.name = "report.md"
         mock_path.suffix = ".md"
         mock_path.open.return_value.__enter__.return_value = mock.MagicMock()
-        with mock.patch("src.notification_sender.feishu_sender.Path", return_value=mock_path):
+        with mock.patch("src.notification_parts.senders.feishu_sender.Path", return_value=mock_path):
             cfg = _config(
                 feishu_app_id="cli_app",
                 feishu_app_secret="secret",
@@ -768,9 +768,9 @@ class TestFeishuSender(unittest.TestCase):
         content_json = json.loads(mock_raw.call_args[0][2])
         self.assertEqual(content_json["file_key"], "file_key_abc")
 
-    @mock.patch("src.notification_sender.feishu_sender._CreateFileRequestBody", create=True)
-    @mock.patch("src.notification_sender.feishu_sender._CreateFileRequest", create=True)
-    @mock.patch("src.notification_sender.feishu_sender.FEISHU_FILE_SDK_AVAILABLE", True)
+    @mock.patch("src.notification_parts.senders.feishu_sender._CreateFileRequestBody", create=True)
+    @mock.patch("src.notification_parts.senders.feishu_sender._CreateFileRequest", create=True)
+    @mock.patch("src.notification_parts.senders.feishu_sender.FEISHU_FILE_SDK_AVAILABLE", True)
     def test_send_feishu_file_app_bot_upload_failure_returns_false(self, *_):
         """App Bot returns False when the file upload fails."""
         mock_path = mock.MagicMock()
@@ -778,7 +778,7 @@ class TestFeishuSender(unittest.TestCase):
         mock_path.name = "report.md"
         mock_path.suffix = ".md"
         mock_path.open.return_value.__enter__.return_value = mock.MagicMock()
-        with mock.patch("src.notification_sender.feishu_sender.Path", return_value=mock_path):
+        with mock.patch("src.notification_parts.senders.feishu_sender.Path", return_value=mock_path):
             cfg = _config(
                 feishu_app_id="cli_app",
                 feishu_app_secret="secret",
@@ -795,9 +795,9 @@ class TestFeishuSender(unittest.TestCase):
                 result = sender.send_feishu_file("/tmp/report.md")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.feishu_sender._CreateFileRequestBody", create=True)
-    @mock.patch("src.notification_sender.feishu_sender._CreateFileRequest", create=True)
-    @mock.patch("src.notification_sender.feishu_sender.FEISHU_FILE_SDK_AVAILABLE", True)
+    @mock.patch("src.notification_parts.senders.feishu_sender._CreateFileRequestBody", create=True)
+    @mock.patch("src.notification_parts.senders.feishu_sender._CreateFileRequest", create=True)
+    @mock.patch("src.notification_parts.senders.feishu_sender.FEISHU_FILE_SDK_AVAILABLE", True)
     def test_send_feishu_file_app_bot_missing_file_key_returns_false(self, *_):
         """App Bot returns False when upload succeeds but file_key is missing."""
         mock_path = mock.MagicMock()
@@ -805,7 +805,7 @@ class TestFeishuSender(unittest.TestCase):
         mock_path.name = "report.md"
         mock_path.suffix = ".md"
         mock_path.open.return_value.__enter__.return_value = mock.MagicMock()
-        with mock.patch("src.notification_sender.feishu_sender.Path", return_value=mock_path):
+        with mock.patch("src.notification_parts.senders.feishu_sender.Path", return_value=mock_path):
             cfg = _config(
                 feishu_app_id="cli_app",
                 feishu_app_secret="secret",
@@ -951,7 +951,7 @@ class TestNtfySender(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.ntfy_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_send_success_uses_json_publish_with_topic_endpoint(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(
@@ -980,7 +980,7 @@ class TestNtfySender(unittest.TestCase):
         self.assertEqual(call_kw["timeout"], 5)
         self.assertFalse(call_kw["verify"])
 
-    @mock.patch("src.notification_sender.ntfy_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_send_supports_self_hosted_path_prefix(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(ntfy_url="https://example.com/ntfy/dsa-topic")
@@ -992,7 +992,7 @@ class TestNtfySender(unittest.TestCase):
         self.assertEqual(mock_post.call_args.args[0], "https://example.com/ntfy")
         self.assertEqual(mock_post.call_args.kwargs["json"]["topic"], "dsa-topic")
 
-    @mock.patch("src.notification_sender.ntfy_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_send_returns_false_when_url_has_no_topic(self, mock_post):
         cfg = _config(ntfy_url="https://ntfy.sh")
         sender = NtfySender(cfg)
@@ -1002,7 +1002,7 @@ class TestNtfySender(unittest.TestCase):
         self.assertFalse(result)
         mock_post.assert_not_called()
 
-    @mock.patch("src.notification_sender.ntfy_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_send_returns_false_when_url_scheme_is_not_http(self, mock_post):
         cfg = _config(ntfy_url="ftp://ntfy.example/dsa-topic")
         sender = NtfySender(cfg)
@@ -1012,7 +1012,7 @@ class TestNtfySender(unittest.TestCase):
         self.assertFalse(result)
         mock_post.assert_not_called()
 
-    @mock.patch("src.notification_sender.ntfy_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_send_http_error_returns_false(self, mock_post):
         mock_post.return_value = _response(500)
         cfg = _config(ntfy_url="https://ntfy.sh/dsa-topic")
@@ -1022,13 +1022,13 @@ class TestNtfySender(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.ntfy_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_send_timeout_does_not_log_token_value(self, mock_post):
         mock_post.side_effect = requests.exceptions.Timeout("secret-token")
         cfg = _config(ntfy_url="https://ntfy.sh/dsa-topic", ntfy_token="secret-token")
         sender = NtfySender(cfg)
 
-        with self.assertLogs("src.notification_sender.ntfy_sender", level="ERROR") as captured:
+        with self.assertLogs("src.notification_parts.senders.ntfy_sender", level="ERROR") as captured:
             result = sender.send_to_ntfy("body")
 
         self.assertFalse(result)
@@ -1054,7 +1054,7 @@ class TestGotifySender(unittest.TestCase):
 
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.gotify_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.gotify_sender.requests.post")
     def test_send_success_uses_json_payload_and_header_auth(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(
@@ -1087,7 +1087,7 @@ class TestGotifySender(unittest.TestCase):
         self.assertEqual(call_kw["timeout"], 5)
         self.assertFalse(call_kw["verify"])
 
-    @mock.patch("src.notification_sender.gotify_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.gotify_sender.requests.post")
     def test_send_supports_reverse_proxy_path_prefix(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(gotify_url="https://example.com/gotify", gotify_token="secret-token")
@@ -1098,7 +1098,7 @@ class TestGotifySender(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(mock_post.call_args.args[0], "https://example.com/gotify/message")
 
-    @mock.patch("src.notification_sender.gotify_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.gotify_sender.requests.post")
     def test_send_returns_false_when_url_already_includes_message_endpoint(self, mock_post):
         cfg = _config(gotify_url="https://gotify.example/message", gotify_token="secret-token")
         sender = GotifySender(cfg)
@@ -1108,13 +1108,13 @@ class TestGotifySender(unittest.TestCase):
         self.assertFalse(result)
         mock_post.assert_not_called()
 
-    @mock.patch("src.notification_sender.gotify_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.gotify_sender.requests.post")
     def test_send_timeout_does_not_log_token_value(self, mock_post):
         mock_post.side_effect = requests.exceptions.Timeout("secret-token")
         cfg = _config(gotify_url="https://gotify.example", gotify_token="secret-token")
         sender = GotifySender(cfg)
 
-        with self.assertLogs("src.notification_sender.gotify_sender", level="ERROR") as captured:
+        with self.assertLogs("src.notification_parts.senders.gotify_sender", level="ERROR") as captured:
             result = sender.send_to_gotify("body")
 
         self.assertFalse(result)
@@ -1130,7 +1130,7 @@ class TestAstrbotSender(unittest.TestCase):
         result = sender.send_to_astrbot("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.astrbot_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.astrbot_sender.requests.post")
     def test_send_success_returns_true(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(astrbot_url="https://astrbot.example/api")
@@ -1149,7 +1149,7 @@ class TestCustomWebhookSender(unittest.TestCase):
         result = sender.send_to_custom("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_send_success_payload_has_text_and_content(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(custom_webhook_urls=["https://example.com/webhook"])
@@ -1159,7 +1159,7 @@ class TestCustomWebhookSender(unittest.TestCase):
         body = mock_post.call_args[1]["data"].decode("utf-8")
         self.assertIn("hello", body)
 
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_send_returns_true_when_one_custom_webhook_succeeds(self, mock_post):
         mock_post.side_effect = [_response(500), _response(200)]
         cfg = _config(
@@ -1175,7 +1175,7 @@ class TestCustomWebhookSender(unittest.TestCase):
         self.assertTrue(result)
         self.assertEqual(mock_post.call_count, 2)
 
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_test_custom_webhooks_returns_ordered_attempts(self, mock_post):
         mock_post.side_effect = [_response(500), _response(200)]
         cfg = _config(
@@ -1257,7 +1257,7 @@ class TestCustomWebhookSender(unittest.TestCase):
             },
         )
 
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_send_uses_custom_body_template(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(
@@ -1275,7 +1275,7 @@ class TestCustomWebhookSender(unittest.TestCase):
             {"msg_type": "text", "content": 'hello "world"'},
         )
 
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_dingtalk_send_uses_custom_body_template(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(
@@ -1295,7 +1295,7 @@ class TestCustomWebhookSender(unittest.TestCase):
         )
 
     @mock.patch("time.sleep", return_value=None)
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_dingtalk_template_failure_falls_back_to_chunked_send(
         self, mock_post, _mock_sleep
     ):
@@ -1316,7 +1316,7 @@ class TestCustomWebhookSender(unittest.TestCase):
         self.assertEqual(fallback_body["msgtype"], "markdown")
         self.assertIn("markdown", fallback_body)
 
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_invalid_custom_body_template_falls_back(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(
@@ -1331,7 +1331,7 @@ class TestCustomWebhookSender(unittest.TestCase):
         body = mock_post.call_args[1]["data"].decode("utf-8")
         self.assertIn("hello", body)
 
-    @mock.patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_non_object_custom_body_template_falls_back(self, mock_post):
         mock_post.return_value = _response(200)
         cfg = _config(
@@ -1357,7 +1357,7 @@ class TestPushoverSender(unittest.TestCase):
         result = sender.send_to_pushover("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.pushover_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.pushover_sender.requests.post")
     def test_send_success_returns_true(self, mock_post):
         mock_post.return_value = _response(200, {"status": 1})
         cfg = _config(pushover_user_key="U", pushover_api_token="T")
@@ -1369,7 +1369,7 @@ class TestPushoverSender(unittest.TestCase):
         self.assertEqual(call_data["token"], "T")
 
     @mock.patch("time.sleep")
-    @mock.patch("src.notification_sender.pushover_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.pushover_sender.requests.post")
     def test_send_chunked_uses_test_timeout(self, mock_post, _mock_sleep):
         mock_post.return_value = _response(200, {"status": 1})
         cfg = _config(pushover_user_key="U", pushover_api_token="T")
@@ -1391,7 +1391,7 @@ class TestPushplusSender(unittest.TestCase):
         result = sender.send_to_pushplus("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.pushplus_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.pushplus_sender.requests.post")
     def test_send_success_returns_true(self, mock_post):
         mock_post.return_value = _response(200, {"code": 200})
         cfg = _config(pushplus_token="TOKEN")
@@ -1399,8 +1399,8 @@ class TestPushplusSender(unittest.TestCase):
         result = sender.send_to_pushplus("hello")
         self.assertTrue(result)
 
-    @mock.patch("src.notification_sender.pushplus_sender.time.sleep")
-    @mock.patch("src.notification_sender.pushplus_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.pushplus_sender.time.sleep")
+    @mock.patch("src.notification_parts.senders.pushplus_sender.requests.post")
     def test_send_long_message_chunks_pushplus_requests(self, mock_post, _mock_sleep):
         mock_post.return_value = _response(200, {"code": 200})
         cfg = _config(pushplus_token="TOKEN")
@@ -1421,7 +1421,7 @@ class TestServerchan3Sender(unittest.TestCase):
         result = sender.send_to_serverchan3("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.serverchan3_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.serverchan3_sender.requests.post")
     def test_send_success_returns_true(self, mock_post):
         mock_post.return_value = _response(200, {"code": 0})
         cfg = _config(serverchan3_sendkey="SCT123")
@@ -1454,7 +1454,7 @@ class TestSlackSender(unittest.TestCase):
         sender = SlackSender(cfg)
         self.assertFalse(sender._is_slack_configured())
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_webhook_success(self, mock_post):
         resp = mock.MagicMock()
         resp.status_code = 200
@@ -1466,7 +1466,7 @@ class TestSlackSender(unittest.TestCase):
         self.assertTrue(result)
         mock_post.assert_called_once()
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_webhook_http_error_returns_false(self, mock_post):
         resp = mock.MagicMock()
         resp.status_code = 400
@@ -1477,7 +1477,7 @@ class TestSlackSender(unittest.TestCase):
         result = sender.send_to_slack("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_bot_success(self, mock_post):
         mock_post.return_value = _response(200, {"ok": True})
         cfg = _config(slack_bot_token="xoxb-test", slack_channel_id="C123")
@@ -1486,7 +1486,7 @@ class TestSlackSender(unittest.TestCase):
         self.assertTrue(result)
         self.assertIn("chat.postMessage", mock_post.call_args[0][0])
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_bot_error_returns_false(self, mock_post):
         mock_post.return_value = _response(200, {"ok": False, "error": "channel_not_found"})
         cfg = _config(slack_bot_token="xoxb-test", slack_channel_id="C123")
@@ -1503,7 +1503,7 @@ class TestSlackSender(unittest.TestCase):
         self.assertEqual(blocks[0]["type"], "section")
         self.assertEqual(blocks[0]["text"]["type"], "mrkdwn")
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_preserves_legacy_text_payload(self, mock_post):
         resp = mock.MagicMock()
         resp.status_code = 200
@@ -1519,7 +1519,7 @@ class TestSlackSender(unittest.TestCase):
         self.assertIn("## 日报", payload["text"])
         self.assertIn("[详情](https://example.com/report)", payload["text"])
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_text_prefers_bot_when_both_configured(self, mock_post):
         """When both webhook and bot are configured, text must go via bot
         so it lands in the same channel as images."""
@@ -1534,7 +1534,7 @@ class TestSlackSender(unittest.TestCase):
         self.assertTrue(result)
         self.assertIn("chat.postMessage", mock_post.call_args[0][0])
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_image_bot_success(self, mock_post):
         # Mock three sequential calls: getUploadURLExternal, PUT upload, completeUploadExternal
         mock_post.side_effect = [
@@ -1554,7 +1554,7 @@ class TestSlackSender(unittest.TestCase):
         self.assertNotIn("files", upload_call_kwargs)
         self.assertIn("completeUploadExternal", mock_post.call_args_list[2][0][0])
 
-    @mock.patch("src.notification_sender.slack_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.slack_sender.requests.post")
     def test_send_image_fallback_to_text_when_no_bot(self, mock_post):
         resp = mock.MagicMock()
         resp.status_code = 200
@@ -1575,7 +1575,7 @@ class TestTelegramSender(unittest.TestCase):
         result = sender.send_to_telegram("hello")
         self.assertFalse(result)
 
-    @mock.patch("src.notification_sender.telegram_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.telegram_sender.requests.post")
     def test_send_success_returns_true(self, mock_post):
         mock_post.return_value = _response(200, {"ok": True})
         cfg = _config(telegram_bot_token="BOT", telegram_chat_id="CHAT")
@@ -1584,7 +1584,7 @@ class TestTelegramSender(unittest.TestCase):
         self.assertTrue(result)
         self.assertIn("sendMessage", mock_post.call_args[0][0])
 
-    @mock.patch("src.notification_sender.telegram_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.telegram_sender.requests.post")
     def test_send_retries_plain_text_when_markdown_http_400(self, mock_post):
         markdown_error = _response(400)
         markdown_error.text = (
@@ -1605,7 +1605,7 @@ class TestTelegramSender(unittest.TestCase):
         self.assertNotIn("parse_mode", second_payload)
         self.assertEqual(second_payload["text"], "*ST宝实")
 
-    @mock.patch("src.notification_sender.telegram_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.telegram_sender.requests.post")
     def test_send_plain_text_fallback_keeps_original_text_after_legacy_markdown_error(self, mock_post):
         markdown_error = _response(400)
         markdown_error.text = (
@@ -1625,7 +1625,7 @@ class TestTelegramSender(unittest.TestCase):
         self.assertEqual(first_payload["text"], "关注 *AAPL* \\(未闭合\\)")
         self.assertEqual(second_payload["text"], content)
 
-    @mock.patch("src.notification_sender.telegram_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.telegram_sender.requests.post")
     def test_send_uses_legacy_telegram_report_formatter(self, mock_post):
         mock_post.return_value = _response(200, {"ok": True})
         cfg = _config(telegram_bot_token="BOT", telegram_chat_id="CHAT")
@@ -1686,7 +1686,7 @@ class TestTelegramSender(unittest.TestCase):
             sent_text = call.args[2]
             self.assertLessEqual(len(sent_text), 4096)
 
-    @mock.patch("src.notification_sender.telegram_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.telegram_sender.requests.post")
     def test_send_chunks_by_final_markdown_payload_length(self, mock_post):
         mock_post.return_value = _response(200, {"ok": True})
         cfg = _config(telegram_bot_token="BOT", telegram_chat_id="CHAT")
@@ -1701,7 +1701,7 @@ class TestTelegramSender(unittest.TestCase):
         self.assertTrue(all(len(text) <= 4096 for text in payload_texts))
         self.assertEqual("".join(payload_texts), sender._convert_to_telegram_markdown(content))
 
-    @mock.patch("src.notification_sender.telegram_sender.requests.post")
+    @mock.patch("src.notification_parts.senders.telegram_sender.requests.post")
     def test_send_plain_text_fallback_handles_non_json_200(self, mock_post):
         markdown_error = _response(400)
         markdown_error.text = (

@@ -17,7 +17,7 @@ from tests.system_config_service_test_support import (
 
 
 class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
-    @patch("src.notification_sender.wechat_sender.requests.post")
+    @patch("src.notification_parts.senders.wechat_sender.requests.post")
     def test_test_notification_channel_uses_temporary_items_without_persisting(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200, {"errcode": 0})
 
@@ -106,7 +106,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(payload["success"])
         self.assertEqual(captured["config"].feishu_domain, "lark")
 
-    @patch("src.notification_sender.wechat_sender.requests.post")
+    @patch("src.notification_parts.senders.wechat_sender.requests.post")
     def test_test_notification_channel_skips_masked_secret_overwrite(self, mock_post) -> None:
         self._rewrite_env("WECHAT_WEBHOOK_URL=https://saved.example.com/hook?key=savedsecret")
         mock_post.return_value = self._mock_http_response(200, {"errcode": 0})
@@ -124,7 +124,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertTrue(payload["success"])
         self.assertEqual(mock_post.call_args[0][0], "https://saved.example.com/hook?key=savedsecret")
 
-    @patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_test_custom_webhook_reuses_saved_urls_for_mask_token(self, mock_post) -> None:
         saved_url = "https://saved.example.com/custom?access_token=savedsecret"
         self._rewrite_env(f"CUSTOM_WEBHOOK_URLS={saved_url}")
@@ -144,7 +144,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(mock_post.call_args.args[0], saved_url)
         self.assertNotIn("savedsecret", str(payload))
 
-    @patch("src.notification_sender.dingtalk_sender.safe_post")
+    @patch("src.notification_parts.senders.dingtalk_sender.safe_post")
     def test_test_dingtalk_channel_signs_draft_without_persisting(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200, {"errcode": 0})
 
@@ -171,7 +171,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("DINGTALK_WEBHOOK_URL", self.env_path.read_text(encoding="utf-8"))
         self.assertNotIn("DINGTALK_SECRET", self.env_path.read_text(encoding="utf-8"))
 
-    @patch("src.notification_sender.dingtalk_sender.safe_post")
+    @patch("src.notification_parts.senders.dingtalk_sender.safe_post")
     def test_test_dingtalk_channel_preserves_masked_secret_and_allows_unsigned_bot(
         self,
         mock_post,
@@ -201,7 +201,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
             "https://oapi.dingtalk.com/robot/send?access_token=saved-token",
         )
 
-    @patch("src.notification_sender.dingtalk_sender.safe_post")
+    @patch("src.notification_parts.senders.dingtalk_sender.safe_post")
     def test_test_dingtalk_channel_classifies_api_rejection_without_leaking_secrets(
         self,
         mock_post,
@@ -238,7 +238,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("draft-token", str(payload))
         self.assertNotIn("SECdraft_signing_secret", str(payload))
 
-    @patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_test_notification_channel_returns_custom_webhook_attempts(self, mock_post) -> None:
         mock_post.side_effect = [
             self._mock_http_response(500),
@@ -273,7 +273,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("access_token=first", str(payload))
         self.assertEqual(mock_post.call_args_list[0].kwargs["timeout"], 4)
 
-    @patch("src.notification_sender.custom_webhook_sender.requests.post")
+    @patch("src.notification_parts.senders.custom_webhook_sender.requests.post")
     def test_test_notification_channel_custom_webhook_all_failures_are_retryable(self, mock_post) -> None:
         mock_post.side_effect = [
             self._mock_http_response(500),
@@ -307,7 +307,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("access_token=first", str(payload))
         self.assertNotIn("token=second", str(payload))
 
-    @patch("src.notification_sender.ntfy_sender.requests.post")
+    @patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_test_notification_channel_supports_ntfy_and_masks_topic_target(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200)
 
@@ -332,7 +332,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("private-topic", str(payload))
         self.assertNotIn("NTFY_URL", self.env_path.read_text(encoding="utf-8"))
 
-    @patch("src.notification_sender.ntfy_sender.requests.post")
+    @patch("src.notification_parts.senders.ntfy_sender.requests.post")
     def test_test_notification_channel_rejects_ntfy_url_without_topic(self, mock_post) -> None:
         with self._notification_test_env():
             payload = self.service.test_notification_channel(
@@ -349,7 +349,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertIn("NTFY_URL", payload["message"])
         mock_post.assert_not_called()
 
-    @patch("src.notification_sender.gotify_sender.requests.post")
+    @patch("src.notification_parts.senders.gotify_sender.requests.post")
     def test_test_notification_channel_supports_gotify_and_keeps_token_out_of_url(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200)
 
@@ -373,7 +373,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("secret-token", str(payload))
         self.assertNotIn("GOTIFY_URL", self.env_path.read_text(encoding="utf-8"))
 
-    @patch("src.notification_sender.gotify_sender.requests.post")
+    @patch("src.notification_parts.senders.gotify_sender.requests.post")
     def test_test_notification_channel_rejects_gotify_message_endpoint(self, mock_post) -> None:
         with self._notification_test_env():
             payload = self.service.test_notification_channel(
@@ -394,7 +394,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         mock_post.assert_not_called()
 
     @patch(
-        "src.notification_sender.WechatSender.send_to_wechat",
+        "src.notification_parts.senders.WechatSender.send_to_wechat",
         side_effect=requests.exceptions.Timeout(
             "timeout for https://qyapi.example.com/cgi-bin/webhook/send?key=secret token=abc123"
         ),
@@ -422,7 +422,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("key=secret", str(payload))
         self.assertNotIn("abc123", str(payload))
 
-    @patch("src.notification_sender.telegram_sender.requests.post")
+    @patch("src.notification_parts.senders.telegram_sender.requests.post")
     def test_test_notification_channel_masks_short_sensitive_target(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200, {"ok": True})
 
@@ -442,7 +442,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(payload["attempts"][0]["target"], "***")
         self.assertNotIn("tok123", str(payload))
 
-    @patch("src.notification_sender.wechat_sender.requests.post")
+    @patch("src.notification_parts.senders.wechat_sender.requests.post")
     def test_test_notification_channel_rejects_url_userinfo(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200, {"errcode": 0})
 
@@ -466,7 +466,7 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertNotIn("password", str(payload))
         self.assertNotIn("key=secret", str(payload))
 
-    @patch("src.notification_sender.discord_sender.requests.post")
+    @patch("src.notification_parts.senders.discord_sender.requests.post")
     def test_test_notification_channel_prefers_discord_main_channel_alias(self, mock_post) -> None:
         mock_post.return_value = self._mock_http_response(200)
 

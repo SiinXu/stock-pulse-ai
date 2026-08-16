@@ -85,7 +85,7 @@ Deep field contracts, data-source priority, and deploy paths: [Full Guide (EN)](
 | Strategies & reports | `strategies/`, `templates/` |
 | Docs & tests | `docs/`, `tests/` |
 | Ops | `scripts/`, `docker/`, `.github/workflows/` |
-| Entrypoints | `main.py`, `server.py`, `webui.py` |
+| Entrypoints | `main.py`, `server.py` (`python main.py --webui-only` for Web-only FastAPI) |
 
 Architecture: [overview](docs/architecture-overview.md).
 

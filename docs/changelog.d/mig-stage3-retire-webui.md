@@ -1,0 +1,1 @@
+- [Changed] Retire the `webui.py` compatibility launcher; start the Web UI with `python main.py --webui-only` (Refs #167).

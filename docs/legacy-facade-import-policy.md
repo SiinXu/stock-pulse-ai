@@ -21,7 +21,7 @@ This document records:
 
 | Context | Rule |
 | --- | --- |
-| New production code under `src/`, `data_provider/`, `api/`, `bot/`, or entrypoints `main.py` / `server.py` / `webui.py` | Import the **canonical package** only. |
+| New production code under `src/`, `data_provider/`, `api/`, `bot/`, or entrypoints `main.py` / `server.py` | Import the **canonical package** only. |
 | Existing allowlisted production importers | May keep the facade path until a dedicated migration PR shrinks the baseline. |
 | Tests | May import facades when patch targets, reload, or historical contracts require them. Prefer canonical paths for new tests when possible. |
 | Facade shim modules themselves | Remain the re-export surface; do not expand their public contract without a separate decision. |
@@ -63,20 +63,10 @@ Summary at the time this policy was introduced:
 **Total allowlisted production importer rows: 30** (one file may appear under
 multiple facades).
 
-### Notification sender facades (added 2026-08-05)
-
-The ADR-006 re-export shims under `src/notification_sender/` are also
-guarded. Canonical targets live in `src/notification_parts/senders/`:
-
-| Legacy facade | Canonical module |
-| --- | --- |
-| `src.notification_sender` | `src.notification_parts.senders` |
-| `src.notification_sender.<channel>_sender` | `src.notification_parts.senders.<channel>_sender` |
-
-Existing production importers are grandfathered in
-`scripts/legacy_facade_import_baseline.json`. New production imports of
-these facades fail CI; migrate to the canonical package and shrink the
-baseline with `--write-baseline` after deliberate moves.
+The `src/notification_sender/` re-export shims have been removed. Production
+and test imports use `src.notification_parts.senders` only. The legacy facade
+guard no longer catalogues those paths; leftover baseline keys fail as
+unknown facades.
 
 `data_provider.base` is **not** listed as a banned legacy facade in this guard.
 It is the active compatibility surface for the data-provider decomposition

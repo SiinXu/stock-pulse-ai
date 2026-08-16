@@ -81,7 +81,7 @@ from src.utils.data_processing import (
     signal_attribution_weight_items,
     normalize_model_used,
 )
-from src.notification_sender import (
+from src.notification_parts.senders import (
     AstrbotSender,
     CustomWebhookSender,
     DingtalkSender,

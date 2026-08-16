@@ -1,0 +1,1 @@
+- [Chore] Removed the dead `src/notification_sender/` compatibility shims and migrated remaining production importers to `src.notification_parts.senders` (Refs #167).
