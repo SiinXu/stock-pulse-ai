@@ -16,6 +16,31 @@ from scripts.check_legacy_facade_imports import (
 )
 
 
+def test_legacy_facade_catalog_excludes_retired_analysis_context_pack_shims():
+    """Deleted analysis-context-pack facades are no longer catalogued."""
+
+    for name in (
+        "src.analysis_context_pack_overview",
+        "src.analysis_context_pack_prompt",
+    ):
+        assert name not in LEGACY_FACADES
+    leftover = {
+        "version": BASELINE_VERSION,
+        "facades": {
+            "src.analysis_context_pack_overview": ["src/core/pipeline.py"],
+        },
+    }
+    with tempfile.TemporaryDirectory(prefix="retired-acp-baseline-") as tmp:
+        leftover_path = Path(tmp) / "leftover.json"
+        leftover_path.write_text(json.dumps(leftover), encoding="utf-8")
+        try:
+            load_baseline(leftover_path)
+        except BaselineError as exc:
+            assert "unknown facade" in str(exc)
+        else:
+            raise AssertionError("retired analysis-context-pack facade was accepted")
+
+
 def test_legacy_facade_catalog_excludes_retired_notification_sender_shims():
     """The deleted notification_sender shim package is no longer catalogued."""
 
