@@ -54,7 +54,7 @@ MODULES = {
             "time",
         ),
         ("Template", "requests", "safe_post", "sanitize_exception_chain", "time"),
-        "de05aee564758a8567a4efca6d26dd2dd0646eff80e4b273c05438f1786235bd",
+        "bfcb6b7f83a68fd9477d4de7ec8df18b47aaf73a2fc9825df3e7b00770c052c6",
     ),
     "src.notification_sender.discord_sender": (
         "src.notification_parts.senders.discord_sender",
