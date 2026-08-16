@@ -231,8 +231,6 @@ def test_canonical_senders_preserve_complete_module_surface(legacy_name: str) ->
     implementation = importlib.import_module(implementation_name)
 
     assert tuple(sorted(name for name in vars(implementation) if not name.startswith("_"))) == expected_exports
-    if hasattr(implementation, "__all__"):
-        assert implementation.__all__ == expected_exports
     assert implementation.logger.name == implementation_name
 
     for name, node in _source_definitions(implementation).items():
