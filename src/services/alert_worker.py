@@ -63,6 +63,9 @@ DEFAULT_DB_ALERT_COOLDOWN_SECONDS = 24 * 60 * 60
 MAX_DB_ALERT_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
 ALERT_WORKER_RULE_LIMIT = 1000
 WRITABLE_TRIGGER_STATUSES = frozenset({"triggered", "skipped", "degraded", "failed"})
+# Evaluation outcomes that indicate the rule's data source could not be
+# trusted this cycle (issue #1133: pause rule when data trust/source fails).
+DATA_FAILURE_RECORD_STATUSES = frozenset({"failed", "degraded"})
 
 
 @dataclass
