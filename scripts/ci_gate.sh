@@ -22,7 +22,7 @@ ensure_editable_install() {
   echo "==> backend-gate: editable install (ADR-012, --no-deps)"
   (
     cd "${REPO_ROOT}"
-    python -m pip install -e . --no-deps
+    python -m pip install --build-constraint build-constraints.txt -e . --no-deps
   )
 }
 
