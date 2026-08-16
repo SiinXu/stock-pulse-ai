@@ -137,6 +137,10 @@ class UnifiedRealtimeQuote:
     amount_period: Optional[str] = None          # Window represented by amount (for example rolling_24h)
     # Versioned validation evidence; additive and optional for caller compatibility.
     data_quality_evidence: Optional[Dict[str, Any]] = None
+    # Per-field trust metadata (Issue #1129); additive and optional.
+    # Populated by DataFetcherManager via data_provider.field_trust. Absent
+    # metadata must be read as "unknown", never as "trusted".
+    field_trust: Optional[Dict[str, Any]] = None
     
     # Core price data (available from nearly all sources)
     price: Optional[float] = None           # Latest price
@@ -182,7 +186,7 @@ class UnifiedRealtimeQuote:
         optional_fields = [
             'fetched_at', 'provider_timestamp', 'is_stale', 'stale_seconds',
             'fallback_from', 'market', 'currency', 'data_quality', 'missing_fields',
-            'granularity', 'amount_period', 'data_quality_evidence',
+            'granularity', 'amount_period', 'data_quality_evidence', 'field_trust',
             'price', 'change_pct', 'change_amount', 'volume', 'amount',
             'volume_ratio', 'turnover_rate', 'amplitude',
             'open_price', 'high', 'low', 'pre_close',

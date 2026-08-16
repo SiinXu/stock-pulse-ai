@@ -24,6 +24,7 @@ from api.v1.schemas.stocks import (
     ExtractItem,
     KLineData,
     MoneyFlowViewResponse,
+    StockFieldTrustResponse,
     StockHistoryResponse,
     StockQuote,
 )
@@ -653,6 +654,53 @@ def get_stock_quote(stock_code: str) -> StockQuote:
                 "message": f"获取实时行情失败: {str(e)}"
             }
         )
+
+
+@router.get(
+    "/{stock_code}/trust",
+    response_model=StockFieldTrustResponse,
+    responses={
+        200: {"description": "Field-level data trust view"},
+        400: {"description": "Invalid stock code", "model": ErrorResponse},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Get field-level data trust for a stock quote",
+    description=(
+        "Returns per-field source attribution, staleness, and cross-provider "
+        "conflicts for the latest realtime quote (Issue #1129). The view "
+        "degrades explicitly: status=unavailable when no quote exists, and "
+        "status=degraded when trust metadata is absent, fields are stale or "
+        "unattributed, or providers disagree. Conflicts are surfaced, never "
+        "silently resolved to one source."
+    ),
+    operation_id="getStockFieldTrust",
+)
+def get_stock_field_trust(stock_code: str) -> StockFieldTrustResponse:
+    """Field-level trust view for the stock's realtime quote."""
+    try:
+        code = _validate_and_normalize_stock_code(stock_code)
+    except HTTPException:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise api_error(400, "validation_error", str(exc)) from exc
+
+    try:
+        service = StockService()
+        payload = service.get_field_trust(code)
+        return StockFieldTrustResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - map unexpected trust-view failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Stock field trust view failed",
+            exc,
+            error_code="stock_field_trust_view_failed",
+            context={"stock_code": stock_code},
+        )
+        raise api_error(
+            500,
+            "internal_error",
+            "Failed to build field trust view",
+        ) from exc
 
 
 @router.get(

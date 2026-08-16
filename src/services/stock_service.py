@@ -106,6 +106,165 @@ class StockService:
             )
             return None
     
+    def get_field_trust(self, stock_code: str) -> Dict[str, Any]:
+        """Build the field-level trust view for a stock quote (Issue #1129).
+
+        Returns a structured dict matching ``StockFieldTrustResponse``.
+        Missing trust metadata is reported explicitly (``metadata_present``
+        False, status ``degraded``) so consumers can degrade visibly instead
+        of rendering the quote as trusted.
+        """
+        import math
+
+        from data_provider.field_trust import TRUST_FIELDS
+
+        base: Dict[str, Any] = {
+            "schema_version": "field_trust_view/1.0",
+            "stock_code": stock_code,
+            "status": "unavailable",
+            "metadata_present": False,
+            "quote_source": None,
+            "fetched_at": None,
+            "provider_timestamp": None,
+            "stale_seconds": None,
+            "is_stale": None,
+            "fallback_from": None,
+            "data_quality": None,
+            "missing_fields": [],
+            "fields": [],
+            "conflicts": [],
+            "conflict_checks": [],
+            "message": None,
+        }
+
+        try:
+            manager = self._resolve_data_fetcher_manager()
+            quote = manager.get_realtime_quote(stock_code)
+        except Exception as exc:  # broad-exception: fallback_recorded - trust view reports unavailability instead of failing
+            log_safe_exception(
+                logger,
+                "Field trust quote lookup failed",
+                exc,
+                error_code="field_trust_lookup_failed",
+                context={"stock_code": stock_code},
+            )
+            quote = None
+
+        if quote is None:
+            base["message"] = "No realtime quote available from any provider"
+            return base
+
+        def _clean_number(value: Any) -> Any:
+            if isinstance(value, bool) or value is None:
+                return None
+            try:
+                number = float(value)
+            except (TypeError, ValueError):
+                return None
+            return number if math.isfinite(number) else None
+
+        base["stock_code"] = getattr(quote, "code", None) or stock_code
+        source = getattr(quote, "source", None)
+        base["quote_source"] = getattr(source, "value", source)
+        for key in (
+            "fetched_at",
+            "provider_timestamp",
+            "stale_seconds",
+            "is_stale",
+            "fallback_from",
+            "data_quality",
+        ):
+            base[key] = getattr(quote, key, None)
+        base["missing_fields"] = list(getattr(quote, "missing_fields", None) or [])
+
+        trust = getattr(quote, "field_trust", None)
+        if not isinstance(trust, dict) or not isinstance(trust.get("fields"), dict):
+            # Absent metadata must never read as trusted.
+            base["status"] = "degraded"
+            base["message"] = (
+                "Quote carried no field-level trust metadata; treat all fields as unverified"
+            )
+            return base
+
+        base["metadata_present"] = True
+        entries = []
+        degraded = False
+        for field_name in TRUST_FIELDS:
+            raw = trust["fields"].get(field_name)
+            value = _clean_number(getattr(quote, field_name, None))
+            if raw is None and value is None:
+                continue
+            raw = raw or {}
+            staleness = raw.get("staleness")
+            if staleness not in ("fresh", "stale", "unknown"):
+                staleness = "unknown"
+            origin = raw.get("origin")
+            if origin not in ("primary", "supplement"):
+                origin = "unknown"
+            entry = {
+                "field": field_name,
+                "value": value,
+                "source": raw.get("source") or None,
+                "origin": origin,
+                "provider_timestamp": raw.get("provider_timestamp"),
+                "stale_seconds": raw.get("stale_seconds"),
+                "is_stale": raw.get("is_stale"),
+                "staleness": staleness,
+                "conflict": bool(raw.get("conflict")),
+            }
+            if staleness != "fresh" or entry["conflict"] or entry["source"] is None:
+                degraded = True
+            entries.append(entry)
+        base["fields"] = entries
+
+        conflicts = []
+        for raw_conflict in trust.get("conflicts") or []:
+            if not isinstance(raw_conflict, dict) or not raw_conflict.get("field"):
+                continue
+            values = []
+            for item in raw_conflict.get("values") or []:
+                if not isinstance(item, dict):
+                    continue
+                provider = item.get("provider")
+                value = _clean_number(item.get("value"))
+                if provider and value is not None:
+                    values.append({"provider": str(provider), "value": value})
+            conflicts.append(
+                {
+                    "field": str(raw_conflict["field"]),
+                    "severity": str(raw_conflict.get("severity") or "warn"),
+                    "relative_difference": _clean_number(
+                        raw_conflict.get("relative_difference")
+                    ),
+                    "threshold": _clean_number(raw_conflict.get("threshold")),
+                    "values": values,
+                }
+            )
+        base["conflicts"] = conflicts
+        if conflicts:
+            degraded = True
+
+        checks = []
+        for raw_check in trust.get("conflict_checks") or []:
+            if not isinstance(raw_check, dict):
+                continue
+            status = raw_check.get("status")
+            checks.append(
+                {
+                    "primary_provider": raw_check.get("primary_provider"),
+                    "secondary_provider": raw_check.get("secondary_provider"),
+                    "status": status if status in ("evaluated", "skipped") else "skipped",
+                    "reason": raw_check.get("reason"),
+                }
+            )
+        base["conflict_checks"] = checks
+
+        if not entries:
+            degraded = True
+            base["message"] = "No covered quote fields were attributable"
+        base["status"] = "degraded" if degraded else "ok"
+        return base
+
     def get_history_data(
         self,
         stock_code: str,
