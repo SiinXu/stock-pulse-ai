@@ -13,6 +13,19 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+ensure_editable_install() {
+  # ADR-012: same source tree, no dependency resolve. Pin authority stays
+  # constraints.txt via the requirements path that already populated the env.
+  echo "==> backend-gate: editable install (ADR-012, --no-deps)"
+  (
+    cd "${REPO_ROOT}"
+    python -m pip install -e . --no-deps
+  )
+}
+
 syntax_check() {
   echo "==> backend-gate: Python syntax check"
   python -m py_compile main.py src/config.py src/auth.py src/analyzer.py src/notification.py
@@ -252,6 +265,8 @@ run_all() {
 }
 
 phase="${1:-all}"
+
+ensure_editable_install
 
 case "$phase" in
   all)
