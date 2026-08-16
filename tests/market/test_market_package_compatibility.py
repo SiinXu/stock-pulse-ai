@@ -2,13 +2,9 @@
 
 import ast
 import importlib
-import inspect
 from pathlib import Path
-import subprocess
-import sys
-import textwrap
 from types import FunctionType, SimpleNamespace
-from typing import Any, get_type_hints
+from typing import get_type_hints
 from unittest.mock import patch
 
 import pytest
@@ -118,16 +114,6 @@ MODULES = {
         ),
     ),
 }
-
-
-def _descriptor_function(descriptor: Any):
-    if isinstance(descriptor, (staticmethod, classmethod)):
-        return descriptor.__func__
-    if isinstance(descriptor, FunctionType):
-        return descriptor
-    if isinstance(descriptor, property):
-        return descriptor.fget
-    return None
 
 
 def _source_definitions(module):
