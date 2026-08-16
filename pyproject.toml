@@ -166,8 +166,9 @@ License = "https://github.com/SiinXu/stock-pulse-ai/blob/main/LICENSE"
 # repository … not as an installed library" decision. Four import roots
 # stay first-party package names during the transition. Pin authority
 # remains constraints.txt; environments add
-# `python -m pip install -e . --no-deps` after the constrained
-# requirements path. See docs/adr/ADR-012-installable-package-layout.md.
+# `python -m pip install --build-constraint build-constraints.txt -e . --no-deps`
+# after the constrained requirements path.
+# See docs/adr/ADR-012-installable-package-layout.md.
 [tool.setuptools.packages.find]
 include = ["src*", "api*", "bot*", "data_provider*"]
 

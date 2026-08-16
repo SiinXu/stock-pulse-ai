@@ -73,9 +73,13 @@ single-epoch rewrite of imports or checker classifiers.
    ```
 
 2. **All** environments that need the application importable as installed
-   packages run `python -m pip install -e . --no-deps` **after** the existing
-   constrained requirements path. `--no-deps` is mandatory. Pin authority
-   **remains** `constraints.txt` (plus `build-constraints.txt` for builds).
+   packages run
+   `python -m pip install --build-constraint build-constraints.txt -e . --no-deps`
+   **after** the existing constrained requirements path. `--no-deps` is
+   mandatory so application dependencies are not resolved. Isolated build
+   backends (setuptools) stay inside `build-constraints.txt` via
+   `--build-constraint` or `PIP_BUILD_CONSTRAINT`. Pin authority **remains**
+   `constraints.txt` (plus `build-constraints.txt` for builds).
    `check_dependency_locks` and `check_install_guidance` must never see an
    unconstrained resolve.
 
@@ -95,7 +99,7 @@ single-epoch rewrite of imports or checker classifiers.
 - CI adds **no** new `PYTHONPATH` injection. The installable flip is the
   additional track; cwd/`sys.path` remains the existing one.
 - Local `scripts/ci_gate.sh` and hosted CI stay aligned by running the same
-  `--no-deps` editable install inside the gate.
+  build-constrained `--no-deps` editable install inside the gate.
 
 ## Alternatives rejected
 
@@ -110,14 +114,17 @@ packaging.
 
 ## Consequences
 
-- `pip install -e . --no-deps` makes `import src`, `import api`, `import bot`,
-  and `import data_provider` work from a different cwd. That is the
-  installability proof this stage exists to land.
+- `pip install --build-constraint build-constraints.txt -e . --no-deps` makes
+  `import src`, `import api`, `import bot`, and `import data_provider` work
+  from a different cwd. That is the installability proof this stage exists to
+  land.
 - No production import statement changes in this stage. Guard baselines are
   expected to be unchanged.
 - Docker must copy `pyproject.toml` (and the PEP 621 `readme` / `license`
-  files it references) and run the `--no-deps` editable install after the
-  existing source `COPY` block.
+  files it references) and run the build-constrained `--no-deps` editable
+  install after the existing source `COPY` block. Hosted `docker-build` must
+  also watch those metadata files so a packaging-only break cannot skip the
+  image.
 - Desktop backend builds run the same editable install before PyInstaller so
   hidden-imports resolve through the installed package names rather than
   cwd-only `sys.path`.

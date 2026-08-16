@@ -46,7 +46,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 & $pythonBin -m pip install --build-constraint build-constraints.txt -e . --no-deps
 if ($LASTEXITCODE -ne 0) {
-  throw "Editable install (pip install -e . --no-deps) failed with exit code $LASTEXITCODE."
+  throw "Editable install (pip install --build-constraint build-constraints.txt -e . --no-deps) failed with exit code $LASTEXITCODE."
 }
 & $pythonBin -m pip check
 if ($LASTEXITCODE -ne 0) {

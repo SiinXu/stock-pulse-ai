@@ -153,6 +153,45 @@ def test_docker_build_skips_when_docker_paths_unchanged():
     assert job["if"] == "needs.changes.outputs.docker == 'true'"
 
 
+def test_docker_path_filter_watches_packaging_metadata():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    filter_step = next(
+        step
+        for step in workflow["jobs"]["changes"]["steps"]
+        if step.get("id") == "filter"
+    )
+    filters = yaml.safe_load(filter_step["with"]["filters"])
+    docker_paths = set(filters["docker"])
+    assert {"pyproject.toml", "README.md", "LICENSE"} <= docker_paths
+
+
+def test_editable_installs_are_no_deps_and_build_constrained():
+    install_files = (
+        "scripts/ci_gate.sh",
+        "docker/Dockerfile",
+        "scripts/build-backend-macos.sh",
+        "scripts/build-backend.ps1",
+    )
+    for relative in install_files:
+        text = (REPOSITORY_ROOT / relative).read_text(encoding="utf-8")
+        lines = []
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith(("#", "//")):
+                continue
+            if stripped.startswith(("throw ", "echo ", "Write-Host")):
+                continue
+            if "install" in line and "-e ." in line:
+                lines.append(line)
+        assert lines, relative
+        for line in lines:
+            assert "--no-deps" in line, (relative, line)
+            assert (
+                "--build-constraint" in line
+                or "PIP_BUILD_CONSTRAINT=build-constraints.txt" in line
+            ), (relative, line)
+
+
 def test_web_gate_runs_full_matrix_for_frontend_changes():
     workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
     changes_job = workflow["jobs"]["changes"]
