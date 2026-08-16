@@ -28,7 +28,7 @@ This ratchet:
 | --- | --- |
 | `src/<name>.py` or `src/<name>/...` | `src.<name>` |
 | `data_provider/`, `api/`, `bot/` | `data_provider`, `api`, `bot` |
-| `main.py`, `server.py`, `webui.py` | `main`, `server`, `webui` |
+| `main.py`, `server.py` | `main`, `server` |
 
 Only **module body** imports count. Lazy imports inside functions or methods are
 ignored so intentional deferred loads do not create false pairs.

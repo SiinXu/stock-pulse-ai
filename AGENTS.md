@@ -63,7 +63,7 @@ python scripts/check_ai_assets.py
 - Key entry points:
   - `main.py`: The main entry point for analysis tasks
   - `server.py`: FastAPI service entry point
-  - `webui.py`: Retained compatibility launcher for direct FastAPI startup
+  - Web-only FastAPI: `python main.py --webui-only`
   - `apps/dsa-web/`: Web frontend
   - `apps/dsa-desktop/`: Electron desktop app
   - `.github/workflows/`: CI, release, and daily tasks

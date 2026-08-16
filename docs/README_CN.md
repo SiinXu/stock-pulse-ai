@@ -65,7 +65,7 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 | 产品资源 | `strategies/` 保存内置 YAML 策略，`templates/` 保存 Jinja 报告模板。 |
 | 文档与测试 | `docs/` 保存指南与架构说明，`tests/` 按后端领域组织测试。 |
 | 自动化 | `scripts/`、`docker/`、`.github/workflows/` 与 `.claude/` 分别承载脚本、容器、CI 和 AI 协作资产。 |
-| 运行入口 | `main.py` 启动分析、CLI 与调度，`server.py` 启动 FastAPI，`webui.py` 保留兼容 Web 启动方式。 |
+| 运行入口 | `main.py` 启动分析、CLI 与调度，`server.py` 启动 FastAPI，纯 Web 启动使用 `python main.py --webui-only`。 |
 | 依赖策略 | `requirements*.txt` 声明运行时与可选依赖；`constraints.txt` 和 `build-constraints.txt` 约束运行时与构建解析。 |
 
 详细边界与数据流见 [架构总览](architecture-overview.md)。
