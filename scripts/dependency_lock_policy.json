@@ -28,6 +28,7 @@
     ".github/requirements-ci.txt",
     ".github/requirements-review.txt",
     "requirements-desktop.txt",
+    "requirements-ocr.txt",
     "build-constraints.txt"
   ],
   "exact_source_files": [
@@ -90,6 +91,15 @@
       ],
       "packages": [
         "pyinstaller"
+      ],
+      "allow_other_packages": false
+    },
+    "requirements-ocr.txt": {
+      "constraint": "constraints.txt",
+      "includes": [],
+      "packages": [
+        "Pillow",
+        "pytesseract"
       ],
       "allow_other_packages": false
     }
