@@ -273,7 +273,7 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             ChannelAttemptResult as ContractAttempt,
             NotificationDispatchResult as ContractDispatch,
         )
-        from src.notification_parts.contracts import (
+        from src.notification import (
             ChannelAttemptResult as FacadeAttempt,
             NotificationDispatchResult as FacadeDispatch,
         )
