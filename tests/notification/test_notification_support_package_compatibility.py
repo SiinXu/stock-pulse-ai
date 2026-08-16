@@ -3,12 +3,7 @@
 import ast
 import hashlib
 import importlib
-import inspect
 from pathlib import Path
-import subprocess
-import sys
-import textwrap
-from types import FunctionType
 from typing import Any, get_type_hints
 from unittest.mock import patch
 
@@ -121,18 +116,6 @@ MODULES = {
     ),
 }
 
-_MODULE_METADATA = {
-    "__all__",
-    "__builtins__",
-    "__cached__",
-    "__file__",
-    "__loader__",
-    "__name__",
-    "__package__",
-    "__spec__",
-}
-
-
 def _source_definitions(module) -> dict[str, ast.AST]:
     tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
     return {
@@ -140,16 +123,6 @@ def _source_definitions(module) -> dict[str, ast.AST]:
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
     }
-
-
-def _descriptor_function(descriptor: Any):
-    if isinstance(descriptor, (staticmethod, classmethod)):
-        return descriptor.__func__
-    if isinstance(descriptor, property):
-        return descriptor.fget
-    if isinstance(descriptor, FunctionType):
-        return descriptor
-    return None
 
 
 def _stable_ast(node: Any):
@@ -214,33 +187,21 @@ def test_canonical_support_modules_preserve_callable_contracts(legacy_name: str)
             )
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    ("src.notification_parts.capabilities", "src.notification_parts.capabilities"),
-)
-def test_capabilities_patch_seam_works_through_both_paths(module_name: str) -> None:
-    module = importlib.import_module(module_name)
+def test_capabilities_patch_seam_uses_canonical_module() -> None:
+    module = importlib.import_module("src.notification_parts.capabilities")
     with patch.object(module, "normalize_channel_name", return_value="wechat"):
         assert module.get_channel_profile(object()) is module.CHANNEL_PROFILES["wechat"]
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    ("src.notification_parts.contracts", "src.notification_parts.contracts"),
-)
-def test_contract_patch_seam_works_through_both_paths(module_name: str) -> None:
-    module = importlib.import_module(module_name)
+def test_contract_patch_seam_uses_canonical_module() -> None:
+    module = importlib.import_module("src.notification_parts.contracts")
     with patch.object(module, "_has_env_group", return_value=True) as has_group:
         assert module.is_feishu_app_bot_env_configured({}) is True
     has_group.assert_called_once_with({}, module.FEISHU_APP_BOT_ENV_GROUP)
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    ("src.notification_parts.noise", "src.notification_parts.noise"),
-)
-def test_noise_patch_seam_works_through_both_paths(module_name: str) -> None:
-    module = importlib.import_module(module_name)
+def test_noise_patch_seam_uses_canonical_module() -> None:
+    module = importlib.import_module("src.notification_parts.noise")
     expected = module.NotificationNoiseDecision(should_send=False, reason_code="patched")
     with patch.object(module, "_evaluate_notification_noise", return_value=expected):
         actual = module.evaluate_notification_noise(
@@ -251,12 +212,8 @@ def test_noise_patch_seam_works_through_both_paths(module_name: str) -> None:
     assert actual is expected
 
 
-@pytest.mark.parametrize(
-    "module_name",
-    ("src.notification_parts.route_config", "src.notification_parts.route_config"),
-)
-def test_route_config_patch_seam_works_through_both_paths(module_name: str) -> None:
-    module = importlib.import_module(module_name)
+def test_route_config_patch_seam_uses_canonical_module() -> None:
+    module = importlib.import_module("src.notification_parts.route_config")
     with patch.object(module, "parse_notification_route_channels", return_value=["wechat"]):
         assert module.split_notification_route_channels(["ignored"]) == (["wechat"], [])
 
