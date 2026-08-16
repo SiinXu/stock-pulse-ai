@@ -35,6 +35,7 @@
   "exact_source_files": [
     "requirements-pydanticai.txt",
     "requirements-kronos.txt",
+    "requirements-report-export.txt",
     "build-constraints.txt"
   ],
   "install_contracts": {
