@@ -37,7 +37,7 @@ DEFAULT_BASELINE = ROOT / "scripts" / "config_access_baseline.json"
 BASELINE_VERSION = 1
 
 PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
-PRODUCTION_FILES = ("main.py", "server.py", "webui.py")
+PRODUCTION_FILES = ("main.py", "server.py")
 
 # Composition-root and config definition may still call get_config().
 EXCLUDED_RELATIVE_PATHS = frozenset(

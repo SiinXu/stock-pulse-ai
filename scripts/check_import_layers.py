@@ -36,8 +36,8 @@ DEFAULT_BASELINE = ROOT / "scripts" / "import_layer_baseline.json"
 BASELINE_VERSION = 1
 
 PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
-PRODUCTION_FILES = ("main.py", "server.py", "webui.py")
-ROOT_PACKAGES = frozenset({"data_provider", "api", "bot", "main", "server", "webui"})
+PRODUCTION_FILES = ("main.py", "server.py")
+ROOT_PACKAGES = frozenset({"data_provider", "api", "bot", "main", "server"})
 
 Pair = Tuple[str, str]
 

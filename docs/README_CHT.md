@@ -30,7 +30,7 @@
 | 產品資源 | `strategies/` 保存內建 YAML 策略，`templates/` 保存 Jinja 報告模板。 |
 | 文檔與測試 | `docs/` 保存指南與架構說明，`tests/` 按後端領域組織測試。 |
 | 自動化 | `scripts/`、`docker/`、`.github/workflows/` 與 `.claude/` 分別承載腳本、容器、CI 和 AI 協作資產。 |
-| 執行入口 | `main.py` 啟動分析、CLI 與排程，`server.py` 啟動 FastAPI，`webui.py` 保留相容 Web 啟動方式。 |
+| 執行入口 | `main.py` 啟動分析、CLI 與排程，`server.py` 啟動 FastAPI，純 Web 啟動使用 `python main.py --webui-only`。 |
 | 依賴策略 | `requirements*.txt` 聲明執行時與可選依賴；`constraints.txt` 和 `build-constraints.txt` 約束執行時與構建解析。 |
 
 詳細邊界與數據流見 [架構總覽](./architecture-overview.md)。

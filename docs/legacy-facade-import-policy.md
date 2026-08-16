@@ -21,7 +21,7 @@ This document records:
 
 | Context | Rule |
 | --- | --- |
-| New production code under `src/`, `data_provider/`, `api/`, `bot/`, or entrypoints `main.py` / `server.py` / `webui.py` | Import the **canonical package** only. |
+| New production code under `src/`, `data_provider/`, `api/`, `bot/`, or entrypoints `main.py` / `server.py` | Import the **canonical package** only. |
 | Existing allowlisted production importers | May keep the facade path until a dedicated migration PR shrinks the baseline. |
 | Tests | May import facades when patch targets, reload, or historical contracts require them. Prefer canonical paths for new tests when possible. |
 | Facade shim modules themselves | Remain the re-export surface; do not expand their public contract without a separate decision. |
