@@ -27,11 +27,11 @@ from src.llm.backend_registry import (
     SUPPORTED_GENERATION_BACKENDS,
 )
 from src.llm.hermes import route_deployment_origins, route_has_hermes
-from src.notification_contracts import (
+from src.notification_parts.contracts import (
     is_feishu_app_bot_configured,
     is_feishu_static_configured,
 )
-from src.notification_noise import (
+from src.notification_parts.noise import (
     NOTIFICATION_SEVERITIES,
     is_supported_notification_severity,
     parse_notification_quiet_hours,

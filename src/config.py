@@ -30,14 +30,14 @@ from src.report_language import (
     is_supported_report_language_value,
     normalize_report_language,
 )
-from src.notification_routing import parse_notification_route_channels
-from src.notification_noise import (
+from src.notification_parts.route_config import parse_notification_route_channels
+from src.notification_parts.noise import (
     NOTIFICATION_SEVERITIES,
     is_supported_notification_severity,
     parse_notification_quiet_hours,
     validate_notification_timezone,
 )
-from src.notification_contracts import (
+from src.notification_parts.contracts import (
     is_feishu_app_bot_configured,
     is_feishu_static_configured,
 )

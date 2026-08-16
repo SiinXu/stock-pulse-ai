@@ -27,17 +27,17 @@ from src.agent.facade_binding import bind_facade_methods as _bind_facade_methods
 from src.config import Config, get_config
 from src.enums import ReportType
 from src.market_phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
-from src.notification_routing import (
+from src.notification_parts.route_config import (
     ROUTABLE_NOTIFICATION_CHANNELS as _ROUTABLE_NOTIFICATION_CHANNELS,
     get_notification_route_config,
     split_notification_route_channels,
 )
-from src.notification_contracts import is_feishu_static_configured
+from src.notification_parts.contracts import is_feishu_static_configured
 from src.notification_parts.contracts import (
     ChannelAttemptResult,
     NotificationDispatchResult,
 )
-from src.notification_noise import (
+from src.notification_parts.noise import (
     NotificationNoiseDecision,
     evaluate_notification_noise,
     record_notification_noise,

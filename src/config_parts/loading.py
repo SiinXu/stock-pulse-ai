@@ -48,7 +48,7 @@ from src.llm.local_cli_backend import (
     MAX_LOCAL_CLI_OUTPUT_BYTES,
     MAX_LOCAL_CLI_TIMEOUT_SECONDS,
 )
-from src.notification_routing import parse_notification_route_channels
+from src.notification_parts.route_config import parse_notification_route_channels
 from src.report_language import (
     is_supported_report_language_value,
     normalize_report_language,
