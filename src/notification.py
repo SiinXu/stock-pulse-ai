@@ -26,7 +26,7 @@ from enum import Enum
 from src.agent.facade_binding import bind_facade_methods as _bind_facade_methods
 from src.config import Config, get_config
 from src.enums import ReportType
-from src.market_phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
+from src.market.phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
 from src.notification_routing import (
     ROUTABLE_NOTIFICATION_CHANNELS as _ROUTABLE_NOTIFICATION_CHANNELS,
     get_notification_route_config,

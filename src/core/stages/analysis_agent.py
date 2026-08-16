@@ -35,7 +35,7 @@ from src.core.trading_calendar import (
 )
 from src.daily_market_context_guardrail import apply_daily_market_context_guardrail
 from src.enums import ReportType
-from src.market_phase_summary import render_market_phase_summary
+from src.market.phase_summary import render_market_phase_summary
 from src.phase_decision_guardrail import apply_phase_decision_guardrails
 from src.report_language import (
     get_placeholder_text,

@@ -49,9 +49,9 @@ from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
 from src.report_language import normalize_report_language
-from src.market_context import get_market_role, get_market_guidelines
-from src.market_phase_prompt import format_market_phase_prompt_section
-from src.market_structure_prompt import format_market_structure_prompt_section
+from src.market.context import get_market_role, get_market_guidelines
+from src.market.phase_prompt import format_market_phase_prompt_section
+from src.market.structure_prompt import format_market_structure_prompt_section
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 from src.utils.sanitize import log_safe_exception
 from src.agent.facade_binding import bind_facade_methods as _bind_facade_methods

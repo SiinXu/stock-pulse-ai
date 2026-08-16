@@ -29,7 +29,7 @@ from src.agent.runtime_facts import (
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
 from src.agent.stock_scope import resolve_stock_scope
 from src.config import get_config
-from src.market_structure_prompt import format_market_structure_prompt_section
+from src.market.structure_prompt import format_market_structure_prompt_section
 from src.report_language import normalize_report_language
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 from src.storage import get_db

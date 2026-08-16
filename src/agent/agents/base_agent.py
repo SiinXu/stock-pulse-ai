@@ -38,9 +38,9 @@ from src.agent.soul import (
 )
 from src.agent.skills.defaults import extract_skill_id
 from src.agent.tools.registry import ToolRegistry
-from src.market_phase_prompt import format_market_phase_prompt_section
-from src.market_structure_prompt import format_market_structure_prompt_section
-from src.market_regime_prompt import format_market_regime_prompt_section
+from src.market.phase_prompt import format_market_phase_prompt_section
+from src.market.structure_prompt import format_market_structure_prompt_section
+from src.market.regime_prompt import format_market_regime_prompt_section
 from src.report_language import normalize_report_language
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 from src.utils.sanitize import log_safe_exception
