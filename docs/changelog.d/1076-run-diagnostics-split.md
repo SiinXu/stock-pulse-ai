@@ -1,0 +1,1 @@
+- [Changed] Split run diagnostics into collect / schema / export behind the existing `src.services.run_diagnostics` facade without changing public imports, snapshot or summary shape, or analysis outcomes (Refs #1076).

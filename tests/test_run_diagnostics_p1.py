@@ -357,5 +357,243 @@ class RunDiagnosticsP1TestCase(unittest.TestCase):
         self.assertIn('"raw_response": "<redacted>"', payload)
 
 
+class RunDiagnosticsSplitCharacterizationTestCase(unittest.TestCase):
+    """Freeze the public collect/schema/export contract before the #1076 split."""
+
+    PUBLIC_NAMES = (
+        "PIPELINE_STAGE_NAMES",
+        "PIPELINE_STAGE_STATUSES",
+        "PipelineStageObservation",
+        "ProviderRun",
+        "RunDiagnosticContext",
+        "activate_run_diagnostic_context",
+        "attach_prompt_artifact_versions",
+        "build_run_diagnostic_summary",
+        "build_trace_id",
+        "current_diagnostic_snapshot",
+        "format_copyable_diagnostics",
+        "get_current_diagnostic_context",
+        "observe_pipeline_stage",
+        "record_data_quality_evidence",
+        "record_history_run",
+        "record_llm_run",
+        "record_llm_run_started",
+        "record_missing_pipeline_stages_as_skipped",
+        "record_notification_run",
+        "record_pipeline_stage",
+        "record_provider_run",
+        "record_provider_run_started",
+        "reset_run_diagnostic_context",
+        "safe_diagnostic_key",
+        "sanitize_diagnostic_metadata",
+        "sanitize_diagnostic_text",
+        "sanitize_finite_diagnostic_metadata",
+    )
+
+    SNAPSHOT_KEYS = (
+        "trace_id",
+        "task_id",
+        "query_id",
+        "stock_code",
+        "trigger_source",
+        "scope",
+        "provider_runs",
+        "data_quality_evidence",
+        "llm_runs",
+        "notification_runs",
+        "history_runs",
+        "pipeline_stage_runs",
+        "agent_events",
+        "agent_events_capture",
+    )
+
+    FACADE_BOUND_CALLABLES = (
+        "activate_run_diagnostic_context",
+        "current_diagnostic_snapshot",
+        "get_current_diagnostic_context",
+        "record_history_run",
+        "record_llm_run",
+        "record_llm_run_started",
+        "record_notification_run",
+        "record_provider_run",
+        "record_provider_run_started",
+        "reset_run_diagnostic_context",
+    )
+
+    def test_public_imports_remain_on_run_diagnostics_facade(self) -> None:
+        import src.services.run_diagnostics as run_diagnostics
+
+        for name in self.PUBLIC_NAMES:
+            self.assertTrue(hasattr(run_diagnostics, name), name)
+            self.assertIsNotNone(getattr(run_diagnostics, name))
+        for name in self.FACADE_BOUND_CALLABLES:
+            self.assertEqual(
+                getattr(run_diagnostics, name).__module__,
+                "src.services.run_diagnostics",
+                msg=name,
+            )
+
+    def test_snapshot_schema_shape_and_serialization_omit_none(self) -> None:
+        from src.services.run_diagnostics import (
+            ProviderRun,
+            record_history_run,
+            record_llm_run,
+            record_notification_run,
+            record_pipeline_stage,
+        )
+
+        token = activate_run_diagnostic_context(
+            trace_id="trace-schema",
+            task_id="task-schema",
+            query_id="query-schema",
+            stock_code="600519",
+            trigger_source="api",
+            scope="single_stock",
+        )
+        try:
+            record_provider_run(
+                data_type="daily_data",
+                provider="UnitFetcher",
+                operation="get_daily_data",
+                success=True,
+                record_count=2,
+            )
+            record_llm_run(success=True, model="deepseek-chat")
+            record_notification_run(channel="wechat", status="success", success=True)
+            record_history_run(report_saved=True, analysis_history_id=9)
+            record_pipeline_stage(stage="fetch", status="success")
+            snapshot = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+        self.assertIsNotNone(snapshot)
+        self.assertEqual(set(snapshot), set(self.SNAPSHOT_KEYS))
+        self.assertEqual(snapshot["trace_id"], "trace-schema")
+        self.assertEqual(snapshot["provider_runs"][0]["data_type"], "daily_data")
+        self.assertNotIn("error_message_sanitized", snapshot["provider_runs"][0])
+        self.assertEqual(
+            snapshot["agent_events_capture"],
+            {
+                "original_count": 0,
+                "returned_count": 0,
+                "dropped_count": 0,
+                "truncated": False,
+            },
+        )
+        payload = ProviderRun(
+            trace_id="trace-schema",
+            data_type="daily_data",
+            provider="UnitFetcher",
+            operation="get_daily_data",
+            success=True,
+            latency_ms=None,
+        ).to_dict()
+        self.assertNotIn("latency_ms", payload)
+        self.assertTrue(payload["success"])
+
+    def test_collect_then_export_does_not_mutate_inputs_or_outcome(self) -> None:
+        from src.services.run_diagnostics import (
+            build_run_diagnostic_summary,
+            observe_pipeline_stage,
+            record_llm_run,
+        )
+
+        input_summary = {"stock_code": "600519", "window": {"days": 30}}
+        output_summary = {"record_count": 1}
+        analysis_outcome = {
+            "success": True,
+            "model_used": "deepseek-chat",
+            "analysis_summary": "keep-me",
+        }
+        window_ref = input_summary["window"]
+        frozen_input = json.loads(json.dumps(input_summary))
+        frozen_output = json.loads(json.dumps(output_summary))
+        frozen_outcome = json.loads(json.dumps(analysis_outcome))
+        token = activate_run_diagnostic_context(trace_id="trace-non-mutation")
+        try:
+            stage = observe_pipeline_stage("fetch", input_summary=input_summary)
+            record_provider_run(
+                data_type="daily_data",
+                provider="UnitFetcher",
+                operation="get_daily_data",
+                success=True,
+                record_count=1,
+            )
+            record_llm_run(success=True, model="deepseek-chat")
+            stage.finish(status="success", output_summary=output_summary)
+            snapshot = current_diagnostic_snapshot()
+            summary = build_run_diagnostic_summary(
+                context_snapshot={"diagnostics": snapshot},
+                raw_result=analysis_outcome,
+                report_saved=True,
+            )
+        finally:
+            reset_run_diagnostic_context(token)
+
+        self.assertEqual(input_summary, frozen_input)
+        self.assertEqual(output_summary, frozen_output)
+        self.assertEqual(analysis_outcome, frozen_outcome)
+        self.assertIs(input_summary["window"], window_ref)
+        self.assertEqual(summary["status"], "normal")
+        self.assertEqual(summary["components"]["daily_data"]["status"], "ok")
+        self.assertEqual(summary["components"]["llm"]["status"], "ok")
+        self.assertIn("copy_text", summary)
+
+    def test_empty_partial_and_exception_diagnostics_fail_open(self) -> None:
+        from src.services.run_diagnostics import build_run_diagnostic_summary
+
+        self.assertIsNone(current_diagnostic_context_or_none())
+        record_provider_run(
+            data_type="daily_data",
+            provider="UnitFetcher",
+            operation="get_daily_data",
+            success=True,
+        )
+        self.assertIsNone(current_diagnostic_snapshot())
+
+        empty_summary = build_run_diagnostic_summary()
+        self.assertEqual(empty_summary["status"], "unknown")
+        self.assertIn("copy_text", empty_summary)
+
+        token = activate_run_diagnostic_context(trace_id="trace-partial")
+        try:
+            from src.services.run_diagnostics import record_pipeline_stage
+
+            record_pipeline_stage(stage="fetch", status="success")
+            partial = current_diagnostic_snapshot()
+            summary = build_run_diagnostic_summary(
+                context_snapshot={"diagnostics": partial},
+            )
+            self.assertEqual(summary["status"], "unknown")
+            self.assertEqual(summary["components"]["daily_data"]["status"], "unknown")
+            self.assertEqual(summary["components"]["llm"]["status"], "unknown")
+            self.assertEqual(len(partial["pipeline_stage_runs"]), 1)
+
+            def _boom(_event):
+                raise RuntimeError("sink unavailable")
+
+            from src.services.run_diagnostics import ProviderRun
+
+            context = RunDiagnosticContext(trace_id="trace-sink", event_sink=_boom)
+            context.record_provider_run(
+                ProviderRun(
+                    trace_id="trace-sink",
+                    data_type="daily_data",
+                    provider="UnitFetcher",
+                    operation="get_daily_data",
+                    success=True,
+                )
+            )
+            self.assertEqual(len(context.provider_runs), 1)
+        finally:
+            reset_run_diagnostic_context(token)
+
+
+def current_diagnostic_context_or_none():
+    from src.services.run_diagnostics import get_current_diagnostic_context
+
+    return get_current_diagnostic_context()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -31,9 +31,20 @@
 
 错误摘要会做基础脱敏，避免输出 token、API key、Authorization、Cookie、包含敏感参数的 webhook URL 等内容。
 
+## 模块布局（#1076）
+
+`src.services.run_diagnostics` 仍是唯一对外 facade。实现按只读职责拆到：
+
+- `src/services/diagnostics/schema.py`：稳定 schema、脱敏与序列化
+- `src/services/diagnostics/collect.py`：只读采集（写入诊断上下文，不改分析输入/结果/全局业务状态）
+- `src/services/diagnostics/export.py`：摘要与 `copy_text` 投影
+
+旧 import、snapshot / summary 字段形状、序列化与 fail-open 异常行为保持不变。消费者继续从 facade 导入，不要直接依赖内部包路径。
+
 ## 稳定性边界
 
 - 诊断记录失败只记录 warning，不影响主分析、数据源 fallback 或历史保存。
+- 采集路径不得改变分析 outcome、输入对象或无关的全局运行状态。
 - 本轮不新增配置项，不改变数据源优先级，不改变 fallback 策略。
 - 本轮不新增 Web 展示组件；`trace_id` 和 provider runs 先进入 API/SSE/历史快照，供后续 Phase 2/3 聚合与展示复用。
 
@@ -41,5 +52,5 @@
 
 ```bash
 python -m pytest tests/test_run_diagnostics_p1.py tests/test_analysis_api_contract.py::AnalysisApiContractTestCase::test_get_analysis_status_normalizes_completed_queue_result_contract
-python -m py_compile src/services/run_diagnostics.py src/services/task_queue/__init__.py src/services/analysis_service.py src/core/pipeline.py data_provider/base.py api/v1/schemas/analysis.py api/v1/endpoints/analysis.py
+python -m py_compile src/services/run_diagnostics.py src/services/diagnostics/schema.py src/services/diagnostics/collect.py src/services/diagnostics/export.py src/services/task_queue/__init__.py src/services/analysis_service.py src/core/pipeline.py data_provider/base.py api/v1/schemas/analysis.py api/v1/endpoints/analysis.py
 ```
