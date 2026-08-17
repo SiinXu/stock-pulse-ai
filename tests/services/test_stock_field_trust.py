@@ -84,6 +84,48 @@ def test_service_unavailable_when_all_providers_fail(mock_get_config, monkeypatc
     Config.reset_instance()
 
 
+@patch("src.config.get_config")
+def test_service_degrades_when_comparison_raises(mock_get_config, monkeypatch):
+    """Reviewer counterexample: comparison exception must not stay status=ok."""
+    from src.application_services import reset_application_services
+    from src.config import Config
+
+    monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
+    reset_application_services()
+    Config.reset_instance()
+    mock_get_config.return_value = _mock_config()
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    primary = _make_quote(source=RealtimeSource.EFINANCE, provider_timestamp=fresh_ts)
+    secondary = _make_quote(source=RealtimeSource.AKSHARE_EM, pe_ratio=25.5)
+    secondary.price = 200.0
+    manager = DataFetcherManager(
+        fetchers=[
+            _DummyFetcher("EfinanceFetcher", 0, result=primary),
+            _DummyFetcher("AkshareFetcher", 1, result=secondary),
+        ]
+    )
+    service = StockService(data_fetcher_manager=manager)
+
+    with patch(
+        "src.data_provider.data_validation.compare_cross_source_quotes",
+        side_effect=RuntimeError("comparison exploded"),
+    ):
+        view = service.get_field_trust("600519")
+
+    assert view["status"] == "degraded"
+    assert view["analysis_input"]["confidence"] != "high"
+    assert any(
+        check.get("reason") == "comparison_failed"
+        for check in view["conflict_checks"]
+    )
+    assert any(
+        gap["code"] == "conflict_check_skipped"
+        for gap in view["analysis_input"]["gaps"]
+    )
+    reset_application_services()
+    Config.reset_instance()
+
+
 def test_service_degrades_when_quote_has_no_trust_metadata():
     quote = UnifiedRealtimeQuote(
         code="600519",

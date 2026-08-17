@@ -28,6 +28,8 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List, Optional
 
+from src.utils.sanitize import log_safe_exception
+
 logger = logging.getLogger(__name__)
 
 FIELD_TRUST_SCHEMA_VERSION = "field_trust_v1"
@@ -86,7 +88,8 @@ def _source_token(value: Any) -> Optional[str]:
     token = getattr(value, "value", value)
     try:
         token = str(token).strip()
-    except Exception:  # broad-exception: optional_metadata - unknown provider object stays unattributed
+    except Exception as exc:  # broad-exception: fallback_recorded - unknown provider object stays unattributed
+        logger.debug("field_trust source token unavailable: %s", exc)
         return None
     return token or None
 
@@ -106,7 +109,8 @@ def _ensure_payload(quote: Any) -> Optional[Dict[str, Any]]:
         }
         try:
             setattr(quote, "field_trust", payload)
-        except Exception:  # broad-exception: optional_metadata - frozen quote objects simply carry no trust payload
+        except Exception as exc:  # broad-exception: fallback_recorded - frozen quote objects simply carry no trust payload
+            logger.debug("field_trust payload attach failed: %s", exc)
             return None
     payload.setdefault("schema_version", FIELD_TRUST_SCHEMA_VERSION)
     payload.setdefault("fields", {})
@@ -296,7 +300,8 @@ def _circuit_snapshots() -> Dict[str, Dict[str, Any]]:
 
         snapshot = get_realtime_circuit_breaker().get_snapshot()
         return snapshot if isinstance(snapshot, dict) else {}
-    except Exception:  # broad-exception: optional_metadata - circuit health is optional enrichment
+    except Exception as exc:  # broad-exception: fallback_recorded - circuit health is optional enrichment
+        logger.debug("field_trust circuit snapshot unavailable: %s", exc)
         return {}
 
 
@@ -323,6 +328,57 @@ def record_comparison_failure(
         status=CONFLICT_CHECK_SKIPPED,
         reason="comparison_failed",
     )
+
+
+def observe_cross_source_quotes(
+    primary: Any,
+    secondary: Any,
+    *,
+    stock_code: str,
+    market: Optional[str] = None,
+    primary_candidates: tuple = (),
+    secondary_candidates: tuple = (),
+    asset_type: Any = None,
+) -> None:
+    """Run the existing comparison and record evaluated, skipped, or failed checks.
+
+    Comparison exceptions are recorded as ``comparison_failed`` skips so an
+    unevaluated pair cannot read as agreement or high confidence.
+    """
+    primary_provider = resolve_source_token(*primary_candidates) or "primary"
+    secondary_provider = resolve_source_token(*secondary_candidates)
+    try:
+        from src.data_provider.data_validation import compare_cross_source_quotes
+
+        result = compare_cross_source_quotes(
+            primary,
+            secondary,
+            primary_provider=str(primary_provider),
+            secondary_provider=str(secondary_provider or "secondary"),
+            market=market,
+            stock_code=stock_code,
+            asset_type=asset_type,
+        )
+        record_cross_source_result(
+            primary,
+            result,
+            primary_provider=primary_provider,
+            secondary_provider=secondary_provider,
+        )
+    except Exception as exc:  # broad-exception: fallback_recorded - failed comparison is recorded, not treated as agreement
+        log_safe_exception(
+            logger,
+            "Cross-source quote comparison failed",
+            exc,
+            error_code="data_validation_cross_source_failed",
+            level=logging.DEBUG,
+            context={"symbol": stock_code, "provider": str(secondary_provider or "")},
+        )
+        record_comparison_failure(
+            primary,
+            primary_provider=primary_provider,
+            secondary_provider=secondary_provider,
+        )
 
 
 def build_provider_health(payload: Dict[str, Any]) -> List[Dict[str, Any]]:

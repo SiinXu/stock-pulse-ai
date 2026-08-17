@@ -2093,64 +2093,13 @@ class DataFetcherManager:
                         if supplement_attempts > 1:
                             logger.debug(f"[实时行情] {stock_code} 补充尝试已达上限，停止继续")
                             break
-                        # Issue #185: observe cross-source divergence on shared fields.
-                        try:
-                            from src.data_provider.data_validation import (
-                                compare_cross_source_quotes,
-                            )
-
-                            primary_provider = _field_trust.resolve_source_token(
-                                getattr(primary_quote, "source", None),
-                                "primary",
-                            )
-                            secondary_provider = _field_trust.resolve_source_token(
-                                getattr(quote, "source", None),
-                                source,
-                                provider_name,
-                            )
-                            # compare_cross_source_quotes already no-ops when
-                            # validation is disabled; record that skip instead
-                            # of implying agreement.
-                            cross_result = compare_cross_source_quotes(
-                                primary_quote,
-                                quote,
-                                primary_provider=str(primary_provider),
-                                secondary_provider=str(secondary_provider),
-                                market=_market_tag(
-                                    normalize_stock_code(stock_code)
-                                ),
-                                stock_code=stock_code,
-                                asset_type=getattr(
-                                    primary_quote, "instrument_type", None
-                                ),
-                            )
-                            _field_trust.record_cross_source_result(
-                                primary_quote,
-                                cross_result,
-                                primary_provider=primary_provider,
-                                secondary_provider=secondary_provider,
-                            )
-                        except Exception as cross_exc:  # broad-exception: fallback_recorded - observational only
-                            log_safe_exception(
-                                logger,
-                                "Cross-source quote comparison failed",
-                                cross_exc,
-                                error_code="data_validation_cross_source_failed",
-                                level=logging.DEBUG,
-                                context={
-                                    "symbol": stock_code,
-                                    "provider": provider_name,
-                                },
-                            )
-                            _field_trust.record_comparison_failure(
-                                primary_quote,
-                                primary_provider=getattr(primary_quote, "source", None),
-                                secondary_provider=_field_trust.resolve_source_token(
-                                    getattr(quote, "source", None),
-                                    source,
-                                    provider_name,
-                                ),
-                            )
+                        _field_trust.observe_cross_source_quotes(
+                            primary_quote, quote, stock_code=stock_code,
+                            market=_market_tag(normalize_stock_code(stock_code)),
+                            primary_candidates=(getattr(primary_quote, "source", None),),
+                            secondary_candidates=(getattr(quote, "source", None), source, provider_name),
+                            asset_type=getattr(primary_quote, "instrument_type", None),
+                        )
                         merged = self._merge_quote_fields(primary_quote, quote)
                         if merged:
                             logger.info(f"[实时行情] {stock_code} 从 {source} 补充了缺失字段: {merged}")
@@ -2404,63 +2353,17 @@ class DataFetcherManager:
                         role=_field_trust.PROVIDER_ROLE_ATTEMPTED,
                     )
                 if secondary is not None:
-                    # Issue #185: cross-source consistency when both providers
-                    # supply the same field. Fail-open: never drop the primary.
-                    try:
-                        from src.data_provider.data_validation import (
-                            compare_cross_source_quotes,
-                        )
-
-                        primary_provider = _field_trust.resolve_source_token(
-                            getattr(primary_quote, "source", None),
-                            "primary",
-                        )
-                        secondary_provider = _field_trust.resolve_source_token(
+                    _field_trust.observe_cross_source_quotes(
+                        primary_quote, secondary, stock_code=stock_code,
+                        market=_market_tag(normalize_stock_code(stock_code)),
+                        primary_candidates=(getattr(primary_quote, "source", None),),
+                        secondary_candidates=(
                             getattr(secondary, "source", None),
                             self._realtime_fetcher_token(fetcher_name, **kw),
                             fetcher_name,
-                        )
-                        # compare_cross_source_quotes already no-ops when
-                        # validation is disabled; record that skip instead
-                        # of implying agreement.
-                        cross_result = compare_cross_source_quotes(
-                            primary_quote,
-                            secondary,
-                            primary_provider=str(primary_provider),
-                            secondary_provider=str(secondary_provider),
-                            market=_market_tag(normalize_stock_code(stock_code)),
-                            stock_code=stock_code,
-                            asset_type=getattr(
-                                primary_quote, "instrument_type", None
-                            ),
-                        )
-                        _field_trust.record_cross_source_result(
-                            primary_quote,
-                            cross_result,
-                            primary_provider=primary_provider,
-                            secondary_provider=secondary_provider,
-                        )
-                    except Exception as cross_exc:  # broad-exception: fallback_recorded - comparison is observational
-                        log_safe_exception(
-                            logger,
-                            "Cross-source quote comparison failed",
-                            cross_exc,
-                            error_code="data_validation_cross_source_failed",
-                            level=logging.DEBUG,
-                            context={
-                                "symbol": stock_code,
-                                "provider": fetcher_name,
-                            },
-                        )
-                        _field_trust.record_comparison_failure(
-                            primary_quote,
-                            primary_provider=getattr(primary_quote, "source", None),
-                            secondary_provider=_field_trust.resolve_source_token(
-                                getattr(secondary, "source", None),
-                                self._realtime_fetcher_token(fetcher_name, **kw),
-                                fetcher_name,
-                            ),
-                        )
+                        ),
+                        asset_type=getattr(primary_quote, "instrument_type", None),
+                    )
                     filled = self._merge_quote_fields(primary_quote, secondary)
                     if filled:
                         logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 补充了: {filled}")

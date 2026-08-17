@@ -377,6 +377,80 @@ def test_post_primary_provider_failure_is_recorded(
 
 
 @patch("src.config.get_config")
+def test_supplement_quote_records_comparison_failure_and_empty_attempt(
+    mock_get_config, validation_enabled
+):
+    """US/HK supplement path must record failed checks and later-source empty."""
+    mock_get_config.return_value = _mock_config()
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    primary = _make_quote(
+        code="AAPL",
+        source=RealtimeSource.LONGBRIDGE,
+        provider_timestamp=fresh_ts,
+    )
+    secondary = _make_quote(code="AAPL", source=RealtimeSource.AKSHARE_EM, pe_ratio=18.0)
+    secondary.price = 200.0
+    manager = DataFetcherManager(fetchers=[])
+
+    with patch.object(manager, "_try_fetcher_quote", return_value=secondary), patch(
+        "src.data_provider.data_validation.compare_cross_source_quotes",
+        side_effect=RuntimeError("comparison exploded"),
+    ):
+        quote = manager._supplement_quote("AAPL", primary, "AkshareFetcher")
+
+    assert quote is primary
+    assert quote.price == 1688.0
+    skipped = [
+        check
+        for check in quote.field_trust["conflict_checks"]
+        if check.get("reason") == "comparison_failed"
+    ]
+    assert skipped
+    assert skipped[0]["status"] == field_trust.CONFLICT_CHECK_SKIPPED
+    assert skipped[0]["secondary_provider"] == "akshare_em"
+
+    empty_primary = _make_quote(
+        code="AAPL",
+        source=RealtimeSource.LONGBRIDGE,
+        provider_timestamp=fresh_ts,
+    )
+    with patch.object(manager, "_try_fetcher_quote", return_value=None):
+        empty_quote = manager._supplement_quote("AAPL", empty_primary, "YfinanceFetcher")
+    # finalize has not run on this helper path; inspect attempts directly.
+    attempts = {
+        (row["provider"], row["status"])
+        for row in empty_quote.field_trust["provider_attempts"]
+    }
+    assert ("yfinance", "empty") in attempts
+
+
+@patch("src.config.get_config")
+def test_supplement_quote_records_post_primary_exception(
+    mock_get_config, validation_enabled
+):
+    """A later-source exception on the supplement path is a failed attempt."""
+    mock_get_config.return_value = _mock_config()
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    primary = _make_quote(
+        code="AAPL",
+        source=RealtimeSource.LONGBRIDGE,
+        provider_timestamp=fresh_ts,
+    )
+    manager = DataFetcherManager(fetchers=[])
+    with patch.object(
+        manager, "_try_fetcher_quote", side_effect=RuntimeError("yfinance down")
+    ):
+        quote = manager._supplement_quote("AAPL", primary, "YfinanceFetcher")
+
+    assert quote is primary
+    attempts = {
+        (row["provider"], row["status"])
+        for row in quote.field_trust["provider_attempts"]
+    }
+    assert ("yfinance", "failed") in attempts
+
+
+@patch("src.config.get_config")
 def test_all_providers_fail_returns_none(mock_get_config, validation_enabled):
     """Total provider failure stays None; callers must degrade, not invent a quote."""
     mock_get_config.return_value = _mock_config()

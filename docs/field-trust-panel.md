@@ -1,6 +1,6 @@
 # Field-level data trust panel
 
-Issue reference: #1129. Implementation lives in `src/data_provider/field_trust.py` with minimal wiring in `src/data_provider/base.py` and `src/data_provider/realtime_types.py`. The HTTP view is `GET /api/v1/stocks/{code}/trust`. The Web panel mounts on the stock workspace (`/stocks/<code>`).
+Issue reference: #1129. Implementation lives in `src/data_provider/field_trust.py` with minimal wiring in `src/data_provider/base.py` and `src/data_provider/realtime_types.py`. The HTTP view is `GET /api/v1/stocks/{code}/trust`. The Web panel mounts on the stock workspace (`/stocks/<code>`). The exported `FieldTrustPanel` is also registered in the real playground catalog.
 
 ## Contract
 

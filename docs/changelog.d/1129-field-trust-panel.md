@@ -1,2 +1,3 @@
 - [Added] Field-level quote trust panel and API: per-field source, lag, staleness, cross-provider conflicts, provider health, and analysis gap/confidence without silently choosing one source as truth (Refs #1129).
 - [Fixed] Record comparison failures and post-primary supplement failures on the trust payload so they cannot read as agreement or healthy (Refs #1129).
+- [Fixed] Register FieldTrustPanel in the playground catalog with real degraded/unavailable/error renderers (Refs #1129).

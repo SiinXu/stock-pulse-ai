@@ -43,7 +43,7 @@ const staleConflictView: StockFieldTrustResponse = {
   conflictChecks: [
     {
       primaryProvider: 'efinance',
-      secondaryProvider: 'AkshareFetcher',
+      secondaryProvider: 'akshare_em',
       status: 'evaluated',
     },
   ],

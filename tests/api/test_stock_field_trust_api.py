@@ -175,6 +175,37 @@ class StockFieldTrustApiTests(unittest.TestCase):
         self.assertIn(("akshare_em", "failed"), statuses)
         self.assertEqual(payload["analysis_input"]["confidence"], "low")
 
+    def test_comparison_exception_does_not_read_as_trusted(self) -> None:
+        fresh_ts = datetime.now(timezone.utc).isoformat()
+        primary = _make_quote(
+            source=RealtimeSource.EFINANCE,
+            provider_timestamp=fresh_ts,
+        )
+        secondary = _make_quote(source=RealtimeSource.AKSHARE_EM, pe_ratio=25.5)
+        secondary.price = 200.0
+        manager = DataFetcherManager(
+            fetchers=[
+                _DummyFetcher("EfinanceFetcher", 0, result=primary),
+                _DummyFetcher("AkshareFetcher", 1, result=secondary),
+            ]
+        )
+
+        with patch(
+            "src.data_provider.data_validation.compare_cross_source_quotes",
+            side_effect=RuntimeError("comparison exploded"),
+        ):
+            resp = self._get_trust(manager)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        payload = resp.json()
+        self.assertEqual(payload["status"], "degraded")
+        self.assertNotEqual(payload["analysis_input"]["confidence"], "high")
+        self.assertTrue(
+            any(
+                check.get("reason") == "comparison_failed"
+                for check in payload["conflict_checks"]
+            )
+        )
+
     def test_unavailable_when_every_provider_fails(self) -> None:
         manager = DataFetcherManager(
             fetchers=[
