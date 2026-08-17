@@ -11,7 +11,6 @@ from .common import ConflictContext, ConflictHunk, RefusalError, parse_conflict_
 SUPPORTED_PATTERNS = ("apps/dsa-web/src/locales/settingsHelp.<lang>.ts",)
 _PATH = re.compile(r"^apps/dsa-web/src/locales/settingsHelp\.[A-Za-z-]+\.ts$")
 _BLOCK_START = re.compile(r"^(\s*)(['\"])((?:[^'\"\\]|\\.)+)\2\s*:\s*\{\s*$")
-_ONE_LINE = re.compile(r"^\s*(['\"])((?:[^'\"\\]|\\.)+)\1\s*:\s*.*,\s*$")
 _CLOSER = re.compile(r"^\s*\},?\s*$")
 
 
@@ -25,7 +24,6 @@ def _raw_lines(lines: tuple[str, ...]) -> list[str]:
 
 def _blocks(
     path: Path,
-    hunk: ConflictHunk,
     side: str,
     lines: list[str],
 ) -> tuple[list[tuple[str, list[str]]], tuple[str, list[str]] | None]:
@@ -66,11 +64,6 @@ def _blocks(
                 )
             blocks.append((key, body))
             continue
-        single = _ONE_LINE.match(line.rstrip("\n"))
-        if single is not None:
-            blocks.append((single.group(2), [line]))
-            index += 1
-            continue
         raise RefusalError(
             path,
             f"{side} side is not a settings-help entry block: {line.strip()[:100]!r}",
@@ -99,8 +92,8 @@ def _merge_hunk(path: Path, hunk: ConflictHunk, closer: str | None) -> str:
     ):
         raise RefusalError(path, "settings-help conflict has an empty side")
 
-    ours, our_open = _blocks(path, hunk, "ours", ours_lines)
-    theirs, their_open = _blocks(path, hunk, "theirs", theirs_lines)
+    ours, our_open = _blocks(path, "ours", ours_lines)
+    theirs, their_open = _blocks(path, "theirs", theirs_lines)
 
     if (our_open is None) != (their_open is None):
         raise RefusalError(

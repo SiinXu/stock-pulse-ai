@@ -114,6 +114,18 @@ def test_settings_help_refuses_unexpected_lines():
         )
 
 
+def test_settings_help_refuses_executable_one_line_entries():
+    with pytest.raises(RefusalError, match="not a settings-help entry block"):
+        settings_help.resolve(
+            _context(
+                _conflict(
+                    "  'settings.ours': makeHelp(),\n",
+                    _help_block("settings.theirs", "Theirs"),
+                )
+            )
+        )
+
+
 def test_settings_help_refuses_empty_conflict():
     with pytest.raises(RefusalError, match="no conflict hunks"):
         settings_help.resolve(_context(_help_file([_help_block("settings.a", "A")])))
@@ -175,6 +187,24 @@ def test_cli_refuses_unsupported_path(capsys):
     err = capsys.readouterr().err
     assert "REFUSE" in err
     assert "unsupported conflict file" in err
+
+
+def test_plan_resolutions_dispatches_settings_help(monkeypatch, tmp_path):
+    context = _context(
+        _conflict(
+            _help_block("settings.ours", "Ours"),
+            _help_block("settings.theirs", "Theirs"),
+        )
+    )
+    monkeypatch.setattr(
+        "scripts.merge_resolvers.resolve.load_conflict_context",
+        lambda _root, _path: context,
+    )
+    outputs = plan_resolutions(tmp_path, [HELP_PATH])
+    text = outputs[HELP_PATH].decode("utf-8")
+    assert "settings.ours" in text
+    assert "settings.theirs" in text
+    assert "<<<<<<<" not in text
 
 
 def test_plan_resolutions_refuses_empty_path_list(tmp_path):
