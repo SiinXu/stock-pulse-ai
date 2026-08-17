@@ -63,6 +63,9 @@ DEFAULT_DB_ALERT_COOLDOWN_SECONDS = 24 * 60 * 60
 MAX_DB_ALERT_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
 ALERT_WORKER_RULE_LIMIT = 1000
 WRITABLE_TRIGGER_STATUSES = frozenset({"triggered", "skipped", "degraded", "failed"})
+# Evaluation outcomes that mean the rule's data source could not be trusted
+# this cycle (issue #1133: pause the persisted rule instead of notifying).
+DATA_FAILURE_RECORD_STATUSES = frozenset({"failed", "degraded"})
 
 
 @dataclass
@@ -139,6 +142,7 @@ class AlertWorker:
             "failed": 0,
             "notification_attempts": 0,
             "cooldown_suppressed": 0,
+            "paused": 0,
             "auto_analysis_submitted": 0,
             "auto_analysis_skipped": 0,
         }
@@ -213,6 +217,11 @@ class AlertWorker:
                 trigger_write = TriggerWriteResult()
                 trigger_id = None
 
+            if record_status in DATA_FAILURE_RECORD_STATUSES:
+                if self._pause_db_rule_on_data_failure(runtime_rule, result):
+                    stats["paused"] += 1
+                continue
+
             if record_status == "triggered":
                 # Persist first so NaN/Inf or DB write failures cannot enqueue
                 # analysis or consume debounce/budget without a durable trigger row.
@@ -265,6 +274,57 @@ class AlertWorker:
                         stats["notified"] += 1
 
         return stats
+
+    def _pause_db_rule_on_data_failure(
+        self,
+        runtime_rule: RuntimeAlertRule,
+        result: Dict[str, Any],
+    ) -> bool:
+        """Disable a persisted rule when evaluation data cannot be trusted.
+
+        ``skipped`` (no quote / non-trading day) is not a trust failure.
+        ``failed`` and ``degraded`` mean the source or payload is unusable, so
+        the worker pauses the rule instead of leaving it eligible to notify.
+        """
+        if runtime_rule.source != "db":
+            return False
+        rule_id = self._persisted_rule_id(runtime_rule, result)
+        if rule_id <= 0:
+            return False
+        try:
+            self.service.enable_rule(rule_id, False)
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate pause failure
+            log_safe_exception(
+                logger,
+                "Alert rule pause after data failure failed",
+                exc,
+                error_code="alert_rule_pause_failed",
+                level=logging.WARNING,
+                context={"rule_id": rule_id},
+            )
+            return False
+        logger.warning(
+            "[AlertWorker] Paused rule %s after data failure (status=%s)",
+            rule_id,
+            result.get("record_status"),
+        )
+        return True
+
+    @staticmethod
+    def _persisted_rule_id(runtime_rule: RuntimeAlertRule, result: Dict[str, Any]) -> int:
+        try:
+            rule_id = int(result.get("rule_id") or 0)
+        except (TypeError, ValueError):
+            rule_id = 0
+        if rule_id > 0:
+            return rule_id
+        metadata = getattr(runtime_rule.rule, "metadata", None)
+        if isinstance(metadata, dict):
+            try:
+                return int(metadata.get("persisted_rule_id") or 0)
+            except (TypeError, ValueError):
+                return 0
+        return 0
 
     def _load_runtime_rules(self, config: Config) -> List[RuntimeAlertRule]:
         runtime_rules: List[RuntimeAlertRule] = []

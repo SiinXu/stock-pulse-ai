@@ -131,3 +131,15 @@ Quiet hours for alert **delivery** continue to use `NOTIFICATION_QUIET_HOURS` /
 phrases into Alert create payloads. Outcomes: `success` | `need_clarification` |
 `rejected`. No arbitrary code execution. Corporate-event compiles always include
 `event_categories`, `lookback_hours`, and `min_items` to prevent field-loss regressions.
+
+Successful compiles produce a structured IR with `symbol`, `metric`, `comparator`,
+`threshold`, and optional `cooldown` (seconds). An explicit clause such as
+`cooldown 30 minutes` / `冷却 1 小时` is stripped before threshold parsing and
+written to `cooldown_policy.cooldown_seconds`. Ambiguous cooldown mentions return
+`need_clarification`. The compiler never evaluates the input as code.
+
+When a persisted monitor later evaluates as `failed` or `degraded` (data source or
+untrusted payload), `AlertWorker` pauses the rule (`enabled=false`) and does not
+notify. `skipped` (no quote / non-trading day) is not a trust failure and does not
+pause the rule. This path reuses the existing evaluator `record_status` contract
+and does not introduce a second trust model.

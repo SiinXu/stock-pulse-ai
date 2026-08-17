@@ -1,0 +1,1 @@
+- [Added] Natural-language monitor compiler emits structured IR (symbol/metric/comparator/threshold/cooldown) and AlertWorker pauses persisted rules on failed/degraded evaluation instead of notifying (Refs #1133).

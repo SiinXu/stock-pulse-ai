@@ -564,3 +564,13 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 `POST /api/v1/alerts/rules/compile-nl` 将白名单内自然语言编译为 Alert 创建载荷。
 结果：`success` | `need_clarification` | `rejected`。禁止任意代码执行。
 企业事件编译始终包含 `event_categories` / `lookback_hours` / `min_items`，防止编辑丢字段回归。
+
+成功编译会产出结构化 IR：`symbol` / `metric` / `comparator` / `threshold` / 可选
+`cooldown`（秒）。`cooldown 30 minutes` / `冷却 1 小时` 这类子句会先从短语中剥离，
+再写入 `cooldown_policy.cooldown_seconds`，避免冷却数字被当成阈值。冷却被提到但
+无法解析时长时返回 `need_clarification`。编译器不会把输入当代码执行。
+
+持久化规则后续评估为 `failed` 或 `degraded`（数据源或载荷不可信）时，`AlertWorker`
+会暂停该规则（`enabled=false`）且不发送通知。`skipped`（无行情 / 非交易日）不是
+trust 失败，不会暂停规则。该路径复用现有 evaluator 的 `record_status`，不另建一套
+trust 模型。
