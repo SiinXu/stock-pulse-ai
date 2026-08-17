@@ -51,6 +51,7 @@ Summary at the time this policy was introduced:
 
 | Legacy facade | Canonical module | Production importers | Facade definition |
 | --- | --- | --- | --- |
+| `data_provider` | `src.data_provider` | 67 | `data_provider/__init__.py` |
 | `src.market_context` | `src.market.context` | 4 | `src/market_context.py` |
 | `src.market_phase_prompt` | `src.market.phase_prompt` | 4 | `src/market_phase_prompt.py` |
 | `src.market_phase_summary` | `src.market.phase_summary` | 10 | `src/market_phase_summary.py` |
@@ -60,20 +61,15 @@ Summary at the time this policy was introduced:
 | `src.analysis_context_pack_overview` | `src.analysis_context_pack.overview` | 2 | `src/analysis_context_pack_overview.py` |
 | `src.analysis_context_pack_prompt` | `src.analysis_context_pack.prompt` | 3 | `src/analysis_context_pack_prompt.py` |
 
-**Total allowlisted production importer rows: 30** (one file may appear under
-multiple facades).
+**Total allowlisted production importer rows: 97** (one file may appear under
+multiple facades). The `data_provider` facade was registered when the package
+moved to `src/data_provider` (Refs #167); existing callers stay on the alias
+and new production code must import `src.data_provider`.
 
 The `src/notification_sender/` re-export shims have been removed. Production
 and test imports use `src.notification_parts.senders` only. The legacy facade
 guard no longer catalogues those paths; leftover baseline keys fail as
 unknown facades.
-
-`data_provider.base` is **not** listed as a banned legacy facade in this guard.
-It is the active compatibility surface for the data-provider decomposition
-tracked by Issue #622 / ADR-006; its extraction uses re-exports, not a second
-parallel public import tree. New call sites should continue to use the public
-`data_provider` / `data_provider.base` contracts until a later retirement PR says
-otherwise.
 
 ## Phased Retirement
 

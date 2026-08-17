@@ -29,6 +29,7 @@ BASELINE_VERSION = 1
 
 # Legacy compatibility shims (facade module) -> canonical implementation package.
 LEGACY_FACADES: Mapping[str, str] = {
+    "data_provider": "src.data_provider",
     "src.market_context": "src.market.context",
     "src.market_phase_prompt": "src.market.phase_prompt",
     "src.market_phase_summary": "src.market.phase_summary",
@@ -42,6 +43,7 @@ LEGACY_FACADES: Mapping[str, str] = {
 # Shim files that re-export the canonical package; they are not importers of
 # themselves for allowlist purposes.
 FACADE_DEFINITION_FILES: Mapping[str, str] = {
+    "data_provider": "data_provider/__init__.py",
     "src.market_context": "src/market_context.py",
     "src.market_phase_prompt": "src/market_phase_prompt.py",
     "src.market_phase_summary": "src/market_phase_summary.py",

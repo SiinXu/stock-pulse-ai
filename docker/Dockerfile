@@ -57,6 +57,8 @@ COPY api/ ./api/
 COPY data_provider/ ./data_provider/
 COPY bot/ ./bot/
 COPY src/ ./src/
+# Compatibility alias COPY above stays; implementation is under src/data_provider.
+RUN DSA_PACKAGED_IMPORT_PROBE=src.data_provider.base python main.py
 COPY strategies/ ./strategies/
 COPY --from=web-builder /app/static ./static/
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh

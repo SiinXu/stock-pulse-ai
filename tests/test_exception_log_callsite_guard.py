@@ -294,7 +294,7 @@ _IMPORTED_RECEIVER_DECORATORS = {
     "contextmanager": {"contextlib"},
     "override": {"typing", "typing_extensions"},
     "property": {"builtins"},
-    "provider_retry": {"data_provider.retry_policy"},
+    "provider_retry": {"data_provider.retry_policy", "src.data_provider.retry_policy"},
     "retry": {"tenacity"},
 }
 _CALLED_RECEIVER_DECORATORS = {"provider_retry", "retry"}

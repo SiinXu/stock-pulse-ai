@@ -18,21 +18,21 @@ _MOVED_DESCRIPTOR_CONTRACT = {
     "data_provider_runtime": ("property", "(self)"),
     "_assign_fetcher_static_order_locked": (
         "function",
-        "(self, fetcher: data_provider.base.DataProvider) -> None",
+        "(self, fetcher: src.data_provider.base.DataProvider) -> None",
     ),
     "_provider_priority": (
         "function",
-        "(self, fetcher: data_provider.base.DataProvider) -> int",
+        "(self, fetcher: src.data_provider.base.DataProvider) -> int",
     ),
     "_sort_fetchers_locked": ("function", "(self) -> None"),
     "_remove_registered_fetcher_locked": (
         "function",
-        "(self, fetcher: data_provider.base.DataProvider) -> None",
+        "(self, fetcher: src.data_provider.base.DataProvider) -> None",
     ),
     "_sync_registered_data_providers": ("function", "(self) -> None"),
     "_get_fetchers_snapshot": (
         "function",
-        "(self) -> List[data_provider.base.DataProvider]",
+        "(self) -> List[src.data_provider.base.DataProvider]",
     ),
     "_provider_plugin_registration": (
         "staticmethod",
@@ -41,7 +41,7 @@ _MOVED_DESCRIPTOR_CONTRACT = {
     "_provider_supports_capability": (
         "function",
         (
-            "(self, fetcher: data_provider.base.DataProvider, capability: str, "
+            "(self, fetcher: src.data_provider.base.DataProvider, capability: str, "
             "market: Optional[str] = None) -> bool"
         ),
     ),
@@ -49,7 +49,7 @@ _MOVED_DESCRIPTOR_CONTRACT = {
         "function",
         (
             "(self, capability: str, *, market: Optional[str] = None, "
-            "plugins_only: bool = False) -> List[data_provider.base.DataProvider]"
+            "plugins_only: bool = False) -> List[src.data_provider.base.DataProvider]"
         ),
     ),
     "_refresh_fetcher_indexes_locked": ("function", "(self) -> None"),
@@ -57,35 +57,35 @@ _MOVED_DESCRIPTOR_CONTRACT = {
         "function",
         (
             "(self, fetcher_name: str, capability: str = '') -> "
-            "Optional[data_provider.base.DataProvider]"
+            "Optional[src.data_provider.base.DataProvider]"
         ),
     ),
     "_call_availability_probe": (
         "staticmethod",
         (
-            "(fetcher: data_provider.base.BaseFetcher, probe_name: str, "
+            "(fetcher: src.data_provider.base.BaseFetcher, probe_name: str, "
             "capability: str) -> Optional[bool]"
         ),
     ),
     "_is_fetcher_available": (
         "classmethod",
         (
-            "(cls, fetcher: data_provider.base.BaseFetcher, "
+            "(cls, fetcher: src.data_provider.base.BaseFetcher, "
             "capability: str = '') -> bool"
         ),
     ),
     "_filter_daily_fetchers_for_market": (
         "function",
         (
-            "(self, fetchers: List[data_provider.base.DataProvider], "
-            "market: str) -> List[data_provider.base.DataProvider]"
+            "(self, fetchers: List[src.data_provider.base.DataProvider], "
+            "market: str) -> List[src.data_provider.base.DataProvider]"
         ),
     ),
     "_filter_fetchers_by_capability": (
         "function",
         (
-            "(self, fetchers: List[data_provider.base.DataProvider], "
-            "capability: str) -> List[data_provider.base.DataProvider]"
+            "(self, fetchers: List[src.data_provider.base.DataProvider], "
+            "capability: str) -> List[src.data_provider.base.DataProvider]"
         ),
     ),
     "_register_builtin_data_provider": (
@@ -94,7 +94,7 @@ _MOVED_DESCRIPTOR_CONTRACT = {
     ),
     "add_fetcher": (
         "function",
-        "(self, fetcher: data_provider.base.DataProvider) -> None",
+        "(self, fetcher: src.data_provider.base.DataProvider) -> None",
     ),
     "available_fetchers": ("property", "(self) -> List[str]"),
 }
@@ -148,7 +148,7 @@ def descriptor_bindings():
         assert facade_function is not source_function
         assert facade_function.__code__ is source_function.__code__
         assert facade_function.__globals__ is vars(base)
-        assert facade_function.__module__ == "data_provider.base"
+        assert facade_function.__module__ == "src.data_provider.base"
         assert facade_function.__qualname__ == f"DataFetcherManager.{name}"
 
         source_descriptors[name] = source_descriptor
@@ -271,7 +271,7 @@ def test_capability_catalog_facade_preserves_import_and_reflection_contract() ->
 
         assert kind == expected_kind
         assert str(inspect.signature(function)) == expected_signature
-        assert function.__module__ == "data_provider.base"
+        assert function.__module__ == "src.data_provider.base"
         assert function.__qualname__ == f"DataFetcherManager.{name}"
         assert function.__globals__ is vars(base)
         assert not (

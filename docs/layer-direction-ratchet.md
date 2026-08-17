@@ -18,14 +18,14 @@ known cycles without encoding the intended **direction**.
 This ratchet enforces the directed layer shape:
 
 ```text
-api → services → pipeline/stages → data_provider
+api → services → pipeline/stages → src.data_provider
 ```
 
 Lower layers must not import higher ones. In particular:
 
 | Forbidden reverse edge | Why |
 | --- | --- |
-| `data_provider` → `src.services` / `src.core` / `src.agent` / `api` | Providers are the leaf data adapters |
+| `src.data_provider` → `src.services` / `src.core` / `src.agent` / `api` | Providers are the leaf data adapters |
 | `src.services` → `api` | HTTP transport is one-way |
 | `src.core` / `src.agent` / `src.market` / `src.analyzer` → `api` | Domain and orchestration must not depend on transport |
 | `src.core` pipeline/stages → `src.services` | Intended direction is services → pipeline |
@@ -43,7 +43,7 @@ Historical reverse edges are frozen in
 `scripts/layer_direction_baseline.json` (hard ceiling = exception count at
 introduction). Current categories:
 
-1. **data_provider → src.services** (symbol/market helpers used by providers).
+1. **src.data_provider → src.services** (symbol/market helpers used by providers).
 2. **pipeline/stages → src.services** (orchestration importing application
    services instead of receiving injected ports).
 
@@ -62,7 +62,7 @@ introduction). Current categories:
 ## How to read a failure
 
 ```text
-[layer-direction] ERROR: new-reverse-edge: data_provider/foo.py: data_provider -> src.services: ...
+[layer-direction] ERROR: new-reverse-edge: src/data_provider/foo.py: src.data_provider -> src.services: ...
 [layer-direction] HINT: break the reverse import or see docs/layer-direction-ratchet.md ...
 ```
 

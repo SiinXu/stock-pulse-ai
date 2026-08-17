@@ -18,7 +18,7 @@ and fails CI when debt grows.
 
 | Path | Role on the hot path |
 | --- | --- |
-| `data_provider/` | Market adapters, fallback, cache |
+| `src/data_provider/` | Market adapters, fallback, cache |
 | `src/services/` | Application use cases and task lifecycle |
 | `src/agent/` | Agent orchestration and tools |
 | `src/market/` | Market analysis / phase / structure |
@@ -52,7 +52,7 @@ Historical oversized modules live in
 introduction (remeasured against current `main`) the inventory includes
 gravity modules such as:
 
-- `data_provider/base.py`
+- `src/data_provider/base.py`
 - `src/services/run_diagnostics.py`
 - `src/services/scheduled_task_service.py`
 - `src/market/analyzer.py`
@@ -75,7 +75,7 @@ under the soft budget and are not allowlisted.
 
 ```text
 [hot-path-size] ERROR: new-oversized-module: src/services/foo.py: 1600 lines exceeds soft budget 1500; ...
-[hot-path-size] ERROR: module-grew: data_provider/base.py: 4800 lines exceeds baselined max 4659; ...
+[hot-path-size] ERROR: module-grew: src/data_provider/base.py: 4800 lines exceeds baselined max 4659; ...
 ```
 
 Typical fixes:

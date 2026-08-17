@@ -9,7 +9,7 @@
 ## Purpose
 
 Track ownership after the sequential ADR-006 extractions from
-`data_provider/base.py`. This map tells contributors **where new code belongs**
+`src/data_provider/base.py`. This map tells contributors **where new code belongs**
 and **how to land the next review-sized slice** without changing provider
 priority, circuit, or fallback policy (ADR-005).
 
@@ -35,21 +35,21 @@ below, then re-exported from the facade when a public name must remain stable.
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
-| `data_provider/symbol_normalization.py` | Pure symbol / market code helpers: `normalize_stock_code`, `canonical_stock_code`, `is_bse_code`, `is_st_stock`, `is_kc_cy_stock`, ETF prefix checks, and market tags (`_is_*_market`, `_market_tag`, `_is_etf_code`, `ETF_PREFIXES`) | Provider I/O, caching, circuit policy, dataframe column normalization |
-| `data_provider/errors.py` | Typed provider failures (`DataFetchError`, `RateLimitError`, `DataSourceUnavailableError`, `CircuitOpenError`) and exception summary helpers (`unwrap_exception`, `summarize_exception`) | Provider I/O, routing, cache policy |
-| `data_provider/chip_helpers.py` | Pure chip metric coercion and meaningful-distribution checks | Provider I/O and chip fetch orchestration |
-| `data_provider/us_index_mapping.py` | US ticker / index identity helpers used by market classification | A-share / HK / JP / KR / TW suffix rules (those live with symbol normalization or `src.services.market_symbol_utils`) |
-| `data_provider/realtime_types.py` | Shared realtime quote types and circuit-breaker data shapes | Manager failover order |
-| `data_provider/daily_cache.py` | Layered daily cache keys and lookup helpers | Provider priority |
-| `data_provider/manager_parts/daily_cache_methods.py` | Manager-owned daily cache orchestration rebound onto `DataFetcherManager` (cache resolve, candidate validation, stock-name cache helpers) | Layered cache storage implementation (owned by `daily_cache.py`) |
-| `data_provider/manager_parts/daily_source_health.py` | Daily health/circuit/adaptive-priority methods rebound onto `DataFetcherManager` | Daily fetch execution loops |
-| `data_provider/plugin_registry.py` | Plugin provider registration and discovery seams | Built-in fetcher implementations |
-| `data_provider/_capability_catalog.py` | Built-in capability inventory and the mechanics that apply manager-owned ordering inputs, maintain indexes, synchronize plugin providers, filter by capability/market/availability, and look up fetchers | Priority values or policy, daily/realtime/fundamental execution, cache, health, circuit, fallback, or plugin routing policy |
-| `data_provider/*_fetcher.py` | One remote/source adapter each (history, quote, or specialty data) | Cross-provider orchestration |
-| `data_provider/akshare_fetcher.py` | Compatibility facade for the AkShare provider: public class, constants, re-exports, and ADR-006 method rebinding / timeout clone seams | New capability-domain bodies (add under `akshare_parts/`) |
-| `data_provider/akshare_parts/` | AkShare implementation ownership by capability domain: `symbols`, `timeout_client`, `parse_tencent`, `realtime_errors`, `history`, `realtime_quotes`, `market_boards`, `enhanced`, `realtime_cache`, plus `facade_bind` helpers | Cross-provider manager policy (ADR-005) |
-| `data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
-| `data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/fallback/plugin policy and state, daily/realtime/fundamental workflows still co-located, facade bindings/re-exports | New pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache descriptors |
+| `src/data_provider/symbol_normalization.py` | Pure symbol / market code helpers: `normalize_stock_code`, `canonical_stock_code`, `is_bse_code`, `is_st_stock`, `is_kc_cy_stock`, ETF prefix checks, and market tags (`_is_*_market`, `_market_tag`, `_is_etf_code`, `ETF_PREFIXES`) | Provider I/O, caching, circuit policy, dataframe column normalization |
+| `src/data_provider/errors.py` | Typed provider failures (`DataFetchError`, `RateLimitError`, `DataSourceUnavailableError`, `CircuitOpenError`) and exception summary helpers (`unwrap_exception`, `summarize_exception`) | Provider I/O, routing, cache policy |
+| `src/data_provider/chip_helpers.py` | Pure chip metric coercion and meaningful-distribution checks | Provider I/O and chip fetch orchestration |
+| `src/data_provider/us_index_mapping.py` | US ticker / index identity helpers used by market classification | A-share / HK / JP / KR / TW suffix rules (those live with symbol normalization or `src.services.market_symbol_utils`) |
+| `src/data_provider/realtime_types.py` | Shared realtime quote types and circuit-breaker data shapes | Manager failover order |
+| `src/data_provider/daily_cache.py` | Layered daily cache keys and lookup helpers | Provider priority |
+| `src/data_provider/manager_parts/daily_cache_methods.py` | Manager-owned daily cache orchestration rebound onto `DataFetcherManager` (cache resolve, candidate validation, stock-name cache helpers) | Layered cache storage implementation (owned by `daily_cache.py`) |
+| `src/data_provider/manager_parts/daily_source_health.py` | Daily health/circuit/adaptive-priority methods rebound onto `DataFetcherManager` | Daily fetch execution loops |
+| `src/data_provider/plugin_registry.py` | Plugin provider registration and discovery seams | Built-in fetcher implementations |
+| `src/data_provider/_capability_catalog.py` | Built-in capability inventory and the mechanics that apply manager-owned ordering inputs, maintain indexes, synchronize plugin providers, filter by capability/market/availability, and look up fetchers | Priority values or policy, daily/realtime/fundamental execution, cache, health, circuit, fallback, or plugin routing policy |
+| `src/data_provider/*_fetcher.py` | One remote/source adapter each (history, quote, or specialty data) | Cross-provider orchestration |
+| `src/data_provider/akshare_fetcher.py` | Compatibility facade for the AkShare provider: public class, constants, re-exports, and ADR-006 method rebinding / timeout clone seams | New capability-domain bodies (add under `akshare_parts/`) |
+| `src/data_provider/akshare_parts/` | AkShare implementation ownership by capability domain: `symbols`, `timeout_client`, `parse_tencent`, `realtime_errors`, `history`, `realtime_quotes`, `market_boards`, `enhanced`, `realtime_cache`, plus `facade_bind` helpers | Cross-provider manager policy (ADR-005) |
+| `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
+| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/fallback/plugin policy and state, daily/realtime/fundamental workflows still co-located, facade bindings/re-exports | New pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache descriptors |
 
 The private catalog receives and mutates only manager-owned state through
 `DataFetcherManager` descriptors. It does not introduce an independent policy
@@ -120,14 +120,14 @@ Follow ADR-006:
    chip metric helpers; env reader + circuit defaults; exception unwrap/summary;
    non-manager pure utilities). Do not duplicate capability-catalog mechanics.
    Prefer pure functions with dense offline tests.
-3. **Move bodies** into a focused `data_provider/<slice>.py` module.
+3. **Move bodies** into a focused `src/data_provider/<slice>.py` module.
 4. **Re-export** the same names from `data_provider.base` in the same PR.
    Do **not** migrate callers in the structural slice.
 5. **State** “no intentional behavior change” in the PR body.
 6. **Verify** at least:
    ```bash
    python -m pytest -m "not network" tests/data_provider -q
-   python -m py_compile data_provider/*.py
+   python -m py_compile src/data_provider/*.py
    ```
 7. **Update this ownership map** so the table matches the tree.
 8. If broad-exception handlers move, classify or regenerate fingerprints through

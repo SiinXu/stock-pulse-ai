@@ -123,6 +123,8 @@ $hiddenImports = @(
   'src.migrations',
   'src.migrations.registry',
   'src.migrations.versions',
+  'src.data_provider',
+  'src.data_provider.base',
   'uvicorn.logging',
   'uvicorn.loops',
   'uvicorn.loops.auto',
@@ -178,7 +180,7 @@ if (-not (Test-Path $packagedEntry)) {
 }
 $previousProbe = $env:DSA_PACKAGED_IMPORT_PROBE
 try {
-  foreach ($module in @('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry')) {
+  foreach ($module in @('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry', 'src.data_provider.base')) {
     $env:DSA_PACKAGED_IMPORT_PROBE = $module
     $probeProcess = Start-Process -FilePath $packagedEntry -Wait -PassThru
     if ($probeProcess.ExitCode -ne 0) {

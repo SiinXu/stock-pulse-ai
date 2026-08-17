@@ -35,10 +35,10 @@ def test_repository_layer_direction_guard() -> None:
 
 
 def test_detects_new_reverse_data_provider_to_services(tmp_path: Path) -> None:
-    """Reject a new data_provider → src.services reverse import (issue #1082)."""
+    """Reject a new src.data_provider → src.services reverse import (issue #1082)."""
 
     _write_module(tmp_path, "src/services/svc.py", "VALUE = 1\n")
-    _write_module(tmp_path, "data_provider/clean.py", "VALUE = 0\n")
+    _write_module(tmp_path, "src/data_provider/clean.py", "VALUE = 0\n")
     baseline = tmp_path / "scripts" / "layer_direction_baseline.json"
     baseline.parent.mkdir(parents=True, exist_ok=True)
     baseline.write_text(serialize_baseline([], hard_ceiling=0), encoding="utf-8")
@@ -46,14 +46,14 @@ def test_detects_new_reverse_data_provider_to_services(tmp_path: Path) -> None:
 
     _write_module(
         tmp_path,
-        "data_provider/clean.py",
+        "src/data_provider/clean.py",
         "from src.services.svc import VALUE\n",
     )
     violations = collect_violations(tmp_path, baseline)
     reverse = [item for item in violations if item.rule == "new-reverse-edge"]
     assert len(reverse) == 1
-    assert reverse[0].path == "data_provider/clean.py"
-    assert reverse[0].from_package == "data_provider"
+    assert reverse[0].path == "src/data_provider/clean.py"
+    assert reverse[0].from_package == "src.data_provider"
     assert reverse[0].to_package == "src.services"
     # hard_ceiling=0 also reports hard-ceiling when any reverse edge exists
     assert any(item.rule == "hard-ceiling" for item in violations)
@@ -93,12 +93,12 @@ def test_write_baseline_allows_shrink_refuses_growth(tmp_path: Path) -> None:
     _write_module(tmp_path, "src/services/svc.py", "VALUE = 1\n")
     _write_module(
         tmp_path,
-        "data_provider/a.py",
+        "src/data_provider/a.py",
         "from src.services.svc import VALUE\n",
     )
     baseline = tmp_path / "scripts" / "layer_direction_baseline.json"
     edges = scan_reverse_edges(tmp_path)
-    assert edges == [("data_provider/a.py", "data_provider", "src.services")]
+    assert edges == [("src/data_provider/a.py", "src.data_provider", "src.services")]
     baseline.parent.mkdir(parents=True, exist_ok=True)
     baseline.write_text(
         serialize_baseline(edges, hard_ceiling=len(edges)),
@@ -107,13 +107,13 @@ def test_write_baseline_allows_shrink_refuses_growth(tmp_path: Path) -> None:
 
     _write_module(
         tmp_path,
-        "data_provider/b.py",
+        "src/data_provider/b.py",
         "from src.services.svc import VALUE\n",
     )
     assert write_baseline(tmp_path, baseline) == 1
 
-    _write_module(tmp_path, "data_provider/b.py", "VALUE = 0\n")
-    _write_module(tmp_path, "data_provider/a.py", "VALUE = 0\n")
+    _write_module(tmp_path, "src/data_provider/b.py", "VALUE = 0\n")
+    _write_module(tmp_path, "src/data_provider/a.py", "VALUE = 0\n")
     assert write_baseline(tmp_path, baseline) == 0
     assert load_baseline(baseline) == []
 
