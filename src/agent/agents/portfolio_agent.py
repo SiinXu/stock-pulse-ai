@@ -150,6 +150,9 @@ class PortfolioAgent(BaseAgent):
             "- You may polish narrative `summary` / notes only.\n"
             "- Every suggestion is for human review only — never imply auto-execution.\n"
             "- Always include that outputs are research aid, not investment advice.\n"
+            "- Do not decide constraint feasibility or do portfolio-cap arithmetic; "
+            "a deterministic rules engine labels scenarios as research-only or "
+            "constraint-feasible after you answer. That label is not broker compliance.\n"
             "- If the base status is empty_portfolio or insufficient_data, do not "
             "fabricate rebalance trades; explain the refusal.\n\n"
             "## Output format\n"
@@ -290,6 +293,24 @@ class PortfolioAgent(BaseAgent):
                 base.get("disclaimer")
                 or "Research aid only — not investment advice.",
             )
+
+        from src.services.portfolio.constraint_scenarios import (
+            apply_constraints_to_research_assessment,
+        )
+
+        data = apply_constraints_to_research_assessment(
+            data,
+            portfolio=ctx.data.get("portfolio_view") or ctx.meta.get("portfolio_view"),
+            config=(
+                ctx.data.get("portfolio_constraint_config")
+                or ctx.meta.get("portfolio_constraint_config")
+            ),
+            proposal=ctx.data.get("research_proposal") or ctx.meta.get("research_proposal"),
+            rebalancing_base=base,
+            risk_flags=ctx.data.get("portfolio_risk_flags")
+            or ctx.meta.get("portfolio_risk_flags")
+            or ctx.risk_flags,
+        )
 
         ctx.data["portfolio_assessment"] = data
 

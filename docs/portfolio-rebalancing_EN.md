@@ -76,6 +76,8 @@ Optional environment keys (defaults work without configuration):
 
 `PortfolioAgent` injects the service payload as a **Deterministic Rebalancing Base**. When present, `post_process` overwrites free-form LLM `rebalance_suggestions` with the base, and stores `deterministic_rebalancing` for downstream consumers. The model may polish narrative text only.
 
+After that merge, the same `post_process` path runs the issue #1132 constraint engine (`evaluate_research_scenario`). Violating proposals are labeled `research_only` and are not presented as executable scenarios. A `constraint_feasible` label is still **not** broker, exchange, or regulatory compliance. See [portfolio-constraints_EN.md](portfolio-constraints_EN.md).
+
 ## Non-goals / fences
 
 - Web / PortfolioPage UI — follow-up (see #790 / remaining #237 surface work).

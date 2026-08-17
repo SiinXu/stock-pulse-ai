@@ -1,0 +1,1 @@
+- [Added] Add a deterministic portfolio constraint engine that labels research proposals as research-only or constraint-feasible without implying broker compliance (Refs #1132).
