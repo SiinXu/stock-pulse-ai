@@ -33,7 +33,7 @@ def _notification_delivery_snapshot_context(service, route_type):
     """Retain one routed target snapshot until its caller exits."""
 
     from src.notification import _ensure_notification_runtime
-    from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
+    from src.notification_parts.route_config import ROUTABLE_NOTIFICATION_CHANNELS
     from src.plugins import available_notification_channel_snapshot
 
     application_services, _notification_registry = (

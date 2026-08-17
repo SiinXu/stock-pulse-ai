@@ -15,7 +15,7 @@ import requests
 
 from src.config import Config
 from src.formatters import chunk_content_by_max_bytes, slice_at_max_bytes
-from src.notification_contracts import is_dingtalk_session_webhook_url
+from src.notification_parts.contracts import is_dingtalk_session_webhook_url
 from src.security.outbound_policy import safe_post
 from src.utils.sanitize import log_safe_exception, sanitize_exception_chain
 

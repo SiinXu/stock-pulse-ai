@@ -18,8 +18,8 @@ from src.config import (
     AGENT_MAX_STEPS_DEFAULT,
     DEFAULT_ALPHASIFT_INSTALL_SPEC,
 )
-from src.notification_noise import NOTIFICATION_SEVERITIES
-from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
+from src.notification_parts.noise import NOTIFICATION_SEVERITIES
+from src.notification_parts.route_config import ROUTABLE_NOTIFICATION_CHANNELS
 
 SCHEMA_VERSION = "2026-08-15-config-inventory-contract"
 

@@ -2,8 +2,8 @@
 
 from typing import Any, Dict, List
 
-from src.notification_noise import NOTIFICATION_SEVERITIES
-from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS
+from src.notification_parts.noise import NOTIFICATION_SEVERITIES
+from src.notification_parts.route_config import ROUTABLE_NOTIFICATION_CHANNELS
 from src.services.report_mode import (
     REPORT_MODE_BRIEF,
     REPORT_MODE_RESEARCH,

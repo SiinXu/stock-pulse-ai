@@ -33,7 +33,7 @@ from src.config import Config
 from src.application_services import reset_application_services
 import src.notification as notification_module
 from src.notification import NotificationBuilder, NotificationChannel, NotificationService
-from src.notification_noise import reset_notification_noise_state
+from src.notification_parts.noise import reset_notification_noise_state
 from src.notification_parts.senders.gotify_sender import resolve_gotify_message_endpoint
 from src.notification_parts.senders.ntfy_sender import resolve_ntfy_endpoint
 from src.analyzer import AnalysisResult
@@ -273,7 +273,7 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             ChannelAttemptResult as ContractAttempt,
             NotificationDispatchResult as ContractDispatch,
         )
-        from src.notification_contracts import (
+        from src.notification import (
             ChannelAttemptResult as FacadeAttempt,
             NotificationDispatchResult as FacadeDispatch,
         )
@@ -1013,7 +1013,7 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
 
         service = NotificationService()
 
-        with mock.patch("src.notification_noise._evaluate_notification_noise", side_effect=RuntimeError("boom")), \
+        with mock.patch("src.notification_parts.noise._evaluate_notification_noise", side_effect=RuntimeError("boom")), \
              mock.patch.object(service, "send_to_custom", return_value=True) as mock_custom:
             ok = service.send("content", route_type="report")
 
