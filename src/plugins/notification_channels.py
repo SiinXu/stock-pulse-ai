@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Callable, Literal, Mapping, Protocol, TypeAlias
 
-from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNEL_SET
+from src.notification_parts.route_config import ROUTABLE_NOTIFICATION_CHANNEL_SET
 from src.utils.sanitize import log_safe_exception
 
 from .manifest import PLUGIN_ID_PATTERN

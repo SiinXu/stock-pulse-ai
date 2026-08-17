@@ -30,17 +30,6 @@ from src.report_language import (
     is_supported_report_language_value,
     normalize_report_language,
 )
-from src.notification_routing import parse_notification_route_channels
-from src.notification_noise import (
-    NOTIFICATION_SEVERITIES,
-    is_supported_notification_severity,
-    parse_notification_quiet_hours,
-    validate_notification_timezone,
-)
-from src.notification_contracts import (
-    is_feishu_app_bot_configured,
-    is_feishu_static_configured,
-)
 from src.utils.stock_list import split_stock_list
 from src.utils.sanitize import log_safe_exception
 from src.llm.backend_registry import (
@@ -259,6 +248,70 @@ for _config_part_name in (
 
 _config_model_module = _load_or_reload_config_part("src.config_parts.model")
 Config = _config_model_module.Config
+
+
+_NOTIFICATION_SUPPORT_EXPORTS = {
+    "parse_notification_route_channels": (
+        "src.notification_parts.route_config",
+        "parse_notification_route_channels",
+    ),
+    "NOTIFICATION_SEVERITIES": (
+        "src.notification_parts.noise",
+        "NOTIFICATION_SEVERITIES",
+    ),
+    "is_supported_notification_severity": (
+        "src.notification_parts.noise",
+        "is_supported_notification_severity",
+    ),
+    "parse_notification_quiet_hours": (
+        "src.notification_parts.noise",
+        "parse_notification_quiet_hours",
+    ),
+    "validate_notification_timezone": (
+        "src.notification_parts.noise",
+        "validate_notification_timezone",
+    ),
+    "is_feishu_app_bot_configured": (
+        "src.notification_parts.contracts",
+        "is_feishu_app_bot_configured",
+    ),
+    "is_feishu_static_configured": (
+        "src.notification_parts.contracts",
+        "is_feishu_static_configured",
+    ),
+}
+
+# A reload keeps names that were populated by a previous ``__getattr__`` call.
+# Clear them so reloading this facade preserves the same lazy-import contract.
+for _notification_support_name in _NOTIFICATION_SUPPORT_EXPORTS:
+    globals().pop(_notification_support_name, None)
+del _notification_support_name
+
+
+def __getattr__(name: str):
+    """Load public notification helpers only when a caller first requests one."""
+
+    target = _NOTIFICATION_SUPPORT_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute_name = target
+    value = getattr(_importlib.import_module(module_name), attribute_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    """Include lazy compatibility exports in module introspection."""
+
+    return sorted(set(globals()) | set(_NOTIFICATION_SUPPORT_EXPORTS))
+
+
+def _notification_support(name: str):
+    """Resolve a lazy helper through the facade so test patches stay observable."""
+
+    return getattr(_sys.modules[__name__], name)
+
+
 _config_model_module._bind_config_facade(globals())
 
 

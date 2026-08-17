@@ -29,7 +29,7 @@ from src.core.pipeline_stage_results import (
 )
 from src.enums import ReportType
 from src.notification import NotificationService
-from src.notification_noise import reset_notification_noise_state
+from src.notification_parts.noise import reset_notification_noise_state
 from src.plugins import (
     NotificationAdapterResult,
     NotificationChannelRegistry,

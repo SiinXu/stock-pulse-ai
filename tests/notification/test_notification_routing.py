@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for notification route channel parsing."""
 
-from src.notification_routing import ROUTABLE_NOTIFICATION_CHANNELS, split_notification_route_channels
+from src.notification_parts.route_config import ROUTABLE_NOTIFICATION_CHANNELS, split_notification_route_channels
 
 
 def test_ntfy_and_gotify_are_routable_notification_channels() -> None:

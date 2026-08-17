@@ -172,7 +172,7 @@ def test_alerts_doc_defines_p4_notification_and_cooldown_scope() -> None:
         "`__cooldown__`",
         "`__cooldown_read_failed__`",
         "`__noise_suppressed__`",
-        "notification_noise.py",
+        "src/notification_parts/noise.py",
         "DB 持久化规则正常路径使用 `alert_cooldowns`",
         "读取持久化冷却状态失败",
         "legacy `AGENT_EVENT_ALERT_RULES_JSON` 规则继续使用 worker 进程内 fingerprint",

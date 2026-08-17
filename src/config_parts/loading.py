@@ -48,7 +48,6 @@ from src.llm.local_cli_backend import (
     MAX_LOCAL_CLI_OUTPUT_BYTES,
     MAX_LOCAL_CLI_TIMEOUT_SECONDS,
 )
-from src.notification_routing import parse_notification_route_channels
 from src.report_language import (
     is_supported_report_language_value,
     normalize_report_language,
@@ -59,6 +58,14 @@ from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
     from src.config_parts.model import Config
+
+
+def _notification_support(name: str):
+    """Resolve notification parsing helpers only at their configuration use point."""
+
+    from src.notification_parts import route_config
+
+    return getattr(route_config, name)
 
 # Legacy day-batch env vars (still supported; prefer versioned scheduled tasks).
 LEGACY_SCHEDULE_ENV_KEYS = (
@@ -1460,13 +1467,19 @@ class _ConfigLoadingMethods:
             slack_channel_id=os.getenv('SLACK_CHANNEL_ID'),
             astrbot_url=os.getenv('ASTRBOT_URL'),
             astrbot_token=os.getenv('ASTRBOT_TOKEN'),
-            notification_report_channels=parse_notification_route_channels(
+            notification_report_channels=_notification_support(
+                "parse_notification_route_channels"
+            )(
                 os.getenv('NOTIFICATION_REPORT_CHANNELS')
             ),
-            notification_alert_channels=parse_notification_route_channels(
+            notification_alert_channels=_notification_support(
+                "parse_notification_route_channels"
+            )(
                 os.getenv('NOTIFICATION_ALERT_CHANNELS')
             ),
-            notification_system_error_channels=parse_notification_route_channels(
+            notification_system_error_channels=_notification_support(
+                "parse_notification_route_channels"
+            )(
                 os.getenv('NOTIFICATION_SYSTEM_ERROR_CHANNELS')
             ),
             notification_dedup_ttl_seconds=parse_env_int(

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "description": "Allowlisted bidirectional package import pairs (module-level imports only). New pairs are banned; shrink this list by breaking cycles and running --write-baseline. Growth requires an explicit PR justification and is refused by --write-baseline.",
-  "pair_count": 12,
+  "pair_count": 11,
   "pairs": [
     [
       "data_provider",
@@ -34,10 +34,6 @@
     [
       "src.market",
       "src.services"
-    ],
-    [
-      "src.notification_contracts",
-      "src.notification_parts"
     ],
     [
       "src.report_language",

@@ -14,7 +14,7 @@ from typing import Any, Literal, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
-from src.notification_contracts import is_dingtalk_session_webhook_url
+from src.notification_parts.contracts import is_dingtalk_session_webhook_url
 
 
 ReplyTargetKind = Literal["dingtalk", "feishu", "telegram"]

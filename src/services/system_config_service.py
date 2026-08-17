@@ -76,13 +76,13 @@ from src.llm.provider_catalog import (
     get_unknown_connection_contract_fields,
     validate_connection_contract_values,
 )
-from src.notification_contracts import (
+from src.notification_parts.contracts import (
     FEISHU_APP_BOT_ENV_GROUP,
     FEISHU_WEBHOOK_ENV_GROUP,
     is_feishu_app_bot_env_configured,
     is_feishu_static_env_configured,
 )
-from src.notification_noise import validate_notification_timezone
+from src.notification_parts.noise import validate_notification_timezone
 from src.notification_parts.senders.gotify_sender import resolve_gotify_message_endpoint
 from src.notification_parts.senders.ntfy_sender import resolve_ntfy_endpoint
 from src.services.stock_list_parser import split_stock_list

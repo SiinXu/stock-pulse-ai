@@ -18,7 +18,7 @@ from src.application_services import (
 )
 from src.config import Config
 from src.notification import NotificationService
-from src.notification_noise import reset_notification_noise_state
+from src.notification_parts.noise import reset_notification_noise_state
 from src.plugins import (
     EXTENSION_POINTS,
     PLUGIN_APPLICATION_VERSION,
