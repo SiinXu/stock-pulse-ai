@@ -347,3 +347,62 @@ def test_compatibility_error_uses_the_same_semver_tuple_as_manager() -> None:
     assert application_version == parse_semver("1.5.0")
     manager = PluginManager(application_version="1.5.0")
     assert manager._application_version == application_version
+
+
+def test_extracted_permission_helpers_match_manager_decisions() -> None:
+    from src.plugins.lifecycle import PluginLifecycleMixin
+    from src.plugins.permissions import compatibility_error, load_time_permission_error
+
+    manager = PluginManager(application_version="1.5.0", supported_api_versions=("1",))
+    future = _manifest("future", min_app_version="2.0.0")
+    api = _manifest("api", api_version="2")
+    ok = _manifest("ok")
+    assert compatibility_error(
+        future,
+        manager._application_version,
+        manager._supported_api_versions,
+    ) == manager.compatibility_error(future)
+    assert compatibility_error(
+        api,
+        manager._application_version,
+        manager._supported_api_versions,
+    ) == manager.compatibility_error(api)
+    assert compatibility_error(
+        ok,
+        manager._application_version,
+        manager._supported_api_versions,
+    ) is None
+    assert compatibility_error(
+        object(),
+        manager._application_version,
+        manager._supported_api_versions,
+    ) == "plugin_manifest_invalid"
+    assert issubclass(PluginManager, PluginLifecycleMixin)
+    assert load_time_permission_error(manifest=ok, registrations=()) is None
+
+
+def test_extracted_batch_order_helpers_match_manager_snapshots() -> None:
+    from src.plugins.loader import select_disable_ids, select_load_ids
+
+    registered = ("first-plugin", "second-plugin", "third-plugin")
+    assert select_load_ids(None, registered) == registered
+    assert select_disable_ids(None, registered) == (
+        "third-plugin",
+        "second-plugin",
+        "first-plugin",
+    )
+    explicit = ("c-plugin", "a-plugin")
+    assert select_load_ids(explicit, registered) == explicit
+    assert select_disable_ids(explicit, registered) == ("a-plugin", "c-plugin")
+    assert select_load_ids((), registered) == ()
+    assert select_disable_ids((), registered) == ()
+
+
+def test_split_modules_remain_internal_host_details() -> None:
+    from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+
+    assert "PluginManager" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "ExternalPluginLoader" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "compatibility_error" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "PluginLifecycleMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "select_load_ids" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS

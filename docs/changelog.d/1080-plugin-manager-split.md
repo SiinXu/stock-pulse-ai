@@ -1,0 +1,1 @@
+- [Changed] Split PluginManager internals into permissions, lifecycle, and loader helpers while keeping the public manager facade (Refs #1080).

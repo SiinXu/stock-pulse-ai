@@ -55,6 +55,21 @@ The following are host-only and **must not** be treated as a stable plugin API:
 - any seventh extension point name (for example UI, Settings, marketplace,
   custom commands, connector/MCP)
 
+Host-only layout for the manager split (`src.plugins.manager` remains the
+compatible facade and public type home):
+
+| Module | Responsibility |
+| --- | --- |
+| `src.plugins.manager` | Public types and `PluginManager` facade (register, snapshots, settings) |
+| `src.plugins.loader` | Trusted-directory discovery (`ExternalPluginLoader`) and batch load/disable order |
+| `src.plugins.permissions` | Compatibility and load-time permission decisions |
+| `src.plugins.lifecycle` | Enable/disable/load/reload transitions and reverse cleanup |
+
+`loader.py` already owned external discovery before this split, so in-process
+`load()` stays a lifecycle transition rather than a second file-import loader.
+Permission and lifecycle failures stay isolated per plugin and are not hidden
+behind a broad fallback.
+
 Registering an unsupported extension point fails closed with
 `PluginRegistryError("extension_point_unsupported")`. Using a closed
 `PluginContext` after `onload` fails with

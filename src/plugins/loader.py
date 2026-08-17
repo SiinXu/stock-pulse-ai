@@ -11,17 +11,39 @@ import logging
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import TYPE_CHECKING, Iterable
 
 from pydantic import ValidationError
 
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
-from .manager import PluginManager, PluginState
 from .manifest import PluginManifest, split_entrypoint
 from .plugin import Plugin
 
+if TYPE_CHECKING:
+    from .manager import PluginManager, PluginState
+
 
 logger = logging.getLogger(__name__)
+
+
+def select_load_ids(
+    plugin_ids: Iterable[str] | None,
+    registered_ids: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return the batch load order: registration order, or the caller snapshot."""
+
+    return registered_ids if plugin_ids is None else tuple(plugin_ids)
+
+
+def select_disable_ids(
+    plugin_ids: Iterable[str] | None,
+    registered_ids: tuple[str, ...],
+) -> tuple[str, ...]:
+    """Return the batch disable order: reverse of the load snapshot."""
+
+    selected = registered_ids if plugin_ids is None else tuple(plugin_ids)
+    return tuple(reversed(selected))
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,7 +61,9 @@ class ExternalPluginLoader:
     """Import direct child plugins only when an explicit caller supplies a root."""
 
     def __init__(self, manager: PluginManager) -> None:
-        if not isinstance(manager, PluginManager):
+        from .manager import PluginManager as PluginManagerType
+
+        if not isinstance(manager, PluginManagerType):
             raise TypeError("manager must be a PluginManager")
         self._manager = manager
 
