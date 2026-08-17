@@ -1,0 +1,1 @@
+- [Chore] Drop unused setup.cfg [isort] (stale pre-src/ first-party names). isort now reads only pyproject.toml with known_first_party src, api, bot, data_provider (Refs #167).
