@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
+from src.analysis_context_pack.prompt import format_analysis_context_pack_prompt_section
 from src.schemas.analysis_context_pack import (
     AnalysisContextBlock,
     AnalysisContextItem,
