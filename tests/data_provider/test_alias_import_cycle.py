@@ -34,6 +34,13 @@ def test_stock_code_utils_can_import_through_alias_without_cycle() -> None:
                     "assert DataFetcherManager is not None",
                     "assert alias is canon",
                     "assert FutuPosition is canon.FutuPosition",
+                    "from unittest.mock import patch",
+                    "from data_provider.tickflow_fetcher import TickFlowFetcher",
+                    "import data_provider.tickflow_fetcher as tick_alias",
+                    "import src.data_provider.tickflow_fetcher as tick_canon",
+                    "assert tick_alias is tick_canon",
+                    "with patch('data_provider.tickflow_fetcher.monotonic', return_value=1.0):",
+                    "    assert tick_canon.monotonic() == 1.0",
                 )
             ),
         ],

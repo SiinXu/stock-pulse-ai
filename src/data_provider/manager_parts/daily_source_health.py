@@ -46,7 +46,7 @@ if TYPE_CHECKING:
 CircuitOpenError = None  # type: ignore[assignment,misc]
 record_provider_run = None  # type: ignore[assignment,misc]
 
-logger = logging.getLogger("data_provider.base")
+logger = logging.getLogger("src.data_provider.base")
 
 # ``importlib.reload`` retains a module dictionary. Preserve the callback
 # installed by the loaded compatibility facade so an owner reload can

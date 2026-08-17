@@ -5,11 +5,7 @@
 The implementation lives at ``src/data_provider``. This package keeps the
 historical ``data_provider`` import root working after the physical move so
 existing callers (``import data_provider``, ``from data_provider.base import
-...``) do not need to change in this stage.
-
-Submodule identity is shared: ``data_provider.base is src.data_provider.base``.
-Logger names used by ``logging.getLogger(__name__)`` are aliased so
-``data_provider.<module>`` still captures the same records.
+...``, and ``patch("data_provider.X.attr")``) do not need to change.
 
 Do **not** eagerly import every implementation submodule. The historical
 package ``__init__`` only loaded its public surface. Preloading the rest
@@ -44,15 +40,16 @@ def _alias_logger(alias_name: str, canonical_name: str) -> None:
     manager.loggerDict[alias_name] = canonical_logger
 
 
-def _alias_module(alias_name: str, canonical: ModuleType) -> None:
+def _bind_alias(alias_name: str, canonical: ModuleType) -> ModuleType:
     sys.modules[alias_name] = canonical
     canonical_name = getattr(canonical, "__name__", "")
     if isinstance(canonical_name, str) and canonical_name:
         _alias_logger(alias_name, canonical_name)
+    return canonical
 
 
 class _ExistingModuleLoader(importlib.abc.Loader):
-    """Return an already-imported canonical module under the alias name."""
+    """Reuse an already-imported canonical module under the alias name."""
 
     def __init__(self, module: ModuleType) -> None:
         self._module = module
@@ -64,8 +61,26 @@ class _ExistingModuleLoader(importlib.abc.Loader):
         return None
 
 
+class _BindAliasAfterLoad(importlib.abc.Loader):
+    """Load a canonical module, then register the historical import name."""
+
+    def __init__(self, loader: importlib.abc.Loader | None, alias_name: str) -> None:
+        self._loader = loader
+        self._alias_name = alias_name
+
+    def create_module(self, spec: importlib.machinery.ModuleSpec) -> ModuleType | None:
+        if self._loader is not None and hasattr(self._loader, "create_module"):
+            return self._loader.create_module(spec)
+        return None
+
+    def exec_module(self, module: ModuleType) -> None:
+        if self._loader is not None:
+            self._loader.exec_module(module)
+        _bind_alias(self._alias_name, module)
+
+
 class _DataProviderAliasFinder(importlib.abc.MetaPathFinder):
-    """Resolve ``data_provider.*`` to ``src.data_provider.*`` on demand."""
+    """Keep ``data_provider.*`` and ``src.data_provider.*`` on one module object."""
 
     def find_spec(
         self,
@@ -73,37 +88,56 @@ class _DataProviderAliasFinder(importlib.abc.MetaPathFinder):
         path: object | None,
         target: ModuleType | None = None,
     ) -> importlib.machinery.ModuleSpec | None:
+        if fullname == _CANONICAL_PREFIX or fullname.startswith(_CANONICAL_PREFIX + "."):
+            spec = importlib.machinery.PathFinder.find_spec(fullname, path, target)
+            if spec is None:
+                return None
+            alias_name = _ALIAS_PREFIX + fullname[len(_CANONICAL_PREFIX) :]
+            spec.loader = _BindAliasAfterLoad(spec.loader, alias_name)
+            return spec
         if fullname != _ALIAS_PREFIX and not fullname.startswith(_ALIAS_PREFIX + "."):
             return None
         if fullname in sys.modules:
-            return importlib.util.spec_from_loader(
-                fullname, _ExistingModuleLoader(sys.modules[fullname])
-            )
+            module = sys.modules[fullname]
+            if isinstance(module, ModuleType):
+                return self._spec_for(fullname, module)
         canonical_name = (
             _CANONICAL_PREFIX
             if fullname == _ALIAS_PREFIX
             else _CANONICAL_PREFIX + fullname[len(_ALIAS_PREFIX) :]
         )
         module = importlib.import_module(canonical_name)
-        _alias_module(fullname, module)
-        return importlib.util.spec_from_loader(
-            fullname, _ExistingModuleLoader(module)
+        _bind_alias(fullname, module)
+        return self._spec_for(fullname, module)
+
+    @staticmethod
+    def _spec_for(fullname: str, module: ModuleType) -> importlib.machinery.ModuleSpec:
+        origin = None
+        module_spec = getattr(module, "__spec__", None)
+        if module_spec is not None:
+            origin = module_spec.origin
+        spec = importlib.util.spec_from_loader(
+            fullname,
+            _ExistingModuleLoader(module),
+            origin=origin,
+            is_package=hasattr(module, "__path__"),
         )
+        return spec
 
 
-def _alias_loaded_submodules() -> None:
+def _bind_loaded_submodules() -> None:
     prefix = _CANONICAL_PREFIX + "."
     for name, module in list(sys.modules.items()):
         if name.startswith(prefix) and isinstance(module, ModuleType):
-            _alias_module(_ALIAS_PREFIX + name[len(_CANONICAL_PREFIX) :], module)
+            _bind_alias(_ALIAS_PREFIX + name[len(_CANONICAL_PREFIX) :], module)
 
 
 def _install() -> ModuleType:
     if not any(isinstance(finder, _DataProviderAliasFinder) for finder in sys.meta_path):
         sys.meta_path.insert(0, _DataProviderAliasFinder())
     canonical = importlib.import_module(_CANONICAL_PREFIX)
-    _alias_module(_ALIAS_PREFIX, canonical)
-    _alias_loaded_submodules()
+    _bind_alias(_ALIAS_PREFIX, canonical)
+    _bind_loaded_submodules()
     return canonical
 
 

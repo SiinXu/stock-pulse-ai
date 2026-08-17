@@ -6,8 +6,8 @@ import unittest
 import sys
 import os
 
-# Ensure the data_provider module can be imported (direct import to avoid loading heavy dependencies)
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'data_provider')))
+# Import the leaf module directly so this suite does not load the provider package.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'src', 'data_provider')))
 
 from us_index_mapping import (
     is_us_index_code,

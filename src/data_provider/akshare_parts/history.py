@@ -21,7 +21,7 @@ from src.utils.sanitize import log_safe_exception
 
 # Facade free-name anchors for flake8 F821. Rebound methods resolve these from
 # ``data_provider.akshare_fetcher`` globals at runtime (ADR-006).
-logger = logging.getLogger("data_provider.akshare_fetcher")
+logger = logging.getLogger("src.data_provider.akshare_fetcher")
 USER_AGENTS = []  # type: ignore[assignment]
 DataFetchError = Exception  # type: ignore[assignment,misc]
 RateLimitError = Exception  # type: ignore[assignment,misc]
