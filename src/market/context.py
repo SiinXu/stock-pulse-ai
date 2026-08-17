@@ -10,7 +10,7 @@ Upstream issue reference: https://github.com/ZhuLinsen/daily_stock_analysis/issu
 """
 
 import re
-from typing import Optional
+from typing import Dict, Optional
 
 from src.services.market_symbol_utils import get_suffix_market
 
@@ -186,6 +186,12 @@ def get_market_role(stock_code: Optional[str], lang: str = "zh") -> str:
 def get_market_guidelines(stock_code: Optional[str], lang: str = "zh") -> str:
     """Return market-specific analysis guidelines for LLM prompt.
 
+    Includes the versioned trading-regime pack section (Issue #1141) so
+    session, halt/price-limit, and short-selling language is attached
+    automatically on market detection. Raises
+    :class:`src.market.regime_packs.RegimePackError` if packaged regime-pack
+    data is malformed (fail-loud by contract; no silent fallback).
+
     Args:
         stock_code: The stock code being analyzed.
         lang: 'zh' or 'en'.
@@ -193,6 +199,24 @@ def get_market_guidelines(stock_code: Optional[str], lang: str = "zh") -> str:
     Returns:
         Multi-line string with market-specific guidelines.
     """
+    from src.market.regime_packs import format_trading_regime_section
+
     market = detect_market(stock_code)
     lang_key = "en" if lang in ("en", "ko") else "zh"
-    return _MARKET_GUIDELINES.get(market, _MARKET_GUIDELINES["cn"])[lang_key]
+    base = _MARKET_GUIDELINES.get(market, _MARKET_GUIDELINES["cn"])[lang_key]
+    return f"{base}\n{format_trading_regime_section(market, lang_key)}"
+
+
+def get_trading_regime_context_metadata(
+    stock_code: Optional[str] = None,
+) -> Dict[str, object]:
+    """Return queryable trading-regime pack metadata for run/context consumers.
+
+    The dict includes ``market``, ``pack_version``, ``schema_version``,
+    ``has_pack``, ``timezone``, and ``legal_authority``. ``pack_version`` is
+    ``None`` when the detected market has no shipped pack. Packs are static
+    reference material and never claim live legal authority.
+    """
+    from src.market.regime_packs import build_trading_regime_context_metadata
+
+    return build_trading_regime_context_metadata(detect_market(stock_code))

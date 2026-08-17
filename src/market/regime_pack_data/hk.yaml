@@ -1,0 +1,36 @@
+# Trading-regime pack: Hong Kong (HKEX).
+# Versioned static reference facts; not a live legal or regulatory authority.
+schema_version: 1
+market: hk
+pack_version: v1
+sessions:
+  timezone: Asia/Hong_Kong
+  zh: >-
+    开市前竞价 09:00-09:30；持续交易 09:30-12:00、13:00-16:00（当地时间）；
+    收市竞价约 16:00-16:10；圣诞前夕、新年前夕、农历新年前夕为半日市（中午收市），
+    具体以交易所日历为准。
+  en: >-
+    Pre-opening auction 09:00-09:30; continuous trading 09:30-12:00 and
+    13:00-16:00 local time; closing auction until about 16:10; half-day
+    sessions (noon close) on Christmas Eve, New Year's Eve, and Lunar New
+    Year's Eve per the exchange calendar.
+halts:
+  zh: >-
+    无每日涨跌停限制；适用证券触发市场波动调节机制（VCM）时进入 5 分钟冷静期；
+    个股可因重大事项或监管要求停牌。
+  en: >-
+    No daily up/down price limits; the Volatility Control Mechanism (VCM)
+    imposes a 5-minute cooling-off period on eligible securities after large
+    swings; stocks can be halted for material announcements or regulatory
+    reasons.
+shorting:
+  zh: >-
+    仅允许对指定可卖空证券名单内的股票进行有担保卖空，并受提价规则（tick rule）
+    约束；禁止裸卖空。支持 T+0 回转交易（当日买入可当日卖出）。
+  en: >-
+    Covered short selling is allowed only in securities on the designated
+    short-selling list and is subject to the uptick (tick) rule; naked short
+    selling is prohibited. Same-day turnaround (T+0) trading is allowed.
+settlement:
+  zh: 股票交收为 T+2。
+  en: Stock settlement is T+2.

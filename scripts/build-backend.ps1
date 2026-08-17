@@ -154,6 +154,7 @@ $pyInstallerArgs = @(
   '--add-data', 'static;static',
   '--add-data', 'strategies;strategies',
   '--add-data', 'src/llm/local_model_catalog.json;src/llm',
+  '--add-data', 'src/market/regime_pack_data;src/market/regime_pack_data',
   '--add-data', 'src/migrations/versions/*.py;src/migrations/versions',
   '--add-data', 'constraints.txt;.',
   '--add-data', 'build-constraints.txt;.',
@@ -220,6 +221,28 @@ $sourceCatalogHash = (Get-FileHash 'src\llm\local_model_catalog.json' -Algorithm
 $packagedCatalogHash = (Get-FileHash $packagedLocalModelCatalog -Algorithm SHA256).Hash
 if ($sourceCatalogHash -ne $packagedCatalogHash) {
   throw 'Packaged local model catalog differs from the authoritative source.'
+}
+
+Write-Host 'Verifying packaged trading-regime packs...'
+$packagedRegimePackDir = Join-Path 'dist\backend\stock_analysis' '_internal\src\market\regime_pack_data'
+if (-not (Test-Path $packagedRegimePackDir -PathType Container)) {
+  $packagedRegimePackDir = Join-Path 'dist\backend\stock_analysis' 'src\market\regime_pack_data'
+}
+$requiredRegimePacks = @('cn.yaml', 'hk.yaml', 'us.yaml', 'crypto.yaml')
+if (-not (Test-Path $packagedRegimePackDir -PathType Container)) {
+  throw 'Packaged trading-regime pack directory not found under dist\backend\stock_analysis.'
+}
+foreach ($packName in $requiredRegimePacks) {
+  $packagedPack = Join-Path $packagedRegimePackDir $packName
+  $sourcePack = Join-Path 'src\market\regime_pack_data' $packName
+  if (-not (Test-Path $packagedPack -PathType Leaf)) {
+    throw "Packaged trading-regime pack not found: $packName"
+  }
+  $sourcePackHash = (Get-FileHash $sourcePack -Algorithm SHA256).Hash
+  $packagedPackHash = (Get-FileHash $packagedPack -Algorithm SHA256).Hash
+  if ($sourcePackHash -ne $packagedPackHash) {
+    throw "Packaged trading-regime pack differs from source: $packName"
+  }
 }
 
 Write-Host 'Verifying packaged AkShare calendar data...'
