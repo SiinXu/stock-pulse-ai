@@ -24,9 +24,14 @@ Hard boundaries:
 
 from __future__ import annotations
 
+import logging
 import math
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger(__name__)
 
 ENGINE_VERSION = "portfolio-constraints-v1"
 
@@ -520,6 +525,11 @@ def _check_sector_caps(
         projected = _sector_weight(
             sector, weights=projected_weights, sectors=sectors
         )
+        untagged = sum(
+            weight
+            for symbol, weight in projected_weights.items()
+            if not sectors.get(symbol)
+        )
         if action.target_weight_pct is None and current_sector >= cap - _EPS:
             findings.append(
                 ConstraintFinding(
@@ -544,6 +554,22 @@ def _check_sector_caps(
                     reason=(
                         f"Projected weight {projected:.2f}% for sector '{sector}' "
                         f"exceeds the sector cap {cap:.2f}%."
+                    ),
+                    observed_pct=projected,
+                    limit_pct=cap,
+                )
+            )
+            continue
+        if untagged > _EPS:
+            findings.append(
+                ConstraintFinding(
+                    constraint="sector_cap",
+                    severity=SEVERITY_HINT,
+                    symbol=action.symbol,
+                    reason=(
+                        f"Sector cap {cap:.2f}% is configured for sector '{sector}' "
+                        f"but {untagged:.2f} pp of holdings have no sector tag; "
+                        "the cap cannot be fully evaluated."
                     ),
                     observed_pct=projected,
                     limit_pct=cap,
@@ -701,7 +727,13 @@ def check_proposal_fail_closed(
     """
     try:
         return check_proposal(portfolio, proposal, config)
-    except Exception as exc:  # broad-exception: fail_closed_verdict - Engine errors must label the proposal non-executable, never feasible.
+    except Exception as exc:  # broad-exception: fallback_recorded - Engine errors must label the proposal non-executable, never feasible.
+        log_safe_exception(
+            logger,
+            "Constraint engine failed; labeling proposal research-only",
+            exc,
+            error_code="portfolio_constraint_engine_error",
+        )
         return ConstraintVerdict(
             status=STATUS_REJECT,
             label=LABEL_RESEARCH_ONLY,

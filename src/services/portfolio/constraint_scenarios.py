@@ -13,6 +13,7 @@ not block the proposal. It is not broker, exchange, or regulatory compliance.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from src.services.portfolio.constraints import (
@@ -31,6 +32,9 @@ from src.services.portfolio.constraints import (
     check_proposal_fail_closed,
     load_constraint_config,
 )
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger(__name__)
 
 NOT_BROKER_COMPLIANCE_DISCLAIMER = (
     "Constraint checks are a deterministic research aid. They do not execute "
@@ -39,6 +43,11 @@ NOT_BROKER_COMPLIANCE_DISCLAIMER = (
 )
 
 PASSTHROUGH_REASON_NO_PROPOSED_ACTIONS = "no_proposed_actions"
+PASSTHROUGH_REASON_UNPARSEABLE_PROPOSAL = "unparseable_proposal"
+PASSTHROUGH_DISCLAIMER = (
+    "No portfolio constraint policy was applied; constraint_feasible is a "
+    "passthrough, not a policy check."
+)
 
 
 def _as_mapping(raw: Any) -> Optional[Mapping[str, Any]]:
@@ -127,17 +136,41 @@ def portfolio_view_from_mapping(raw: Optional[Mapping[str, Any]]) -> PortfolioVi
     )
 
 
-def _actions_from_sequence(raw_actions: Sequence[Any]) -> List[ProposedAction]:
+def _optional_sequence(raw: Any) -> List[Any]:
+    if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes, bytearray)):
+        return []
+    return list(raw)
+
+
+def _is_candidate_row(item: Any) -> bool:
+    if not isinstance(item, Mapping):
+        return False
+    if _symbol_from_item(item):
+        return True
+    if str(item.get("action") or item.get("signal") or "").strip():
+        return True
+    try:
+        return _weight_pct_from_item(item) is not None
+    except (TypeError, ValueError):
+        return True
+
+
+def _actions_from_sequence(raw_actions: Sequence[Any]) -> Tuple[List[ProposedAction], int]:
     actions: List[ProposedAction] = []
+    candidates = 0
     for item in raw_actions:
-        if not isinstance(item, Mapping):
+        if not _is_candidate_row(item):
             continue
+        candidates += 1
         symbol = _symbol_from_item(item)
         # PortfolioAgent positions emit `signal`; rebalancing suggestions emit `action`.
         action = str(item.get("action") or item.get("signal") or "").strip()
         if not symbol or not action:
             continue
-        target = _weight_pct_from_item(item)
+        try:
+            target = _weight_pct_from_item(item)
+        except (TypeError, ValueError):
+            continue
         sector = item.get("sector")
         actions.append(
             ProposedAction(
@@ -147,29 +180,21 @@ def _actions_from_sequence(raw_actions: Sequence[Any]) -> List[ProposedAction]:
                 sector=str(sector).strip() if sector not in (None, "") else None,
             )
         )
-    return actions
+    return actions, candidates
+
+
+def _proposal_from_rows(
+    raw_actions: Sequence[Any], *, label: str
+) -> Tuple[ResearchProposal, int]:
+    actions, candidates = _actions_from_sequence(raw_actions)
+    return ResearchProposal(actions=tuple(actions), label=label), candidates
 
 
 def research_proposal_from_mapping(raw: Optional[Mapping[str, Any]]) -> ResearchProposal:
     """Project a research proposal / scenario mapping into typed actions."""
 
-    if raw is None:
-        return ResearchProposal(actions=())
-    if not isinstance(raw, Mapping):
-        raise ConstraintInputError("research proposal must be an object")
-    actions_raw = raw.get("actions")
-    if actions_raw is None:
-        actions_raw = raw.get("suggestions")
-    if actions_raw is None:
-        actions_raw = raw.get("positions")
-    if not isinstance(actions_raw, Sequence) or isinstance(
-        actions_raw, (str, bytes, bytearray)
-    ):
-        raise ConstraintInputError("proposal actions must be a list")
-    return ResearchProposal(
-        actions=tuple(_actions_from_sequence(actions_raw)),
-        label=str(raw.get("label") or raw.get("name") or "").strip(),
-    )
+    proposal, _candidates = _project_research_proposal(explicit_proposal=raw)
+    return proposal
 
 
 def research_proposal_from_assessment(
@@ -182,43 +207,108 @@ def research_proposal_from_assessment(
 
     Preference order:
     1. An explicit research proposal mapping.
-    2. Deterministic rebalancing suggestions / position bands.
-    3. Assessment positions already overwritten by the deterministic base.
+    2. Deterministic rebalancing suggestions (the user-visible scenario).
+    3. Position bands only when suggestions are empty.
+    4. Assessment positions already overwritten by the deterministic base.
     """
 
+    proposal, _candidates = _project_research_proposal(
+        assessment=assessment,
+        rebalancing_base=rebalancing_base,
+        explicit_proposal=explicit_proposal,
+    )
+    return proposal
+
+
+def _project_research_proposal(
+    *,
+    assessment: Optional[Mapping[str, Any]] = None,
+    rebalancing_base: Optional[Mapping[str, Any]] = None,
+    explicit_proposal: Optional[Mapping[str, Any]] = None,
+) -> Tuple[ResearchProposal, int]:
     if explicit_proposal is not None:
-        return research_proposal_from_mapping(explicit_proposal)
+        if not isinstance(explicit_proposal, Mapping):
+            raise ConstraintInputError("research proposal must be an object")
+        actions_raw = explicit_proposal.get("actions")
+        if actions_raw is None:
+            actions_raw = explicit_proposal.get("suggestions")
+        if actions_raw is None:
+            actions_raw = explicit_proposal.get("positions")
+        if not isinstance(actions_raw, Sequence) or isinstance(
+            actions_raw, (str, bytes, bytearray)
+        ):
+            raise ConstraintInputError("proposal actions must be a list")
+        return _proposal_from_rows(
+            actions_raw,
+            label=str(
+                explicit_proposal.get("label") or explicit_proposal.get("name") or ""
+            ).strip(),
+        )
 
     if isinstance(rebalancing_base, Mapping):
-        suggestions = rebalancing_base.get("suggestions") or []
-        bands = rebalancing_base.get("position_bands") or []
-        actions = _actions_from_sequence(
-            list(suggestions) + list(bands) if isinstance(suggestions, Sequence) else list(bands)
-        )
-        if actions:
-            return ResearchProposal(
-                actions=tuple(actions),
+        suggestions = _optional_sequence(rebalancing_base.get("suggestions"))
+        bands = _optional_sequence(rebalancing_base.get("position_bands"))
+        source = suggestions if suggestions else bands
+        if source:
+            return _proposal_from_rows(
+                source,
                 label=str(rebalancing_base.get("status") or "rebalance_scenario"),
             )
 
     if isinstance(assessment, Mapping):
-        positions = assessment.get("positions")
-        if isinstance(positions, Sequence) and not isinstance(
-            positions, (str, bytes, bytearray)
-        ):
-            actions = _actions_from_sequence(positions)
-            if actions:
-                return ResearchProposal(actions=tuple(actions), label="assessment")
-    return ResearchProposal(actions=())
+        positions = _optional_sequence(assessment.get("positions"))
+        if positions:
+            return _proposal_from_rows(positions, label="assessment")
+    return ResearchProposal(actions=()), 0
+
+
+def _sectors_from_items(*groups: Any) -> Dict[str, str]:
+    sectors: Dict[str, str] = {}
+    for group in groups:
+        if isinstance(group, Mapping):
+            values = list(group.values())
+            if values and all(not isinstance(item, Mapping) for item in values):
+                for raw_symbol, raw_sector in group.items():
+                    text = str(raw_sector or "").strip()
+                    symbol = str(raw_symbol or "").strip().upper()
+                    if symbol and text:
+                        sectors.setdefault(symbol, text)
+                continue
+            group = [group]
+        if not isinstance(group, Sequence) or isinstance(group, (str, bytes, bytearray)):
+            continue
+        for item in group:
+            if not isinstance(item, Mapping):
+                continue
+            symbol = _symbol_from_item(item).upper()
+            text = str(item.get("sector") or "").strip()
+            if symbol and text:
+                sectors.setdefault(symbol, text)
+    return sectors
 
 
 def portfolio_view_from_research_context(
     *,
     portfolio: Any = None,
     rebalancing_base: Optional[Mapping[str, Any]] = None,
+    assessment: Optional[Mapping[str, Any]] = None,
     risk_flags: Any = None,
 ) -> PortfolioView:
     """Project the live research context into a portfolio view."""
+
+    extra_sectors: Dict[str, str] = {}
+    if isinstance(rebalancing_base, Mapping):
+        current = _as_mapping(rebalancing_base.get("current")) or {}
+        extra_sectors.update(
+            _sectors_from_items(
+                rebalancing_base.get("sectors"),
+                current.get("weights"),
+                rebalancing_base.get("suggestions"),
+                rebalancing_base.get("position_bands"),
+            )
+        )
+    if isinstance(assessment, Mapping):
+        extra_sectors.update(_sectors_from_items(assessment.get("positions")))
 
     explicit = _as_mapping(portfolio)
     if explicit is not None:
@@ -228,32 +318,30 @@ def portfolio_view_from_research_context(
         view = portfolio_view_from_mapping(
             {
                 "weights": current.get("weights"),
-                "sectors": (
-                    explicit.get("sectors")
-                    if explicit is not None
-                    else (rebalancing_base.get("sectors") or {})
-                ),
+                "sectors": extra_sectors,
                 "risk_flags": rebalancing_base.get("risk_flags") or {},
                 "weights_known": True,
             }
         )
     else:
-        view = PortfolioView(weights_known=False)
+        view = PortfolioView(weights_known=False, sectors=extra_sectors)
+
+    merged_sectors = dict(view.normalized_sectors())
+    for symbol, sector in extra_sectors.items():
+        merged_sectors.setdefault(symbol, sector)
 
     extra_flags = _risk_flags_from_agent(risk_flags)
-    if not extra_flags:
-        return view
-    merged = dict(view.normalized_risk_flags())
+    merged_flags = dict(view.normalized_risk_flags())
     for symbol, flags in extra_flags.items():
-        existing = list(merged.get(symbol, ()))
+        existing = list(merged_flags.get(symbol, ()))
         for flag in flags:
             if flag not in existing:
                 existing.append(flag)
-        merged[symbol] = tuple(existing)
+        merged_flags[symbol] = tuple(existing)
     return PortfolioView(
         weights_pct=view.normalized_weights(),
-        sectors=view.normalized_sectors(),
-        risk_flags=merged,
+        sectors=merged_sectors,
+        risk_flags=merged_flags,
         weights_known=view.weights_known,
     )
 
@@ -317,35 +405,63 @@ def evaluate_research_scenario(
             else portfolio_view_from_research_context(
                 portfolio=portfolio,
                 rebalancing_base=rebalancing_base,
+                assessment=assessment,
                 risk_flags=risk_flags,
             )
         )
-        typed_proposal = (
-            proposal
-            if isinstance(proposal, ResearchProposal)
-            else research_proposal_from_assessment(
-                assessment,
+        if isinstance(proposal, ResearchProposal):
+            typed_proposal = proposal
+            candidate_count = len(proposal.actions)
+        else:
+            typed_proposal, candidate_count = _project_research_proposal(
+                assessment=assessment,
                 rebalancing_base=rebalancing_base,
                 explicit_proposal=_as_mapping(proposal),
             )
-        )
         typed_config = _config_from_input(config)
         if not typed_proposal.actions:
-            verdict = ConstraintVerdict(
-                status="allow",
-                label=LABEL_CONSTRAINT_FEASIBLE,
-                findings=(),
-                constraints_evaluated=typed_config.normalized().constraint_count,
-                passthrough=typed_config.normalized().constraint_count == 0,
-                passthrough_reason=(
-                    PASSTHROUGH_REASON_NO_CONSTRAINTS
-                    if typed_config.normalized().constraint_count == 0
-                    else PASSTHROUGH_REASON_NO_PROPOSED_ACTIONS
-                ),
-            )
+            if candidate_count > 0:
+                verdict = ConstraintVerdict(
+                    status=STATUS_REJECT,
+                    label=LABEL_RESEARCH_ONLY,
+                    findings=(
+                        ConstraintFinding(
+                            constraint="unparseable_proposal",
+                            severity=SEVERITY_BLOCKING,
+                            symbol=None,
+                            reason=(
+                                "Proposal rows were present but none could be "
+                                "normalized into actions; the scenario is "
+                                "research-only until the engine can evaluate it."
+                            ),
+                        ),
+                    ),
+                    constraints_evaluated=typed_config.normalized().constraint_count,
+                    passthrough=False,
+                    passthrough_reason=PASSTHROUGH_REASON_UNPARSEABLE_PROPOSAL,
+                )
+            else:
+                verdict = ConstraintVerdict(
+                    status="allow",
+                    label=LABEL_CONSTRAINT_FEASIBLE,
+                    findings=(),
+                    constraints_evaluated=typed_config.normalized().constraint_count,
+                    passthrough=typed_config.normalized().constraint_count == 0,
+                    passthrough_reason=(
+                        PASSTHROUGH_REASON_NO_CONSTRAINTS
+                        if typed_config.normalized().constraint_count == 0
+                        else PASSTHROUGH_REASON_NO_PROPOSED_ACTIONS
+                    ),
+                )
         else:
             verdict = check_proposal_fail_closed(view, typed_proposal, typed_config)
-    except Exception as exc:  # broad-exception: fail_closed_verdict - Presentation paths must never treat a gate error as feasible.
+    except Exception as exc:  # broad-exception: fallback_recorded - Presentation paths must never treat a gate error as feasible.
+        log_safe_exception(
+            logger,
+            "Constraint scenario gate failed; labeling proposal research-only",
+            exc,
+            error_code="portfolio_constraint_scenario_error",
+        )
         verdict = ConstraintVerdict(
             status=STATUS_REJECT,
             label=LABEL_RESEARCH_ONLY,
@@ -413,16 +529,22 @@ def apply_constraints_to_research_assessment(
     assessment["constraint_check"] = result
     assessment["scenario_label"] = result["scenario_label"]
     assessment["constraint_feasible"] = result["label"] == LABEL_CONSTRAINT_FEASIBLE
+    assessment["constraint_passthrough"] = bool(result.get("passthrough"))
+    if result.get("passthrough_reason"):
+        assessment["constraint_passthrough_reason"] = result["passthrough_reason"]
     assessment["is_executable"] = False
     assessment["is_executable_scenario"] = False
     assessment["not_broker_compliance"] = True
 
     existing = str(assessment.get("disclaimer") or "").strip()
+    extras = []
     if NOT_BROKER_COMPLIANCE_DISCLAIMER not in existing:
+        extras.append(NOT_BROKER_COMPLIANCE_DISCLAIMER)
+    if assessment.get("constraint_passthrough") and PASSTHROUGH_DISCLAIMER not in existing:
+        extras.append(PASSTHROUGH_DISCLAIMER)
+    if extras:
         assessment["disclaimer"] = (
-            f"{existing} {NOT_BROKER_COMPLIANCE_DISCLAIMER}".strip()
-            if existing
-            else NOT_BROKER_COMPLIANCE_DISCLAIMER
+            f"{existing} {' '.join(extras)}".strip() if existing else " ".join(extras)
         )
 
     if result["status"] == STATUS_REJECT:

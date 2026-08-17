@@ -170,8 +170,29 @@ class PortfolioAgentConstraintGateTests(unittest.TestCase):
         assessment = _run(config={}, base=_base_with_buy(target=80.0))
         self.assertEqual(assessment["scenario_label"], LABEL_CONSTRAINT_FEASIBLE)
         self.assertTrue(assessment["constraint_check"]["passthrough"])
+        self.assertTrue(assessment["constraint_passthrough"])
+        self.assertEqual(
+            assessment["constraint_passthrough_reason"],
+            "no_constraints_configured",
+        )
         self.assertFalse(assessment["is_executable_scenario"])
         self.assertIn("not broker", assessment["disclaimer"].lower())
+        self.assertIn("passthrough", assessment["disclaimer"].lower())
+
+    def test_conflicting_band_does_not_mask_suggestion_target(self) -> None:
+        base = _base_with_buy(target=40.0)
+        base["position_bands"][0]["target_weight_pct_mid"] = 20.0
+        assessment = _run(
+            config={"max_single_name_weight_pct": 30.0},
+            base=base,
+        )
+        self.assertEqual(assessment["scenario_label"], LABEL_RESEARCH_ONLY)
+        self.assertEqual(
+            assessment["constraint_check"]["findings"][0]["constraint"], "per_name_cap"
+        )
+        self.assertTrue(
+            assessment["rebalance_suggestions"][0].startswith("[research_only]")
+        )
 
     def test_llm_signal_positions_are_gated_without_rebalancing_base(self) -> None:
         agent = _agent()

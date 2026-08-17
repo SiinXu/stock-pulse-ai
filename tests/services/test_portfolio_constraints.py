@@ -11,8 +11,10 @@ import unittest
 
 from src.services.portfolio.constraint_scenarios import (
     NOT_BROKER_COMPLIANCE_DISCLAIMER,
+    PASSTHROUGH_DISCLAIMER,
     apply_constraints_to_research_assessment,
     evaluate_research_scenario,
+    research_proposal_from_assessment,
 )
 from src.services.portfolio.constraints import (
     LABEL_CONSTRAINT_FEASIBLE,
@@ -297,6 +299,112 @@ class ResearchScenarioWiringTests(unittest.TestCase):
             assessment["constraint_check"]["engine_version"],
             "portfolio-constraints-v1",
         )
+
+    def test_unconfigured_assessment_exposes_explicit_passthrough(self) -> None:
+        assessment = {
+            "summary": "no policy injected",
+            "disclaimer": "Research aid only — not investment advice.",
+        }
+        apply_constraints_to_research_assessment(
+            assessment,
+            portfolio={"weights_pct": {"AAA": 10.0}, "weights_known": True},
+            proposal={
+                "actions": [{"symbol": "AAA", "action": "buy", "target_weight_pct": 40.0}]
+            },
+        )
+        self.assertTrue(assessment["constraint_passthrough"])
+        self.assertEqual(
+            assessment["constraint_passthrough_reason"],
+            PASSTHROUGH_REASON_NO_CONSTRAINTS,
+        )
+        self.assertTrue(assessment["constraint_feasible"])
+        self.assertIn(PASSTHROUGH_DISCLAIMER, assessment["disclaimer"])
+        self.assertFalse(assessment["is_executable_scenario"])
+
+    def test_research_proposal_prefers_suggestions_over_bands(self) -> None:
+        proposal = research_proposal_from_assessment(
+            {},
+            rebalancing_base={
+                "status": "ok",
+                "suggestions": [
+                    {"symbol": "AAA", "action": "add", "to_weight_pct": 40.0}
+                ],
+                "position_bands": [
+                    {"symbol": "AAA", "action": "add", "target_weight_pct_mid": 20.0}
+                ],
+            },
+        )
+        self.assertEqual(len(proposal.actions), 1)
+        self.assertEqual(proposal.actions[0].symbol, "AAA")
+        self.assertEqual(proposal.actions[0].target_weight_pct, 40.0)
+
+    def test_conflicting_suggestion_target_is_checked_not_band_mid(self) -> None:
+        result = evaluate_research_scenario(
+            portfolio={"weights_pct": {"AAA": 10.0}, "weights_known": True},
+            rebalancing_base={
+                "status": "ok",
+                "suggestions": [
+                    {"symbol": "AAA", "action": "add", "to_weight_pct": 40.0}
+                ],
+                "position_bands": [
+                    {"symbol": "AAA", "action": "add", "target_weight_pct_mid": 20.0}
+                ],
+                "current": {"weights": [{"symbol": "AAA", "weight_pct": 10.0}]},
+            },
+            config={"max_single_name_weight_pct": 30.0},
+        )
+        self.assertEqual(result["status"], "reject")
+        self.assertEqual(result["findings"][0]["constraint"], "per_name_cap")
+        self.assertAlmostEqual(result["findings"][0]["observed_pct"], 40.0)
+
+    def test_unparseable_candidate_rows_fail_closed(self) -> None:
+        result = evaluate_research_scenario(
+            portfolio={"weights_pct": {"AAA": 10.0}, "weights_known": True},
+            proposal={"actions": [{"symbol": "AAA", "suggested_weight": 0.4}]},
+            config={"max_single_name_weight_pct": 25.0},
+        )
+        self.assertEqual(result["status"], "reject")
+        self.assertEqual(result["label"], LABEL_RESEARCH_ONLY)
+        self.assertEqual(result["findings"][0]["constraint"], "unparseable_proposal")
+
+    def test_partial_sector_map_is_hint_not_silent_pass(self) -> None:
+        result = evaluate_research_scenario(
+            portfolio={
+                "weights_pct": {"AAA": 20.0, "BBB": 25.0},
+                "sectors": {"AAA": "Tech"},
+                "weights_known": True,
+            },
+            proposal={
+                "actions": [
+                    {
+                        "symbol": "AAA",
+                        "action": "add",
+                        "target_weight_pct": 22.0,
+                        "sector": "Tech",
+                    }
+                ]
+            },
+            config={"max_sector_weight_pct": 40.0},
+        )
+        self.assertEqual(result["status"], "hints")
+        self.assertEqual(result["findings"][0]["constraint"], "sector_cap")
+        self.assertEqual(result["findings"][0]["severity"], "hint")
+        self.assertIn("no sector tag", result["findings"][0]["reason"])
+
+    def test_rebalancing_base_without_sectors_hints_sector_cap(self) -> None:
+        result = evaluate_research_scenario(
+            rebalancing_base={
+                "status": "ok",
+                "suggestions": [
+                    {"symbol": "AAA", "action": "add", "to_weight_pct": 20.0}
+                ],
+                "current": {"weights": [{"symbol": "AAA", "weight_pct": 10.0}]},
+            },
+            config={"max_sector_weight_pct": 40.0},
+        )
+        self.assertEqual(result["status"], "hints")
+        self.assertEqual(result["findings"][0]["constraint"], "sector_cap")
+        self.assertIn("no sector is known", result["findings"][0]["reason"])
 
 
 if __name__ == "__main__":

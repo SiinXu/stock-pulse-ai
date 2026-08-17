@@ -22,6 +22,10 @@
 - `constraint_feasible`：已配置的**研究约束**未阻断提案。这不是下单许可。
 - `research_only`：提案违规或引擎无法安全评估，不得当作可执行情景。
 - `executable` / `auto_execute` 始终为 `false`；`not_broker_compliance` 始终为 `true`。
+- 未注入 `portfolio_constraint_config` 时为显式 passthrough：`constraint_passthrough=true`，`constraint_feasible` 不代表做过政策检查。
+- 再平衡 `suggestions` 优先于 `position_bands`，用户可见目标不得被 band 中位值覆盖。
+- 有候选行但无法规范化为 action → fail-closed `unparseable_proposal`。
+- 缺行业、持仓无行业标签、或当前权重未知 → `hints`，不是静默放行。默认再平衡载荷不含行业图，行业上限只能在注入 `portfolio_view.sectors` / action.sector 后阻断。
 
 `PortfolioAgent.post_process` 会调用同一条真实接线：`apply_constraints_to_research_assessment`。
 
