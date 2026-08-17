@@ -150,14 +150,9 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(entry.maxGzipBytes).toBeLessThan(195_814);
   });
 
-  it('gives the displaced TimePicker chunk a named rule with 5% headroom', () => {
+  it('does not add a named TimePicker budget', () => {
     const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
-    const picker = budget.rules.find((rule) => rule.id === 'TimePicker');
-
-    expect(picker).toEqual(expect.objectContaining({
-      match: 'assets/TimePicker-*.js',
-    }));
-    expect(picker.maxGzipBytes).toBeGreaterThanOrEqual(Math.ceil(picker.measuredGzipBytes * 1.05));
+    expect(budget.rules.some((rule) => rule.id === 'TimePicker')).toBe(false);
   });
 
   it('forbids the shared control barrel from App, main, and layout', () => {

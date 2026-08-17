@@ -25,13 +25,6 @@
       "note": "Rebaselined after removing the components/common barrel from App.tsx (Refs #883). Local gzip-9 measurement 177329 B; cap = ceil(measured * 1.05)."
     },
     {
-      "id": "TimePicker",
-      "match": "assets/TimePicker-*.js",
-      "maxGzipBytes": 19612,
-      "measuredGzipBytes": 18678,
-      "note": "Displaced from the entry chunk when App.tsx stopped importing the shared control barrel (Refs #883). Local gzip-9 measurement 18678 B; cap = ceil(measured * 1.05)."
-    },
-    {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
       "maxGzipBytes": 164741,
