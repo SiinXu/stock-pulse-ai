@@ -12,7 +12,6 @@ import {
   isTypeScriptModulePath,
   productionCssSources,
   productionTypeScriptSources,
-  productionTsxSources,
 } from './productionSourceInventory';
 
 assertNonEmptyProductionInventory(productionTypeScriptSources, 'productionTypeScriptSources');
