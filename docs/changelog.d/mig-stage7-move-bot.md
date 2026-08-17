@@ -1,0 +1,1 @@
+- [Changed] Move the bot package to src/bot and keep a root-level import alias shim (Refs #167).

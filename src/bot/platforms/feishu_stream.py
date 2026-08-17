@@ -64,7 +64,7 @@ except ImportError:
     )
     logger.warning("[Feishu Stream] Install it with: pip install lark-oapi")
 
-from bot.models import BotMessage, BotResponse, ChatType
+from src.bot.models import BotMessage, BotResponse, ChatType
 from src.formatters import format_feishu_markdown, chunk_content_by_max_bytes
 from src.config import get_config
 
@@ -656,7 +656,7 @@ class FeishuStreamClient:
         """创建消息处理函数"""
 
         def handle_message(message: BotMessage) -> BotResponse:
-            from bot.dispatcher import get_dispatcher
+            from src.bot.dispatcher import get_dispatcher
             dispatcher = get_dispatcher()
             return dispatcher.dispatch(message)
 

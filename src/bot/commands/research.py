@@ -12,10 +12,10 @@ import logging
 import time
 from typing import List, Optional
 
-from bot.commands.base import BotCommand
-from bot.models import BotMessage, BotResponse
+from src.bot.commands.base import BotCommand
+from src.bot.models import BotMessage, BotResponse
 from src.config import get_config
-from bot.stock_symbols import BotStockSymbolError, parse_bot_stock_symbol
+from src.bot.stock_symbols import BotStockSymbolError, parse_bot_stock_symbol
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)

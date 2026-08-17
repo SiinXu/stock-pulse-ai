@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from bot.models import BotMessage
+from src.bot.models import BotMessage
 from src.notification_contracts import is_dingtalk_session_webhook_url
 from src.schemas.request_context import AnalysisRequestContext, NotificationReplyTarget
 

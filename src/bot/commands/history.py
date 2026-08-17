@@ -9,8 +9,8 @@ starts with their own ``{platform}_{user_id}`` prefix.
 import logging
 from typing import List, Optional
 
-from bot.commands.base import BotCommand
-from bot.models import BotMessage, BotResponse, ChatType
+from src.bot.commands.base import BotCommand
+from src.bot.models import BotMessage, BotResponse, ChatType
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)

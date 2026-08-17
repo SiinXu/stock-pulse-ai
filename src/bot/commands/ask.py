@@ -14,9 +14,9 @@ import time
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
 
-from bot.commands.base import BotCommand
-from bot.models import BotMessage, BotResponse
-from bot.stock_symbols import (
+from src.bot.commands.base import BotCommand
+from src.bot.models import BotMessage, BotResponse
+from src.bot.stock_symbols import (
     BotStockSymbolError,
     is_recognized_stock_symbol,
     parse_bot_stock_symbol,
