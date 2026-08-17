@@ -1,0 +1,1 @@
+- [Added] Cross-market trading-regime packs: versioned per-market YAML facts (sessions, halts/price limits, short-selling norms) schema-validated on load and auto-attached to market guidelines on market detection, with queryable pack versions in context metadata and an explicit no-pack default that is not live legal advice (Refs #1141).

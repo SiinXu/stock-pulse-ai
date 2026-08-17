@@ -1,0 +1,34 @@
+# Trading-regime pack: crypto assets (venue-traded, 24x7).
+# Versioned static reference facts; not a live legal or regulatory authority.
+schema_version: 1
+market: crypto
+pack_version: v1
+sessions:
+  timezone: UTC
+  zh: >-
+    全年 24×7 连续交易，无开收盘与节假日休市；本系统按 UTC 自然日划分统计口径。
+  en: >-
+    Continuous 24x7 trading with no open/close or holiday closures; this
+    system uses UTC calendar-day boundaries.
+halts:
+  zh: >-
+    无全市场涨跌停或熔断机制；个别交易场所可自行暂停交易或提现，不同场所间
+    流动性与价格可能出现差异。
+  en: >-
+    No market-wide price limits or circuit breakers; individual venues may
+    pause trading or withdrawals on their own, and liquidity and prices can
+    diverge across venues.
+shorting:
+  zh: >-
+    做空与杠杆依赖具体场所的衍生品（永续合约、杠杆保证金），受资金费率与强平
+    机制影响；无统一监管框架，规则因场所而异。
+  en: >-
+    Short exposure and leverage depend on venue-specific derivatives
+    (perpetual futures, margin), subject to funding rates and liquidation
+    mechanics; there is no uniform regulatory framework and rules vary by
+    venue.
+settlement:
+  zh: 场内成交即时入账；链上转账最终性取决于具体链的确认机制。
+  en: >-
+    On-venue fills settle immediately; on-chain transfer finality depends on
+    each chain's confirmation mechanics.
