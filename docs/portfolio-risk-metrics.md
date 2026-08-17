@@ -142,8 +142,8 @@ N_{\mathrm{eff}} = \frac{1}{\mathrm{HHI}}
 | 组件 | 路径 |
 | --- | --- |
 | 服务 | `src/services/portfolio_risk_metrics_service.py` |
-| 端点 | `api/v1/endpoints/portfolio_risk_metrics.py` |
-| Schema | `api/v1/schemas/portfolio_risk_metrics.py` |
+| 端点 | `src/api/v1/endpoints/portfolio_risk_metrics.py` |
+| Schema | `src/api/v1/schemas/portfolio_risk_metrics.py` |
 | 服务测试 | `tests/services/test_portfolio_risk_metrics_service.py` |
 | API 测试 | `tests/api/test_portfolio_risk_metrics_api.py` |
 | Web 客户端 | `apps/dsa-web/src/api/portfolioRiskMetrics.ts` |

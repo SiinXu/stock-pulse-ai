@@ -238,7 +238,7 @@ class IntelligenceApiTestCase(unittest.TestCase):
                     self.assertNotIn("super-secret", body["message"])
 
     def test_internal_error_logging_does_not_pre_render_exception(self) -> None:
-        with self.assertLogs("api.v1.endpoints.intelligence", level="ERROR") as logs:
+        with self.assertLogs("src.api.v1.endpoints.intelligence", level="ERROR") as logs:
             response = _internal_error(
                 "Intelligence operation failed",
                 BrokenIntelligenceError("RAW_INTELLIGENCE_API_CANARY"),

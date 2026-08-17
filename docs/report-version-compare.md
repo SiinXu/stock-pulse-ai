@@ -60,6 +60,6 @@ HTTP API 为兼容保留 `base_run_id` / `target_run_id` 参数名，但参数�
 
 - `src/services/report_version_compare_service.py`
 - `src/services/report_version_compare_adapter.py`
-- `api/v1/endpoints/report_version_compare.py`
+- `src/api/v1/endpoints/report_version_compare.py`
 - `apps/dsa-web/src/pages/ReportVersionComparePage.tsx`
 - `apps/dsa-web/src/components/report-version-compare/`

@@ -76,8 +76,8 @@ measurements with `--follow-imports=skip` (error counts change as code moves):
 | --- | --- | --- | --- |
 | Done | `src/schemas/` | 18 modules, clean | First ratchet package |
 | Done | `src/api/v1/schemas/` | 23 modules, ~250 models, clean | This expansion; pure API data shapes |
-| Next | `api/v1/errors.py` | 1 file, 0 errors | Leaf error helpers adjacent to schemas |
-| Next | `api/middlewares/` | 4 modules, ~1 error | Small auth/error middleware surface |
+| Next | `src/api/v1/errors.py` | 1 file, 0 errors | Leaf error helpers adjacent to schemas |
+| Next | `src/api/middlewares/` | 4 modules, ~1 error | Small auth/error middleware surface |
 | Next | `src/repositories/` | 18 modules, ~1 error | Data access; mostly typed shapes already |
 | Later | `api/deps.py` | 1 file, ~13 errors | FastAPI dependencies; more runtime coupling |
 | Later | `bot/` | 24 modules, ~25 errors | Notification bots; medium fix cost |

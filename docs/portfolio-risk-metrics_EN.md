@@ -153,8 +153,8 @@ horizon scaling, cash exclusion, and `provider_calls_on_hot_path: false`.
 | Piece | Path |
 | --- | --- |
 | Service | `src/services/portfolio_risk_metrics_service.py` |
-| Endpoint | `api/v1/endpoints/portfolio_risk_metrics.py` |
-| Schemas | `api/v1/schemas/portfolio_risk_metrics.py` |
+| Endpoint | `src/api/v1/endpoints/portfolio_risk_metrics.py` |
+| Schemas | `src/api/v1/schemas/portfolio_risk_metrics.py` |
 | Service tests | `tests/services/test_portfolio_risk_metrics_service.py` |
 | API tests | `tests/api/test_portfolio_risk_metrics_api.py` |
 | Web client | `apps/dsa-web/src/api/portfolioRiskMetrics.ts` |

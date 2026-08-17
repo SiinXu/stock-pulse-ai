@@ -55,11 +55,11 @@ class DesktopPackagingAssetsTestCase(unittest.TestCase):
             self.assertIn(f"'{module}'", windows_script)
 
         self.assertIn(
-            "for module in alphasift.dsa_adapter orjson src.migrations.registry",
+            "for module in alphasift.dsa_adapter orjson src.migrations.registry src.api.app",
             macos_script,
         )
         self.assertIn(
-            "@('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry')",
+            "@('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry', 'src.api.app')",
             windows_script,
         )
         self.assertNotIn(

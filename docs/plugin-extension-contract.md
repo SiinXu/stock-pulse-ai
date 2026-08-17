@@ -1143,7 +1143,7 @@ names.
 
 Auth follows neighbors: global admin-session middleware when
 `ADMIN_AUTH_ENABLED=true`. Response models live in
-`api/v1/schemas/plugins.py`.
+`src/api/v1/schemas/plugins.py`.
 
 ### Security reasoning
 

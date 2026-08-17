@@ -27,7 +27,7 @@ There is no process-wide cache, auth rate limiter or shared thread pool singleto
 to own, so none is invented here (thread pools are owned per-pipeline /
 per-queue instance).
 ``system_config_service`` is already composed in the FastAPI lifespan
-(``api/app.py``) and keeps its app-scoped lifecycle; this root does not modify
+(``src/api/app.py``) and keeps its app-scoped lifecycle; this root does not modify
 or take over ``system_config_service.py``.
 """
 
