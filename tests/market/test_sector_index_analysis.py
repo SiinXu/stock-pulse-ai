@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 from src.core.market_profile import CN_PROFILE, US_PROFILE
 from src.core.market_strategy import get_market_strategy_blueprint
-from src.market_analyzer import MarketAnalyzer, MarketIndex, MarketOverview
+from src.market.analyzer import MarketAnalyzer, MarketIndex, MarketOverview
 
 
 def _make_market_analyzer(*, region: str = "cn", language: str = "zh") -> MarketAnalyzer:

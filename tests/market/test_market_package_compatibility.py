@@ -2,13 +2,9 @@
 
 import ast
 import importlib
-import inspect
 from pathlib import Path
-import subprocess
-import sys
-import textwrap
 from types import FunctionType, SimpleNamespace
-from typing import Any, get_type_hints
+from typing import get_type_hints
 from unittest.mock import patch
 
 import pytest
@@ -120,16 +116,6 @@ MODULES = {
 }
 
 
-def _descriptor_function(descriptor: Any):
-    if isinstance(descriptor, (staticmethod, classmethod)):
-        return descriptor.__func__
-    if isinstance(descriptor, FunctionType):
-        return descriptor
-    if isinstance(descriptor, property):
-        return descriptor.fget
-    return None
-
-
 def _source_definitions(module):
     tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
     return {
@@ -139,104 +125,92 @@ def _source_definitions(module):
     }
 
 
+RETIRED_MARKET_SHIMS = tuple(MODULES)
+
+
+def test_retired_market_shims_are_not_importable() -> None:
+    """Deleted root-level market facades must not remain importable."""
+
+    for legacy_name in RETIRED_MARKET_SHIMS:
+        with pytest.raises(ModuleNotFoundError):
+            importlib.import_module(legacy_name)
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("src.market_regime_prompt")
+
+
 @pytest.mark.parametrize("legacy_name", MODULES)
-def test_market_facades_preserve_public_exports(legacy_name: str) -> None:
+def test_canonical_market_modules_keep_owned_exports(legacy_name: str) -> None:
     implementation_name, expected_exports = MODULES[legacy_name]
-    legacy = importlib.import_module(legacy_name)
     implementation = importlib.import_module(implementation_name)
-
-    public_names = tuple(sorted(name for name in vars(legacy) if not name.startswith("_")))
-    assert public_names == expected_exports
-    assert legacy.__all__ == expected_exports
-    assert implementation.__all__ == expected_exports
-    owned_names = set(_source_definitions(implementation))
+    owned = set(_source_definitions(implementation))
     for name in expected_exports:
-        legacy_value = getattr(legacy, name)
+        if name not in owned:
+            continue
         implementation_value = getattr(implementation, name)
-        if name in owned_names and isinstance(legacy_value, FunctionType):
-            assert legacy_value is not implementation_value
-        else:
-            assert legacy_value is implementation_value
+        if isinstance(implementation_value, FunctionType):
+            assert implementation_value.__module__ == implementation_name
 
 
 @pytest.mark.parametrize("legacy_name", MODULES)
-def test_market_facades_preserve_callable_ownership(legacy_name: str) -> None:
+def test_canonical_market_modules_preserve_callable_ownership(legacy_name: str) -> None:
     implementation_name, _ = MODULES[legacy_name]
-    legacy = importlib.import_module(legacy_name)
     implementation = importlib.import_module(implementation_name)
 
     for name, node in _source_definitions(implementation).items():
-        value = getattr(legacy, name)
-        assert value.__module__ == legacy_name
+        value = getattr(implementation, name)
+        assert value.__module__ == implementation_name
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            assert value is not getattr(implementation, name)
-            assert getattr(implementation, name).__module__ == implementation_name
-            assert value.__globals__ is vars(legacy)
-            assert inspect.unwrap(value).__globals__ is vars(legacy)
-            get_type_hints(value, globalns=vars(legacy), localns=vars(legacy))
-            continue
-
-        get_type_hints(value, globalns=vars(legacy), localns=vars(legacy))
-        for descriptor_name, descriptor in vars(value).items():
-            function = _descriptor_function(descriptor)
-            if function is None:
-                continue
-            assert function.__module__ == legacy_name, descriptor_name
-            unwrapped = inspect.unwrap(function)
-            assert unwrapped.__module__ == legacy_name, descriptor_name
-            assert unwrapped.__globals__ is vars(legacy), descriptor_name
-            if unwrapped is function:
-                assert function.__globals__ is vars(legacy), descriptor_name
-            else:
-                assert function.__globals__.get("__name__") == "dataclasses"
-            get_type_hints(
-                function,
-                globalns=vars(legacy),
-                localns={**vars(legacy), **vars(value)},
-            )
+            assert value.__globals__ is vars(implementation)
+            get_type_hints(value, globalns=vars(implementation), localns=vars(implementation))
 
 
-def test_market_analyzer_legacy_patch_seams() -> None:
-    legacy = importlib.import_module("src.market_analyzer")
+def test_market_analyzer_canonical_patch_seams() -> None:
+    canonical = importlib.import_module("src.market.analyzer")
     config = object()
     data_manager = object()
-    profile = object()
-    strategy = object()
 
     with (
-        patch.object(legacy, "get_config", return_value=config) as get_config,
-        patch.object(legacy, "DataFetcherManager", return_value=data_manager),
-        patch.object(legacy, "get_profile", return_value=profile),
-        patch.object(legacy, "get_market_strategy_blueprint", return_value=strategy),
+        patch.object(canonical, "get_config", return_value=config) as get_config,
+        patch.object(canonical, "DataFetcherManager", return_value=data_manager),
+        patch(
+            "src.core.market_profile.get_profile",
+            return_value=object(),
+        ) as get_profile,
+        patch(
+            "src.core.market_strategy.get_market_strategy_blueprint",
+            return_value=object(),
+        ) as get_strategy,
     ):
-        analyzer = legacy.MarketAnalyzer()
+        analyzer = canonical.MarketAnalyzer()
 
     get_config.assert_called_once_with()
+    get_profile.assert_called_once()
+    get_strategy.assert_called_once()
     assert analyzer.config is config
     assert analyzer.data_manager is data_manager
-    assert analyzer.profile is profile
-    assert analyzer.strategy is strategy
 
 
 def test_small_market_module_patch_seams() -> None:
-    context = importlib.import_module("src.market_context")
+    context = importlib.import_module("src.market.context")
     with patch.object(context, "get_suffix_market", return_value="jp"):
         assert context.detect_market("7203.T") == "jp"
 
-    phase_prompt = importlib.import_module("src.market_phase_prompt")
+    phase_prompt = importlib.import_module("src.market.phase_prompt")
     with patch.object(phase_prompt, "_format_en", return_value="patched\n"):
         assert phase_prompt.format_market_phase_prompt_section(
             {"phase": "intraday"},
             report_language="en",
         ) == "patched\n"
 
-    phase_summary = importlib.import_module("src.market_phase_summary")
+    phase_summary = importlib.import_module("src.market.phase_summary")
     rebuilt = {"phase": "postmarket", "market": "jp", "warnings": []}
     with (
-        patch.object(phase_summary, "get_market_for_stock", return_value="jp"),
-        patch.object(
-            phase_summary,
-            "build_market_phase_context",
+        patch(
+            "src.core.trading_calendar.get_market_for_stock",
+            return_value="jp",
+        ),
+        patch(
+            "src.core.trading_calendar.build_market_phase_context",
             return_value=SimpleNamespace(to_dict=lambda: rebuilt),
         ),
     ):
@@ -245,7 +219,7 @@ def test_small_market_module_patch_seams() -> None:
             {"market_phase_summary": {"phase": "postmarket"}},
         ) == rebuilt
 
-    structure_prompt = importlib.import_module("src.market_structure_prompt")
+    structure_prompt = importlib.import_module("src.market.structure_prompt")
     payload = {
         "schema_version": structure_prompt.MARKET_STRUCTURE_SCHEMA_VERSION,
         "status": "available",
@@ -256,92 +230,3 @@ def test_small_market_module_patch_seams() -> None:
         assert "Market Structure Context" in (
             structure_prompt.format_market_structure_prompt_section(payload)
         )
-
-
-def test_market_facade_reload_contract_in_subprocess() -> None:
-    code = textwrap.dedent(
-        """
-        import ast
-        import importlib
-        from pathlib import Path
-        from types import FunctionType
-
-        modules = {
-            "src.market_analyzer": "src.market.analyzer",
-            "src.market_context": "src.market.context",
-            "src.market_phase_prompt": "src.market.phase_prompt",
-            "src.market_phase_summary": "src.market.phase_summary",
-            "src.market_structure_prompt": "src.market.structure_prompt",
-        }
-
-        for legacy_name, implementation_name in modules.items():
-            legacy = importlib.import_module(legacy_name)
-            implementation = importlib.import_module(implementation_name)
-            tree = ast.parse(Path(implementation.__file__).read_text(encoding="utf-8"))
-            owned_names = [
-                node.name
-                for node in tree.body
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-            ]
-            previous = {name: getattr(legacy, name) for name in owned_names}
-            for _ in range(2):
-                importlib.reload(legacy)
-                implementation = importlib.import_module(implementation_name)
-                for name in owned_names:
-                    value = getattr(legacy, name)
-                    assert value is not previous[name]
-                    assert value.__module__ == legacy_name
-                    if isinstance(value, FunctionType):
-                        assert value is not getattr(implementation, name)
-                        assert getattr(implementation, name).__module__ == implementation_name
-                        assert value.__globals__ is vars(legacy)
-                    else:
-                        assert value is getattr(implementation, name)
-                    previous[name] = value
-        """
-    )
-    subprocess.run([sys.executable, "-c", code], check=True)
-
-
-@pytest.mark.parametrize("legacy_name", MODULES)
-def test_new_path_first_import_preserves_existing_objects(legacy_name: str) -> None:
-    implementation_name, _ = MODULES[legacy_name]
-    code = textwrap.dedent(
-        f"""
-        import ast
-        import importlib
-        from pathlib import Path
-        from types import FunctionType
-
-        implementation = importlib.import_module({implementation_name!r})
-        tree = ast.parse(Path(implementation.__file__).read_text(encoding="utf-8"))
-        owned_names = [
-            node.name
-            for node in tree.body
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-        ]
-        before = {{name: getattr(implementation, name) for name in owned_names}}
-        legacy = importlib.import_module({legacy_name!r})
-        for name in owned_names:
-            implementation_value = getattr(implementation, name)
-            legacy_value = getattr(legacy, name)
-            assert implementation_value is before[name]
-            if isinstance(implementation_value, FunctionType):
-                assert legacy_value is not implementation_value
-                assert implementation_value.__module__ == {implementation_name!r}
-                assert implementation_value.__globals__ is vars(implementation)
-            else:
-                assert legacy_value is implementation_value
-        """
-    )
-    subprocess.run([sys.executable, "-c", code], check=True)
-
-
-@pytest.mark.parametrize("legacy_name", MODULES)
-def test_legacy_market_modules_are_thin_facades(legacy_name: str) -> None:
-    module = importlib.import_module(legacy_name)
-    tree = ast.parse(Path(module.__file__).read_text(encoding="utf-8"))
-    assert not any(
-        isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
-        for node in tree.body
-    )

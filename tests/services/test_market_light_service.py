@@ -13,7 +13,7 @@ from unittest.mock import patch
 
 from src.config import Config
 from src.core.market_review import MARKET_REVIEW_HISTORY_CODE, MARKET_REVIEW_REPORT_TYPE
-from src.market_analyzer import MarketIndex, MarketOverview
+from src.market.analyzer import MarketIndex, MarketOverview
 from src.services.market_light_service import (
     MARKET_LIGHT_HISTORY_BATCH_SIZE,
     build_current_snapshot,

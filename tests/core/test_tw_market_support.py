@@ -13,7 +13,7 @@ import pandas as pd
 from data_provider.base import BaseFetcher, DataFetchError, DataFetcherManager, normalize_stock_code
 from data_provider.yfinance_fetcher import YfinanceFetcher
 from src.core.trading_calendar import MARKET_EXCHANGE, MARKET_TIMEZONE, get_market_for_stock
-from src.market_context import detect_market, get_market_guidelines
+from src.market.context import detect_market, get_market_guidelines
 from src.services.stock_code_utils import is_code_like, normalize_code
 
 

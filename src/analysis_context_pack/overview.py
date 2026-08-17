@@ -14,7 +14,7 @@ from src.analysis_context_pack.prompt import (
     get_analysis_context_pack_block_labels,
     iter_analysis_context_pack_block_keys,
 )
-from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY
+from src.market.phase_summary import MARKET_PHASE_SUMMARY_KEY
 from src.schemas.analysis_context_pack import ContextFieldStatus
 from src.utils.sanitize import log_safe_exception
 

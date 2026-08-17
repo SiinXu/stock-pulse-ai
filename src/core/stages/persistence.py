@@ -20,7 +20,7 @@ from src.core.pipeline_stage_results import (
 from src.core.outbound_delivery import (
     outbound_notifications_enabled as _outbound_notifications_enabled,
 )
-from src.market_phase_summary import MARKET_PHASE_SUMMARY_KEY
+from src.market.phase_summary import MARKET_PHASE_SUMMARY_KEY
 from src.services.analysis_context_builder import (
     AnalysisContextBuilder,
     PipelineAnalysisArtifacts,

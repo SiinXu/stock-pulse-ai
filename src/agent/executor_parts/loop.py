@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from src.agent.runner import parse_dashboard_json_result, run_agent_loop
 from src.agent.runtime.mode_budget import create_mode_budget_account
 from src.agent.stock_scope import StockScope
-from src.market_phase_prompt import format_market_phase_prompt_section
-from src.market_structure_prompt import format_market_structure_prompt_section
+from src.market.phase_prompt import format_market_phase_prompt_section
+from src.market.structure_prompt import format_market_structure_prompt_section
 from src.report_language import normalize_report_language
 from src.services.daily_market_context import format_daily_market_context_prompt_section
 

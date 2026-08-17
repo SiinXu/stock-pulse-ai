@@ -1,0 +1,1 @@
+- [Changed] Remove root-level market compatibility shims; import `src.market.analyzer`, `src.market.context`, `src.market.phase_prompt`, `src.market.phase_summary`, `src.market.regime_prompt`, and `src.market.structure_prompt` (Refs #167).
