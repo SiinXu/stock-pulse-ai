@@ -10,13 +10,20 @@ existing callers (``import data_provider``, ``from data_provider.base import
 Submodule identity is shared: ``data_provider.base is src.data_provider.base``.
 Logger names used by ``logging.getLogger(__name__)`` are aliased so
 ``data_provider.<module>`` still captures the same records.
+
+Do **not** eagerly import every implementation submodule. The historical
+package ``__init__`` only loaded its public surface. Preloading the rest
+(for example ``futu_position_fetcher``) reintroduces a circular import with
+``src.services.stock_code_utils``.
 """
 
 from __future__ import annotations
 
 import importlib
+import importlib.abc
+import importlib.machinery
+import importlib.util
 import logging
-import pkgutil
 import sys
 from types import ModuleType
 
@@ -44,13 +51,59 @@ def _alias_module(alias_name: str, canonical: ModuleType) -> None:
         _alias_logger(alias_name, canonical_name)
 
 
+class _ExistingModuleLoader(importlib.abc.Loader):
+    """Return an already-imported canonical module under the alias name."""
+
+    def __init__(self, module: ModuleType) -> None:
+        self._module = module
+
+    def create_module(self, spec: importlib.machinery.ModuleSpec) -> ModuleType:
+        return self._module
+
+    def exec_module(self, module: ModuleType) -> None:
+        return None
+
+
+class _DataProviderAliasFinder(importlib.abc.MetaPathFinder):
+    """Resolve ``data_provider.*`` to ``src.data_provider.*`` on demand."""
+
+    def find_spec(
+        self,
+        fullname: str,
+        path: object | None,
+        target: ModuleType | None = None,
+    ) -> importlib.machinery.ModuleSpec | None:
+        if fullname != _ALIAS_PREFIX and not fullname.startswith(_ALIAS_PREFIX + "."):
+            return None
+        if fullname in sys.modules:
+            return importlib.util.spec_from_loader(
+                fullname, _ExistingModuleLoader(sys.modules[fullname])
+            )
+        canonical_name = (
+            _CANONICAL_PREFIX
+            if fullname == _ALIAS_PREFIX
+            else _CANONICAL_PREFIX + fullname[len(_ALIAS_PREFIX) :]
+        )
+        module = importlib.import_module(canonical_name)
+        _alias_module(fullname, module)
+        return importlib.util.spec_from_loader(
+            fullname, _ExistingModuleLoader(module)
+        )
+
+
+def _alias_loaded_submodules() -> None:
+    prefix = _CANONICAL_PREFIX + "."
+    for name, module in list(sys.modules.items()):
+        if name.startswith(prefix) and isinstance(module, ModuleType):
+            _alias_module(_ALIAS_PREFIX + name[len(_CANONICAL_PREFIX) :], module)
+
+
 def _install() -> ModuleType:
+    if not any(isinstance(finder, _DataProviderAliasFinder) for finder in sys.meta_path):
+        sys.meta_path.insert(0, _DataProviderAliasFinder())
     canonical = importlib.import_module(_CANONICAL_PREFIX)
     _alias_module(_ALIAS_PREFIX, canonical)
-    for info in pkgutil.walk_packages(canonical.__path__, _CANONICAL_PREFIX + "."):
-        module = importlib.import_module(info.name)
-        alias_name = _ALIAS_PREFIX + info.name[len(_CANONICAL_PREFIX) :]
-        _alias_module(alias_name, module)
+    _alias_loaded_submodules()
     return canonical
 
 
