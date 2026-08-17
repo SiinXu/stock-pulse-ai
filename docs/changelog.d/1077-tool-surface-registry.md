@@ -1,0 +1,2 @@
+- [Changed] Converge Agent tool execution through `src/agent/tools/surface.py` (registry → ToolSurface authz/timeout/audit → handler) with a new-tool checklist and bypass tests (Refs #1077).
+- [Docs] Add the Chinese Agent ToolSurface contract twin and cross-link it from the English living contract (Refs #1077).

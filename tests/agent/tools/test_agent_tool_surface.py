@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from src.agent.stock_scope import StockScope
 from src.agent.runtime.tool_session import BoundToolSession
-from src.agent.tool_surface import ToolSurface
+from src.agent.tools.surface import ToolSurface
 from src.agent.tools.data_tools import get_portfolio_snapshot_tool
 from src.agent.tools.execution import ToolAccessContext
 from src.agent.tools.registry import (
@@ -576,7 +576,7 @@ def test_replaced_definition_cannot_dispatch_stale_preflight_handler() -> None:
         )
 
     with patch(
-        "src.agent.tool_surface.validate_outbound_url",
+        "src.agent.tools.surface.validate_outbound_url",
         side_effect=_pause_outbound_validation,
     ):
         worker = threading.Thread(target=_execute)
@@ -624,7 +624,7 @@ def test_direct_surface_rejects_in_place_mutation_after_preflight() -> None:
         )
 
     with patch(
-        "src.agent.tool_surface.validate_outbound_url",
+        "src.agent.tools.surface.validate_outbound_url",
         side_effect=_pause_outbound_validation,
     ):
         worker = threading.Thread(target=_execute)
@@ -772,7 +772,7 @@ def test_slow_outbound_policy_cannot_start_handler_after_call_deadline() -> None
         return object()
 
     with patch(
-        "src.agent.tool_surface.validate_outbound_url",
+        "src.agent.tools.surface.validate_outbound_url",
         side_effect=_slow_policy,
     ):
         result = surface.execute_tool(
@@ -796,7 +796,7 @@ def test_cancellation_during_outbound_policy_prevents_handler_dispatch() -> None
         return object()
 
     with patch(
-        "src.agent.tool_surface.validate_outbound_url",
+        "src.agent.tools.surface.validate_outbound_url",
         side_effect=_policy_then_cancel,
     ):
         result = surface.execute_tool(
