@@ -51,6 +51,8 @@ Before technical-indicator synthesis, OHLCV frames are validated through `prepar
 
 When a realtime quote is supplemented from a secondary provider, matching finite fields are compared. Divergences above `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` emit WARN evidence with provider attribution. Values are always kept; a single missing provider is a no-op so one source failure cannot interrupt overall analysis.
 
+Field-level trust (Issue #1129) records those comparisons, supplement attribution, lag/staleness, and provider-health attempts on the returned quote. The Web stock workspace and `GET /api/v1/stocks/{code}/trust` surface the same payload; analysis receives a provider-neutral `gaps` + `confidence` projection and must not treat a conflict as a chosen winner. See [field-trust-panel.md](./field-trust-panel.md).
+
 ## Evidence and diagnostics
 
 Findings are projected as `data_quality_evidence.v1`. Each record contains bounded issue lists plus sanitized severity, symbol, canonical market, canonical instrument type, provider, and available cache/fallback/staleness provenance. Realtime evidence is regenerated after supplementation and final fallback metadata are complete, so the evidence describes the returned quote rather than an earlier provider candidate. Non-finite values are converted to strict-JSON-safe values before evidence persistence.

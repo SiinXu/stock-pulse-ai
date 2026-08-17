@@ -22,7 +22,7 @@ import {
 import type { StockHistoryResponse, StockQuote } from '../../types/stocks';
 
 vi.mock('../../api/stocks', () => ({
-  stocksApi: { getQuote: vi.fn(), getDailyHistory: vi.fn() },
+  stocksApi: { getQuote: vi.fn(), getDailyHistory: vi.fn(), getFieldTrust: vi.fn() },
 }));
 
 vi.mock('../../api/systemConfig', () => ({
@@ -60,6 +60,7 @@ vi.mock('../../api/moneyFlow', () => ({
 
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
 const getHistoryMock = vi.mocked(stocksApi.getDailyHistory);
+const getFieldTrustMock = vi.mocked(stocksApi.getFieldTrust);
 const addWatchlistMock = vi.mocked(systemConfigApi.addToWatchlist);
 const estimateStockValuationMock = vi.mocked(estimateStockValuation);
 const getStockMoneyFlowMock = vi.mocked(getStockMoneyFlow);
@@ -156,9 +157,49 @@ describe('StockDetailsPage', () => {
   beforeEach(() => {
     getQuoteMock.mockReset();
     getHistoryMock.mockReset();
+    getFieldTrustMock.mockReset();
     addWatchlistMock.mockReset();
     estimateStockValuationMock.mockReset();
     getStockMoneyFlowMock.mockReset();
+    getFieldTrustMock.mockResolvedValue({
+      schemaVersion: 'field_trust_view/1.0',
+      stockCode: '600519',
+      status: 'degraded',
+      metadataPresent: true,
+      quoteSource: 'efinance',
+      staleSeconds: 7200,
+      isStale: true,
+      missingFields: [],
+      fields: [
+        {
+          field: 'price',
+          value: 1688,
+          source: 'efinance',
+          origin: 'primary',
+          staleness: 'stale',
+          conflict: true,
+        },
+      ],
+      conflicts: [
+        {
+          field: 'price',
+          severity: 'warn',
+          values: [
+            { provider: 'efinance', value: 1688 },
+            { provider: 'AkshareFetcher', value: 2100 },
+          ],
+        },
+      ],
+      conflictChecks: [],
+      providerHealth: [{ provider: 'efinance', status: 'ok', role: 'primary' }],
+      analysisInput: {
+        schemaVersion: 'field_trust_analysis_input/1.0',
+        confidence: 'low',
+        gaps: [{ code: 'conflict', field: 'price', detail: 'providers disagreed' }],
+        conflictCount: 1,
+        failedProviderCount: 0,
+      },
+    });
     getStockMoneyFlowMock.mockResolvedValue({
       schemaVersion: 'money_flow_view/1.0',
       stockCode: '600519',
@@ -191,6 +232,8 @@ describe('StockDetailsPage', () => {
     expect(screen.getByTestId('stock-details-kline-chart')).toBeTruthy();
     expect(screen.getByTestId('stock-details-kline-chart-canvas')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Peer relative-value canvas' })).toBeTruthy();
+    expect(screen.getByTestId('stock-details-field-trust-section')).toBeTruthy();
+    expect(await screen.findByTestId('field-trust-degraded')).toBeTruthy();
     // history table rows (dates also appear in the K-line readout/axis)
     expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('2026-01-06').length).toBeGreaterThanOrEqual(1);

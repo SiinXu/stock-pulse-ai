@@ -88,7 +88,7 @@ tools, without a duplicate **Research overview** child. On the compact rail,
 | --- | --- |
 | **Human approvals** `/approvals` | **Not** in the primary sidebar; open via the Home **Review human approvals** control when administrator sign-in is enabled (labels as in UI); contract: `docs/human-approvals_EN.md` |
 | **Notification Center** `/notifications` | Notification bell → View all |
-| **Stock workspace** | Type a code in the palette, or open `/stocks/<code>` (example: `/stocks/600519`) |
+| **Stock workspace** | Type a code in the palette, or open `/stocks/<code>` (example: `/stocks/600519`). The page shows per-field source, lag, staleness, and cross-provider conflicts; conflicts stay visible instead of silently picking one source as truth |
 | **Login** `/login` | When admin auth is on; protected pages use `?redirect=` |
 
 Legacy paths such as `/decision-signals`, `/alerts`, `/backtest`, and `/screening` usually redirect to the canonical routes above.

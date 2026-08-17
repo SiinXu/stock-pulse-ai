@@ -25,9 +25,11 @@ import {
 } from '../components/common';
 import { DcfSensitivityPanel, PeerValuationCanvas } from '../components/valuation';
 import ResearchTimelinePanel from '../components/stocks/ResearchTimelinePanel';
+import FieldTrustPanel from '../components/stocks/FieldTrustPanel';
 import { MoneyFlowPanel } from '../components/money-flow';
 import { VALUATION_TEXT } from '../locales/valuation';
 import { MONEY_FLOW_TEXT } from '../locales/moneyFlow';
+import { FIELD_TRUST_TEXT } from '../locales/fieldTrust';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import {
   buildStockDetailsHistoryQueryKey,
@@ -375,6 +377,7 @@ const StockDetailsPage: React.FC = () => {
 
   const valuationText = VALUATION_TEXT[language] ?? VALUATION_TEXT.en;
   const moneyFlowText = MONEY_FLOW_TEXT[language] ?? MONEY_FLOW_TEXT.en;
+  const fieldTrustText = FIELD_TRUST_TEXT[language] ?? FIELD_TRUST_TEXT.en;
 
   return (
     <AppPage className="max-w-none">
@@ -505,6 +508,10 @@ const StockDetailsPage: React.FC = () => {
             />
           )}
         </Card>
+
+        <section aria-label={fieldTrustText.title} data-testid="stock-details-field-trust-section">
+          <FieldTrustPanel key={`field-trust-${canonicalCode}`} stockCode={canonicalCode} />
+        </section>
 
         <Card title={t('stocks.workspace.historyTitle')} padding="md">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">

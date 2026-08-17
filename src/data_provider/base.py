@@ -51,6 +51,7 @@ from .daily_cache import (
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
 from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
+from . import field_trust as _field_trust
 
 if TYPE_CHECKING:
     from .plugin_registry import DataProviderRegistration
@@ -1783,6 +1784,8 @@ class DataFetcherManager:
             setattr(quote, "provider_timestamp", None)
             setattr(quote, "stale_seconds", None)
             setattr(quote, "is_stale", None)
+            # Issue #1129: unknown provider timestamp means unknown staleness.
+            _field_trust.finalize(quote)
             return quote
 
         setattr(quote, "provider_timestamp", provider_dt.isoformat())
@@ -1791,6 +1794,9 @@ class DataFetcherManager:
         ttl = realtime_cache_ttl if realtime_cache_ttl is not None else 600
         setattr(quote, "stale_seconds", stale_seconds)
         setattr(quote, "is_stale", stale_seconds > int(ttl))
+        # Issue #1129: complete per-field attribution at the single exit
+        # point of every successful realtime-quote path.
+        _field_trust.finalize(quote)
         return quote
 
     def _try_plugin_realtime_quote(
@@ -2070,6 +2076,9 @@ class DataFetcherManager:
                         logger.info(f"[实时行情] {stock_code} 成功获取 (来源: {source})")
                         # If all key supplementary fields are present, return early
                         if not self._quote_needs_supplement(primary_quote):
+                            _field_trust.attach_failed_sources(
+                                primary_quote, failed_sources
+                            )
                             return self._enrich_realtime_quote(
                                 primary_quote,
                                 fallback_from=primary_fallback_from,
@@ -2091,12 +2100,12 @@ class DataFetcherManager:
                                 is_validation_enabled,
                             )
 
+                            primary_source = getattr(primary_quote, "source", None)
+                            primary_provider = getattr(
+                                primary_source, "value", primary_source
+                            ) or "primary"
                             if is_validation_enabled():
-                                primary_source = getattr(primary_quote, "source", None)
-                                primary_provider = getattr(
-                                    primary_source, "value", primary_source
-                                ) or "primary"
-                                compare_cross_source_quotes(
+                                cross_result = compare_cross_source_quotes(
                                     primary_quote,
                                     quote,
                                     primary_provider=str(primary_provider),
@@ -2108,6 +2117,22 @@ class DataFetcherManager:
                                     asset_type=getattr(
                                         primary_quote, "instrument_type", None
                                     ),
+                                )
+                                # Issue #1129: surface divergences as
+                                # field-level conflicts on the merged quote.
+                                _field_trust.record_cross_source_result(
+                                    primary_quote,
+                                    cross_result,
+                                    primary_provider=primary_provider,
+                                    secondary_provider=provider_name,
+                                )
+                            else:
+                                _field_trust.record_conflict_check(
+                                    primary_quote,
+                                    primary_provider=primary_provider,
+                                    secondary_provider=provider_name,
+                                    status=_field_trust.CONFLICT_CHECK_SKIPPED,
+                                    reason="validation_disabled",
                                 )
                         except Exception as cross_exc:  # broad-exception: fallback_recorded - observational only
                             log_safe_exception(
@@ -2173,6 +2198,7 @@ class DataFetcherManager:
         
         # Return primary even if some fields are still missing
         if primary_quote is not None:
+            _field_trust.attach_failed_sources(primary_quote, failed_sources)
             return self._enrich_realtime_quote(
                 primary_quote,
                 fallback_from=primary_fallback_from,
@@ -2240,6 +2266,8 @@ class DataFetcherManager:
                 if val is not None:
                     setattr(primary, f, val)
                     filled.append(f)
+        # Issue #1129: attribute supplemented fields to their actual provider.
+        _field_trust.record_supplement(primary, filled, secondary)
         return filled
 
     def _longbridge_preferred(self, capability: str = "realtime_quote") -> bool:
@@ -2358,12 +2386,12 @@ class DataFetcherManager:
                             is_validation_enabled,
                         )
 
+                        primary_source = getattr(primary_quote, "source", None)
+                        primary_provider = getattr(
+                            primary_source, "value", primary_source
+                        ) or "primary"
                         if is_validation_enabled():
-                            primary_source = getattr(primary_quote, "source", None)
-                            primary_provider = getattr(
-                                primary_source, "value", primary_source
-                            ) or "primary"
-                            compare_cross_source_quotes(
+                            cross_result = compare_cross_source_quotes(
                                 primary_quote,
                                 secondary,
                                 primary_provider=str(primary_provider),
@@ -2373,6 +2401,22 @@ class DataFetcherManager:
                                 asset_type=getattr(
                                     primary_quote, "instrument_type", None
                                 ),
+                            )
+                            # Issue #1129: surface divergences as field-level
+                            # conflicts instead of discarding the result.
+                            _field_trust.record_cross_source_result(
+                                primary_quote,
+                                cross_result,
+                                primary_provider=primary_provider,
+                                secondary_provider=fetcher_name,
+                            )
+                        else:
+                            _field_trust.record_conflict_check(
+                                primary_quote,
+                                primary_provider=primary_provider,
+                                secondary_provider=fetcher_name,
+                                status=_field_trust.CONFLICT_CHECK_SKIPPED,
+                                reason="validation_disabled",
                             )
                     except Exception as cross_exc:  # broad-exception: fallback_recorded - comparison is observational
                         log_safe_exception(
