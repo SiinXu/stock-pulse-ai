@@ -37,6 +37,7 @@ LEGACY_FACADES: Mapping[str, str] = {
     "src.market_analyzer": "src.market.analyzer",
     "src.analysis_context_pack_overview": "src.analysis_context_pack.overview",
     "src.analysis_context_pack_prompt": "src.analysis_context_pack.prompt",
+    "bot": "src.bot",
 }
 
 # Shim files that re-export the canonical package; they are not importers of
@@ -50,6 +51,7 @@ FACADE_DEFINITION_FILES: Mapping[str, str] = {
     "src.market_analyzer": "src/market_analyzer.py",
     "src.analysis_context_pack_overview": "src/analysis_context_pack_overview.py",
     "src.analysis_context_pack_prompt": "src/analysis_context_pack_prompt.py",
+    "bot": "bot/__init__.py",
 }
 
 PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
