@@ -33,6 +33,11 @@ def test_dockerfile_bundles_default_alphasift_adapter() -> None:
     assert "git \\" in dockerfile
     assert f"{DEFAULT_ALPHASIFT_INSTALL_SPEC}#egg=alphasift" in requirements
     assert "PIP_BUILD_CONSTRAINT=build-constraints.txt pip install -r requirements.txt" in dockerfile
+    assert "COPY pyproject.toml README.md LICENSE ./" in dockerfile
+    assert (
+        "PIP_BUILD_CONSTRAINT=build-constraints.txt pip install -e . --no-deps"
+        in dockerfile
+    )
     assert "--mount=type=cache,target=/root/.cache/pip" in dockerfile
     assert "import alphasift.dsa_adapter" in dockerfile
 

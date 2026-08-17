@@ -44,6 +44,10 @@ if ($LASTEXITCODE -ne 0) {
 if ($LASTEXITCODE -ne 0) {
   throw "Dependency installation from requirements-desktop.txt failed with exit code $LASTEXITCODE."
 }
+& $pythonBin -m pip install --build-constraint build-constraints.txt -e . --no-deps
+if ($LASTEXITCODE -ne 0) {
+  throw "Editable install (pip install --build-constraint build-constraints.txt -e . --no-deps) failed with exit code $LASTEXITCODE."
+}
 & $pythonBin -m pip check
 if ($LASTEXITCODE -ne 0) {
   throw "pip check failed with exit code $LASTEXITCODE."
