@@ -1,0 +1,4 @@
+- [Added] Fail-closed settings-help catalogue merge resolver and all-zero/no-op batch refusal for derived-file merge resolvers.
+- [Fixed] Settings-help unions compare complete and mid-block entries in one key table, and accept one-line empty catalogue entries.
+- [Tests] Add tests/scripts/test_merge_resolvers.py covering settings-help unions, edit conflicts, empty batches, and CLI list/refuse contracts.
+- [Docs] Document the settings-help resolver and all-zero/no-op refusal in scripts/merge_resolvers/README.md.

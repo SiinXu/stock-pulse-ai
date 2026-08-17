@@ -184,7 +184,7 @@ def atomic_write_and_stage(root: Path, outputs: dict[Path, bytes]) -> None:
     """
 
     if not outputs:
-        return
+        raise RefusalError("<batch>", "refusing all-zero/no-op write batch")
 
     originals: dict[Path, bytes | None] = {}
     original_modes: dict[Path, int | None] = {}

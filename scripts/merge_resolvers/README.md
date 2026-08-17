@@ -2,7 +2,8 @@
 
 These resolvers handle conflicts where neither Git side is the merged truth.
 They plan every output before writing anything, reject unknown conflict shapes,
-replace all files as one batch, and stage them with one Git index update.
+refuse all-zero or no-op batches, replace all files as one batch, and stage
+them with one Git index update.
 
 ```bash
 python scripts/merge_resolvers/resolve.py --list
@@ -38,6 +39,12 @@ error. A refusal writes no output.
   same atomic entry point because real public-surface PRs conflict in those
   snapshots too. I18n accepts only one-line array/map additions with disjoint
   keys; registry hashes are recomputed by importing the merged registry.
+- `settingsHelp.<lang>.ts` files are the Settings-page help catalogue. The
+  resolver unions complete, brace-balanced entry blocks by settings key,
+  including one-line empty `key: {}` entries. Complete and mid-block (open)
+  forms share that key table: the same key with different bodies is refused,
+  and equivalent open/complete copies are kept once. It also refuses empty
+  sides, unexpected hunk lines, and hunks where only one side ends mid-block.
 
 Rollback is ordinary Git merge rollback: run `git merge --abort`. The resolver
 does not commit, push, raise budgets, or resolve semantic source conflicts.

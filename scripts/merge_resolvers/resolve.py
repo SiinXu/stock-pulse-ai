@@ -14,7 +14,7 @@ if __package__ in {None, ""}:
 
 from scripts.merge_resolvers import additive_entries, bundle_size_budget, docs_index
 from scripts.merge_resolvers import config_registry_snapshot, generated_openapi
-from scripts.merge_resolvers import playground_catalog, public_surface
+from scripts.merge_resolvers import playground_catalog, public_surface, settings_help
 from scripts.merge_resolvers.common import (
     RefusalError,
     atomic_write_and_stage,
@@ -37,11 +37,16 @@ SUPPORTED_PATHS = frozenset(
 SUPPORTED_DISPLAY = tuple(
     sorted(path.as_posix() for path in SUPPORTED_PATHS)
     + list(additive_entries.SUPPORTED_PATTERNS)
+    + list(settings_help.SUPPORTED_PATTERNS)
 )
 
 
 def _is_supported(path: Path) -> bool:
-    return path in SUPPORTED_PATHS or additive_entries.is_supported(path)
+    return (
+        path in SUPPORTED_PATHS
+        or additive_entries.is_supported(path)
+        or settings_help.is_supported(path)
+    )
 
 
 def _repository_root() -> Path:
@@ -80,6 +85,9 @@ def plan_resolutions(root: Path, paths: list[Path]) -> dict[Path, bytes]:
     for path in sorted(path for path in contexts if additive_entries.is_supported(path)):
         outputs[path] = additive_entries.resolve(contexts[path]).encode()
 
+    for path in sorted(path for path in contexts if settings_help.is_supported(path)):
+        outputs[path] = settings_help.resolve(contexts[path]).encode()
+
     if config_registry_snapshot.SUPPORTED_PATH in contexts:
         path = config_registry_snapshot.SUPPORTED_PATH
         outputs[path] = config_registry_snapshot.resolve(contexts[path], root).encode()
@@ -112,7 +120,12 @@ def plan_resolutions(root: Path, paths: list[Path]) -> dict[Path, bytes]:
             )
         )
 
+    if not outputs:
+        raise RefusalError("<batch>", "resolver produced no outputs")
+
     for path, body in outputs.items():
+        if not body:
+            raise RefusalError(path, "resolver produced empty output")
         try:
             text = body.decode("utf-8")
         except UnicodeDecodeError as exc:
