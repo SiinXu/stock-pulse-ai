@@ -173,6 +173,35 @@ class PortfolioAgentConstraintGateTests(unittest.TestCase):
         self.assertFalse(assessment["is_executable_scenario"])
         self.assertIn("not broker", assessment["disclaimer"].lower())
 
+    def test_llm_signal_positions_are_gated_without_rebalancing_base(self) -> None:
+        agent = _agent()
+        ctx = AgentContext(stock_code="PORT", query="analyze")
+        ctx.data["portfolio_constraint_config"] = {"blacklist": ["600519"]}
+        ctx.data["portfolio_view"] = {"weights_known": False}
+        raw = json.dumps(
+            {
+                "portfolio_risk_score": 6,
+                "summary": "buy moutai",
+                "positions": [
+                    {
+                        "code": "600519",
+                        "suggested_weight": 0.25,
+                        "signal": "buy",
+                        "note": "high conviction",
+                    }
+                ],
+                "rebalance_suggestions": [],
+            }
+        )
+        opinion = agent.post_process(ctx, raw)
+        self.assertIsNotNone(opinion)
+        assessment = ctx.data["portfolio_assessment"]
+        self.assertEqual(assessment["scenario_label"], LABEL_RESEARCH_ONLY)
+        self.assertEqual(
+            assessment["constraint_check"]["findings"][0]["constraint"], "blacklist"
+        )
+        self.assertFalse(assessment["is_executable_scenario"])
+
     def test_unparsed_llm_output_still_runs_the_real_engine(self) -> None:
         agent = _agent()
         ctx = AgentContext(stock_code="PORT", query="rebalance")

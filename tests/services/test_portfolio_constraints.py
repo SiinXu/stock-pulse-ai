@@ -171,6 +171,62 @@ class ResearchScenarioWiringTests(unittest.TestCase):
         self.assertEqual(result["findings"][0]["constraint"], "risk_flag")
         self.assertIn("halt", result["findings"][0]["reason"])
 
+    def test_assessment_signal_positions_are_checked(self) -> None:
+        result = evaluate_research_scenario(
+            assessment={
+                "positions": [
+                    {"code": "AAA", "signal": "buy", "suggested_weight": 0.4}
+                ]
+            },
+            portfolio={"weights_pct": {"AAA": 10.0}, "weights_known": True},
+            config={"max_single_name_weight_pct": 25.0},
+        )
+        self.assertEqual(result["status"], "reject")
+        self.assertEqual(result["label"], LABEL_RESEARCH_ONLY)
+        self.assertEqual(result["findings"][0]["constraint"], "per_name_cap")
+
+    def test_unknown_weights_sized_sector_target_is_hint_not_silent_pass(self) -> None:
+        result = evaluate_research_scenario(
+            portfolio={"weights_pct": {}, "sectors": {}, "weights_known": False},
+            proposal={
+                "actions": [
+                    {
+                        "symbol": "AAA",
+                        "action": "buy",
+                        "target_weight_pct": 15.0,
+                        "sector": "Tech",
+                    }
+                ]
+            },
+            config={"max_sector_weight_pct": 40.0},
+        )
+        self.assertEqual(result["status"], "hints")
+        self.assertEqual(result["label"], LABEL_CONSTRAINT_FEASIBLE)
+        self.assertEqual(result["findings"][0]["constraint"], "sector_cap")
+        self.assertEqual(result["findings"][0]["severity"], "hint")
+        self.assertIn("unavailable", result["findings"][0]["reason"])
+
+    def test_unknown_weights_still_reject_when_proposal_alone_exceeds_sector_cap(
+        self,
+    ) -> None:
+        result = evaluate_research_scenario(
+            portfolio={"weights_known": False},
+            proposal={
+                "actions": [
+                    {
+                        "symbol": "AAA",
+                        "action": "buy",
+                        "target_weight_pct": 50.0,
+                        "sector": "Tech",
+                    }
+                ]
+            },
+            config={"max_sector_weight_pct": 40.0},
+        )
+        self.assertEqual(result["status"], "reject")
+        self.assertEqual(result["label"], LABEL_RESEARCH_ONLY)
+        self.assertEqual(result["findings"][0]["constraint"], "sector_cap")
+
     def test_empty_proposal_is_not_an_executable_scenario(self) -> None:
         result = evaluate_research_scenario(
             portfolio={"weights_pct": {"AAA": 10.0}, "weights_known": True},

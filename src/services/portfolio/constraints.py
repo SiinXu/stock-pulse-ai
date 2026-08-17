@@ -491,21 +491,28 @@ def _check_sector_caps(
                 )
             )
             continue
-        if not weights_known and action.target_weight_pct is None:
-            findings.append(
-                ConstraintFinding(
-                    constraint="sector_cap",
-                    severity=SEVERITY_HINT,
-                    symbol=action.symbol,
-                    reason=(
-                        f"Sector cap {cap:.2f}% is configured for sector '{sector}' "
-                        f"but current portfolio weights are unavailable; the cap "
-                        f"cannot be fully evaluated."
-                    ),
-                    limit_pct=cap,
-                )
+        if not weights_known:
+            # Incomplete current weights cannot prove the sector is under the cap.
+            # Only skip this hint when the available projection already exceeds
+            # the cap (a definite breach from proposal targets alone).
+            projected_incomplete = _sector_weight(
+                sector, weights=projected_weights, sectors=sectors
             )
-            continue
+            if projected_incomplete <= cap + _EPS:
+                findings.append(
+                    ConstraintFinding(
+                        constraint="sector_cap",
+                        severity=SEVERITY_HINT,
+                        symbol=action.symbol,
+                        reason=(
+                            f"Sector cap {cap:.2f}% is configured for sector '{sector}' "
+                            f"but current portfolio weights are unavailable; the cap "
+                            f"cannot be fully evaluated."
+                        ),
+                        limit_pct=cap,
+                    )
+                )
+                continue
         if sector in seen_sectors:
             continue
         seen_sectors.add(sector)

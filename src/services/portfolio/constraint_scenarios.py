@@ -133,7 +133,8 @@ def _actions_from_sequence(raw_actions: Sequence[Any]) -> List[ProposedAction]:
         if not isinstance(item, Mapping):
             continue
         symbol = _symbol_from_item(item)
-        action = str(item.get("action") or "").strip()
+        # PortfolioAgent positions emit `signal`; rebalancing suggestions emit `action`.
+        action = str(item.get("action") or item.get("signal") or "").strip()
         if not symbol or not action:
             continue
         target = _weight_pct_from_item(item)
