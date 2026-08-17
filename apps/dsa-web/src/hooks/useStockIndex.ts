@@ -6,7 +6,6 @@
 
 import { useState, useEffect } from 'react';
 import type { StockIndexItem } from '../types/stockIndex';
-import { loadStockIndex } from '../utils/stockIndexLoader';
 import type { IndexLoadResult } from '../utils/stockIndexLoader';
 
 export interface UseStockIndexResult {
@@ -23,48 +22,56 @@ export interface UseStockIndexResult {
 }
 
 /**
- * Stock index loading Hook
+ * Stock index loading Hook.
+ *
+ * `enabled` defaults to true so existing call sites (StockAutocomplete,
+ * DecisionSignalsPage) keep mount-time loading. The command palette
+ * passes `isOpen` so a closed palette does not fetch.
  *
  * @returns Index state and data
  */
-export function useStockIndex(): UseStockIndexResult {
+export function useStockIndex(enabled = true): UseStockIndexResult {
   const [index, setIndex] = useState<StockIndexItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<Error | null>(null);
   const [fallback, setFallback] = useState(false);
 
   useEffect(() => {
+    if (!enabled) {
+      return undefined;
+    }
+
     let mounted = true;
 
     async function load() {
       setLoading(true);
       setError(null);
 
+      const { loadStockIndex } = await import('../utils/stockIndexLoader');
       const result: IndexLoadResult = await loadStockIndex();
 
-      if (mounted) {
-        setIndex(result.data);
-        setFallback(result.fallback);
-        if (result.error) {
-          setError(result.error);
-        }
-        setLoading(false);
+      if (!mounted) {
+        return;
       }
+      setIndex(result.data);
+      setFallback(result.fallback);
+      setError(result.error ?? null);
+      setLoading(false);
     }
 
-    load();
+    void load();
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [enabled]);
 
   return {
     index,
     loading,
     error,
     fallback,  // Whether fallback
-    loaded: !loading,
+    loaded: enabled && !loading,
   };
 }
 

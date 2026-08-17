@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as AuthContext from './contexts/AuthContext';
 import {
@@ -21,6 +21,7 @@ import {
 } from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
 import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
+import { resetStockIndexCacheForTests } from './utils/stockIndexLoader';
 
 type AuthState = ReturnType<typeof AuthContext.useAuth>;
 
@@ -129,6 +130,7 @@ beforeEach(() => {
   window.history.pushState({}, '', '/');
   localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
   sessionStorage.clear();
+  resetStockIndexCacheForTests();
   vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState());
 });
 
@@ -557,3 +559,55 @@ describe('App routing behavior', () => {
     }
   });
 });
+
+function requestUrl(input: RequestInfo | URL): string {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input.url;
+}
+
+function stockIndexFetchCalls(fetchMock: { mock: { calls: unknown[][] } }) {
+  return fetchMock.mock.calls.filter((call) => {
+    const input = call[0] as RequestInfo | URL;
+    return requestUrl(input).includes('/stocks.index.json');
+  });
+}
+
+describe('App stock index loading', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    resetStockIndexCacheForTests();
+  });
+
+  it('does not fetch stocks.index.json on a cold home load until the palette opens', async () => {
+    resetStockIndexCacheForTests();
+    let parseCount = 0;
+    const originalFetch = globalThis.fetch.bind(globalThis);
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      if (requestUrl(input).includes('/stocks.index.json')) {
+        return {
+          ok: true,
+          json: async () => {
+            parseCount += 1;
+            return [];
+          },
+        } as Response;
+      }
+      return originalFetch(input, init);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(<App />);
+    expect(await screen.findByTestId('home-page')).toBeInTheDocument();
+    expect(stockIndexFetchCalls(fetchMock)).toHaveLength(0);
+    expect(parseCount).toBe(0);
+
+    fireEvent.keyDown(document, { key: 'k', metaKey: true });
+    expect(await screen.findByRole('dialog', { name: '快速前往' })).toBeInTheDocument();
+
+    await waitFor(() => expect(stockIndexFetchCalls(fetchMock)).toHaveLength(1));
+    expect(parseCount).toBe(1);
+    expect(stockIndexFetchCalls(fetchMock)[0][0]).toBe('/stocks.index.json');
+  });
+});
+
