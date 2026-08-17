@@ -152,6 +152,10 @@ def _load_pack_file(path: Path) -> TradingRegimePack:
         raise RegimePackError(
             f"Trading-regime pack {file_name}: invalid YAML: {exc}"
         ) from exc
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RegimePackError(
+            f"Trading-regime pack {file_name}: cannot read file: {exc}"
+        ) from exc
 
     if not isinstance(data, Mapping):
         raise RegimePackError(

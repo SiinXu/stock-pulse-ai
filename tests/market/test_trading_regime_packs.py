@@ -294,6 +294,28 @@ def test_invalid_yaml_fails_loudly(tmp_path: Path) -> None:
         load_trading_regime_packs(tmp_path)
 
 
+def test_unreadable_pack_file_is_regime_pack_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_pack(tmp_path, "zz.yaml", VALID_PACK_YAML)
+    real_open = open
+
+    def fake_open(file, *args, **kwargs):
+        if Path(file).name == "zz.yaml":
+            raise PermissionError("denied")
+        return real_open(file, *args, **kwargs)
+
+    monkeypatch.setattr("builtins.open", fake_open)
+    with pytest.raises(RegimePackError, match=r"zz\.yaml.*cannot read file"):
+        load_trading_regime_packs(tmp_path)
+
+
+def test_undecodable_pack_file_is_regime_pack_error(tmp_path: Path) -> None:
+    (tmp_path / "zz.yaml").write_bytes(b"\xff\xfe not utf-8")
+    with pytest.raises(RegimePackError, match=r"zz\.yaml.*cannot read file"):
+        load_trading_regime_packs(tmp_path)
+
+
 def test_missing_directory_fails_loudly(tmp_path: Path) -> None:
     with pytest.raises(RegimePackError, match="directory not found"):
         load_trading_regime_packs(tmp_path / "nope")

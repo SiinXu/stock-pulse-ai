@@ -31,8 +31,11 @@ language and reuse the same timezone identifiers.
 - Markets without a pack (for example `jp`, `kr`, `tw`) get an explicit
   no-pack section. They do not inherit US or A-share rules.
 - Pack YAML is schema-validated on load. Missing required fields, unknown
-  keys, wrong `schema_version`, or a missing packaged directory fail loudly
-  with `RegimePackError` naming the file and field.
+  keys, wrong `schema_version`, a missing packaged directory, or an
+  unreadable/undecodable pack file fail loudly with `RegimePackError`
+  naming the file and field.
+- Frozen desktop backends must ship `src/market/regime_pack_data/` via
+  `scripts/build-backend.ps1` and `scripts/build-backend-macos.sh`.
 - Loaded pack objects and their localized maps are immutable.
 
 ## Disclaimer
