@@ -128,7 +128,7 @@ describe('useCommandPaletteSearch stock index loading', () => {
     rerender({ isOpen: false });
     rerender({ isOpen: true });
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
 
     await act(async () => {
       resolveJson?.(mockIndex);

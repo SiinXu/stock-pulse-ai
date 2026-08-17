@@ -50,7 +50,7 @@ describe('useStockIndex', () => {
   it('does not fetch when enabled is false', () => {
     const { fetchMock } = mockStockIndexResponse();
 
-    const { result } = renderHook(() => useStockIndex({ enabled: false }));
+    const { result } = renderHook(() => useStockIndex(false));
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(result.current.loading).toBe(false);
@@ -76,7 +76,7 @@ describe('useStockIndex', () => {
     const { fetchMock } = mockStockIndexResponse();
 
     const { result, rerender } = renderHook(
-      ({ enabled }) => useStockIndex({ enabled }),
+      ({ enabled }) => useStockIndex(enabled),
       { initialProps: { enabled: false } },
     );
 
@@ -107,7 +107,7 @@ describe('useStockIndex', () => {
 
     const { result } = renderHook(() => useTwoConsumers());
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(result.current[0].loading).toBe(true);
     expect(result.current[1].loading).toBe(true);
 

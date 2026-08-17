@@ -18,8 +18,6 @@ export interface IndexLoadResult {
   fallback: boolean;
 }
 
-const STOCK_INDEX_URL = '/stocks.index.json';
-
 let inFlight: Promise<IndexLoadResult> | null = null;
 
 /**
@@ -29,40 +27,6 @@ export function resetStockIndexCacheForTests(): void {
   inFlight = null;
 }
 
-async function fetchAndParseStockIndex(): Promise<IndexLoadResult> {
-  try {
-    // Fetch the static URL as-is. Do not append ?_t= (or any other cache-buster):
-    // the browser revalidates via ETag / Last-Modified. A query-string bust
-    // defeats HTTP caching and forced a full download on every hour bucket.
-    const response = await fetch(STOCK_INDEX_URL);
-
-    if (!response.ok) {
-      throw new Error(`Failed to load index: ${response.status} ${response.statusText}`);
-    }
-
-    const data: StockIndexData = await response.json();
-
-    // Uncompress format (if array format)
-    const items = isCompressedFormat(data)
-      ? unpackTuples(data as StockIndexTuple[])
-      : data as StockIndexItem[];
-
-    return {
-      data: items,
-      loaded: true,
-      fallback: false,
-    };
-  } catch (error) {
-    console.error('[StockIndexLoader] Failed to load stock index:', error);
-    return {
-      data: [],
-      loaded: false,
-      error: error as Error,
-      fallback: true,  // Load failed, fallback to old mode
-    };
-  }
-}
-
 /**
  * Load stock index
  *
@@ -70,21 +34,44 @@ async function fetchAndParseStockIndex(): Promise<IndexLoadResult> {
  * A successful result stays cached for the page lifetime. A failed
  * result is not cached so the next caller can retry.
  *
+ * Fetch the static URL as-is. Do not append ?_t= (or any other cache-buster):
+ * the browser revalidates via ETag / Last-Modified. A query-string bust
+ * defeats HTTP caching and forced a full download on every hour bucket.
+ *
  * @returns Index load result
  */
 export function loadStockIndex(): Promise<IndexLoadResult> {
-  if (inFlight) {
-    return inFlight;
-  }
+  return inFlight ??= (async () => {
+    try {
+      const response = await fetch('/stocks.index.json');
 
-  const request = fetchAndParseStockIndex().then((result) => {
-    if (!result.loaded && inFlight === request) {
+      if (!response.ok) {
+        throw new Error(`Failed to load index: ${response.status} ${response.statusText}`);
+      }
+
+      const data: StockIndexData = await response.json();
+
+      // Uncompress format (if array format)
+      const items = isCompressedFormat(data)
+        ? unpackTuples(data as StockIndexTuple[])
+        : data as StockIndexItem[];
+
+      return {
+        data: items,
+        loaded: true,
+        fallback: false,
+      };
+    } catch (error) {
       inFlight = null;
+      console.error('[StockIndexLoader] Failed to load stock index:', error);
+      return {
+        data: [],
+        loaded: false,
+        error: error as Error,
+        fallback: true,  // Load failed, fallback to old mode
+      };
     }
-    return result;
-  });
-  inFlight = request;
-  return request;
+  })();
 }
 
 /**

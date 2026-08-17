@@ -6,7 +6,6 @@
 
 import { useState, useEffect } from 'react';
 import type { StockIndexItem } from '../types/stockIndex';
-import { loadStockIndex } from '../utils/stockIndexLoader';
 import type { IndexLoadResult } from '../utils/stockIndexLoader';
 
 export interface UseStockIndexResult {
@@ -22,21 +21,16 @@ export interface UseStockIndexResult {
   loaded: boolean;
 }
 
-export interface UseStockIndexOptions {
-  /**
-   * When false, do not fetch. Defaults to true so existing call sites
-   * (StockAutocomplete, DecisionSignalsPage) keep mount-time loading.
-   */
-  enabled?: boolean;
-}
-
 /**
- * Stock index loading Hook
+ * Stock index loading Hook.
+ *
+ * `enabled` defaults to true so existing call sites (StockAutocomplete,
+ * DecisionSignalsPage) keep mount-time loading. The command palette
+ * passes `isOpen` so a closed palette does not fetch.
  *
  * @returns Index state and data
  */
-export function useStockIndex(options: UseStockIndexOptions = {}): UseStockIndexResult {
-  const enabled = options.enabled ?? true;
+export function useStockIndex(enabled = true): UseStockIndexResult {
   const [index, setIndex] = useState<StockIndexItem[]>([]);
   const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<Error | null>(null);
@@ -53,6 +47,7 @@ export function useStockIndex(options: UseStockIndexOptions = {}): UseStockIndex
       setLoading(true);
       setError(null);
 
+      const { loadStockIndex } = await import('../utils/stockIndexLoader');
       const result: IndexLoadResult = await loadStockIndex();
 
       if (!mounted) {

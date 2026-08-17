@@ -54,9 +54,7 @@ export function useCommandPaletteSearch(
     error: false,
     loaded: false,
   });
-  const { index, loading: stockIndexLoading, error: stockIndexError } = useStockIndex({
-    enabled: isOpen,
-  });
+  const { index, loading: stockIndexLoading, error: stockIndexError } = useStockIndex(isOpen);
 
   useEffect(() => {
     if (!isOpen || skillState.loaded) return undefined;
@@ -127,6 +125,7 @@ export function useCommandPaletteSearch(
   }, [isOpen, normalizedQuery]);
 
   const queryIsSettled = normalizedQuery === settledQuery;
+  const searchingStocks = normalizedQuery.length >= STOCK_SEARCH_MIN_LENGTH;
   const stocks = useMemo(() => {
     if (!isOpen || !queryIsSettled || settledQuery.length < STOCK_SEARCH_MIN_LENGTH) {
       return [];
@@ -138,19 +137,14 @@ export function useCommandPaletteSearch(
       ? reportState.items
       : []
   );
-  const isDebouncing = (
-    isOpen
-    && normalizedQuery.length >= STOCK_SEARCH_MIN_LENGTH
-    && !queryIsSettled
-  );
+  const isDebouncing = isOpen && searchingStocks && !queryIsSettled;
 
   return {
     stocks,
     reports,
     skills: isOpen ? skillState.items : [],
     isLoading: isDebouncing || (
-      normalizedQuery.length >= STOCK_SEARCH_MIN_LENGTH
-      && stockIndexLoading
+      searchingStocks && stockIndexLoading
     ) || (
       reportState.query === normalizedQuery
       && reportState.loading
@@ -159,9 +153,7 @@ export function useCommandPaletteSearch(
     ),
     hasError: (
       reportState.query === normalizedQuery && reportState.error
-    ) || Boolean(
-      stockIndexError && normalizedQuery.length >= STOCK_SEARCH_MIN_LENGTH
-    ),
+    ) || Boolean(stockIndexError && searchingStocks),
     skillSearchError: isOpen && skillState.error,
   };
 }
