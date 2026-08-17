@@ -11,7 +11,7 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import List, Optional
 
-from bot.models import BotMessage, BotResponse
+from src.bot.models import BotMessage, BotResponse
 
 
 class BotCommand(ABC):

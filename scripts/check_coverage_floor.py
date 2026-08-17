@@ -50,7 +50,7 @@ DEFAULT_REPORT = ROOT / "coverage.json"
 BASELINE_VERSION = 1
 DEFAULT_EPSILON = 0.5
 DEFAULT_MAIN_REF = "origin/main"
-SCOPED_PACKAGES = ("src", "api", "data_provider", "bot")
+SCOPED_PACKAGES = ("src", "api", "data_provider")
 ALLOW_LOWER_VS_MAIN_ENV = "COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN"
 
 
@@ -471,7 +471,7 @@ def write_baseline_from_report(
         measured_command=measured_command
         or (
             "python -m pytest -m 'not network and not benchmark' "
-            "--cov=src --cov=api --cov=data_provider --cov=bot "
+            "--cov=src --cov=api --cov=data_provider "
             "--cov-report=json:coverage.json"
         ),
         notes=notes
@@ -574,7 +574,6 @@ def run_self_tests() -> None:
                     "data_provider/mod.py": {
                         "summary": {"percent_covered": percent}
                     },
-                    "bot/mod.py": {"summary": {"percent_covered": percent}},
                 },
                 "totals": {
                     "covered_lines": int(percent * 10),
@@ -684,7 +683,7 @@ def run_self_tests() -> None:
             files={
                 "src/only.py": {"summary": {"percent_covered": 90.0}},
                 "api/only.py": {"summary": {"percent_covered": 90.0}},
-                # data_provider and bot intentionally absent
+                # data_provider intentionally absent
             },
         )
         # Keep floor low so only the package-scope check fails.
@@ -709,7 +708,7 @@ def run_self_tests() -> None:
             ("src/a.py", "api/b.py"),
             SCOPED_PACKAGES,
         )
-        if missing != ["data_provider", "bot"]:
+        if missing != ["data_provider"]:
             raise AssertionError(f"unexpected missing packages: {missing}")
         cases += 1
 
@@ -718,7 +717,6 @@ def run_self_tests() -> None:
                 "src/a.py",
                 "api/b.py",
                 "data_provider/c.py",
-                "bot/d.py",
             ),
             SCOPED_PACKAGES,
         ):
@@ -727,7 +725,7 @@ def run_self_tests() -> None:
 
         # --cov flag exact match.
         if assert_cov_flags_match_packages(
-            ["src", "api", "data_provider", "bot"],
+            ["src", "api", "data_provider"],
             SCOPED_PACKAGES,
         ):
             raise AssertionError("exact cov flags should match")
@@ -739,14 +737,14 @@ def run_self_tests() -> None:
             raise AssertionError("narrowed cov flags must fail")
         cases += 1
         if not assert_cov_flags_match_packages(
-            ["src", "api", "bot", "data_provider"],
+            ["src", "data_provider", "api"],
             SCOPED_PACKAGES,
         ):
             raise AssertionError("reordered cov flags must fail exact match")
         cases += 1
         if run_assert_cov_flags(
             baseline_path,
-            ["src", "api", "data_provider", "bot"],
+            ["src", "api", "data_provider"],
         ) != 0:
             raise AssertionError("run_assert_cov_flags should pass exact list")
         cases += 1

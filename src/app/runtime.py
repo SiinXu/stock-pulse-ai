@@ -191,7 +191,7 @@ def start_bot_stream_clients(config: Config) -> None:
     # Start the DingTalk Stream client.
     if config.dingtalk_stream_enabled:
         try:
-            from bot.platforms import start_dingtalk_stream_background, DINGTALK_STREAM_AVAILABLE
+            from src.bot.platforms import start_dingtalk_stream_background, DINGTALK_STREAM_AVAILABLE
             if DINGTALK_STREAM_AVAILABLE:
                 if start_dingtalk_stream_background():
                     logger.info("[Main] Dingtalk Stream client started in background.")
@@ -211,7 +211,7 @@ def start_bot_stream_clients(config: Config) -> None:
     # Start the Feishu Stream client.
     if getattr(config, 'feishu_stream_enabled', False):
         try:
-            from bot.platforms import start_feishu_stream_background, FEISHU_SDK_AVAILABLE
+            from src.bot.platforms import start_feishu_stream_background, FEISHU_SDK_AVAILABLE
             if FEISHU_SDK_AVAILABLE:
                 if start_feishu_stream_background():
                     logger.info("[Main] Feishu Stream client started in background.")

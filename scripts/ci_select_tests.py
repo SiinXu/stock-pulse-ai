@@ -45,10 +45,12 @@ FULL_SUITE_PREFIXES: tuple[str, ...] = (
     ".github/workflows/ci.yml",
 )
 
-# Longest-prefix path map: changed path prefix → pytest roots (dirs or files).
+# First-match path map: longer prefixes must be listed before shorter ones
+# (for example src/bot/ before src/). Changed path prefix → pytest roots.
 PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("api/", ("tests/api", "tests/test_error_envelope_contract.py")),
     ("bot/", ("tests/bot", "tests/test_notification.py", "tests/test_notification_sender.py")),
+    ("src/bot/", ("tests/bot", "tests/test_notification.py", "tests/test_notification_sender.py")),
     ("data_provider/", ("tests/data_provider",)),
     ("src/agent/", ("tests/agent", "tests/skill_opinion_outcomes")),
     ("src/services/", ("tests/services",)),

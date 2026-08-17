@@ -2,11 +2,17 @@
   "version": 1,
   "description": "Allowlisted production importers of ADR-006 legacy facade modules. New production imports must use the canonical package and must not expand this list without an explicit migration plan.",
   "facades": {
+    "bot": [],
     "src.market_sector_analysis": [
       "src/market/analyzer.py"
     ]
   },
   "catalog": {
+    "bot": {
+      "canonical": "src.bot",
+      "definition": "bot/__init__.py",
+      "importers": []
+    },
     "src.market_sector_analysis": {
       "canonical": "src.market.sector_analysis",
       "definition": "src/market_sector_analysis.py",

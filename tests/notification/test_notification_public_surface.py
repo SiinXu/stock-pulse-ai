@@ -149,7 +149,7 @@ EXPECTED_GROUPS = (
             '_send_feishu_stream_reply',
             '_send_feishu_stream_chunked',
         ),
-        '779c906e0a2fe29d5a9dac5da777900995a3f7e24667cf02eb68e216e7ebccf1',
+        '8aca63e91bdfa44267ca2bbd1cb87a9a015bc28cd579928d9d29cd813b261db4',
     ),
     (
         '_RenderingMethods',

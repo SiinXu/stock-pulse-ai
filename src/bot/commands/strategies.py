@@ -8,8 +8,8 @@ Shows all available trading strategies and their activation status.
 import logging
 from typing import List
 
-from bot.commands.base import BotCommand
-from bot.models import BotMessage, BotResponse
+from src.bot.commands.base import BotCommand
+from src.bot.models import BotMessage, BotResponse
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)

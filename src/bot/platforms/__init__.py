@@ -11,8 +11,8 @@
 2. Stream 模式：无需公网 IP，通过 WebSocket 长连接（钉钉、飞书支持）
 """
 
-from bot.platforms.base import BotPlatform
-from bot.platforms.dingtalk import DingtalkPlatform
+from src.bot.platforms.base import BotPlatform
+from src.bot.platforms.dingtalk import DingtalkPlatform
 
 # All available platforms (Webhook mode)
 ALL_PLATFORMS = {
@@ -21,7 +21,7 @@ ALL_PLATFORMS = {
 
 # DingTalk Stream mode (optional)
 try:
-    from bot.platforms.dingtalk_stream import (
+    from src.bot.platforms.dingtalk_stream import (
         DingtalkStreamClient,
         DingtalkStreamHandler,
         get_dingtalk_stream_client,
@@ -37,7 +37,7 @@ except ImportError:
 
 # Feishu Stream mode (optional)
 try:
-    from bot.platforms.feishu_stream import (
+    from src.bot.platforms.feishu_stream import (
         FeishuStreamClient,
         FeishuStreamHandler,
         FeishuReplyClient,

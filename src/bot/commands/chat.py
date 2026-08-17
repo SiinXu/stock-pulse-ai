@@ -6,8 +6,8 @@ Chat command for free-form conversation with the Agent.
 import logging
 from typing import List, Optional
 
-from bot.commands.base import BotCommand
-from bot.models import BotMessage, BotResponse, ChatType
+from src.bot.commands.base import BotCommand
+from src.bot.models import BotMessage, BotResponse, ChatType
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_MESSAGE,
     sanitize_agent_diagnostic,

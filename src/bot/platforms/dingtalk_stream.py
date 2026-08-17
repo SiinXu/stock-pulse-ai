@@ -43,7 +43,7 @@ except ImportError:
     )
     logger.warning("[DingTalk Stream] Install it with: pip install dingtalk-stream")
 
-from bot.models import BotMessage, BotResponse, ChatType
+from src.bot.models import BotMessage, BotResponse, ChatType
 
 
 class DingtalkStreamHandler:
@@ -241,7 +241,7 @@ class DingtalkStreamClient:
         """创建消息处理函数"""
 
         async def handle_message(message: BotMessage) -> BotResponse:
-            from bot.dispatcher import get_dispatcher
+            from src.bot.dispatcher import get_dispatcher
             dispatcher = get_dispatcher()
             return await dispatcher.dispatch_async(message)
 
