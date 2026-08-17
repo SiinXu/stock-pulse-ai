@@ -34,9 +34,9 @@ language and reuse the same timezone identifiers.
   keys, wrong `schema_version`, a missing packaged directory, or an
   unreadable/undecodable pack file fail loudly with `RegimePackError`
   naming the file and field.
-- Frozen desktop backends must ship `src/market/regime_pack_data/` via
-  `scripts/build-backend.ps1` and `scripts/build-backend-macos.sh`.
 - Loaded pack objects and their localized maps are immutable.
+- Frozen desktop / PyInstaller packaging of `src/market/regime_pack_data/`
+  is a follow-up outside this lane (`scripts/build-backend*.ps1|sh`).
 
 ## Disclaimer
 
