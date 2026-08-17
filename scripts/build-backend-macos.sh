@@ -102,6 +102,8 @@ hidden_imports=(
   "src.migrations"
   "src.migrations.registry"
   "src.migrations.versions"
+  "src.data_provider"
+  "src.data_provider.base"
   "alphasift"
   "alphasift.dsa_adapter"
   "orjson"
@@ -155,7 +157,7 @@ if ! "${packaged_entry}" --help >/tmp/alphasift-packaged-help.log 2>&1; then
   exit 1
 fi
 
-for module in alphasift.dsa_adapter orjson src.migrations.registry src.api.app; do
+for module in alphasift.dsa_adapter orjson src.migrations.registry src.api.app src.data_provider.base; do
   if DSA_PACKAGED_IMPORT_PROBE="${module}" "${packaged_entry}" >/tmp/dsa-packaged-import.log 2>&1; then
     cat /tmp/dsa-packaged-import.log
   else

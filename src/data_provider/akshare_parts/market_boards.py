@@ -17,7 +17,7 @@ import pandas as pd
 
 from src.utils.sanitize import log_safe_exception
 
-logger = logging.getLogger("data_provider.akshare_fetcher")
+logger = logging.getLogger("src.data_provider.akshare_fetcher")
 safe_float = None  # type: ignore[assignment]
 safe_int = None  # type: ignore[assignment]
 normalize_stock_code = None  # type: ignore[assignment]

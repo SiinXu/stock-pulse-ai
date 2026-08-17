@@ -50,6 +50,16 @@ def test_non_collectable_test_support_forces_full_suite() -> None:
     assert select_targets(["tests/services/conftest.py"]) == "FULL"
 
 
+def test_data_provider_roots_map_to_provider_tests() -> None:
+    for changed in (
+        "data_provider/__init__.py",
+        "src/data_provider/base.py",
+        "src/data_provider/akshare_parts/symbols.py",
+    ):
+        result = select_targets([changed])
+        assert result == ["tests/data_provider"], changed
+
+
 def test_docs_only_is_none() -> None:
     assert select_targets(["docs/CHANGELOG.md", "docs/FAQ.md"]) == []
 

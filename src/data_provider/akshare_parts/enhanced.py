@@ -13,7 +13,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.utils.sanitize import log_safe_exception
 
-logger = logging.getLogger("data_provider.akshare_fetcher")
+logger = logging.getLogger("src.data_provider.akshare_fetcher")
 ChipDistribution = None  # type: ignore[assignment,misc]
 get_chip_circuit_breaker = None  # type: ignore[assignment]
 _is_etf_code = None  # type: ignore[assignment]

@@ -35,7 +35,7 @@ _EXIT_METHODS = (
 
 def _infer_market_from_code(stock_code: Optional[str]) -> str:
     try:
-        from data_provider.symbol_normalization import _market_tag, normalize_stock_code
+        from src.data_provider.symbol_normalization import _market_tag, normalize_stock_code
 
         return _market_tag(normalize_stock_code(str(stock_code or "")))
     except (ImportError, TypeError, ValueError):
@@ -47,14 +47,14 @@ def _wrap_get_daily_data(original: Callable[..., Any]) -> Callable[..., Any]:
     def wrapped(self: Any, stock_code: str, *args: Any, **kwargs: Any) -> Any:
         result = original(self, stock_code, *args, **kwargs)
         try:
-            from data_provider.data_validation import is_validation_enabled
+            from src.data_provider.data_validation import is_validation_enabled
 
             if not is_validation_enabled():
                 return result
             frame = result[0] if isinstance(result, tuple) and result else result
             attrs = getattr(frame, "attrs", None)
             if not (isinstance(attrs, dict) and isinstance(attrs.get("data_validation"), dict)):
-                from data_provider.data_validation import validate_and_annotate
+                from src.data_provider.data_validation import validate_and_annotate
 
                 provider = (
                     str(result[1])
@@ -90,7 +90,7 @@ def _wrap_get_realtime_quote(original: Callable[..., Any]) -> Callable[..., Any]
         if result is None:
             return None
         try:
-            from data_provider.data_validation import (
+            from src.data_provider.data_validation import (
                 is_validation_enabled,
                 validate_and_annotate,
             )
@@ -127,7 +127,7 @@ def _wrap_get_fundamental_context(original: Callable[..., Any]) -> Callable[...,
     def wrapped(self: Any, stock_code: str, *args: Any, **kwargs: Any) -> Any:
         result = original(self, stock_code, *args, **kwargs)
         try:
-            from data_provider.data_validation import (
+            from src.data_provider.data_validation import (
                 DataValidationRejected,
                 is_validation_enabled,
                 upper_layer_rejection_enabled,

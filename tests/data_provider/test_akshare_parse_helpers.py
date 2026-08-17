@@ -124,15 +124,15 @@ def test_facade_exposes_capability_domain_methods() -> None:
     )
     for name in required:
         assert callable(getattr(AkshareFetcher, name)), name
-    assert AkshareFetcher._normalize_limit_time_value.__module__ == "data_provider.akshare_fetcher"
-    assert AkshareFetcher._fetch_raw_data.__module__ == "data_provider.akshare_fetcher"
+    assert AkshareFetcher._normalize_limit_time_value.__module__ == "src.data_provider.akshare_fetcher"
+    assert AkshareFetcher._fetch_raw_data.__module__ == "src.data_provider.akshare_fetcher"
     assert not AkshareFetcher.__abstractmethods__
 
 
 def test_facade_module_line_count_is_materially_smaller() -> None:
     from pathlib import Path
 
-    facade = Path(__file__).resolve().parents[2] / "data_provider" / "akshare_fetcher.py"
+    facade = Path(__file__).resolve().parents[2] / "src" / "data_provider" / "akshare_fetcher.py"
     lines = len(facade.read_text(encoding="utf-8").splitlines())
     assert lines < 800, lines
 

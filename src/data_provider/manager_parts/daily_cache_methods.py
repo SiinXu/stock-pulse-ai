@@ -121,7 +121,7 @@ class _DailyCacheMethods:
         source_name: str,
     ) -> pd.DataFrame:
         """Apply the active quality policy to provider and cached candidates."""
-        from data_provider.data_validation import (
+        from src.data_provider.data_validation import (
             DataValidationRejected,
             infer_instrument_type,
             validate_and_annotate,

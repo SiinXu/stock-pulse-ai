@@ -22,8 +22,8 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Any, Dict, Iterable, List, Optional, Sequence
 
-from data_provider.base import canonical_stock_code
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.base import canonical_stock_code
+from src.data_provider.us_index_mapping import is_us_stock_code
 from src.services.stock_code_utils import normalize_code
 from src.utils.sanitize import log_safe_exception
 

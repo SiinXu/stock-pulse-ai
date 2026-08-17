@@ -23,11 +23,11 @@ from data_provider.base import (
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE_PATH = ROOT / "data_provider" / "base.py"
-ERRORS_PATH = ROOT / "data_provider" / "errors.py"
-CHIP_PATH = ROOT / "data_provider" / "chip_helpers.py"
+BASE_PATH = ROOT / "src" / "data_provider" / "base.py"
+ERRORS_PATH = ROOT / "src" / "data_provider" / "errors.py"
+CHIP_PATH = ROOT / "src" / "data_provider" / "chip_helpers.py"
 CACHE_METHODS_PATH = (
-    ROOT / "data_provider" / "manager_parts" / "daily_cache_methods.py"
+    ROOT / "src" / "data_provider" / "manager_parts" / "daily_cache_methods.py"
 )
 
 
@@ -75,7 +75,7 @@ def test_daily_cache_methods_remain_on_data_fetcher_manager_facade() -> None:
     for name in required:
         method = getattr(DataFetcherManager, name)
         assert callable(method), name
-        assert method.__module__ == "data_provider.base", name
+        assert method.__module__ == "src.data_provider.base", name
         assert method.__qualname__.startswith("DataFetcherManager."), name
 
 

@@ -31,6 +31,7 @@ BASELINE_VERSION = 1
 LEGACY_FACADES: Mapping[str, str] = {
     "api": "src.api",
     "bot": "src.bot",
+    "data_provider": "src.data_provider",
     "src.market_sector_analysis": "src.market.sector_analysis",
 }
 
@@ -39,6 +40,7 @@ LEGACY_FACADES: Mapping[str, str] = {
 FACADE_DEFINITION_FILES: Mapping[str, str] = {
     "api": "api/__init__.py",
     "bot": "bot/__init__.py",
+    "data_provider": "data_provider/__init__.py",
     "src.market_sector_analysis": "src/market_sector_analysis.py",
 }
 
