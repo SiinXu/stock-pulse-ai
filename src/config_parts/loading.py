@@ -1686,8 +1686,10 @@ class _ConfigLoadingMethods:
             ),
             trading_day_check_enabled=os.getenv('TRADING_DAY_CHECK_ENABLED', 'true').lower() != 'false',
             webui_enabled=os.getenv('WEBUI_ENABLED', 'false').lower() == 'true',
-            webui_host=os.getenv('WEBUI_HOST', '127.0.0.1'),
-            webui_port=parse_env_int(os.getenv('WEBUI_PORT'), 8000, field_name='WEBUI_PORT', minimum=1, maximum=65535),
+            # Compatible with the old environment variable names; keep the same
+            # precedence as the direct `python server.py` launch path.
+            webui_host=os.getenv('WEBUI_HOST', os.getenv('API_HOST', '127.0.0.1')),
+            webui_port=parse_env_int(os.getenv('WEBUI_PORT', os.getenv('API_PORT')), 8000, field_name='WEBUI_PORT', minimum=1, maximum=65535),
             # Robot configuration
             bot_enabled=os.getenv('BOT_ENABLED', 'true').lower() == 'true',
             bot_command_prefix=os.getenv('BOT_COMMAND_PREFIX', '/'),
