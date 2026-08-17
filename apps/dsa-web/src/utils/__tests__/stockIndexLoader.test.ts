@@ -248,6 +248,27 @@ describe('stockIndexLoader', () => {
       expect(recovered.data).toEqual(mockIndexData);
       expect(mockFetch).toHaveBeenCalledTimes(2);
     });
+
+    test('retries after a synchronous fetch throw instead of caching the failed promise', async () => {
+      mockFetch
+        .mockImplementationOnce(() => {
+          throw new Error('sync fetch throw');
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockIndexData,
+        } as unknown as Response);
+
+      const failed = await loadStockIndex();
+      const recovered = await loadStockIndex();
+
+      expect(failed.loaded).toBe(false);
+      expect(failed.fallback).toBe(true);
+      expect(failed.error).toMatchObject({ message: 'sync fetch throw' });
+      expect(recovered.loaded).toBe(true);
+      expect(recovered.data).toEqual(mockIndexData);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('compressIndex - Compress index', () => {

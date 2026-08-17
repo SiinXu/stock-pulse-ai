@@ -41,37 +41,53 @@ export function resetStockIndexCacheForTests(): void {
  * @returns Index load result
  */
 export function loadStockIndex(): Promise<IndexLoadResult> {
-  return inFlight ??= (async () => {
-    try {
-      const response = await fetch('/stocks.index.json');
+  if (inFlight) {
+    return inFlight;
+  }
 
-      if (!response.ok) {
-        throw new Error(`Failed to load index: ${response.status} ${response.statusText}`);
-      }
-
-      const data: StockIndexData = await response.json();
-
-      // Uncompress format (if array format)
-      const items = isCompressedFormat(data)
-        ? unpackTuples(data as StockIndexTuple[])
-        : data as StockIndexItem[];
-
-      return {
-        data: items,
-        loaded: true,
-        fallback: false,
-      };
-    } catch (error) {
+  // Assign inFlight only after this promise exists. Do not clear the cache
+  // from a catch that can run before that assignment: a synchronous fetch()
+  // throw would then be overwritten by the failed promise and retry would
+  // stick. Drop the cache in a later then, and only if it still is this request.
+  const request = fetchAndParseStockIndex().then((result) => {
+    if (!result.loaded && inFlight === request) {
       inFlight = null;
-      console.error('[StockIndexLoader] Failed to load stock index:', error);
-      return {
-        data: [],
-        loaded: false,
-        error: error as Error,
-        fallback: true,  // Load failed, fallback to old mode
-      };
     }
-  })();
+    return result;
+  });
+  inFlight = request;
+  return request;
+}
+
+async function fetchAndParseStockIndex(): Promise<IndexLoadResult> {
+  try {
+    const response = await fetch('/stocks.index.json');
+
+    if (!response.ok) {
+      throw new Error(`Failed to load index: ${response.status} ${response.statusText}`);
+    }
+
+    const data: StockIndexData = await response.json();
+
+    // Uncompress format (if array format)
+    const items = isCompressedFormat(data)
+      ? unpackTuples(data as StockIndexTuple[])
+      : data as StockIndexItem[];
+
+    return {
+      data: items,
+      loaded: true,
+      fallback: false,
+    };
+  } catch (error) {
+    console.error('[StockIndexLoader] Failed to load stock index:', error);
+    return {
+      data: [],
+      loaded: false,
+      error: error as Error,
+      fallback: true,  // Load failed, fallback to old mode
+    };
+  }
 }
 
 /**
