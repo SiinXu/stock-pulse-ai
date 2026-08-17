@@ -104,11 +104,11 @@ from src.schemas.decision_scale import (
     score_band_metadata,
 )
 from src.schemas.report_schema import AnalysisReportSchema
-from src.market_context import detect_market, get_market_role, get_market_guidelines
+from src.market.context import detect_market, get_market_role, get_market_guidelines
 from src.services.daily_market_context import format_daily_market_context_prompt_section
-from src.market_phase_prompt import format_market_phase_prompt_section
-from src.market_structure_prompt import format_market_structure_prompt_section
-from src.market_regime_prompt import format_market_regime_prompt_section
+from src.market.phase_prompt import format_market_phase_prompt_section
+from src.market.structure_prompt import format_market_structure_prompt_section
+from src.market.regime_prompt import format_market_regime_prompt_section
 
 # A facade reload must recreate moved mutable constants, as the monolith did.
 if "__result_processing" in globals():

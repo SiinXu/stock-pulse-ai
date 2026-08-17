@@ -6,7 +6,7 @@ import unittest
 from src.agent.agents.decision_agent import DecisionAgent
 from src.agent.protocols import AgentContext
 from src.analysis_context_pack.prompt import normalize_analysis_context_pack_language
-from src.market_phase_prompt import format_market_phase_prompt_section
+from src.market.phase_prompt import format_market_phase_prompt_section
 
 
 def _phase_ctx():

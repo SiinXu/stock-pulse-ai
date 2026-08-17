@@ -16,13 +16,20 @@ from scripts.check_legacy_facade_imports import (
 )
 
 
-def test_legacy_facade_catalog_excludes_retired_analysis_context_pack_shims():
-    """Deleted analysis-context-pack facades are no longer catalogued."""
+def test_legacy_facade_catalog_excludes_all_retired_stage2_shims():
+    """Deleted analysis-context-pack and market facades are not catalogued."""
 
-    for name in (
+    retired = (
         "src.analysis_context_pack_overview",
         "src.analysis_context_pack_prompt",
-    ):
+        "src.market_analyzer",
+        "src.market_context",
+        "src.market_phase_prompt",
+        "src.market_phase_summary",
+        "src.market_regime_prompt",
+        "src.market_structure_prompt",
+    )
+    for name in retired:
         assert name not in LEGACY_FACADES
     leftover = {
         "version": BASELINE_VERSION,
@@ -30,7 +37,7 @@ def test_legacy_facade_catalog_excludes_retired_analysis_context_pack_shims():
             "src.analysis_context_pack_overview": ["src/core/pipeline.py"],
         },
     }
-    with tempfile.TemporaryDirectory(prefix="retired-acp-baseline-") as tmp:
+    with tempfile.TemporaryDirectory(prefix="retired-stage2-baseline-") as tmp:
         leftover_path = Path(tmp) / "leftover.json"
         leftover_path.write_text(json.dumps(leftover), encoding="utf-8")
         try:
@@ -38,7 +45,7 @@ def test_legacy_facade_catalog_excludes_retired_analysis_context_pack_shims():
         except BaselineError as exc:
             assert "unknown facade" in str(exc)
         else:
-            raise AssertionError("retired analysis-context-pack facade was accepted")
+            raise AssertionError("retired Stage 2 facade was accepted")
 
 
 def test_legacy_facade_catalog_excludes_retired_notification_sender_shims():

@@ -19,7 +19,7 @@ import uuid
 
 from src.config import get_config
 from src.notification import NotificationService
-from src.market_analyzer import MarketAnalyzer
+from src.market.analyzer import MarketAnalyzer
 from src.report_language import normalize_report_language
 from src.search_service import SearchService
 from src.analyzer import AnalysisResult, GeminiAnalyzer

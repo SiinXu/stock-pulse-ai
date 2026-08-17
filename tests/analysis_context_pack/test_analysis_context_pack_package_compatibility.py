@@ -66,7 +66,7 @@ EXPECTED_AST_DIGESTS = {
         "9a7eb8269f8db041abb7cf3cbf6a8beddab927c663a63b450d61978621f7b251"
     ),
     "src.analysis_context_pack.overview": (
-        "0e87c19dd6ba3c2a124f4b629aff29f70007e101a9b940db05d819016154513e"
+        "ee90a810312c561b182f5888ea70d7bd3280ac50318241d5a915851972507f50"
     ),
 }
 

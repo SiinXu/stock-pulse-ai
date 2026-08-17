@@ -11,7 +11,7 @@ from src.agent.runtime_facts import (
 )
 from src.agent.stock_scope import resolve_stock_scope
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
-from src.market_context import get_market_guidelines, get_market_role
+from src.market.context import get_market_guidelines, get_market_role
 from src.report_language import normalize_report_language
 from src.utils.sanitize import log_safe_exception
 

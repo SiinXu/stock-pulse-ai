@@ -28,7 +28,7 @@ from src.agent.provider_trace import (
     trace_model_matches,
 )
 from src.agent.runtime.lifecycle import get_default_usage_recorder
-from src.market_context import detect_market, get_market_guidelines, get_market_role
+from src.market.context import detect_market, get_market_guidelines, get_market_role
 from src.report_language import normalize_report_language
 from src.agent.what_if_scenario import build_what_if_prompt_section_from_context
 from src.services.stock_code_utils import canonicalize_analysis_stock_code

@@ -57,7 +57,7 @@ TRUSTED_LOCAL_SANITIZERS = {
     "src/llm/errors.py": {"classify_litellm_generation_param_error"},
     "src/llm/hermes.py": {"sanitize_hermes_error_text"},
     "src/llm/local_cli_backend.py": {"redact_diagnostic_text"},
-    "src/market_analyzer.py": {"_sanitize_generation_diagnostic"},
+    "src/market/analyzer.py": {"_sanitize_generation_diagnostic"},
     "src/services/intelligence_service.py": {"_sanitize_error"},
     "src/utils/sanitize.py": {
         "sanitize_diagnostic_text",
