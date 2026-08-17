@@ -52,6 +52,7 @@ const zh = {
   rolePrimary: '主源',
   roleSupplement: '补充',
   roleAttempted: '已尝试',
+  conflictValues: '冲突取值（均保留，未选定真值）',
 } as const;
 
 const en = {
@@ -106,6 +107,7 @@ const en = {
   rolePrimary: 'Primary',
   roleSupplement: 'Supplement',
   roleAttempted: 'Attempted',
+  conflictValues: 'Conflict values (kept; no source chosen as truth)',
 } as const;
 
 export type FieldTrustText = { readonly [Key in keyof typeof en]: string };

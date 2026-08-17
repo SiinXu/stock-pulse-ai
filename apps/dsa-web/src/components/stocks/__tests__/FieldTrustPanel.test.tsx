@@ -100,8 +100,10 @@ describe('FieldTrustPanel', () => {
     expect(screen.getByTestId('field-trust-fields')).toHaveTextContent('Stale');
     expect(screen.getByTestId('field-trust-fields')).toHaveTextContent('Yes');
     expect(screen.getByTestId('field-trust-gaps')).toHaveTextContent(/providers disagreed/i);
+    expect(screen.getByTestId('field-trust-conflicts')).toHaveTextContent(/efinance=1,?688/);
+    expect(screen.getByTestId('field-trust-conflicts')).toHaveTextContent(/AkshareFetcher=2,?100/);
     expect(screen.getByTestId('field-trust-provider-health')).toHaveTextContent('efinance');
-    expect(screen.queryByText('2100')).not.toBeInTheDocument();
+    expect(screen.getByTestId('field-trust-fields')).not.toHaveTextContent(/2,?100/);
   });
 
   it('renders unavailable degradation when no quote exists', () => {

@@ -249,6 +249,22 @@ export const FieldTrustPanel: React.FC<FieldTrustPanelProps> = ({
               </p>
             )
           )}
+          {view.conflicts.length > 0 ? (
+            <div data-testid="field-trust-conflicts">
+              <p className="mb-1 text-xs text-secondary-text">{text.conflictValues}</p>
+              <ul className="list-disc space-y-1 pl-5 text-sm">
+                {view.conflicts.map((conflict) => (
+                  <li key={conflict.field}>
+                    {conflict.field}
+                    {': '}
+                    {conflict.values
+                      .map((item) => `${item.provider}=${formatOptionalNumber(item.value, language, text.notAvailable)}`)
+                      .join('; ') || text.notAvailable}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
           {analysis && analysis.gaps.length > 0 ? (
             <div data-testid="field-trust-gaps">
               <p className="mb-1 text-xs text-secondary-text">{text.gaps}</p>
