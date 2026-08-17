@@ -12,12 +12,14 @@ from __future__ import annotations
 import importlib
 import importlib.abc
 import importlib.machinery
+import logging
 import sys
 
 import src.bot as _canonical
 
 _ALIAS_PREFIX = "bot"
 _CANONICAL_PREFIX = "src.bot"
+_GETLOGGER_MARK = "_stockpulse_bot_alias"
 
 
 class _ExistingModuleLoader(importlib.abc.Loader):
@@ -53,16 +55,60 @@ class _LegacyBotAliasFinder(importlib.abc.MetaPathFinder):
         return spec
 
 
+def _alias_name_for(canonical_name: str) -> str:
+    """Map ``src.bot`` / ``src.bot.*`` onto the legacy ``bot`` logger name."""
+
+    return _ALIAS_PREFIX + canonical_name[len(_CANONICAL_PREFIX) :]
+
+
 def _alias_loaded_submodules() -> None:
     """Point ``bot`` / ``bot.*`` at already-imported ``src.bot`` modules."""
 
     for name, module in list(sys.modules.items()):
         if name == _CANONICAL_PREFIX or name.startswith(_CANONICAL_PREFIX + "."):
-            sys.modules.setdefault(_ALIAS_PREFIX + name[len(_CANONICAL_PREFIX) :], module)
+            sys.modules.setdefault(_alias_name_for(name), module)
+
+
+def _alias_logger(canonical_name: str, logger: logging.Logger) -> None:
+    """Expose one ``src.bot*`` logger under the matching ``bot*`` name."""
+
+    if canonical_name != _CANONICAL_PREFIX and not canonical_name.startswith(
+        _CANONICAL_PREFIX + "."
+    ):
+        return
+    logging.Logger.manager.loggerDict.setdefault(_alias_name_for(canonical_name), logger)
+
+
+def _alias_loaded_loggers() -> None:
+    """Point ``bot.*`` logger names at already-created ``src.bot.*`` loggers."""
+
+    for name, logger in list(logging.Logger.manager.loggerDict.items()):
+        if isinstance(logger, logging.Logger):
+            _alias_logger(name, logger)
+
+
+def _install_logger_alias() -> None:
+    """Keep newly created ``src.bot.*`` loggers visible as ``bot.*``."""
+
+    if getattr(logging.Manager.getLogger, _GETLOGGER_MARK, False):
+        return
+
+    original = logging.Manager.getLogger
+
+    def getLogger(self, name):  # noqa: N802 - logging API
+        logger = original(self, name)
+        if isinstance(name, str):
+            _alias_logger(name, logger)
+        return logger
+
+    setattr(getLogger, _GETLOGGER_MARK, True)
+    logging.Manager.getLogger = getLogger
 
 
 if not any(isinstance(finder, _LegacyBotAliasFinder) for finder in sys.meta_path):
     sys.meta_path.insert(0, _LegacyBotAliasFinder())
 
+_install_logger_alias()
 _alias_loaded_submodules()
+_alias_loaded_loggers()
 sys.modules[__name__] = _canonical
