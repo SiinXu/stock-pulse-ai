@@ -63,9 +63,11 @@ DEFAULT_DB_ALERT_COOLDOWN_SECONDS = 24 * 60 * 60
 MAX_DB_ALERT_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
 ALERT_WORKER_RULE_LIMIT = 1000
 WRITABLE_TRIGGER_STATUSES = frozenset({"triggered", "skipped", "degraded", "failed"})
-# Evaluation outcomes that mean the rule's data source could not be trusted
-# this cycle (issue #1133: pause the persisted rule instead of notifying).
-DATA_FAILURE_RECORD_STATUSES = frozenset({"failed", "degraded"})
+# Hard source/evaluation errors pause a persisted single-symbol rule.
+# `degraded` is warm-up or soft unavailability (insufficient bars, empty
+# daily frame) and must keep retrying without notifying.
+PAUSE_RECORD_STATUSES = frozenset({"failed"})
+DATA_FAILURE_RECORD_STATUSES = PAUSE_RECORD_STATUSES
 
 
 @dataclass
@@ -174,7 +176,11 @@ class AlertWorker:
         monitor = EventMonitor()
         daily_cache: Dict[Any, Any] = {}
         self._analysis_visibility_cache = {}
+        paused_rule_ids: set[int] = set()
         for runtime_rule in runtime_rules:
+            already_paused_id = self._persisted_rule_id(runtime_rule, {})
+            if already_paused_id > 0 and already_paused_id in paused_rule_ids:
+                continue
             stats["evaluated"] += 1
             try:
                 result = asyncio.run(self.service._evaluate_rule(runtime_rule.rule, monitor, daily_cache=daily_cache))
@@ -217,9 +223,12 @@ class AlertWorker:
                 trigger_write = TriggerWriteResult()
                 trigger_id = None
 
-            if record_status in DATA_FAILURE_RECORD_STATUSES:
+            if record_status in PAUSE_RECORD_STATUSES:
                 if self._pause_db_rule_on_data_failure(runtime_rule, result):
                     stats["paused"] += 1
+                    paused_id = self._persisted_rule_id(runtime_rule, result)
+                    if paused_id > 0:
+                        paused_rule_ids.add(paused_id)
                 continue
 
             if record_status == "triggered":
@@ -282,21 +291,31 @@ class AlertWorker:
     ) -> bool:
         """Disable a persisted rule when evaluation data cannot be trusted.
 
-        ``skipped`` (no quote / non-trading day) is not a trust failure.
-        ``failed`` and ``degraded`` mean the source or payload is unusable, so
-        the worker pauses the rule instead of leaving it eligible to notify.
-        Expanded watchlist / portfolio-holdings children share one parent id
+        ``skipped`` and ``degraded`` keep the rule enabled so warm-up and
+        missing quotes can recover. Only ``failed`` pauses a non-expanded
+        DB rule. Watchlist / portfolio-holdings children share one parent id
         and must not pause that parent on a single-symbol data failure.
         """
         if runtime_rule.source != "db":
+            return False
+        if str(result.get("record_status") or "") not in PAUSE_RECORD_STATUSES:
             return False
         if self._is_expanded_batch_child(runtime_rule):
             return False
         rule_id = self._persisted_rule_id(runtime_rule, result)
         if rule_id <= 0:
             return False
+        policy = dict(runtime_rule.notification_policy or {})
+        policy["paused_reason"] = "data_failure"
+        policy["paused_record_status"] = "failed"
         try:
-            self.service.enable_rule(rule_id, False)
+            self.service.repo.update_rule(
+                rule_id,
+                {
+                    "enabled": False,
+                    "notification_policy": self.service._dump_json_or_none(policy),
+                },
+            )
         except Exception as exc:  # broad-exception: fallback_recorded - isolate pause failure
             log_safe_exception(
                 logger,

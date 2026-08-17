@@ -1255,13 +1255,13 @@ class AlertWorkerTestCase(unittest.TestCase):
             second = worker.run_once()
 
         self.assertEqual(first["recorded"], 3)
-        self.assertEqual(first["paused"], 2)
-        # skipped is not a trust failure, so it stays enabled and is not
-        # history-deduplicated. failed/degraded pause the persisted rule.
-        self.assertEqual(second["recorded"], 1)
-        self.assertEqual(second["loaded"], 1)
+        self.assertEqual(first["paused"], 1)
+        # skipped/degraded stay enabled and are not history-deduplicated.
+        # Only failed pauses the persisted single-symbol rule.
+        self.assertEqual(second["recorded"], 2)
+        self.assertEqual(second["loaded"], 2)
         self.assertEqual(len(self._triggers(status="skipped")), 2)
-        self.assertEqual(len(self._triggers(status="degraded")), 1)
+        self.assertEqual(len(self._triggers(status="degraded")), 2)
         self.assertEqual(len(self._triggers(status="failed")), 1)
 
     def test_technical_indicator_insufficient_data_writes_degraded_trigger(self) -> None:
@@ -1290,12 +1290,14 @@ class AlertWorkerTestCase(unittest.TestCase):
             stats = worker.run_once()
 
         self.assertEqual(stats["degraded"], 1)
+        self.assertEqual(stats["paused"], 0)
         triggers = self._triggers(rule_id=rule["id"], status="degraded")
         self.assertEqual(len(triggers), 1)
         self.assertEqual(triggers[0]["target"], "600519")
         self.assertIn("insufficient data: need 21 bars, got 3", triggers[0]["diagnostics"])
         manager.get_daily_data.assert_called_once_with("600519", days=63)
         notifier.send_with_results.assert_not_called()
+        self.assertTrue(self.service.get_rule(rule["id"])["enabled"])
 
     def test_technical_indicator_fetch_exception_writes_failed_trigger(self) -> None:
         self._create_rule(

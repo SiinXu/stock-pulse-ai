@@ -136,12 +136,15 @@ Successful compiles produce a structured IR with `symbol`, `metric`, `comparator
 `threshold`, and optional `cooldown` (seconds). An explicit clause such as
 `cooldown 30 minutes` / `冷却 1 小时` is stripped before threshold parsing and
 written to `cooldown_policy.cooldown_seconds`. Ambiguous cooldown mentions return
-`need_clarification`. The compiler never evaluates the input as code.
+`need_clarification`. Non-positive cooldown durations are rejected. The compiler
+never evaluates the input as code.
 
-When a persisted monitor later evaluates as `failed` or `degraded` (data source or
-untrusted payload), `AlertWorker` pauses the rule (`enabled=false`) and does not
-notify. A `failed` or `degraded` result on one expanded watchlist or
-portfolio-holdings symbol does not pause the parent rule, so sibling symbols stay
-eligible. `skipped` (no quote / non-trading day) is not a trust failure and does
-not pause the rule. This path reuses the existing evaluator `record_status`
-contract and does not introduce a second trust model.
+When a persisted single-symbol monitor later evaluates as `failed` (source or
+evaluation error), `AlertWorker` pauses the rule (`enabled=false`), writes
+`notification_policy.paused_reason=data_failure`, and does not notify. `degraded`
+(warm-up / insufficient bars / empty daily frame) and `skipped` (no quote /
+non-trading day) do not pause the rule and do not notify. A `failed` result on one
+expanded watchlist or portfolio-holdings symbol does not pause the parent. After a
+successful pause, remaining same-cycle expansions of that rule id are skipped.
+This path reuses the existing evaluator `record_status` contract and does not
+introduce a second trust model.

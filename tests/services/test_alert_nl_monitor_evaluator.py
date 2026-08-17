@@ -6,9 +6,12 @@ from __future__ import annotations
 import os
 import tempfile
 import unittest
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pandas as pd
 
 from src.config import Config
 from src.notification import ChannelAttemptResult, NotificationDispatchResult
@@ -156,6 +159,8 @@ class AlertNlMonitorEvaluatorTestCase(unittest.TestCase):
         notifier.send_with_results.assert_not_called()
         paused = self.service.get_rule(created["id"])
         self.assertFalse(paused["enabled"])
+        self.assertEqual(paused["notification_policy"]["paused_reason"], "data_failure")
+        self.assertEqual(paused["notification_policy"]["paused_record_status"], "failed")
 
         second = worker.run_once()
         self.assertEqual(second["loaded"], 0)
@@ -183,7 +188,7 @@ class AlertNlMonitorEvaluatorTestCase(unittest.TestCase):
         still_enabled = self.service.get_rule(created["id"])
         self.assertTrue(still_enabled["enabled"])
 
-    def test_degraded_daily_data_pauses_rule_instead_of_notifying(self) -> None:
+    def test_degraded_daily_data_does_not_pause_or_notify(self) -> None:
         created = self._persist_compiled("300750 成交量异动 2.5倍")
         notifier = self._notifier()
         manager = MagicMock()
@@ -204,9 +209,43 @@ class AlertNlMonitorEvaluatorTestCase(unittest.TestCase):
             stats = worker.run_once()
 
         self.assertEqual(stats["degraded"], 1)
-        self.assertEqual(stats["paused"], 1)
+        self.assertEqual(stats["paused"], 0)
         self.assertEqual(stats["notified"], 0)
         notifier.send_with_results.assert_not_called()
-        paused = self.service.get_rule(created["id"])
-        self.assertFalse(paused["enabled"])
-        self.assertEqual(paused["alert_type"], "volume_spike")
+        still_enabled = self.service.get_rule(created["id"])
+        self.assertTrue(still_enabled["enabled"])
+        self.assertEqual(still_enabled["alert_type"], "volume_spike")
+
+    def test_compiled_rsi_short_history_stays_enabled(self) -> None:
+        created = self._persist_compiled("AAPL RSI above 70")
+        notifier = self._notifier()
+        manager = MagicMock()
+        manager.get_daily_data.return_value = (
+            pd.DataFrame({
+                "date": [date(2026, 5, 13), date(2026, 5, 14), date(2026, 5, 15)],
+                "close": [10, 9, 12],
+            }),
+            "unit-test",
+        )
+
+        async def _run_inline(func, *args, **kwargs):
+            return func(*args, **kwargs)
+
+        worker = AlertWorker(
+            config_provider=lambda: self._config(),
+            service=self.service,
+            notifier=notifier,
+        )
+        with patch("data_provider.DataFetcherManager", return_value=manager), patch(
+            "src.services.alert_service.asyncio.to_thread",
+            new=_run_inline,
+        ):
+            stats = worker.run_once()
+
+        self.assertEqual(stats["degraded"], 1)
+        self.assertEqual(stats["paused"], 0)
+        self.assertEqual(stats["notified"], 0)
+        notifier.send_with_results.assert_not_called()
+        still_enabled = self.service.get_rule(created["id"])
+        self.assertTrue(still_enabled["enabled"])
+        self.assertEqual(still_enabled["alert_type"], "rsi_threshold")

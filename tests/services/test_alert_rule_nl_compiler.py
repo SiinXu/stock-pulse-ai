@@ -119,6 +119,12 @@ class TestAlertRuleNlCompiler:
         assert result.rejected_reason == "unsupported_metric"
         assert "supported monitor metric" in result.message.lower()
 
+    def test_reject_non_positive_cooldown(self) -> None:
+        result = compile_alert_rule_nl("AAPL price above 200 cooldown 0 seconds")
+        assert result.outcome == "rejected"
+        assert result.rejected_reason == "invalid_parameters"
+        assert "at least 1 second" in result.message
+
     def test_reject_cooldown_above_worker_maximum(self) -> None:
         assert _MAX_COOLDOWN_SECONDS == MAX_DB_ALERT_COOLDOWN_SECONDS
         result = compile_alert_rule_nl("AAPL price above 200 cooldown 366 days")

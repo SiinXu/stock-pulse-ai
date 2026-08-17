@@ -568,10 +568,12 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 成功编译会产出结构化 IR：`symbol` / `metric` / `comparator` / `threshold` / 可选
 `cooldown`（秒）。`cooldown 30 minutes` / `冷却 1 小时` 这类子句会先从短语中剥离，
 再写入 `cooldown_policy.cooldown_seconds`，避免冷却数字被当成阈值。冷却被提到但
-无法解析时长时返回 `need_clarification`。编译器不会把输入当代码执行。
+无法解析时长时返回 `need_clarification`。非正冷却时长会被拒绝。编译器不会把输入
+当代码执行。
 
-持久化规则后续评估为 `failed` 或 `degraded`（数据源或载荷不可信）时，`AlertWorker`
-会暂停该规则（`enabled=false`）且不发送通知。自选股 / 持仓展开后的单个标的出现
-`failed` 或 `degraded` 时，不会暂停父规则，同组其他标的仍可继续评估。`skipped`
-（无行情 / 非交易日）不是 trust 失败，不会暂停规则。该路径复用现有 evaluator 的
-`record_status`，不另建一套 trust 模型。
+持久化单标的规则后续评估为 `failed`（数据源或评估异常）时，`AlertWorker` 会暂停
+该规则（`enabled=false`），写入 `notification_policy.paused_reason=data_failure`，
+且不发送通知。`degraded`（热身 / 历史不足 / 空日线）和 `skipped`（无行情 / 非交易日）
+不暂停、不通知。自选股 / 持仓展开后的单个标的 `failed` 不会暂停父规则。同一轮里
+某规则已被暂停后，其余展开项会被跳过。该路径复用现有 evaluator 的 `record_status`，
+不另建一套 trust 模型。

@@ -114,6 +114,11 @@ def _extract_cooldown_clause(source: str) -> _CooldownClause:
         seconds = value * unit_seconds
         if not math.isfinite(seconds):
             return _CooldownClause(source, reject_message="cooldown duration must be finite")
+        if seconds <= 0:
+            return _CooldownClause(
+                source,
+                reject_message="cooldown duration must be at least 1 second",
+            )
         if seconds > _MAX_COOLDOWN_SECONDS:
             return _CooldownClause(
                 source,
