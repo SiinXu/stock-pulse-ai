@@ -23,7 +23,7 @@ if TYPE_CHECKING:
     from .plugin_registry import DataProviderRegistration
 
 
-logger = logging.getLogger("data_provider.base")
+logger = logging.getLogger("src.data_provider.base")
 
 
 # ``importlib.reload`` retains a module dictionary. Preserve the callback

@@ -12,7 +12,7 @@ from data_provider.base import DataFetcherManager
 
 
 ROOT = Path(__file__).resolve().parents[2]
-BASE_PATH = ROOT / "data_provider" / "base.py"
+BASE_PATH = ROOT / "src" / "data_provider" / "base.py"
 
 
 def test_base_module_has_no_module_level_run_diagnostics_import() -> None:

@@ -1,0 +1,1 @@
+- [Changed] Move the data_provider package to src/data_provider and keep the historical import root working through a compatibility alias (Refs #167).

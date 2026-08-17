@@ -61,6 +61,8 @@ COPY src/ ./src/
 # README.md and LICENSE are referenced by PEP 621 metadata in pyproject.toml.
 COPY pyproject.toml README.md LICENSE ./
 RUN PIP_BUILD_CONSTRAINT=build-constraints.txt pip install -e . --no-deps
+# Compatibility alias COPY above stays; implementation is under src/data_provider.
+RUN DSA_PACKAGED_IMPORT_PROBE=src.data_provider.base python main.py
 COPY strategies/ ./strategies/
 COPY --from=web-builder /app/static ./static/
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh

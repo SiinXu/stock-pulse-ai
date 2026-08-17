@@ -3,23 +3,23 @@
   "description": "Allowlisted reverse layer-import edges (module-level imports only). New reverse edges are banned; shrink this list after breaking a dependency and running --write-baseline. Growth is refused. Never raise hard_ceiling to green CI \u2014 fix the reverse import.",
   "rules": [
     [
-      "data_provider",
+      "src.data_provider",
       "src.services"
     ],
     [
-      "data_provider",
+      "src.data_provider",
       "api"
     ],
     [
-      "data_provider",
+      "src.data_provider",
       "src.api"
     ],
     [
-      "data_provider",
+      "src.data_provider",
       "src.core"
     ],
     [
-      "data_provider",
+      "src.data_provider",
       "src.agent"
     ],
     [
@@ -71,21 +71,6 @@
   "exception_count": 12,
   "exceptions": [
     {
-      "path": "data_provider/futu_position_fetcher.py",
-      "from_package": "data_provider",
-      "to_package": "src.services"
-    },
-    {
-      "path": "data_provider/symbol_normalization.py",
-      "from_package": "data_provider",
-      "to_package": "src.services"
-    },
-    {
-      "path": "data_provider/yfinance_fetcher.py",
-      "from_package": "data_provider",
-      "to_package": "src.services"
-    },
-    {
       "path": "src/core/pipeline.py",
       "from_package": "src.core",
       "to_package": "src.services"
@@ -128,6 +113,21 @@
     {
       "path": "src/core/stages/persistence.py",
       "from_package": "src.core",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/data_provider/futu_position_fetcher.py",
+      "from_package": "src.data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/data_provider/symbol_normalization.py",
+      "from_package": "src.data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/data_provider/yfinance_fetcher.py",
+      "from_package": "src.data_provider",
       "to_package": "src.services"
     }
   ],

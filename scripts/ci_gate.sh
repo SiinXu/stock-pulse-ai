@@ -32,7 +32,7 @@ syntax_check() {
   python -m py_compile src/storage.py src/scheduler.py src/search_service.py
   python -m py_compile src/migrations/*.py src/migrations/versions/*.py
   python -m py_compile src/market/analyzer.py src/stock_analyzer.py
-  python -m py_compile data_provider/*.py
+  python -m py_compile src/data_provider/*.py
 }
 
 flake8_checks() {

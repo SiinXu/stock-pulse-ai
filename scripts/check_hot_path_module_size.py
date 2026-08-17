@@ -23,7 +23,7 @@ oversized modules and fails closed on growth:
 **refuses growth**. Do not raise budgets or ceilings to green CI — split the
 module instead.
 
-Scopes (issue #1087): ``data_provider/``, ``src/services/``, ``src/agent/``,
+Scopes (issue #1087): ``src/data_provider/``, ``src/services/``, ``src/agent/``,
 ``src/market/``.
 
 See: docs/hot-path-module-size-ratchet.md,
@@ -49,7 +49,7 @@ SOFT_BUDGET_LINES = 1500
 EXTRACTION_PREFERENCE_LINES = 2000
 
 HOT_PATH_SCOPES: tuple[str, ...] = (
-    "data_provider",
+    "src/data_provider",
     "src/services",
     "src/agent",
     "src/market",
@@ -232,7 +232,7 @@ def serialize_baseline(
                 f"(soft review budget is {SOFT_BUDGET_LINES})."
             ),
             (
-                "Priority gravity modules at introduction: data_provider/base.py, "
+                "Priority gravity modules at introduction: src/data_provider/base.py, "
                 "src/services/run_diagnostics.py, "
                 "src/services/scheduled_task_service.py, src/market/analyzer.py."
             ),

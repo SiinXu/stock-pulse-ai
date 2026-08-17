@@ -6,7 +6,7 @@
 Enforces the directed dependency shape from issue #1082:
 
 ```text
-api → services → pipeline/stages → data_provider
+api → services → pipeline/stages → src.data_provider
 ```
 
 and keeps lower layers from reaching the HTTP transport (``api``).
@@ -50,11 +50,11 @@ DEFAULT_BASELINE = ROOT / "scripts" / "layer_direction_baseline.json"
 BASELINE_VERSION = 1
 
 FORBIDDEN_RULES: Tuple[Tuple[str, str], ...] = (
-    ("data_provider", "src.services"),
-    ("data_provider", "api"),
-    ("data_provider", "src.api"),
-    ("data_provider", "src.core"),
-    ("data_provider", "src.agent"),
+    ("src.data_provider", "src.services"),
+    ("src.data_provider", "api"),
+    ("src.data_provider", "src.api"),
+    ("src.data_provider", "src.core"),
+    ("src.data_provider", "src.agent"),
     ("src.services", "api"),
     ("src.services", "src.api"),
     ("src.core", "api"),
@@ -224,9 +224,9 @@ def serialize_baseline(edges: Sequence[Edge], hard_ceiling: int) -> str:
         ],
         "cleanup_plan": [
             (
-                "data_provider → src.services: move market/symbol helpers used by "
+                "src.data_provider → src.services: move market/symbol helpers used by "
                 "providers into a leaf module (for example src.utils or "
-                "data_provider-local) so providers no longer import services."
+                "src.data_provider-local) so providers no longer import services."
             ),
             (
                 "src.core pipeline/stages → src.services: inject service ports from "
@@ -280,7 +280,7 @@ def collect_violations(root: Path, baseline_path: Path) -> list[Violation]:
                 to_package=to_package,
                 message=(
                     "new reverse layer import is banned (api → services → "
-                    "pipeline/stages → data_provider); extract a leaf utility "
+                    "pipeline/stages → src.data_provider); extract a leaf utility "
                     "or invert the dependency. Do not expand the baseline to "
                     "green CI"
                 ),
@@ -351,14 +351,14 @@ def run_self_tests() -> None:
         root = Path(tmp)
         (root / "src" / "services").mkdir(parents=True)
         (root / "src" / "core" / "stages").mkdir(parents=True)
-        (root / "data_provider").mkdir(parents=True)
+        (root / "src" / "data_provider").mkdir(parents=True)
         (root / "api").mkdir(parents=True)
         (root / "scripts").mkdir()
 
         (root / "src" / "services" / "svc.py").write_text(
             "VALUE = 1\n", encoding="utf-8"
         )
-        (root / "data_provider" / "fetcher.py").write_text(
+        (root / "src" / "data_provider" / "fetcher.py").write_text(
             "from src.services.svc import VALUE\n", encoding="utf-8"
         )
         (root / "src" / "core" / "pipeline.py").write_text(
@@ -370,7 +370,7 @@ def run_self_tests() -> None:
 
         edges = scan_reverse_edges(root)
         expected = {
-            ("data_provider/fetcher.py", "data_provider", "src.services"),
+            ("src/data_provider/fetcher.py", "src.data_provider", "src.services"),
             ("src/core/pipeline.py", "src.core", "src.services"),
         }
         if set(edges) != expected:
@@ -385,12 +385,12 @@ def run_self_tests() -> None:
             raise AssertionError("clean tree produced violations")
         cases += 1
 
-        (root / "data_provider" / "other.py").write_text(
+        (root / "src" / "data_provider" / "other.py").write_text(
             "from src.services.svc import VALUE\n", encoding="utf-8"
         )
         violations = collect_violations(root, baseline_path)
         if not any(
-            item.rule == "new-reverse-edge" and item.path == "data_provider/other.py"
+            item.rule == "new-reverse-edge" and item.path == "src/data_provider/other.py"
             for item in violations
         ):
             raise AssertionError(f"new reverse edge not rejected: {violations!r}")
@@ -400,8 +400,8 @@ def run_self_tests() -> None:
             raise AssertionError("write-baseline accepted growth")
         cases += 1
 
-        (root / "data_provider" / "other.py").unlink()
-        (root / "data_provider" / "fetcher.py").write_text("VALUE = 0\n", encoding="utf-8")
+        (root / "src" / "data_provider" / "other.py").unlink()
+        (root / "src" / "data_provider" / "fetcher.py").write_text("VALUE = 0\n", encoding="utf-8")
         if write_baseline(root, baseline_path) != 0:
             raise AssertionError("write-baseline rejected legitimate shrink")
         loaded = load_baseline(baseline_path)
@@ -409,13 +409,13 @@ def run_self_tests() -> None:
             raise AssertionError(f"baseline not shrunk: {loaded!r}")
         cases += 1
 
-        (root / "data_provider" / "fetcher.py").write_text(
+        (root / "src" / "data_provider" / "fetcher.py").write_text(
             "def load():\n"
             "    from src.services.svc import VALUE\n"
             "    return VALUE\n",
             encoding="utf-8",
         )
-        if any(edge[0] == "data_provider/fetcher.py" for edge in scan_reverse_edges(root)):
+        if any(edge[0] == "src/data_provider/fetcher.py" for edge in scan_reverse_edges(root)):
             raise AssertionError("function-body import treated as reverse edge")
         cases += 1
 

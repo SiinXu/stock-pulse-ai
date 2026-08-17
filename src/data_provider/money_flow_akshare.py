@@ -19,12 +19,12 @@ from typing import Any, Callable, Dict, Optional
 import pandas as pd
 import requests
 
-from data_provider.money_flow_types import (
+from src.data_provider.money_flow_types import (
     EASTMONEY_EM_ORDER_BUCKET_DEFINITION,
     MoneyFlowSnapshot,
     validate_history_days,
 )
-from data_provider.symbol_normalization import (
+from src.data_provider.symbol_normalization import (
     _is_hk_market,
     _is_jp_market,
     _is_kr_market,
@@ -187,7 +187,7 @@ def fetch_akshare_individual_money_flow(
         import akshare as ak_module  # type: ignore
 
     if timeout_runner is None:
-        from data_provider.retry_policy import call_with_timeout
+        from src.data_provider.retry_policy import call_with_timeout
 
         timeout_runner = call_with_timeout
 

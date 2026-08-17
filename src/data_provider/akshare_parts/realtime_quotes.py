@@ -18,7 +18,7 @@ import requests
 
 from src.utils.sanitize import log_safe_exception
 
-logger = logging.getLogger("data_provider.akshare_fetcher")
+logger = logging.getLogger("src.data_provider.akshare_fetcher")
 USER_AGENTS = []  # type: ignore[assignment]
 SINA_REALTIME_ENDPOINT = ""
 TENCENT_REALTIME_ENDPOINT = ""

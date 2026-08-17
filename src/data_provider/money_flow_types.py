@@ -126,7 +126,7 @@ class MoneyFlowSnapshot:
     completeness: str = "partial"
 
     def __post_init__(self) -> None:
-        from data_provider.symbol_normalization import normalize_stock_code
+        from src.data_provider.symbol_normalization import normalize_stock_code
 
         self.code = normalize_stock_code(self.code)
         if not (self.code.isdigit() and len(self.code) == 6 and self.market == "cn"):
@@ -235,7 +235,7 @@ class MoneyFlowOutcome:
     warnings: list[str] = field(default_factory=list)
 
     def __post_init__(self) -> None:
-        from data_provider.symbol_normalization import normalize_stock_code
+        from src.data_provider.symbol_normalization import normalize_stock_code
 
         try:
             self.status = MoneyFlowStatus(self.status)
