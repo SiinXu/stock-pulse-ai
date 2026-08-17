@@ -128,7 +128,7 @@ pushd "${ROOT_DIR}" >/dev/null
 # setuptools>=82 removed pkg_resources; PyInstaller's pyi_rth_pkgres still expects
 # NullProvider and crashes the frozen backend at startup. Exclude the module so the
 # obsolete runtime hook is not collected (app code uses importlib, not pkg_resources).
-cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --exclude-module pkg_resources --add-data "static:static" --add-data "strategies:strategies" --add-data "src/llm/local_model_catalog.json:src/llm" --add-data "src/migrations/versions/*.py:src/migrations/versions" --add-data "constraints.txt:." --add-data "build-constraints.txt:." --collect-data litellm --collect-data tiktoken --collect-data akshare)
+cmd=("${PYTHON_BIN}" -m PyInstaller --name stock_analysis --onedir --noconfirm --noconsole --exclude-module pkg_resources --add-data "static:static" --add-data "strategies:strategies" --add-data "src/llm/local_model_catalog.json:src/llm" --add-data "src/market/regime_pack_data:src/market/regime_pack_data" --add-data "src/migrations/versions/*.py:src/migrations/versions" --add-data "constraints.txt:." --add-data "build-constraints.txt:." --collect-data litellm --collect-data tiktoken --collect-data akshare)
 cmd+=("--collect-all" "alphasift")
 cmd+=("${hidden_import_args[@]}" "main.py")
 
@@ -190,6 +190,28 @@ if ! cmp -s "${ROOT_DIR}/src/llm/local_model_catalog.json" "${packaged_local_mod
   echo "ERROR: packaged local model catalog differs from the authoritative source."
   exit 1
 fi
+
+log "Verifying packaged trading-regime packs..."
+packaged_regime_pack_dir="${packaged_root}/_internal/src/market/regime_pack_data"
+if [[ ! -d "${packaged_regime_pack_dir}" ]]; then
+  packaged_regime_pack_dir="${packaged_root}/src/market/regime_pack_data"
+fi
+if [[ ! -d "${packaged_regime_pack_dir}" ]]; then
+  echo "ERROR: packaged trading-regime pack directory not found under ${packaged_root}."
+  exit 1
+fi
+for pack_name in cn.yaml hk.yaml us.yaml crypto.yaml; do
+  packaged_pack="${packaged_regime_pack_dir}/${pack_name}"
+  source_pack="${ROOT_DIR}/src/market/regime_pack_data/${pack_name}"
+  if [[ ! -f "${packaged_pack}" ]]; then
+    echo "ERROR: packaged trading-regime pack not found: ${pack_name}."
+    exit 1
+  fi
+  if ! cmp -s "${source_pack}" "${packaged_pack}"; then
+    echo "ERROR: packaged trading-regime pack differs from source: ${pack_name}."
+    exit 1
+  fi
+done
 
 log "Verifying packaged AkShare calendar data..."
 packaged_akshare_calendar="${packaged_root}/_internal/akshare/file_fold/calendar.json"

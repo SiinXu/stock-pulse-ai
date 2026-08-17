@@ -83,6 +83,32 @@ class DesktopPackagingAssetsTestCase(unittest.TestCase):
         self.assertIn("-name 'v*.py'", macos_script)
         self.assertIn("-Filter 'v*.py'", windows_script)
 
+    def test_scripts_bundle_and_verify_trading_regime_packs(self) -> None:
+        macos_script = (self.repo_root / "scripts" / "build-backend-macos.sh").read_text(
+            encoding="utf-8"
+        )
+        windows_script = (self.repo_root / "scripts" / "build-backend.ps1").read_text(
+            encoding="utf-8"
+        )
+        pack_dir = self.repo_root / "src" / "market" / "regime_pack_data"
+
+        self.assertIn(
+            '--add-data "src/market/regime_pack_data:src/market/regime_pack_data"',
+            macos_script,
+        )
+        self.assertIn(
+            "'--add-data', 'src/market/regime_pack_data;src/market/regime_pack_data'",
+            windows_script,
+        )
+        self.assertIn("Verifying packaged trading-regime packs", macos_script)
+        self.assertIn("Verifying packaged trading-regime packs", windows_script)
+        self.assertIn("_internal/src/market/regime_pack_data", macos_script)
+        self.assertIn("_internal\\src\\market\\regime_pack_data", windows_script)
+        for pack_name in ("cn.yaml", "hk.yaml", "us.yaml", "crypto.yaml"):
+            self.assertTrue((pack_dir / pack_name).is_file(), pack_name)
+            self.assertIn(pack_name, macos_script)
+            self.assertIn(pack_name, windows_script)
+
 
 if __name__ == "__main__":
     unittest.main()
