@@ -57,6 +57,10 @@ COPY api/ ./api/
 COPY data_provider/ ./data_provider/
 COPY bot/ ./bot/
 COPY src/ ./src/
+# ADR-012: editable install after the four import roots are on disk.
+# README.md and LICENSE are referenced by PEP 621 metadata in pyproject.toml.
+COPY pyproject.toml README.md LICENSE ./
+RUN PIP_BUILD_CONSTRAINT=build-constraints.txt pip install -e . --no-deps
 COPY strategies/ ./strategies/
 COPY --from=web-builder /app/static ./static/
 COPY docker/entrypoint.sh /usr/local/bin/docker-entrypoint.sh
