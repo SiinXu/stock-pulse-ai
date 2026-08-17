@@ -1,0 +1,1 @@
+- [Changed] Converge Agent tool execution through `src/agent/tools/surface.py` (registry → ToolSurface authz/timeout/audit → handler) with a new-tool checklist and bypass tests (Refs #1077).

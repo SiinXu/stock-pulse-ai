@@ -439,6 +439,7 @@ class ToolRegistry:
 
         registry = ToolRegistry()
         registry.register(tool_def)
+        from src.agent.tools.surface import ToolSurface
         ToolSurface(registry).execute_tool(
             "get_realtime_quote",
             {"stock_code": "600519"},
