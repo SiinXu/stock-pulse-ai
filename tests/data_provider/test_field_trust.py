@@ -53,11 +53,13 @@ def _make_quote(
     )
 
 
-def _mock_config(*, ttl: int = 600):
+def _mock_config(*, ttl: int = 600, validation_enabled: bool = True):
     return SimpleNamespace(
         enable_realtime_quote=True,
         realtime_source_priority="efinance,akshare_em",
         realtime_cache_ttl=ttl,
+        data_validation_enabled=validation_enabled,
+        data_validation_strict=False,
     )
 
 
@@ -215,7 +217,7 @@ def test_validation_disabled_records_skipped_conflict_check(
     mock_get_config, validation_disabled
 ):
     """A skipped comparison must not imply agreement between providers."""
-    mock_get_config.return_value = _mock_config()
+    mock_get_config.return_value = _mock_config(validation_enabled=False)
     primary = _make_quote(source=RealtimeSource.EFINANCE)
     supplement = _make_quote(source=RealtimeSource.AKSHARE_EM, pe_ratio=25.5)
     manager = DataFetcherManager(

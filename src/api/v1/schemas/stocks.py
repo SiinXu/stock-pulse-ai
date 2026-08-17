@@ -419,6 +419,17 @@ class StockFieldTrustResponse(BaseModel):
             return self
         if not self.metadata_present and self.status == "ok":
             raise ValueError("trust view without metadata must not report ok")
+        analysis = self.analysis_input
+        analysis_degraded = bool(
+            analysis is not None
+            and (
+                analysis.confidence != "high"
+                or analysis.gaps
+                or analysis.conflict_count > 0
+                or analysis.failed_provider_count > 0
+            )
+        )
+        health_degraded = any(row.status != "ok" for row in self.provider_health)
         degraded_signals = (
             any(
                 entry.staleness != "fresh" or entry.conflict or entry.source is None
@@ -426,6 +437,9 @@ class StockFieldTrustResponse(BaseModel):
             )
             or bool(self.conflicts)
             or not self.fields
+            or self.fallback_from is not None
+            or health_degraded
+            or analysis_degraded
         )
         if self.status == "ok" and degraded_signals:
             raise ValueError("ok trust view must not contain degraded field verdicts")

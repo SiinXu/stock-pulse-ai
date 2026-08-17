@@ -2097,43 +2097,34 @@ class DataFetcherManager:
                         try:
                             from src.data_provider.data_validation import (
                                 compare_cross_source_quotes,
-                                is_validation_enabled,
                             )
 
                             primary_source = getattr(primary_quote, "source", None)
                             primary_provider = getattr(
                                 primary_source, "value", primary_source
                             ) or "primary"
-                            if is_validation_enabled():
-                                cross_result = compare_cross_source_quotes(
-                                    primary_quote,
-                                    quote,
-                                    primary_provider=str(primary_provider),
-                                    secondary_provider=str(provider_name),
-                                    market=_market_tag(
-                                        normalize_stock_code(stock_code)
-                                    ),
-                                    stock_code=stock_code,
-                                    asset_type=getattr(
-                                        primary_quote, "instrument_type", None
-                                    ),
-                                )
-                                # Issue #1129: surface divergences as
-                                # field-level conflicts on the merged quote.
-                                _field_trust.record_cross_source_result(
-                                    primary_quote,
-                                    cross_result,
-                                    primary_provider=primary_provider,
-                                    secondary_provider=provider_name,
-                                )
-                            else:
-                                _field_trust.record_conflict_check(
-                                    primary_quote,
-                                    primary_provider=primary_provider,
-                                    secondary_provider=provider_name,
-                                    status=_field_trust.CONFLICT_CHECK_SKIPPED,
-                                    reason="validation_disabled",
-                                )
+                            # compare_cross_source_quotes already no-ops when
+                            # validation is disabled; record that skip instead
+                            # of implying agreement.
+                            cross_result = compare_cross_source_quotes(
+                                primary_quote,
+                                quote,
+                                primary_provider=str(primary_provider),
+                                secondary_provider=str(provider_name),
+                                market=_market_tag(
+                                    normalize_stock_code(stock_code)
+                                ),
+                                stock_code=stock_code,
+                                asset_type=getattr(
+                                    primary_quote, "instrument_type", None
+                                ),
+                            )
+                            _field_trust.record_cross_source_result(
+                                primary_quote,
+                                cross_result,
+                                primary_provider=primary_provider,
+                                secondary_provider=provider_name,
+                            )
                         except Exception as cross_exc:  # broad-exception: fallback_recorded - observational only
                             log_safe_exception(
                                 logger,
@@ -2383,41 +2374,32 @@ class DataFetcherManager:
                     try:
                         from src.data_provider.data_validation import (
                             compare_cross_source_quotes,
-                            is_validation_enabled,
                         )
 
                         primary_source = getattr(primary_quote, "source", None)
                         primary_provider = getattr(
                             primary_source, "value", primary_source
                         ) or "primary"
-                        if is_validation_enabled():
-                            cross_result = compare_cross_source_quotes(
-                                primary_quote,
-                                secondary,
-                                primary_provider=str(primary_provider),
-                                secondary_provider=str(fetcher_name),
-                                market=_market_tag(normalize_stock_code(stock_code)),
-                                stock_code=stock_code,
-                                asset_type=getattr(
-                                    primary_quote, "instrument_type", None
-                                ),
-                            )
-                            # Issue #1129: surface divergences as field-level
-                            # conflicts instead of discarding the result.
-                            _field_trust.record_cross_source_result(
-                                primary_quote,
-                                cross_result,
-                                primary_provider=primary_provider,
-                                secondary_provider=fetcher_name,
-                            )
-                        else:
-                            _field_trust.record_conflict_check(
-                                primary_quote,
-                                primary_provider=primary_provider,
-                                secondary_provider=fetcher_name,
-                                status=_field_trust.CONFLICT_CHECK_SKIPPED,
-                                reason="validation_disabled",
-                            )
+                        # compare_cross_source_quotes already no-ops when
+                        # validation is disabled; record that skip instead
+                        # of implying agreement.
+                        cross_result = compare_cross_source_quotes(
+                            primary_quote,
+                            secondary,
+                            primary_provider=str(primary_provider),
+                            secondary_provider=str(fetcher_name),
+                            market=_market_tag(normalize_stock_code(stock_code)),
+                            stock_code=stock_code,
+                            asset_type=getattr(
+                                primary_quote, "instrument_type", None
+                            ),
+                        )
+                        _field_trust.record_cross_source_result(
+                            primary_quote,
+                            cross_result,
+                            primary_provider=primary_provider,
+                            secondary_provider=fetcher_name,
+                        )
                     except Exception as cross_exc:  # broad-exception: fallback_recorded - comparison is observational
                         log_safe_exception(
                             logger,
