@@ -22,49 +22,57 @@ export interface UseStockIndexResult {
   loaded: boolean;
 }
 
+export interface UseStockIndexOptions {
+  /**
+   * When false, do not fetch. Defaults to true so existing call sites
+   * (StockAutocomplete, DecisionSignalsPage) keep mount-time loading.
+   */
+  enabled?: boolean;
+}
+
 /**
  * Stock index loading Hook
  *
  * @returns Index state and data
  */
-export function useStockIndex(): UseStockIndexResult {
+export function useStockIndex(options: UseStockIndexOptions = {}): UseStockIndexResult {
+  const enabled = options.enabled ?? true;
   const [index, setIndex] = useState<StockIndexItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<Error | null>(null);
   const [fallback, setFallback] = useState(false);
 
   useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      setLoading(true);
-      setError(null);
-
-      const result: IndexLoadResult = await loadStockIndex();
-
-      if (mounted) {
-        setIndex(result.data);
-        setFallback(result.fallback);
-        if (result.error) {
-          setError(result.error);
-        }
-        setLoading(false);
-      }
+    if (!enabled) {
+      return undefined;
     }
 
-    load();
+    let mounted = true;
+
+    setLoading(true);
+    setError(null);
+
+    void loadStockIndex().then((result: IndexLoadResult) => {
+      if (!mounted) {
+        return;
+      }
+      setIndex(result.data);
+      setFallback(result.fallback);
+      setError(result.error ?? null);
+      setLoading(false);
+    });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [enabled]);
 
   return {
     index,
     loading,
     error,
     fallback,  // Whether fallback
-    loaded: !loading,
+    loaded: enabled && !loading,
   };
 }
 

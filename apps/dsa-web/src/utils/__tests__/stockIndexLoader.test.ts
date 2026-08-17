@@ -6,6 +6,7 @@
 
 import {
   loadStockIndex,
+  resetStockIndexCacheForTests,
   compressIndex,
   findStockInIndex,
   getPopularStocks,
@@ -84,6 +85,7 @@ describe('stockIndexLoader', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    resetStockIndexCacheForTests();
   });
 
   describe('loadStockIndex - Load stock index', () => {
@@ -176,7 +178,7 @@ describe('stockIndexLoader', () => {
       expect(result.data).toEqual([]);
     });
 
-    test('fetch call includes cache-busting parameter', async () => {
+    test('fetch call uses the static URL without a cache-busting query', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => mockIndexData,
@@ -184,8 +186,67 @@ describe('stockIndexLoader', () => {
 
       await loadStockIndex();
 
-      const fetchCallArgs = mockFetch.mock.calls[0][0];
-      expect(fetchCallArgs).toContain('?_t=');
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(mockFetch.mock.calls[0][0]).toBe('/stocks.index.json');
+    });
+
+    test('concurrent callers share one fetch and one parse', async () => {
+      let parseCount = 0;
+      mockFetch.mockImplementation(async () => ({
+        ok: true,
+        json: async () => {
+          parseCount += 1;
+          return mockIndexData;
+        },
+      } as unknown as Response));
+
+      const [first, second, third] = await Promise.all([
+        loadStockIndex(),
+        loadStockIndex(),
+        loadStockIndex(),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(parseCount).toBe(1);
+      expect(first.data).toBe(second.data);
+      expect(second.data).toBe(third.data);
+      expect(first.data).toEqual(mockIndexData);
+    });
+
+    test('reuses the cached success without a second fetch or parse', async () => {
+      let parseCount = 0;
+      mockFetch.mockImplementation(async () => ({
+        ok: true,
+        json: async () => {
+          parseCount += 1;
+          return mockIndexData;
+        },
+      } as unknown as Response));
+
+      const first = await loadStockIndex();
+      const second = await loadStockIndex();
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(parseCount).toBe(1);
+      expect(second.data).toBe(first.data);
+    });
+
+    test('does not cache a failed load so the next caller can retry', async () => {
+      mockFetch
+        .mockRejectedValueOnce(new Error('Network error'))
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => mockIndexData,
+        } as unknown as Response);
+
+      const failed = await loadStockIndex();
+      const recovered = await loadStockIndex();
+
+      expect(failed.loaded).toBe(false);
+      expect(failed.fallback).toBe(true);
+      expect(recovered.loaded).toBe(true);
+      expect(recovered.data).toEqual(mockIndexData);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
 

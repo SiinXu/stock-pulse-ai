@@ -54,7 +54,9 @@ export function useCommandPaletteSearch(
     error: false,
     loaded: false,
   });
-  const { index, loading: stockIndexLoading } = useStockIndex();
+  const { index, loading: stockIndexLoading, error: stockIndexError } = useStockIndex({
+    enabled: isOpen,
+  });
 
   useEffect(() => {
     if (!isOpen || skillState.loaded) return undefined;
@@ -155,7 +157,11 @@ export function useCommandPaletteSearch(
     ) || (
       isOpen && skillState.loading && normalizedQuery.length > 0
     ),
-    hasError: reportState.query === normalizedQuery && reportState.error,
+    hasError: (
+      reportState.query === normalizedQuery && reportState.error
+    ) || Boolean(
+      stockIndexError && normalizedQuery.length >= STOCK_SEARCH_MIN_LENGTH
+    ),
     skillSearchError: isOpen && skillState.error,
   };
 }

@@ -18,15 +18,23 @@ export interface IndexLoadResult {
   fallback: boolean;
 }
 
+const STOCK_INDEX_URL = '/stocks.index.json';
+
+let inFlight: Promise<IndexLoadResult> | null = null;
+
 /**
- * Load stock index
- *
- * @returns Index load result
+ * Drop the module-level load cache. Tests use this so each case starts cold.
  */
-export async function loadStockIndex(): Promise<IndexLoadResult> {
+export function resetStockIndexCacheForTests(): void {
+  inFlight = null;
+}
+
+async function fetchAndParseStockIndex(): Promise<IndexLoadResult> {
   try {
-    // Add time parameter to bypass cache (in case the backend doesn't handle ETag/Cache-Control)
-    const response = await fetch(`/stocks.index.json?_t=${Math.floor(Date.now() / 3600000)}`);
+    // Fetch the static URL as-is. Do not append ?_t= (or any other cache-buster):
+    // the browser revalidates via ETag / Last-Modified. A query-string bust
+    // defeats HTTP caching and forced a full download on every hour bucket.
+    const response = await fetch(STOCK_INDEX_URL);
 
     if (!response.ok) {
       throw new Error(`Failed to load index: ${response.status} ${response.statusText}`);
@@ -53,6 +61,30 @@ export async function loadStockIndex(): Promise<IndexLoadResult> {
       fallback: true,  // Load failed, fallback to old mode
     };
   }
+}
+
+/**
+ * Load stock index
+ *
+ * Concurrent callers share one in-flight fetch and one JSON parse.
+ * A successful result stays cached for the page lifetime. A failed
+ * result is not cached so the next caller can retry.
+ *
+ * @returns Index load result
+ */
+export function loadStockIndex(): Promise<IndexLoadResult> {
+  if (inFlight) {
+    return inFlight;
+  }
+
+  const request = fetchAndParseStockIndex().then((result) => {
+    if (!result.loaded && inFlight === request) {
+      inFlight = null;
+    }
+    return result;
+  });
+  inFlight = request;
+  return request;
 }
 
 /**
