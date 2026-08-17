@@ -87,6 +87,34 @@ def test_forward_api_to_services_is_allowed(tmp_path: Path) -> None:
     assert edges == []
 
 
+def test_forward_src_api_to_services_is_allowed(tmp_path: Path) -> None:
+    """src.api → services is the same intended direction after the package move."""
+
+    _write_module(tmp_path, "src/services/svc.py", "VALUE = 1\n")
+    _write_module(tmp_path, "src/api/app.py", "from src.services.svc import VALUE\n")
+    edges = scan_reverse_edges(tmp_path)
+    assert edges == []
+
+
+def test_detects_services_to_src_api_reverse(tmp_path: Path) -> None:
+    """Reject src.services → src.api so the HTTP one-way rule survives the move."""
+
+    _write_module(tmp_path, "src/api/app.py", "VALUE = 1\n")
+    _write_module(
+        tmp_path,
+        "src/services/svc.py",
+        "from src.api.app import VALUE\n",
+    )
+    baseline = tmp_path / "scripts" / "layer_direction_baseline.json"
+    baseline.parent.mkdir(parents=True, exist_ok=True)
+    baseline.write_text(serialize_baseline([], hard_ceiling=0), encoding="utf-8")
+    violations = collect_violations(tmp_path, baseline)
+    assert any(
+        item.path == "src/services/svc.py" and item.to_package == "src.api"
+        for item in violations
+    )
+
+
 def test_write_baseline_allows_shrink_refuses_growth(tmp_path: Path) -> None:
     """--write-baseline may shrink exceptions but must refuse growth."""
 

@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 INBOX_PATHS = (
     REPO_ROOT / "src/services/notification_inbox_service.py",
     REPO_ROOT / "src/repositories/notification_inbox_repo.py",
-    REPO_ROOT / "api/v1/endpoints/notification_inbox.py",
+    REPO_ROOT / "src/api/v1/endpoints/notification_inbox.py",
 )
 FORBIDDEN_IMPORT_PREFIXES = (
     "src.notification",

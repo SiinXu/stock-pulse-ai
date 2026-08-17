@@ -32,6 +32,13 @@ def test_api_paths_map_to_api_tests() -> None:
     assert any(path.startswith("tests/api") or path == "tests/api" for path in result)
 
 
+def test_src_api_paths_map_to_the_same_api_tests() -> None:
+    result = select_targets(["src/api/v1/endpoints/analysis.py"])
+    assert result != "FULL"
+    assert isinstance(result, list)
+    assert result == select_targets(["api/v1/endpoints/analysis.py"])
+
+
 def test_config_forces_full_suite() -> None:
     assert select_targets(["src/config.py"]) == "FULL"
     assert select_targets(["tests/conftest.py"]) == "FULL"

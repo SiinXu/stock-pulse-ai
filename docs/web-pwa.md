@@ -50,7 +50,7 @@ this service worker to store analysis reports, quotes, or SSE streams.
 - The FastAPI SPA host serves `static/` including `sw.js` and
   `manifest.webmanifest`.
 - `.webmanifest` is registered as `application/manifest+json` in
-  `api/app.py` so install prompts work when the OS MIME map is incomplete.
+  `src/api/app.py` so install prompts work when the OS MIME map is incomplete.
 - Installable PWAs require HTTPS (or `localhost`) in real browsers.
 
 ## Verification

@@ -53,15 +53,15 @@ remain assertive `alert` announcements. Generic warning/info toasts remain polit
 
 Source of truth:
 
-- Backend registry: `api/v1/error_taxonomy.py`
+- Backend registry: `src/api/v1/error_taxonomy.py`
 - Web mirror: `apps/dsa-web/src/api/error/taxonomy.ts`
-- Envelope builder: `api/v1/errors.py`
+- Envelope builder: `src/api/v1/errors.py`
 - Web remediation: `resolveErrorRemediation` + `ApiErrorAlert` / `ActionableApiErrorInline`
 
 ## Adding a new error code
 
 1. Choose a stable snake_case `error` code.
-2. Register it in `api/v1/error_taxonomy.py` with category, severity, and default action.
+2. Register it in `src/api/v1/error_taxonomy.py` with category, severity, and default action.
 3. Mirror the entry in `apps/dsa-web/src/api/error/taxonomy.ts`.
 4. Add Web catalog copy under `STABLE_ERROR_TEXT` (reuse existing action labels; do not expand i18n baselines without justification).
 5. Emit through `api_error` / `error_body`.

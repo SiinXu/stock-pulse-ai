@@ -2303,8 +2303,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         repository_root = projection_path.parents[2]
         endpoint_paths = (
-            repository_root / "api/v1/endpoints/analysis.py",
-            repository_root / "api/v1/endpoints/history.py",
+            repository_root / "src/api/v1/endpoints/analysis.py",
+            repository_root / "src/api/v1/endpoints/history.py",
         )
         projection_symbols = (
             "extract_analysis_context_pack_overview",

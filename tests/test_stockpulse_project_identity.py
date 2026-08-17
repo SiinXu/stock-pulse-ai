@@ -107,7 +107,7 @@ def test_external_defaults_use_stockpulse_identity() -> None:
     from src.config import Config
 
     workflow = (ROOT_DIR / ".github/workflows/00-daily-analysis.yml").read_text(encoding="utf-8")
-    api = (ROOT_DIR / "api/app.py").read_text(encoding="utf-8")
+    api = (ROOT_DIR / "src/api/app.py").read_text(encoding="utf-8")
     api_spec = json.loads((ROOT_DIR / "docs/architecture/api_spec.json").read_text(encoding="utf-8"))
     user_agents = "\n".join(
         (ROOT_DIR / path).read_text(encoding="utf-8")

@@ -146,7 +146,7 @@ Full inventory, client headers, and rollback: [MCP server integration (EN)](mcp-
 | `AUTH-05` | MUST | Authorization and data ownership must deny cross-user or cross-workspace access by default. Until a multi-user model exists, administrator authentication must not be described as user isolation or role-based access control. |
 | `AUTH-06` | SHOULD | Login attempts and other abuse-sensitive endpoints should use bounded rate limits whose client identity is derived only from a documented trusted-proxy topology. |
 
-Current anchors: [`api/middlewares/auth.py`](../api/middlewares/auth.py), [`api/v1/endpoints/auth.py`](../api/v1/endpoints/auth.py), the startup bind policy in [`src/security/http_bind.py`](../src/security/http_bind.py), and [PR #292](https://github.com/SiinXu/stock-pulse-ai/pull/292). The current implementation uses an opt-in single-administrator session, signed expiring cookies, file-backed password hashes and session secrets, login throttling, session-secret rotation, current-password verification before disabling authentication, and fail-closed startup for unauthenticated non-local HTTP binds. The emergency public-bind override is explicit and emits a security warning. This is not a multi-user identity or authorization system.
+Current anchors: [`src/api/middlewares/auth.py`](../src/api/middlewares/auth.py), [`src/api/v1/endpoints/auth.py`](../src/api/v1/endpoints/auth.py), the startup bind policy in [`src/security/http_bind.py`](../src/security/http_bind.py), and [PR #292](https://github.com/SiinXu/stock-pulse-ai/pull/292). The current implementation uses an opt-in single-administrator session, signed expiring cookies, file-backed password hashes and session secrets, login throttling, session-secret rotation, current-password verification before disabling authentication, and fail-closed startup for unauthenticated non-local HTTP binds. The emergency public-bind override is explicit and emits a security warning. This is not a multi-user identity or authorization system.
 
 <a id="browser-response-headers-csp"></a>
 ### Browser response headers (CSP)
@@ -157,7 +157,7 @@ Current anchors: [`api/middlewares/auth.py`](../api/middlewares/auth.py), [`api/
 | `WEB-02` | MUST | CSP allowances MUST be derived from the actual production SPA (Vite assets, inline theme bootstrap, React inline styles, same-origin API/SSE, `blob:` download URLs, `data:` CSS/image URIs). Remote script/style hosts and `unsafe-eval` MUST NOT be allowed for the product UI. |
 | `WEB-03` | SHOULD | Interactive OpenAPI UIs (`/docs`, `/redoc`) that load CDN assets may omit CSP only; other security headers SHOULD still apply. Prefer not exposing `/docs` on untrusted networks without an edge policy. |
 
-Current anchors: [`api/middlewares/security_headers.py`](../api/middlewares/security_headers.py) (registered from [`api/app.py`](../api/app.py)). The shipped policy is:
+Current anchors: [`src/api/middlewares/security_headers.py`](../src/api/middlewares/security_headers.py) (registered from [`src/api/app.py`](../src/api/app.py)). The shipped policy is:
 
 ```text
 default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';
@@ -190,7 +190,7 @@ This is defense-in-depth only. Markdown surfaces still rely on `react-markdown` 
 | `INPUT-04` | MUST | Agent and automation tools must deny unknown tools, schema-invalid arguments, out-of-scope symbols or data, and capabilities not granted to the current execution. Model output must never directly grant a capability. |
 | `INPUT-05` | SHOULD | Validation failures should return stable error codes and bounded safe details suitable for correlation without echoing the raw rejected secret or payload. |
 
-Current anchors include the Pydantic API schemas under [`api/v1/schemas/`](../api/v1/schemas/), the configuration registry under [`src/core/config_registry.py`](../src/core/config_registry.py), and the Agent tool contract under [`src/agent/tool_surface.py`](../src/agent/tool_surface.py). Coverage remains capability-specific rather than one complete platform contract.
+Current anchors include the Pydantic API schemas under [`src/api/v1/schemas/`](../src/api/v1/schemas/), the configuration registry under [`src/core/config_registry.py`](../src/core/config_registry.py), and the Agent tool contract under [`src/agent/tool_surface.py`](../src/agent/tool_surface.py). Coverage remains capability-specific rather than one complete platform contract.
 
 ### Secrets and redaction
 
@@ -202,7 +202,7 @@ Current anchors include the Pydantic API schemas under [`api/v1/schemas/`](../ap
 | `SECRET-04` | MUST | Raw configuration backup and restore must require an explicit trusted local mode or authenticated administrator session. Returned settings must mask sensitive fields and must not treat a mask placeholder as a new secret. |
 | `SECRET-05` | SHOULD | Operators should rotate a credential after suspected disclosure, remove exposed artifacts, invalidate affected sessions, and record the incident without reproducing the secret. |
 
-Current anchors: [`.gitignore`](../.gitignore), [`.env.example`](../.env.example), [`src/utils/sanitize/`](../src/utils/sanitize/), and the backup gate in [`api/v1/endpoints/system_config.py`](../api/v1/endpoints/system_config.py). `log_safe_exception`, bounded diagnostic sanitizers, sensitive configuration metadata, and static exception-log guards provide meaningful coverage, but they do not yet establish a repository-wide guarantee for every provider, trace, and export path.
+Current anchors: [`.gitignore`](../.gitignore), [`.env.example`](../.env.example), [`src/utils/sanitize/`](../src/utils/sanitize/), and the backup gate in [`src/api/v1/endpoints/system_config.py`](../src/api/v1/endpoints/system_config.py). `log_safe_exception`, bounded diagnostic sanitizers, sensitive configuration metadata, and static exception-log guards provide meaningful coverage, but they do not yet establish a repository-wide guarantee for every provider, trace, and export path.
 
 ### Outbound network access
 
@@ -295,7 +295,7 @@ These completed tracks are implementation evidence, not open gaps. Residual risk
 | Central sensitive-data redaction expansion | `SECRET-03` | [#176](https://github.com/SiinXu/stock-pulse-ai/issues/176) (completed) |
 | Dependency and workflow supply-chain hardening | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) (completed) |
 | Constrained AlphaSift repair installation | `SUPPLY-01` | [#359](https://github.com/SiinXu/stock-pulse-ai/issues/359) (completed by [#531](https://github.com/SiinXu/stock-pulse-ai/pull/531)) |
-| FastAPI browser security headers (CSP, nosniff, frame deny, referrer) | `WEB-01` through `WEB-03` | [`api/middlewares/security_headers.py`](../api/middlewares/security_headers.py) |
+| FastAPI browser security headers (CSP, nosniff, frame deny, referrer) | `WEB-01` through `WEB-03` | [`src/api/middlewares/security_headers.py`](../src/api/middlewares/security_headers.py) |
 
 ## Review Cadence
 

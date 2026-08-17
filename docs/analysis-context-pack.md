@@ -275,7 +275,7 @@ Agent 工具还会独立调用 `get_realtime_quote`、`get_daily_history`、`get
 
 ### 持仓
 
-持仓快照在 `src/services/portfolio_service.py` 中聚合账户、仓位、成本、价格、汇率和风险输入，API 输出结构在 `api/v1/schemas/portfolio.py`。当前已有 `price_source`、`price_provider`、`price_date`、`price_stale`、`price_available`、`fx_stale` 等字段。
+持仓快照在 `src/services/portfolio_service.py` 中聚合账户、仓位、成本、价格、汇率和风险输入，API 输出结构在 `src/api/v1/schemas/portfolio.py`。当前已有 `price_source`、`price_provider`、`price_date`、`price_stale`、`price_available`、`fx_stale` 等字段。
 
 首版 pack 可记录“是否持仓、账户摘要、成本、数量、仓位、浮盈浮亏、价格/汇率 stale 摘要”，但不纳入交易流水、现金流水、公司行动或完整账户隐私数据。
 
@@ -287,7 +287,7 @@ P0 必须把 `enhanced_context.date` 标为兼容边界。后续 pack 可以新�
 
 ### 历史
 
-历史详情在 `src/services/history_service.py`、`api/v1/endpoints/history.py`、`api/v1/schemas/history.py` 中返回 `raw_result`、`news_content`、`context_snapshot` 等字段。同步 analysis/status 响应也会在 `api/v1/endpoints/analysis.py` 中读取 `context_snapshot.enhanced_context`、`realtime_quote_raw` 和基本面 fallback。
+历史详情在 `src/services/history_service.py`、`src/api/v1/endpoints/history.py`、`src/api/v1/schemas/history.py` 中返回 `raw_result`、`news_content`、`context_snapshot` 等字段。同步 analysis/status 响应也会在 `src/api/v1/endpoints/analysis.py` 中读取 `context_snapshot.enhanced_context`、`realtime_quote_raw` 和基本面 fallback。
 
 P0 只记录历史消费面。完整 pack 不应默认公开到历史详情或公共 API；后续 P4 如需展示，应优先暴露摘要、来源和降级说明。
 
@@ -304,9 +304,9 @@ P0 只记录历史消费面。完整 pack 不应默认公开到历史详情或�
 | 普通分析 | `src/core/pipeline.py`, `src/storage.py`, `src/analyzer.py` |
 | Agent | `src/agent/orchestrator.py`, `src/agent/executor.py`, `src/agent/tools/data_tools.py` |
 | 告警 | `src/services/alert_worker.py`, `docs/alerts.md` |
-| 持仓 | `src/services/portfolio_service.py`, `api/v1/schemas/portfolio.py` |
+| 持仓 | `src/services/portfolio_service.py`, `src/api/v1/schemas/portfolio.py` |
 | 回测 | `src/services/backtest_service.py`, `src/repositories/backtest_repo.py` |
-| 历史 | `src/services/history_service.py`, `api/v1/endpoints/history.py`, `api/v1/endpoints/analysis.py`, `api/v1/schemas/history.py` |
+| 历史 | `src/services/history_service.py`, `src/api/v1/endpoints/history.py`, `src/api/v1/endpoints/analysis.py`, `src/api/v1/schemas/history.py` |
 | 通知 | `src/notification.py`, `docs/notifications.md` |
 
 ## 兼容与安全边界

@@ -12,14 +12,15 @@ from typing import Iterable
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCOPED_DIRECTORIES = (
-    REPO_ROOT / "api" / "middlewares",
-    REPO_ROOT / "api" / "v1" / "endpoints",
+    REPO_ROOT / "src" / "api" / "middlewares",
+    REPO_ROOT / "src" / "api" / "v1" / "endpoints",
     REPO_ROOT / "src" / "agent",
     REPO_ROOT / "bot",
 )
 SCOPED_FILES = (
     REPO_ROOT / "main.py",
-    REPO_ROOT / "api" / "app.py",
+    REPO_ROOT / "src" / "api" / "app.py",
+    REPO_ROOT / "api" / "__init__.py",
     REPO_ROOT / "src" / "core" / "pipeline.py",
     REPO_ROOT / "src" / "logging_config.py",
     REPO_ROOT / "src" / "services" / "alphasift_service.py",

@@ -70,7 +70,7 @@ def _load_web_error_code_taxonomy() -> dict[str, tuple[str, str, str]]:
 
 def main() -> int:
     sys.path.insert(0, str(REPO_ROOT))
-    from api.v1.error_taxonomy import (  # noqa: WPS433
+    from src.api.v1.error_taxonomy import (  # noqa: WPS433
         ERROR_ACTIONS,
         ERROR_CATEGORIES,
         ERROR_CODE_TAXONOMY,
