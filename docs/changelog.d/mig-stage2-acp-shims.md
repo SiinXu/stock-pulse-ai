@@ -1,0 +1,1 @@
+- [Changed] Remove root-level analysis-context-pack compatibility shims; import `src.analysis_context_pack.overview` and `src.analysis_context_pack.prompt` (Refs #167).

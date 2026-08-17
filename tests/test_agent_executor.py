@@ -46,7 +46,7 @@ from src.agent.tools.registry import (
     ToolPolicy,
     ToolRegistry,
 )
-from src.analysis_context_pack_prompt import format_analysis_context_pack_prompt_section
+from src.analysis_context_pack.prompt import format_analysis_context_pack_prompt_section
 from src.config import Config
 from src.llm.usage import normalize_litellm_usage
 from src.services.analysis_context_builder import (
