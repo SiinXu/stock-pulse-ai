@@ -157,8 +157,8 @@ _enforce_server_bind(_bind_options)
 # process-wide service singletons have a single owner before the app loads.
 set_application_services(ApplicationServices())
 
-# Import application instance from api.app
-from api.app import app  # noqa: E402
+# Import application instance from src.api.app
+from src.api.app import app  # noqa: E402
 
 # Export app for uvicorn usage
 __all__ = ['app']

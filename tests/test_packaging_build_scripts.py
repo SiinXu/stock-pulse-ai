@@ -39,7 +39,7 @@ def test_windows_backend_build_script_collects_and_probes_migration_registry() -
     assert "'src.migrations'" in script
     assert "'src.migrations.registry'" in script
     assert "'src.migrations.versions'" in script
-    assert "@('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry')" in script
+    assert "@('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry', 'src.api.app')" in script
     assert "src/migrations/versions/*.py;src/migrations/versions" in script
     assert "Verifying packaged migration source" in script
     assert 'if _packaged_import_probe == "src.migrations.registry"' in main_py
@@ -74,7 +74,7 @@ def test_macos_backend_build_script_collects_and_probes_migration_registry() -> 
     assert '"src.migrations"' in script
     assert '"src.migrations.registry"' in script
     assert '"src.migrations.versions"' in script
-    assert "for module in alphasift.dsa_adapter orjson src.migrations.registry" in script
+    assert "for module in alphasift.dsa_adapter orjson src.migrations.registry src.api.app" in script
     assert "src/migrations/versions/*.py:src/migrations/versions" in script
     assert "Verifying packaged migration source" in script
     assert 'if _packaged_import_probe == "src.migrations.registry"' in main_py

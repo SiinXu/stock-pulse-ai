@@ -11,7 +11,7 @@
 
 ## 字段与枚举
 
-核心字段由 `api/v1/schemas/decision_signals.py` 定义，主要包括：
+核心字段由 `src/api/v1/schemas/decision_signals.py` 定义，主要包括：
 
 - 身份与来源：`stock_code`、`stock_name`、`market`、`source_type`、`source_agent`、`source_report_id`、`trace_id`、`decision_profile`、`trigger_source`。
 - 建议语义：`action`、`action_label`、`confidence`、`score`、`horizon`、`market_phase`、`plan_quality`、`status`。
@@ -71,7 +71,7 @@ Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标
 
 ## API
 
-当前公开接口由 `api/v1/endpoints/decision_signals.py` 和 `docs/architecture/api_spec.json` 描述：
+当前公开接口由 `src/api/v1/endpoints/decision_signals.py` 和 `docs/architecture/api_spec.json` 描述：
 
 - `POST /api/v1/decision-signals`：创建或按同源键去重，返回 `{ item, created }`。
 - `GET /api/v1/decision-signals`：分页查询，支持市场、股票、动作、阶段、`decision_profile`、来源、状态、时间范围和持仓过滤。省略或传空 `decision_profile` 不加 profile 条件，返回所有 profile；`decision_profile=unknown` 查询 `NULL` 行；合法 profile 精确匹配。

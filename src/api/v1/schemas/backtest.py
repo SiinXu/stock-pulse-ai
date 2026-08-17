@@ -1,0 +1,198 @@
+# -*- coding: utf-8 -*-
+"""Backtest API schemas."""
+
+from __future__ import annotations
+
+from datetime import date
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+from src.api.v1.schemas.market_phase import MarketPhaseSummary
+from src.schemas.decision_action import DecisionAction
+
+
+class BacktestRunRequest(BaseModel):
+    code: Optional[str] = Field(None, description="仅回测指定股票")
+    force: bool = Field(False, description="强制重新计算")
+    eval_window_days: Optional[int] = Field(None, ge=1, le=120, description="评估窗口（交易日数）")
+    min_age_days: Optional[int] = Field(None, ge=0, le=365, description="分析记录最小天龄（0=不限）")
+    analysis_date_from: Optional[date] = Field(None, description="分析日期起始（含）")
+    analysis_date_to: Optional[date] = Field(None, description="分析日期结束（含）")
+    limit: int = Field(200, ge=1, le=2000, description="最多处理的分析记录数")
+
+
+class BacktestAppliedConfig(BaseModel):
+    """Echo of the effective run configuration used for evaluation honesty."""
+
+    code: Optional[str] = Field(None, description="Normalized stock filter, if any")
+    force: bool = Field(False, description="Whether force re-evaluation was requested")
+    eval_window_days: int = Field(..., description="Effective evaluation window in trading days")
+    min_age_days: int = Field(..., description="Effective minimum analysis age in calendar days")
+    limit: int = Field(..., description="Maximum candidate analysis rows processed")
+    engine_version: str = Field(..., description="Effective backtest engine version label")
+    neutral_band_pct: float = Field(..., description="Neutral outcome band percentage")
+    commission_bps: float = Field(
+        0.0,
+        description="Commission cost in basis points per side applied to simulated long returns",
+    )
+    slippage_bps: float = Field(
+        0.0,
+        description="Slippage cost in basis points per side applied to simulated long returns",
+    )
+    round_trip_cost_pct: float = Field(
+        0.0,
+        description="Total round-trip cost percentage deducted from long simulated returns",
+    )
+    analysis_date_from: Optional[date] = Field(None, description="Analysis date start filter (inclusive)")
+    analysis_date_to: Optional[date] = Field(None, description="Analysis date end filter (inclusive)")
+
+
+class BacktestMethodology(BaseModel):
+    """Research-honesty methodology block. Never a return promise."""
+
+    version: str = Field("v1", description="Methodology contract version")
+    engine_version: str = Field(..., description="Engine version label for the run/summary")
+    metric_source: str = Field(
+        "analysis_advice",
+        description="analysis_advice | skill_opinion_outcomes",
+    )
+    eval_window_days: Optional[int] = Field(None, description="Evaluation window when known")
+    is_return_promise: bool = Field(
+        False,
+        description="Always false. Metrics must not be presented as guaranteed future returns.",
+    )
+    disclaimer: str = Field(
+        ...,
+        description="Primary user-facing limitation statement (historical simulation only)",
+    )
+    disclaimer_codes: List[str] = Field(default_factory=list)
+    look_ahead_policy: str = Field(
+        "forward_only_after_resolved_start_session",
+        description="Look-ahead bias protection policy",
+    )
+    survivorship_policy: str = Field(
+        "analyzed_universe_only",
+        description="Survivorship bias disclosure policy",
+    )
+    cost_model: Dict[str, Any] = Field(default_factory=dict)
+    sample_split: Dict[str, Any] = Field(default_factory=dict)
+    return_units: str = Field("percent_relative")
+    currency_policy: str = Field(
+        "percent_returns_currency_agnostic;absolute_prices_not_aggregated_across_currencies"
+    )
+    limitations: List[str] = Field(default_factory=list)
+
+
+class BacktestRunResponse(BaseModel):
+    processed: int = Field(..., description="候选记录数")
+    saved: int = Field(..., description="写入回测结果数")
+    completed: int = Field(..., description="完成回测数")
+    insufficient: int = Field(..., description="数据不足数")
+    errors: int = Field(..., description="错误数")
+    applied_eval_window_days: Optional[int] = Field(
+        ...,
+        description="实际生效的评估窗口（交易日数）",
+    )
+    applied_config: Optional[BacktestAppliedConfig] = Field(
+        None,
+        description="Echo of the effective run configuration (window, universe limit, engine, dates)",
+    )
+    methodology: Optional[BacktestMethodology] = Field(
+        None,
+        description="Methodology limitations; historical simulation only, not a return promise",
+    )
+    message: Optional[str] = Field(None, description="空结果或降级时的诊断说明")
+    diagnostics: Dict[str, Any] = Field(default_factory=dict, description="回测筛选与诊断信息")
+
+
+class BacktestResultItem(BaseModel):
+    analysis_history_id: int
+    code: str
+    stock_name: Optional[str] = None
+    analysis_date: Optional[str] = None
+    eval_window_days: int
+    engine_version: str
+    eval_status: str
+    evaluated_at: Optional[str] = None
+    operation_advice: Optional[str] = None
+    action: Optional[DecisionAction] = None
+    action_label: Optional[str] = None
+    trend_prediction: Optional[str] = None
+    market_phase: Optional[str] = None
+    market_phase_summary: Optional[MarketPhaseSummary] = None
+    position_recommendation: Optional[str] = None
+    start_price: Optional[float] = None
+    end_close: Optional[float] = None
+    max_high: Optional[float] = None
+    min_low: Optional[float] = None
+    stock_return_pct: Optional[float] = None
+    actual_return_pct: Optional[float] = None
+    actual_movement: Optional[str] = None
+    direction_expected: Optional[str] = None
+    direction_correct: Optional[bool] = None
+    outcome: Optional[str] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    hit_stop_loss: Optional[bool] = None
+    hit_take_profit: Optional[bool] = None
+    first_hit: Optional[str] = None
+    first_hit_date: Optional[str] = None
+    first_hit_trading_days: Optional[int] = None
+    simulated_entry_price: Optional[float] = None
+    simulated_exit_price: Optional[float] = None
+    simulated_exit_reason: Optional[str] = None
+    simulated_return_pct: Optional[float] = None
+    resolution_notes: Optional[str] = Field(
+        None,
+        description=(
+            "Optional comma-separated start-resolution markers such as "
+            "legacy_analysis_date or prior_session_start"
+        ),
+    )
+
+
+class BacktestResultsResponse(BaseModel):
+    total: int
+    page: int
+    limit: int
+    items: List[BacktestResultItem] = Field(default_factory=list)
+
+
+class PerformanceMetrics(BaseModel):
+    scope: str
+    code: Optional[str] = None
+    skill_id: Optional[str] = Field(
+        None,
+        description="Present when scope=skill (YAML skill / strategy metrics)",
+    )
+    eval_window_days: int
+    engine_version: str
+    computed_at: Optional[str] = None
+
+    total_evaluations: int
+    completed_count: int
+    insufficient_count: int
+    long_count: int
+    cash_count: int
+    win_count: int
+    loss_count: int
+    neutral_count: int
+
+    direction_accuracy_pct: Optional[float] = None
+    win_rate_pct: Optional[float] = None
+    neutral_rate_pct: Optional[float] = None
+    avg_stock_return_pct: Optional[float] = None
+    avg_simulated_return_pct: Optional[float] = None
+
+    stop_loss_trigger_rate: Optional[float] = None
+    take_profit_trigger_rate: Optional[float] = None
+    ambiguous_rate: Optional[float] = None
+    avg_days_to_first_hit: Optional[float] = None
+
+    advice_breakdown: Dict[str, Any] = Field(default_factory=dict)
+    diagnostics: Dict[str, Any] = Field(default_factory=dict)
+    methodology: Optional[BacktestMethodology] = Field(
+        None,
+        description="Methodology limitations; never a return promise",
+    )

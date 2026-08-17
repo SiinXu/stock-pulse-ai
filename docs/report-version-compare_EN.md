@@ -60,6 +60,6 @@ Tests may inject fixtures with `ReportVersionCompareService(compare_fn=...)`.
 
 - `src/services/report_version_compare_service.py`
 - `src/services/report_version_compare_adapter.py`
-- `api/v1/endpoints/report_version_compare.py`
+- `src/api/v1/endpoints/report_version_compare.py`
 - `apps/dsa-web/src/pages/ReportVersionComparePage.tsx`
 - `apps/dsa-web/src/components/report-version-compare/`

@@ -125,8 +125,8 @@ def test_decision_signal_topic_source_anchors_exist() -> None:
     topic = _read("docs/decision-signals.md")
 
     for source_path in (
-        "api/v1/schemas/decision_signals.py",
-        "api/v1/endpoints/decision_signals.py",
+        "src/api/v1/schemas/decision_signals.py",
+        "src/api/v1/endpoints/decision_signals.py",
         "src/services/decision_signal_service.py",
         "src/schemas/decision_signal_presentation.py",
         "src/utils/sanitize/",

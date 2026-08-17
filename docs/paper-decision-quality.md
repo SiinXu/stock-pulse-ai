@@ -56,7 +56,7 @@ Signal linkage: DecisionSignals for the same stock code with `created_at` within
 | --- | --- |
 | `src/services/paper_decision_quality_service.py` | Scorer + account aggregation |
 | `score_paper_decision_context(context)` | Pure fixture / offline entry (no I/O) |
-| `api/v1/endpoints/paper_decision_quality.py` | HTTP surface |
+| `src/api/v1/endpoints/paper_decision_quality.py` | HTTP surface |
 
 ## Tests
 

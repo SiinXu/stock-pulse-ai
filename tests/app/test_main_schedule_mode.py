@@ -29,7 +29,7 @@ _MAIN_IMPORT_ENV_OVERRIDES = {
 
 
 def _api_app_stub_modules():
-    """sys.modules entries so ``start_api_server`` can ``from api.app import app``
+    """sys.modules entries so ``start_api_server`` can ``from src.api.app import app``
     without importing the real (heavy) app tree in these isolated unit tests.
 
     ``start_api_server`` imports the ASGI app object in the calling thread so the
@@ -38,11 +38,11 @@ def _api_app_stub_modules():
     """
     import types
 
-    api_pkg = types.ModuleType("api")
-    api_app_mod = types.ModuleType("api.app")
-    api_app_mod.app = SimpleNamespace()
-    api_pkg.app = api_app_mod
-    return {"api": api_pkg, "api.app": api_app_mod}
+    src_api_pkg = types.ModuleType("src.api")
+    src_api_app_mod = types.ModuleType("src.api.app")
+    src_api_app_mod.app = SimpleNamespace()
+    src_api_pkg.app = src_api_app_mod
+    return {"src.api": src_api_pkg, "src.api.app": src_api_app_mod}
 
 
 class _DummyConfig(SimpleNamespace):

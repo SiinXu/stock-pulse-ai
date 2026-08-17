@@ -240,7 +240,7 @@ python_min_smoke() {
 from src.config import get_config
 from src.storage import DatabaseManager
 from data_provider import DataFetcherManager
-from api.app import app
+from src.api.app import app
 print('✅ python-minimum smoke imports OK', app.title)
 "
   local test_data_dir

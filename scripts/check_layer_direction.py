@@ -52,13 +52,19 @@ BASELINE_VERSION = 1
 FORBIDDEN_RULES: Tuple[Tuple[str, str], ...] = (
     ("data_provider", "src.services"),
     ("data_provider", "api"),
+    ("data_provider", "src.api"),
     ("data_provider", "src.core"),
     ("data_provider", "src.agent"),
     ("src.services", "api"),
+    ("src.services", "src.api"),
     ("src.core", "api"),
+    ("src.core", "src.api"),
     ("src.agent", "api"),
+    ("src.agent", "src.api"),
     ("src.market", "api"),
+    ("src.market", "src.api"),
     ("src.analyzer", "api"),
+    ("src.analyzer", "src.api"),
     ("src.core", "src.services"),
 )
 
@@ -228,8 +234,9 @@ def serialize_baseline(edges: Sequence[Edge], hard_ceiling: int) -> str:
                 "application services from orchestration stages."
             ),
             (
-                "Any * → api edge: keep HTTP transport one-way; share DTOs via "
-                "src.schemas or dedicated contracts, never import api from below."
+                "Any * → api / src.api edge: keep HTTP transport one-way; share "
+                "DTOs via src.schemas or dedicated contracts, never import the "
+                "HTTP package from below."
             ),
         ],
     }

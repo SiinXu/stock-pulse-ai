@@ -61,7 +61,7 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `main.py` | Process bootstrap, analysis and scheduling coordination, optional API serving, Bot stream startup, and compatibility exports | Runtime helpers and direct analysis remain here; parsing and mode dispatch are rebound from `src/app/cli.py` to preserve the existing import surface. Web-only FastAPI startup is `python main.py --webui-only`, which binds `WEBUI_HOST` / `WEBUI_PORT` with a legacy `API_HOST` / `API_PORT` fallback before the `127.0.0.1:8000` defaults. |
 | `src/app/cli.py` | CLI argument parsing and mode dispatch | Dispatches through `main.py` runtime helpers; it does not own a second analysis or service lifecycle. |
 | `server.py` | Direct ASGI/uvicorn entry | Installs `ApplicationServices` and exports the FastAPI application; it does not start Bot stream clients. A direct `python server.py` launch resolves the same `WEBUI_HOST` / `WEBUI_PORT` bind with the legacy `API_HOST` / `API_PORT` fallback; explicit `--host` / `--port` still win, which is why Docker is unaffected by either key. |
-| `api/app.py` | FastAPI factory and lifespan | Owns auth/CORS/errors, routes, static Web hosting, `RuntimeSchedulerService`, and app-scoped `SystemConfigService`. |
+| `src/api/app.py` | FastAPI factory and lifespan | Owns auth/CORS/errors, routes, static Web hosting, `RuntimeSchedulerService`, and app-scoped `SystemConfigService`. |
 | `bot/` | Platform adapters, dispatcher, and commands | Bot `/analyze` submits to the shared process-local queue. Stream clients are started by `main.py`; Bot webhooks are not FastAPI routes. |
 | `apps/dsa-web/` | React/Vite product client | Calls `/api/v1` and observes analysis state through polling and task SSE. The production build is served by FastAPI. |
 | `apps/dsa-desktop/` | Electron packaging and desktop process coordination | Starts the packaged or local Python backend, waits for `/api/health`, then loads the FastAPI-hosted Web UI. |
@@ -101,7 +101,7 @@ path-filter, container-smoke, and reference-update coverage.
 | `data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control | Product task lifecycle or report presentation. |
 | `src/search_service.py` and intelligence/context services | News and intelligence retrieval, context assembly, and source diagnostics | Market-price provider ownership or HTTP presentation. |
 | `src/agent/` and `src/llm/` | Native Agent execution, tools, skills, conversation/runtime contracts, and model invocation adapters | Provider configuration source of truth, task lifecycle, or public report persistence. |
-| `src/schemas/` | Internal analysis and domain contracts | HTTP request/response DTOs, which live in `api/v1/schemas/`. |
+| `src/schemas/` | Internal analysis and domain contracts | HTTP request/response DTOs, which live in `src/api/v1/schemas/`. |
 | `src/storage.py`, `src/repositories/`, `src/migrations/` | ORM/database lifecycle, domain persistence adapters, and ordered schema migrations | Pipeline sequencing or transport behavior. |
 | `api/` | HTTP routing, middleware, lifespan, transport schemas, SSE and static asset delivery | A second business lifecycle or task status authority. |
 | Report and notification paths | `src/schemas/report_schema.py`, `src/services/report_renderer.py`, `templates/`, `src/core/stages/delivery.py`, and notification modules | A `src/reports/` package; no such package exists in the current tree. |
