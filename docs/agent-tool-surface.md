@@ -3,6 +3,8 @@
 Status: living contract for Agent tool registration and execution.
 Issue: [#1077](https://github.com/SiinXu/stock-pulse-ai/issues/1077).
 
+**Chinese**: [agent-tool-surface_CN.md](agent-tool-surface_CN.md)
+
 Canonical implementation: `src/agent/tools/surface.py`.
 Compatibility import: `src.agent.tool_surface` (re-export only).
 
