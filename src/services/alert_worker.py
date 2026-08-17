@@ -285,8 +285,12 @@ class AlertWorker:
         ``skipped`` (no quote / non-trading day) is not a trust failure.
         ``failed`` and ``degraded`` mean the source or payload is unusable, so
         the worker pauses the rule instead of leaving it eligible to notify.
+        Expanded watchlist / portfolio-holdings children share one parent id
+        and must not pause that parent on a single-symbol data failure.
         """
         if runtime_rule.source != "db":
+            return False
+        if self._is_expanded_batch_child(runtime_rule):
             return False
         rule_id = self._persisted_rule_id(runtime_rule, result)
         if rule_id <= 0:
@@ -309,6 +313,25 @@ class AlertWorker:
             result.get("record_status"),
         )
         return True
+
+    @staticmethod
+    def _is_expanded_batch_child(runtime_rule: RuntimeAlertRule) -> bool:
+        """Return True when this payload is one symbol of a shared parent rule.
+
+        Watchlist and portfolio-holdings rows expand into many runtime rules that
+        still share one persisted id. A single child's data failure must not
+        disable monitoring for the rest of that parent.
+        """
+        rule = getattr(runtime_rule, "rule", runtime_rule)
+        metadata = getattr(rule, "metadata", None)
+        if not isinstance(metadata, dict):
+            metadata = {}
+        target_scope = str(
+            getattr(rule, "target_scope", None)
+            or metadata.get("target_scope")
+            or ""
+        ).strip()
+        return target_scope in {"watchlist", "portfolio_holdings"}
 
     @staticmethod
     def _persisted_rule_id(runtime_rule: RuntimeAlertRule, result: Dict[str, Any]) -> int:

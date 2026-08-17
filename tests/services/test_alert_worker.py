@@ -1782,6 +1782,45 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(notifier.send_with_results.call_count, 3)
         self.assertEqual(len(self._triggers(status="triggered")), 4)
 
+    def test_watchlist_child_data_failure_does_not_pause_parent(self) -> None:
+        created = self._create_rule(
+            name="Watchlist",
+            target_scope="watchlist",
+            target="default",
+            alert_type="price_cross",
+            parameters={"direction": "above", "price": 10},
+        )
+        config = self._config(stock_list=["600519", "000001"])
+        notifier = self._notifier()
+
+        async def _evaluate(rule, _monitor, **_kwargs):
+            status = "failed" if rule.stock_code == "600519" else "triggered"
+            return {
+                "rule_id": self.service._runtime_rule_id(rule),
+                "record_status": status,
+                "triggered": status == "triggered",
+                "observed_value": 11.0 if status == "triggered" else None,
+                "threshold": 10.0,
+                "data_source": "realtime_quote",
+                "data_timestamp": None,
+                "reason": f"{status} test",
+                "message": f"{status} test",
+            }
+
+        worker = AlertWorker(config_provider=lambda: config, service=self.service, notifier=notifier)
+        with patch.object(self.service, "_evaluate_rule", new=_evaluate):
+            stats = worker.run_once()
+            second = worker.run_once()
+
+        self.assertEqual(stats["failed"], 1)
+        self.assertEqual(stats["triggered"], 1)
+        self.assertEqual(stats["paused"], 0)
+        self.assertEqual(stats["notified"], 1)
+        self.assertTrue(self.service.get_rule(created["id"])["enabled"])
+        self.assertEqual(second["loaded"], 2)
+        self.assertEqual(second["paused"], 0)
+        notifier.send_with_results.assert_called()
+
     def test_p6_watchlist_expands_to_child_keys_for_db_cooldown_fallback(self) -> None:
         self._create_rule(
             name="Watchlist",

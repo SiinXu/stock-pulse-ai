@@ -1,1 +1,2 @@
 - [Added] Natural-language monitor compiler emits structured IR (symbol/metric/comparator/threshold/cooldown) and AlertWorker pauses persisted rules on failed/degraded evaluation instead of notifying (Refs #1133).
+- [Fixed] AlertWorker no longer pauses a watchlist or portfolio-holdings parent rule when one expanded symbol evaluates as failed or degraded.

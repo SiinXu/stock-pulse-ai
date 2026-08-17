@@ -140,6 +140,8 @@ written to `cooldown_policy.cooldown_seconds`. Ambiguous cooldown mentions retur
 
 When a persisted monitor later evaluates as `failed` or `degraded` (data source or
 untrusted payload), `AlertWorker` pauses the rule (`enabled=false`) and does not
-notify. `skipped` (no quote / non-trading day) is not a trust failure and does not
-pause the rule. This path reuses the existing evaluator `record_status` contract
-and does not introduce a second trust model.
+notify. A `failed` or `degraded` result on one expanded watchlist or
+portfolio-holdings symbol does not pause the parent rule, so sibling symbols stay
+eligible. `skipped` (no quote / non-trading day) is not a trust failure and does
+not pause the rule. This path reuses the existing evaluator `record_status`
+contract and does not introduce a second trust model.
