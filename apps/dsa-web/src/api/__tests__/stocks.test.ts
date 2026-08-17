@@ -93,7 +93,7 @@ describe('stocksApi.getFieldTrust', () => {
             severity: 'warn',
             values: [
               { provider: 'efinance', value: 1688 },
-              { provider: 'AkshareFetcher', value: 2100 },
+              { provider: 'akshare_em', value: 2100 },
             ],
           },
         ],

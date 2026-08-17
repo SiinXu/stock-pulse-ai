@@ -86,7 +86,7 @@ def _source_token(value: Any) -> Optional[str]:
     token = getattr(value, "value", value)
     try:
         token = str(token).strip()
-    except Exception:  # broad-exception: fallback_recorded - unknown provider object stays unattributed
+    except Exception:  # broad-exception: optional_metadata - unknown provider object stays unattributed
         return None
     return token or None
 
@@ -106,7 +106,7 @@ def _ensure_payload(quote: Any) -> Optional[Dict[str, Any]]:
         }
         try:
             setattr(quote, "field_trust", payload)
-        except Exception:  # broad-exception: fallback_recorded - frozen quote objects simply carry no trust payload
+        except Exception:  # broad-exception: optional_metadata - frozen quote objects simply carry no trust payload
             return None
     payload.setdefault("schema_version", FIELD_TRUST_SCHEMA_VERSION)
     payload.setdefault("fields", {})
@@ -296,22 +296,45 @@ def _circuit_snapshots() -> Dict[str, Dict[str, Any]]:
 
         snapshot = get_realtime_circuit_breaker().get_snapshot()
         return snapshot if isinstance(snapshot, dict) else {}
-    except Exception:  # broad-exception: fallback_recorded - circuit health is optional enrichment
+    except Exception:  # broad-exception: optional_metadata - circuit health is optional enrichment
         return {}
+
+
+def resolve_source_token(*candidates: Any) -> Optional[str]:
+    """Return the first normalized provider token among *candidates*."""
+    for candidate in candidates:
+        token = _source_token(candidate)
+        if token:
+            return token
+    return None
+
+
+def record_comparison_failure(
+    quote: Any,
+    *,
+    primary_provider: Any,
+    secondary_provider: Any,
+) -> None:
+    """Record that a comparison attempted to run and failed closed for trust."""
+    record_conflict_check(
+        quote,
+        primary_provider=primary_provider,
+        secondary_provider=secondary_provider,
+        status=CONFLICT_CHECK_SKIPPED,
+        reason="comparison_failed",
+    )
 
 
 def build_provider_health(payload: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Project provider-neutral health rows from attempts + circuit snapshots."""
     circuits = _circuit_snapshots()
     rows: List[Dict[str, Any]] = []
-    seen: set[str] = set()
     for attempt in payload.get("provider_attempts") or []:
         if not isinstance(attempt, dict):
             continue
         provider = _source_token(attempt.get("provider"))
         if not provider:
             continue
-        seen.add(provider)
         circuit = circuits.get(provider) or {}
         rows.append(
             {

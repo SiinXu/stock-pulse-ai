@@ -110,7 +110,7 @@ class StockFieldTrustApiTests(unittest.TestCase):
             for item in entry["values"]
         }
         self.assertEqual(providers["efinance"], 1688.0)
-        self.assertEqual(providers["AkshareFetcher"], 2100.0)
+        self.assertEqual(providers["akshare_em"], 2100.0)
         health_providers = {row["provider"] for row in payload["provider_health"]}
         self.assertIn("efinance", health_providers)
         self.assertEqual(payload["analysis_input"]["confidence"], "low")
@@ -152,6 +152,28 @@ class StockFieldTrustApiTests(unittest.TestCase):
         self.assertTrue(
             any(gap["code"] == "provider_failed" for gap in payload["analysis_input"]["gaps"])
         )
+
+    def test_post_primary_failure_degrades_health_view(self) -> None:
+        fresh_ts = datetime.now(timezone.utc).isoformat()
+        primary = _make_quote(
+            source=RealtimeSource.EFINANCE,
+            provider_timestamp=fresh_ts,
+        )
+        manager = DataFetcherManager(
+            fetchers=[
+                _DummyFetcher("EfinanceFetcher", 0, result=primary),
+                _DummyFetcher("AkshareFetcher", 1, error=RuntimeError("akshare down")),
+            ]
+        )
+
+        resp = self._get_trust(manager)
+        self.assertEqual(resp.status_code, 200, resp.text)
+        payload = resp.json()
+        self.assertEqual(payload["status"], "degraded")
+        statuses = {(row["provider"], row["status"]) for row in payload["provider_health"]}
+        self.assertIn(("efinance", "ok"), statuses)
+        self.assertIn(("akshare_em", "failed"), statuses)
+        self.assertEqual(payload["analysis_input"]["confidence"], "low")
 
     def test_unavailable_when_every_provider_fails(self) -> None:
         manager = DataFetcherManager(

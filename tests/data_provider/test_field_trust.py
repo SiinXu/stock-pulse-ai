@@ -199,7 +199,7 @@ def test_conflict_recorded_when_providers_disagree(mock_get_config, validation_e
     )
     providers = {item["provider"]: item["value"] for item in price_conflict["values"]}
     assert providers["efinance"] == 1688.0
-    assert providers["AkshareFetcher"] == 2100.0
+    assert providers["akshare_em"] == 2100.0
     assert trust["fields"]["price"]["conflict"] is True
     assert any(
         check["status"] == field_trust.CONFLICT_CHECK_EVALUATED
@@ -302,6 +302,78 @@ def test_provider_failure_is_recorded_on_fallback(mock_get_config, validation_en
     assert any(gap["code"] == "provider_failed" for gap in analysis["gaps"])
     assert analysis["confidence"] == field_trust.CONFIDENCE_LOW
     assert analysis["failed_provider_count"] >= 1
+
+
+@patch("src.config.get_config")
+def test_comparison_exception_does_not_imply_agreement(
+    mock_get_config, validation_enabled
+):
+    """A failed comparison must degrade trust instead of reading as agreement."""
+    mock_get_config.return_value = _mock_config()
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    primary = _make_quote(
+        source=RealtimeSource.EFINANCE,
+        provider_timestamp=fresh_ts,
+    )
+    secondary = _make_quote(source=RealtimeSource.AKSHARE_EM, volume_ratio=1.5)
+    secondary.price = 200.0
+    manager = DataFetcherManager(
+        fetchers=[
+            _DummyFetcher("EfinanceFetcher", 0, result=primary),
+            _DummyFetcher("AkshareFetcher", 1, result=secondary),
+        ]
+    )
+
+    with patch(
+        "src.data_provider.data_validation.compare_cross_source_quotes",
+        side_effect=RuntimeError("comparison exploded"),
+    ):
+        quote = manager.get_realtime_quote("600519")
+
+    assert quote is primary
+    assert quote.price == 1688.0
+    trust = quote.field_trust
+    skipped = [
+        check
+        for check in trust["conflict_checks"]
+        if check.get("reason") == "comparison_failed"
+    ]
+    assert skipped
+    assert skipped[0]["status"] == field_trust.CONFLICT_CHECK_SKIPPED
+    assert skipped[0]["secondary_provider"] == "akshare_em"
+    assert trust["analysis_input"]["confidence"] != field_trust.CONFIDENCE_HIGH
+    assert any(
+        gap["code"] == "conflict_check_skipped" for gap in trust["analysis_input"]["gaps"]
+    )
+
+
+@patch("src.config.get_config")
+def test_post_primary_provider_failure_is_recorded(
+    mock_get_config, validation_enabled
+):
+    """A failed later source must appear on health after a primary quote exists."""
+    mock_get_config.return_value = _mock_config()
+    fresh_ts = datetime.now(timezone.utc).isoformat()
+    primary = _make_quote(
+        source=RealtimeSource.EFINANCE,
+        provider_timestamp=fresh_ts,
+    )
+    manager = DataFetcherManager(
+        fetchers=[
+            _DummyFetcher("EfinanceFetcher", 0, result=primary),
+            _DummyFetcher("AkshareFetcher", 1, error=RuntimeError("akshare down")),
+        ]
+    )
+
+    quote = manager.get_realtime_quote("600519")
+
+    assert quote is primary
+    trust = quote.field_trust
+    statuses = {(row["provider"], row["status"]) for row in trust["provider_health"]}
+    assert ("efinance", "ok") in statuses
+    assert ("akshare_em", "failed") in statuses
+    assert trust["analysis_input"]["confidence"] == field_trust.CONFIDENCE_LOW
+    assert any(gap["code"] == "provider_failed" for gap in trust["analysis_input"]["gaps"])
 
 
 @patch("src.config.get_config")

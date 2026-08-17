@@ -2099,10 +2099,15 @@ class DataFetcherManager:
                                 compare_cross_source_quotes,
                             )
 
-                            primary_source = getattr(primary_quote, "source", None)
-                            primary_provider = getattr(
-                                primary_source, "value", primary_source
-                            ) or "primary"
+                            primary_provider = _field_trust.resolve_source_token(
+                                getattr(primary_quote, "source", None),
+                                "primary",
+                            )
+                            secondary_provider = _field_trust.resolve_source_token(
+                                getattr(quote, "source", None),
+                                source,
+                                provider_name,
+                            )
                             # compare_cross_source_quotes already no-ops when
                             # validation is disabled; record that skip instead
                             # of implying agreement.
@@ -2110,7 +2115,7 @@ class DataFetcherManager:
                                 primary_quote,
                                 quote,
                                 primary_provider=str(primary_provider),
-                                secondary_provider=str(provider_name),
+                                secondary_provider=str(secondary_provider),
                                 market=_market_tag(
                                     normalize_stock_code(stock_code)
                                 ),
@@ -2123,7 +2128,7 @@ class DataFetcherManager:
                                 primary_quote,
                                 cross_result,
                                 primary_provider=primary_provider,
-                                secondary_provider=provider_name,
+                                secondary_provider=secondary_provider,
                             )
                         except Exception as cross_exc:  # broad-exception: fallback_recorded - observational only
                             log_safe_exception(
@@ -2136,6 +2141,15 @@ class DataFetcherManager:
                                     "symbol": stock_code,
                                     "provider": provider_name,
                                 },
+                            )
+                            _field_trust.record_comparison_failure(
+                                primary_quote,
+                                primary_provider=getattr(primary_quote, "source", None),
+                                secondary_provider=_field_trust.resolve_source_token(
+                                    getattr(quote, "source", None),
+                                    source,
+                                    provider_name,
+                                ),
                             )
                         merged = self._merge_quote_fields(primary_quote, quote)
                         if merged:
@@ -2157,6 +2171,13 @@ class DataFetcherManager:
                     )
                     if primary_quote is None:
                         failed_sources.append(source)
+                    else:
+                        _field_trust.record_provider_attempt(
+                            primary_quote,
+                            provider=source,
+                            status=_field_trust.PROVIDER_STATUS_EMPTY,
+                            role=_field_trust.PROVIDER_ROLE_ATTEMPTED,
+                        )
                     
             except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede realtime fallback
                 error_msg = f"[{source}] 失败: {str(e)}"
@@ -2185,6 +2206,13 @@ class DataFetcherManager:
                 errors.append(error_msg)
                 if primary_quote is None:
                     failed_sources.append(source)
+                else:
+                    _field_trust.record_provider_attempt(
+                        primary_quote,
+                        provider=source,
+                        status=_field_trust.PROVIDER_STATUS_FAILED,
+                        role=_field_trust.PROVIDER_ROLE_ATTEMPTED,
+                    )
                 continue
         
         # Return primary even if some fields are still missing
@@ -2368,6 +2396,13 @@ class DataFetcherManager:
                 return primary_quote
             try:
                 secondary = self._try_fetcher_quote(stock_code, fetcher_name, **kw)
+                if secondary is None:
+                    _field_trust.record_provider_attempt(
+                        primary_quote,
+                        provider=self._realtime_fetcher_token(fetcher_name, **kw),
+                        status=_field_trust.PROVIDER_STATUS_EMPTY,
+                        role=_field_trust.PROVIDER_ROLE_ATTEMPTED,
+                    )
                 if secondary is not None:
                     # Issue #185: cross-source consistency when both providers
                     # supply the same field. Fail-open: never drop the primary.
@@ -2376,10 +2411,15 @@ class DataFetcherManager:
                             compare_cross_source_quotes,
                         )
 
-                        primary_source = getattr(primary_quote, "source", None)
-                        primary_provider = getattr(
-                            primary_source, "value", primary_source
-                        ) or "primary"
+                        primary_provider = _field_trust.resolve_source_token(
+                            getattr(primary_quote, "source", None),
+                            "primary",
+                        )
+                        secondary_provider = _field_trust.resolve_source_token(
+                            getattr(secondary, "source", None),
+                            self._realtime_fetcher_token(fetcher_name, **kw),
+                            fetcher_name,
+                        )
                         # compare_cross_source_quotes already no-ops when
                         # validation is disabled; record that skip instead
                         # of implying agreement.
@@ -2387,7 +2427,7 @@ class DataFetcherManager:
                             primary_quote,
                             secondary,
                             primary_provider=str(primary_provider),
-                            secondary_provider=str(fetcher_name),
+                            secondary_provider=str(secondary_provider),
                             market=_market_tag(normalize_stock_code(stock_code)),
                             stock_code=stock_code,
                             asset_type=getattr(
@@ -2398,7 +2438,7 @@ class DataFetcherManager:
                             primary_quote,
                             cross_result,
                             primary_provider=primary_provider,
-                            secondary_provider=fetcher_name,
+                            secondary_provider=secondary_provider,
                         )
                     except Exception as cross_exc:  # broad-exception: fallback_recorded - comparison is observational
                         log_safe_exception(
@@ -2412,6 +2452,15 @@ class DataFetcherManager:
                                 "provider": fetcher_name,
                             },
                         )
+                        _field_trust.record_comparison_failure(
+                            primary_quote,
+                            primary_provider=getattr(primary_quote, "source", None),
+                            secondary_provider=_field_trust.resolve_source_token(
+                                getattr(secondary, "source", None),
+                                self._realtime_fetcher_token(fetcher_name, **kw),
+                                fetcher_name,
+                            ),
+                        )
                     filled = self._merge_quote_fields(primary_quote, secondary)
                     if filled:
                         logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 补充了: {filled}")
@@ -2423,6 +2472,12 @@ class DataFetcherManager:
                     error_code="realtime_quote_supplement_failed",
                     level=logging.DEBUG,
                     context={"symbol": stock_code, "provider": fetcher_name},
+                )
+                _field_trust.record_provider_attempt(
+                    primary_quote,
+                    provider=self._realtime_fetcher_token(fetcher_name, **kw),
+                    status=_field_trust.PROVIDER_STATUS_FAILED,
+                    role=_field_trust.PROVIDER_ROLE_ATTEMPTED,
                 )
             return primary_quote
 

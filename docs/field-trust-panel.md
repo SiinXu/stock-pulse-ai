@@ -13,7 +13,7 @@ Per-field trust is additive metadata on the existing realtime quote fallback cha
 | Analysis input | provider-neutral `{ confidence, gaps[] }`; `high` only when every covered field is fresh, attributed, and conflict-free |
 | Web panel | Visible degradation for stale, conflict, missing metadata, provider failure, and unavailable quotes |
 
-`status=ok` is reserved for a complete, fresh, attributed, conflict-free view. Missing metadata, unknown staleness, skipped conflict checks, stale fields, conflicts, and preferred-provider failures are degradation signals.
+`status=ok` is reserved for a complete, fresh, attributed, conflict-free view. Missing metadata, unknown staleness, skipped conflict checks (including a comparison that failed closed), stale fields, conflicts, preferred-provider failures, and later-source empty/failed supplement attempts are degradation signals. Cross-source identities use the same source tokens as field attribution (`efinance`, `akshare_em`), not fetcher class names.
 
 ## Ownership boundary vs #1133
 

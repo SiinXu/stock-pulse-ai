@@ -36,7 +36,7 @@ const staleConflictView: StockFieldTrustResponse = {
       threshold: 0.05,
       values: [
         { provider: 'efinance', value: 1688 },
-        { provider: 'AkshareFetcher', value: 2100 },
+        { provider: 'akshare_em', value: 2100 },
       ],
     },
   ],
@@ -101,7 +101,7 @@ describe('FieldTrustPanel', () => {
     expect(screen.getByTestId('field-trust-fields')).toHaveTextContent('Yes');
     expect(screen.getByTestId('field-trust-gaps')).toHaveTextContent(/providers disagreed/i);
     expect(screen.getByTestId('field-trust-conflicts')).toHaveTextContent(/efinance=1,?688/);
-    expect(screen.getByTestId('field-trust-conflicts')).toHaveTextContent(/AkshareFetcher=2,?100/);
+    expect(screen.getByTestId('field-trust-conflicts')).toHaveTextContent(/akshare_em=2,?100/);
     expect(screen.getByTestId('field-trust-provider-health')).toHaveTextContent('efinance');
     expect(screen.getByTestId('field-trust-fields')).not.toHaveTextContent(/2,?100/);
   });
