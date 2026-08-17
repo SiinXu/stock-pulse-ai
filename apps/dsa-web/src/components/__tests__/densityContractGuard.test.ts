@@ -13,7 +13,10 @@ import {
   SURFACE_PADDING_DENSITY_CLASS,
 } from '../../design/density';
 import {
+  assertNonEmptyProductionInventory,
+  isTypeScriptModulePath,
   productionCssSources,
+  productionTypeScriptSources,
   productionTsxSources,
 } from './productionSourceInventory';
 
@@ -185,15 +188,18 @@ function findNonSemanticOverlayElevation(
 }
 
 describe('density contract guard', () => {
+  assertNonEmptyProductionInventory(productionTypeScriptSources, 'productionTypeScriptSources');
+  assertNonEmptyProductionInventory(productionCssSources, 'productionCssSources');
   // Read index.css from disk so token inventory checks are not coupled to Vite
   // raw-module transform/caching of productionCssSources.
   const indexCss = fs.readFileSync('src/index.css', 'utf8');
-  const surfaceSource = productionTsxSources[SURFACE_OWNER]
+  const surfaceSource = productionTypeScriptSources[SURFACE_OWNER]
+    ?? productionTsxSources[SURFACE_OWNER]
     ?? fs.readFileSync('src/components/common/Surface.tsx', 'utf8');
-  const productionCssAndTsx = {
+  const productionCssAndTypeScript = {
     ...productionCssSources,
     [INDEX_CSS]: indexCss,
-    ...productionTsxSources,
+    ...productionTypeScriptSources,
   };
 
   it('keeps the density token inventory declared in index.css', () => {
@@ -204,7 +210,7 @@ describe('density contract guard', () => {
   });
 
   it('rejects parallel --density-* definitions outside the token owner', () => {
-    expect(findParallelDensityDefinitions(productionCssAndTsx)).toEqual([]);
+    expect(findParallelDensityDefinitions(productionCssAndTypeScript)).toEqual([]);
   });
 
   it('wires Surface padding and overlay elevation to density / elevation tokens', () => {
@@ -244,5 +250,20 @@ describe('density contract guard', () => {
     expect(badOverlay.map(({ token }) => token)).toEqual(
       expect.arrayContaining(['shadow-2xl', 'shadow-elevation-overlay:missing']),
     );
+  });
+
+  it('fails closed when the TypeScript inventory is empty and still scans .ts modules', () => {
+    expect(Object.keys(productionTypeScriptSources).some(isTypeScriptModulePath)).toBe(true);
+    expect(() => assertNonEmptyProductionInventory({}, 'productionTypeScriptSources'))
+      .toThrow(/empty/);
+    const parallel = findParallelDensityDefinitions({
+      '../../utils/densityFixture.ts': 'const rules = `--density-stack-gap: 1rem;`;',
+    });
+    expect(parallel).toEqual([
+      expect.objectContaining({
+        file: '../../utils/densityFixture.ts',
+        token: '--density-stack-gap',
+      }),
+    ]);
   });
 });

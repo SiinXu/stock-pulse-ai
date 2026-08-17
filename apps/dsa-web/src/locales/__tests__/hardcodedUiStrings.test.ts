@@ -10,8 +10,11 @@ import { describe, expect, it } from 'vitest';
 import {
   collectHardcodedUiStrings,
   collectHardcodedUiStringsFromSources,
+  expiringFileAllowanceMatches,
   findHardcodedUiStrings,
+  findUnusedExpiringFileAllowances,
   findUnusedUiStringAllowances,
+  type ExpiringUiStringFileAllowance,
   type HardcodedUiStringAllowance,
   type HardcodedUiStringContext,
 } from './hardcodedUiStringGuard';
@@ -123,6 +126,20 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
   },
 ];
 
+const expiringErrorCopyAllowance: ExpiringUiStringFileAllowance = {
+  files: [
+    'components/settings/LLMConnectionModal.tsx',
+    'components/settings/llmChannelEditorModel.ts',
+  ],
+  context: 'error',
+  reason: 'LLM connection editor still ships Chinese field-error literals through error={...}.',
+  removeWhen: 'Follow-up task localizes LLM connection field-error copy in LLMConnectionModal and llmChannelEditorModel (Refs #164).',
+};
+
+const expiringFileAllowances: readonly ExpiringUiStringFileAllowance[] = [
+  expiringErrorCopyAllowance,
+];
+
 function collectSourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry: { name: string; isDirectory: () => boolean; isFile: () => boolean }) => {
     const fullPath = path.join(directory, entry.name);
@@ -137,7 +154,7 @@ function collectSourceFiles(directory: string): string[] {
 
 let productionCandidateCache: ReturnType<typeof collectHardcodedUiStrings> | null = null;
 
-const nonJsxUserCopyContext = /(?:\btoast(?:\s*\.|\s*\()|\bnotify\s*\(|\b(?:set|show|add|push)[A-Za-z0-9]*Toast\s*\(|\bset[A-Za-z0-9]*Error(?:Message)?\s*\(|\bset[A-Za-z0-9]*(?:Notice|Feedback|Banner)\s*\(|\b(?:document|window\s*\.\s*document|globalThis\s*\.\s*document)\s*\.\s*title\s*=)/;
+const nonJsxUserCopyContext = /(?:\btoast(?:\s*\.|\s*\()|\bnotify\s*\(|\b(?:set|show|add|push)[A-Za-z0-9]*Toast\s*\(|\bset[A-Za-z0-9]*Error(?:Message)?\s*\(|\bset[A-Za-z0-9]*(?:Notice|Feedback|Banner)\s*\(|\b(?:document|window\s*\.\s*document|globalThis\s*\.\s*document)\s*\.\s*title\s*=|export\s+(?:function\s+get[A-Za-z0-9]+Issues\b|const\s+[A-Z0-9_]+_ISSUE\b))/;
 
 function canContainUserCopyContext(filename: string, sourceText: string): boolean {
   // JSX is not valid in .ts files. Avoid constructing a TypeScript Program for
@@ -168,6 +185,7 @@ describe('hardcoded UI string scanner', () => {
     ['feedback.ts', "toast.error('Could not save settings');"],
     ['notice.ts', "setSaveBanner({ title: 'Settings saved' });"],
     ['document.ts', "window.document.title = 'Settings';"],
+    ['issues.ts', "export function getChannelNameIssues() { return ['连接名称必填']; }"],
   ])('keeps %s in the production candidate scan', (filename, sourceText) => {
     expect(canContainUserCopyContext(filename, sourceText)).toBe(true);
   });
@@ -193,6 +211,7 @@ describe('hardcoded UI string scanner', () => {
     ['custom-component emptyText', 'const View = () => <Select emptyText="No options" />;', 'emptyText'],
     ['custom-component searchPlaceholder', 'const View = () => <Select searchPlaceholder="Search models" />;', 'searchPlaceholder'],
     ['custom-component loadingText', 'const View = () => <Button loadingText="Saving settings" />;', 'loadingText'],
+    ['custom-component error', 'const View = () => <Input error="Could not save settings" />;', 'error'],
     ['error setter', "const fail = () => setError('Could not save settings');", 'error-call'],
     ['toast call', "const fail = () => toast.error('Could not save settings');", 'toast-call'],
     ['direct toast call', "const done = () => toast('Settings saved');", 'toast-call'],
@@ -363,6 +382,40 @@ describe('hardcoded UI string scanner', () => {
     ]);
   });
 
+  it('detects exported issue-copy literals as error context', () => {
+    const sourceText = `
+      export const CONNECTION_SCHEMA_UNAVAILABLE_ISSUE = '连接 Schema 不完整或不可用';
+      export function getChannelNameIssues() {
+        return ['连接名称必填'];
+      }
+    `;
+
+    expect(findHardcodedUiStrings('llmChannelEditorModel.ts', sourceText)).toEqual([
+      expect.objectContaining({ context: 'error', text: '连接 Schema 不完整或不可用' }),
+      expect.objectContaining({ context: 'error', text: '连接名称必填' }),
+    ]);
+  });
+
+  it('resolves Chinese comparison literals passed through error={...}', () => {
+    const sourceText = `
+      const apiKeyError = issues.find((issue) => issue === '缺少 API 密钥');
+      const View = () => <Input error={apiKeyError} />;
+    `;
+
+    expect(findHardcodedUiStrings('LLMConnectionModal.tsx', sourceText)).toEqual([
+      expect.objectContaining({ context: 'error', text: '缺少 API 密钥' }),
+    ]);
+  });
+
+  it('does not treat a status token compared inside an error-state initializer as UI copy', () => {
+    const sourceText = `
+      const [error, setError] = useState(initialRun?.status === 'error' ? payload : null);
+      const View = () => <ApiErrorAlert error={error} />;
+    `;
+
+    expect(findHardcodedUiStrings('DeepResearchPanel.tsx', sourceText)).toEqual([]);
+  });
+
   it('requires an exact file, string, and context match for an allowance', () => {
     const sourceText = 'const View = () => <span>JSON</span>;';
     const allowance: HardcodedUiStringAllowance = {
@@ -392,12 +445,18 @@ describe('hardcoded UI string scanner', () => {
 
 describe('production hardcoded UI strings', () => {
   it('keeps hardcoded English and Chinese copy out of user-facing TSX contexts', () => {
-    const failures = productionCandidates().filter((candidate) => !exactAllowedStrings.some((allowance) => (
-      allowance.file === candidate.file
-      && allowance.text === candidate.text
-      && allowance.context === candidate.context
-    )));
+    const failures = productionCandidates().filter((candidate) => (
+      !exactAllowedStrings.some((allowance) => (
+        allowance.file === candidate.file
+        && allowance.text === candidate.text
+        && allowance.context === candidate.context
+      ))
+      && !expiringFileAllowances.some((allowance) => (
+        expiringFileAllowanceMatches(candidate, allowance)
+      ))
+    ));
 
+    expect(productionCandidates().length).toBeGreaterThan(0);
     expect(failures.map(({ file, line, context, text }) => (
       `${file}:${line} [${context}] ${JSON.stringify(text)}`
     ))).toEqual([]);
@@ -406,5 +465,9 @@ describe('production hardcoded UI strings', () => {
   it('keeps every allowance documented, exact, and in use', () => {
     expect(exactAllowedStrings.every((allowance) => allowance.purpose.trim().length > 0)).toBe(true);
     expect(findUnusedUiStringAllowances(productionCandidates(), exactAllowedStrings)).toEqual([]);
+    expect(expiringFileAllowances).toHaveLength(1);
+    expect(expiringErrorCopyAllowance.reason.trim().length).toBeGreaterThan(0);
+    expect(expiringErrorCopyAllowance.removeWhen).toMatch(/localizes LLM connection field-error copy/i);
+    expect(findUnusedExpiringFileAllowances(productionCandidates(), expiringFileAllowances)).toEqual([]);
   });
 });

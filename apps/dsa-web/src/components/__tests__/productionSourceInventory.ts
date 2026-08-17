@@ -59,3 +59,20 @@ export const productionCssAndTsxSources = {
   ...productionCssSources,
   ...productionTsxSources,
 };
+export const productionCssAndTypeScriptSources = {
+  ...productionCssSources,
+  ...productionTypeScriptSources,
+};
+
+export function assertNonEmptyProductionInventory(
+  sources: RawSourceInventory,
+  label: string,
+): void {
+  if (Object.keys(sources).length === 0) {
+    throw new Error(`${label} is empty; refusing to pass a vacuous production scan.`);
+  }
+}
+
+export function isTypeScriptModulePath(filename: string): boolean {
+  return filename.endsWith('.ts') && !filename.endsWith('.tsx');
+}

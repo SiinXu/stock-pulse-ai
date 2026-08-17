@@ -1,0 +1,1 @@
+- [Tests] Extended the design and i18n guards to scan TypeScript sources (Refs #1300).

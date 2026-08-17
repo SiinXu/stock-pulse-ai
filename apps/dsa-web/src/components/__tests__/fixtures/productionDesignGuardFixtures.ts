@@ -5,6 +5,8 @@ export const productionDesignGuardFixtures = {
   pillCssButton: '.btn-primary { border-radius: 9999px; }',
   mappedPillCssButton: '.session-item { border-radius: 50%; }',
   hardcodedHex: '<div className="bg-[#123456]" />',
+  hardcodedHexTypeScript: "export const scoreColor = (score: number): string => score > 0 ? '#22c55e' : '#ef4444';",
+  localeIssueReference: 'Score paper trades on process. Outcome metrics (#987). Shares metering with per-mode budgets (#1213).',
   hardcodedFunctionalColor: '<div className="shadow-[0_8px_24px_rgba(0,0,0,0.2)]" />',
   hardcodedCssFunctionalColor: '.card { box-shadow: 0 8px 24px hsl(0 0% 0% / 0.2); }',
   magicPixelFont: '<p className="text-[13px]">Summary</p>',

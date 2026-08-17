@@ -13,8 +13,10 @@ import {
 } from '../../design/theme';
 import { THEME_PACKS } from '../../design/themePacks';
 import {
+  assertNonEmptyProductionInventory,
+  isTypeScriptModulePath,
   productionCssSources,
-  productionTsxSources,
+  productionTypeScriptSources,
 } from './productionSourceInventory';
 
 const INDEX_CSS = '../../index.css';
@@ -195,11 +197,13 @@ function findDarkThemeDirectionOverrides(indexCss: string): Finding[] {
 }
 
 describe('theme contract guard', () => {
+  assertNonEmptyProductionInventory(productionTypeScriptSources, 'productionTypeScriptSources');
+  assertNonEmptyProductionInventory(productionCssSources, 'productionCssSources');
   const indexCss = fs.readFileSync('src/index.css', 'utf8');
-  const productionCssAndTsx = {
+  const productionCssAndTypeScript = {
     ...productionCssSources,
     [INDEX_CSS]: indexCss,
-    ...productionTsxSources,
+    ...productionTypeScriptSources,
   };
 
   it('keeps Theme Contract v1 core tokens declared in index.css', () => {
@@ -217,7 +221,7 @@ describe('theme contract guard', () => {
   });
 
   it('rejects parallel --price-* definitions outside index.css', () => {
-    const parallel = findParallelPriceDefinitions(productionCssAndTsx);
+    const parallel = findParallelPriceDefinitions(productionCssAndTypeScript);
     expect(parallel.length).toBeLessThanOrEqual(MAX_PARALLEL_PRICE_TOKEN_DEFINITIONS);
     expect(parallel).toEqual([]);
   });
@@ -246,13 +250,13 @@ describe('theme contract guard', () => {
   });
 
   it('ratchets hardcoded --home-price-* production references downward only', () => {
-    const refs = findHardcodedHomePriceRefs(productionCssAndTsx);
+    const refs = findHardcodedHomePriceRefs(productionCssAndTypeScript);
     expect(refs.length).toBeLessThanOrEqual(MAX_HARDCODED_HOME_PRICE_CSS_VAR_REFS);
     expect(refs).toEqual([]);
   });
 
   it('forbids shared common components from depending on page token families', () => {
-    const refs = findCommonPageTokenRefs(productionCssAndTsx);
+    const refs = findCommonPageTokenRefs(productionCssAndTypeScript);
     expect(refs.length).toBeLessThanOrEqual(MAX_COMMON_PAGE_TOKEN_REFS);
     expect(refs).toEqual([]);
   });
@@ -298,5 +302,20 @@ describe('theme contract guard', () => {
       '../../components/common/Example.tsx': "return <div style={{ color: 'var(--login-text)' }} />;",
     });
     expect(commonPageRefs.map(({ token }) => token)).toEqual(['--login-text']);
+  });
+
+  it('fails closed when the TypeScript inventory is empty and still scans .ts modules', () => {
+    expect(Object.keys(productionTypeScriptSources).some(isTypeScriptModulePath)).toBe(true);
+    expect(() => assertNonEmptyProductionInventory({}, 'productionTypeScriptSources'))
+      .toThrow(/empty/);
+    const parallel = findParallelPriceDefinitions({
+      '../../utils/themeFixture.ts': 'const rules = `--price-up: red;`;',
+    });
+    expect(parallel).toEqual([
+      expect.objectContaining({
+        file: '../../utils/themeFixture.ts',
+        token: '--price-up',
+      }),
+    ]);
   });
 });
