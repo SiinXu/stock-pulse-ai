@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
@@ -130,5 +131,43 @@ describe('bundle size checker', () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('No .js/.css assets found under');
+  });
+});
+
+describe('first-paint entry budget (Refs #883)', () => {
+  const budgetPath = path.join(WEB_ROOT, 'scripts', 'bundle-size-budget.json');
+  const eslintPath = path.join(WEB_ROOT, 'eslint.config.js');
+
+  it('keeps js-entry at or under the 178000 B gzip acceptance cap with 5% headroom', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const entry = budget.rules.find((rule) => rule.id === 'js-entry');
+
+    expect(entry).toEqual(expect.objectContaining({
+      match: 'assets/index-*.js',
+    }));
+    expect(entry.measuredGzipBytes).toBeLessThanOrEqual(178_000);
+    expect(entry.maxGzipBytes).toBeGreaterThanOrEqual(Math.ceil(entry.measuredGzipBytes * 1.05));
+    expect(entry.maxGzipBytes).toBeLessThan(195_814);
+  });
+
+  it('gives the displaced TimePicker chunk a named rule with 5% headroom', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const picker = budget.rules.find((rule) => rule.id === 'TimePicker');
+
+    expect(picker).toEqual(expect.objectContaining({
+      match: 'assets/TimePicker-*.js',
+    }));
+    expect(picker.maxGzipBytes).toBeGreaterThanOrEqual(Math.ceil(picker.measuredGzipBytes * 1.05));
+  });
+
+  it('forbids the shared control barrel from App, main, and layout', () => {
+    const source = readFileSync(eslintPath, 'utf8');
+
+    expect(source).toContain("'src/App.tsx'");
+    expect(source).toContain("'src/main.tsx'");
+    expect(source).toContain('src/components/layout/**/*.{ts,tsx}');
+    expect(source).toContain("'no-restricted-imports'");
+    expect(source).toContain("'./components/common'");
+    expect(source).toContain("'../common'");
   });
 });
