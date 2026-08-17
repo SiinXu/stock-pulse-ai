@@ -184,8 +184,9 @@ NaN 与正负 Infinity 都会 fail-closed，且不会改变持久化文件。
    - `agent_tool`：`src.agent.tools.registry` 中的
      `ToolDefinition` / `ToolParameter` / `ToolPolicy`（由 ToolSurface 拥有）
 
-不要导入 `PluginManager`、`ExternalPluginLoader`、私有 `src.plugins.*` 模块，
-也不要发明第七个扩展点名称。
+不要导入 `PluginManager`、`ExternalPluginLoader`、私有 `src.plugins.*` 模块
+（`permissions`、`lifecycle`、`loader` 内部实现），也不要发明第七个扩展点名称。
+宿主组合继续使用 `PluginManager` 门面；拆分后的模块不是作者 API。
 
 生命周期始终为：
 
