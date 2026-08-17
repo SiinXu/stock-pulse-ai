@@ -40,9 +40,11 @@ error. A refusal writes no output.
   snapshots too. I18n accepts only one-line array/map additions with disjoint
   keys; registry hashes are recomputed by importing the merged registry.
 - `settingsHelp.<lang>.ts` files are the Settings-page help catalogue. The
-  resolver unions complete, brace-balanced entry blocks by settings key. It
-  refuses empty sides, unexpected hunk lines, the same key with different
-  bodies, and hunks where only one side ends mid-block.
+  resolver unions complete, brace-balanced entry blocks by settings key,
+  including one-line empty `key: {}` entries. Complete and mid-block (open)
+  forms share that key table: the same key with different bodies is refused,
+  and equivalent open/complete copies are kept once. It also refuses empty
+  sides, unexpected hunk lines, and hunks where only one side ends mid-block.
 
 Rollback is ordinary Git merge rollback: run `git merge --abort`. The resolver
 does not commit, push, raise budgets, or resolve semantic source conflicts.

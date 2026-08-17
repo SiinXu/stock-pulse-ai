@@ -11,6 +11,9 @@ from .common import ConflictContext, ConflictHunk, RefusalError, parse_conflict_
 SUPPORTED_PATTERNS = ("apps/dsa-web/src/locales/settingsHelp.<lang>.ts",)
 _PATH = re.compile(r"^apps/dsa-web/src/locales/settingsHelp\.[A-Za-z-]+\.ts$")
 _BLOCK_START = re.compile(r"^(\s*)(['\"])((?:[^'\"\\]|\\.)+)\2\s*:\s*\{\s*$")
+_ONE_LINE_EMPTY = re.compile(
+    r"^(\s*)(['\"])((?:[^'\"\\]|\\.)+)\2\s*:\s*\{\s*\}\s*,?\s*$"
+)
 _CLOSER = re.compile(r"^\s*\},?\s*$")
 
 
@@ -20,6 +23,38 @@ def is_supported(path: Path) -> bool:
 
 def _raw_lines(lines: tuple[str, ...]) -> list[str]:
     return [line if line.endswith("\n") else f"{line}\n" for line in lines]
+
+
+def _entry_start(line: str) -> re.Match[str] | None:
+    raw = line.rstrip("\n")
+    return _ONE_LINE_EMPTY.match(raw) or _BLOCK_START.match(raw)
+
+
+def _normalized(lines: list[str]) -> list[str]:
+    return [line.strip() for line in lines]
+
+
+def _remember(
+    path: Path,
+    by_key: dict[str, list[str]],
+    key: str,
+    body: list[str],
+) -> bool:
+    existing = by_key.get(key)
+    if existing is None:
+        by_key[key] = body
+        return True
+    if _normalized(existing) != _normalized(body):
+        raise RefusalError(
+            path,
+            f"both sides define the settings-help entry {key!r} differently",
+        )
+    return False
+
+
+def _closed_body(body: list[str], closer: str) -> list[str]:
+    closer_line = closer if closer.endswith("\n") else f"{closer}\n"
+    return [*body, closer_line]
 
 
 def _blocks(
@@ -37,6 +72,11 @@ def _blocks(
         if not line.strip():
             index += 1
             continue
+        empty = _ONE_LINE_EMPTY.match(line.rstrip("\n"))
+        if empty is not None:
+            blocks.append((empty.group(3), [line]))
+            index += 1
+            continue
         start = _BLOCK_START.match(line.rstrip("\n"))
         if start is not None:
             key = start.group(3)
@@ -50,10 +90,21 @@ def _blocks(
                 if depth <= 0:
                     break
             if depth > 0:
-                if depth != 1 or index < len(lines):
+                if depth != 1:
                     raise RefusalError(
                         path,
                         f"{side} side ends inside entry {key!r} at brace depth {depth}",
+                    )
+                extra = [
+                    inner
+                    for inner in body[1:]
+                    if _entry_start(inner) is not None
+                ]
+                if extra:
+                    raise RefusalError(
+                        path,
+                        f"{side} side unfinished entry {key!r} contains another "
+                        "settings-help entry",
                     )
                 open_block = (key, body)
                 continue
@@ -101,37 +152,30 @@ def _merge_hunk(path: Path, hunk: ConflictHunk, closer: str | None) -> str:
             "only one side ends inside an entry block, so the shared closing "
             "brace cannot serve both",
         )
-    if our_open is not None and their_open is not None:
-        if our_open[0] == their_open[0]:
-            raise RefusalError(
-                path,
-                f"both sides open the entry {our_open[0]!r} with different bodies",
-            )
-        if closer is None:
-            raise RefusalError(
-                path,
-                "hunk ends inside an entry block but the next shared line is "
-                "not a closing brace",
-            )
+    if our_open is not None and their_open is not None and closer is None:
+        raise RefusalError(
+            path,
+            "hunk ends inside an entry block but the next shared line is "
+            "not a closing brace",
+        )
 
     merged: list[str] = []
     by_key: dict[str, list[str]] = {}
     for key, body in ours + theirs:
-        existing = by_key.get(key)
-        if existing is None:
-            by_key[key] = body
+        if _remember(path, by_key, key, body):
             merged.extend(body)
-            continue
-        if [line.strip() for line in existing] != [line.strip() for line in body]:
-            raise RefusalError(
-                path,
-                f"both sides define the settings-help entry {key!r} differently",
-            )
 
     if our_open is not None and their_open is not None and closer is not None:
-        merged.extend(our_open[1])
-        merged.append(closer if closer.endswith("\n") else f"{closer}\n")
-        merged.extend(their_open[1])
+        pending_opens: list[list[str]] = []
+        for key, body in (our_open, their_open):
+            if _remember(path, by_key, key, _closed_body(body, closer)):
+                pending_opens.append(body)
+        if len(pending_opens) == 2:
+            merged.extend(pending_opens[0])
+            merged.append(closer if closer.endswith("\n") else f"{closer}\n")
+            merged.extend(pending_opens[1])
+        elif len(pending_opens) == 1:
+            merged.extend(pending_opens[0])
 
     if not merged:
         raise RefusalError(path, "settings-help merge produced no entries")

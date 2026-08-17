@@ -87,6 +87,66 @@ def test_settings_help_merges_a_hunk_cut_inside_the_appended_block():
     assert "summary: 'S'" in output
 
 
+def test_settings_help_refuses_complete_and_open_same_key_with_different_bodies():
+    current = (
+        "const settingsHelpEnUS = {\n"
+        "<<<<<<< HEAD\n"
+        "  'settings.foo': {\n    title: 'FooOurs',\n  },\n"
+        "  'settings.bar': {\n    title: 'Bar',\n"
+        "=======\n"
+        "  'settings.foo': {\n    title: 'FooTheirs',\n"
+        ">>>>>>> branch\n"
+        "  },\n"
+        "};\n"
+    )
+    with pytest.raises(RefusalError, match="differently"):
+        settings_help.resolve(_context(current))
+
+
+def test_settings_help_dedupes_equivalent_open_and_complete_same_key():
+    current = (
+        "const settingsHelpEnUS = {\n"
+        "<<<<<<< HEAD\n"
+        "  'settings.foo': {\n    title: 'Foo',\n  },\n"
+        "  'settings.bar': {\n    title: 'Bar',\n"
+        "=======\n"
+        "  'settings.foo': {\n    title: 'Foo',\n"
+        ">>>>>>> branch\n"
+        "  },\n"
+        "};\n"
+    )
+    output = settings_help.resolve(_context(current))
+    assert output.count("'settings.foo'") == 1
+    assert "settings.bar" in output
+    assert "<<<<<<<" not in output
+
+
+def test_settings_help_unions_one_line_empty_entries():
+    output = settings_help.resolve(
+        _context(
+            _conflict(
+                "  'settings.agent.market_regime': {},\n",
+                _help_block("settings.theirs", "Theirs"),
+            )
+        )
+    )
+    assert "settings.agent.market_regime" in output
+    assert "settings.theirs" in output
+    assert "<<<<<<<" not in output
+
+
+def test_settings_help_refuses_one_line_empty_versus_populated_same_key():
+    with pytest.raises(RefusalError, match="differently"):
+        settings_help.resolve(
+            _context(
+                _conflict(
+                    "  'settings.same': {},\n",
+                    _help_block("settings.same", "Theirs"),
+                )
+            )
+        )
+
+
 def test_settings_help_refuses_when_only_one_side_ends_mid_block():
     current = (
         "const settingsHelpEnUS = {\n"
