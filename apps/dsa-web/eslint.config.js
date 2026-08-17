@@ -28,6 +28,22 @@ const pageBaselineOverrides = Object.entries(pageLineBaselines).map(([file, max]
   },
 }))
 
+// First-paint graph: App / main / layout must not pull the shared control barrel
+// (modal/table/picker) into assets/index-*.js. Use deep imports instead (Refs #883).
+const firstPaintBarrelMessage =
+  'Keep the shared control barrel off the first-paint graph. Import the specific module instead (Refs #883).'
+
+const firstPaintBarrelRestriction = {
+  paths: [
+    { name: './components/common', message: firstPaintBarrelMessage },
+    { name: './components/common/index', message: firstPaintBarrelMessage },
+    { name: './components/common/index.ts', message: firstPaintBarrelMessage },
+    { name: '../common', message: firstPaintBarrelMessage },
+    { name: '../common/index', message: firstPaintBarrelMessage },
+    { name: '../common/index.ts', message: firstPaintBarrelMessage },
+  ],
+}
+
 export default defineConfig([
   globalIgnores(['dist', 'playwright-report', 'test-results']),
   {
@@ -60,4 +76,10 @@ export default defineConfig([
     },
   },
   ...pageBaselineOverrides,
+  {
+    files: ['src/App.tsx', 'src/main.tsx', 'src/components/layout/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', firstPaintBarrelRestriction],
+    },
+  },
 ])

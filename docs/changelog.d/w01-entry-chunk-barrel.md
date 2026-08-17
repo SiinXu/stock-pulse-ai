@@ -1,0 +1,1 @@
+- [Changed] Kept the shared control barrel off the first-paint graph (Refs #883).
