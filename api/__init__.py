@@ -13,7 +13,7 @@ from __future__ import annotations
 import importlib
 import sys
 from importlib.abc import Loader, MetaPathFinder
-from importlib.machinery import ModuleSpec
+from importlib.machinery import ModuleSpec, PathFinder
 from importlib.util import find_spec
 from types import ModuleType
 
@@ -45,13 +45,42 @@ class _ApiAliasLoader(Loader):
         return None
 
 
+class _BindAliasAfterLoad(Loader):
+    """Execute a canonical module and bind its historical name afterwards."""
+
+    def __init__(self, loader: Loader | None, alias: str) -> None:
+        self.loader = loader
+        self.alias = alias
+
+    def create_module(self, spec: ModuleSpec) -> ModuleType | None:
+        if self.loader is not None and hasattr(self.loader, "create_module"):
+            return self.loader.create_module(spec)
+        return None
+
+    def exec_module(self, module: ModuleType) -> None:
+        if self.loader is not None:
+            self.loader.exec_module(module)
+        sys.modules[self.alias] = module
+
+
 class _ApiAliasFinder(MetaPathFinder):
     """Map ``api`` / ``api.*`` import requests onto ``src.api`` / ``src.api.*``."""
 
     def find_spec(self, fullname, path=None, target=None):  # type: ignore[no-untyped-def]
+        if fullname == _CANONICAL_ROOT or fullname.startswith(_CANONICAL_ROOT + "."):
+            spec = PathFinder.find_spec(fullname, path, target)
+            if spec is None:
+                return None
+            alias = _ALIAS_ROOT + fullname[len(_CANONICAL_ROOT) :]
+            spec.loader = _BindAliasAfterLoad(spec.loader, alias)
+            return spec
         canonical = _canonical_name(fullname)
         if canonical is None:
             return None
+        module = importlib.import_module(canonical)
+        # Bind before returning the temporary alias spec. The canonical-side
+        # loader above owns the durable metadata and reload behavior.
+        sys.modules[fullname] = module
         canonical_spec = find_spec(canonical)
         is_package = bool(
             canonical_spec is not None
@@ -80,7 +109,7 @@ def _bind_alias_tree() -> None:
     for name, module in list(sys.modules.items()):
         if name == _CANONICAL_ROOT or name.startswith(prefix):
             alias = _ALIAS_ROOT + name[len(_CANONICAL_ROOT) :]
-            sys.modules.setdefault(alias, module)
+            sys.modules[alias] = module
 
 
 _install_finder()
