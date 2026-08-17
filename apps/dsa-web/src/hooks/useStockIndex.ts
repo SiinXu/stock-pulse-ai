@@ -49,10 +49,12 @@ export function useStockIndex(options: UseStockIndexOptions = {}): UseStockIndex
 
     let mounted = true;
 
-    setLoading(true);
-    setError(null);
+    async function load() {
+      setLoading(true);
+      setError(null);
 
-    void loadStockIndex().then((result: IndexLoadResult) => {
+      const result: IndexLoadResult = await loadStockIndex();
+
       if (!mounted) {
         return;
       }
@@ -60,7 +62,9 @@ export function useStockIndex(options: UseStockIndexOptions = {}): UseStockIndex
       setFallback(result.fallback);
       setError(result.error ?? null);
       setLoading(false);
-    });
+    }
+
+    void load();
 
     return () => {
       mounted = false;
