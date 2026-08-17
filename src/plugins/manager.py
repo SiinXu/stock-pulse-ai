@@ -6,13 +6,13 @@ from __future__ import annotations
 
 import logging
 import threading
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Iterable, Literal, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
 from src.utils.sanitize import log_safe_exception
 
 from .health import PluginHealthReport, build_plugin_health_report
+from .lifecycle import PluginLifecycleMixin
 from .lifecycle_audit import LifecycleAuditRecorder, PluginLifecycleAuditor
 from .manifest import (
     API_MAJOR_PATTERN,
@@ -22,108 +22,37 @@ from .manifest import (
     parse_semver,
     validate_plugin_setting_value,
 )
+from .manager_types import (
+    PluginLifecycleAuditCompletionUnavailable,
+    PluginOperationResult,
+    PluginReloadResult,
+    PluginSettingsUpdateResult,
+    PluginSettingsValidationError,
+    PluginSnapshot,
+    PluginSource,
+    PluginState,
+    _ManagedPlugin,
+)
+from .permissions import compatibility_error as permission_compatibility_error
 from .plugin import Plugin
-from .registry import ExtensionPoint, ExtensionRegistration, ExtensionRegistry, RegistrationHandle
+from .registry import ExtensionPoint, ExtensionRegistration, ExtensionRegistry
 from .state_store import PluginLifecycleStateStore
 from .settings_store import PluginSettingsPersistenceError, PluginSettingsStore
 
 
 logger = logging.getLogger(__name__)
 
-PluginSource = Literal["builtin", "external"]
-PluginState = Literal["registered", "enabled", "disabled", "failed"]
-
-
-@dataclass(frozen=True, slots=True)
-class PluginOperationResult:
-    """Stable result for one lifecycle or registration operation."""
-
-    plugin_id: str
-    operation: str
-    success: bool
-    state: PluginState
-    error_code: str | None = None
-    deferred: bool = False
-
-
-@dataclass(frozen=True, slots=True)
-class PluginReloadResult:
-    """Result of one hot-reload attempt (honest restart-required when unsafe)."""
-
-    plugin_id: str
-    success: bool
-    state: PluginState
-    reloaded: bool
-    restart_required: bool
-    error_code: str | None = None
-    message: str | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class PluginSettingsUpdateResult:
-    """Result of one validated per-plugin settings replacement."""
-
-    plugin_id: str
-    success: bool
-    changed_keys: tuple[str, ...]
-    restart_required: bool
-    error_code: str | None = None
-
-
-class PluginSettingsValidationError(ValueError):
-    """Structured validation failure for a plugin settings request."""
-
-    code = "plugin_settings_validation_failed"
-
-    def __init__(self, issues: tuple[dict[str, str], ...]) -> None:
-        super().__init__(self.code)
-        self.issues = issues
-
-
-class PluginLifecycleAuditCompletionUnavailable(RuntimeError):
-    """Audit completion failed after the lifecycle operation returned."""
-
-    code = "security_audit_unavailable"
-
-    def __init__(
-        self,
-        result: PluginOperationResult | PluginReloadResult | PluginSettingsUpdateResult,
-    ) -> None:
-        super().__init__(self.code)
-        self.result = result
-
-
-@dataclass(frozen=True, slots=True)
-class PluginSnapshot:
-    """Read-only manager state for diagnostics and later composition wiring."""
-
-    manifest: PluginManifest
-    source: PluginSource
-    state: PluginState
-    desired_enabled: bool = True
-    package_root: str | None = None
-    reloadable: bool = False
-    extension_points: tuple[ExtensionPoint, ...] = ()
-    notification_channels: tuple[str, ...] = ()
-    last_error_code: str | None = None
-
-
-@dataclass(slots=True)
-class _ManagedPlugin:
-    plugin: Plugin
-    manifest: PluginManifest
-    source: PluginSource
-    state: PluginState = "registered"
-    handles: list[RegistrationHandle] = field(default_factory=list)
-    transition: str | None = None
-    cleanup_pending: bool = False
-    package_root: Path | None = None
-    module_name: str | None = None
-    last_error_code: str | None = None
-
-
-from .lifecycle import PluginLifecycleMixin
-from .permissions import compatibility_error as permission_compatibility_error
+__all__ = (
+    "PluginLifecycleAuditCompletionUnavailable",
+    "PluginManager",
+    "PluginOperationResult",
+    "PluginReloadResult",
+    "PluginSettingsUpdateResult",
+    "PluginSettingsValidationError",
+    "PluginSnapshot",
+    "PluginSource",
+    "PluginState",
+)
 
 
 class PluginManager(PluginLifecycleMixin):

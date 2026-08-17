@@ -11,7 +11,7 @@ from src.utils.sanitize import log_safe_exception
 
 from .errors import PluginError
 from .loader import select_disable_ids, select_load_ids
-from .manager import (
+from .manager_types import (
     PluginLifecycleAuditCompletionUnavailable,
     PluginOperationResult,
     PluginReloadResult,

@@ -30,6 +30,7 @@ from src.plugins import (
     PluginManager,
     PluginManifest,
     PluginOperationResult,
+    PluginState,
     build_agent_tool_extension_contract,
 )
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolPolicy, ToolRegistry
@@ -173,7 +174,12 @@ def test_public_import_and_patch_surface_stays_on_manager_module() -> None:
     assert plugins_root.ExternalPluginResult is ExternalPluginResult
     assert ExternalPluginLoader.__module__ == "src.plugins.loader"
     assert PluginManager.__module__ == "src.plugins.manager"
-    assert PluginOperationResult.__module__ == "src.plugins.manager"
+    assert PluginOperationResult is manager_mod.PluginOperationResult
+    from src.plugins.manager_types import PluginOperationResult as TypedResult
+    from src.plugins.manager_types import PluginState as TypedState
+
+    assert TypedResult is manager_mod.PluginOperationResult
+    assert TypedState is manager_mod.PluginState
 
 
 def test_compatibility_error_decisions_remain_fail_closed() -> None:
@@ -406,3 +412,44 @@ def test_split_modules_remain_internal_host_details() -> None:
     assert "compatibility_error" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginLifecycleMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "select_load_ids" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "PluginState" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+
+
+def test_external_plugin_result_type_hints_resolve_at_runtime() -> None:
+    from typing import get_type_hints
+
+    hints = get_type_hints(ExternalPluginResult)
+    assert hints["state"] == PluginState | None
+    assert hints["plugin_id"] == str | None
+
+
+def test_lifecycle_and_manager_import_in_either_order() -> None:
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[2]
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(repo_root), env.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+    script = (
+        "import src.plugins.lifecycle as lifecycle\n"
+        "import src.plugins.manager as manager\n"
+        "import src.plugins.loader as loader\n"
+        "from typing import get_type_hints\n"
+        "assert issubclass(manager.PluginManager, lifecycle.PluginLifecycleMixin)\n"
+        "assert manager.PluginState is loader.PluginState\n"
+        "assert get_type_hints(loader.ExternalPluginResult)['state'] "
+        "== manager.PluginState | None\n"
+    )
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=repo_root,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert completed.returncode == 0, completed.stderr

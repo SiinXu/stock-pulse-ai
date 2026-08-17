@@ -60,7 +60,8 @@ compatible facade and public type home):
 
 | Module | Responsibility |
 | --- | --- |
-| `src.plugins.manager` | Public types and `PluginManager` facade (register, snapshots, settings) |
+| `src.plugins.manager` | Public facade: re-exports types and owns `PluginManager` (register, snapshots, settings) |
+| `src.plugins.manager_types` | Cycle-free result/state types shared by loader, lifecycle, and the facade |
 | `src.plugins.loader` | Trusted-directory discovery (`ExternalPluginLoader`) and batch load/disable order |
 | `src.plugins.permissions` | Compatibility and load-time permission decisions |
 | `src.plugins.lifecycle` | Enable/disable/load/reload transitions and reverse cleanup |

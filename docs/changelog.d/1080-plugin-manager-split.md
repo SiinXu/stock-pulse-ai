@@ -1,1 +1,2 @@
 - [Changed] Split PluginManager internals into permissions, lifecycle, and loader helpers while keeping the public manager facade (Refs #1080).
+- [Fixed] Keep PluginState resolvable at runtime for ExternalPluginResult and remove the manager/lifecycle import cycle (Refs #1080).

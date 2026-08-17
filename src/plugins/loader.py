@@ -17,11 +17,12 @@ from pydantic import ValidationError
 
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
+from .manager_types import PluginState
 from .manifest import PluginManifest, split_entrypoint
 from .plugin import Plugin
 
 if TYPE_CHECKING:
-    from .manager import PluginManager, PluginState
+    from .manager import PluginManager
 
 
 logger = logging.getLogger(__name__)
