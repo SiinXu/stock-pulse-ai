@@ -55,40 +55,60 @@ class _LegacyBotAliasFinder(importlib.abc.MetaPathFinder):
         return spec
 
 
+def _is_canonical_name(name: str) -> bool:
+    return name == _CANONICAL_PREFIX or name.startswith(_CANONICAL_PREFIX + ".")
+
+
+def _is_alias_name(name: str) -> bool:
+    return name == _ALIAS_PREFIX or name.startswith(_ALIAS_PREFIX + ".")
+
+
 def _alias_name_for(canonical_name: str) -> str:
-    """Map ``src.bot`` / ``src.bot.*`` onto the legacy ``bot`` logger name."""
+    """Map ``src.bot`` / ``src.bot.*`` onto the legacy ``bot`` name."""
 
     return _ALIAS_PREFIX + canonical_name[len(_CANONICAL_PREFIX) :]
+
+
+def _canonical_name_for(alias_name: str) -> str:
+    """Map ``bot`` / ``bot.*`` onto the canonical ``src.bot`` name."""
+
+    return _CANONICAL_PREFIX + alias_name[len(_ALIAS_PREFIX) :]
+
+
+def _bind_logger_alias(manager: logging.Manager, alias: str, logger: logging.Logger) -> None:
+    """Point ``bot.*`` at the same Logger object as ``src.bot.*``."""
+
+    existing = manager.loggerDict.get(alias)
+    if existing is logger:
+        return
+    if existing is not None and not isinstance(existing, logging.Logger):
+        manager._fixupChildren(existing, logger)
+    manager.loggerDict[alias] = logger
 
 
 def _alias_loaded_submodules() -> None:
     """Point ``bot`` / ``bot.*`` at already-imported ``src.bot`` modules."""
 
     for name, module in list(sys.modules.items()):
-        if name == _CANONICAL_PREFIX or name.startswith(_CANONICAL_PREFIX + "."):
+        if _is_canonical_name(name):
             sys.modules.setdefault(_alias_name_for(name), module)
-
-
-def _alias_logger(canonical_name: str, logger: logging.Logger) -> None:
-    """Expose one ``src.bot*`` logger under the matching ``bot*`` name."""
-
-    if canonical_name != _CANONICAL_PREFIX and not canonical_name.startswith(
-        _CANONICAL_PREFIX + "."
-    ):
-        return
-    logging.Logger.manager.loggerDict.setdefault(_alias_name_for(canonical_name), logger)
 
 
 def _alias_loaded_loggers() -> None:
     """Point ``bot.*`` logger names at already-created ``src.bot.*`` loggers."""
 
-    for name, logger in list(logging.Logger.manager.loggerDict.items()):
-        if isinstance(logger, logging.Logger):
-            _alias_logger(name, logger)
+    manager = logging.Logger.manager
+    for name, logger in list(manager.loggerDict.items()):
+        if isinstance(logger, logging.Logger) and _is_canonical_name(name):
+            _bind_logger_alias(manager, _alias_name_for(name), logger)
 
 
 def _install_logger_alias() -> None:
-    """Keep newly created ``src.bot.*`` loggers visible as ``bot.*``."""
+    """Make ``logging.getLogger("bot.X")`` return the ``src.bot.X`` logger.
+
+    ``setdefault`` is not enough: if a caller creates ``bot.X`` before
+    ``src.bot.X``, the two names must still resolve to one Logger object.
+    """
 
     if getattr(logging.Manager.getLogger, _GETLOGGER_MARK, False):
         return
@@ -96,9 +116,13 @@ def _install_logger_alias() -> None:
     original = logging.Manager.getLogger
 
     def getLogger(self, name):  # noqa: N802 - logging API
+        if isinstance(name, str) and _is_alias_name(name):
+            logger = original(self, _canonical_name_for(name))
+            _bind_logger_alias(self, name, logger)
+            return logger
         logger = original(self, name)
-        if isinstance(name, str):
-            _alias_logger(name, logger)
+        if isinstance(name, str) and _is_canonical_name(name):
+            _bind_logger_alias(self, _alias_name_for(name), logger)
         return logger
 
     setattr(getLogger, _GETLOGGER_MARK, True)
