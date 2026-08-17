@@ -30,12 +30,14 @@ BASELINE_VERSION = 1
 # Legacy compatibility shims (facade module) -> canonical implementation package.
 LEGACY_FACADES: Mapping[str, str] = {
     "src.market_sector_analysis": "src.market.sector_analysis",
+    "bot": "src.bot",
 }
 
 # Shim files that re-export the canonical package; they are not importers of
 # themselves for allowlist purposes.
 FACADE_DEFINITION_FILES: Mapping[str, str] = {
     "src.market_sector_analysis": "src/market_sector_analysis.py",
+    "bot": "bot/__init__.py",
 }
 
 PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")

@@ -123,12 +123,12 @@ The checked-in floor lives in [`scripts/coverage_floor_baseline.json`](../script
 # Same packages and marker selection as the gate (timeout optional locally)
 DATABASE_PATH=/tmp/stockpulse-cov.sqlite \
   python -m pytest -m "not network and not benchmark" \
-    --cov=src --cov=api --cov=data_provider --cov=bot \
+    --cov=src --cov=api --cov=data_provider \
     --cov-report=term \
     --cov-report=json:coverage.json
 
 python scripts/check_coverage_floor.py --assert-cov-flags \
-  --cov src --cov api --cov data_provider --cov bot
+  --cov src --cov api --cov data_provider
 python scripts/check_coverage_floor.py --write-baseline --report coverage.json
 # After review only, if the measured value legitimately dropped:
 # python scripts/check_coverage_floor.py --write-baseline --allow-lower --report coverage.json

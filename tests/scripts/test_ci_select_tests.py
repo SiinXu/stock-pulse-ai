@@ -10,6 +10,21 @@ from scripts import ci_select_tests
 from scripts.ci_select_tests import select_targets
 
 
+def test_bot_and_src_bot_share_the_same_selective_targets() -> None:
+    """src/bot/ must win over the catch-all src/ prefix (first-match)."""
+
+    shim = select_targets(["bot/__init__.py"])
+    moved = select_targets(["src/bot/dispatcher.py"])
+    expected = [
+        "tests/bot",
+        "tests/test_notification.py",
+        "tests/test_notification_sender.py",
+    ]
+    assert shim == expected
+    assert moved == expected
+    assert "tests/" not in moved
+
+
 def test_api_paths_map_to_api_tests() -> None:
     result = select_targets(["api/v1/endpoints/analysis.py"])
     assert result != "FULL"

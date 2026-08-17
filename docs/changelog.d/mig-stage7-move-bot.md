@@ -1,0 +1,2 @@
+- [Changed] Move the bot package to src/bot and keep a root-level import alias shim (Refs #167).
+- [Docs] Measure offline coverage under --cov=src after the bot package move; drop --cov=bot from the gate recipe (Refs #167).

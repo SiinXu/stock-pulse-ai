@@ -10,10 +10,10 @@
 import logging
 from typing import List, Optional
 
-from bot.commands.base import BotCommand
-from bot.application_context import to_analysis_request_context
-from bot.models import BotMessage, BotResponse
-from bot.stock_symbols import (
+from src.bot.commands.base import BotCommand
+from src.bot.application_context import to_analysis_request_context
+from src.bot.models import BotMessage, BotResponse
+from src.bot.stock_symbols import (
     BotStockSymbolError,
     parse_bot_stock_symbol,
     supported_stock_formats_message,

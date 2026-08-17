@@ -13,13 +13,13 @@ import logging
 import threading
 from typing import Dict, Optional, TYPE_CHECKING
 
-from bot.models import WebhookResponse
-from bot.dispatcher import get_dispatcher
-from bot.platforms import ALL_PLATFORMS
+from src.bot.models import WebhookResponse
+from src.bot.dispatcher import get_dispatcher
+from src.bot.platforms import ALL_PLATFORMS
 from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
-    from bot.platforms.base import BotPlatform  # noqa: F401
+    from src.bot.platforms.base import BotPlatform  # noqa: F401
 
 logger = logging.getLogger(__name__)
 

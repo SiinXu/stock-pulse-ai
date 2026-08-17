@@ -20,8 +20,8 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from urllib.parse import quote_plus
 
-from bot.platforms.base import BotPlatform
-from bot.models import BotMessage, BotResponse, WebhookResponse, ChatType
+from src.bot.platforms.base import BotPlatform
+from src.bot.models import BotMessage, BotResponse, WebhookResponse, ChatType
 from src.security.outbound_policy import safe_post
 from src.utils.sanitize import log_safe_exception
 

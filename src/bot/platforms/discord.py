@@ -20,8 +20,8 @@ from src.security.outbound_policy import safe_patch, safe_post
 from nacl.exceptions import BadSignatureError
 from nacl.signing import VerifyKey
 
-from bot.platforms.base import BotPlatform
-from bot.models import BotMessage, BotResponse, WebhookResponse, ChatType
+from src.bot.platforms.base import BotPlatform
+from src.bot.models import BotMessage, BotResponse, WebhookResponse, ChatType
 from src.utils.sanitize import log_safe_exception
 
 

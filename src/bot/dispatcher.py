@@ -18,9 +18,9 @@ from typing import TYPE_CHECKING, Callable, Dict, List, Optional, Type
 if TYPE_CHECKING:
     from src.config import Config
 
-from bot.models import BotMessage, BotResponse
-from bot.commands.base import BotCommand
-from bot.stock_symbols import is_recognized_stock_symbol
+from src.bot.models import BotMessage, BotResponse
+from src.bot.commands.base import BotCommand
+from src.bot.stock_symbols import is_recognized_stock_symbol
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -811,7 +811,7 @@ def get_dispatcher() -> CommandDispatcher:
         )
 
         # Automatically register all commands
-        from bot.commands import ALL_COMMANDS
+        from src.bot.commands import ALL_COMMANDS
         for command_class in ALL_COMMANDS:
             _dispatcher.register_class(command_class)
 
