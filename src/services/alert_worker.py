@@ -63,6 +63,11 @@ DEFAULT_DB_ALERT_COOLDOWN_SECONDS = 24 * 60 * 60
 MAX_DB_ALERT_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
 ALERT_WORKER_RULE_LIMIT = 1000
 WRITABLE_TRIGGER_STATUSES = frozenset({"triggered", "skipped", "degraded", "failed"})
+# Hard source/evaluation errors pause a persisted single-symbol rule.
+# `degraded` is warm-up or soft unavailability (insufficient bars, empty
+# daily frame) and must keep retrying without notifying.
+PAUSE_RECORD_STATUSES = frozenset({"failed"})
+DATA_FAILURE_RECORD_STATUSES = PAUSE_RECORD_STATUSES
 
 
 @dataclass
@@ -139,6 +144,7 @@ class AlertWorker:
             "failed": 0,
             "notification_attempts": 0,
             "cooldown_suppressed": 0,
+            "paused": 0,
             "auto_analysis_submitted": 0,
             "auto_analysis_skipped": 0,
         }
@@ -170,7 +176,11 @@ class AlertWorker:
         monitor = EventMonitor()
         daily_cache: Dict[Any, Any] = {}
         self._analysis_visibility_cache = {}
+        paused_rule_ids: set[int] = set()
         for runtime_rule in runtime_rules:
+            already_paused_id = self._persisted_rule_id(runtime_rule, {})
+            if already_paused_id > 0 and already_paused_id in paused_rule_ids:
+                continue
             stats["evaluated"] += 1
             try:
                 result = asyncio.run(self.service._evaluate_rule(runtime_rule.rule, monitor, daily_cache=daily_cache))
@@ -212,6 +222,14 @@ class AlertWorker:
             else:
                 trigger_write = TriggerWriteResult()
                 trigger_id = None
+
+            if record_status in PAUSE_RECORD_STATUSES:
+                if self._pause_db_rule_on_data_failure(runtime_rule, result):
+                    stats["paused"] += 1
+                    paused_id = self._persisted_rule_id(runtime_rule, result)
+                    if paused_id > 0:
+                        paused_rule_ids.add(paused_id)
+                continue
 
             if record_status == "triggered":
                 # Persist first so NaN/Inf or DB write failures cannot enqueue
@@ -265,6 +283,90 @@ class AlertWorker:
                         stats["notified"] += 1
 
         return stats
+
+    def _pause_db_rule_on_data_failure(
+        self,
+        runtime_rule: RuntimeAlertRule,
+        result: Dict[str, Any],
+    ) -> bool:
+        """Disable a persisted rule when evaluation data cannot be trusted.
+
+        ``skipped`` and ``degraded`` keep the rule enabled so warm-up and
+        missing quotes can recover. Only ``failed`` pauses a non-expanded
+        DB rule. Watchlist / portfolio-holdings children share one parent id
+        and must not pause that parent on a single-symbol data failure.
+        """
+        if runtime_rule.source != "db":
+            return False
+        if str(result.get("record_status") or "") not in PAUSE_RECORD_STATUSES:
+            return False
+        if self._is_expanded_batch_child(runtime_rule):
+            return False
+        rule_id = self._persisted_rule_id(runtime_rule, result)
+        if rule_id <= 0:
+            return False
+        policy = dict(runtime_rule.notification_policy or {})
+        policy["paused_reason"] = "data_failure"
+        policy["paused_record_status"] = "failed"
+        try:
+            self.service.repo.update_rule(
+                rule_id,
+                {
+                    "enabled": False,
+                    "notification_policy": self.service._dump_json_or_none(policy),
+                },
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate pause failure
+            log_safe_exception(
+                logger,
+                "Alert rule pause after data failure failed",
+                exc,
+                error_code="alert_rule_pause_failed",
+                level=logging.WARNING,
+                context={"rule_id": rule_id},
+            )
+            return False
+        logger.warning(
+            "[AlertWorker] Paused rule %s after data failure (status=%s)",
+            rule_id,
+            result.get("record_status"),
+        )
+        return True
+
+    @staticmethod
+    def _is_expanded_batch_child(runtime_rule: RuntimeAlertRule) -> bool:
+        """Return True when this payload is one symbol of a shared parent rule.
+
+        Watchlist and portfolio-holdings rows expand into many runtime rules that
+        still share one persisted id. A single child's data failure must not
+        disable monitoring for the rest of that parent.
+        """
+        rule = getattr(runtime_rule, "rule", runtime_rule)
+        metadata = getattr(rule, "metadata", None)
+        if not isinstance(metadata, dict):
+            metadata = {}
+        target_scope = str(
+            getattr(rule, "target_scope", None)
+            or metadata.get("target_scope")
+            or ""
+        ).strip()
+        return target_scope in {"watchlist", "portfolio_holdings"}
+
+    @staticmethod
+    def _persisted_rule_id(runtime_rule: RuntimeAlertRule, result: Dict[str, Any]) -> int:
+        try:
+            rule_id = int(result.get("rule_id") or 0)
+        except (TypeError, ValueError):
+            rule_id = 0
+        if rule_id > 0:
+            return rule_id
+        metadata = getattr(runtime_rule.rule, "metadata", None)
+        if isinstance(metadata, dict):
+            try:
+                return int(metadata.get("persisted_rule_id") or 0)
+            except (TypeError, ValueError):
+                return 0
+        return 0
 
     def _load_runtime_rules(self, config: Config) -> List[RuntimeAlertRule]:
         runtime_rules: List[RuntimeAlertRule] = []

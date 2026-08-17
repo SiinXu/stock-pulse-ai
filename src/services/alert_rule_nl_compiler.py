@@ -17,6 +17,9 @@ from src.services.event_alerts import CORPORATE_EVENT_CATEGORIES, CORPORATE_EVEN
 
 CompilerOutcome = str
 
+# Match AlertWorker.MAX_DB_ALERT_COOLDOWN_SECONDS without importing the worker.
+_MAX_COOLDOWN_SECONDS = 365 * 24 * 60 * 60
+
 _COMPARATORS = {
     "above": ("above", "over", "greater than", "高于", "上破", "突破", "超过", "大于"),
     "below": ("below", "under", "less than", "低于", "下破", "跌破", "小于"),
@@ -53,15 +56,93 @@ _SYMBOL_STOPWORDS = frozenset(
         "PRICE", "ABOVE", "BELOW", "VOLUME", "CHANGE", "PERCENT", "SPIKE", "ALERT",
         "EVENT", "CORPORATE", "EARNINGS", "RSI", "MACD", "WHEN", "THEN", "WITH",
         "AUTO", "DEEP", "ANALYSIS", "TRIGGER", "STOCK", "SHARE", "SHARES",
+        "COOLDOWN",
     }
 )
 _NUMBER_RE = re.compile(r"(-?\d+(?:\.\d+)?)\s*%?")
+
+_COOLDOWN_UNIT_SECONDS: Dict[str, int] = {
+    "s": 1, "sec": 1, "secs": 1, "second": 1, "seconds": 1, "秒": 1,
+    "m": 60, "min": 60, "mins": 60, "minute": 60, "minutes": 60, "分": 60, "分钟": 60,
+    "h": 3600, "hr": 3600, "hrs": 3600, "hour": 3600, "hours": 3600, "时": 3600, "小时": 3600,
+    "d": 86400, "day": 86400, "days": 86400, "天": 86400, "日": 86400,
+}
+_COOLDOWN_UNIT_PATTERN = (
+    r"(seconds?|secs?|minutes?|mins?|hours?|hrs?|days?|s|m|h|d|秒|分钟|分|小时|时|天|日)(?![a-zA-Z])"
+)
+_COOLDOWN_KEYWORD_RE = re.compile(r"cooldown|冷却", re.IGNORECASE)
+_COOLDOWN_CLAUSE_RES: Tuple[re.Pattern[str], ...] = (
+    re.compile(
+        r"(?:cooldown|冷却(?:时间)?)\s*(?:of\s+|for\s+|[=:：]\s*)?(?<![\d.-])(\d+(?:\.\d+)?)\s*"
+        + _COOLDOWN_UNIT_PATTERN,
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"(?<![\d.-])(\d+(?:\.\d+)?)\s*-?\s*"
+        + _COOLDOWN_UNIT_PATTERN
+        + r"\s*(?:的)?\s*(?:cooldown|冷却(?:时间)?)",
+        re.IGNORECASE,
+    ),
+)
+
+
+@dataclass
+class _CooldownClause:
+    """Outcome of extracting an optional cooldown clause from the phrase."""
+
+    stripped_source: str
+    cooldown_seconds: Optional[int] = None
+    needs_clarification: bool = False
+    reject_message: Optional[str] = None
+
+
+def _extract_cooldown_clause(source: str) -> _CooldownClause:
+    """Parse and strip a whitelist-bounded cooldown clause from the phrase.
+
+    The clause is removed from the returned text so cooldown numbers can never
+    be mistaken for metric thresholds. Ambiguous cooldown mentions ask for
+    clarification instead of guessing a duration.
+    """
+    for pattern in _COOLDOWN_CLAUSE_RES:
+        match = pattern.search(source)
+        if match is None:
+            continue
+        value = float(match.group(1))
+        unit_seconds = _COOLDOWN_UNIT_SECONDS.get(match.group(2).lower())
+        if unit_seconds is None:
+            break
+        seconds = value * unit_seconds
+        if not math.isfinite(seconds):
+            return _CooldownClause(source, reject_message="cooldown duration must be finite")
+        if seconds <= 0:
+            return _CooldownClause(
+                source,
+                reject_message="cooldown duration must be at least 1 second",
+            )
+        if seconds > _MAX_COOLDOWN_SECONDS:
+            return _CooldownClause(
+                source,
+                reject_message=(
+                    f"cooldown exceeds the maximum of {_MAX_COOLDOWN_SECONDS} seconds (365 days)"
+                ),
+            )
+        if seconds != int(seconds):
+            return _CooldownClause(
+                source,
+                reject_message="cooldown duration must resolve to a whole number of seconds",
+            )
+        stripped = " ".join((source[: match.start()] + " " + source[match.end():]).split())
+        return _CooldownClause(stripped, cooldown_seconds=int(seconds))
+    if _COOLDOWN_KEYWORD_RE.search(source):
+        return _CooldownClause(source, needs_clarification=True)
+    return _CooldownClause(source)
 
 
 @dataclass
 class AlertRuleCompileResult:
     outcome: CompilerOutcome
     rule: Optional[Dict[str, Any]] = None
+    ir: Optional[Dict[str, Any]] = None
     message: str = ""
     clarifications: List[str] = field(default_factory=list)
     rejected_reason: Optional[str] = None
@@ -77,6 +158,7 @@ class AlertRuleCompileResult:
             "clarifications": list(self.clarifications),
             "rejected_reason": self.rejected_reason,
             "rule": self.rule,
+            "ir": self.ir,
         }
 
 
@@ -97,13 +179,24 @@ def compile_alert_rule_nl(
             message="Input too long (max 500 characters)",
             rejected_reason="input_too_long",
         )
-    lowered = source.lower()
     if _looks_like_code(source):
         return AlertRuleCompileResult(
             outcome="rejected",
             message="Natural-language compiler rejects code or executable snippets",
             rejected_reason="code_like_input",
         )
+
+    cooldown = _extract_cooldown_clause(source)
+    if cooldown.reject_message:
+        return AlertRuleCompileResult(
+            outcome="rejected",
+            message=cooldown.reject_message,
+            rejected_reason="invalid_parameters",
+        )
+    # Strip the cooldown clause first so its numbers and unit words can never
+    # be mistaken for metric thresholds or symbols.
+    source = cooldown.stripped_source
+    lowered = source.lower()
 
     symbols = _extract_symbols(source)
     metric = _detect_metric(lowered)
@@ -115,6 +208,17 @@ def compile_alert_rule_nl(
                 "Supported: price, percent change, volume spike, corporate event, RSI."
             ),
             rejected_reason="unsupported_metric",
+            matched_symbols=symbols,
+        )
+    if cooldown.needs_clarification:
+        return AlertRuleCompileResult(
+            outcome="need_clarification",
+            message=(
+                "Cooldown was mentioned without a parseable duration. "
+                "Use an explicit amount and unit, for example 'cooldown 30 minutes'."
+            ),
+            clarifications=["cooldown_duration"],
+            matched_metric=metric,
             matched_symbols=symbols,
         )
     if not symbols:
@@ -169,6 +273,9 @@ def compile_alert_rule_nl(
             "lookback_hours": int(parameters.get("lookback_hours") or 24),
             "min_items": int(parameters.get("min_items") or 1),
         }
+        parameters = rule["parameters"]
+    if cooldown.cooldown_seconds is not None:
+        rule["cooldown_policy"] = {"cooldown_seconds": cooldown.cooldown_seconds}
 
     notification_policy: Dict[str, Any] = {}
     if auto_analysis is True or (auto_analysis is None and _wants_auto_analysis(lowered)):
@@ -176,9 +283,11 @@ def compile_alert_rule_nl(
     if notification_policy:
         rule["notification_policy"] = notification_policy
 
+    ir = _structured_ir(symbol, metric, parameters, cooldown.cooldown_seconds)
     return AlertRuleCompileResult(
         outcome="success",
         rule=rule,
+        ir=ir,
         message="Compiled to a whitelist-bounded alert rule payload",
         matched_metric=metric,
         matched_symbols=symbols,
@@ -323,6 +432,36 @@ def _first_positive(numbers: Sequence[float]) -> Optional[float]:
 def _wants_auto_analysis(lowered: str) -> bool:
     cues = ("deep analysis", "auto analysis", "trigger analysis", "深度分析", "自动分析", "触发分析", "跑一遍分析")
     return any(cue in lowered for cue in cues)
+
+
+def _structured_ir(
+    symbol: str,
+    metric: str,
+    parameters: Dict[str, Any],
+    cooldown_seconds: Optional[int],
+) -> Dict[str, Any]:
+    comparator, threshold = _comparator_and_threshold(metric, parameters)
+    return {
+        "symbol": symbol,
+        "metric": metric,
+        "comparator": comparator,
+        "threshold": threshold,
+        "cooldown": cooldown_seconds,
+    }
+
+
+def _comparator_and_threshold(metric: str, parameters: Dict[str, Any]) -> Tuple[str, Any]:
+    if metric == "price_cross":
+        return str(parameters.get("direction") or "above"), parameters.get("price")
+    if metric == "price_change_percent":
+        return str(parameters.get("direction") or "up"), parameters.get("change_pct")
+    if metric == "rsi_threshold":
+        return str(parameters.get("direction") or "above"), parameters.get("threshold")
+    if metric == "volume_spike":
+        return "gte", parameters.get("multiplier")
+    if metric == "corporate_event":
+        return "any", parameters.get("min_items")
+    return "eq", None
 
 
 def _default_name(metric: str, symbol: str, parameters: Dict[str, Any]) -> str:

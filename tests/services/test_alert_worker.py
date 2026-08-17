@@ -1255,9 +1255,14 @@ class AlertWorkerTestCase(unittest.TestCase):
             second = worker.run_once()
 
         self.assertEqual(first["recorded"], 3)
-        self.assertEqual(second["recorded"], 3)
-        for status in ("skipped", "degraded", "failed"):
-            self.assertEqual(len(self._triggers(status=status)), 2)
+        self.assertEqual(first["paused"], 1)
+        # skipped/degraded stay enabled and are not history-deduplicated.
+        # Only failed pauses the persisted single-symbol rule.
+        self.assertEqual(second["recorded"], 2)
+        self.assertEqual(second["loaded"], 2)
+        self.assertEqual(len(self._triggers(status="skipped")), 2)
+        self.assertEqual(len(self._triggers(status="degraded")), 2)
+        self.assertEqual(len(self._triggers(status="failed")), 1)
 
     def test_technical_indicator_insufficient_data_writes_degraded_trigger(self) -> None:
         rule = self._create_rule(
@@ -1285,12 +1290,14 @@ class AlertWorkerTestCase(unittest.TestCase):
             stats = worker.run_once()
 
         self.assertEqual(stats["degraded"], 1)
+        self.assertEqual(stats["paused"], 0)
         triggers = self._triggers(rule_id=rule["id"], status="degraded")
         self.assertEqual(len(triggers), 1)
         self.assertEqual(triggers[0]["target"], "600519")
         self.assertIn("insufficient data: need 21 bars, got 3", triggers[0]["diagnostics"])
         manager.get_daily_data.assert_called_once_with("600519", days=63)
         notifier.send_with_results.assert_not_called()
+        self.assertTrue(self.service.get_rule(rule["id"])["enabled"])
 
     def test_technical_indicator_fetch_exception_writes_failed_trigger(self) -> None:
         self._create_rule(
@@ -1776,6 +1783,45 @@ class AlertWorkerTestCase(unittest.TestCase):
         self.assertEqual(fourth["notified"], 0)
         self.assertEqual(notifier.send_with_results.call_count, 3)
         self.assertEqual(len(self._triggers(status="triggered")), 4)
+
+    def test_watchlist_child_data_failure_does_not_pause_parent(self) -> None:
+        created = self._create_rule(
+            name="Watchlist",
+            target_scope="watchlist",
+            target="default",
+            alert_type="price_cross",
+            parameters={"direction": "above", "price": 10},
+        )
+        config = self._config(stock_list=["600519", "000001"])
+        notifier = self._notifier()
+
+        async def _evaluate(rule, _monitor, **_kwargs):
+            status = "failed" if rule.stock_code == "600519" else "triggered"
+            return {
+                "rule_id": self.service._runtime_rule_id(rule),
+                "record_status": status,
+                "triggered": status == "triggered",
+                "observed_value": 11.0 if status == "triggered" else None,
+                "threshold": 10.0,
+                "data_source": "realtime_quote",
+                "data_timestamp": None,
+                "reason": f"{status} test",
+                "message": f"{status} test",
+            }
+
+        worker = AlertWorker(config_provider=lambda: config, service=self.service, notifier=notifier)
+        with patch.object(self.service, "_evaluate_rule", new=_evaluate):
+            stats = worker.run_once()
+            second = worker.run_once()
+
+        self.assertEqual(stats["failed"], 1)
+        self.assertEqual(stats["triggered"], 1)
+        self.assertEqual(stats["paused"], 0)
+        self.assertEqual(stats["notified"], 1)
+        self.assertTrue(self.service.get_rule(created["id"])["enabled"])
+        self.assertEqual(second["loaded"], 2)
+        self.assertEqual(second["paused"], 0)
+        notifier.send_with_results.assert_called()
 
     def test_p6_watchlist_expands_to_child_keys_for_db_cooldown_fallback(self) -> None:
         self._create_rule(
