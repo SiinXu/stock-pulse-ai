@@ -1240,7 +1240,7 @@ class DataFetcherManager:
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
         market = _market_tag(stock_code)
-        from data_provider.data_validation import infer_instrument_type
+        from src.data_provider.data_validation import infer_instrument_type
 
         instrument_type = infer_instrument_type(stock_code)
 
@@ -2086,7 +2086,7 @@ class DataFetcherManager:
                             break
                         # Issue #185: observe cross-source divergence on shared fields.
                         try:
-                            from data_provider.data_validation import (
+                            from src.data_provider.data_validation import (
                                 compare_cross_source_quotes,
                                 is_validation_enabled,
                             )
@@ -2353,7 +2353,7 @@ class DataFetcherManager:
                     # Issue #185: cross-source consistency when both providers
                     # supply the same field. Fail-open: never drop the primary.
                     try:
-                        from data_provider.data_validation import (
+                        from src.data_provider.data_validation import (
                             compare_cross_source_quotes,
                             is_validation_enabled,
                         )
@@ -3659,7 +3659,7 @@ class DataFetcherManager:
                 # programming / deploy bug, so log it LOUD (error). Still fail-open
                 # (never interrupt the main analysis — a hard requirement of #1777).
                 try:
-                    from data_provider.tw_institutional_fetcher import TwInstitutionalFetcher
+                    from src.data_provider.tw_institutional_fetcher import TwInstitutionalFetcher
 
                     fetcher = TwInstitutionalFetcher()
                     self._tw_institutional_fetcher = fetcher

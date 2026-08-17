@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import List, Optional
 
-from data_provider.realtime_types import safe_float, safe_int
+from src.data_provider.realtime_types import safe_float, safe_int
 
 
 def _normalize_tencent_volume(fields: List[str]) -> Optional[int]:

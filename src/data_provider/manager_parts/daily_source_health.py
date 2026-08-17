@@ -37,7 +37,7 @@ from ..realtime_types import CircuitBreaker
 from ..symbol_normalization import _market_tag, normalize_stock_code
 
 if TYPE_CHECKING:
-    from data_provider.base import BaseFetcher, DataProvider
+    from src.data_provider.base import BaseFetcher, DataProvider
 
 # Facade-only symbols cannot be imported from ``data_provider.base`` while that
 # module is still assembling this part (circular import). Declare anchors so
@@ -169,7 +169,7 @@ class _DailySourceHealthMethods:
             if method_name == "get_realtime_quote":
                 result = method(*args, **kwargs)
                 if result is not None:
-                    from data_provider.data_validation import validate_and_annotate
+                    from src.data_provider.data_validation import validate_and_annotate
 
                     stock_code = kwargs.get("stock_code") or (args[0] if args else "")
                     validate_and_annotate(
@@ -210,7 +210,7 @@ class _DailySourceHealthMethods:
                 if result_validator is not None:
                     result = result_validator(result)
                 if isinstance(result, pd.DataFrame) and not result.empty:
-                    from data_provider.data_validation import validate_and_annotate
+                    from src.data_provider.data_validation import validate_and_annotate
 
                     validate_and_annotate(
                         result,

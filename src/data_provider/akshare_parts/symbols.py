@@ -7,8 +7,8 @@ External callers must keep importing from ``data_provider.akshare_fetcher``.
 
 from __future__ import annotations
 
-from data_provider.symbol_normalization import is_bse_code
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.symbol_normalization import is_bse_code
+from src.data_provider.us_index_mapping import is_us_stock_code
 
 
 def _is_etf_code(stock_code: str) -> bool:

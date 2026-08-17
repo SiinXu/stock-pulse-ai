@@ -32,7 +32,7 @@ from typing import Any, Dict, Optional
 
 import requests
 
-from data_provider.realtime_types import CircuitBreaker
+from src.data_provider.realtime_types import CircuitBreaker
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)

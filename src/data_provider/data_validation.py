@@ -314,7 +314,7 @@ def infer_instrument_type(
         return canonical_instrument_type(explicit)
     code = str(stock_code or "").strip()
     try:
-        from data_provider.symbol_normalization import normalize_stock_code
+        from src.data_provider.symbol_normalization import normalize_stock_code
 
         canonical_code = normalize_stock_code(code).upper()
         raw_overrides = str(
@@ -337,8 +337,8 @@ def infer_instrument_type(
     except (ImportError, RuntimeError, TypeError, ValueError):
         pass
     try:
-        from data_provider.symbol_normalization import _is_etf_code
-        from data_provider.us_index_mapping import is_us_index_code
+        from src.data_provider.symbol_normalization import _is_etf_code
+        from src.data_provider.us_index_mapping import is_us_index_code
 
         if is_us_index_code(code):
             return "index"
