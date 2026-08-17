@@ -1,0 +1,1 @@
+- [Fixed] Restored the legacy API_HOST/API_PORT fallback for the WebUI bind after the webui.py retirement (Refs #167).

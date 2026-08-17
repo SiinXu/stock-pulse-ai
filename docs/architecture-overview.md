@@ -58,9 +58,9 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 
 | Entrypoint | Responsibility | Important boundary |
 | --- | --- | --- |
-| `main.py` | Process bootstrap, analysis and scheduling coordination, optional API serving, Bot stream startup, and compatibility exports | Runtime helpers and direct analysis remain here; parsing and mode dispatch are rebound from `src/app/cli.py` to preserve the existing import surface. Web-only FastAPI startup is `python main.py --webui-only`. |
+| `main.py` | Process bootstrap, analysis and scheduling coordination, optional API serving, Bot stream startup, and compatibility exports | Runtime helpers and direct analysis remain here; parsing and mode dispatch are rebound from `src/app/cli.py` to preserve the existing import surface. Web-only FastAPI startup is `python main.py --webui-only`, which binds `WEBUI_HOST` / `WEBUI_PORT` with a legacy `API_HOST` / `API_PORT` fallback before the `127.0.0.1:8000` defaults. |
 | `src/app/cli.py` | CLI argument parsing and mode dispatch | Dispatches through `main.py` runtime helpers; it does not own a second analysis or service lifecycle. |
-| `server.py` | Direct ASGI/uvicorn entry | Installs `ApplicationServices` and exports the FastAPI application; it does not start Bot stream clients. |
+| `server.py` | Direct ASGI/uvicorn entry | Installs `ApplicationServices` and exports the FastAPI application; it does not start Bot stream clients. A direct `python server.py` launch resolves the same `WEBUI_HOST` / `WEBUI_PORT` bind with the legacy `API_HOST` / `API_PORT` fallback; explicit `--host` / `--port` still win, which is why Docker is unaffected by either key. |
 | `src/api/app.py` | FastAPI factory and lifespan | Owns auth/CORS/errors, routes, static Web hosting, `RuntimeSchedulerService`, and app-scoped `SystemConfigService`. |
 | `bot/` | Platform adapters, dispatcher, and commands | Bot `/analyze` submits to the shared process-local queue. Stream clients are started by `main.py`; Bot webhooks are not FastAPI routes. |
 | `apps/dsa-web/` | React/Vite product client | Calls `/api/v1` and observes analysis state through polling and task SSE. The production build is served by FastAPI. |
