@@ -692,7 +692,12 @@ class TestPortfolioAgentPostProcess(unittest.TestCase):
         op = agent.post_process(ctx, json.dumps(data))
         self.assertIsNotNone(op)
         self.assertEqual(op.signal, "buy")
-        self.assertEqual(ctx.data.get("portfolio_assessment"), data)
+        assessment = ctx.data.get("portfolio_assessment")
+        self.assertIsNotNone(assessment)
+        self.assertEqual(assessment["portfolio_risk_score"], 3)
+        self.assertEqual(assessment["summary"], "Looks good")
+        self.assertIn("constraint_check", assessment)
+        self.assertFalse(assessment["is_executable_scenario"])
 
     def test_parse_markdown_json(self):
         agent = self._make_agent()

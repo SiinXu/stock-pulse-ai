@@ -228,21 +228,15 @@ class PortfolioAgent(BaseAgent):
         if not isinstance(base, dict):
             base = None
 
-        if data is None:
+        parse_failed = not isinstance(data, dict)
+        if parse_failed:
             logger.debug("[PortfolioAgent] post_process: failed to parse JSON")
-            if base is None:
-                return AgentOpinion(
-                    agent_name="portfolio",
-                    signal="hold",
-                    confidence=0.3,
-                    reasoning=raw_response[:500],
-                    raw_data={"raw": raw_response[:1000]},
-                )
             data = {
                 "portfolio_risk_score": 5,
                 "summary": raw_response[:500],
                 "rebalance_suggestions": [],
                 "positions": [],
+                "raw": raw_response[:1000],
             }
 
         if base is not None:
@@ -313,6 +307,15 @@ class PortfolioAgent(BaseAgent):
         )
 
         ctx.data["portfolio_assessment"] = data
+
+        if parse_failed and base is None:
+            return AgentOpinion(
+                agent_name="portfolio",
+                signal="hold",
+                confidence=0.3,
+                reasoning=raw_response[:500],
+                raw_data=data,
+            )
 
         risk_score = data.get("portfolio_risk_score", 5)
         signal = "hold"

@@ -173,6 +173,26 @@ class PortfolioAgentConstraintGateTests(unittest.TestCase):
         self.assertFalse(assessment["is_executable_scenario"])
         self.assertIn("not broker", assessment["disclaimer"].lower())
 
+    def test_unparsed_llm_output_still_runs_the_real_engine(self) -> None:
+        agent = _agent()
+        ctx = AgentContext(stock_code="PORT", query="rebalance")
+        ctx.data["portfolio_constraint_config"] = {"blacklist": ["AAA"]}
+        ctx.data["research_proposal"] = {
+            "actions": [{"symbol": "AAA", "action": "buy", "target_weight_pct": 10.0}]
+        }
+        ctx.data["portfolio_view"] = {
+            "weights_pct": {"AAA": 5.0},
+            "weights_known": True,
+        }
+        opinion = agent.post_process(ctx, "This is not JSON at all")
+        self.assertIsNotNone(opinion)
+        self.assertEqual(opinion.signal, "hold")
+        self.assertAlmostEqual(opinion.confidence, 0.3)
+        assessment = ctx.data["portfolio_assessment"]
+        self.assertEqual(assessment["scenario_label"], LABEL_RESEARCH_ONLY)
+        self.assertEqual(assessment["constraint_check"]["findings"][0]["constraint"], "blacklist")
+        self.assertFalse(assessment["is_executable_scenario"])
+
 
 if __name__ == "__main__":
     unittest.main()
