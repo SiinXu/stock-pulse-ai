@@ -27,16 +27,16 @@ from src.llm.backend_registry import (
     SUPPORTED_GENERATION_BACKENDS,
 )
 from src.llm.hermes import route_deployment_origins, route_has_hermes
-from src.notification_parts.contracts import (
-    is_feishu_app_bot_configured,
-    is_feishu_static_configured,
-)
-from src.notification_parts.noise import (
-    NOTIFICATION_SEVERITIES,
-    is_supported_notification_severity,
-    parse_notification_quiet_hours,
-    validate_notification_timezone,
-)
+
+
+def _notification_support(name: str):
+    """Resolve notification validation helpers only when validation uses them."""
+
+    if name.startswith("is_feishu_"):
+        from src.notification_parts import contracts as module
+    else:
+        from src.notification_parts import noise as module
+    return getattr(module, name)
 
 
 class _ConfigValidationMethods:
@@ -521,7 +521,9 @@ class _ConfigValidationMethods:
 
         if self.notification_quiet_hours:
             try:
-                parse_notification_quiet_hours(self.notification_quiet_hours)
+                _notification_support("parse_notification_quiet_hours")(
+                    self.notification_quiet_hours
+                )
             except ValueError as exc:
                 issues.append(ConfigIssue(
                     severity="error",
@@ -531,7 +533,9 @@ class _ConfigValidationMethods:
 
         if self.notification_timezone:
             try:
-                validate_notification_timezone(self.notification_timezone)
+                _notification_support("validate_notification_timezone")(
+                    self.notification_timezone
+                )
             except ValueError as exc:
                 issues.append(ConfigIssue(
                     severity="error",
@@ -539,12 +543,14 @@ class _ConfigValidationMethods:
                     field="NOTIFICATION_TIMEZONE",
                 ))
 
-        if self.notification_min_severity and not is_supported_notification_severity(self.notification_min_severity):
+        if self.notification_min_severity and not _notification_support(
+            "is_supported_notification_severity"
+        )(self.notification_min_severity):
             issues.append(ConfigIssue(
                 severity="error",
                 message=(
                     "通知最低级别配置无效，允许值："
-                    f"{', '.join(NOTIFICATION_SEVERITIES)}"
+                    f"{', '.join(_notification_support('NOTIFICATION_SEVERITIES'))}"
                 ),
                 field="NOTIFICATION_MIN_SEVERITY",
             ))
@@ -569,11 +575,13 @@ class _ConfigValidationMethods:
             and has_feishu_doc_token
         )
         has_feishu_stream_route = bool(self.feishu_stream_enabled and has_feishu_app_credentials_complete)
-        has_feishu_app_notification_route = is_feishu_app_bot_configured(self)
+        has_feishu_app_notification_route = _notification_support(
+            "is_feishu_app_bot_configured"
+        )(self)
         if (
             has_feishu_app_credentials
             and not has_feishu_full_cloud_doc_credentials
-            and not is_feishu_static_configured(self)
+            and not _notification_support("is_feishu_static_configured")(self)
             and not has_feishu_stream_route
             and not has_feishu_app_notification_route
         ):

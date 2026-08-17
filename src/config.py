@@ -250,41 +250,68 @@ _config_model_module = _load_or_reload_config_part("src.config_parts.model")
 Config = _config_model_module.Config
 
 
-def _bind_notification_support_names() -> None:
-    """Expose notification helpers on this module without a module-level import.
+_NOTIFICATION_SUPPORT_EXPORTS = {
+    "parse_notification_route_channels": (
+        "src.notification_parts.route_config",
+        "parse_notification_route_channels",
+    ),
+    "NOTIFICATION_SEVERITIES": (
+        "src.notification_parts.noise",
+        "NOTIFICATION_SEVERITIES",
+    ),
+    "is_supported_notification_severity": (
+        "src.notification_parts.noise",
+        "is_supported_notification_severity",
+    ),
+    "parse_notification_quiet_hours": (
+        "src.notification_parts.noise",
+        "parse_notification_quiet_hours",
+    ),
+    "validate_notification_timezone": (
+        "src.notification_parts.noise",
+        "validate_notification_timezone",
+    ),
+    "is_feishu_app_bot_configured": (
+        "src.notification_parts.contracts",
+        "is_feishu_app_bot_configured",
+    ),
+    "is_feishu_static_configured": (
+        "src.notification_parts.contracts",
+        "is_feishu_static_configured",
+    ),
+}
 
-    Config mixin methods are rebound into ``src.config`` globals. Importing
-    ``src.notification_parts`` at module top-level would create a banned
-    ``src.config <-> src.notification_parts`` cycle because senders import
-    ``src.config``.
-    """
-
-    from src.notification_parts.route_config import parse_notification_route_channels
-    from src.notification_parts.noise import (
-        NOTIFICATION_SEVERITIES,
-        is_supported_notification_severity,
-        parse_notification_quiet_hours,
-        validate_notification_timezone,
-    )
-    from src.notification_parts.contracts import (
-        is_feishu_app_bot_configured,
-        is_feishu_static_configured,
-    )
-
-    globals().update(
-        {
-            "parse_notification_route_channels": parse_notification_route_channels,
-            "NOTIFICATION_SEVERITIES": NOTIFICATION_SEVERITIES,
-            "is_supported_notification_severity": is_supported_notification_severity,
-            "parse_notification_quiet_hours": parse_notification_quiet_hours,
-            "validate_notification_timezone": validate_notification_timezone,
-            "is_feishu_app_bot_configured": is_feishu_app_bot_configured,
-            "is_feishu_static_configured": is_feishu_static_configured,
-        }
-    )
+# A reload keeps names that were populated by a previous ``__getattr__`` call.
+# Clear them so reloading this facade preserves the same lazy-import contract.
+for _notification_support_name in _NOTIFICATION_SUPPORT_EXPORTS:
+    globals().pop(_notification_support_name, None)
+del _notification_support_name
 
 
-_bind_notification_support_names()
+def __getattr__(name: str):
+    """Load public notification helpers only when a caller first requests one."""
+
+    target = _NOTIFICATION_SUPPORT_EXPORTS.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module_name, attribute_name = target
+    value = getattr(_importlib.import_module(module_name), attribute_name)
+    globals()[name] = value
+    return value
+
+
+def __dir__():
+    """Include lazy compatibility exports in module introspection."""
+
+    return sorted(set(globals()) | set(_NOTIFICATION_SUPPORT_EXPORTS))
+
+
+def _notification_support(name: str):
+    """Resolve a lazy helper through the facade so test patches stay observable."""
+
+    return getattr(_sys.modules[__name__], name)
+
+
 _config_model_module._bind_config_facade(globals())
 
 

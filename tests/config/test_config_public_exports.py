@@ -134,6 +134,23 @@ def test_config_public_export_surface_is_stable():
     assert public_exports == EXPECTED_PUBLIC_EXPORTS
 
 
+def test_config_cold_import_does_not_preload_notification_package():
+    script = """
+import sys
+import src.config as config
+
+assert "src.notification_parts.noise" not in sys.modules
+assert "src.notification_parts.route_config" not in sys.modules
+assert "parse_notification_route_channels" in dir(config)
+assert "src.notification_parts.noise" not in sys.modules
+assert "src.notification_parts.route_config" not in sys.modules
+
+assert config.parse_notification_route_channels("wechat,email") == ["wechat", "email"]
+assert "src.notification_parts.route_config" in sys.modules
+"""
+    subprocess.run([sys.executable, "-c", script], check=True)
+
+
 def test_config_class_identity_and_method_ownership_are_stable():
     assert Config.__module__ == "src.config"
     assert Config.__mro__ == (Config, object)
