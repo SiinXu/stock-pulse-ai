@@ -715,11 +715,31 @@ function isIssueCopyDeclaration(node: ts.Node): boolean {
   return false;
 }
 
+function isEqualityOrInequalityOperand(node: ts.Node): boolean {
+  const parent = node.parent;
+  if (!parent || !ts.isBinaryExpression(parent)) return false;
+  if (parent.left !== node && parent.right !== node) return false;
+  return (
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+    || parent.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+    || parent.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken
+    || parent.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsToken
+  );
+}
+
 function collectDescendantStringParts(node: ts.Node): StaticTextPart[] {
   const parts: StaticTextPart[] = [];
   const visit = (current: ts.Node): void => {
     if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
-      parts.push({ node: current, text: current.text });
+      // Match collectEqualityStringParts: comparison tokens such as
+      // 'unknown_condition' or 'ollama' are not user-facing issue copy.
+      if (
+        !isEqualityOrInequalityOperand(current)
+        || han.test(current.text)
+        || /\s/.test(current.text)
+      ) {
+        parts.push({ node: current, text: current.text });
+      }
       return;
     }
     ts.forEachChild(current, visit);

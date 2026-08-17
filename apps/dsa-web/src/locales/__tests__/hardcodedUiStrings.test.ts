@@ -396,6 +396,25 @@ describe('hardcoded UI string scanner', () => {
     ]);
   });
 
+  it('does not treat internal tokens compared inside get*Issues as UI copy', () => {
+    const sourceText = `
+      export function getChannelCompletenessIssues(channel) {
+        if (channel.reason === 'unknown_condition') {
+          return ['连接 Schema 不完整或不可用'];
+        }
+        if (channel.protocol !== 'ollama') {
+          return ['缺少服务地址'];
+        }
+        return [];
+      }
+    `;
+
+    expect(findHardcodedUiStrings('llmChannelEditorModel.ts', sourceText)).toEqual([
+      expect.objectContaining({ context: 'error', text: '连接 Schema 不完整或不可用' }),
+      expect.objectContaining({ context: 'error', text: '缺少服务地址' }),
+    ]);
+  });
+
   it('resolves Chinese comparison literals passed through error={...}', () => {
     const sourceText = `
       const apiKeyError = issues.find((issue) => issue === '缺少 API 密钥');
