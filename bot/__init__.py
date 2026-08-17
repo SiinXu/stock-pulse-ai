@@ -14,6 +14,7 @@ import importlib.abc
 import importlib.machinery
 import logging
 import sys
+from types import ModuleType
 
 import src.bot as _canonical
 
@@ -35,16 +36,44 @@ class _ExistingModuleLoader(importlib.abc.Loader):
         return None
 
 
+class _BindAliasAfterLoad(importlib.abc.Loader):
+    """Execute a canonical child and publish its legacy name afterwards."""
+
+    def __init__(self, loader, alias_name: str) -> None:
+        self._loader = loader
+        self._alias_name = alias_name
+
+    def create_module(self, spec):
+        if self._loader is not None and hasattr(self._loader, "create_module"):
+            return self._loader.create_module(spec)
+        return None
+
+    def exec_module(self, module: ModuleType) -> None:
+        if self._loader is not None:
+            self._loader.exec_module(module)
+        sys.modules[self._alias_name] = module
+
+
 class _LegacyBotAliasFinder(importlib.abc.MetaPathFinder):
     """Resolve ``bot.*`` to the canonical ``src.bot.*`` module objects."""
 
     def find_spec(self, fullname, path=None, target=None):  # noqa: ARG002
+        if _is_canonical_name(fullname):
+            spec = importlib.machinery.PathFinder.find_spec(fullname, path, target)
+            if spec is None:
+                return None
+            spec.loader = _BindAliasAfterLoad(
+                spec.loader,
+                _alias_name_for(fullname),
+            )
+            return spec
         if fullname != _ALIAS_PREFIX and not fullname.startswith(_ALIAS_PREFIX + "."):
             return None
         if fullname == _ALIAS_PREFIX:
             return None
         canonical_name = _CANONICAL_PREFIX + fullname[len(_ALIAS_PREFIX) :]
         module = importlib.import_module(canonical_name)
+        sys.modules[fullname] = module
         spec = importlib.machinery.ModuleSpec(
             fullname,
             _ExistingModuleLoader(module),
@@ -91,7 +120,7 @@ def _alias_loaded_submodules() -> None:
 
     for name, module in list(sys.modules.items()):
         if _is_canonical_name(name):
-            sys.modules.setdefault(_alias_name_for(name), module)
+            sys.modules[_alias_name_for(name)] = module
 
 
 def _alias_loaded_loggers() -> None:
