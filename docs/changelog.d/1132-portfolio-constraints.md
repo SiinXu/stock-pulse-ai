@@ -1,0 +1,2 @@
+- [Added] Add a deterministic portfolio constraint engine that labels research proposals as research-only or constraint-feasible without implying broker compliance (Refs #1132).
+- [Changed] Live constraint assessments expose explicit passthrough fields, prefer rebalancing suggestions over band midpoints, and fail closed on unparseable proposal rows (Refs #1132).

@@ -36,7 +36,7 @@
 
 ## Agent
 
-`PortfolioAgent` 注入确定性基座；`post_process` 以服务结果覆盖自由生成的 `rebalance_suggestions`，LLM 仅可润色叙述。
+`PortfolioAgent` 注入确定性基座；`post_process` 以服务结果覆盖自由生成的 `rebalance_suggestions`，LLM 仅可润色叙述。随后同一路径会跑 Issue #1132 约束引擎：违规提案标为 `research_only`，不得当作可执行情景；`constraint_feasible` 也**不是**券商合规。详见 [portfolio-constraints.md](portfolio-constraints.md)。
 
 ## 回滚
 
