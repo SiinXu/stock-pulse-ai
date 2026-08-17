@@ -12,7 +12,7 @@ Type checking is **not** repo-wide.
 | --- | --- |
 | Tool | `mypy` (version pinned via `constraints.txt` / `.github/requirements-ci.txt`) |
 | Config | [`mypy.ini`](../mypy.ini) |
-| Checked paths | `src/schemas/` (18 modules) and `api/v1/schemas/` (23 modules, ~250 pydantic models) |
+| Checked paths | `src/schemas/` (18 modules) and `src/api/v1/schemas/` (23 modules, ~250 pydantic models) |
 | Import policy | `follow_imports = skip` so the rest of the tree is not pulled into the check |
 | CI entry | `./scripts/ci_gate.sh` → `deterministic_checks` runs `python -m mypy --config-file mypy.ini` |
 
@@ -75,13 +75,13 @@ measurements with `--follow-imports=skip` (error counts change as code moves):
 | Priority | Package | Approx. size / skip-cost | Notes |
 | --- | --- | --- | --- |
 | Done | `src/schemas/` | 18 modules, clean | First ratchet package |
-| Done | `api/v1/schemas/` | 23 modules, ~250 models, clean | This expansion; pure API data shapes |
+| Done | `src/api/v1/schemas/` | 23 modules, ~250 models, clean | This expansion; pure API data shapes |
 | Next | `api/v1/errors.py` | 1 file, 0 errors | Leaf error helpers adjacent to schemas |
 | Next | `api/middlewares/` | 4 modules, ~1 error | Small auth/error middleware surface |
 | Next | `src/repositories/` | 18 modules, ~1 error | Data access; mostly typed shapes already |
 | Later | `api/deps.py` | 1 file, ~13 errors | FastAPI dependencies; more runtime coupling |
 | Later | `bot/` | 24 modules, ~25 errors | Notification bots; medium fix cost |
-| Later | `api/v1/endpoints/` | 23 modules, low skip-errors but high coupling | Prefer after schemas/deps stabilize; analysis endpoints may be owned by a separate workstream |
+| Later | `src/api/v1/endpoints/` | 23 modules, low skip-errors but high coupling | Prefer after schemas/deps stabilize; analysis endpoints may be owned by a separate workstream |
 | Later | `src/services/` | large (~89 modules) | High coupling; split by subdomain when ratcheting |
 | Deferred | Drop `follow_imports=skip` | 2745+ transitive errors today | Only after large portions of `src/` and `data_provider/` are clean |
 

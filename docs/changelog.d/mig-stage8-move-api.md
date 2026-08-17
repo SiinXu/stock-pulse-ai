@@ -1,0 +1,1 @@
+- [Changed] Relocate the HTTP package from `api/` to `src/api/` and keep a compatibility alias so existing `from api...` importers resolve to the same module objects (Refs #167).

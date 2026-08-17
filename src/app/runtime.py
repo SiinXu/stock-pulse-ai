@@ -115,13 +115,13 @@ def start_api_server(host: str, port: int, config: Config) -> None:
         "log_config": None,
     }
     # Import the ASGI app object in the calling thread instead of handing uvicorn
-    # the "api.app:app" import string. With the string, uvicorn imports the app
+    # the "src.api.app:app" import string. With the string, uvicorn imports the app
     # lazily inside the server thread, and that import (litellm + the full app
     # tree, ~10s+ on constrained hosts) runs inside the startup probe window
     # below, tripping the 3.0s timeout and causing a restart loop on slower
     # machines. Importing first keeps the heavy work out of the probe window;
     # genuine import failures still surface immediately to the caller.
-    from api.app import app as fastapi_app
+    from src.api.app import app as fastapi_app
 
     try:
         uvicorn_config = uvicorn.Config(

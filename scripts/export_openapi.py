@@ -119,7 +119,7 @@ def _load_app():
 
     ensure_litellm_stub()
 
-    from api.app import create_app
+    from src.api.app import create_app
 
     return create_app()
 

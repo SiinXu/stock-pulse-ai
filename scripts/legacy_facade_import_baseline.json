@@ -2,6 +2,7 @@
   "version": 1,
   "description": "Allowlisted production importers of ADR-006 legacy facade modules. New production imports must use the canonical package and must not expand this list without an explicit migration plan.",
   "facades": {
+    "api": [],
     "src.analysis_context_pack_overview": [
       "src/core/pipeline.py",
       "src/core/stages/persistence.py"
@@ -50,6 +51,11 @@
     ]
   },
   "catalog": {
+    "api": {
+      "canonical": "src.api",
+      "definition": "api/__init__.py",
+      "importers": []
+    },
     "src.analysis_context_pack_overview": {
       "canonical": "src.analysis_context_pack.overview",
       "definition": "src/analysis_context_pack_overview.py",

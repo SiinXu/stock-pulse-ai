@@ -655,7 +655,7 @@ jobs:
           from src.analyzer import GeminiAnalyzer; print('✅ analyzer')
           from src.patches.eastmoney_patch import eastmoney_patch; print('✅ patch')
           from bot.dispatcher import CommandDispatcher; print('✅ bot')
-          from api.app import app; print('✅ api')
+          from src.api.app import app; print('✅ api')
           print('✅ All Docker imports OK')
           "
       - name: 🗃️ Docker legacy volume migration smoke

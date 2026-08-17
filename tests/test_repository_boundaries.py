@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-ENDPOINT_ROOT = REPOSITORY_ROOT / "api" / "v1" / "endpoints"
+ENDPOINT_ROOT = REPOSITORY_ROOT / "src" / "api" / "v1" / "endpoints"
 TRANSACTION_PRIMITIVES = {
     "_run_write_transaction",
     "begin",

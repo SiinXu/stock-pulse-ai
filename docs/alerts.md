@@ -125,8 +125,8 @@ P1/P2 实现告警持久化时，推荐优先复用以上模式：在 storage �
 
 P1 新增后端 Alert API 与 schema，锁定告警中心最小 API 契约，不接入 Web 页面或后台 worker。
 
-- 新增 API 文件：`api/v1/endpoints/alerts.py`。
-- 新增 schema 文件：`api/v1/schemas/alerts.py`。
+- 新增 API 文件：`src/api/v1/endpoints/alerts.py`。
+- 新增 schema 文件：`src/api/v1/schemas/alerts.py`。
 - API 范围：
   - `GET /api/v1/alerts/rules`
   - `POST /api/v1/alerts/rules`

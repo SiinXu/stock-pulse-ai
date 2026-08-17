@@ -93,8 +93,8 @@ def test_alerts_doc_defines_p1_api_mvp_scope() -> None:
     doc = _read_doc()
 
     for token in (
-        "api/v1/endpoints/alerts.py",
-        "api/v1/schemas/alerts.py",
+        "src/api/v1/endpoints/alerts.py",
+        "src/api/v1/schemas/alerts.py",
         "GET /api/v1/alerts/rules",
         "POST /api/v1/alerts/rules",
         "GET /api/v1/alerts/rules/{rule_id}",

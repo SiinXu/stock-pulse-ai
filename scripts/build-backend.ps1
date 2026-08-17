@@ -95,26 +95,26 @@ $hiddenImports = @(
   'tiktoken',
   'tiktoken_ext',
   'tiktoken_ext.openai_public',
-  'api',
-  'api.app',
-  'api.deps',
-  'api.v1',
-  'api.v1.router',
-  'api.v1.endpoints',
-  'api.v1.endpoints.analysis',
-  'api.v1.endpoints.history',
-  'api.v1.endpoints.stocks',
-  'api.v1.endpoints.health',
-  'api.v1.endpoints.alphasift',
+  'src.api',
+  'src.api.app',
+  'src.api.deps',
+  'src.api.v1',
+  'src.api.v1.router',
+  'src.api.v1.endpoints',
+  'src.api.v1.endpoints.analysis',
+  'src.api.v1.endpoints.history',
+  'src.api.v1.endpoints.stocks',
+  'src.api.v1.endpoints.health',
+  'src.api.v1.endpoints.alphasift',
   'alphasift',
   'alphasift.dsa_adapter',
-  'api.v1.schemas',
-  'api.v1.schemas.analysis',
-  'api.v1.schemas.history',
-  'api.v1.schemas.stocks',
-  'api.v1.schemas.common',
-  'api.middlewares',
-  'api.middlewares.error_handler',
+  'src.api.v1.schemas',
+  'src.api.v1.schemas.analysis',
+  'src.api.v1.schemas.history',
+  'src.api.v1.schemas.stocks',
+  'src.api.v1.schemas.common',
+  'src.api.middlewares',
+  'src.api.middlewares.error_handler',
   'src.services',
   'src.services.task_queue',
   'src.services.analysis_service',
@@ -178,7 +178,7 @@ if (-not (Test-Path $packagedEntry)) {
 }
 $previousProbe = $env:DSA_PACKAGED_IMPORT_PROBE
 try {
-  foreach ($module in @('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry')) {
+  foreach ($module in @('alphasift.dsa_adapter', 'orjson', 'src.migrations.registry', 'src.api.app')) {
     $env:DSA_PACKAGED_IMPORT_PROBE = $module
     $probeProcess = Start-Process -FilePath $packagedEntry -Wait -PassThru
     if ($probeProcess.ExitCode -ne 0) {
