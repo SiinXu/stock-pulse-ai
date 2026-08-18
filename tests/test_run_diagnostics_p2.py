@@ -536,6 +536,56 @@ class RunDiagnosticsP2TestCase(unittest.TestCase):
 
         self.assertEqual(ctx.exception.status_code, 500)
 
+    def test_export_summary_schema_and_non_mutation(self) -> None:
+        snapshot = {
+            "diagnostics": _diagnostic_snapshot(),
+            "news_content": "新闻摘要",
+        }
+        raw_result = {
+            "success": True,
+            "model_used": "deepseek-chat",
+            "analysis_summary": "测试摘要",
+        }
+        frozen_snapshot = json.loads(json.dumps(snapshot))
+        frozen_raw = json.loads(json.dumps(raw_result))
+
+        summary = build_run_diagnostic_summary(
+            context_snapshot=snapshot,
+            raw_result=raw_result,
+            report_saved=True,
+        )
+
+        self.assertEqual(snapshot, frozen_snapshot)
+        self.assertEqual(raw_result, frozen_raw)
+        self.assertEqual(
+            set(summary),
+            {
+                "trace_id",
+                "task_id",
+                "query_id",
+                "stock_code",
+                "trigger_source",
+                "status",
+                "status_label",
+                "reason",
+                "components",
+                "copy_text",
+            },
+        )
+        self.assertEqual(
+            set(summary["components"]),
+            {
+                "realtime_quote",
+                "daily_data",
+                "news",
+                "data_quality",
+                "llm",
+                "notification",
+                "history",
+            },
+        )
+        self.assertIn("trace_id: trace-p2", summary["copy_text"])
+
 
 if __name__ == "__main__":
     unittest.main()
