@@ -18,6 +18,7 @@ export type HardcodedUiStringContext =
   | 'emptyText'
   | 'searchPlaceholder'
   | 'loadingText'
+  | 'error'
   | 'toast-call'
   | 'notice-call'
   | 'error-call'
@@ -35,6 +36,13 @@ export interface HardcodedUiStringAllowance {
   text: string;
   context: HardcodedUiStringContext;
   purpose: string;
+}
+
+export interface ExpiringUiStringFileAllowance {
+  files: readonly string[];
+  context: HardcodedUiStringContext;
+  reason: string;
+  removeWhen: string;
 }
 
 interface StaticTextPart {
@@ -76,6 +84,7 @@ const userFacingAttributes = new Set([
   'emptyText',
   'searchPlaceholder',
   'loadingText',
+  'error',
 ]);
 const userCopyObjectProperties = new Set(['message', 'title', 'description']);
 const han = /[\p{Script=Han}]/u;
@@ -681,6 +690,86 @@ function allowanceMatches(
   );
 }
 
+export function expiringFileAllowanceMatches(
+  candidate: HardcodedUiStringCandidate,
+  allowance: ExpiringUiStringFileAllowance,
+): boolean {
+  return allowance.files.includes(candidate.file) && candidate.context === allowance.context;
+}
+
+function hasExportModifier(node: ts.Node): boolean {
+  return Boolean(ts.canHaveModifiers(node) && ts.getModifiers(node)?.some((modifier) => (
+    modifier.kind === ts.SyntaxKind.ExportKeyword
+  )));
+}
+
+function isIssueCopyDeclaration(node: ts.Node): boolean {
+  if (ts.isFunctionDeclaration(node) && node.name && /^get[A-Za-z0-9]+Issues$/.test(node.name.text)) {
+    return hasExportModifier(node);
+  }
+  if (ts.isVariableStatement(node) && hasExportModifier(node)) {
+    return node.declarationList.declarations.some((declaration) => (
+      ts.isIdentifier(declaration.name) && /_ISSUE$/.test(declaration.name.text)
+    ));
+  }
+  return false;
+}
+
+function isEqualityOrInequalityOperand(node: ts.Node): boolean {
+  const parent = node.parent;
+  if (!parent || !ts.isBinaryExpression(parent)) return false;
+  if (parent.left !== node && parent.right !== node) return false;
+  return (
+    parent.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+    || parent.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+    || parent.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken
+    || parent.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsToken
+  );
+}
+
+function collectDescendantStringParts(node: ts.Node): StaticTextPart[] {
+  const parts: StaticTextPart[] = [];
+  const visit = (current: ts.Node): void => {
+    if (ts.isStringLiteral(current) || ts.isNoSubstitutionTemplateLiteral(current)) {
+      // Match collectEqualityStringParts: comparison tokens such as
+      // 'unknown_condition' or 'ollama' are not user-facing issue copy.
+      if (
+        !isEqualityOrInequalityOperand(current)
+        || han.test(current.text)
+        || /\s/.test(current.text)
+      ) {
+        parts.push({ node: current, text: current.text });
+      }
+      return;
+    }
+    ts.forEachChild(current, visit);
+  };
+  visit(node);
+  return parts;
+}
+
+function collectEqualityStringParts(node: ts.Node): StaticTextPart[] {
+  const parts: StaticTextPart[] = [];
+  const visit = (current: ts.Node): void => {
+    if (
+      ts.isBinaryExpression(current)
+      && current.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+    ) {
+      for (const side of [current.left, current.right]) {
+        if (
+          (ts.isStringLiteral(side) || ts.isNoSubstitutionTemplateLiteral(side))
+          && (han.test(side.text) || /\s/.test(side.text))
+        ) {
+          parts.push({ node: side, text: side.text });
+        }
+      }
+    }
+    ts.forEachChild(current, visit);
+  };
+  visit(node);
+  return parts;
+}
+
 export function collectHardcodedUiStrings(
   filename: string,
   sourceText: string,
@@ -749,14 +838,29 @@ function collectBoundHardcodedUiStrings(
     } else if (ts.isJsxAttribute(node) && ts.isIdentifier(node.name)) {
       const context = node.name.text;
       if (userFacingAttributes.has(context) && node.initializer) {
-        const parts = ts.isStringLiteral(node.initializer)
+        const expression = ts.isJsxExpression(node.initializer)
+          ? node.initializer.expression
+          : undefined;
+        const parts: StaticTextPart[] = ts.isStringLiteral(node.initializer)
           ? [{ node: node.initializer, text: node.initializer.text }]
-          : ts.isJsxExpression(node.initializer) && node.initializer.expression
-            ? collectStaticTextParts(node.initializer.expression, checker)
+          : expression
+            ? collectStaticTextParts(expression, checker)
             : [];
+        if (context === 'error' && expression && ts.isIdentifier(expression)) {
+          const resolved = resolveConstInitializer(expression, checker, new Set());
+          if (resolved) {
+            parts.push(...resolved.references.flatMap((reference) => (
+              collectEqualityStringParts(reference.expression)
+            )));
+          }
+        }
         for (const part of parts) {
           add(part, context as HardcodedUiStringContext);
         }
+      }
+    } else if (isIssueCopyDeclaration(node)) {
+      for (const part of collectDescendantStringParts(node)) {
+        add(part, 'error');
       }
     } else if (ts.isJsxSpreadAttribute(node)) {
       for (const { context, part } of collectJsxSpreadTextParts(node.expression, checker)) {
@@ -832,5 +936,16 @@ export function findUnusedUiStringAllowances(
 ): HardcodedUiStringAllowance[] {
   return allowances.filter((allowance) => (
     !candidates.some((candidate) => allowanceMatches(candidate, allowance))
+  ));
+}
+
+export function findUnusedExpiringFileAllowances(
+  candidates: HardcodedUiStringCandidate[],
+  allowances: readonly ExpiringUiStringFileAllowance[],
+): ExpiringUiStringFileAllowance[] {
+  return allowances.filter((allowance) => (
+    !allowance.files.every((file) => candidates.some((candidate) => (
+      candidate.file === file && candidate.context === allowance.context
+    )))
   ));
 }
