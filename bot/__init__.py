@@ -33,7 +33,10 @@ class _ExistingModuleLoader(importlib.abc.Loader):
         return self._module
 
     def exec_module(self, module):  # noqa: ARG002
-        return None
+        # Importlib temporarily executes the canonical package through an
+        # alias spec. Rebind its already-loaded descendants after that step,
+        # when the package object is ready to retain child attributes.
+        _alias_loaded_submodules()
 
 
 class _BindAliasAfterLoad(importlib.abc.Loader):
@@ -51,7 +54,11 @@ class _BindAliasAfterLoad(importlib.abc.Loader):
     def exec_module(self, module: ModuleType) -> None:
         if self._loader is not None:
             self._loader.exec_module(module)
-        sys.modules[self._alias_name] = module
+        _bind_module_alias(_canonical_name_for(self._alias_name), module)
+        # A package can import canonical children while its own loader is
+        # still executing. Rebind the loaded tree once the parent completes
+        # so those child attributes are not lost to the partial import state.
+        _alias_loaded_submodules()
 
 
 class _LegacyBotAliasFinder(importlib.abc.MetaPathFinder):
@@ -73,7 +80,7 @@ class _LegacyBotAliasFinder(importlib.abc.MetaPathFinder):
             return None
         canonical_name = _CANONICAL_PREFIX + fullname[len(_ALIAS_PREFIX) :]
         module = importlib.import_module(canonical_name)
-        sys.modules[fullname] = module
+        _bind_module_alias(canonical_name, module)
         spec = importlib.machinery.ModuleSpec(
             fullname,
             _ExistingModuleLoader(module),
@@ -104,6 +111,29 @@ def _canonical_name_for(alias_name: str) -> str:
     return _CANONICAL_PREFIX + alias_name[len(_ALIAS_PREFIX) :]
 
 
+def _bind_child(parent_name: str, child_name: str, module: ModuleType) -> None:
+    """Expose a loaded child on its parent package when the parent is loaded."""
+
+    parent = sys.modules.get(parent_name)
+    if parent is not None:
+        setattr(parent, child_name, module)
+
+
+def _bind_module_alias(canonical_name: str, module: ModuleType) -> None:
+    """Publish one canonical module and bind it on both parent package names."""
+
+    alias_name = _alias_name_for(canonical_name)
+    sys.modules[alias_name] = module
+
+    canonical_parent, separator, child_name = canonical_name.rpartition(".")
+    if not separator:
+        return
+    _bind_child(canonical_parent, child_name, module)
+
+    alias_parent, _, _ = alias_name.rpartition(".")
+    _bind_child(alias_parent, child_name, module)
+
+
 def _bind_logger_alias(manager: logging.Manager, alias: str, logger: logging.Logger) -> None:
     """Point ``bot.*`` at the same Logger object as ``src.bot.*``."""
 
@@ -120,7 +150,7 @@ def _alias_loaded_submodules() -> None:
 
     for name, module in list(sys.modules.items()):
         if _is_canonical_name(name):
-            sys.modules[_alias_name_for(name)] = module
+            _bind_module_alias(name, module)
 
 
 def _alias_loaded_loggers() -> None:
