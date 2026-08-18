@@ -68,4 +68,38 @@ describe('KlineChart', () => {
     renderChart([candle(1, 10, 11)], { height: Number.POSITIVE_INFINITY });
     expect(screen.getByTestId('kline-chart-canvas').querySelector('svg')).toHaveAttribute('viewBox', '0 0 640 222');
   });
+  it('paints CN rising/falling candles with price hue tokens, not status tokens', () => {
+    renderChart([candle(1, 10, 11), candle(2, 11, 10)], { market: 'cn' });
+    const upBody = screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])');
+    const downBody = screen.getByTestId('kline-chart-candle-1').querySelector('rect[fill]:not([fill="transparent"])');
+    expect(upBody).toHaveAttribute('fill', 'var(--price-red)');
+    expect(downBody).toHaveAttribute('fill', 'var(--price-green)');
+    expect(upBody?.getAttribute('fill')).not.toContain('--danger');
+    expect(downBody?.getAttribute('fill')).not.toContain('--success');
+  });
+  it('paints US rising/falling candles with the inverse price hues', () => {
+    renderChart([candle(1, 10, 11), candle(2, 11, 10)], { market: 'us' });
+    const upBody = screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])');
+    const downBody = screen.getByTestId('kline-chart-candle-1').querySelector('rect[fill]:not([fill="transparent"])');
+    expect(upBody).toHaveAttribute('fill', 'var(--price-green)');
+    expect(downBody).toHaveAttribute('fill', 'var(--price-red)');
+  });
+  it('honors red_up preference on a US market rising candle', () => {
+    renderChart([candle(1, 10, 11)], { market: 'us', colorPreference: 'red_up' });
+    expect(
+      screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])'),
+    ).toHaveAttribute('fill', 'var(--price-red)');
+  });
+  it('honors green_up preference on a CN market rising candle', () => {
+    renderChart([candle(1, 10, 11)], { market: 'cn', colorPreference: 'green_up' });
+    expect(
+      screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])'),
+    ).toHaveAttribute('fill', 'var(--price-green)');
+  });
+  it('uses the muted-foreground fallback for a flat candle', () => {
+    renderChart([{ date: '2026-01-01', open: 10, high: 10, low: 10, close: 10, volume: 1 }], { market: 'cn' });
+    expect(
+      screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])'),
+    ).toHaveAttribute('fill', 'hsl(var(--muted-foreground))');
+  });
 });

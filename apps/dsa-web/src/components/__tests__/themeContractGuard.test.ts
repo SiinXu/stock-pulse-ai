@@ -29,6 +29,20 @@ const MAX_HARDCODED_HOME_PRICE_CSS_VAR_REFS = 0;
 const MAX_PARALLEL_PRICE_TOKEN_DEFINITIONS = 0;
 const MAX_PACK_FORBIDDEN_OVERRIDES = 0;
 const MAX_COMMON_PAGE_TOKEN_REFS = 0;
+const CANONICAL_PRICE_HUE_OWNER = 'utils/marketFormat.ts';
+
+/**
+ * Remaining production sites that map a signed change/PnL/return to
+ * success/danger CSS instead of `changeColorCssVar`. Occurrence-level
+ * ceiling — shrink only. Do not add MarketStructureCard: its `text-success`
+ * icons are decorative, not a signed-direction mapping.
+ */
+const PRICE_DIRECTION_BYPASS_DEBT = [
+  'components/portfolio/PortfolioWorkspace.tsx',
+  'pages/BacktestPage.tsx',
+  'pages/FinancialCalculatorsPage.tsx',
+] as const;
+const MAX_PRICE_DIRECTION_BYPASS_DEBT = 4;
 
 function lineOf(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -178,6 +192,58 @@ function findMissingPriceDirectionSelectors(indexCss: string): string[] {
 }
 
 /** `.dark { }` (not `.dark .child` / `.dark[attr]`) must not reassign direction tokens. */
+/** Glob keys from `src/components/__tests__/` → path under `src/`. */
+function srcRelativeGuardPath(file: string): string {
+  if (file.startsWith('../../')) return file.slice('../../'.length);
+  if (file.startsWith('../')) return `components/${file.slice('../'.length)}`;
+  return file;
+}
+
+function isCanonicalPriceHueOwner(file: string): boolean {
+  return srcRelativeGuardPath(file) === CANONICAL_PRICE_HUE_OWNER
+    || file.endsWith('/utils/marketFormat.ts');
+}
+
+/**
+ * Any production module other than `utils/marketFormat.ts` that maps a
+ * change direction / ChangeColor / signed change onto a CSS colour value.
+ */
+function findPriceDirectionCssMappings(file: string, raw: string): Finding[] {
+  if (isCanonicalPriceHueOwner(file)) return [];
+  const source = maskComments(raw);
+  const findings: Finding[] = [];
+  const patterns: ReadonlyArray<{ token: string; regex: RegExp }> = [
+    { token: 'changeColorToCss', regex: /\bchangeColorToCss\b/g },
+    { token: 'CHANGE_COLOR_CSS_VAR', regex: /\bCHANGE_COLOR_CSS_VAR\b/g },
+    {
+      token: 'change-color-eq-css',
+      regex: /(?:\bcolor\s*===\s*['"](?:red|green)['"]|['"](?:red|green)['"]\s*===\s*\bcolor\b)[\s\S]{0,160}?(?:--price-red|--price-green|--danger|--success)/g,
+    },
+    {
+      token: 'change-color-table',
+      regex: /['"]red['"]\s*:\s*['"][^'"]*(?:--price-red|--danger)/g,
+    },
+    {
+      token: 'signed-to-status-css',
+      regex: /(?:>=?|<=?)\s*0\s*\?\s*['"](?:text-)?(?:success|danger)['"][\s\S]{0,160}?['"](?:text-)?(?:success|danger)['"]/g,
+    },
+  ];
+  for (const { token, regex } of patterns) {
+    for (const match of source.matchAll(regex)) {
+      findings.push({
+        file,
+        line: lineOf(source, match.index ?? 0),
+        token,
+      });
+    }
+  }
+  return findings;
+}
+
+function collectPriceDirectionCssMappings(sources: Record<string, string>): Finding[] {
+  return Object.entries(sources).flatMap(([file, raw]) => findPriceDirectionCssMappings(file, raw));
+}
+
 function findDarkThemeDirectionOverrides(indexCss: string): Finding[] {
   const source = maskComments(indexCss);
   const findings: Finding[] = [];
@@ -302,6 +368,21 @@ describe('theme contract guard', () => {
       '../../components/common/Example.tsx': "return <div style={{ color: 'var(--login-text)' }} />;",
     });
     expect(commonPageRefs.map(({ token }) => token)).toEqual(['--login-text']);
+
+    const mapper = findPriceDirectionCssMappings('../charts/chartUtils.ts', `
+export function changeColorToCss(color: ChangeColor): string {
+  if (color === 'red') return 'hsl(var(--danger))';
+  if (color === 'green') return 'hsl(var(--success))';
+  return 'hsl(var(--muted-foreground))';
+}
+`);
+    expect(mapper.map(({ token }) => token)).toContain('changeColorToCss');
+    expect(mapper.map(({ token }) => token)).toContain('change-color-eq-css');
+
+    expect(findPriceDirectionCssMappings(
+      '../../utils/marketFormat.ts',
+      "export const CHANGE_COLOR_CSS_VAR = { red: 'var(--price-red)', green: 'var(--price-green)' };",
+    )).toEqual([]);
   });
 
   it('fails closed when the TypeScript inventory is empty and still scans .ts modules', () => {
@@ -317,5 +398,21 @@ describe('theme contract guard', () => {
         token: '--price-up',
       }),
     ]);
+  });
+
+  it('forbids production modules other than marketFormat from mapping change direction to CSS', () => {
+    const findings = collectPriceDirectionCssMappings(productionTypeScriptSources);
+    const forbidden = findings.filter((finding) => finding.token !== 'signed-to-status-css');
+    expect(forbidden).toEqual([]);
+    expect(findings.some((finding) => finding.token === 'changeColorToCss')).toBe(false);
+  });
+
+  it('ratchets remaining price-direction bypass debt downward only', () => {
+    const findings = collectPriceDirectionCssMappings(productionTypeScriptSources)
+      .filter((finding) => finding.token === 'signed-to-status-css');
+    const files = [...new Set(findings.map((finding) => srcRelativeGuardPath(finding.file)))].sort();
+    expect(findings.length).toBeLessThanOrEqual(MAX_PRICE_DIRECTION_BYPASS_DEBT);
+    expect(findings.length).toBe(MAX_PRICE_DIRECTION_BYPASS_DEBT);
+    expect(files).toEqual([...PRICE_DIRECTION_BYPASS_DEBT].sort());
   });
 });

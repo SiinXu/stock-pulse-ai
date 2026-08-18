@@ -1,0 +1,1 @@
+- [Fixed] Painted K-line candles with the price direction tokens (Refs #1300).
