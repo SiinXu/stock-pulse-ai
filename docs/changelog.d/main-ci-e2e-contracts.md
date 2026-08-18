@@ -1,0 +1,2 @@
+- [Tests] Align Web E2E acceptance assertions with the current Discover, Signal Center, command palette, and navigation contracts.
+- [Chore] Bound report-export font installation retries and network timeouts so unavailable package mirrors fail clearly instead of exhausting the job timeout.

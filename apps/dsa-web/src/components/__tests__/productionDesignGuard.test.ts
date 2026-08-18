@@ -7,12 +7,17 @@ import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 import { productionDesignGuardFixtures } from './fixtures/productionDesignGuardFixtures';
 import {
+  assertNonEmptyProductionInventory,
   isProductionSourcePath as isProductionSource,
+  isTypeScriptModulePath,
   productionCssSources,
-  productionTsxSources,
+  productionTypeScriptSources,
 } from './productionSourceInventory';
 
-const productionComponents = productionTsxSources;
+assertNonEmptyProductionInventory(productionTypeScriptSources, 'productionTypeScriptSources');
+assertNonEmptyProductionInventory(productionCssSources, 'productionCssSources');
+
+const productionComponents = productionTypeScriptSources;
 const productionStylePaths = productionCssSources;
 const productionStyles: Record<string, string> = {
   '../../App.css': fs.readFileSync('src/App.css', 'utf8'),
@@ -59,6 +64,7 @@ const PRIMARY_INLINE_GRADIENT_PATTERN = /(?:(?:repeating-)?(?:linear|radial|coni
 const PRIMARY_INLINE_SHIMMER_PATTERN = /shimmer/i;
 const PILL_RADIUS_CLASS_PATTERN = /\brounded-(?:[trblse]{1,2}-)?full\b/g;
 const FILTER_CHIP_OWNER = '../common/AppliedFilterChips.tsx';
+const OVERLAY_Z_OWNER = '../common/overlayZ.ts';
 const FILTER_CHIP_CONTROL_PATTERN = /\bdata-control\s*=\s*["']filter-chip["']/;
 const BUTTON_RADIUS_CLASS_PATTERN = /^rounded(?:-(?:none|sm|md|lg|xl|2xl|3xl|full|\[[^\]]+\]))?$/;
 const BUTTON_CANONICAL_SIZE_HEIGHTS = {
@@ -193,6 +199,21 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
   }]],
 ]);
 const HARDCODED_HEX_PATTERN = /#[0-9a-fA-F]{3,8}(?![0-9a-fA-F])/g;
+
+function isColorHexContext(source: string, index: number, token: string): boolean {
+  const prefix = source.slice(Math.max(0, index - 2), index);
+  const suffix = source.slice(index + token.length, index + token.length + 1);
+  if (
+    (prefix.endsWith("'") || prefix.endsWith('"') || prefix.endsWith('`'))
+    && (suffix === "'" || suffix === '"' || suffix === '`')
+  ) {
+    return true;
+  }
+  if (prefix.endsWith('[') && suffix === ']') {
+    return true;
+  }
+  return /(?::|=)\s*$/.test(source.slice(Math.max(0, index - 12), index));
+}
 const HARDCODED_COLOR_FUNCTION_PATTERN = /(?<![a-zA-Z0-9])(?:rgb|hsl)a?\(\s*(?!var\(|\$\{)[^)]+\)/gi;
 const MAGIC_PIXEL_SIZE_PATTERN = /\b(?:text|size|[wh]|min-[wh]|max-[wh]|basis)-\[[^\]\r\n]*\d(?:\.\d+)?px[^\]\r\n]*\]/g;
 const ARBITRARY_RADIUS_PATTERN = /\brounded-\[[^\]\r\n]+\]/g;
@@ -218,6 +239,55 @@ const NEAR_VIEWPORT_PANEL_ALLOWLIST = new Map<string, readonly string[]>([
   ['../common/Modal.tsx', ['max-w-[96vw]']],
 ]);
 const MAX_RESTRAINED_BLUR_PX = 4;
+
+type TypeScriptDesignAllowance = {
+  rules: Partial<Record<DesignRule, number>>;
+  reason: string;
+  removeWhen: string;
+};
+
+const TYPESCRIPT_DESIGN_DEBT = new Map<string, TypeScriptDesignAllowance>([
+  ['../../utils/marketReview.ts', {
+    rules: { 'hardcoded-hex': 3 },
+    reason: 'getMarketLightColor still returns raw Tailwind palette hex.',
+    removeWhen: 'Market Light maps scores onto Layer 0 status tokens instead of hex literals.',
+  }],
+  ['../../utils/decisionSignalTimeline.ts', {
+    rules: { 'hardcoded-hex': 4 },
+    reason: 'Timeline point colours are hardcoded hex instead of price or status tokens.',
+    removeWhen: 'getPointColor uses Layer 0 price tokens or the shared change-color mapper.',
+  }],
+  ['../../types/analysis.ts', {
+    rules: { 'hardcoded-hex': 5 },
+    reason: 'getSentimentColor ships a parallel hex scale next to the tokenized chart mapper.',
+    removeWhen: 'Sentiment colour reuses the shared status-token mapper (chartUtils.riskScoreFill).',
+  }],
+]);
+
+const TYPESCRIPT_DESIGN_DEBT_CEILING = 12;
+
+function typescriptDesignDebtViolations(
+  findings: readonly DesignViolation[],
+  allowances: ReadonlyMap<string, TypeScriptDesignAllowance>,
+): DesignViolation[] {
+  const seen = new Map<string, number>();
+  return findings.filter((finding) => {
+    const allowance = allowances.get(finding.file);
+    const key = `${finding.file}:${finding.rule}`;
+    const nextCount = (seen.get(key) ?? 0) + 1;
+    seen.set(key, nextCount);
+    return nextCount > (allowance?.rules[finding.rule] ?? 0);
+  });
+}
+
+function typescriptDesignDebtCount(
+  allowances: ReadonlyMap<string, TypeScriptDesignAllowance>,
+): number {
+  return Array.from(allowances.values()).reduce(
+    (total, allowance) => total + Object.values(allowance.rules).reduce((sum, count) => sum + (count ?? 0), 0),
+    0,
+  );
+}
 const CSS_RULE_PATTERN = /([^{}]+)\{([^{}]*)\}/g;
 const CSS_RADIUS_DECLARATION_PATTERN = /\bborder-radius\s*:\s*([^;{}\r\n]+)/i;
 const BUTTON_SELECTOR_PATTERN = /\bbutton\b|\.[\w-]*(?:button|btn)[\w-]*/i;
@@ -2632,6 +2702,7 @@ function findProductionDesignViolations(
 
   for (const match of sourceWithoutComments.matchAll(HARDCODED_HEX_PATTERN)) {
     const index = match.index ?? 0;
+    if (!isColorHexContext(sourceWithoutComments, index, match[0])) continue;
     if (!isAllowedIndexCssToken(filename, source, index)) {
       violations.push({
         file: filename,
@@ -2751,26 +2822,28 @@ function findProductionDesignViolations(
     }
   }
 
-  for (const match of sourceWithoutComments.matchAll(OVERLAY_Z_UTILITY_PATTERN)) {
-    const index = match.index ?? 0;
-    violations.push({
-      file: filename,
-      line: lineNumberAt(source, index),
-      rule: 'overlay-z-index',
-      token: match[0],
-    });
-  }
+  if (filename !== OVERLAY_Z_OWNER) {
+    for (const match of sourceWithoutComments.matchAll(OVERLAY_Z_UTILITY_PATTERN)) {
+      const index = match.index ?? 0;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, index),
+        rule: 'overlay-z-index',
+        token: match[0],
+      });
+    }
 
-  for (const match of sourceWithoutComments.matchAll(INLINE_Z_INDEX_PATTERN)) {
-    const index = match.index ?? 0;
-    const numericValue = /^\d+$/.test(match[1]) ? Number(match[1]) : null;
-    if (numericValue !== null && numericValue < 40) continue;
-    violations.push({
-      file: filename,
-      line: lineNumberAt(source, index),
-      rule: 'overlay-z-index',
-      token: match[0],
-    });
+    for (const match of sourceWithoutComments.matchAll(INLINE_Z_INDEX_PATTERN)) {
+      const index = match.index ?? 0;
+      const numericValue = /^\d+$/.test(match[1]) ? Number(match[1]) : null;
+      if (numericValue !== null && numericValue < 40) continue;
+      violations.push({
+        file: filename,
+        line: lineNumberAt(source, index),
+        rule: 'overlay-z-index',
+        token: match[0],
+      });
+    }
   }
 
   for (const match of sourceWithoutComments.matchAll(NEAR_VIEWPORT_PANEL_PATTERN)) {
@@ -3255,6 +3328,15 @@ describe('production design guard', () => {
       'fixture.tsx',
       productionDesignGuardFixtures.nearViewportPanel,
     )).toEqual([expect.objectContaining({ rule: 'near-viewport-panel' })]);
+    expect(productionTypeScriptSources[OVERLAY_Z_OWNER]).toContain('zIndex');
+    expect(findProductionDesignViolations(
+      OVERLAY_Z_OWNER,
+      'export function getOverlayStyle() { return { zIndex: OVERLAY_Z.dialog }; }',
+    ).filter(({ rule }) => rule === 'overlay-z-index')).toEqual([]);
+    expect(findProductionDesignViolations(
+      '../../utils/overlayFixture.ts',
+      'export const style = { zIndex: 90 };',
+    )).toEqual([expect.objectContaining({ rule: 'overlay-z-index', token: 'zIndex: 90' })]);
   });
 
   it('self-test detects a hardcoded hex colour', () => {
@@ -3264,6 +3346,42 @@ describe('production design guard', () => {
       .toEqual([expect.objectContaining({ rule: 'hardcoded-color', token: 'rgba(0,0,0,0.2)' })]);
     expect(findProductionDesignViolations('fixture.css', productionDesignGuardFixtures.hardcodedCssFunctionalColor))
       .toEqual([expect.objectContaining({ rule: 'hardcoded-color', token: 'hsl(0 0% 0% / 0.2)' })]);
+  });
+
+  it('self-test actually scans a .ts fixture for hex colours', () => {
+    expect(Object.keys(productionTypeScriptSources).some(isTypeScriptModulePath)).toBe(true);
+    expect(productionTypeScriptSources['../../utils/marketReview.ts']).toBeDefined();
+    expect(findProductionDesignViolations(
+      '../../utils/hexFixture.ts',
+      productionDesignGuardFixtures.hardcodedHexTypeScript,
+    )).toEqual([
+      expect.objectContaining({
+        file: '../../utils/hexFixture.ts',
+        rule: 'hardcoded-hex',
+        token: '#22c55e',
+      }),
+      expect.objectContaining({
+        file: '../../utils/hexFixture.ts',
+        rule: 'hardcoded-hex',
+        token: '#ef4444',
+      }),
+    ]);
+  });
+
+  it('does not treat #987-style issue references in locale copy as hex colours', () => {
+    expect(findProductionDesignViolations(
+      '../../locales/personalPerformance.ts',
+      productionDesignGuardFixtures.localeIssueReference,
+    )).toEqual([]);
+    expect(findProductionDesignViolations(
+      '../../utils/searchStocks.ts',
+      "export const escape = (value: string) => value.replace(/'/g, '&#039;');",
+    )).toEqual([]);
+  });
+
+  it('fails closed when the TypeScript inventory is empty', () => {
+    expect(() => assertNonEmptyProductionInventory({}, 'productionTypeScriptSources'))
+      .toThrow(/empty/);
   });
 
   it('keeps native buttons soft-rounded when they have no local radius class', () => {
@@ -3802,16 +3920,18 @@ describe('production design guard', () => {
       .toEqual([]);
   });
 
-  it('keeps every production CSS and TSX source within the enforced rules', () => {
+  it('keeps every production CSS and TypeScript source within the enforced rules', () => {
     const scannedSources = Object.entries(productionSources)
       .filter(([filename]) => isProductionSource(filename));
-    const productionTsxSources = scannedSources
+    const scannedTsxSources = scannedSources
       .filter(([filename]) => filename.endsWith('.tsx'));
-    const totalMatchedButtonTags = productionTsxSources.reduce(
+    const scannedTsSources = scannedSources
+      .filter(([filename]) => isTypeScriptModulePath(filename));
+    const totalMatchedButtonTags = scannedTsxSources.reduce(
       (total, [, source]) => total + Array.from(source.matchAll(BUTTON_OPENING_TAG_PATTERN)).length,
       0,
     );
-    const primaryScans = scanPrimaryCtaSources(productionTsxSources);
+    const primaryScans = scanPrimaryCtaSources(scannedTsxSources);
     const allowlistHits = Array.from(primaryScans.values())
       .flatMap((scan) => scan.allowlistHits)
       .sort();
@@ -3837,7 +3957,7 @@ describe('production design guard', () => {
       (total, scan) => total + scan.matchedSurfaceLevelStyles,
       0,
     );
-    const buttonClassNames = new Set(productionTsxSources
+    const buttonClassNames = new Set(scannedTsxSources
       .flatMap(([, source]) => Array.from(extractButtonClassNames(source))));
     const violations = scannedSources.flatMap(([filename, source]) => (
       findProductionDesignViolations(
@@ -3847,15 +3967,32 @@ describe('production design guard', () => {
         primaryScans.get(filename),
       )
     ));
+    const typescriptDebt = violations.filter((violation) => isTypeScriptModulePath(violation.file));
+    const uncovered = [
+      ...violations.filter((violation) => !isTypeScriptModulePath(violation.file)),
+      ...typescriptDesignDebtViolations(typescriptDebt, TYPESCRIPT_DESIGN_DEBT),
+    ];
+    const unusedDebtFiles = Array.from(TYPESCRIPT_DESIGN_DEBT.keys()).filter((filename) => (
+      !typescriptDebt.some((finding) => finding.file === filename)
+    ));
 
     expect(scannedSources.length).toBeGreaterThan(0);
+    expect(scannedTsSources.length).toBeGreaterThan(0);
+    expect(scannedTsSources.some(([filename]) => filename.endsWith('/marketReview.ts'))).toBe(true);
     expect(totalMatchedButtonTags).toBeGreaterThan(0);
     expect(totalMatchedPrimaryButtons).toBeGreaterThan(0);
     expect(totalMatchedSharedPrimaryStyles).toBe(PRIMARY_CTA_VARIANTS.size);
     expect(totalMatchedSurfaceLevelStyles).toBe(1);
     expect(allowlistHits).toEqual(expectedAllowlistHits);
     expect(buttonClassNames.size).toBeGreaterThan(0);
-    expect(violations).toEqual([]);
+    expect(Array.from(TYPESCRIPT_DESIGN_DEBT.values()).every(({ reason, removeWhen }) => (
+      reason.trim().length > 0 && removeWhen.trim().length > 0
+    ))).toBe(true);
+    expect(unusedDebtFiles).toEqual([]);
+    expect(typescriptDesignDebtCount(TYPESCRIPT_DESIGN_DEBT)).toBe(TYPESCRIPT_DESIGN_DEBT_CEILING);
+    expect(typescriptDebt.length).toBe(TYPESCRIPT_DESIGN_DEBT_CEILING);
+    expect(TYPESCRIPT_DESIGN_DEBT_CEILING + 1).not.toBe(typescriptDebt.length);
+    expect(uncovered).toEqual([]);
   }, 15_000);
 
   it('retains the legacy-visual guard for upstream-adapted surfaces', () => {

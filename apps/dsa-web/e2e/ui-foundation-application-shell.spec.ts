@@ -1,6 +1,10 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { APPLICATION_NAVIGATION_ITEMS } from '../src/components/layout/navigation';
 
 const FIXTURE_PATH = '/e2e/application-shell-fixture.html';
+const COMPACT_NAVIGATION_LINK_COUNT = APPLICATION_NAVIGATION_ITEMS.filter(
+  (item) => item.kind === 'link',
+).length;
 
 test.beforeEach(async ({ page }) => {
   const emptyPage = { items: [], total: 0, page: 1, page_size: 20 };
@@ -372,7 +376,7 @@ test.describe('application shell foundation', () => {
     await expect(compactResearch).toHaveAttribute('data-navigation-active', 'true');
     const compactNavigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
     const compactRoutes = await compactNavigation.getByRole('link').all();
-    expect(compactRoutes).toHaveLength(4);
+    expect(compactRoutes).toHaveLength(COMPACT_NAVIGATION_LINK_COUNT);
     for (const route of compactRoutes) {
       expect((await route.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
     }

@@ -1528,10 +1528,10 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await page.goto(APP_ROUTE_PATHS.signals);
 
     await expect(page.getByRole('heading', { name: '信号中心' })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '信号流', exact: true })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '规则', exact: true })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '推送历史', exact: true })).toBeVisible();
-    await expect(page.getByRole('tab', { name: '再评估与统计', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.feed'], exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.rules'], exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.history'], exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.review'], exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: '持仓', exact: true }).click();
     await expect(page.getByRole('button', { name: '持仓', exact: true }))
@@ -1540,14 +1540,14 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
     }));
 
-    await page.getByRole('tab', { name: '规则', exact: true }).click();
+    await page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.rules'], exact: true }).click();
     await expect(page).toHaveURL(buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       tab: SIGNAL_CENTER_TAB_VALUES.rules,
     }));
     await expect(page.getByRole('button', { name: '创建告警规则' })).toBeVisible();
 
-    await page.getByRole('tab', { name: '推送历史', exact: true }).click();
+    await page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.history'], exact: true }).click();
     await expect(page).toHaveURL(buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       tab: SIGNAL_CENTER_TAB_VALUES.history,
@@ -1556,7 +1556,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
     await expect(page.getByRole('tab', { name: '通知尝试记录', exact: true })).toBeVisible();
     await expect(page.getByRole('group', { name: '信号范围' })).toHaveCount(0);
 
-    await page.getByRole('tab', { name: '再评估与统计', exact: true }).click();
+    await page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.review'], exact: true }).click();
     await expect(page).toHaveURL(buildSignalCenterHref({
       scope: SIGNAL_CENTER_SCOPE_VALUES.holdings,
       tab: SIGNAL_CENTER_TAB_VALUES.review,
@@ -1618,7 +1618,7 @@ test.describe('infrastructure interaction acceptance matrix', () => {
       view: null,
       keep: 'yes',
     });
-    await expect(page.getByRole('tab', { name: '再评估与统计', exact: true }))
+    await expect(page.getByRole('tab', { name: UI_TEXT.zh['decisionSignals.tab.review'], exact: true }))
       .toHaveAttribute('aria-selected', 'true');
   });
 

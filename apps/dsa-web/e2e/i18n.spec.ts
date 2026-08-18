@@ -3,8 +3,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { UI_TEXT } from '../src/i18n/uiText';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
+import { SOURCE_CANDIDATE_DISCOVERY_TEXT } from '../src/locales/candidateDiscoveryText';
 import { PORTFOLIO_TEXT } from '../src/locales/portfolio';
-import { SCREENING_TEXT } from '../src/locales/screening';
 import { loginAsE2eAdmin, getE2eAuthStatus } from './auth-fixture';
 import { UI_LANGUAGE_METADATA, type UiLanguage } from '../src/i18n/uiLanguages';
 import {
@@ -206,7 +206,11 @@ test.describe('complete UI i18n acceptance', () => {
       { path: APP_ROUTE_PATHS.agent, text: UI_TEXT.en['chat.title'], title: UI_TEXT.en['chat.pageTitle'] },
       { path: APP_ROUTE_PATHS.research, text: UI_TEXT.en['researchOverview.description'], title: UI_TEXT.en['researchOverview.documentTitle'] },
       { path: APP_ROUTE_PATHS.researchMarket, text: UI_TEXT.en['home.marketReviewHistoryTitle'], title: UI_TEXT.en['home.marketReviewPageTitle'] },
-      { path: APP_ROUTE_PATHS.researchDiscover, text: SCREENING_TEXT.en.title, title: SCREENING_TEXT.en.documentTitle },
+      {
+        path: APP_ROUTE_PATHS.researchDiscover,
+        text: SOURCE_CANDIDATE_DISCOVERY_TEXT.en.pageTitle,
+        title: SOURCE_CANDIDATE_DISCOVERY_TEXT.en.documentTitle,
+      },
       { path: APP_ROUTE_PATHS.researchAnalysis, text: UI_TEXT.en['analysisWorkbench.title'], title: UI_TEXT.en['analysisWorkbench.documentTitle'] },
       { path: APP_ROUTE_PATHS.portfolio, text: PORTFOLIO_TEXT.en.title, title: PORTFOLIO_TEXT.en.documentTitle },
       { path: APP_ROUTE_PATHS.signals, text: UI_TEXT.en['decisionSignals.title'], title: UI_TEXT.en['decisionSignals.pageTitle'] },
