@@ -93,7 +93,7 @@ const NotificationCenterPage: React.FC = () => {
       });
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
-      if (mode !== 'more') {
+      if (mode === 'initial') {
         setPageData(null);
         setItems([]);
       }
@@ -120,6 +120,7 @@ const NotificationCenterPage: React.FC = () => {
     setError(null);
     try {
       await notificationInboxApi.markRead([itemId]);
+      if (requestIdRef.current !== requestId) return;
       await load('refresh');
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
@@ -135,6 +136,7 @@ const NotificationCenterPage: React.FC = () => {
     setError(null);
     try {
       await notificationInboxApi.markAllRead(kindRef.current || undefined);
+      if (requestIdRef.current !== requestId) return;
       await load('refresh');
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
