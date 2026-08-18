@@ -8,6 +8,8 @@ import {
   type RouteFocusTarget,
 } from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { chooseOption, createDeferred } from '../../test-utils';
+import type { NotificationInboxItem, NotificationInboxPage } from '../../types/notificationInbox';
 import NotificationCenterPage from '../NotificationCenterPage';
 
 const listMock = vi.fn();
@@ -27,6 +29,37 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   void target;
   return () => {};
 });
+
+function emptyPage(overrides: Partial<NotificationInboxPage> = {}): NotificationInboxPage {
+  return {
+    items: [],
+    page: 1,
+    pageSize: 50,
+    total: 0,
+    unreadTotal: 0,
+    hasMore: false,
+    sourceStatuses: [],
+    retentionDays: 90,
+    maxItems: 500,
+    ...overrides,
+  };
+}
+
+function inboxItem(overrides: Partial<NotificationInboxItem> = {}): NotificationInboxItem {
+  return {
+    id: 'v1:analysis_complete:1:1786233600000000',
+    kind: 'analysis_complete',
+    titleKey: 'analysisCompleteTitle',
+    titleParams: { label: '600519' },
+    summary: 'hold',
+    severity: 'info',
+    createdAt: '2026-08-09T00:00:00Z',
+    isRead: false,
+    href: '/research/analysis?segment=history&recordId=1',
+    sourceId: '1',
+    ...overrides,
+  };
+}
 
 function renderPage() {
   return render(
@@ -207,5 +240,75 @@ describe('NotificationCenterPage', () => {
       'Some notifications are temporarily unavailable.',
     );
     expect(screen.getByTestId('notification-center-empty')).toBeInTheDocument();
+  });
+
+  it('shows a retryable error without the empty state when the inbox load fails', async () => {
+    listMock.mockRejectedValue(new Error('inbox unavailable'));
+    renderPage();
+
+    expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
+    expect(screen.queryByText('No notifications yet')).not.toBeInTheDocument();
+  });
+
+  it('retries the inbox request and clears the error after a successful reload', async () => {
+    listMock
+      .mockRejectedValueOnce(new Error('inbox unavailable'))
+      .mockResolvedValueOnce(emptyPage());
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByTestId('notification-center-empty')).toBeInTheDocument();
+    expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+    expect(listMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the latest kind filter response when requests resolve out of order', async () => {
+    const allRequest = createDeferred<NotificationInboxPage>();
+    const alertRequest = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockReturnValueOnce(allRequest.promise)
+      .mockReturnValueOnce(alertRequest.promise);
+
+    renderPage();
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+
+    alertRequest.resolve(emptyPage({
+      items: [inboxItem({
+        id: 'v1:alert_triggered:2:1786233500000000',
+        kind: 'alert_triggered',
+        titleKey: 'alertTriggeredTitle',
+        titleParams: { target: 'MSFT' },
+        summary: 'Threshold crossed',
+        severity: 'warning',
+        createdAt: '2026-08-09T23:58:20Z',
+        href: '/signals?tab=history&trigger=2',
+        sourceId: '2',
+      })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    allRequest.resolve(emptyPage({
+      items: [inboxItem({
+        id: 'v1:analysis_complete:1:1786233600000000',
+        titleParams: { label: 'STALE' },
+        summary: 'stale all-types row',
+      })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Analysis complete: STALE')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
   });
 });
