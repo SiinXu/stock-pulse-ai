@@ -2,6 +2,11 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ChatThinkingDetails } from '../ChatThinkingDetails';
 import { UI_TEXT, type UiTextKey } from '../../../i18n/uiText';
+import type { ProgressStep } from '../../../stores/agentChatStore';
+import {
+  resetChatThinkingTraceStats,
+  snapshotChatThinkingTraceStats,
+} from '../chatThinkingTrace';
 
 const t = (key: UiTextKey) => UI_TEXT.en[key];
 
@@ -186,4 +191,83 @@ describe('ChatThinkingDetails', () => {
     );
     expect(within(row as HTMLElement).queryByText('Running')).not.toBeInTheDocument();
   });
+
+  it('keeps per-append derivation and row work constant while streaming 200 live steps', () => {
+    const streamed: ProgressStep[] = [];
+    const { rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={streamed} />,
+    );
+
+    const perAppendDerive: number[] = [];
+    const perAppendIdentity: number[] = [];
+    const perAppendRowRenders: number[] = [];
+
+    for (let index = 0; index < 200; index += 1) {
+      streamed.push({
+        type: 'thinking',
+        step: index + 1,
+        message: `Planning ${index + 1}`,
+      });
+      resetChatThinkingTraceStats();
+      rerender(
+        <ChatThinkingDetails mode="live" t={t} steps={[...streamed]} />,
+      );
+      const snapshot = snapshotChatThinkingTraceStats();
+      perAppendDerive.push(snapshot.derive);
+      perAppendIdentity.push(snapshot.identity);
+      perAppendRowRenders.push(snapshot.rowRenders);
+    }
+
+    const tailDerive = perAppendDerive.slice(1);
+    const tailIdentity = perAppendIdentity.slice(1);
+    const tailRowRenders = perAppendRowRenders.slice(1);
+
+    expect(perAppendDerive[0]).toBe(1);
+    expect(new Set(tailDerive)).toEqual(new Set([1]));
+    expect(new Set(tailIdentity)).toEqual(new Set([1]));
+    expect(Math.max(...tailRowRenders)).toBeLessThanOrEqual(2);
+    expect(Math.min(...tailRowRenders)).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Planning \d+/)).toHaveLength(200);
+    expect(document.querySelectorAll('[data-current="true"]')).toHaveLength(1);
+    expect(document.querySelector('[data-current="true"]')).toHaveTextContent('Planning 200');
+  });
+
+  it('renders the same live transcript HTML when steps arrive incrementally or all at once', () => {
+    const steps: ProgressStep[] = [
+      { type: 'thinking', step: 1, message: 'Planning' },
+      { type: 'tool_start', tool: 'search', display_name: 'Search' },
+      {
+        type: 'tool_done',
+        tool: 'search',
+        display_name: 'Search',
+        success: true,
+        duration: 0.4,
+        meta: { arguments: { q: '600519' }, result_preview: '{"ok":true}', result_length: 11 },
+      },
+      { type: 'stage_done', stage: 'agent_loop', status: 'completed', duration: 1.2, reason: 'budget_guard' },
+      { type: 'pipeline_budget_skipped', stage: 'critic', reason: 'insufficient_budget' },
+    ];
+
+    const { container: batchContainer } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={steps} />,
+    );
+    const batchHtml = normalizeTraceHtml(batchContainer.innerHTML);
+
+    const growing: ProgressStep[] = [];
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={growing} />,
+    );
+    for (const step of steps) {
+      growing.push(step);
+      rerender(<ChatThinkingDetails mode="live" t={t} steps={[...growing]} />);
+    }
+
+    expect(normalizeTraceHtml(container.innerHTML)).toBe(batchHtml);
+  });
 });
+
+function normalizeTraceHtml(html: string): string {
+  return html
+    .replace(/id="[^"]*-detail-\d+"/g, 'id="trace-detail"')
+    .replace(/aria-controls="[^"]*-detail-\d+"/g, 'aria-controls="trace-detail"');
+}

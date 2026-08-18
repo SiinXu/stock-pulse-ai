@@ -1,0 +1,1 @@
+- [Changed] Bounded live agent progress rendering during streaming (Refs #883).
