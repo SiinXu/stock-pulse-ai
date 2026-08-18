@@ -1,0 +1,1 @@
+- [Fixed] Keep legacy bot child-module attributes bound to their canonical packages across supported Python versions.
