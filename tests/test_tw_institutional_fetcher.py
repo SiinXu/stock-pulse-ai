@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from data_provider.tw_institutional_fetcher import (  # noqa: E402
+from src.data_provider.tw_institutional_fetcher import (  # noqa: E402
     TwInstitutionalFetcher,
     minguo_to_ad,
     _to_int,
@@ -105,7 +105,7 @@ class TestPureHelpers(unittest.TestCase):
 
 class TestT86Parsing(unittest.TestCase):
     def test_twse_2330_net_breakdown(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
             rec = _fetcher().get_institutional_net("2330.TW", "20260626")
         self.assertIsNotNone(rec)
         self.assertEqual(rec["stock_code"], "2330")
@@ -122,24 +122,24 @@ class TestT86Parsing(unittest.TestCase):
         self.assertEqual(rec["total_net"], rec["foreign_net"] + rec["trust_net"] + rec["dealer_net"])
 
     def test_twse_lowercase_suffix_and_other_row(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
             rec = _fetcher().get_institutional_net("2337.tw")
         self.assertEqual(rec["stock_code"], "2337")
         self.assertEqual(rec["trust_net"], -3505000)   # negative net preserved
 
     def test_twse_stat_not_ok_fails_open(self):
         bad = {"stat": "很抱歉，沒有符合條件的資料!", "data": []}
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(bad)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(bad)):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260101"))
 
     def test_twse_empty_data_fails_open(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp({"stat": "OK", "data": []})):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp({"stat": "OK", "data": []})):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW"))
 
 
 class TestTpexParsing(unittest.TestCase):
     def test_tpex_3105_net_breakdown_and_minguo_date(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
             rec = _fetcher().get_institutional_net("3105.TWO")
         self.assertIsNotNone(rec)
         self.assertEqual(rec["stock_code"], "3105")
@@ -153,13 +153,13 @@ class TestTpexParsing(unittest.TestCase):
         self.assertEqual(rec["total_net"], rec["foreign_net"] + rec["trust_net"] + rec["dealer_net"])
 
     def test_tpex_non_list_fails_open(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp({})):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp({})):
             self.assertIsNone(_fetcher().get_institutional_net("6488.TWO"))
 
 
 class TestRoutingAndFailOpen(unittest.TestCase):
     def test_bare_or_non_tw_code_returns_none_without_fetching(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get") as mock_get:
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get") as mock_get:
             f = _fetcher()
             self.assertIsNone(f.get_institutional_net("2330"))     # bare -> not applicable
             self.assertIsNone(f.get_institutional_net("AAPL"))
@@ -167,15 +167,15 @@ class TestRoutingAndFailOpen(unittest.TestCase):
             mock_get.assert_not_called()
 
     def test_network_error_fails_open(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", side_effect=ConnectionError("boom")):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", side_effect=ConnectionError("boom")):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260626"))
 
     def test_unknown_stock_returns_none(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
             self.assertIsNone(_fetcher().get_institutional_net("9999.TW"))
 
     def test_whole_market_cached_single_fetch(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)) as mock_get:
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)) as mock_get:
             f = _fetcher()
             f.get_institutional_net("2330.TW", "20260626")
             f.get_institutional_net("2337.TW", "20260626")   # same (market, date) -> cache hit
@@ -190,14 +190,14 @@ class TestMissingFieldAndEmptyCacheFailOpen(unittest.TestCase):
         import copy
         row = copy.deepcopy(TPEX_FIXTURE[0])
         del row["SecuritiesInvestmentTrustCompanies-Difference"]   # trust column renamed/missing
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
             self.assertIsNone(_fetcher().get_institutional_net("3105.TWO"))
 
     def test_tpex_genuine_zero_is_kept(self):
         import copy
         row = copy.deepcopy(TPEX_FIXTURE[0])
         row["SecuritiesInvestmentTrustCompanies-Difference"] = "0"  # `投信` is genuinely net-zero today
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
             rec = _fetcher().get_institutional_net("3105.TWO")
         self.assertIsNotNone(rec)
         self.assertEqual(rec["trust_net"], 0)       # genuine 0 preserved
@@ -208,12 +208,12 @@ class TestMissingFieldAndEmptyCacheFailOpen(unittest.TestCase):
         fix = copy.deepcopy(T86_FIXTURE)
         trust_idx = fix["fields"].index("投信買賣超股數")
         fix["data"][0][trust_idx] = ""   # Blank `投信買賣超` cell -> missing -> drop 2330, not 0
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260626"))
 
     def test_empty_result_not_cached_and_retried(self):
         empty = {"stat": "OK", "data": []}
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(empty)) as mock_get:
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(empty)) as mock_get:
             f = _fetcher()
             self.assertIsNone(f.get_institutional_net("2330.TW", "20260626"))
             self.assertIsNone(f.get_institutional_net("2330.TW", "20260626"))
@@ -230,7 +230,7 @@ class TestStructureRobustness(unittest.TestCase):
         perm = list(range(len(fix["fields"])))[::-1]   # reverse the column order
         fix["fields"] = [fix["fields"][p] for p in perm]
         fix["data"] = [[row[p] for p in perm] for row in fix["data"]]
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
             rec = _fetcher().get_institutional_net("2330.TW", "20260626")
         self.assertIsNotNone(rec)                       # parsed correctly despite reorder
         self.assertEqual(rec["foreign_net"], -14281155)
@@ -242,19 +242,19 @@ class TestStructureRobustness(unittest.TestCase):
         import copy
         fix = copy.deepcopy(T86_FIXTURE)
         fix["fields"][10] = "投信買賣超股數_v2"          # `投信` column renamed
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260626"))
 
     def test_twse_missing_fields_header_fails_open(self):
         fix = {"stat": "OK", "date": "20260626", "data": [["2330", "x", "1", "2", "3"]]}
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(fix)):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260626"))
 
     def test_tpex_unconvertible_date_drops_row(self):
         import copy
         row = copy.deepcopy(TPEX_FIXTURE[0])
         row["Date"] = "bad-date"                        # Not a 7-digit `民國` date -> drop
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp([row])):
             self.assertIsNone(_fetcher().get_institutional_net("3105.TWO"))
 
 
@@ -279,7 +279,7 @@ class TestConcurrencyAndHttpError(unittest.TestCase):
             barrier.wait()   # release all 8 threads together so they truly race
             f.get_institutional_net("2330.TW", "20260626")
 
-        with patch("data_provider.tw_institutional_fetcher.requests.get", side_effect=slow_get):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", side_effect=slow_get):
             threads = [threading.Thread(target=caller) for _ in range(8)]
             for th in threads:
                 th.start()
@@ -288,7 +288,7 @@ class TestConcurrencyAndHttpError(unittest.TestCase):
         self.assertEqual(len(calls), 1)   # 8 concurrent same-key callers -> ONE fetch
 
     def test_different_keys_are_not_coalesced(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)) as mock_get:
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)) as mock_get:
             f = _fetcher()
             f.get_institutional_net("2330.TW", "20260626")
             f.get_institutional_net("2330.TW", "20260625")   # different date -> different key
@@ -298,7 +298,7 @@ class TestConcurrencyAndHttpError(unittest.TestCase):
         import requests as _rq
         resp = MagicMock()
         resp.raise_for_status.side_effect = _rq.HTTPError("429 Too Many Requests")
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=resp):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=resp):
             self.assertIsNone(_fetcher().get_institutional_net("2330.TW", "20260626"))
 
 
@@ -307,11 +307,11 @@ class TestCircuitBreakerAndDateGuard(unittest.TestCase):
 
     def test_circuit_breaker_opens_after_3_failures_and_skips_fetch(self):
         import requests as _rq
-        from data_provider.realtime_types import CircuitBreaker
+        from src.data_provider.realtime_types import CircuitBreaker
 
         f = _fetcher()
         with patch(
-            "data_provider.tw_institutional_fetcher.requests.get",
+            "src.data_provider.tw_institutional_fetcher.requests.get",
             side_effect=_rq.ConnectionError("down"),
         ) as mock_get:
             for _ in range(3):  # 3 consecutive failures trip the breaker
@@ -324,18 +324,18 @@ class TestCircuitBreakerAndDateGuard(unittest.TestCase):
 
     def test_circuit_breaker_recovers_after_cooldown_reset(self):
         import requests as _rq
-        from data_provider.realtime_types import CircuitBreaker
+        from src.data_provider.realtime_types import CircuitBreaker
 
         f = _fetcher()
         with patch(
-            "data_provider.tw_institutional_fetcher.requests.get",
+            "src.data_provider.tw_institutional_fetcher.requests.get",
             side_effect=_rq.ConnectionError("down"),
         ):
             for _ in range(3):
                 f.get_institutional_net("2330.TW")
         self.assertEqual(f._breaker.get_status().get("twse"), CircuitBreaker.OPEN)
         f._breaker.reset("twse")  # simulate the ~5 min cooldown elapsing / recovery
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(T86_FIXTURE)):
             rec = f.get_institutional_net("2330.TW")
         self.assertIsNotNone(rec)
         self.assertEqual(f._breaker.get_status().get("twse"), CircuitBreaker.CLOSED)
@@ -343,18 +343,18 @@ class TestCircuitBreakerAndDateGuard(unittest.TestCase):
     def test_empty_responses_do_not_trip_breaker(self):
         # an empty / non-trading-day response means the endpoint RESPONDED -> reachable,
         # so the breaker must stay CLOSED and keep fetching (never skip a recovered day).
-        from data_provider.realtime_types import CircuitBreaker
+        from src.data_provider.realtime_types import CircuitBreaker
 
         f = _fetcher()
         empty = {"stat": "OK", "data": []}
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(empty)) as mock_get:
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(empty)) as mock_get:
             for _ in range(3):
                 self.assertIsNone(f.get_institutional_net("2330.TW"))
             self.assertEqual(mock_get.call_count, 3, "an empty response wrongly tripped/skipped the breaker")
         self.assertEqual(f._breaker.get_status().get("twse"), CircuitBreaker.CLOSED)
 
     def test_tpex_explicit_date_match_returns_record(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
             rec = _fetcher().get_institutional_net("3105.TWO", "20260626")  # == served trading day
         self.assertIsNotNone(rec)
         self.assertEqual(rec["date"], "20260626")
@@ -362,12 +362,12 @@ class TestCircuitBreakerAndDateGuard(unittest.TestCase):
     def test_tpex_explicit_date_mismatch_fails_open(self):
         # TPEx serves only the latest day; a mismatched explicit date must not return a
         # wrong-day record -> fail open (None).
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
             rec = _fetcher().get_institutional_net("3105.TWO", "20260101")
         self.assertIsNone(rec)
 
     def test_tpex_no_date_returns_latest(self):
-        with patch("data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
+        with patch("src.data_provider.tw_institutional_fetcher.requests.get", return_value=_resp(TPEX_FIXTURE)):
             rec = _fetcher().get_institutional_net("3105.TWO")  # no date -> latest, guard inactive
         self.assertIsNotNone(rec)
 

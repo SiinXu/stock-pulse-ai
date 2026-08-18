@@ -63,6 +63,77 @@ describe('stocksApi.getQuote', () => {
   });
 });
 
+describe('stocksApi.getFieldTrust', () => {
+  beforeEach(() => mockGet.mockReset());
+
+  it('requests the trust path and camelCases source, lag, stale, conflict, and health', async () => {
+    mockGet.mockResolvedValue({
+      data: {
+        schema_version: 'field_trust_view/1.0',
+        stock_code: '600519',
+        status: 'degraded',
+        metadata_present: true,
+        quote_source: 'efinance',
+        stale_seconds: 7200,
+        is_stale: true,
+        missing_fields: [],
+        fields: [
+          {
+            field: 'price',
+            value: 1688,
+            source: 'efinance',
+            origin: 'primary',
+            staleness: 'stale',
+            conflict: true,
+          },
+        ],
+        conflicts: [
+          {
+            field: 'price',
+            severity: 'warn',
+            values: [
+              { provider: 'efinance', value: 1688 },
+              { provider: 'akshare_em', value: 2100 },
+            ],
+          },
+        ],
+        conflict_checks: [],
+        provider_health: [{ provider: 'efinance', status: 'ok', role: 'primary' }],
+        analysis_input: {
+          schema_version: 'field_trust_analysis_input/1.0',
+          confidence: 'low',
+          gaps: [{ code: 'conflict', field: 'price', detail: 'providers disagreed' }],
+          conflict_count: 1,
+          failed_provider_count: 0,
+        },
+      },
+    });
+    const view = await stocksApi.getFieldTrust('600519');
+    expect(mockGet).toHaveBeenCalledWith('/api/v1/stocks/600519/trust');
+    expect(view.stockCode).toBe('600519');
+    expect(view.staleSeconds).toBe(7200);
+    expect(view.isStale).toBe(true);
+    expect(view.fields[0].conflict).toBe(true);
+    expect(view.providerHealth[0].provider).toBe('efinance');
+    expect(view.analysisInput?.confidence).toBe('low');
+    expect(view.analysisInput?.gaps[0]?.code).toBe('conflict');
+    expect(view.message).toBeUndefined();
+  });
+
+  it('surfaces shape mismatches through ParsedApiError', async () => {
+    mockGet.mockResolvedValue({
+      data: { schema_version: 'field_trust_view/1.0', stock_code: '600519' },
+    });
+    await expect(stocksApi.getFieldTrust('600519')).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('StockFieldTrustResponse');
+      return true;
+    });
+  });
+});
+
 describe('stocksApi.getDailyHistory', () => {
   beforeEach(() => mockGet.mockReset());
 

@@ -7,7 +7,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from api.v1.endpoints import candidate_discovery as endpoint
+from src.api.v1.endpoints import candidate_discovery as endpoint
 from src.services.candidate_discovery_service import (
     DiscoveryCancelled,
     DiscoveryValidationError,
@@ -111,8 +111,8 @@ class CandidateDiscoveryApiTests(unittest.TestCase):
             max_provider_calls=10,
         )
         with (
-            patch("api.v1.endpoints.candidate_discovery.get_task_queue", return_value=fake_queue),
-            patch("api.v1.endpoints.candidate_discovery.uuid.uuid4", return_value=SimpleNamespace(hex="disc-1")),
+            patch("src.api.v1.endpoints.candidate_discovery.get_task_queue", return_value=fake_queue),
+            patch("src.api.v1.endpoints.candidate_discovery.uuid.uuid4", return_value=SimpleNamespace(hex="disc-1")),
         ):
             accepted = endpoint.start_candidate_discovery_task(request, config=config)
 
@@ -133,7 +133,7 @@ class CandidateDiscoveryApiTests(unittest.TestCase):
             status=QueueTaskStatus.COMPLETED,
             result={},
         )
-        with patch("api.v1.endpoints.candidate_discovery.get_task_queue", return_value=fake_queue):
+        with patch("src.api.v1.endpoints.candidate_discovery.get_task_queue", return_value=fake_queue):
             with self.assertRaises(Exception) as caught:
                 endpoint.get_candidate_discovery_task("other-1")
         self.assertEqual(caught.exception.status_code, 404)
@@ -159,7 +159,7 @@ class CandidateDiscoveryApiTests(unittest.TestCase):
             message_code="task.cancel_requested",
             message_params={},
         )
-        with patch("api.v1.endpoints.candidate_discovery.get_task_queue", return_value=fake_queue):
+        with patch("src.api.v1.endpoints.candidate_discovery.get_task_queue", return_value=fake_queue):
             payload = endpoint.cancel_candidate_discovery_task("disc-2")
         fake_queue.cancel.assert_called_once_with("disc-2")
         self.assertEqual(payload.status, "cancel_requested")
@@ -200,7 +200,7 @@ class CandidateDiscoveryApiTests(unittest.TestCase):
                 }
 
             with (
-                patch("api.v1.endpoints.candidate_discovery.get_task_queue", return_value=queue),
+                patch("src.api.v1.endpoints.candidate_discovery.get_task_queue", return_value=queue),
                 patch.object(
                     endpoint.CandidateDiscoveryService,
                     "discover",

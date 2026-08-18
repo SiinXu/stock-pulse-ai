@@ -21,7 +21,7 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.storage import DatabaseManager
 from src.storage_parts.schema import AnalysisHistory
@@ -191,7 +191,7 @@ class ReportVersionCompareApiTests(unittest.TestCase):
         from unittest.mock import patch
 
         with patch(
-            "api.v1.endpoints.report_version_compare.ReportVersionCompareService"
+            "src.api.v1.endpoints.report_version_compare.ReportVersionCompareService"
         ) as service_cls:
             real = __import__(
                 "src.services.report_version_compare_service",

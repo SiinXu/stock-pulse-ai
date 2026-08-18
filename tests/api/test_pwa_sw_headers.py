@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from api.app import create_app
+from src.api.app import create_app
 
 
 class PwaServiceWorkerHeadersTestCase(unittest.TestCase):

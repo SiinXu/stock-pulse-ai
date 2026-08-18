@@ -15,12 +15,11 @@ SCOPED_DIRECTORIES = (
     REPO_ROOT / "src" / "api" / "middlewares",
     REPO_ROOT / "src" / "api" / "v1" / "endpoints",
     REPO_ROOT / "src" / "agent",
-    REPO_ROOT / "bot",
+    REPO_ROOT / "src" / "bot",
 )
 SCOPED_FILES = (
     REPO_ROOT / "main.py",
     REPO_ROOT / "src" / "api" / "app.py",
-    REPO_ROOT / "api" / "__init__.py",
     REPO_ROOT / "src" / "core" / "pipeline.py",
     REPO_ROOT / "src" / "logging_config.py",
     REPO_ROOT / "src" / "services" / "alphasift_service.py",

@@ -56,7 +56,7 @@ def test_local_only_blocks_non_loopback_fail_closed(
     url: str,
 ) -> None:
     monkeypatch.setenv(LOCAL_ONLY_MODE_ENV, "true")
-    monkeypatch.setenv("OUTBOUND_HTTP_ALLOWLIST", "api.openai.com,10.0.0.5:8080,searxng.internal:8080")
+    monkeypatch.setenv("OUTBOUND_HTTP_ALLOWLIST", "src.api.openai.com,10.0.0.5:8080,searxng.internal:8080")
     with pytest.raises(OutboundPolicyError, match="local_only_mode_blocked") as exc_info:
         validate_outbound_url(url, resolve_dns=False)
     assert exc_info.value.reason == "local_only_mode_blocked"

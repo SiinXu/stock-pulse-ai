@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Literal, Optional, Tuple, get_args
 
-from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.data_provider.base import canonical_stock_code, normalize_stock_code
 from src.core.trading_calendar import MarketPhase
 from src.repositories.decision_signal_repo import (
     DecisionSignalCreateResult,

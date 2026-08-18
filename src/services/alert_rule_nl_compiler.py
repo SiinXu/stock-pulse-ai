@@ -12,7 +12,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from data_provider.base import normalize_stock_code
+from src.data_provider.base import normalize_stock_code
 from src.services.event_alerts import CORPORATE_EVENT_CATEGORIES, CORPORATE_EVENT_CATEGORY_SET
 
 CompilerOutcome = str

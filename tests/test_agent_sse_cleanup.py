@@ -36,7 +36,7 @@ class TestAgentSSECleanup(unittest.IsolatedAsyncioTestCase):
         else:
             fut.set_result(None)
 
-        import api.v1.endpoints.agent as agent_mod
+        import src.api.v1.endpoints.agent as agent_mod
 
         # Replicate the finally block logic directly
         try:
@@ -54,7 +54,7 @@ class TestAgentSSECleanup(unittest.IsolatedAsyncioTestCase):
 
     async def test_cancelled_error_is_silent(self):
         """CancelledError must NOT produce a warning log."""
-        import api.v1.endpoints.agent as agent_mod
+        import src.api.v1.endpoints.agent as agent_mod
 
         with self.assertLogs(agent_mod.logger, level="WARNING") as cm:
             # We need at least one log message for assertLogs to succeed;
@@ -68,7 +68,7 @@ class TestAgentSSECleanup(unittest.IsolatedAsyncioTestCase):
 
     async def test_runtime_error_emits_warning(self):
         """Non-CancelledError exceptions must emit a WARNING log."""
-        import api.v1.endpoints.agent as agent_mod
+        import src.api.v1.endpoints.agent as agent_mod
 
         with self.assertLogs(agent_mod.logger, level="WARNING") as cm:
             await self._run_cleanup(RuntimeError("simulated executor crash"))
@@ -80,7 +80,7 @@ class TestAgentSSECleanup(unittest.IsolatedAsyncioTestCase):
 
     async def test_value_error_emits_warning(self):
         """ValueError also triggers a WARNING log."""
-        import api.v1.endpoints.agent as agent_mod
+        import src.api.v1.endpoints.agent as agent_mod
 
         with self.assertLogs(agent_mod.logger, level="WARNING") as cm:
             await self._run_cleanup(ValueError("bad value"))

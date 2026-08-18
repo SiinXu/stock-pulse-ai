@@ -9,7 +9,7 @@ from types import SimpleNamespace
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.v1.endpoints import watchlist_scores
+from src.api.v1.endpoints import watchlist_scores
 from src.services.watchlist_score_service import WatchlistScoreService
 
 

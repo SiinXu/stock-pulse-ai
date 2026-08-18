@@ -52,7 +52,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.core.config_registry import (
     WEB_SETTINGS_HIDDEN_FROM_UI,

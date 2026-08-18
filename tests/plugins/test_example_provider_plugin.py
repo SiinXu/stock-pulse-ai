@@ -12,7 +12,7 @@ from typing import Iterator
 import pandas as pd
 import pytest
 
-from data_provider import DataFetcherManager, DataProvider
+from src.data_provider import DataFetcherManager, DataProvider
 from src.application_services import ApplicationServices
 from src.plugins import PLUGIN_APPLICATION_VERSION, PluginManager
 
@@ -95,7 +95,7 @@ def _write_failing_provider(root: Path) -> None:
         encoding="utf-8",
     )
     (candidate / "plugin.py").write_text(
-        "from data_provider import DataProviderRegistration\n"
+        "from src.data_provider import DataProviderRegistration\n"
         "from src.plugins import Plugin as BasePlugin\n"
         "\n"
         "def create_provider():\n"

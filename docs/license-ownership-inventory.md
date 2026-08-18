@@ -128,7 +128,7 @@ repository has been fully inventoried.
 
 Update the inventory (or add/adjust SPDX headers per this process) when the PR:
 
-1. Adds a **new top-level package or major tree** (`src/<new>/`, `api/<new>/`, vendored directory, etc.)
+1. Adds a **new top-level package or major tree** (`src/<new>/`, `src/api/<new>/`, vendored directory, etc.)
 2. **Vendors** third-party code or model weights metadata that ships in the repo
 3. **Ports** a substantial upstream MIT file into StockPulse
 4. Changes **license notices**, dual-license messaging, or redistribution packaging

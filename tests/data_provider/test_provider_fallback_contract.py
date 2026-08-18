@@ -27,18 +27,18 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from data_provider.akshare_fetcher import AkshareFetcher
-from data_provider.base import (
+from src.data_provider.akshare_fetcher import AkshareFetcher
+from src.data_provider.base import (
     STANDARD_COLUMNS,
     DataFetchError,
     DataFetcherManager,
     RateLimitError,
 )
-from data_provider.realtime_types import CircuitBreaker
-from data_provider.retry_policy import DEFAULT_ATTEMPTS, provider_retry
-from data_provider.tencent_fetcher import TencentFetcher, _extract_kline_rows
-from data_provider.tushare_fetcher import TushareFetcher, _TushareHttpClient
-from data_provider.yfinance_fetcher import YfinanceFetcher
+from src.data_provider.realtime_types import CircuitBreaker
+from src.data_provider.retry_policy import DEFAULT_ATTEMPTS, provider_retry
+from src.data_provider.tencent_fetcher import TencentFetcher, _extract_kline_rows
+from src.data_provider.tushare_fetcher import TushareFetcher, _TushareHttpClient
+from src.data_provider.yfinance_fetcher import YfinanceFetcher
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
     current_diagnostic_snapshot,
@@ -111,7 +111,7 @@ class _SequencedProvider:
 
 def test_builtin_daily_provider_market_support_inventory() -> None:
     """Document markets each builtin daily fetcher declares support for."""
-    from data_provider._capability_catalog import _DAILY_MARKET_FETCHER_SUPPORT
+    from src.data_provider._capability_catalog import _DAILY_MARKET_FETCHER_SUPPORT
 
     expected = {
         "EfinanceFetcher": {"cn"},
@@ -336,10 +336,10 @@ def test_normalized_daily_columns_match_across_recorded_providers() -> None:
     ts = _load_json(FIXTURE_DIR / "tushare_daily_pro.json")["response"]
     client = _TushareHttpClient(token="fixture-token-not-real", timeout=5)
     response = MagicMock(status_code=200, text=json.dumps(ts))
-    with patch("data_provider.tushare_fetcher.safe_post", return_value=response):
+    with patch("src.data_provider.tushare_fetcher.safe_post", return_value=response):
         raw_ts = client.query("daily", ts_code="600519.SH")
     with patch(
-        "data_provider.tushare_fetcher.get_config",
+        "src.data_provider.tushare_fetcher.get_config",
         return_value=SimpleNamespace(tushare_token=""),
     ):
         ts_fetcher = TushareFetcher()
@@ -408,7 +408,7 @@ def test_tencent_empty_http_payload_returns_empty_not_fake_bars() -> None:
         def json(self):
             return fixture["payload"]
 
-    with patch("data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
+    with patch("src.data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
         df = TencentFetcher().get_daily_data(
             "000001",
             start_date="2026-05-01",
@@ -423,7 +423,7 @@ def test_tushare_empty_items_fixture_is_empty_dataframe() -> None:
     body = _load_json(FAILURE_DIR / "tushare_daily_pro_empty_items.json")["response"]
     client = _TushareHttpClient(token="fixture-token-not-real", timeout=5)
     response = MagicMock(status_code=200, text=json.dumps(body))
-    with patch("data_provider.tushare_fetcher.safe_post", return_value=response):
+    with patch("src.data_provider.tushare_fetcher.safe_post", return_value=response):
         raw = client.query("daily", ts_code="600519.SH")
     assert isinstance(raw, pd.DataFrame)
     assert raw.empty
@@ -436,13 +436,13 @@ def test_tushare_rate_limit_body_becomes_rate_limit_error() -> None:
     response = MagicMock(status_code=200, text=json.dumps(body))
 
     with patch(
-        "data_provider.tushare_fetcher.get_config",
+        "src.data_provider.tushare_fetcher.get_config",
         return_value=SimpleNamespace(tushare_token="fixture-token-not-real"),
     ):
         fetcher = TushareFetcher()
     fetcher._api = client
 
-    with patch("data_provider.tushare_fetcher.safe_post", return_value=response):
+    with patch("src.data_provider.tushare_fetcher.safe_post", return_value=response):
         with pytest.raises(RateLimitError):
             fetcher._fetch_raw_data("600519", "2026-05-06", "2026-05-08")
 

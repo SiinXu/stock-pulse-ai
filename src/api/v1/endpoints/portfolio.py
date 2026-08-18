@@ -41,7 +41,7 @@ from src.api.v1.schemas.portfolio import (
     PaperTradeCreateRequest,
     PaperTradeCreatedResponse,
 )
-from data_provider.futu_position_fetcher import FutuPositionFetchError
+from src.data_provider.futu_position_fetcher import FutuPositionFetchError
 from src.services.task_queue import get_task_queue
 from src.services.portfolio_import_service import (
     PortfolioImportPreviewStaleError,

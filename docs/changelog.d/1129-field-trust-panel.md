@@ -1,0 +1,6 @@
+- [Added] Field-level quote trust panel and API: per-field source, lag, staleness, cross-provider conflicts, provider health, and analysis gap/confidence without silently choosing one source as truth (Refs #1129).
+- [Fixed] Record comparison failures and post-primary supplement failures on the trust payload so they cannot read as agreement or healthy (Refs #1129).
+- [Fixed] Register FieldTrustPanel in the playground catalog with real degraded/unavailable/error renderers (Refs #1129).
+- [Fixed] Treat unavailable provider attempts and circuit-unavailable health as visible degradation so GET /api/v1/stocks/{code}/trust cannot return status=ok with non-ok provider health (Refs #1129).
+- [Fixed] Localize known field-trust status and gap codes in the Web panel instead of preferring backend English message/detail strings (Refs #1129).
+- [Fixed] Attach provider-health rows by exact route/circuit identity so CN, ETF, and HK AkShare snapshots cannot cross-attach (Refs #1129).

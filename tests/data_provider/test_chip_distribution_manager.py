@@ -4,8 +4,8 @@
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from data_provider.base import DataFetcherManager
-from data_provider.realtime_types import ChipDistribution, get_chip_circuit_breaker
+from src.data_provider.base import DataFetcherManager
+from src.data_provider.realtime_types import ChipDistribution, get_chip_circuit_breaker
 
 
 class _ChipFetcher:

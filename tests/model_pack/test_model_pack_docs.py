@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from api.app import create_app
+from src.api.app import create_app
 
 
 ROOT = Path(__file__).resolve().parents[2]

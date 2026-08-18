@@ -15,7 +15,7 @@ from email.header import Header
 from email.utils import formataddr
 import smtplib
 
-from data_provider.base import normalize_stock_code
+from src.data_provider.base import normalize_stock_code
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
 from src.formatters import markdown_to_html_document

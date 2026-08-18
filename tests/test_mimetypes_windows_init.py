@@ -8,7 +8,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from api import app as app_module
+from src.api import app as app_module
 
 
 @pytest.fixture

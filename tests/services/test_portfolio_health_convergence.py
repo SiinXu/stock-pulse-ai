@@ -9,7 +9,7 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import text
 
-from api.v1.schemas.portfolio_health import PortfolioHealthResponse
+from src.api.v1.schemas.portfolio_health import PortfolioHealthResponse
 from src.config import Config
 from src.repositories.base import RepositoryError
 from src.repositories.portfolio_health_repo import PortfolioHealthRepository

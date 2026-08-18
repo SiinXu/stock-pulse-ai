@@ -12,8 +12,8 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 import pytest
 
-from api.v1.endpoints import scheduled_tasks
-from api.v1.schemas.scheduled_tasks import (
+from src.api.v1.endpoints import scheduled_tasks
+from src.api.v1.schemas.scheduled_tasks import (
     DailyScheduleRequest,
     ResearchScheduledPayload,
     ScheduledTaskCreateRequest,
@@ -48,7 +48,7 @@ class FakeRuntimeScheduler:
 def client(tmp_path):
     DatabaseManager.reset_instance()
     Config.reset_instance()
-    database = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'api.sqlite'}")
+    database = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'src.api.sqlite'}")
     service = ScheduledTaskService(
         repository=ScheduledTaskRepository(database),
         clock=lambda: datetime(2026, 7, 25, 12, 0),
@@ -447,7 +447,7 @@ def test_future_schema_is_opaque_and_mutation_returns_conflict(client) -> None:
 
 
 def test_static_openapi_contains_exact_scheduled_task_contract() -> None:
-    from api.app import create_app
+    from src.api.app import create_app
 
     runtime = create_app().openapi()
     static = json.loads(

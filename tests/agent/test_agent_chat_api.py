@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from api.app import create_app
+from src.api.app import create_app
 from src.agent.chat_context import build_agent_chat_market_context
 from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
 from src.agent.public_contract import (
@@ -134,7 +134,7 @@ def test_chat_session_messages_api_does_not_expose_provider_trace(tmp_path: Path
     }
     assert db.get_visible_conversation_messages(session_id)[-1]["content"] == AGENT_CHAT_FAILURE_MESSAGE
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
         client = TestClient(create_app(static_dir=tmp_path / "static"))
         response = client.get(f"/api/v1/agent/chat/sessions/{session_id}")
 
@@ -198,7 +198,7 @@ def test_chat_session_messages_api_restores_public_tool_details(tmp_path: Path) 
         },
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
         client = TestClient(create_app(static_dir=tmp_path / "static"))
         response = client.get(f"/api/v1/agent/chat/sessions/{session_id}")
 
@@ -228,9 +228,9 @@ def test_agent_chat_forwards_stock_context_to_executor(tmp_path: Path) -> None:
         report_language="en",
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat",
@@ -268,9 +268,9 @@ def test_agent_chat_preserves_explicit_report_language(tmp_path: Path) -> None:
         report_language="en",
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat",
@@ -301,9 +301,9 @@ def test_agent_chat_treats_null_or_blank_report_language_as_missing(
         report_language="en",
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat",
@@ -335,9 +335,9 @@ def test_agent_chat_stream_treats_null_or_blank_report_language_as_missing(
         report_language="en",
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -366,7 +366,7 @@ def test_build_agent_chat_context_normalizes_default_report_language(
     provided_language,
     expected_language,
 ) -> None:
-    from api.v1.endpoints import agent as agent_endpoint
+    from src.api.v1.endpoints import agent as agent_endpoint
 
     request = agent_endpoint.ChatRequest(
         message="question",
@@ -386,7 +386,7 @@ def test_build_agent_chat_context_normalizes_default_report_language(
 
 @pytest.mark.parametrize("turn_id", ["   ", " turn-1", "turn-1 "])
 def test_chat_request_rejects_noncanonical_turn_identity(turn_id: str) -> None:
-    from api.v1.endpoints import agent as agent_endpoint
+    from src.api.v1.endpoints import agent as agent_endpoint
 
     with pytest.raises(ValidationError):
         agent_endpoint.ChatRequest(message="question", turn_id=turn_id)
@@ -404,9 +404,9 @@ def test_agent_chat_returns_truthful_soul_runtime_identity(tmp_path: Path) -> No
     )
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat",
@@ -427,9 +427,9 @@ def test_agent_chat_omits_direct_unverified_runtime_facts(tmp_path: Path) -> Non
     )
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat",
@@ -441,7 +441,7 @@ def test_agent_chat_omits_direct_unverified_runtime_facts(tmp_path: Path) -> Non
 
 
 def test_agent_chat_openapi_exposes_optional_soul_runtime_identity(tmp_path: Path) -> None:
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
         schema = create_app(static_dir=tmp_path / "static").openapi()
 
     chat_response = schema["components"]["schemas"]["ChatResponse"]
@@ -459,11 +459,11 @@ def test_agent_chat_failure_does_not_expose_executor_details(tmp_path: Path, cap
         error=SENSITIVE_PROVIDER_ERROR,
     )
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
-    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
+    caplog.set_level(logging.ERROR, logger="src.api.v1.endpoints.agent")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat",
@@ -490,9 +490,9 @@ def test_agent_chat_keeps_all_unavailable_comparison_failure_content_empty(
     executor.chat.return_value = _build_all_unavailable_comparison_result()
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat",
@@ -529,10 +529,10 @@ def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) 
         timed_out=False,
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
             with patch(
-                "api.v1.endpoints.agent._run_research_in_background",
+                "src.api.v1.endpoints.agent._run_research_in_background",
                 new=AsyncMock(return_value=research_result),
             ):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
@@ -571,10 +571,10 @@ def test_agent_research_rejects_a_successful_result_with_an_empty_report(
         timed_out=False,
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
             with patch(
-                "api.v1.endpoints.agent._run_research_in_background",
+                "src.api.v1.endpoints.agent._run_research_in_background",
                 new=AsyncMock(return_value=research_result),
             ):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
@@ -594,7 +594,7 @@ def test_agent_research_rejects_a_successful_result_with_an_empty_report(
 
 
 def test_agent_research_persists_the_current_chat_session(tmp_path: Path) -> None:
-    from api.deps import get_agent_chat_session_service
+    from src.api.deps import get_agent_chat_session_service
 
     config = SimpleNamespace(
         is_agent_available=lambda: True,
@@ -614,10 +614,10 @@ def test_agent_research_persists_the_current_chat_session(tmp_path: Path) -> Non
     app = create_app(static_dir=tmp_path / "static")
     app.dependency_overrides[get_agent_chat_session_service] = lambda: session_service
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
             with patch(
-                "api.v1.endpoints.agent._run_research_in_background",
+                "src.api.v1.endpoints.agent._run_research_in_background",
                 new=AsyncMock(return_value=research_result),
             ):
                 client = TestClient(app)
@@ -660,10 +660,10 @@ def test_agent_research_timeout_does_not_expose_internal_result(tmp_path: Path) 
         timed_out=True,
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
             with patch(
-                "api.v1.endpoints.agent._run_research_in_background",
+                "src.api.v1.endpoints.agent._run_research_in_background",
                 new=AsyncMock(return_value=research_result),
             ):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
@@ -697,9 +697,9 @@ def test_agent_chat_stream_forwards_stock_context_to_executor(tmp_path: Path) ->
         report_language="zh",
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -737,9 +737,9 @@ def test_agent_chat_stream_forwards_turn_identity_and_public_ack(tmp_path: Path)
     executor.chat.side_effect = _chat
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), patch(
-        "api.v1.endpoints.agent.get_config", return_value=config
-    ), patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False), patch(
+        "src.api.v1.endpoints.agent.get_config", return_value=config
+    ), patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
         client = TestClient(create_app(static_dir=tmp_path / "static"))
         response = client.post(
             "/api/v1/agent/chat/stream",
@@ -777,9 +777,9 @@ def test_agent_chat_stream_redacts_terminal_identifiers_but_not_chat_content(
     )
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -814,11 +814,11 @@ def test_agent_chat_stream_failure_does_not_expose_executor_details(tmp_path: Pa
         total_steps=1,
     )
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
-    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
+    caplog.set_level(logging.ERROR, logger="src.api.v1.endpoints.agent")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -843,9 +843,9 @@ def test_agent_chat_stream_keeps_all_unavailable_failure_content_empty(
     executor.chat.return_value = _build_all_unavailable_comparison_result()
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -885,9 +885,9 @@ def test_agent_chat_stream_callback_error_is_replaced_with_safe_event(tmp_path: 
     executor.chat.side_effect = fail_with_callback
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -922,9 +922,9 @@ def test_agent_chat_stream_callback_error_redacts_secret_shaped_trace_id(
     executor.chat.side_effect = fail_with_callback
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -944,11 +944,11 @@ def test_agent_chat_stream_exception_is_redacted_from_event_and_logs(tmp_path: P
     executor = MagicMock()
     executor.chat.side_effect = RuntimeError(SENSITIVE_PROVIDER_ERROR)
     config = SimpleNamespace(is_agent_available=lambda: True, report_language="zh")
-    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.agent")
+    caplog.set_level(logging.ERROR, logger="src.api.v1.endpoints.agent")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
-            with patch("api.v1.endpoints.agent._build_executor", return_value=executor):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
+            with patch("src.api.v1.endpoints.agent._build_executor", return_value=executor):
                 client = TestClient(create_app(static_dir=tmp_path / "static"))
                 response = client.post(
                     "/api/v1/agent/chat/stream",
@@ -973,7 +973,7 @@ def test_chat_session_messages_returns_null_when_state_is_missing(tmp_path: Path
     db = DatabaseManager(db_url=f"sqlite:///{tmp_path / 'default-state.db'}")
     db.save_conversation_message("legacy-session", "user", "legacy question")
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False):
         response = TestClient(create_app(static_dir=tmp_path / "static")).get(
             "/api/v1/agent/chat/sessions/legacy-session"
         )
@@ -999,9 +999,9 @@ def test_agent_chat_inherits_saved_skills_without_rewriting_session_state(tmp_pa
         runtime_facts=None,
     )
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
-         patch("api.v1.endpoints.agent.get_config", return_value=config), \
-         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("src.api.v1.endpoints.agent.get_config", return_value=config), \
+         patch("src.api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
         response = TestClient(create_app(static_dir=tmp_path / "static")).post(
             "/api/v1/agent/chat",
             json={
@@ -1041,10 +1041,10 @@ def test_agent_chat_all_invalid_skills_inherit_without_clearing_state(tmp_path: 
     skill_manager = MagicMock()
     skill_manager.list_skills.return_value = [SimpleNamespace(name="technical")]
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=False), \
-         patch("api.v1.endpoints.agent.get_config", return_value=config), \
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False), \
+         patch("src.api.v1.endpoints.agent.get_config", return_value=config), \
          patch("src.agent.factory.get_skill_manager", return_value=skill_manager), \
-         patch("api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
+         patch("src.api.v1.endpoints.agent._build_executor", return_value=executor) as build_executor:
         response = TestClient(create_app(static_dir=tmp_path / "static")).post(
             "/api/v1/agent/chat",
             json={

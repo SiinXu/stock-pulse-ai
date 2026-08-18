@@ -24,7 +24,7 @@ try:
 except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
-from api.v1.endpoints import alphasift as alphasift_endpoint
+from src.api.v1.endpoints import alphasift as alphasift_endpoint
 from src.config import Config, DEFAULT_ALPHASIFT_INSTALL_SPEC
 from src.security.outbound_policy import OutboundPolicyError
 from src.services import alphasift_service

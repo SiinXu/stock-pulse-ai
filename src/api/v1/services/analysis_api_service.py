@@ -2,7 +2,7 @@
 """Analysis API application service (HTTP use-case orchestration).
 
 Owns the cohesive analysis HTTP use cases previously inlined in
-``api.v1.endpoints.analysis`` (API-local application service to keep HTTP DTOs out of ``src/``). Collaborators are injectable so the endpoint
+``src.api.v1.endpoints.analysis`` (API-local application service to keep HTTP DTOs out of ``src/``). Collaborators are injectable so the endpoint
 module can rebind them for tests without changing the wire contract.
 """
 
@@ -38,7 +38,7 @@ from src.api.v1.schemas.analysis import (
 )
 from src.api.v1.schemas.history import AnalysisReport
 from src.api.v1.schemas.run_flow import RunFlowSnapshot
-from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.data_provider.base import canonical_stock_code, normalize_stock_code
 from src.config import Config
 from src.core.market_review_lock import (
     MarketReviewExecutionLock as _MarketReviewExecutionLock,

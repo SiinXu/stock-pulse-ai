@@ -1,6 +1,6 @@
 # ADR-012: Installable Package Layout Without Import Rewrites
 
-- Status: `Accepted`
+- Status: `Accepted — migration completed`
 - Decision date: 2026-08-17
 - Decision owners: maintainers of the packaged-layout migration (issue #167)
 - References: [Issue #167](https://github.com/SiinXu/stock-pulse-ai/issues/167),
@@ -12,7 +12,7 @@
 
 ## Context
 
-Everything in this repository imports through four top-level names that live on
+At the start of this migration, the repository imported through four top-level names that lived on
 repo-root `sys.path`: `src`, `api`, `bot`, and `data_provider`. Callers, tests,
 PyInstaller hidden-import lists, Docker `COPY` fan-out, and CI `py_compile`
 lists all encode that layout. `pyproject.toml` previously recorded a deliberate
@@ -63,13 +63,13 @@ single-epoch rewrite of imports or checker classifiers.
 
 ## Decision
 
-1. `src` is the long-term single installed package. During the transition the
-   distribution installs **four** packages whose names match the existing
-   import roots: `src`, `api`, `bot`, `data_provider`. Discovery is:
+1. `src` is the long-term single installed package. The transition initially
+   installed four packages whose names matched the existing import roots. After
+   caller migration and compatibility-shim retirement, final discovery is:
 
    ```toml
    [tool.setuptools.packages.find]
-   include = ["src*", "api*", "bot*", "data_provider*"]
+   include = ["src*"]
    ```
 
 2. **All** environments that need the application importable as installed
@@ -115,11 +115,11 @@ packaging.
 ## Consequences
 
 - `pip install --build-constraint build-constraints.txt -e . --no-deps` makes
-  `import src`, `import api`, `import bot`, and `import data_provider` work
-  from a different cwd. That is the installability proof this stage exists to
-  land.
-- No production import statement changes in this stage. Guard baselines are
-  expected to be unchanged.
+  `src`, including `src.api`, `src.bot`, and `src.data_provider`, importable
+  from a different cwd. The retired `api`, `bot`, and `data_provider` roots are
+  no longer part of the distribution.
+- Production, tests, scripts, workflows, Docker, and package discovery use the
+  canonical `src.*` paths.
 - Docker must copy `pyproject.toml` (and the PEP 621 `readme` / `license`
   files it references) and run the build-constrained `--no-deps` editable
   install after the existing source `COPY` block. Hosted `docker-build` must
@@ -128,14 +128,15 @@ packaging.
 - Desktop backend builds run the same editable install before PyInstaller so
   hidden-imports resolve through the installed package names rather than
   cwd-only `sys.path`.
-- Rollback is a single revert of the PR: `packages = []` returns and the
-  install commands disappear. No data or configuration migration.
+- Rollback of the final convergence requires restoring the three compatibility
+  shims, their package-discovery entries, and the matching import contracts.
+  There is no data or configuration migration.
 
 ## Migration reference
 
-Issue #167 staged packaged-layout work. This record is the keystone
-**installable flip**. Later stages may collapse the four packages to `src`
-alone; they must not rewrite imports in the same slice that changes package
-discovery. ADR-006 still governs any later physical file moves: inventory
-callers first, keep facades if needed, and do not combine a move with a
-behavior change.
+Issue #167 staged packaged-layout work. The initial installable flip proved the
+four-name transition; subsequent stages moved implementations and callers,
+then removed the three root compatibility packages and collapsed discovery to
+`src*`. ADR-006 continues to govern later physical moves: inventory callers
+first, preserve behavior, and remove a facade only after its dependents have
+migrated.

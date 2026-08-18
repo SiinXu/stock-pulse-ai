@@ -300,7 +300,7 @@ class PortfolioServiceTestCase(unittest.TestCase):
                         fetch_state["active"] -= 1
                     return SimpleNamespace(price=125.0, source="unit-test")
 
-        with patch("data_provider.base.DataFetcherManager", new=FakeDataFetcherManager):
+        with patch("src.data_provider.base.DataFetcherManager", new=FakeDataFetcherManager):
             snapshot = self.service.get_portfolio_snapshot(account_id=aid, as_of=today, cost_method="fifo")
 
         positions = snapshot["accounts"][0]["positions"]
@@ -368,7 +368,7 @@ class PortfolioServiceTestCase(unittest.TestCase):
                         fetch_state["active"] -= 1
                     return SimpleNamespace(price=125.0, source="unit-test")
 
-        with patch("data_provider.base.DataFetcherManager", new=FakeDataFetcherManager):
+        with patch("src.data_provider.base.DataFetcherManager", new=FakeDataFetcherManager):
             snapshot = self.service.get_portfolio_snapshot(account_id=aid, as_of=today, cost_method="fifo")
 
         positions = snapshot["accounts"][0]["positions"]

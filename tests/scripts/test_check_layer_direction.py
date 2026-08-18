@@ -78,17 +78,8 @@ def test_detects_pipeline_to_services_reverse(tmp_path: Path) -> None:
     )
 
 
-def test_forward_api_to_services_is_allowed(tmp_path: Path) -> None:
-    """api → services is the intended direction and must not be flagged."""
-
-    _write_module(tmp_path, "src/services/svc.py", "VALUE = 1\n")
-    _write_module(tmp_path, "api/app.py", "from src.services.svc import VALUE\n")
-    edges = scan_reverse_edges(tmp_path)
-    assert edges == []
-
-
 def test_forward_src_api_to_services_is_allowed(tmp_path: Path) -> None:
-    """src.api → services is the same intended direction after the package move."""
+    """src.api → services is the intended direction and must not be flagged."""
 
     _write_module(tmp_path, "src/services/svc.py", "VALUE = 1\n")
     _write_module(tmp_path, "src/api/app.py", "from src.services.svc import VALUE\n")

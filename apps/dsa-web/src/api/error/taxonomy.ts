@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 /**
- * Web-side mirror of `api/v1/error_taxonomy.py`.
+ * Web-side mirror of `src/api/v1/error_taxonomy.py`.
  * Integrates existing stable error codes with category, severity, and default action.
  */
 import { APP_ROUTE_PATHS, buildSettingsHref } from '../../routing/routes';

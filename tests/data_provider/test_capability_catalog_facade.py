@@ -8,9 +8,9 @@ import subprocess
 import sys
 from types import SimpleNamespace
 
-import data_provider
-import data_provider._capability_catalog as capability_catalog
-import data_provider.base as base
+import src.data_provider._capability_catalog as capability_catalog
+import src.data_provider.base as base
+from src import data_provider
 
 
 _MOVED_DESCRIPTOR_CONTRACT = {
@@ -112,8 +112,8 @@ _RELOAD_CONTRACT_PREAMBLE = r"""
 import importlib
 from types import SimpleNamespace
 
-import data_provider._capability_catalog as capability_catalog
-import data_provider.base as base
+import src.data_provider._capability_catalog as capability_catalog
+import src.data_provider.base as base
 
 inventory_names = (
     "_DAILY_MARKET_FETCHER_SUPPORT",

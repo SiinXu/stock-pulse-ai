@@ -8,7 +8,7 @@ import ast
 from pathlib import Path
 from unittest.mock import MagicMock
 
-from data_provider.base import DataFetcherManager
+from src.data_provider.base import DataFetcherManager
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -20,7 +20,7 @@ def test_base_module_has_no_module_level_run_diagnostics_import() -> None:
     for node in tree.body:
         if isinstance(node, ast.ImportFrom) and node.module == "src.services.run_diagnostics":
             raise AssertionError(
-                "data_provider.base must not import run_diagnostics at module level"
+                "src.data_provider.base must not import run_diagnostics at module level"
             )
 
 

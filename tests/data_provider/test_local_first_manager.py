@@ -12,8 +12,8 @@ from typing import Optional
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetchError, DataFetcherManager
-from data_provider.daily_cache import (
+from src.data_provider.base import DataFetchError, DataFetcherManager
+from src.data_provider.daily_cache import (
     DailyCacheConfig,
     DailyCacheKey,
     DailyDataCache,
@@ -229,7 +229,7 @@ def test_manager_default_end_date_rollover_uses_covered_bars_without_provider(
             value = cls.current
             return value if tz is None else value.replace(tzinfo=tz)
 
-    monkeypatch.setattr("data_provider.base.datetime", _ManagerNow)
+    monkeypatch.setattr("src.data_provider.base.datetime", _ManagerNow)
     clock = _Clock()
     warm_provider = _Provider([_bars()])
     warm_manager = _manager(

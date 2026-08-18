@@ -64,7 +64,7 @@ Audit method (adjust symbols/paths to the change):
 
 ```bash
 # Production references only — exclude tests, playground, and generated noise
-rg -n "ComponentName|api/moduleName|service_function" apps/dsa-web/src src api \
+rg -n "ComponentName|api/moduleName|service_function" apps/dsa-web/src src \
   --glob '!**/*test*' \
   --glob '!**/*.test.*' \
   --glob '!**/*.spec.*' \

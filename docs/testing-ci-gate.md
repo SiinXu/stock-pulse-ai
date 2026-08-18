@@ -74,14 +74,9 @@ Do **not** raise the global 120s limit for one slow case. Local debugging withou
 
 ## Coverage measurement and floor
 
-The offline phase measures line coverage for:
-
-- `src`
-- `api`
-- `data_provider`
-- `bot`
-
-and writes a coverage.py JSON report, then runs:
+The offline phase measures line coverage for the single canonical `src`
+package, including its API, Bot, and provider subpackages, and writes a
+coverage.py JSON report, then runs:
 
 ```bash
 python scripts/check_coverage_floor.py --report <coverage.json>
@@ -123,12 +118,11 @@ The checked-in floor lives in [`scripts/coverage_floor_baseline.json`](../script
 # Same packages and marker selection as the gate (timeout optional locally)
 DATABASE_PATH=/tmp/stockpulse-cov.sqlite \
   python -m pytest -m "not network and not benchmark" \
-    --cov=src --cov=api --cov=data_provider \
+    --cov=src \
     --cov-report=term \
     --cov-report=json:coverage.json
 
-python scripts/check_coverage_floor.py --assert-cov-flags \
-  --cov src --cov api --cov data_provider
+python scripts/check_coverage_floor.py --assert-cov-flags --cov src
 python scripts/check_coverage_floor.py --write-baseline --report coverage.json
 # After review only, if the measured value legitimately dropped:
 # python scripts/check_coverage_floor.py --write-baseline --allow-lower --report coverage.json
@@ -311,7 +305,7 @@ The `changes` job in `.github/workflows/ci.yml` emits two independent filters:
 | Output | Consumed by | Paths (summary) |
 | --- | --- | --- |
 | `frontend` | `web-gate` on PR and push (lint / i18n / unit / build / bundle size) | `apps/dsa-web/**` |
-| `web_e2e` | `web-e2e` on **push-to-main only** (real backend + Playwright smoke) | `apps/dsa-web/**`, `api/**`, `src/**`, `data_provider/**`, `bot/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
+| `web_e2e` | `web-e2e` on **push-to-main only** (real backend + Playwright smoke) | `apps/dsa-web/**`, `src/**`, `main.py`, `server.py`, dependency lock inputs, `ci.yml` |
 
 PR runs keep the ruleset-required backend/docker/openapi gates. `web-gate` always concludes: it runs the full frontend matrix only when `frontend` is `true`, records a no-frontend summary when it is `false`, and fails closed when change detection is unavailable. `web-e2e` and `api-real-client` are observation jobs after merge. The auxiliary `PR Review` workflow is opt-in via `workflow_dispatch` and does not auto-run on every PR.
 

@@ -27,7 +27,7 @@ Both schema packages already pass cleanly with `follow_imports=skip`. Enabling
 | Setting | Result |
 | --- | --- |
 | `follow_imports=skip` | Success (41 source files) |
-| `follow_imports=normal` | **2745 errors in 261 files** (transitive surface through `src/config_parts`, `data_provider`, `src/core`, repositories, endpoints, etc.) |
+| `follow_imports=normal` | **2745 errors in 261 files** (transitive surface through `src/config_parts`, `src/data_provider`, `src/core`, repositories, endpoints, etc.) |
 
 Keep skip until a later decision deliberately widens import following after those
 downstream packages join the ratchet.
@@ -79,11 +79,11 @@ measurements with `--follow-imports=skip` (error counts change as code moves):
 | Next | `src/api/v1/errors.py` | 1 file, 0 errors | Leaf error helpers adjacent to schemas |
 | Next | `src/api/middlewares/` | 4 modules, ~1 error | Small auth/error middleware surface |
 | Next | `src/repositories/` | 18 modules, ~1 error | Data access; mostly typed shapes already |
-| Later | `api/deps.py` | 1 file, ~13 errors | FastAPI dependencies; more runtime coupling |
-| Later | `bot/` | 24 modules, ~25 errors | Notification bots; medium fix cost |
+| Later | `src/api/deps.py` | 1 file, ~13 errors | FastAPI dependencies; more runtime coupling |
+| Later | `src/bot/` | 24 modules, ~25 errors | Notification bots; medium fix cost |
 | Later | `src/api/v1/endpoints/` | 23 modules, low skip-errors but high coupling | Prefer after schemas/deps stabilize; analysis endpoints may be owned by a separate workstream |
 | Later | `src/services/` | large (~89 modules) | High coupling; split by subdomain when ratcheting |
-| Deferred | Drop `follow_imports=skip` | 2745+ transitive errors today | Only after large portions of `src/` and `data_provider/` are clean |
+| Deferred | Drop `follow_imports=skip` | 2745+ transitive errors today | Only after large portions of `src/` and `src/data_provider/` are clean |
 
 When claiming the next package, re-measure with the commands above before editing
 `mypy.ini`. Prefer pure data / leaf modules over orchestration and provider code.

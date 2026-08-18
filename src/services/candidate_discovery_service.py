@@ -360,7 +360,7 @@ def load_stock_index_symbols() -> List[IndexSymbol]:
 
 def _default_quote_fetcher(stock_code: str) -> Optional[Mapping[str, Any]]:
     try:
-        from data_provider.base import DataFetcherManager
+        from src.data_provider.base import DataFetcherManager
 
         quote = DataFetcherManager().get_realtime_quote(stock_code, log_final_failure=False)
         if quote is None:

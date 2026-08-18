@@ -12,9 +12,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import evidence_pack as endpoint
-from api.v1.schemas.evidence_pack import AuditPackageJsonEnvelope
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import evidence_pack as endpoint
+from src.api.v1.schemas.evidence_pack import AuditPackageJsonEnvelope
 from src.services.audit_package_export_service import AuditPackageExportResult
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
@@ -24,7 +24,7 @@ def _client(audit: SecurityAuditRecorderStub | None = None) -> TestClient:
     app.include_router(endpoint.router, prefix="/api/v1/history")
     app.include_router(endpoint.analysis_alias_router, prefix="/api/v1/analysis")
     add_error_handlers(app)
-    from api import deps as api_deps
+    from src.api import deps as api_deps
 
     app.dependency_overrides[api_deps.get_database_manager] = lambda: MagicMock()
     app.dependency_overrides[api_deps.require_security_audit_service] = (

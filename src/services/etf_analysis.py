@@ -60,8 +60,8 @@ _TRACKING_NAME_MARKERS: Tuple[str, ...] = (
 )
 
 
-# Mirror data_provider.symbol_normalization.ETF_PREFIXES / SearchService._A_ETF_PREFIXES.
-# Kept local so analysis semantics stay available without importing the full data_provider package.
+# Mirror src.data_provider.symbol_normalization.ETF_PREFIXES / SearchService._A_ETF_PREFIXES.
+# Kept local so analysis semantics stay available without importing the full src.data_provider package.
 _A_SHARE_ETF_PREFIXES: Tuple[str, ...] = ("51", "52", "56", "58", "15", "16", "18")
 
 
@@ -71,7 +71,7 @@ def is_a_share_etf_code(stock_code: Optional[str]) -> bool:
     if not raw:
         return False
     try:
-        from data_provider.symbol_normalization import _is_etf_code
+        from src.data_provider.symbol_normalization import _is_etf_code
 
         return bool(_is_etf_code(raw))
     except (ImportError, TypeError, ValueError, AttributeError, RuntimeError):
@@ -85,7 +85,7 @@ def is_a_share_etf_code(stock_code: Optional[str]) -> bool:
 def is_market_index_code(stock_code: Optional[str]) -> bool:
     """True for pure market index codes (e.g. SPX), not ETF tickers."""
     try:
-        from data_provider.us_index_mapping import is_us_index_code
+        from src.data_provider.us_index_mapping import is_us_index_code
 
         return bool(is_us_index_code(stock_code or ""))
     except (ImportError, TypeError, ValueError, AttributeError, RuntimeError):
@@ -135,7 +135,7 @@ def _normalize_code(stock_code: Optional[str]) -> str:
     if not raw:
         return ""
     try:
-        from data_provider.symbol_normalization import normalize_stock_code
+        from src.data_provider.symbol_normalization import normalize_stock_code
 
         return normalize_stock_code(raw)
     except (ImportError, TypeError, ValueError, AttributeError, RuntimeError):

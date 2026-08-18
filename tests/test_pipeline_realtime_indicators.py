@@ -18,7 +18,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from data_provider.realtime_types import UnifiedRealtimeQuote, RealtimeSource
+from src.data_provider.realtime_types import UnifiedRealtimeQuote, RealtimeSource
 from src.stock_analyzer import StockTrendAnalyzer, TrendAnalysisResult, TrendStatus
 from src.core.pipeline import StockAnalysisPipeline
 

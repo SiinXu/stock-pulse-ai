@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Mapping, Sequence
 
 import pytest
 
-from api.v1.schemas.watchlist_scores import WatchlistScoreResponse
+from src.api.v1.schemas.watchlist_scores import WatchlistScoreResponse
 from src.services.watchlist_score_service import (
     SCORE_STATUS_SCORED,
     SCORE_STATUS_UNANALYZED,

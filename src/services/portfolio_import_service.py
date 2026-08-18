@@ -15,8 +15,8 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from data_provider.base import canonical_stock_code
-from data_provider.futu_position_fetcher import (
+from src.data_provider.base import canonical_stock_code
+from src.data_provider.futu_position_fetcher import (
     FutuPositionFetchError,
     fetch_futu_positions,
     positions_to_import_records,

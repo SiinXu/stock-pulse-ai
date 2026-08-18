@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 
-from data_provider.base import normalize_stock_code
+from src.data_provider.base import normalize_stock_code
 
 
 def watchlist_match_key(code: str) -> str:

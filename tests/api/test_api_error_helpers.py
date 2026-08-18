@@ -3,7 +3,7 @@
 
 from fastapi import HTTPException
 
-from api.v1.errors import api_error, error_body, error_json_response
+from src.api.v1.errors import api_error, error_body, error_json_response
 
 
 def test_error_body_uses_stable_envelope() -> None:

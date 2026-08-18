@@ -26,9 +26,9 @@ except ModuleNotFoundError:
 
     ensure_litellm_stub()
 
-from bot.application_context import to_analysis_request_context
-from bot.commands.analyze import AnalyzeCommand
-from bot.models import BotMessage, ChatType
+from src.bot.application_context import to_analysis_request_context
+from src.bot.commands.analyze import AnalyzeCommand
+from src.bot.models import BotMessage, ChatType
 from src.services.task_queue import AnalysisTaskQueue, DuplicateTaskError, TaskStatus
 
 

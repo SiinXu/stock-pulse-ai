@@ -1,0 +1,2 @@
+- [Tests] Point developer-log and exception-log guards at the canonical `src/api`, `src/bot`, and `src/data_provider` implementation tree (Refs #167).
+- [Docs] Update the paired Bot command guides to use canonical `src/bot` filesystem paths (Refs #167).

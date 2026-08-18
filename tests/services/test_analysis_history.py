@@ -30,8 +30,8 @@ except ModuleNotFoundError:
 
 try:
     from fastapi.testclient import TestClient
-    from api.app import create_app
-    from api.v1.endpoints.history import delete_history_by_code, get_history_detail, get_history_list, get_stock_bar
+    from src.api.app import create_app
+    from src.api.v1.endpoints.history import delete_history_by_code, get_history_detail, get_history_list, get_stock_bar
 except ModuleNotFoundError:
     TestClient = None
     create_app = None
@@ -243,7 +243,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             self.skipTest("fastapi is not installed in this test environment")
 
         db = MagicMock()
-        with patch("api.v1.endpoints.history.HistoryService") as service_class:
+        with patch("src.api.v1.endpoints.history.HistoryService") as service_class:
             service_class.return_value.delete_history_by_code.return_value = 3
 
             response = delete_history_by_code("600519", db_manager=db)
@@ -979,7 +979,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             },
         }
 
-        with patch("api.v1.endpoints.history.HistoryService", return_value=service):
+        with patch("src.api.v1.endpoints.history.HistoryService", return_value=service):
             response = get_history_detail("query_action_conflict", db_manager=self.db)
 
         self.assertEqual(response.summary.operation_advice, "持有观察")
@@ -2508,7 +2508,7 @@ class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
     def setUpClass(cls) -> None:
         """Import schema classes once for all tests, skipping gracefully when deps are missing."""
         try:
-            from api.v1.schemas.history import HistoryItem, ReportSummary  # type: ignore
+            from src.api.v1.schemas.history import HistoryItem, ReportSummary  # type: ignore
         except ModuleNotFoundError:
             cls.HistoryItem = None
             cls.ReportSummary = None

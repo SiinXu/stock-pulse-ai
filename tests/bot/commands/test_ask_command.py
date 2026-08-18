@@ -13,8 +13,8 @@ except ModuleNotFoundError:
 
     ensure_litellm_stub()
 
-from bot.commands.ask import AskCommand
-from bot.models import BotMessage, ChatType
+from src.bot.commands.ask import AskCommand
+from src.bot.models import BotMessage, ChatType
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
@@ -327,7 +327,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
                     dashboard=TestAskCommandMultiStock._dashboard(code),
                 )
 
-        with patch("bot.commands.ask.get_db", side_effect=lambda: call_order.append("db")) as mock_get_db:
+        with patch("src.bot.commands.ask.get_db", side_effect=lambda: call_order.append("db")) as mock_get_db:
             with patch("src.agent.factory.build_agent_executor", return_value=FakeExecutor()):
                 with patch.object(command, "_build_portfolio_section", return_value=""):
                     with patch("src.agent.conversation.conversation_manager") as mock_cm:
@@ -387,7 +387,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
         )
 
         with patch("src.agent.factory.build_agent_executor", return_value=executor):
-            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+            with self.assertLogs("src.bot.commands.ask", level="ERROR") as logs:
                 response = command._analyze_single(
                     SimpleNamespace(),
                     self._message(),
@@ -410,7 +410,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
             "src.agent.factory.build_agent_executor",
             side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR),
         ):
-            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+            with self.assertLogs("src.bot.commands.ask", level="ERROR") as logs:
                 response = command._analyze_single(
                     SimpleNamespace(),
                     self._message(),
@@ -440,11 +440,11 @@ class TestAskCommandMultiStock(unittest.TestCase):
                     error=SENSITIVE_PROVIDER_ERROR,
                 )
 
-        with patch("bot.commands.ask.get_db"):
+        with patch("src.bot.commands.ask.get_db"):
             with patch("src.agent.factory.build_agent_executor", return_value=FakeExecutor()):
                 with patch.object(command, "_build_portfolio_section", return_value=""):
                     with patch("src.agent.conversation.conversation_manager") as mock_cm:
-                        with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+                        with self.assertLogs("src.bot.commands.ask", level="ERROR") as logs:
                             response = command._analyze_multi(
                                 SimpleNamespace(),
                                 self._message(),
@@ -475,8 +475,8 @@ class TestAskCommandMultiStock(unittest.TestCase):
     def test_execute_configuration_exception_returns_only_public_message(self):
         command = AskCommand()
 
-        with patch("bot.commands.ask.get_config", side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR)):
-            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+        with patch("src.bot.commands.ask.get_config", side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR)):
+            with self.assertLogs("src.bot.commands.ask", level="ERROR") as logs:
                 response = command.execute(self._message(), ["600519"])
 
         self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
@@ -489,8 +489,8 @@ class TestAskCommandMultiStock(unittest.TestCase):
     def test_analyze_multi_storage_exception_returns_only_public_message(self):
         command = AskCommand()
 
-        with patch("bot.commands.ask.get_db", side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR)):
-            with self.assertLogs("bot.commands.ask", level="ERROR") as logs:
+        with patch("src.bot.commands.ask.get_db", side_effect=RuntimeError(SENSITIVE_PROVIDER_ERROR)):
+            with self.assertLogs("src.bot.commands.ask", level="ERROR") as logs:
                 response = command._analyze_multi(
                     SimpleNamespace(),
                     self._message(),
@@ -513,7 +513,7 @@ class TestAskCommandSilentExceptionFix(unittest.TestCase):
     def test_load_skills_logs_warning_and_returns_empty_list(self):
         boom = RuntimeError("skill manager unavailable")
         with patch("src.agent.factory.get_skill_manager", side_effect=boom):
-            with self.assertLogs("bot.commands.ask", level="WARNING") as cm:
+            with self.assertLogs("src.bot.commands.ask", level="WARNING") as cm:
                 result = AskCommand._load_skills()
         self.assertEqual(result, [])
         self.assertTrue(any("Failed to load skills" in line for line in cm.output))
@@ -522,7 +522,7 @@ class TestAskCommandSilentExceptionFix(unittest.TestCase):
         boom = RuntimeError("defaults unavailable")
         with patch.object(AskCommand, "_load_skills", return_value=[]):
             with patch("src.agent.skills.defaults.get_primary_default_skill_id", side_effect=boom):
-                with self.assertLogs("bot.commands.ask", level="WARNING") as cm:
+                with self.assertLogs("src.bot.commands.ask", level="WARNING") as cm:
                     result = AskCommand._get_default_skill_id()
         self.assertEqual(result, "")
         self.assertTrue(any("Failed to resolve default skill id" in line for line in cm.output))

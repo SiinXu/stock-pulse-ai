@@ -1532,7 +1532,7 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
             "stock_count": 0,
         }
 
-        with patch("api.v1.endpoints.alphasift._service", return_value=service):
+        with patch("src.api.v1.endpoints.alphasift._service", return_value=service):
             response = TestClient(app).get("/api/v1/alphasift/hotspots/DRG%2FDIP?provider=akshare")
 
         self.assertEqual(response.status_code, 200)

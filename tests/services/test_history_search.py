@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import create_engine, text
 from sqlalchemy.exc import OperationalError
 
-from api.v1.endpoints.history import search_history
+from src.api.v1.endpoints.history import search_history
 from src.config import Config
 from src.migrations.versions.v202608100002_analysis_history_search_fts import upgrade
 from src.storage import AnalysisHistory, DatabaseManager

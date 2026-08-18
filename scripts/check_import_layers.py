@@ -3,15 +3,14 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Ratcheting guard: ban new bidirectional package import cycles.
 
-Scans production Python under ``src/``, ``data_provider/``, ``api/``, ``bot/``,
-plus top-level entrypoints. Computes package-level dependency edges from
+Scans production Python under ``src/`` plus top-level entrypoints. Computes package-level dependency edges from
 **module-level** imports only (lazy imports inside functions are ignored), then
 detects bidirectional package pairs.
 
 A package is:
 
 - ``src.<name>`` for modules under ``src/`` (first segment after ``src``), or
-- a root package ``data_provider`` / ``api`` / ``bot`` / entrypoint name.
+- a top-level entrypoint name.
 
 Known pairs live in the checked-in baseline. New pairs fail CI. Removing a pair
 does not fail the check; run ``--write-baseline`` after a deliberate break to
@@ -35,9 +34,9 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BASELINE = ROOT / "scripts" / "import_layer_baseline.json"
 BASELINE_VERSION = 1
 
-PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
+PRODUCTION_ROOTS = ("src",)
 PRODUCTION_FILES = ("main.py", "server.py")
-ROOT_PACKAGES = frozenset({"data_provider", "api", "bot", "main", "server"})
+ROOT_PACKAGES = frozenset({"main", "server"})
 
 Pair = Tuple[str, str]
 

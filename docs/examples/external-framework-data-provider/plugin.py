@@ -36,7 +36,7 @@ from typing import Any, Protocol
 import numpy as np
 import pandas as pd
 
-from data_provider import DataProvider, DataProviderRegistration
+from src.data_provider import DataProvider, DataProviderRegistration
 from src.plugins import Plugin as BasePlugin
 from src.plugins import PluginContext
 

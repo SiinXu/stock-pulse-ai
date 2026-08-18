@@ -21,8 +21,8 @@ from src.agent.events import (
     parse_event_alert_rules,
     validate_event_alert_rule,
 )
-from data_provider.base import normalize_stock_code
-from data_provider.us_index_mapping import is_us_index_code
+from src.data_provider.base import normalize_stock_code
+from src.data_provider.us_index_mapping import is_us_index_code
 from src.analysis_context_pack.overview import (
     ANALYSIS_CONTEXT_PACK_OVERVIEW_KEY,
     extract_analysis_context_pack_overview,

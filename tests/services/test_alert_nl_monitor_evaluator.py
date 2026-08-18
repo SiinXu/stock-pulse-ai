@@ -202,7 +202,7 @@ class AlertNlMonitorEvaluatorTestCase(unittest.TestCase):
             service=self.service,
             notifier=notifier,
         )
-        with patch("data_provider.DataFetcherManager", return_value=manager), patch(
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), patch(
             "src.services.alert_service.asyncio.to_thread",
             new=_run_inline,
         ):
@@ -236,7 +236,7 @@ class AlertNlMonitorEvaluatorTestCase(unittest.TestCase):
             service=self.service,
             notifier=notifier,
         )
-        with patch("data_provider.DataFetcherManager", return_value=manager), patch(
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), patch(
             "src.services.alert_service.asyncio.to_thread",
             new=_run_inline,
         ):

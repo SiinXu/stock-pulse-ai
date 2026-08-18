@@ -10,7 +10,7 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import patch
 
-from data_provider.futu_position_fetcher import FutuPosition, FutuPositionFetchError
+from src.data_provider.futu_position_fetcher import FutuPosition, FutuPositionFetchError
 from src.config import Config
 from src.services.portfolio_import_service import (
     PortfolioImportPreviewStaleError,

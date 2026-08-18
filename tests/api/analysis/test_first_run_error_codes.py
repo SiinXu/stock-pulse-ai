@@ -14,8 +14,8 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from api.v1.endpoints.analysis import _handle_sync_analysis, trigger_market_review
-from api.v1.schemas.analysis import AnalyzeRequest, MarketReviewRequest
+from src.api.v1.endpoints.analysis import _handle_sync_analysis, trigger_market_review
+from src.api.v1.schemas.analysis import AnalyzeRequest, MarketReviewRequest
 from src.services.analysis_service import (
     AnalysisService,
     LLM_NOT_CONFIGURED_ERROR_CODE,

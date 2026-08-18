@@ -22,7 +22,7 @@ import {
 import type { StockHistoryResponse, StockQuote } from '../../types/stocks';
 
 vi.mock('../../api/stocks', () => ({
-  stocksApi: { getQuote: vi.fn(), getDailyHistory: vi.fn() },
+  stocksApi: { getQuote: vi.fn(), getDailyHistory: vi.fn(), getFieldTrust: vi.fn() },
 }));
 
 vi.mock('../../api/systemConfig', () => ({
@@ -60,6 +60,7 @@ vi.mock('../../api/moneyFlow', () => ({
 
 const getQuoteMock = vi.mocked(stocksApi.getQuote);
 const getHistoryMock = vi.mocked(stocksApi.getDailyHistory);
+const getFieldTrustMock = vi.mocked(stocksApi.getFieldTrust);
 const addWatchlistMock = vi.mocked(systemConfigApi.addToWatchlist);
 const estimateStockValuationMock = vi.mocked(estimateStockValuation);
 const getStockMoneyFlowMock = vi.mocked(getStockMoneyFlow);
@@ -128,11 +129,15 @@ function wrapWithQueryClient(ui: ReactElement): ReactElement {
   return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
 }
 
-function renderPage(code = '600519', includeNavigationProbe = false) {
+function renderPage(
+  code = '600519',
+  includeNavigationProbe = false,
+  language: 'en' | 'zh' = 'en',
+) {
   return render(
     wrapWithQueryClient(
       <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-        <UiLanguageProvider initialLanguage="en">
+        <UiLanguageProvider initialLanguage={language}>
         <MemoryRouter initialEntries={[`/stocks/${code}`]}>
           {includeNavigationProbe && <StockRouteNavigationProbe />}
           <Routes>
@@ -156,9 +161,49 @@ describe('StockDetailsPage', () => {
   beforeEach(() => {
     getQuoteMock.mockReset();
     getHistoryMock.mockReset();
+    getFieldTrustMock.mockReset();
     addWatchlistMock.mockReset();
     estimateStockValuationMock.mockReset();
     getStockMoneyFlowMock.mockReset();
+    getFieldTrustMock.mockResolvedValue({
+      schemaVersion: 'field_trust_view/1.0',
+      stockCode: '600519',
+      status: 'degraded',
+      metadataPresent: true,
+      quoteSource: 'efinance',
+      staleSeconds: 7200,
+      isStale: true,
+      missingFields: [],
+      fields: [
+        {
+          field: 'price',
+          value: 1688,
+          source: 'efinance',
+          origin: 'primary',
+          staleness: 'stale',
+          conflict: true,
+        },
+      ],
+      conflicts: [
+        {
+          field: 'price',
+          severity: 'warn',
+          values: [
+            { provider: 'efinance', value: 1688 },
+            { provider: 'akshare_em', value: 2100 },
+          ],
+        },
+      ],
+      conflictChecks: [],
+      providerHealth: [{ provider: 'efinance', status: 'ok', role: 'primary' }],
+      analysisInput: {
+        schemaVersion: 'field_trust_analysis_input/1.0',
+        confidence: 'low',
+        gaps: [{ code: 'conflict', field: 'price', detail: 'providers disagreed' }],
+        conflictCount: 1,
+        failedProviderCount: 0,
+      },
+    });
     getStockMoneyFlowMock.mockResolvedValue({
       schemaVersion: 'money_flow_view/1.0',
       stockCode: '600519',
@@ -191,6 +236,8 @@ describe('StockDetailsPage', () => {
     expect(screen.getByTestId('stock-details-kline-chart')).toBeTruthy();
     expect(screen.getByTestId('stock-details-kline-chart-canvas')).toBeTruthy();
     expect(screen.getByRole('heading', { name: 'Peer relative-value canvas' })).toBeTruthy();
+    expect(screen.getByTestId('stock-details-field-trust-section')).toBeTruthy();
+    expect(await screen.findByTestId('field-trust-degraded')).toBeTruthy();
     // history table rows (dates also appear in the K-line readout/axis)
     expect(screen.getAllByText('2026-01-05').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('2026-01-06').length).toBeGreaterThanOrEqual(1);
@@ -199,6 +246,55 @@ describe('StockDetailsPage', () => {
     expect(screen.getByTestId('stock-details-money-flow-section')).toBeTruthy();
     expect(screen.getByTestId('money-flow-panel')).toBeTruthy();
     await waitFor(() => expect(getStockMoneyFlowMock).toHaveBeenCalled());
+  });
+
+  it('localizes field-trust degradation on the stock workspace in zh', async () => {
+    getQuoteMock.mockResolvedValue(makeQuote());
+    getHistoryMock.mockResolvedValue(makeHistory());
+    getFieldTrustMock.mockResolvedValue({
+      schemaVersion: 'field_trust_view/1.0',
+      stockCode: '600519',
+      status: 'degraded',
+      metadataPresent: true,
+      quoteSource: 'efinance',
+      message: 'Quote carried no field-level trust metadata; treat all fields as unverified',
+      missingFields: [],
+      fields: [
+        {
+          field: 'price',
+          value: 1688,
+          source: 'efinance',
+          origin: 'primary',
+          staleness: 'stale',
+          conflict: true,
+        },
+      ],
+      conflicts: [],
+      conflictChecks: [],
+      providerHealth: [{ provider: 'efinance', status: 'ok', role: 'primary' }],
+      analysisInput: {
+        schemaVersion: 'field_trust_analysis_input/1.0',
+        confidence: 'low',
+        gaps: [
+          {
+            code: 'conflict',
+            field: 'price',
+            detail: 'providers disagreed; no source was chosen as truth',
+          },
+        ],
+        conflictCount: 1,
+        failedProviderCount: 0,
+      },
+    });
+
+    renderPage('600519', false, 'zh');
+
+    expect(await screen.findByTestId('field-trust-degraded')).toHaveTextContent('过期、冲突、未归因或数据源失败');
+    expect(screen.getByTestId('field-trust-gaps')).toHaveTextContent('数据源对该字段意见不一致');
+    expect(screen.getByTestId('field-trust-degraded')).not.toHaveTextContent(
+      'Quote carried no field-level trust metadata',
+    );
+    expect(screen.getByTestId('field-trust-gaps')).not.toHaveTextContent(/providers disagreed/i);
   });
 
   it('keeps history loading and error states without painting a false chart', async () => {

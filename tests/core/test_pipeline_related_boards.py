@@ -7,8 +7,8 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from unittest.mock import MagicMock
 
-from api.v1.schemas.history import ReportDetails
-from data_provider.base import DataFetcherManager
+from src.api.v1.schemas.history import ReportDetails
+from src.data_provider.base import DataFetcherManager
 from src.core.pipeline import StockAnalysisPipeline
 from src.services.market_hotspot_service import MarketHotspotService
 from src.services.market_structure_service import MarketStructureService

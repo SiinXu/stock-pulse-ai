@@ -2,7 +2,7 @@
 """
 Regression tests for HK stock name fallback when stock_hk_spot_em fails.
 
-Covers: data_provider/akshare_fetcher.py _get_hk_realtime_quote
+Covers: src/data_provider/akshare_fetcher.py _get_hk_realtime_quote
 """
 
 import sys
@@ -24,8 +24,9 @@ except ImportError:
     if "json_repair" not in sys.modules:
         sys.modules["json_repair"] = MagicMock()
 
-from data_provider import akshare_fetcher as akshare_fetcher_module
-from data_provider.akshare_fetcher import AkshareFetcher
+from src.data_provider import akshare_fetcher as akshare_fetcher_module
+from src.data_provider.akshare_fetcher import AkshareFetcher
+from src.data_provider.realtime_types import RealtimeSource
 
 
 class _DummyCircuitBreaker:
@@ -100,7 +101,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         self.fetcher._enforce_rate_limit = lambda: None
         self.fetcher._set_random_user_agent = lambda: None
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_em_success_returns_quote_with_name(self, mock_cb):
         """stock_hk_spot_em 成功时直接返回含名称的 quote。"""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -114,7 +115,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         self.assertEqual(quote.name, "腾讯控股")
         self.assertAlmostEqual(quote.price, 370.0)
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_repeated_em_lookup_reuses_full_market_cache(self, mock_cb):
         """A warm snapshot must not trigger another full-market request."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -134,7 +135,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         self.fetcher._enforce_rate_limit.assert_called_once()
 
     @pytest.mark.benchmark
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_parallel_cold_lookups_share_one_em_request(self, mock_cb):
         """Concurrent symbol lookups must coalesce the cold market refresh.
 
@@ -172,7 +173,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         ak_mock.stock_hk_spot_em.assert_called_once()
         ak_mock.stock_hk_spot.assert_not_called()
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_em_failure_falls_back_to_spot(self, mock_cb):
         """stock_hk_spot_em 抛异常时应 fallback 到 stock_hk_spot 并返回名称。"""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -186,9 +187,10 @@ class TestHKRealtimeFallback(unittest.TestCase):
         self.assertIsNotNone(quote)
         self.assertEqual(quote.name, "腾讯控股")
         self.assertAlmostEqual(quote.price, 368.0)
+        self.assertEqual(quote.source, RealtimeSource.AKSHARE_SINA)
         ak_mock.stock_hk_spot.assert_called_once()
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_parallel_em_failure_reuses_negative_cache(self, mock_cb):
         """Concurrent failures try the expensive primary endpoint only once."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -225,7 +227,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
             "failure",
         )
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_both_fail_returns_none(self, mock_cb):
         """stock_hk_spot_em 和 stock_hk_spot 都失败时返回 None，不抛异常。"""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -238,7 +240,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
 
         self.assertIsNone(quote)
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_em_returns_empty_df_falls_back_to_spot(self, mock_cb):
         """stock_hk_spot_em 返回空 DataFrame 时应 fallback 到 stock_hk_spot。"""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -252,7 +254,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         self.assertIsNotNone(quote)
         self.assertEqual(quote.name, "腾讯控股")
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_invalid_em_snapshot_is_not_cached(self, mock_cb):
         """Malformed primary snapshots preserve fallback without cache poisoning."""
         cb = _DummyCircuitBreaker()
@@ -272,7 +274,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         self.assertIsNone(akshare_fetcher_module._realtime_cache["hk"]["data"])
         self.assertTrue(any(source == "akshare_hk_em" for source, _ in cb.failures))
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_malformed_hot_cache_falls_back_without_refetching_em(self, mock_cb):
         """A hot but invalid snapshot skips an immediate full-market re-fetch."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -292,7 +294,7 @@ class TestHKRealtimeFallback(unittest.TestCase):
         ak_mock.stock_hk_spot_em.assert_not_called()
         ak_mock.stock_hk_spot.assert_called_once()
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_circuit_breaker_open_returns_none(self, mock_cb):
         """熔断状态下直接返回 None。"""
         cb = _DummyCircuitBreaker()

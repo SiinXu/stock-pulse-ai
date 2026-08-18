@@ -30,10 +30,10 @@ import pandas as pd
 
 from src.config import FUNDAMENTAL_STAGE_TIMEOUT_SECONDS_DEFAULT, get_config, Config
 from src.storage import get_db
-from data_provider import DataFetcherManager
-from data_provider.base import is_bse_code, normalize_stock_code
-from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
-from data_provider.realtime_types import ChipDistribution
+from src.data_provider import DataFetcherManager
+from src.data_provider.base import is_bse_code, normalize_stock_code
+from src.data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
+from src.data_provider.realtime_types import ChipDistribution
 from src.analyzer import (
     GeminiAnalyzer,
     AnalysisResult,
@@ -147,7 +147,7 @@ from src.core.stages.persistence import (
     _PersistenceStageMixin,
     _symbol_scope_lookup_values as _persistence_symbol_scope_lookup_values,
 )
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.us_index_mapping import is_us_stock_code
 logger = logging.getLogger(__name__)
 
 # Keep legacy module exports alive while concrete stages move behind the facade.

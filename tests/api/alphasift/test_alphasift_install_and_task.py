@@ -87,8 +87,8 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         )
 
         with (
-            patch("api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue),
-            patch("api.v1.endpoints.alphasift.uuid.uuid4", return_value=SimpleNamespace(hex="screen-task-1")),
+            patch("src.api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue),
+            patch("src.api.v1.endpoints.alphasift.uuid.uuid4", return_value=SimpleNamespace(hex="screen-task-1")),
             patch.object(
                 alphasift_endpoint.AlphaSiftService,
                 "screen",
@@ -133,7 +133,7 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         fake_queue = MagicMock()
         fake_queue.get_task.return_value = task
 
-        with patch("api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue):
+        with patch("src.api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue):
             payload = alphasift_endpoint.alphasift_screen_task_status("screen-task-1")
 
         self.assertEqual(payload.status, "completed")
@@ -157,7 +157,7 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         fake_queue = MagicMock()
         fake_queue.get_task.return_value = task
 
-        with patch("api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue):
+        with patch("src.api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue):
             payload = alphasift_endpoint.alphasift_screen_task_status(task.task_id)
 
         self.assertEqual(payload.error, "alphasift_screen_failed")
@@ -174,7 +174,7 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
         fake_queue = MagicMock()
         fake_queue.get_task.return_value = task
 
-        with patch("api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue):
+        with patch("src.api.v1.endpoints.alphasift.get_task_queue", return_value=fake_queue):
             with self.assertRaises(HTTPException) as caught:
                 alphasift_endpoint.alphasift_screen_task_status("analysis-task-1")
 

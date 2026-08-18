@@ -12,7 +12,7 @@ from src.services.security_audit_service import (
     SecurityAuditService,
 )
 from src.services.task_queue import get_task_queue as _default_get_task_queue
-from data_provider.base import normalize_stock_code
+from src.data_provider.base import normalize_stock_code
 
 
 @dataclass(frozen=True)

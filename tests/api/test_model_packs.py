@@ -15,12 +15,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from starlette.formparsers import MultiPartParser
 
-from api.deps import get_local_model_service, get_model_pack_import_service
-from api.middlewares.model_pack_upload import (
+from src.api.deps import get_local_model_service, get_model_pack_import_service
+from src.api.middlewares.model_pack_upload import (
     MODEL_PACK_IMPORT_PATH,
     ModelPackUploadLimitMiddleware,
 )
-from api.v1.endpoints import model_packs
+from src.api.v1.endpoints import model_packs
 from src.model_pack import (
     DESKTOP_MODEL_PACK_ATTESTATION_ENV,
     DESKTOP_MODEL_PACK_ATTESTATION_TTL_MS,

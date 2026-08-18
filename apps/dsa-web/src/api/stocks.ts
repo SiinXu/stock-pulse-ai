@@ -2,7 +2,7 @@ import { z } from 'zod';
 import apiClient from './index';
 import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
-import type { StockHistoryResponse, StockQuote } from '../types/stocks';
+import type { StockFieldTrustResponse, StockHistoryResponse, StockQuote } from '../types/stocks';
 // Generated OpenAPI components document the backend snake_case contract for
 // StockQuote / StockHistoryResponse. Runtime validation below targets the
 // camelCase shape consumers already use after toCamelCase conversion.
@@ -10,15 +10,19 @@ import type { components } from '../types/api.generated';
 
 type OpenApiStockQuote = components['schemas']['StockQuote'];
 type OpenApiStockHistoryResponse = components['schemas']['StockHistoryResponse'];
+type OpenApiStockFieldTrustResponse = components['schemas']['StockFieldTrustResponse'];
 
 // Compile-time anchor: hand-written camelCase types stay aligned with OpenAPI
 // field sets (rename detection is structural; extra optional UI fields are fine).
 type _AssertQuoteFields = keyof OpenApiStockQuote;
 type _AssertHistoryFields = keyof OpenApiStockHistoryResponse;
+type _AssertTrustFields = keyof OpenApiStockFieldTrustResponse;
 const _quoteFieldAnchor: _AssertQuoteFields = 'stock_code';
 const _historyFieldAnchor: _AssertHistoryFields = 'stock_code';
+const _trustFieldAnchor: _AssertTrustFields = 'stock_code';
 void _quoteFieldAnchor;
 void _historyFieldAnchor;
+void _trustFieldAnchor;
 
 function toStockCodePath(stockCode: string): string {
   const trimmed = stockCode.trim();
@@ -70,6 +74,78 @@ const stockHistoryResponseSchema = z.object({
   data: z.array(stockHistoryCandleSchema).optional(),
 }).passthrough();
 
+const fieldTrustEntrySchema = z.object({
+  field: z.string().min(1),
+  value: z.number().finite().nullable().optional(),
+  source: z.string().nullable().optional(),
+  origin: z.enum(['primary', 'supplement', 'unknown']),
+  providerTimestamp: z.string().nullable().optional(),
+  staleSeconds: z.number().int().nonnegative().nullable().optional(),
+  isStale: z.boolean().nullable().optional(),
+  staleness: z.enum(['fresh', 'stale', 'unknown']),
+  conflict: z.boolean(),
+}).passthrough();
+
+const fieldTrustConflictSchema = z.object({
+  field: z.string().min(1),
+  severity: z.string().min(1),
+  relativeDifference: z.number().finite().nullable().optional(),
+  threshold: z.number().finite().nullable().optional(),
+  values: z.array(z.object({
+    provider: z.string().min(1),
+    value: z.number().finite(),
+  }).passthrough()),
+}).passthrough();
+
+const fieldTrustConflictCheckSchema = z.object({
+  primaryProvider: z.string().nullable().optional(),
+  secondaryProvider: z.string().nullable().optional(),
+  status: z.enum(['evaluated', 'skipped']),
+  reason: z.string().nullable().optional(),
+}).passthrough();
+
+const fieldTrustProviderHealthSchema = z.object({
+  provider: z.string().min(1),
+  status: z.enum(['ok', 'failed', 'empty', 'unavailable']),
+  role: z.enum(['primary', 'supplement', 'attempted']),
+  circuitState: z.string().nullable().optional(),
+  available: z.boolean().nullable().optional(),
+  healthScore: z.number().finite().nullable().optional(),
+}).passthrough();
+
+const fieldTrustAnalysisInputSchema = z.object({
+  schemaVersion: z.literal('field_trust_analysis_input/1.0'),
+  confidence: z.enum(['high', 'medium', 'low']),
+  gaps: z.array(z.object({
+    code: z.string().min(1),
+    field: z.string().nullable().optional(),
+    detail: z.string().nullable().optional(),
+  }).passthrough()),
+  conflictCount: z.number().int().nonnegative(),
+  failedProviderCount: z.number().int().nonnegative(),
+}).passthrough();
+
+const stockFieldTrustResponseSchema = z.object({
+  schemaVersion: z.literal('field_trust_view/1.0'),
+  stockCode: z.string().min(1),
+  status: z.enum(['ok', 'degraded', 'unavailable']),
+  metadataPresent: z.boolean(),
+  quoteSource: z.string().nullable().optional(),
+  fetchedAt: z.string().nullable().optional(),
+  providerTimestamp: z.string().nullable().optional(),
+  staleSeconds: z.number().int().nonnegative().nullable().optional(),
+  isStale: z.boolean().nullable().optional(),
+  fallbackFrom: z.string().nullable().optional(),
+  dataQuality: z.string().nullable().optional(),
+  missingFields: z.array(z.string()),
+  fields: z.array(fieldTrustEntrySchema),
+  conflicts: z.array(fieldTrustConflictSchema),
+  conflictChecks: z.array(fieldTrustConflictCheckSchema),
+  providerHealth: z.array(fieldTrustProviderHealthSchema),
+  analysisInput: fieldTrustAnalysisInputSchema.nullable().optional(),
+  message: z.string().nullable().optional(),
+}).passthrough();
+
 function parseCamelCasePayload<T>(
   data: unknown,
   schema: z.ZodTypeAny,
@@ -116,6 +192,17 @@ export type ExtractFromImageResponse = {
 };
 
 export const stocksApi = {
+  async getFieldTrust(stockCode: string): Promise<StockFieldTrustResponse> {
+    const response = await apiClient.get<Record<string, unknown>>(
+      `/api/v1/stocks/${toStockCodePath(stockCode)}/trust`,
+    );
+    return parseCamelCasePayload<StockFieldTrustResponse>(
+      response.data,
+      stockFieldTrustResponseSchema,
+      'StockFieldTrustResponse',
+    );
+  },
+
   async getQuote(stockCode: string): Promise<StockQuote> {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/stocks/${toStockCodePath(stockCode)}/quote`,

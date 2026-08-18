@@ -12,8 +12,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 import src.auth as auth
-from api.app import create_app
-from api.v1.endpoints import capabilities as capabilities_endpoint
+from src.api.app import create_app
+from src.api.v1.endpoints import capabilities as capabilities_endpoint
 from src.capability_registry import CapabilityRecord, CapabilitySnapshot, SourceStatus
 from src.config import Config
 

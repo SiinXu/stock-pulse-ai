@@ -7,7 +7,7 @@ Issue reference: [#123](https://github.com/SiinXu/stock-pulse-ai/issues/123). Re
 Information quality grading **consumes** existing AnalysisContextPack `data_quality` artifacts:
 
 - block statuses and limitations from `AnalysisContextBuilder`
-- versioned `data_quality_evidence.v1` findings from `data_provider/data_validation.py`
+- versioned `data_quality_evidence.v1` findings from `src/data_provider/data_validation.py`
 
 It does **not** re-validate OHLCV, fundamentals, or indicators, and it does not invent a second scoring pipeline.
 

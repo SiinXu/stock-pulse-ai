@@ -590,13 +590,13 @@ class ValuationService:
         self._quote_provider = quote_provider
 
     def _default_fundamental_provider(self, stock_code: str) -> Mapping[str, Any]:
-        from data_provider import DataFetcherManager
+        from src.data_provider import DataFetcherManager
 
         manager = DataFetcherManager()
         return manager.get_fundamental_context(stock_code)
 
     def _default_quote_provider(self, stock_code: str) -> Mapping[str, Any]:
-        from data_provider import DataFetcherManager
+        from src.data_provider import DataFetcherManager
 
         manager = DataFetcherManager()
         quote = manager.get_realtime_quote(stock_code)

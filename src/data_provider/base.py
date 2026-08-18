@@ -51,6 +51,7 @@ from .daily_cache import (
 from .fundamental_adapter import AkshareFundamentalAdapter
 from .yfinance_fundamental_adapter import YfinanceFundamentalAdapter
 from .realtime_types import CircuitBreaker, UnifiedRealtimeQuote
+from . import field_trust as _field_trust
 
 if TYPE_CHECKING:
     from .plugin_registry import DataProviderRegistration
@@ -1745,20 +1746,7 @@ class DataFetcherManager:
             return parsed.replace(tzinfo=timezone.utc)
         return parsed.astimezone(timezone.utc)
 
-    @staticmethod
-    def _realtime_fetcher_token(fetcher_name: str, **kw) -> str:
-        if fetcher_name == "AkshareFetcher" and kw.get("source") == "hk":
-            return "akshare_hk"
-        mapping = {
-            "LongbridgeFetcher": "longbridge",
-            "YfinanceFetcher": "yfinance",
-            "AkshareFetcher": "akshare",
-            "FinnhubFetcher": "finnhub",
-            "AlphaVantageFetcher": "alphavantage",
-            "EfinanceFetcher": "efinance",
-            "TushareFetcher": "tushare",
-        }
-        return mapping.get(fetcher_name, fetcher_name.replace("Fetcher", "").lower())
+    # Rebound from manager_parts.realtime_field_trust_methods after class build.
 
     def _enrich_realtime_quote(
         self,
@@ -1783,6 +1771,8 @@ class DataFetcherManager:
             setattr(quote, "provider_timestamp", None)
             setattr(quote, "stale_seconds", None)
             setattr(quote, "is_stale", None)
+            # Issue #1129: unknown provider timestamp means unknown staleness.
+            _field_trust.finalize(quote)
             return quote
 
         setattr(quote, "provider_timestamp", provider_dt.isoformat())
@@ -1791,6 +1781,9 @@ class DataFetcherManager:
         ttl = realtime_cache_ttl if realtime_cache_ttl is not None else 600
         setattr(quote, "stale_seconds", stale_seconds)
         setattr(quote, "is_stale", stale_seconds > int(ttl))
+        # Issue #1129: complete per-field attribution at the single exit
+        # point of every successful realtime-quote path.
+        _field_trust.finalize(quote)
         return quote
 
     def _try_plugin_realtime_quote(
@@ -1800,18 +1793,36 @@ class DataFetcherManager:
     ) -> Tuple[Optional[UnifiedRealtimeQuote], Optional[str]]:
         """Try declared plugin providers after the frozen built-in route."""
 
+        failed_attempts: List[Any] = []
         for fetcher in self._get_fetchers_for_capability(
             "realtime_quote",
             market=market,
             plugins_only=True,
         ):
+            attempt_sink = _field_trust.QuoteAttemptSink()
             quote = self._try_fetcher_quote(
                 stock_code,
                 fetcher.name,
                 _selected_fetcher=fetcher,
+                _attempt_sink=attempt_sink,
             )
             if quote is not None:
+                self._attach_prior_attempts(quote, failed_attempts)
                 return quote, fetcher.name
+            failed_attempts.append(
+                self._sink_non_ok(
+                    attempt_sink,
+                    self._attempt_provider_token(
+                        fetcher.name,
+                        fetcher=fetcher,
+                    ),
+                    self._realtime_circuit_key(
+                        fetcher.name,
+                        fetcher=fetcher,
+                        stock_code=stock_code,
+                    ),
+                )
+            )
         return None, None
     
     def get_realtime_quote(self, stock_code: str, *, log_final_failure: bool = True):
@@ -1850,21 +1861,39 @@ class DataFetcherManager:
             return None
 
         if _market_tag(stock_code) == "crypto":
+            failed_attempts: List[Any] = []
             for fetcher in self._get_fetchers_for_capability(
                 "realtime_quote", market="crypto"
             ):
                 if not self._is_fetcher_available(fetcher, capability="realtime_quote"):
                     continue
+                attempt_sink = _field_trust.QuoteAttemptSink()
                 quote = self._try_fetcher_quote(
                     stock_code,
                     fetcher.name,
                     _selected_fetcher=fetcher,
+                    _attempt_sink=attempt_sink,
                 )
                 if quote is not None:
+                    self._attach_prior_attempts(quote, failed_attempts)
                     return self._enrich_realtime_quote(
                         quote,
                         realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
                     )
+                failed_attempts.append(
+                    self._sink_non_ok(
+                        attempt_sink,
+                        self._attempt_provider_token(
+                            fetcher.name,
+                            fetcher=fetcher,
+                        ),
+                        self._realtime_circuit_key(
+                            fetcher.name,
+                            fetcher=fetcher,
+                            stock_code=stock_code,
+                        ),
+                    )
+                )
             if log_final_failure:
                 logger.info("[realtime quote] no crypto provider available for %s", stock_code)
             return None
@@ -1884,19 +1913,35 @@ class DataFetcherManager:
 
         if is_jp or is_kr or is_tw:
             market_label = "日股" if is_jp else "韩股" if is_kr else "台股"
-            quote = self._try_fetcher_quote(stock_code, "YfinanceFetcher")
+            yfinance_sink = _field_trust.QuoteAttemptSink()
+            quote = self._try_fetcher_quote(
+                stock_code,
+                "YfinanceFetcher",
+                _attempt_sink=yfinance_sink,
+            )
             if quote is not None:
                 logger.info(f"[实时行情] {market_label} {stock_code} 成功获取 (来源: YfinanceFetcher)")
                 return self._enrich_realtime_quote(
                     quote,
                     realtime_cache_ttl=getattr(config, "realtime_cache_ttl", None),
                 )
+            prior_attempts = [
+                self._sink_non_ok(
+                    yfinance_sink,
+                    "yfinance",
+                    self._realtime_circuit_key(
+                        "YfinanceFetcher",
+                        stock_code=stock_code,
+                    ),
+                ),
+            ]
             market = "jp" if is_jp else "kr" if is_kr else "tw"
             quote, plugin_name = self._try_plugin_realtime_quote(
                 stock_code,
                 market,
             )
             if quote is not None:
+                self._attach_prior_attempts(quote, prior_attempts)
                 logger.info(
                     "Realtime quote plugin fallback succeeded "
                     "market=%s symbol=%s provider=%s",
@@ -1929,12 +1974,35 @@ class DataFetcherManager:
                 secondary_kw = {"source": "hk"} if secondary_src == "AkshareFetcher" else {}
 
             primary_token = self._realtime_fetcher_token(primary_src, **primary_kw)
-            primary_quote = self._try_fetcher_quote(stock_code, primary_src, **primary_kw)
+            failed_attempts: List[Any] = []
+            primary_sink = _field_trust.QuoteAttemptSink()
+            primary_quote = self._try_fetcher_quote(
+                stock_code,
+                primary_src,
+                _attempt_sink=primary_sink,
+                **primary_kw,
+            )
             fallback_from = primary_token if primary_quote is None else None
-            if primary_quote is not None:
+            if primary_quote is None:
+                failed_attempts.append(
+                    self._sink_non_ok(
+                        primary_sink,
+                        primary_token,
+                        self._realtime_circuit_key(
+                            primary_src,
+                            stock_code=stock_code,
+                            **primary_kw,
+                        ),
+                    )
+                )
+            else:
                 logger.info(f"[实时行情] {market_label} {stock_code} 成功获取 (来源: {primary_src})")
             primary_quote = self._supplement_quote(
-                stock_code, primary_quote, secondary_src, **secondary_kw,
+                stock_code,
+                primary_quote,
+                secondary_src,
+                _failed_attempts=failed_attempts,
+                **secondary_kw,
             )
             # U.S. Individual Stocks (non-indices) attempt to supplement missing fields from Finnhub/AlphaVantage
             if is_us and not is_us_index and primary_quote is not None:
@@ -1943,6 +2011,7 @@ class DataFetcherManager:
                         stock_code, primary_quote, extra_src,
                     )
             if primary_quote is not None:
+                self._attach_prior_attempts(primary_quote, failed_attempts)
                 return self._enrich_realtime_quote(
                     primary_quote,
                     fallback_from=fallback_from,
@@ -1954,6 +2023,7 @@ class DataFetcherManager:
                 market,
             )
             if plugin_quote is not None:
+                self._attach_prior_attempts(plugin_quote, failed_attempts)
                 logger.info(
                     "Realtime quote plugin fallback succeeded "
                     "market=%s symbol=%s provider=%s",
@@ -2070,6 +2140,11 @@ class DataFetcherManager:
                         logger.info(f"[实时行情] {stock_code} 成功获取 (来源: {source})")
                         # If all key supplementary fields are present, return early
                         if not self._quote_needs_supplement(primary_quote):
+                            _field_trust.attach_failed_sources(
+                                primary_quote,
+                                failed_sources,
+                                stock_code=stock_code,
+                            )
                             return self._enrich_realtime_quote(
                                 primary_quote,
                                 fallback_from=primary_fallback_from,
@@ -2084,43 +2159,13 @@ class DataFetcherManager:
                         if supplement_attempts > 1:
                             logger.debug(f"[实时行情] {stock_code} 补充尝试已达上限，停止继续")
                             break
-                        # Issue #185: observe cross-source divergence on shared fields.
-                        try:
-                            from src.data_provider.data_validation import (
-                                compare_cross_source_quotes,
-                                is_validation_enabled,
-                            )
-
-                            if is_validation_enabled():
-                                primary_source = getattr(primary_quote, "source", None)
-                                primary_provider = getattr(
-                                    primary_source, "value", primary_source
-                                ) or "primary"
-                                compare_cross_source_quotes(
-                                    primary_quote,
-                                    quote,
-                                    primary_provider=str(primary_provider),
-                                    secondary_provider=str(provider_name),
-                                    market=_market_tag(
-                                        normalize_stock_code(stock_code)
-                                    ),
-                                    stock_code=stock_code,
-                                    asset_type=getattr(
-                                        primary_quote, "instrument_type", None
-                                    ),
-                                )
-                        except Exception as cross_exc:  # broad-exception: fallback_recorded - observational only
-                            log_safe_exception(
-                                logger,
-                                "Cross-source quote comparison failed",
-                                cross_exc,
-                                error_code="data_validation_cross_source_failed",
-                                level=logging.DEBUG,
-                                context={
-                                    "symbol": stock_code,
-                                    "provider": provider_name,
-                                },
-                            )
+                        _field_trust.observe_cross_source_quotes(
+                            primary_quote, quote, stock_code=stock_code,
+                            market=_market_tag(normalize_stock_code(stock_code)),
+                            primary_candidates=(getattr(primary_quote, "source", None),),
+                            secondary_candidates=(getattr(quote, "source", None), source, provider_name),
+                            asset_type=getattr(primary_quote, "instrument_type", None),
+                        )
                         merged = self._merge_quote_fields(primary_quote, quote)
                         if merged:
                             logger.info(f"[实时行情] {stock_code} 从 {source} 补充了缺失字段: {merged}")
@@ -2141,6 +2186,14 @@ class DataFetcherManager:
                     )
                     if primary_quote is None:
                         failed_sources.append(source)
+                    else:
+                        _field_trust.record_provider_attempt(
+                            primary_quote,
+                            provider=source,
+                            status=_field_trust.PROVIDER_STATUS_EMPTY,
+                            role=_field_trust.PROVIDER_ROLE_ATTEMPTED,
+                            stock_code=stock_code,
+                        )
                     
             except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede realtime fallback
                 error_msg = f"[{source}] 失败: {str(e)}"
@@ -2169,10 +2222,23 @@ class DataFetcherManager:
                 errors.append(error_msg)
                 if primary_quote is None:
                     failed_sources.append(source)
+                else:
+                    _field_trust.record_provider_attempt(
+                        primary_quote,
+                        provider=source,
+                        status=_field_trust.PROVIDER_STATUS_FAILED,
+                        role=_field_trust.PROVIDER_ROLE_ATTEMPTED,
+                        stock_code=stock_code,
+                    )
                 continue
         
         # Return primary even if some fields are still missing
         if primary_quote is not None:
+            _field_trust.attach_failed_sources(
+                primary_quote,
+                failed_sources,
+                stock_code=stock_code,
+            )
             return self._enrich_realtime_quote(
                 primary_quote,
                 fallback_from=primary_fallback_from,
@@ -2184,6 +2250,11 @@ class DataFetcherManager:
             "cn",
         )
         if plugin_quote is not None:
+            _field_trust.attach_failed_sources(
+                plugin_quote,
+                failed_sources,
+                stock_code=stock_code,
+            )
             logger.info(
                 "Realtime quote plugin fallback succeeded "
                 "market=cn symbol=%s provider=%s",
@@ -2240,6 +2311,8 @@ class DataFetcherManager:
                 if val is not None:
                     setattr(primary, f, val)
                     filled.append(f)
+        # Issue #1129: attribute supplemented fields to their actual provider.
+        _field_trust.record_supplement(primary, filled, secondary)
         return filled
 
     def _longbridge_preferred(self, capability: str = "realtime_quote") -> bool:
@@ -2253,157 +2326,7 @@ class DataFetcherManager:
             capability=capability,
         ) is not None
 
-    def _try_fetcher_quote(
-        self,
-        stock_code: str,
-        fetcher_name: str,
-        *,
-        _selected_fetcher: Optional[DataProvider] = None,
-        **kw,
-    ):
-        """Try to get a realtime quote from a named fetcher; returns quote or None."""
-        fetcher = _selected_fetcher
-        if fetcher is None:
-            fetcher = self._get_fetcher_by_name(
-                fetcher_name,
-                capability="realtime_quote",
-            )
-        elif not self._is_fetcher_available(
-            fetcher,
-            capability="realtime_quote",
-        ):
-            fetcher = None
-        if fetcher is None or not hasattr(fetcher, 'get_realtime_quote'):
-            record_provider_run(
-                data_type="realtime_quote",
-                provider=fetcher_name,
-                operation="get_realtime_quote",
-                success=False,
-                error_type="unavailable",
-                error_message="fetcher unavailable",
-            )
-            return None
-        attempt_start = time.time()
-        try:
-            record_provider_run_started(
-                data_type="realtime_quote",
-                provider=fetcher.name,
-                operation="get_realtime_quote",
-            )
-            q = self._call_fetcher_method(fetcher, 'get_realtime_quote', stock_code, **kw)
-            if q is not None and q.has_basic_data():
-                record_provider_run(
-                    data_type="realtime_quote",
-                    provider=fetcher.name,
-                    operation="get_realtime_quote",
-                    success=True,
-                    latency_ms=int((time.time() - attempt_start) * 1000),
-                    record_count=1,
-                )
-                return q
-            record_provider_run(
-                data_type="realtime_quote",
-                provider=fetcher.name,
-                operation="get_realtime_quote",
-                success=False,
-                latency_ms=int((time.time() - attempt_start) * 1000),
-                error_type="empty",
-                error_message="empty or incomplete quote",
-                record_count=0,
-            )
-        except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede realtime fallback
-            error_type, error_reason = summarize_exception(e)
-            record_provider_run(
-                data_type="realtime_quote",
-                provider=fetcher.name,
-                operation="get_realtime_quote",
-                success=False,
-                latency_ms=int((time.time() - attempt_start) * 1000),
-                error_type=error_type,
-                error_message=error_reason,
-            )
-            log_safe_exception(
-                logger,
-                "Data provider realtime quote failed",
-                e,
-                error_code="data_provider_realtime_quote_failed",
-                level=logging.DEBUG,
-                context={"symbol": stock_code, "provider": fetcher_name},
-            )
-        return None
-
-    def _supplement_quote(
-        self,
-        stock_code: str,
-        primary_quote: Optional[UnifiedRealtimeQuote],
-        fetcher_name: str,
-        **kw: str,
-    ) -> Optional[UnifiedRealtimeQuote]:
-        """Supplement *primary_quote* with data from *fetcher_name*.
-
-        If *primary_quote* is None, try *fetcher_name* as the sole source.
-        Returns the (potentially enriched) quote, or None.
-        """
-        if primary_quote is not None:
-            if not self._quote_needs_supplement(primary_quote):
-                return primary_quote
-            try:
-                secondary = self._try_fetcher_quote(stock_code, fetcher_name, **kw)
-                if secondary is not None:
-                    # Issue #185: cross-source consistency when both providers
-                    # supply the same field. Fail-open: never drop the primary.
-                    try:
-                        from src.data_provider.data_validation import (
-                            compare_cross_source_quotes,
-                            is_validation_enabled,
-                        )
-
-                        if is_validation_enabled():
-                            primary_source = getattr(primary_quote, "source", None)
-                            primary_provider = getattr(
-                                primary_source, "value", primary_source
-                            ) or "primary"
-                            compare_cross_source_quotes(
-                                primary_quote,
-                                secondary,
-                                primary_provider=str(primary_provider),
-                                secondary_provider=str(fetcher_name),
-                                market=_market_tag(normalize_stock_code(stock_code)),
-                                stock_code=stock_code,
-                                asset_type=getattr(
-                                    primary_quote, "instrument_type", None
-                                ),
-                            )
-                    except Exception as cross_exc:  # broad-exception: fallback_recorded - comparison is observational
-                        log_safe_exception(
-                            logger,
-                            "Cross-source quote comparison failed",
-                            cross_exc,
-                            error_code="data_validation_cross_source_failed",
-                            level=logging.DEBUG,
-                            context={
-                                "symbol": stock_code,
-                                "provider": fetcher_name,
-                            },
-                        )
-                    filled = self._merge_quote_fields(primary_quote, secondary)
-                    if filled:
-                        logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 补充了: {filled}")
-            except Exception as e:  # broad-exception: fallback_recorded - safe log preserves the primary quote
-                log_safe_exception(
-                    logger,
-                    "Realtime quote supplement failed",
-                    e,
-                    error_code="realtime_quote_supplement_failed",
-                    level=logging.DEBUG,
-                    context={"symbol": stock_code, "provider": fetcher_name},
-                )
-            return primary_quote
-
-        q = self._try_fetcher_quote(stock_code, fetcher_name, **kw)
-        if q is not None:
-            logger.info(f"[实时行情] {stock_code} 从 {fetcher_name} 获取成功 (独立数据源)")
-        return q
+    # Rebound from manager_parts.realtime_field_trust_methods after class build.
 
     def _supplement_from_longbridge(
         self,
@@ -4540,14 +4463,17 @@ class DataFetcherManager:
         return []
 
 
-# Keep ``data_provider.base.DataFetcherManager`` as the ADR-006 compatibility
-# facade while focused parts own inventory/selection, daily health/circuit,
-# and daily-cache orchestration mechanics. Rebinding preserves method globals
-# so existing patches against this module continue to intercept moved
-# implementations.
+# Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006
+# compatibility facade while focused parts own inventory/selection, daily
+# health/circuit, daily-cache orchestration, and realtime field-trust
+# bookkeeping. Rebinding preserves method globals so existing patches against
+# this module continue to intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
+from .manager_parts import (  # noqa: E402
+    realtime_field_trust_methods as _realtime_field_trust_methods_module,
+)
 
 _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
     "plugin_registry",
@@ -4624,16 +4550,35 @@ def _assemble_daily_cache_methods_facade(
         )
 
 
+def _assemble_realtime_field_trust_methods_facade(
+    realtime_module=_realtime_field_trust_methods_module,
+) -> None:
+    bound_method_names = realtime_module.bind_realtime_field_trust_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if (
+        bound_method_names
+        != realtime_module.EXPECTED_REALTIME_FIELD_TRUST_METHOD_NAMES
+    ):
+        raise ImportError(
+            "Unexpected DataFetcherManager realtime field-trust methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_data_fetcher_manager_facades(
     assemble_capability=_assemble_capability_catalog_facade,
     assemble_health=_assemble_daily_source_health_facade,
     assemble_daily_cache=_assemble_daily_cache_methods_facade,
+    assemble_realtime=_assemble_realtime_field_trust_methods_facade,
 ) -> None:
     # Default args capture the assembler callables so reload hooks keep working
     # after the facade module deletes the temporary assembly names.
     assemble_capability()
     assemble_health()
     assemble_daily_cache()
+    assemble_realtime()
 
 
 _assemble_data_fetcher_manager_facades()
@@ -4646,14 +4591,19 @@ _daily_source_health_module._install_facade_reload_hook(
 _daily_cache_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_realtime_field_trust_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 
 del (
     _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
     _assemble_capability_catalog_facade,
     _assemble_daily_source_health_facade,
     _assemble_daily_cache_methods_facade,
+    _assemble_realtime_field_trust_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
     _daily_source_health_module,
     _daily_cache_methods_module,
+    _realtime_field_trust_methods_module,
 )

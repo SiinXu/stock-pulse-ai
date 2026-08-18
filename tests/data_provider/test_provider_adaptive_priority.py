@@ -10,8 +10,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetcherManager
-from data_provider.realtime_types import CircuitBreaker
+from src.data_provider.base import DataFetcherManager
+from src.data_provider.realtime_types import CircuitBreaker
 
 
 def _daily_frame() -> pd.DataFrame:
@@ -96,7 +96,7 @@ def test_recent_success_rate_reorders_only_within_static_priority(caplog) -> Non
     degraded_peer = _Provider("DegradedPeer", 1, TimeoutError("must not be called"))
     healthy_peer = _Provider("HealthyPeer", 1, _daily_frame())
 
-    caplog.set_level(logging.INFO, logger="data_provider.base")
+    caplog.set_level(logging.INFO, logger="src.data_provider.base")
     with patch.object(DataFetcherManager, "_daily_source_health", breaker):
         with patch.dict(os.environ, _adaptive_environment(), clear=False):
             manager = DataFetcherManager(
@@ -310,7 +310,7 @@ def test_health_report_is_structured_queryable_and_secret_free(caplog) -> None:
     breaker = CircuitBreaker()
     provider = _Provider("EfinanceFetcher", 0, _daily_frame())
 
-    caplog.set_level(logging.INFO, logger="data_provider.base")
+    caplog.set_level(logging.INFO, logger="src.data_provider.base")
     with patch.object(DataFetcherManager, "_daily_source_health", breaker):
         with patch.dict(os.environ, _adaptive_environment(min_samples=2), clear=False):
             manager = DataFetcherManager(fetchers=[provider])

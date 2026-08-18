@@ -2,13 +2,13 @@
 
 import pandas as pd
 
-from data_provider.akshare_fetcher import _is_hk_code as akshare_is_hk_code
-from data_provider.base import BaseFetcher, DataFetchError, DataFetcherManager, _is_hk_market
-from data_provider.longbridge_fetcher import (
+from src.data_provider.akshare_fetcher import _is_hk_code as akshare_is_hk_code
+from src.data_provider.base import BaseFetcher, DataFetchError, DataFetcherManager, _is_hk_market
+from src.data_provider.longbridge_fetcher import (
     _is_hk_code as longbridge_is_hk_code,
     _to_longbridge_symbol,
 )
-from data_provider.yfinance_fetcher import YfinanceFetcher
+from src.data_provider.yfinance_fetcher import YfinanceFetcher
 
 
 def test_bare_five_digit_hk_code_uses_hk_suffix() -> None:

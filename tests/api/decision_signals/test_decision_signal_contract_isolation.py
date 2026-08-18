@@ -6,8 +6,8 @@ from __future__ import annotations
 import pytest
 from pydantic import BaseModel
 
-from api.v1.schemas.backtest import BacktestResultItem
-from api.v1.schemas.history import (
+from src.api.v1.schemas.backtest import BacktestResultItem
+from src.api.v1.schemas.history import (
     AnalysisReport,
     HistoryItem,
     ReportDetails,

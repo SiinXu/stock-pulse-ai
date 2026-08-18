@@ -46,7 +46,7 @@ class TestFetchYfTickerData(unittest.TestCase):
     """_fetch_yf_ticker_data 单指数取数逻辑测试"""
 
     def setUp(self):
-        from data_provider.yfinance_fetcher import YfinanceFetcher
+        from src.data_provider.yfinance_fetcher import YfinanceFetcher
         self.fetcher = YfinanceFetcher()
 
     def test_returns_dict_with_correct_fields(self):
@@ -94,10 +94,10 @@ class TestGetUsMainIndices(unittest.TestCase):
     """_get_us_main_indices 美股指数批量获取测试"""
 
     def setUp(self):
-        from data_provider.yfinance_fetcher import YfinanceFetcher
+        from src.data_provider.yfinance_fetcher import YfinanceFetcher
         self.fetcher = YfinanceFetcher()
 
-    @patch('data_provider.yfinance_fetcher.get_us_index_yf_symbol')
+    @patch('src.data_provider.yfinance_fetcher.get_us_index_yf_symbol')
     def test_returns_list_when_mock_succeeds(self, mock_get_symbol):
         """当映射与取数均成功时返回指数列表"""
         def get_symbol(code):
@@ -124,7 +124,7 @@ class TestGetUsMainIndices(unittest.TestCase):
             self.assertIn('current', item)
             self.assertIn('change_pct', item)
 
-    @patch('data_provider.yfinance_fetcher.get_us_index_yf_symbol')
+    @patch('src.data_provider.yfinance_fetcher.get_us_index_yf_symbol')
     def test_handles_empty_history_gracefully(self, mock_get_symbol):
         """部分指数 history 为空时仍返回能取到数据的指数"""
         call_count = [0]
@@ -151,7 +151,7 @@ class TestGetUsMainIndices(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertIsInstance(result, list)
 
-    @patch('data_provider.yfinance_fetcher.get_us_index_yf_symbol')
+    @patch('src.data_provider.yfinance_fetcher.get_us_index_yf_symbol')
     def test_returns_none_when_all_fail(self, mock_get_symbol):
         """全部取数失败时返回 None"""
         mock_get_symbol.return_value = (None, None)
@@ -161,7 +161,7 @@ class TestGetUsMainIndices(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('data_provider.yfinance_fetcher.get_us_index_yf_symbol')
+    @patch('src.data_provider.yfinance_fetcher.get_us_index_yf_symbol')
     def test_handles_ticker_exception(self, mock_get_symbol):
         """Ticker.history 抛异常时跳过该指数，不整体失败"""
         mock_get_symbol.return_value = ('^GSPC', '标普500指数')
@@ -174,7 +174,7 @@ class TestGetUsMainIndices(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    @patch('data_provider.yfinance_fetcher.get_us_index_yf_symbol')
+    @patch('src.data_provider.yfinance_fetcher.get_us_index_yf_symbol')
     def test_skips_unknown_index_code(self, mock_get_symbol):
         """get_us_index_yf_symbol 返回 (None, None) 的代码应被跳过"""
         def get_symbol(code):

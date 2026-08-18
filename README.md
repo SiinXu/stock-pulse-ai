@@ -80,7 +80,7 @@ Deep field contracts, data-source priority, and deploy paths: [Full Guide (EN)](
 
 | Area | Path |
 | --- | --- |
-| Backend | `src/`, `data_provider/`, `api/`, `bot/` |
+| Backend | `src/` (including `src/api/`, `src/bot/`, and `src/data_provider/`) |
 | Clients | `apps/dsa-web/`, `apps/dsa-desktop/` |
 | Strategies & reports | `strategies/`, `templates/` |
 | Docs & tests | `docs/`, `tests/` |

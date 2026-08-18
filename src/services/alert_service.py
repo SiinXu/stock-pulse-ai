@@ -454,7 +454,7 @@ class AlertService:
 
     async def _evaluate_volume(self, rule: VolumeAlert) -> Dict[str, Any]:
         def _fetch_daily_data():
-            from data_provider import DataFetcherManager
+            from src.data_provider import DataFetcherManager
 
             return DataFetcherManager().get_daily_data(rule.stock_code, days=20)
 
@@ -550,7 +550,7 @@ class AlertService:
         cache_key = (rule.stock_code, requested_days)
 
         def _fetch_daily_data():
-            from data_provider import DataFetcherManager
+            from src.data_provider import DataFetcherManager
 
             return DataFetcherManager().get_daily_data(rule.stock_code, days=requested_days)
 

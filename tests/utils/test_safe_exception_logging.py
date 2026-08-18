@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.middlewares.error_handler import ErrorHandlerMiddleware, add_error_handlers
+from src.api.middlewares.error_handler import ErrorHandlerMiddleware, add_error_handlers
 from src.utils.sanitize import (
     exception_chain_redaction_values,
     log_safe_exception,
@@ -210,7 +210,7 @@ def test_error_middleware_logs_only_sanitized_exception_chain(caplog) -> None:
     async def middleware_failure(item_id: int) -> None:
         _raise_secret_exception_chain()
 
-    caplog.set_level(logging.ERROR, logger="api.middlewares.error_handler")
+    caplog.set_level(logging.ERROR, logger="src.api.middlewares.error_handler")
     response = TestClient(app, raise_server_exceptions=False).get(
         "/middleware-failure/17?token=query-canary-c01",
         headers={"X-Trace-ID": "trace-middleware-c01"},
@@ -232,7 +232,7 @@ def test_general_exception_handler_logs_only_sanitized_exception_chain(caplog) -
     async def handler_failure(item_id: int) -> None:
         _raise_secret_exception_chain()
 
-    caplog.set_level(logging.ERROR, logger="api.middlewares.error_handler")
+    caplog.set_level(logging.ERROR, logger="src.api.middlewares.error_handler")
     response = TestClient(app, raise_server_exceptions=False).get(
         "/handler-failure/23?token=query-canary-c01",
         headers={"X-Trace-ID": "trace-handler-c01"},

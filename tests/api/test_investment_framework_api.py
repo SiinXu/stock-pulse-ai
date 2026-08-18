@@ -11,7 +11,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.storage import DatabaseManager, InvestmentFrameworkRecord
 
@@ -370,7 +370,7 @@ def test_api_maps_corrupt_aggregate_to_stable_500_without_mutation(
 def test_framework_api_uses_the_existing_optional_admin_session_boundary(
     client: TestClient,
 ) -> None:
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=True):
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=True):
         response = client.get("/api/v1/investment-framework")
     assert response.status_code == 401
     assert response.json()["error"] == "unauthorized"

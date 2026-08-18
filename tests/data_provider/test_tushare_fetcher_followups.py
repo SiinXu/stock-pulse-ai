@@ -21,7 +21,7 @@ except ValueError:
 if not json_repair_available and "json_repair" not in sys.modules:
     sys.modules["json_repair"] = MagicMock()
 
-from data_provider.tushare_fetcher import TushareFetcher
+from src.data_provider.tushare_fetcher import TushareFetcher
 
 
 class TestTushareFetcherFollowUps(unittest.TestCase):

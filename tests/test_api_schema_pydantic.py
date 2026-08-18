@@ -4,12 +4,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from api.app import create_app
-from api.v1.router import router as api_v1_router
-from api.v1.schemas.analysis import AnalyzeRequest, MarketReviewRequest
-from api.v1.schemas.common import RootResponse
-from api.v1.schemas.history import HistoryItem
-from api.v1.schemas.stocks import StockQuote
+from src.api.app import create_app
+from src.api.v1.router import router as api_v1_router
+from src.api.v1.schemas.analysis import AnalyzeRequest, MarketReviewRequest
+from src.api.v1.schemas.common import RootResponse
+from src.api.v1.schemas.history import HistoryItem
+from src.api.v1.schemas.stocks import StockQuote
 
 
 DECISION_SIGNAL_PATHS = (

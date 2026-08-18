@@ -6,8 +6,8 @@ from unittest.mock import patch
 
 from nacl.signing import SigningKey
 
-from bot.models import ChatType
-from bot.platforms.discord import DiscordPlatform
+from src.bot.models import ChatType
+from src.bot.platforms.discord import DiscordPlatform
 
 
 def _make_platform(public_key: str) -> DiscordPlatform:
@@ -183,7 +183,7 @@ def test_expired_timestamp_is_rejected():
 
 def test_format_response_wraps_interaction_callback():
     """type=2 交互响应应使用 Interaction Response 回调格式（type=4 + data）。"""
-    from bot.models import BotMessage, BotResponse, ChatType
+    from src.bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
     message = BotMessage(
@@ -209,7 +209,7 @@ def test_format_response_wraps_interaction_callback():
 
 def test_send_followup_patches_original_message():
     """send_followup 应 PATCH Discord follow-up webhook。"""
-    from bot.models import BotMessage, BotResponse, ChatType
+    from src.bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
     message = BotMessage(
@@ -228,7 +228,7 @@ def test_send_followup_patches_original_message():
     )
     response = BotResponse.text_response("分析结果")
 
-    with patch("bot.platforms.discord.requests") as mock_requests:
+    with patch("src.bot.platforms.discord.requests") as mock_requests:
         mock_resp = type("R", (), {"status_code": 200, "text": "ok"})()
         mock_requests.patch.return_value = mock_resp
         result = platform.send_followup(response, message)
@@ -242,7 +242,7 @@ def test_send_followup_patches_original_message():
 
 def test_send_followup_chunks_long_content():
     """超过 2000 字符的 follow-up 应被分块：首块 PATCH，后续 POST。"""
-    from bot.models import BotMessage, BotResponse, ChatType
+    from src.bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
     message = BotMessage(
@@ -263,7 +263,7 @@ def test_send_followup_chunks_long_content():
     long_content = "A" * 3500
     response = BotResponse.text_response(long_content)
 
-    with patch("bot.platforms.discord.requests") as mock_requests:
+    with patch("src.bot.platforms.discord.requests") as mock_requests:
         mock_resp = type("R", (), {"status_code": 200, "text": "ok"})()
         mock_requests.patch.return_value = mock_resp
         mock_requests.post.return_value = mock_resp
@@ -282,7 +282,7 @@ def test_send_followup_chunks_long_content():
 
 def test_send_followup_missing_token_returns_false():
     """缺少 interaction token 时 send_followup 应返回 False。"""
-    from bot.models import BotMessage, BotResponse, ChatType
+    from src.bot.models import BotMessage, BotResponse, ChatType
 
     platform = _make_platform("00" * 32)
     message = BotMessage(

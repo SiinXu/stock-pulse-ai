@@ -23,7 +23,7 @@ From `git diff --name-only origin/main...HEAD` (or the task boundary):
 
 | Path hit | Layers to run |
 |----------|----------------|
-| `main.py`, `src/**`, `data_provider/**`, `api/**`, `bot/**`, `tests/**` | backend offline gate / path pytest; `py_compile` minimum |
+| `main.py`, `src/**`, `tests/**` | backend offline gate / path pytest; `py_compile` minimum |
 | Config / `.env.example` / `config_registry*` | **config registry guard** + doc consistency (hard-rules §2) |
 | `apps/dsa-web/**` | web lint, unit, build; i18n tests if copy/locales touched; smoke e2e only when UI journeys change |
 | `apps/dsa-desktop/**`, desktop scripts | web build then desktop build |

@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 
 import pytest
 
-from data_provider import futu_position_fetcher as fetcher
+from src.data_provider import futu_position_fetcher as fetcher
 
 
 class _Table:

@@ -907,7 +907,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             stats = worker.run_once()
 
@@ -931,7 +931,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             stats = worker.run_once()
 
@@ -962,7 +962,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             stats = worker.run_once()
 
@@ -1000,7 +1000,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             first = worker.run_once()
             second = worker.run_once()
@@ -1046,7 +1046,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             first = worker.run_once()
             second = worker.run_once()
@@ -1079,7 +1079,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             first = worker.run_once()
             second = worker.run_once()
@@ -1126,7 +1126,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=self._notifier())
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             first = worker.run_once()
             second = worker.run_once()
@@ -1162,7 +1162,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             first = worker.run_once()
             second = worker.run_once()
@@ -1204,7 +1204,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=self._notifier())
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             first = worker.run_once()
             second = worker.run_once()
@@ -1285,7 +1285,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             stats = worker.run_once()
 
@@ -1314,7 +1314,7 @@ class AlertWorkerTestCase(unittest.TestCase):
             return func(*args, **kwargs)
 
         worker = AlertWorker(config_provider=lambda: self._config(), service=self.service, notifier=notifier)
-        with patch("data_provider.DataFetcherManager", return_value=manager), \
+        with patch("src.data_provider.DataFetcherManager", return_value=manager), \
              patch("src.services.alert_service.asyncio.to_thread", new=_run_inline):
             stats = worker.run_once()
 

@@ -20,7 +20,7 @@ import math
 from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from data_provider.base import canonical_stock_code
+from src.data_provider.base import canonical_stock_code
 from src.config import Config
 from src.repositories.decision_signal_repo import DecisionSignalRepository
 from src.services.decision_profile_policy import MIN_ACTIONABLE_CONFIDENCE

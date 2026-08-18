@@ -47,9 +47,9 @@ import sys
 import types
 
 sys.argv = [sys.argv[2], "server:app", "--host", sys.argv[1]]
-fake_api_app = types.ModuleType("api.app")
+fake_api_app = types.ModuleType("src.api.app")
 fake_api_app.app = object()
-sys.modules["api.app"] = fake_api_app
+sys.modules["src.api.app"] = fake_api_app
 import server
 """
 
@@ -231,9 +231,9 @@ import sys
 import types
 
 sys.argv = json.loads(sys.argv[1])
-fake_api_app = types.ModuleType("api.app")
+fake_api_app = types.ModuleType("src.api.app")
 fake_api_app.app = object()
-sys.modules["api.app"] = fake_api_app
+sys.modules["src.api.app"] = fake_api_app
 import server
 """
 

@@ -115,7 +115,7 @@ discovery (safe default).
 ### Registration sketch (`data_provider`)
 
 ```python
-from data_provider import DataProvider, DataProviderRegistration
+from src.data_provider import DataProvider, DataProviderRegistration
 from src.plugins import Plugin as BasePlugin
 
 class Plugin(BasePlugin):
@@ -232,7 +232,7 @@ python -m pytest -q tests/plugins/test_external_framework_openbb_provider.py
 
 # 5) Composition smoke (requires OpenBB only if you call get_daily_data without a fake)
 python - <<'PY'
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 from src.application_services import ApplicationServices
 from src.plugins import PLUGIN_APPLICATION_VERSION, PluginManager
 
@@ -275,9 +275,9 @@ This guide and the OpenBB demonstration:
 
 - add **zero** new extension points;
 - do not change `registry.py` / `manager.py` / `loader.py` / `manifest.py`;
-- do not modify `data_provider/` host implementations;
+- do not modify `src/data_provider/` host implementations;
 - rely only on the public author import surface (`src.plugins` package root +
-  `data_provider.DataProvider` / `DataProviderRegistration`).
+  `src.data_provider.DataProvider` / `DataProviderRegistration`).
 
 ## Follow-ons
 

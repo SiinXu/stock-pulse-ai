@@ -19,7 +19,7 @@ from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.services.portfolio_import_service import PortfolioImportService
 from src.services.portfolio_service import (

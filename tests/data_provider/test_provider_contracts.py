@@ -23,20 +23,20 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from data_provider.akshare_fetcher import (
+from src.data_provider.akshare_fetcher import (
     AkshareFetcher,
     _to_sina_tx_symbol,
 )
-from data_provider.akshare_parts.realtime_cache import store_a_share_snapshot
-from data_provider.base import STANDARD_COLUMNS
-from data_provider.realtime_types import RealtimeSource
-from data_provider.tencent_fetcher import (
+from src.data_provider.akshare_parts.realtime_cache import store_a_share_snapshot
+from src.data_provider.base import STANDARD_COLUMNS
+from src.data_provider.realtime_types import RealtimeSource
+from src.data_provider.tencent_fetcher import (
     TencentFetcher,
     _extract_kline_rows,
     _to_tencent_symbol,
 )
-from data_provider.tushare_fetcher import TushareFetcher, _TushareHttpClient
-from data_provider.yfinance_fetcher import YfinanceFetcher
+from src.data_provider.tushare_fetcher import TushareFetcher, _TushareHttpClient
+from src.data_provider.yfinance_fetcher import YfinanceFetcher
 
 FIXTURE_DIR = Path(__file__).resolve().parents[1] / "fixtures" / "provider_contracts"
 
@@ -199,7 +199,7 @@ def test_tencent_daily_end_to_end_with_recorded_http_payload() -> None:
         def json(self):
             return payload
 
-    with patch("data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
+    with patch("src.data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
         df = TencentFetcher().get_daily_data(
             "000001",
             start_date="2026-05-01",
@@ -218,7 +218,7 @@ def test_tushare_daily_http_and_normalize_contract() -> None:
     client = _TushareHttpClient(token="fixture-token-not-real", timeout=5)
     response = MagicMock(status_code=200, text=json.dumps(body))
 
-    with patch("data_provider.tushare_fetcher.safe_post", return_value=response):
+    with patch("src.data_provider.tushare_fetcher.safe_post", return_value=response):
         raw = client.query(
             "daily",
             ts_code="600519.SH",
@@ -230,7 +230,7 @@ def test_tushare_daily_http_and_normalize_contract() -> None:
     assert len(raw) == 3
 
     with patch(
-        "data_provider.tushare_fetcher.get_config",
+        "src.data_provider.tushare_fetcher.get_config",
         return_value=SimpleNamespace(tushare_token=""),
     ):
         fetcher = TushareFetcher()
@@ -270,7 +270,7 @@ def test_yfinance_daily_normalize_contract() -> None:
 
 def test_akshare_em_spot_realtime_contract() -> None:
     """EM spot row via cache → UnifiedRealtimeQuote with valuation fields."""
-    from data_provider.akshare_parts import realtime_cache as _rc
+    from src.data_provider.akshare_parts import realtime_cache as _rc
 
     payload = _load_json("akshare_em_spot.json")
     snapshot = _frame_from_table(payload)
@@ -280,7 +280,7 @@ def test_akshare_em_spot_realtime_contract() -> None:
     try:
         fetcher = AkshareFetcher(sleep_min=0, sleep_max=0)
         with patch(
-            "data_provider.akshare_fetcher.get_realtime_circuit_breaker",
+            "src.data_provider.akshare_fetcher.get_realtime_circuit_breaker",
             return_value=_AlwaysAvailableBreaker(),
         ):
             quote = fetcher.get_realtime_quote("600519", source="em")
@@ -306,10 +306,10 @@ def test_akshare_sina_realtime_text_contract() -> None:
     fetcher = AkshareFetcher(sleep_min=0, sleep_max=0)
 
     with patch(
-        "data_provider.akshare_fetcher.get_realtime_circuit_breaker",
+        "src.data_provider.akshare_fetcher.get_realtime_circuit_breaker",
         return_value=_AlwaysAvailableBreaker(),
     ), patch(
-        "data_provider.akshare_fetcher.requests.get",
+        "src.data_provider.akshare_fetcher.requests.get",
         return_value=_HttpTextResponse(body),
     ):
         quote = fetcher.get_realtime_quote("600519", source="sina")
@@ -327,10 +327,10 @@ def test_akshare_tencent_realtime_text_contract() -> None:
     fetcher = AkshareFetcher(sleep_min=0, sleep_max=0)
 
     with patch(
-        "data_provider.akshare_fetcher.get_realtime_circuit_breaker",
+        "src.data_provider.akshare_fetcher.get_realtime_circuit_breaker",
         return_value=_AlwaysAvailableBreaker(),
     ), patch(
-        "data_provider.akshare_fetcher.requests.get",
+        "src.data_provider.akshare_fetcher.requests.get",
         return_value=_HttpTextResponse(body),
     ):
         quote = fetcher.get_realtime_quote("600519", source="tencent")
@@ -389,7 +389,7 @@ def test_yfinance_symbol_routing(code: str, expected: str) -> None:
 )
 def test_tushare_symbol_routing(code: str, expected: str) -> None:
     with patch(
-        "data_provider.tushare_fetcher.get_config",
+        "src.data_provider.tushare_fetcher.get_config",
         return_value=SimpleNamespace(tushare_token=""),
     ):
         fetcher = TushareFetcher()

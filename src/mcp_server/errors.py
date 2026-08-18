@@ -3,7 +3,7 @@
 
 Uses the same stable error envelope shape as the HTTP API
 (``error`` / ``message`` / ``params`` / ``details`` / ``detail`` / ``trace_id``)
-without importing ``api.v1`` at module load time (avoids pulling the full API
+without importing ``src.api.v1`` at module load time (avoids pulling the full API
 router graph into the optional MCP process).
 """
 

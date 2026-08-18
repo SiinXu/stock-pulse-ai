@@ -13,13 +13,13 @@ if "litellm" not in sys.modules:
 if "json_repair" not in sys.modules:
     sys.modules["json_repair"] = MagicMock()
 
-from data_provider.base import (
+from src.data_provider.base import (
     BaseFetcher,
     DataFetchError,
     DataFetcherManager,
     STANDARD_COLUMNS,
 )
-from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+from src.data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
 
 
 class _StubFetcher:
@@ -116,26 +116,26 @@ class TestFetcherSourceOptimization(unittest.TestCase):
                 "LONGBRIDGE_APP_SECRET": "",
                 "LONGBRIDGE_ACCESS_TOKEN": "",
             },
-        ), patch("data_provider.efinance_fetcher.EfinanceFetcher", return_value=_StubFetcher("EfinanceFetcher", 0)), patch(
-            "data_provider.tencent_fetcher.TencentFetcher",
+        ), patch("src.data_provider.efinance_fetcher.EfinanceFetcher", return_value=_StubFetcher("EfinanceFetcher", 0)), patch(
+            "src.data_provider.tencent_fetcher.TencentFetcher",
             return_value=_StubFetcher("TencentFetcher", 5),
         ), patch(
-            "data_provider.akshare_fetcher.AkshareFetcher",
+            "src.data_provider.akshare_fetcher.AkshareFetcher",
             return_value=_StubFetcher("AkshareFetcher", 1),
         ), patch(
-            "data_provider.pytdx_fetcher.PytdxFetcher",
+            "src.data_provider.pytdx_fetcher.PytdxFetcher",
             return_value=_StubFetcher("PytdxFetcher", 2),
         ), patch(
-            "data_provider.baostock_fetcher.BaostockFetcher",
+            "src.data_provider.baostock_fetcher.BaostockFetcher",
             return_value=_StubFetcher("BaostockFetcher", 3),
         ), patch(
-            "data_provider.yfinance_fetcher.YfinanceFetcher",
+            "src.data_provider.yfinance_fetcher.YfinanceFetcher",
             return_value=_StubFetcher("YfinanceFetcher", 4),
         ), patch(
-            "data_provider.tushare_fetcher.TushareFetcher",
+            "src.data_provider.tushare_fetcher.TushareFetcher",
             return_value=_StubFetcher("TushareFetcher", -1),
         ) as mock_tushare, patch(
-            "data_provider.longbridge_fetcher.LongbridgeFetcher",
+            "src.data_provider.longbridge_fetcher.LongbridgeFetcher",
             return_value=_StubFetcher("LongbridgeFetcher", 5),
         ) as mock_longbridge:
             mock_longbridge.has_configured_credentials.return_value = False
@@ -204,26 +204,26 @@ class TestFetcherSourceOptimization(unittest.TestCase):
             longbridge_oauth_client_id="client-1",
         )
 
-        with patch("data_provider.efinance_fetcher.EfinanceFetcher", return_value=_StubFetcher("EfinanceFetcher", 0)), patch(
-            "data_provider.tencent_fetcher.TencentFetcher",
+        with patch("src.data_provider.efinance_fetcher.EfinanceFetcher", return_value=_StubFetcher("EfinanceFetcher", 0)), patch(
+            "src.data_provider.tencent_fetcher.TencentFetcher",
             return_value=_StubFetcher("TencentFetcher", 5),
         ), patch(
-            "data_provider.akshare_fetcher.AkshareFetcher",
+            "src.data_provider.akshare_fetcher.AkshareFetcher",
             return_value=_StubFetcher("AkshareFetcher", 1),
         ), patch(
-            "data_provider.pytdx_fetcher.PytdxFetcher",
+            "src.data_provider.pytdx_fetcher.PytdxFetcher",
             return_value=_StubFetcher("PytdxFetcher", 2),
         ), patch(
-            "data_provider.baostock_fetcher.BaostockFetcher",
+            "src.data_provider.baostock_fetcher.BaostockFetcher",
             return_value=_StubFetcher("BaostockFetcher", 3),
         ), patch(
-            "data_provider.yfinance_fetcher.YfinanceFetcher",
+            "src.data_provider.yfinance_fetcher.YfinanceFetcher",
             return_value=_StubFetcher("YfinanceFetcher", 4),
         ), patch(
-            "data_provider.tushare_fetcher.TushareFetcher",
+            "src.data_provider.tushare_fetcher.TushareFetcher",
             return_value=_StubFetcher("TushareFetcher", -1),
         ), patch(
-            "data_provider.longbridge_fetcher.LongbridgeFetcher",
+            "src.data_provider.longbridge_fetcher.LongbridgeFetcher",
             return_value=_StubFetcher("LongbridgeFetcher", 5),
         ) as mock_longbridge:
             mock_longbridge.has_configured_credentials.return_value = True

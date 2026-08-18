@@ -467,12 +467,19 @@ class PortfolioRiskService:
         if self._data_manager_init_error:
             return None
         try:
-            from data_provider import DataFetcherManager
+            from src.data_provider import DataFetcherManager
 
             self._data_manager = DataFetcherManager()
             return self._data_manager
-        except Exception as exc:  # pragma: no cover - fail-open initialization
-            self._data_manager_init_error = str(exc)
+        except Exception as exc:  # broad-exception: fallback_recorded - optional realtime enrichment remains unavailable after a safe-logged initialization failure
+            log_safe_exception(
+                logger,
+                "Portfolio risk data manager initialization failed",
+                exc,
+                error_code="portfolio_risk_data_manager_init_failed",
+                level=logging.WARNING,
+            )
+            self._data_manager_init_error = "initialization_failed"
             return None
 
     def _build_drawdown(

@@ -39,7 +39,7 @@ See `docs/plugin-extension-contract.md` (Data Providers).
 
 ## Normalized snapshot
 
-`data_provider.money_flow_types.MoneyFlowSnapshot` fields include:
+`src.data_provider.money_flow_types.MoneyFlowSnapshot` fields include:
 
 - ratio fields for main / super-large / large / medium / small buckets
 - absolute amount fields and 5d / 10d rollups only when both currency and scale
@@ -77,7 +77,7 @@ buckets differ between Eastmoney, Tushare, and Tonghuashun.
 
 ## Implemented path
 
-1. `AkshareFetcher.get_money_flow` → `data_provider.money_flow_akshare`
+1. `AkshareFetcher.get_money_flow` → `src.data_provider.money_flow_akshare`
 2. `DataFetcherManager.get_money_flow` (typed outcome + bounded cache,
    provider circuit breaker, and multi-provider fallback)
 3. Optional analysis injection when enabled:

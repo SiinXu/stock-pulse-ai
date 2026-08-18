@@ -11,15 +11,15 @@ from pathlib import Path
 
 import pytest
 
-from api.app import create_app
-from api.v1.schemas.run_flow import RunFlowEvent as ApiRunFlowEvent
-from api.v1.schemas.run_flow import RunFlowLane as ApiRunFlowLane
-from api.v1.schemas.run_flow import RunFlowNode as ApiRunFlowNode
-from api.v1.schemas.run_flow import RunFlowEdge as ApiRunFlowEdge
-from api.v1.schemas.run_flow import RunFlowSnapshot as ApiRunFlowSnapshot
-from api.v1.schemas.run_flow import RunFlowSummary as ApiRunFlowSummary
-from bot.application_context import to_analysis_request_context
-from bot.models import BotMessage, ChatType, Platform
+from src.api.app import create_app
+from src.api.v1.schemas.run_flow import RunFlowEvent as ApiRunFlowEvent
+from src.api.v1.schemas.run_flow import RunFlowLane as ApiRunFlowLane
+from src.api.v1.schemas.run_flow import RunFlowNode as ApiRunFlowNode
+from src.api.v1.schemas.run_flow import RunFlowEdge as ApiRunFlowEdge
+from src.api.v1.schemas.run_flow import RunFlowSnapshot as ApiRunFlowSnapshot
+from src.api.v1.schemas.run_flow import RunFlowSummary as ApiRunFlowSummary
+from src.bot.application_context import to_analysis_request_context
+from src.bot.models import BotMessage, ChatType, Platform
 from src.core.pipeline import StockAnalysisPipeline
 from src.schemas.request_context import AnalysisRequestContext, NotificationReplyTarget
 from src.schemas.run_flow import (
@@ -79,13 +79,17 @@ def _imported_modules(path: Path) -> set[str]:
 
 def test_src_does_not_import_delivery_boundary_dtos() -> None:
     violations = []
+    api_package = ROOT / "src" / "api"
+    bot_package = ROOT / "src" / "bot"
     for path in sorted((ROOT / "src").rglob("*.py")):
+        if path.is_relative_to(api_package) or path.is_relative_to(bot_package):
+            continue
         for module in _imported_modules(path):
             if (
-                module == "api.v1"
-                or module.startswith("api.v1.")
-                or module == "bot"
-                or module == "bot.models"
+                module == "src.api.v1"
+                or module.startswith("src.api.v1.")
+                or module == "src.bot"
+                or module == "src.bot.models"
             ):
                 violations.append(f"{path.relative_to(ROOT)} -> {module}")
 

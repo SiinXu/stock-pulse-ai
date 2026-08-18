@@ -24,7 +24,7 @@ helper is pure separator logic and belongs on a leaf path.
 
 1. Maintain a checked-in allowlist of **bidirectional package pairs** measured
    from production module-level imports (`src.<subpkg>` and root packages
-   `data_provider` / `api` / `bot` / entrypoints).
+   canonical `src.<name>` packages plus the top-level entrypoints).
 2. CI fails on any pair not listed in the baseline.
 3. `--write-baseline` may **shrink** the allowlist to the current measurement
    and **refuses growth**. Intentional new pairs require a manual baseline edit

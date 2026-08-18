@@ -668,7 +668,7 @@ class TestReviewBlockerRegressions:
         between ``stock_list_parser`` and the upstream fetcher would break
         STOCK_LIST ingestion.
         """
-        from data_provider.baostock_fetcher import BaostockFetcher
+        from src.data_provider.baostock_fetcher import BaostockFetcher
 
         fetcher = BaostockFetcher()
         for bare in ("510300", "159915", "510050", "588000"):

@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import reasoning_trace as endpoint
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import reasoning_trace as endpoint
 from src.services.reasoning_trace_export_service import (
     CLIP_TRUNCATION_SENTINEL,
     ReasoningTraceNotFound,
@@ -26,7 +26,7 @@ def _client(audit: SecurityAuditRecorderStub | None = None) -> TestClient:
     app = FastAPI()
     app.include_router(endpoint.router, prefix="/api/v1/reasoning-trace")
     add_error_handlers(app)
-    from api import deps as api_deps
+    from src.api import deps as api_deps
 
     app.dependency_overrides[api_deps.get_database_manager] = lambda: MagicMock()
     app.dependency_overrides[api_deps.require_security_audit_service] = (

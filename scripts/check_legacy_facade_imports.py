@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Ratcheting guard: ban new production imports of ADR-006 legacy facades.
 
-Scans production Python under ``src/``, ``data_provider/``, ``api/``, ``bot/``,
-plus top-level entrypoints. Known legacy facade modules remain importable only
+Scans production Python under ``src/`` plus top-level entrypoints. Known legacy facade modules remain importable only
 from paths listed in the checked-in baseline. Tests and docs are out of scope.
 
 New production imports fail CI. Removing an importer does not fail the check;
@@ -29,22 +28,16 @@ BASELINE_VERSION = 1
 
 # Legacy compatibility shims (facade module) -> canonical implementation package.
 LEGACY_FACADES: Mapping[str, str] = {
-    "api": "src.api",
-    "bot": "src.bot",
-    "data_provider": "src.data_provider",
     "src.market_sector_analysis": "src.market.sector_analysis",
 }
 
 # Shim files that re-export the canonical package; they are not importers of
 # themselves for allowlist purposes.
 FACADE_DEFINITION_FILES: Mapping[str, str] = {
-    "api": "api/__init__.py",
-    "bot": "bot/__init__.py",
-    "data_provider": "data_provider/__init__.py",
     "src.market_sector_analysis": "src/market_sector_analysis.py",
 }
 
-PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
+PRODUCTION_ROOTS = ("src",)
 PRODUCTION_FILES = ("main.py", "server.py")
 
 
