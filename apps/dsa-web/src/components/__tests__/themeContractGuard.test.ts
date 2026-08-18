@@ -191,7 +191,6 @@ function findMissingPriceDirectionSelectors(indexCss: string): string[] {
   return missing;
 }
 
-/** `.dark { }` (not `.dark .child` / `.dark[attr]`) must not reassign direction tokens. */
 /** Glob keys from `src/components/__tests__/` → path under `src/`. */
 function srcRelativeGuardPath(file: string): string {
   if (file.startsWith('../../')) return file.slice('../../'.length);
@@ -244,6 +243,7 @@ function collectPriceDirectionCssMappings(sources: Record<string, string>): Find
   return Object.entries(sources).flatMap(([file, raw]) => findPriceDirectionCssMappings(file, raw));
 }
 
+/** `.dark { }` (not `.dark .child` / `.dark[attr]`) must not reassign direction tokens. */
 function findDarkThemeDirectionOverrides(indexCss: string): Finding[] {
   const source = maskComments(indexCss);
   const findings: Finding[] = [];
