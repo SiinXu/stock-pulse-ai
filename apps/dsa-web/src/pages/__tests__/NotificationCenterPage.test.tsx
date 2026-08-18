@@ -252,6 +252,24 @@ describe('NotificationCenterPage', () => {
     expect(screen.queryByText('No notifications yet')).not.toBeInTheDocument();
   });
 
+  it('keeps loaded items visible when marking one as read fails', async () => {
+    listMock.mockResolvedValue(emptyPage({
+      items: [inboxItem()],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    markReadMock.mockRejectedValue(new Error('mark-read failed'));
+    renderPage();
+
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+
+    expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByText('Analysis complete: 600519')).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
+  });
+
   it('retries the inbox request and clears the error after a successful reload', async () => {
     listMock
       .mockRejectedValueOnce(new Error('inbox unavailable'))
