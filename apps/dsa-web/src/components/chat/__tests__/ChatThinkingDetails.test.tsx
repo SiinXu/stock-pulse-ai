@@ -260,6 +260,85 @@ describe('ChatThinkingDetails', () => {
 
     expect(serializeTraceDom(container)).toEqual(batchTrace);
   });
+
+  it('grows the live list after a first flush of one step then another append', () => {
+    const first: ProgressStep = { type: 'thinking', step: 1, message: 'Planning 1' };
+    const second: ProgressStep = { type: 'thinking', step: 2, message: 'Planning 2' };
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={[first]} />,
+    );
+
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(1);
+    expect(container.querySelector('[data-current="true"]')).toHaveTextContent('Planning 1');
+
+    rerender(<ChatThinkingDetails mode="live" t={t} steps={[first, second]} />);
+
+    const rows = container.querySelectorAll('[data-trace-step]');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).not.toHaveAttribute('data-current');
+    expect(rows[1]).toHaveAttribute('data-current', 'true');
+    expect(rows[1]).toHaveTextContent('Planning 2');
+  });
+
+  it('appends a later rAF-style batch onto an already mounted live list', () => {
+    const firstBatch: ProgressStep[] = [
+      { type: 'thinking', step: 1, message: 'Planning' },
+      { type: 'tool_start', tool: 'search', display_name: 'Search' },
+      { type: 'tool_done', tool: 'search', display_name: 'Search', success: true, duration: 0.2 },
+    ];
+    const secondBatch: ProgressStep[] = [
+      ...firstBatch,
+      { type: 'stage_done', stage: 'agent_loop', status: 'completed', duration: 1 },
+      { type: 'generating', message: 'Writing' },
+    ];
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={firstBatch} />,
+    );
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(3);
+
+    rerender(<ChatThinkingDetails mode="live" t={t} steps={secondBatch} />);
+
+    const rows = container.querySelectorAll('[data-trace-step]');
+    expect([...rows].map((row) => row.getAttribute('data-trace-step'))).toEqual([
+      'thinking',
+      'tool_start',
+      'tool_done',
+      'stage_done',
+      'generating',
+    ]);
+    expect(rows[4]).toHaveAttribute('data-current', 'true');
+    expect(rows[4]).toHaveTextContent('Writing');
+  });
+
+  it('clears live rows when the store cancels to an empty progress list', () => {
+    const steps: ProgressStep[] = [
+      { type: 'thinking', step: 1, message: 'Planning' },
+      { type: 'tool_start', tool: 'search', display_name: 'Search' },
+    ];
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={steps} />,
+    );
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(2);
+
+    rerender(<ChatThinkingDetails mode="live" t={t} steps={[]} />);
+
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(0);
+    expect(container.querySelector('[data-trace-mode="live"]')).toBeInTheDocument();
+  });
+
+  it('rebuilds visible step text when the translate function identity changes', () => {
+    const steps: ProgressStep[] = [{ type: 'generating' }];
+    const tAlt = (key: UiTextKey) => `ALT:${UI_TEXT.en[key]}`;
+    const { rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={steps} />,
+    );
+    expect(screen.getByText(UI_TEXT.en['chat.generateAnalysis'])).toBeInTheDocument();
+
+    rerender(<ChatThinkingDetails mode="live" t={tAlt} steps={steps} />);
+
+    expect(screen.getByText(`ALT:${UI_TEXT.en['chat.generateAnalysis']}`)).toBeInTheDocument();
+    expect(screen.queryByText(UI_TEXT.en['chat.generateAnalysis'])).not.toBeInTheDocument();
+  });
 });
 
 function serializeTraceDom(container: HTMLElement) {

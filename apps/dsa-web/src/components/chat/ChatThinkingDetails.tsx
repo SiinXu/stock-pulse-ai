@@ -11,6 +11,7 @@ import {
   type ToolDetail,
   type TracePresentation,
   type TraceRowCache,
+  type TraceRowModel,
   type TraceTranslate,
 } from './chatThinkingTrace';
 
@@ -20,12 +21,17 @@ type TraceView = {
   steps: ProgressStep[];
   t: TraceTranslate;
   cache: TraceRowCache;
+  rows: TraceRowModel[];
 };
 
 function createTraceView(steps: ProgressStep[], t: TraceTranslate): TraceView {
   const cache = createTraceRowCache();
-  advanceTraceRowModels(cache, steps, t);
-  return { steps, t, cache };
+  return {
+    steps,
+    t,
+    cache,
+    rows: advanceTraceRowModels(cache, steps, t),
+  };
 }
 
 type ChatTraceRowProps = {
@@ -172,10 +178,10 @@ export function ChatThinkingDetails({
   const [expandedRows, setExpandedRows] = useState<Set<string>>(() => new Set());
   const [traceModel, setTraceModel] = useState(() => createTraceView(steps, t));
   if (traceModel.steps !== steps || traceModel.t !== t) {
-    advanceTraceRowModels(traceModel.cache, steps, t);
-    setTraceModel({ steps, t, cache: traceModel.cache });
+    const rows = advanceTraceRowModels(traceModel.cache, steps, t);
+    setTraceModel({ steps, t, cache: traceModel.cache, rows });
   }
-  const rows = traceModel.cache.rows;
+  const { rows } = traceModel;
 
   const toggleRow = useCallback((rowKey: string) => {
     setExpandedRows((current) => {

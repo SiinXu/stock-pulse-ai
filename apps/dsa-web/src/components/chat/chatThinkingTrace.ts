@@ -270,19 +270,24 @@ function getOrDeriveRow(
   return model;
 }
 
-function appendCachedRow(
+function buildCachedRow(
   cache: TraceRowCache,
   step: ProgressStep,
   t: TraceTranslate,
-): void {
+): TraceRowModel {
   const model = getOrDeriveRow(cache, step, t);
   const occurrence = (cache.seen.get(model.identity) ?? 0) + 1;
   cache.seen.set(model.identity, occurrence);
-  cache.rows.push({
+  return {
     step,
     rowKey: `${model.identity}\u0001${occurrence}`,
     ...model,
-  });
+  };
+}
+
+function publishRows(cache: TraceRowCache, rows: TraceRowModel[]): TraceRowModel[] {
+  cache.rows = rows;
+  return rows;
 }
 
 function commonPrefixLength(rows: TraceRowModel[], nextSteps: ProgressStep[]): number {
@@ -295,9 +300,13 @@ function commonPrefixLength(rows: TraceRowModel[], nextSteps: ProgressStep[]): n
 }
 
 /**
- * Advance a live/history trace model. Appending steps that keep the existing
- * prefix object-identical is O(appended). Structural changes (prepend, replace,
- * language switch) rebuild from the first changed index.
+ * Advance a live/history trace model.
+ *
+ * Per-step presentation/text/detail is reused from a WeakMap (constant work
+ * per new step object). Prefix object-identity is scanned each call, and
+ * React-safe publication copies the row-pointer array whenever the list
+ * changes so React Compiler can remap. Structural changes (prepend, replace,
+ * language switch, clear) rebuild from the first changed index.
  */
 export function advanceTraceRowModels(
   cache: TraceRowCache,
@@ -306,8 +315,8 @@ export function advanceTraceRowModels(
 ): TraceRowModel[] {
   if (cache.t !== t) {
     cache.t = t;
-    cache.rows = [];
     cache.seen = new Map();
+    publishRows(cache, []);
   }
 
   const prefix = commonPrefixLength(cache.rows, nextSteps);
@@ -316,20 +325,15 @@ export function advanceTraceRowModels(
     return cache.rows;
   }
 
-  if (prefix === cache.rows.length && nextSteps.length > prefix) {
-    for (let index = prefix; index < nextSteps.length; index += 1) {
-      appendCachedRow(cache, nextSteps[index], t);
+  const nextRows = cache.rows.slice(0, prefix);
+  if (prefix < cache.rows.length) {
+    cache.seen = new Map();
+    for (const row of nextRows) {
+      cache.seen.set(row.identity, (cache.seen.get(row.identity) ?? 0) + 1);
     }
-    return cache.rows;
-  }
-
-  cache.rows = cache.rows.slice(0, prefix);
-  cache.seen = new Map();
-  for (const row of cache.rows) {
-    cache.seen.set(row.identity, (cache.seen.get(row.identity) ?? 0) + 1);
   }
   for (let index = prefix; index < nextSteps.length; index += 1) {
-    appendCachedRow(cache, nextSteps[index], t);
+    nextRows.push(buildCachedRow(cache, nextSteps[index], t));
   }
-  return cache.rows;
+  return publishRows(cache, nextRows);
 }

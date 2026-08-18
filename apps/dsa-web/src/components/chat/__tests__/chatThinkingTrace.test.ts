@@ -112,4 +112,33 @@ describe('chatThinkingTrace incremental cache', () => {
       getTraceRowKeys(withDuplicates),
     );
   });
+
+  it('publishes a new rows array on append, truncate, and language rebuild without mutating the previous snapshot', () => {
+    const cache = createTraceRowCache();
+    const first = makeStep(0);
+    const second = makeStep(1);
+    const snapshot1 = advanceTraceRowModels(cache, [first], t);
+    expect(snapshot1).toHaveLength(1);
+
+    const snapshot2 = advanceTraceRowModels(cache, [first, second], t);
+    expect(snapshot2).not.toBe(snapshot1);
+    expect(snapshot1).toHaveLength(1);
+    expect(snapshot2).toHaveLength(2);
+
+    const snapshot3 = advanceTraceRowModels(cache, [first], t);
+    expect(snapshot3).not.toBe(snapshot2);
+    expect(snapshot2).toHaveLength(2);
+    expect(snapshot3).toHaveLength(1);
+
+    const tAlt: typeof t = (key) => `ALT:${UI_TEXT.en[key]}`;
+    const snapshot4 = advanceTraceRowModels(cache, [first], tAlt);
+    expect(snapshot4).not.toBe(snapshot3);
+    expect(snapshot3[0].text).toBe('Planning 1');
+    expect(snapshot4).toHaveLength(1);
+
+    const snapshot5 = advanceTraceRowModels(cache, [], tAlt);
+    expect(snapshot5).not.toBe(snapshot4);
+    expect(snapshot5).toEqual([]);
+    expect(snapshot4).toHaveLength(1);
+  });
 });
