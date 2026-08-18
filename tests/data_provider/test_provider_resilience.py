@@ -12,8 +12,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetcherManager
-from data_provider.realtime_types import CircuitBreaker
+from src.data_provider.base import DataFetcherManager
+from src.data_provider.realtime_types import CircuitBreaker
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
     current_diagnostic_snapshot,
@@ -349,7 +349,7 @@ def test_fallback_metadata_and_log_skip_open_intermediate_provider(caplog) -> No
     intermediate_key = DataFetcherManager._daily_health_key(intermediate, "cn")
     breaker.record_failure(intermediate_key, error="already_open")
 
-    caplog.set_level(logging.INFO, logger="data_provider.base")
+    caplog.set_level(logging.INFO, logger="src.data_provider.base")
     with patch.object(DataFetcherManager, "_daily_source_health", breaker):
         token = activate_run_diagnostic_context(trace_id="trace-open-intermediate")
         try:

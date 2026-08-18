@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from data_provider.tencent_fetcher import TencentFetcher, _to_tencent_symbol
+from src.data_provider.tencent_fetcher import TencentFetcher, _to_tencent_symbol
 
 
 def test_tencent_priority_defaults_to_final_fallback_and_allows_override() -> None:
@@ -84,7 +84,7 @@ def test_tencent_fetcher_parses_qfq_daily_response() -> None:
         return FakeResponse()
 
     fetcher = TencentFetcher()
-    with patch("data_provider.tencent_fetcher.requests.get", fake_get):
+    with patch("src.data_provider.tencent_fetcher.requests.get", fake_get):
         df = fetcher.get_daily_data("000001", start_date="2026-05-01", end_date="2026-05-10")
 
     assert captured["url"] == "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
@@ -136,7 +136,7 @@ def test_tencent_fetcher_requests_explicit_historical_date_window() -> None:
         return FakeResponse()
 
     fetcher = TencentFetcher()
-    with patch("data_provider.tencent_fetcher.requests.get", fake_get):
+    with patch("src.data_provider.tencent_fetcher.requests.get", fake_get):
         df = fetcher.get_daily_data("000001", start_date="2020-05-01", end_date="2020-05-31")
 
     assert captured["url"] == "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
@@ -165,7 +165,7 @@ def test_tencent_fetcher_preserves_amount_column_when_missing() -> None:
         def json(self):
             return payload
 
-    with patch("data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
+    with patch("src.data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
         df = TencentFetcher().get_daily_data("600519", start_date="2026-05-01", end_date="2026-05-10")
 
     assert "amount" in df.columns
@@ -183,7 +183,7 @@ def test_tencent_fetcher_returns_empty_frame_for_empty_history() -> None:
         def json(self):
             return payload
 
-    with patch("data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
+    with patch("src.data_provider.tencent_fetcher.requests.get", return_value=FakeResponse()):
         df = TencentFetcher().get_daily_data("000001", start_date="2026-05-01", end_date="2026-05-10")
 
     assert df.empty
@@ -214,7 +214,7 @@ def test_tencent_fetcher_keeps_short_history_when_cap_not_hit() -> None:
         captured.update(kwargs)
         return FakeResponse()
 
-    with patch("data_provider.tencent_fetcher.requests.get", fake_get):
+    with patch("src.data_provider.tencent_fetcher.requests.get", fake_get):
         df = TencentFetcher().get_daily_data("000001", start_date="2020-01-01", end_date="2026-05-10")
 
     assert ",day,2020-01-01,2026-05-10,800,qfq" in captured["params"]["param"]
@@ -250,7 +250,7 @@ def test_tencent_fetcher_keeps_near_cap_short_history_for_new_listing() -> None:
         captured.update(kwargs)
         return FakeResponse()
 
-    with patch("data_provider.tencent_fetcher.requests.get", fake_get):
+    with patch("src.data_provider.tencent_fetcher.requests.get", fake_get):
         df = TencentFetcher().get_daily_data("000001", start_date="2020-01-01", end_date="2026-05-10")
 
     assert ",day,2020-01-01,2026-05-10,800,qfq" in captured["params"]["param"]
@@ -286,7 +286,7 @@ def test_tencent_fetcher_keeps_capped_history_when_start_is_weekend() -> None:
         captured.update(kwargs)
         return FakeResponse()
 
-    with patch("data_provider.tencent_fetcher.requests.get", fake_get):
+    with patch("src.data_provider.tencent_fetcher.requests.get", fake_get):
         df = TencentFetcher().get_daily_data("000001", start_date="2024-03-02", end_date="2027-05-10")
 
     assert ",day,2024-03-02,2027-05-10,800,qfq" in captured["params"]["param"]
@@ -322,7 +322,7 @@ def test_tencent_fetcher_rejects_capped_incomplete_history() -> None:
         captured.update(kwargs)
         return FakeResponse()
 
-    with patch("data_provider.tencent_fetcher.requests.get", fake_get):
+    with patch("src.data_provider.tencent_fetcher.requests.get", fake_get):
         df = TencentFetcher().get_daily_data("000001", start_date="2020-01-01", end_date="2026-05-10")
 
     assert ",day,2020-01-01,2026-05-10,800,qfq" in captured["params"]["param"]

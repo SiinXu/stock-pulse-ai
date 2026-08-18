@@ -11,21 +11,21 @@ from types import SimpleNamespace
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetcherManager
-from data_provider.money_flow_akshare import (
+from src.data_provider.base import DataFetcherManager
+from src.data_provider.money_flow_akshare import (
     SOURCE_ID,
     fetch_akshare_individual_money_flow,
     normalize_eastmoney_fund_flow_df,
     resolve_cn_exchange_market,
 )
-from data_provider.money_flow_types import (
+from src.data_provider.money_flow_types import (
     EASTMONEY_EM_ORDER_BUCKET_DEFINITION,
     MoneyFlowOutcome,
     MoneyFlowSnapshot,
     MoneyFlowStatus,
     is_meaningful_money_flow,
 )
-from data_provider.plugin_registry import DATA_PROVIDER_CAPABILITY_METHODS
+from src.data_provider.plugin_registry import DATA_PROVIDER_CAPABILITY_METHODS
 from src.core.trading_calendar import get_effective_trading_date
 from src.config import Config
 from src.services.smartmoney_flow_service import (
@@ -377,6 +377,6 @@ def test_service_closes_a_standalone_manager(monkeypatch):
         def close(self):
             self.closed = True
 
-    monkeypatch.setattr("data_provider.base.DataFetcherManager", _OwnedManager)
+    monkeypatch.setattr("src.data_provider.base.DataFetcherManager", _OwnedManager)
     assert fetch_money_flow("600519", config=SimpleNamespace(smartmoney_enabled=True)) is outcome
     assert _OwnedManager.instance is not None and _OwnedManager.instance.closed is True

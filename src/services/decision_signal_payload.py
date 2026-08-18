@@ -14,7 +14,7 @@ import logging
 import math
 from typing import TYPE_CHECKING, Any, Dict, Literal, Mapping, Optional
 
-from data_provider.base import normalize_stock_code
+from src.data_provider.base import normalize_stock_code
 
 from src.core.trading_calendar import get_market_for_stock
 from src.schemas.decision_action import build_action_fields, normalize_decision_action

@@ -12,7 +12,7 @@ from typing import Any, Dict
 
 import pytest
 
-from api.v1.schemas.reasoning_trace import ReasoningTraceExportResponse
+from src.api.v1.schemas.reasoning_trace import ReasoningTraceExportResponse
 from src.services import reasoning_trace_export_service as export_module
 from src.services.reasoning_trace_export_service import (
     CLIP_TRUNCATION_SENTINEL,
@@ -896,7 +896,7 @@ def test_every_clip_call_site_uses_a_registered_ledger_path() -> None:
 
 def test_loss_ledger_stays_inside_the_response_truncation_bound() -> None:
     """Blocker 2 bound: the closed path vocabulary cannot overflow the schema."""
-    from api.v1.schemas.reasoning_trace import ReasoningTraceTruncation
+    from src.api.v1.schemas.reasoning_trace import ReasoningTraceTruncation
 
     ledger_reasons = 5  # unsupported/non-finite/clipped/list-cap/unsupported-item
     non_ledger_initial_drops = 13  # capture, caps, malformed, projection, legacy

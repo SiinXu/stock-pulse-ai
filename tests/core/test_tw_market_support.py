@@ -10,8 +10,8 @@ with a 4-6 digit base (wider than JP ``.T``'s 4-5 to cover ETFs like 00878 /
 from unittest.mock import patch
 
 import pandas as pd
-from data_provider.base import BaseFetcher, DataFetchError, DataFetcherManager, normalize_stock_code
-from data_provider.yfinance_fetcher import YfinanceFetcher
+from src.data_provider.base import BaseFetcher, DataFetchError, DataFetcherManager, normalize_stock_code
+from src.data_provider.yfinance_fetcher import YfinanceFetcher
 from src.core.trading_calendar import MARKET_EXCHANGE, MARKET_TIMEZONE, get_market_for_stock
 from src.market.context import detect_market, get_market_guidelines
 from src.services.stock_code_utils import is_code_like, normalize_code
@@ -115,7 +115,7 @@ def test_data_fetcher_manager_routes_tw_daily_only_to_yfinance() -> None:
     yfinance = _FakeFetcher("YfinanceFetcher")
     manager = DataFetcherManager(fetchers=[efinance, akshare, yfinance])
 
-    with patch("data_provider.base.record_provider_run_started"), patch("data_provider.base.record_provider_run"):
+    with patch("src.data_provider.base.record_provider_run_started"), patch("src.data_provider.base.record_provider_run"):
         tw_df, tw_source = manager.get_daily_data("2330.TW")
         two_df, two_source = manager.get_daily_data("6505.TWO")
 

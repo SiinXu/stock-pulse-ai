@@ -26,7 +26,7 @@ from fastapi import HTTPException, UploadFile
 from starlette.datastructures import Headers
 from unittest.mock import patch
 
-from api.v1.endpoints.stocks import extract_from_image
+from src.api.v1.endpoints.stocks import extract_from_image
 from src.services.image_stock_extractor import (
     _resolve_vision_model,
     _get_api_keys_for_model,

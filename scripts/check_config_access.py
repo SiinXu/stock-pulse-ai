@@ -3,8 +3,7 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Ratcheting guard: ban unexplained growth of direct ``get_config()`` call sites.
 
-Scans production Python under ``src/``, ``data_provider/``, ``api/``, ``bot/``,
-plus top-level entrypoints. Counts bare ``get_config()`` calls (AST ``Name``
+Scans production Python under ``src/`` plus top-level entrypoints. Counts bare ``get_config()`` calls (AST ``Name``
 callees only) per module. Attribute calls such as
 ``system_config_service.get_config(...)`` are intentionally out of scope —
 they are a different API surface.
@@ -36,7 +35,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BASELINE = ROOT / "scripts" / "config_access_baseline.json"
 BASELINE_VERSION = 1
 
-PRODUCTION_ROOTS = ("src", "data_provider", "api", "bot")
+PRODUCTION_ROOTS = ("src",)
 PRODUCTION_FILES = ("main.py", "server.py")
 
 # Composition-root and config definition may still call get_config().

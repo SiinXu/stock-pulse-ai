@@ -43,7 +43,7 @@ def _get_search_service():
 
 
 def _canonical_search_code(stock_code: str) -> str:
-    from data_provider.base import canonical_stock_code, normalize_stock_code
+    from src.data_provider.base import canonical_stock_code, normalize_stock_code
 
     return canonical_stock_code(normalize_stock_code(str(stock_code or "").strip()))
 

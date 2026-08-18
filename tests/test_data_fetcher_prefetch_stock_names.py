@@ -15,8 +15,8 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from data_provider.base import DataFetcherManager
-from data_provider.pytdx_fetcher import PytdxFetcher
+from src.data_provider.base import DataFetcherManager
+from src.data_provider.pytdx_fetcher import PytdxFetcher
 from src.core.pipeline import StockAnalysisPipeline
 
 
@@ -97,7 +97,7 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager._fetchers = [remote_fetcher]
         manager.get_realtime_quote = MagicMock()
 
-        with patch("data_provider.base.get_index_stock_name", return_value=None):
+        with patch("src.data_provider.base.get_index_stock_name", return_value=None):
             name = DataFetcherManager.get_stock_name(manager, "600519", allow_realtime=False)
 
         self.assertEqual(name, "贵州茅台")
@@ -113,7 +113,7 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager._fetchers = [remote_fetcher]
         manager.get_realtime_quote = MagicMock()
 
-        with patch("data_provider.base.get_index_stock_name", return_value="索引名称"):
+        with patch("src.data_provider.base.get_index_stock_name", return_value="索引名称"):
             name = DataFetcherManager.get_stock_name(manager, "123456", allow_realtime=False)
 
         self.assertEqual(name, "索引名称")
@@ -126,8 +126,8 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager._fetchers = []
         manager.get_realtime_quote = MagicMock()
 
-        with patch.dict("data_provider.base.STOCK_NAME_MAP", {"AAPL": "苹果"}, clear=True):
-            with patch("data_provider.base.get_index_stock_name", return_value="APPLE"):
+        with patch.dict("src.data_provider.base.STOCK_NAME_MAP", {"AAPL": "苹果"}, clear=True):
+            with patch("src.data_provider.base.get_index_stock_name", return_value="APPLE"):
                 name = DataFetcherManager.get_stock_name(manager, "AAPL")
 
         self.assertEqual(name, "苹果")
@@ -139,8 +139,8 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager._fetchers = []
         manager.get_realtime_quote = MagicMock(return_value=SimpleNamespace(name="实时名称"))
 
-        with patch.dict("data_provider.base.STOCK_NAME_MAP", {}, clear=True):
-            with patch("data_provider.base.get_index_stock_name", return_value="索引名称"):
+        with patch.dict("src.data_provider.base.STOCK_NAME_MAP", {}, clear=True):
+            with patch("src.data_provider.base.get_index_stock_name", return_value="索引名称"):
                 name = DataFetcherManager.get_stock_name(manager, "123456", allow_realtime=True)
 
         self.assertEqual(name, "索引名称")
@@ -152,8 +152,8 @@ class TestPrefetchStockNames(unittest.TestCase):
         manager._fetchers = []
         manager.get_realtime_quote = MagicMock(return_value=SimpleNamespace(name="平安银行"))
 
-        with patch.dict("data_provider.base.STOCK_NAME_MAP", {}, clear=True):
-            with patch("data_provider.base.get_index_stock_name", return_value=None):
+        with patch.dict("src.data_provider.base.STOCK_NAME_MAP", {}, clear=True):
+            with patch("src.data_provider.base.get_index_stock_name", return_value=None):
                 name = DataFetcherManager.get_stock_name(manager, "000001.SZ")
 
         self.assertEqual(name, "平安银行")

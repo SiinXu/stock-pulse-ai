@@ -9,8 +9,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from api.app import create_app
-from api.middlewares.security_headers import (
+from src.api.app import create_app
+from src.api.middlewares.security_headers import (
     CONTENT_SECURITY_POLICY,
     SECURITY_HEADERS,
     is_openapi_ui_path,

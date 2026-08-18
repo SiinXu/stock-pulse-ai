@@ -359,7 +359,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertIsNotNone(status["last_skipped_at"])
 
     def test_run_now_endpoint_returns_conflict_when_scheduler_is_busy(self) -> None:
-        from api.v1.endpoints.system_config import run_scheduler_now
+        from src.api.v1.endpoints.system_config import run_scheduler_now
 
         scheduler = MagicMock()
         scheduler.run_now.return_value = {
@@ -376,7 +376,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertEqual(captured.exception.detail["reason"], "analysis_already_running")
 
     def test_run_now_endpoint_maps_authoritative_unavailable_reason(self) -> None:
-        from api.v1.endpoints.system_config import run_scheduler_now
+        from src.api.v1.endpoints.system_config import run_scheduler_now
 
         scheduler = MagicMock()
         scheduler.run_now.return_value = {
@@ -393,7 +393,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertEqual(captured.exception.detail["reason"], "scheduler_not_attached")
 
     def test_run_now_endpoint_returns_typed_correlation_payload(self) -> None:
-        from api.v1.endpoints.system_config import run_scheduler_now
+        from src.api.v1.endpoints.system_config import run_scheduler_now
 
         scheduler = MagicMock()
         scheduler.run_now.return_value = {
@@ -698,7 +698,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
             self.assertEqual(fake_schedule.get_jobs(), [])
 
     def test_lifespan_disables_runtime_scheduler_when_cli_owns_schedule(self) -> None:
-        from api.app import create_app
+        from src.api.app import create_app
 
         events = []
 
@@ -740,10 +740,10 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         ), patch(
             "src.config.get_config",
             return_value=SimpleNamespace(schedule_run_immediately=True),
-        ), patch("api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
-            "api.app.SystemConfigService",
+        ), patch("src.api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
+            "src.api.app.SystemConfigService",
             FakeSystemConfigService,
-        ), patch("api.app._schedule_stock_index_background_refresh"):
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
             app = create_app(static_dir=Path(temp_dir))
             with TestClient(app):
                 pass
@@ -755,7 +755,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         ])
 
     def test_lifespan_passes_runtime_scheduler_start_flags(self) -> None:
-        from api.app import create_app
+        from src.api.app import create_app
 
         events = []
 
@@ -800,10 +800,10 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
                 RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV: "true",
             },
             clear=False,
-        ), patch("api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
-            "api.app.SystemConfigService",
+        ), patch("src.api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
+            "src.api.app.SystemConfigService",
             FakeSystemConfigService,
-        ), patch("api.app._schedule_stock_index_background_refresh"):
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
             app = create_app(static_dir=Path(temp_dir))
             with TestClient(app):
                 pass
@@ -817,7 +817,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertIsNone(os.getenv(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV))
 
     def test_lifespan_suppresses_initial_start_without_losing_runtime_ownership(self) -> None:
-        from api.app import create_app
+        from src.api.app import create_app
 
         events = []
 
@@ -862,10 +862,10 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         ), patch(
             "src.config.get_config",
             return_value=SimpleNamespace(schedule_run_immediately=True),
-        ), patch("api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
-            "api.app.SystemConfigService",
+        ), patch("src.api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
+            "src.api.app.SystemConfigService",
             FakeSystemConfigService,
-        ), patch("api.app._schedule_stock_index_background_refresh"):
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
             app = create_app(static_dir=Path(temp_dir))
             with TestClient(app):
                 pass
@@ -878,7 +878,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertIsNone(os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV))
 
     def test_lifespan_respects_crud_only_persisted_task_non_owner(self) -> None:
-        from api.app import create_app
+        from src.api.app import create_app
 
         runtime_scheduler = MagicMock()
         with tempfile.TemporaryDirectory() as temp_dir, patch.dict(
@@ -889,11 +889,11 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
             },
             clear=False,
         ), patch(
-            "api.app.RuntimeSchedulerService",
+            "src.api.app.RuntimeSchedulerService",
             return_value=runtime_scheduler,
         ) as scheduler_class, patch(
-            "api.app.SystemConfigService",
-        ), patch("api.app._schedule_stock_index_background_refresh"):
+            "src.api.app.SystemConfigService",
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
             app = create_app(static_dir=Path(temp_dir))
             with TestClient(app):
                 pass
@@ -906,7 +906,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertIsNone(os.getenv(SCHEDULED_TASK_OWNER_ENV))
 
     def test_lifespan_health_does_not_eagerly_initialize_scheduled_task_database(self) -> None:
-        from api.app import create_app
+        from src.api.app import create_app
 
         class FakeRuntimeSchedulerService:
             def __init__(self, **_kwargs):
@@ -922,11 +922,11 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
             "src.repositories.scheduled_task_repo.DatabaseManager.get_instance",
             side_effect=AssertionError("database initialized during health startup"),
         ), patch(
-            "api.app.RuntimeSchedulerService",
+            "src.api.app.RuntimeSchedulerService",
             FakeRuntimeSchedulerService,
         ), patch(
-            "api.app.SystemConfigService",
-        ), patch("api.app._schedule_stock_index_background_refresh"):
+            "src.api.app.SystemConfigService",
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
             app = create_app(static_dir=Path(temp_dir))
             with TestClient(app) as client:
                 response = client.get("/api/health")
@@ -934,7 +934,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_lifespan_passes_runtime_scheduler_args_overrides(self) -> None:
-        from api.app import create_app
+        from src.api.app import create_app
 
         events = []
         runtime_args = {
@@ -978,10 +978,10 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         ), patch(
             "src.config.get_config",
             return_value=SimpleNamespace(schedule_run_immediately=True),
-        ), patch("api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
-            "api.app.SystemConfigService",
+        ), patch("src.api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
+            "src.api.app.SystemConfigService",
             FakeSystemConfigService,
-        ), patch("api.app._schedule_stock_index_background_refresh"):
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
             app = create_app(static_dir=Path(temp_dir))
             with TestClient(app):
                 pass
@@ -990,7 +990,7 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertIsNone(os.getenv(RUNTIME_SCHEDULER_ARGS_ENV))
 
     def test_lifespan_uses_configured_run_immediately_without_override(self) -> None:
-        from api.app import create_app
+        from src.api.app import create_app
 
         events = []
 
@@ -1021,10 +1021,10 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir, patch.dict(os.environ, {}, clear=False), patch(
             "src.config.get_config",
             return_value=SimpleNamespace(schedule_run_immediately=True),
-        ), patch("api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
-            "api.app.SystemConfigService",
+        ), patch("src.api.app.RuntimeSchedulerService", FakeRuntimeSchedulerService), patch(
+            "src.api.app.SystemConfigService",
             FakeSystemConfigService,
-        ), patch("api.app._schedule_stock_index_background_refresh"):
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
             os.environ.pop(CLI_SCHEDULER_OWNER_ENV, None)
             os.environ.pop(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV, None)
             os.environ.pop(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV, None)

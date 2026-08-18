@@ -209,7 +209,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("uuid.uuid4", return_value=SimpleNamespace(hex="q-sync-overview")), \
              patch("src.services.analysis_service.AnalysisService", return_value=service_instance), \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=(
                      {
                          "enhanced_context": {"code": "600519"},
@@ -268,7 +268,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("uuid.uuid4", return_value=SimpleNamespace(hex="q-sync-market-structure")), \
              patch("src.services.analysis_service.AnalysisService", return_value=service_instance), \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=(
                      None,
                      None,
@@ -339,7 +339,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("uuid.uuid4", return_value=SimpleNamespace(hex="q-sync-no-history")), \
              patch("src.services.analysis_service.AnalysisService", return_value=service_instance), \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=(None, None, None),
              ):
             result = _handle_sync_analysis(
@@ -852,7 +852,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "warnings": ["legacy_snapshot"],
         }
 
-        with patch("api.v1.endpoints.analysis.resolve_index_stock_code", return_value="005930.KS"):
+        with patch("src.api.v1.endpoints.analysis.resolve_index_stock_code", return_value="005930.KS"):
             report = _build_analysis_report(
                 report_data={
                     "meta": {"stock_code": "005930"},
@@ -899,7 +899,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "warnings": ["legacy_cn_snapshot"],
         }
 
-        with patch("api.v1.endpoints.analysis.resolve_index_stock_code", return_value="005930.KS"):
+        with patch("src.api.v1.endpoints.analysis.resolve_index_stock_code", return_value="005930.KS"):
             report = _build_analysis_report(
                 report_data={
                     "meta": {"stock_code": "005930"},
@@ -1118,7 +1118,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             ("context", {}, {"report_language": "en"}),
         ):
             with self.subTest(source=source), patch(
-                "api.v1.endpoints.analysis.Config.get_instance",
+                "src.api.v1.endpoints.analysis.Config.get_instance",
                 side_effect=RuntimeError("config unavailable"),
             ):
                 report = _build_analysis_report(
@@ -1221,7 +1221,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         mock_db = MagicMock()
         mock_db.get_analysis_history.return_value = [record]
 
-        with patch("api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             queue_mock.return_value.get_task.return_value = None
             status = get_analysis_status("task_123")
@@ -1280,7 +1280,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         mock_db.get_analysis_history.return_value = [record]
         mock_db.get_latest_fundamental_snapshot.return_value = None
 
-        with patch("api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             queue_mock.return_value.get_task.return_value = None
             status = get_analysis_status("task_market_structure_raw_1")
@@ -1335,7 +1335,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         mock_db.get_analysis_history.return_value = [record]
         mock_db.get_latest_fundamental_snapshot.return_value = None
 
-        with patch("api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             queue_mock.return_value.get_task.return_value = None
             status = get_analysis_status("task_structured_insights")
@@ -1400,7 +1400,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         mock_db.get_analysis_history.return_value = [record]
         mock_db.get_latest_fundamental_snapshot.return_value = None
 
-        with patch("api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             queue_mock.return_value.get_task.return_value = None
             status = get_analysis_status("task_agent_snapshot_1")
@@ -1497,7 +1497,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         mock_db.get_analysis_history.return_value = [record]
         mock_db.get_latest_fundamental_snapshot.return_value = None
 
-        with patch("api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             queue_mock.return_value.get_task.return_value = task
             status = get_analysis_status("task_agent_snapshot_in_memory_1")
@@ -1572,9 +1572,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             completed_at=datetime(2026, 4, 10, 12, 1, 0),
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue") as queue_mock, \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=(None, None, None),
              ) as load_sources:
             queue_mock.return_value.get_task.return_value = task
@@ -1596,7 +1596,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         if get_analysis_status is None or _handle_sync_analysis is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
 
-        from api.v1.endpoints.history import get_history_detail
+        from src.api.v1.endpoints.history import get_history_detail
 
         query_id = "q-canonical-report"
         created_at = "2026-07-30T16:00:00+00:00"
@@ -1853,7 +1853,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "src.services.analysis_service.AnalysisService",
                 return_value=service,
             ), patch(
-                "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                 return_value=(
                     case_context_snapshot,
                     fallback_fundamental_payload,
@@ -1903,9 +1903,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 completed_at=datetime.fromisoformat(created_at),
             )
             with patch(
-                "api.v1.endpoints.analysis.get_task_queue"
+                "src.api.v1.endpoints.analysis.get_task_queue"
             ) as queue_mock, patch(
-                "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                 return_value=(
                     case_context_snapshot,
                     fallback_fundamental_payload,
@@ -1949,7 +1949,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 fallback_fundamental_payload
             )
             with patch(
-                "api.v1.endpoints.analysis.get_task_queue"
+                "src.api.v1.endpoints.analysis.get_task_queue"
             ) as queue_mock, patch(
                 "src.storage.DatabaseManager.get_instance",
                 return_value=database,
@@ -2119,7 +2119,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         if get_analysis_status is None:
             self.skipTest("analysis endpoint helpers unavailable in this environment")
 
-        from api.v1.endpoints.history import get_history_detail
+        from src.api.v1.endpoints.history import get_history_detail
 
         raw_payload = {
             "report_language": "en",
@@ -2155,7 +2155,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         database.get_latest_fundamental_snapshot.return_value = None
 
         with patch(
-            "api.v1.endpoints.analysis.get_task_queue"
+            "src.api.v1.endpoints.analysis.get_task_queue"
         ) as queue_mock, patch(
             "src.storage.DatabaseManager.get_instance",
             return_value=database,
@@ -2197,7 +2197,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         )
 
     def test_history_detail_preserves_top_level_phase_summary_precedence(self) -> None:
-        from api.v1.endpoints.history import get_history_detail
+        from src.api.v1.endpoints.history import get_history_detail
 
         context_phase = _market_phase_summary()
         top_level_phase = deepcopy(context_phase)
@@ -2244,7 +2244,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         database.get_latest_fundamental_snapshot.return_value = None
 
         with patch(
-            "api.v1.endpoints.history.HistoryService",
+            "src.api.v1.endpoints.history.HistoryService",
             return_value=service,
         ):
             report = get_history_detail(
@@ -2260,7 +2260,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         fallback_result["market_phase_summary"] = None
         service.resolve_and_get_detail.return_value = fallback_result
         with patch(
-            "api.v1.endpoints.history.HistoryService",
+            "src.api.v1.endpoints.history.HistoryService",
             return_value=service,
         ):
             fallback_report = get_history_detail(
@@ -2295,7 +2295,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             module
             for module in imported_modules
             if module == "api"
-            or module.startswith("api.")
+            or module.startswith("src.api.")
             or module == "fastapi"
             or module.startswith("fastapi.")
         )

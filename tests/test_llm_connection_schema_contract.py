@@ -192,7 +192,7 @@ class LLMConnectionSchemaContractTestCase(unittest.TestCase):
         self.assertTrue(field_properties["is_required"]["deprecated"])
 
     def test_legacy_schema_fields_are_explicitly_deprecated(self) -> None:
-        from api.v1.schemas.system_config import LLMProviderCatalogResponse
+        from src.api.v1.schemas.system_config import LLMProviderCatalogResponse
 
         schema = LLMProviderCatalogResponse.model_json_schema()
         self.assertTrue(

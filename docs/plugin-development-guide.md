@@ -195,7 +195,7 @@ External plugins should import only:
 
 1. Names re-exported from `src.plugins` listed in
    `PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS`
-2. `data_provider.DataProvider` / `DataProviderRegistration` for providers
+2. `src.data_provider.DataProvider` / `DataProviderRegistration` for providers
 3. Host-owned types required by a specific point when not on the plugin root:
    - `Skill` from `src.agent.skills.base` for `analysis_strategy`
    - `ToolDefinition` / `ToolParameter` / `ToolPolicy` from
@@ -278,7 +278,7 @@ stable bind code; auto-bind never silently falls back to an orphan registry.
 Custom roots may still call `try_build_auto_bound_registry` directly.
 
 ```python
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 from src.plugins import (
     PLUGIN_APPLICATION_VERSION,
     PluginManager,

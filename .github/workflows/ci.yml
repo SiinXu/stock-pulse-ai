@@ -54,9 +54,6 @@ jobs:
               - 'apps/dsa-web/src/utils/systemConfigI18n.ts'
             docker:
               - '*.py'
-              - 'api/**'
-              - 'bot/**'
-              - 'data_provider/**'
               - 'src/**'
               - 'strategies/**'
               - 'apps/dsa-web/**'
@@ -76,10 +73,7 @@ jobs:
             # web-e2e boots a real backend; re-run when the stack it imports changes
             web_e2e:
               - 'apps/dsa-web/**'
-              - 'api/**'
               - 'src/**'
-              - 'data_provider/**'
-              - 'bot/**'
               - 'main.py'
               - 'server.py'
               - 'requirements.txt'
@@ -666,10 +660,10 @@ jobs:
           assert migration_ids and migration_ids[-1] == TARGET_VERSION
           print(f'✅ migrations target {TARGET_VERSION}')
           from src.notification import NotificationService; print('✅ notification')
-          from data_provider import DataFetcherManager; print('✅ data_provider')
+          from src.data_provider import DataFetcherManager; print('✅ data_provider')
           from src.analyzer import GeminiAnalyzer; print('✅ analyzer')
           from src.patches.eastmoney_patch import eastmoney_patch; print('✅ patch')
-          from bot.dispatcher import CommandDispatcher; print('✅ bot')
+          from src.bot.dispatcher import CommandDispatcher; print('✅ bot')
           from src.api.app import app; print('✅ api')
           print('✅ All Docker imports OK')
           "

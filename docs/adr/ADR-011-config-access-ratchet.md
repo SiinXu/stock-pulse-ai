@@ -24,7 +24,7 @@ incrementally.
 ## Decision
 
 1. Maintain a checked-in per-module count of **bare** `get_config()` call sites
-   in production paths (`src/`, `data_provider/`, `api/`, `bot/`, and top-level
+   in production paths (`src/` and top-level
    entrypoints), measured via AST `Name` callees only.
 2. CI fails when a module's count grows or a new production module introduces
    `get_config()`.

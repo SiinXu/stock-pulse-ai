@@ -19,7 +19,7 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.storage import DatabaseManager
 
@@ -169,7 +169,7 @@ class PortfolioRiskMetricsApiTests(unittest.TestCase):
         self.assertEqual(payload["correlation"]["symbols"], ["AAA", "BBB"])
         self.assertEqual(payload["concentration"]["effective_n"], 2.0)
 
-    @patch("api.v1.endpoints.portfolio_risk_metrics.PortfolioRiskMetricsService")
+    @patch("src.api.v1.endpoints.portfolio_risk_metrics.PortfolioRiskMetricsService")
     def test_insufficient_history_surface(self, mock_cls: MagicMock) -> None:
         mock_cls.return_value.get_risk_metrics.return_value = {
             "as_of": "2026-06-01",

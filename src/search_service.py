@@ -31,7 +31,7 @@ from tenacity import (
     retry_if_exception_type,
 )
 
-from data_provider.us_index_mapping import is_us_index_code
+from src.data_provider.us_index_mapping import is_us_index_code
 from src.config import (
     NEWS_STRATEGY_WINDOWS,
     normalize_news_strategy_profile,

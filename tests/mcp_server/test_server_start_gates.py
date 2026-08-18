@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import os
 from pathlib import Path
@@ -235,7 +236,11 @@ async def test_official_streamable_http_client_real_server(tmp_path: Path) -> No
             "Accept": "application/json, text/event-stream",
             "Content-Type": "application/json",
         }
-        async with httpx2.AsyncClient(auth=_BearerAuth(token), timeout=10) as raw_client:
+        async with httpx2.AsyncClient(
+            auth=_BearerAuth(token),
+            timeout=10,
+            trust_env=False,
+        ) as raw_client:
             malicious_origin = await raw_client.post(
                 f"http://127.0.0.1:{port}/mcp",
                 json=initialize_payload,
@@ -265,7 +270,10 @@ async def test_official_streamable_http_client_real_server(tmp_path: Path) -> No
                 headers={"Origin": "https://attacker.example"},
             )
             assert preflight.status_code == 403
-        async with httpx2.AsyncClient(timeout=10) as anonymous_client:
+        async with httpx2.AsyncClient(
+            timeout=10,
+            trust_env=False,
+        ) as anonymous_client:
             unauthenticated = await anonymous_client.post(
                 f"http://127.0.0.1:{port}/mcp",
                 json=initialize_payload,
@@ -281,6 +289,7 @@ async def test_official_streamable_http_client_real_server(tmp_path: Path) -> No
         async with httpx2.AsyncClient(
             auth=_BearerAuth(token),
             timeout=10,
+            trust_env=False,
             event_hooks={"request": [observe_request]},
         ) as http_client:
             async with streamable_http_client(
@@ -319,3 +328,31 @@ async def _wait_for_port(port: int) -> None:
         await stream.aclose()
         return
     raise AssertionError(f"server did not listen on port {port}")
+
+
+def test_streamable_http_probe_clients_disable_trust_env() -> None:
+    """Every httpx client in this probe must ignore HTTP(S)_PROXY."""
+
+    tree = ast.parse(Path(__file__).read_text(encoding="utf-8"))
+    missing_lines: list[int] = []
+    client_count = 0
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        func = node.func
+        name = ""
+        if isinstance(func, ast.Attribute):
+            name = func.attr
+        elif isinstance(func, ast.Name):
+            name = func.id
+        if name != "AsyncClient":
+            continue
+        client_count += 1
+        trust_env = next(
+            (keyword.value for keyword in node.keywords if keyword.arg == "trust_env"),
+            None,
+        )
+        if not isinstance(trust_env, ast.Constant) or trust_env.value is not False:
+            missing_lines.append(node.lineno)
+    assert client_count >= 3
+    assert missing_lines == []

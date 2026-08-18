@@ -922,11 +922,14 @@ class YfinanceFetcher(BaseFetcher):
         # U.S. stocks indices: use mapping (SPX -> ^GSPC)
         yf_symbol, index_name = get_us_index_yf_symbol(stock_code)
         if yf_symbol:
-            return self._get_us_index_realtime_quote(
+            quote = self._get_us_index_realtime_quote(
                 user_code=stock_code.strip().upper(),
                 yf_symbol=yf_symbol,
                 index_name=index_name,
             )
+            if quote is not None and quote.source is RealtimeSource.FALLBACK:
+                quote.source = RealtimeSource.YFINANCE
+            return quote
 
         # Handles US stocks or JP/KR/TW suffix-only stocks
         if not (
@@ -1026,7 +1029,7 @@ class YfinanceFetcher(BaseFetcher):
             quote = UnifiedRealtimeQuote(
                 code=symbol,
                 name=name,
-                source=RealtimeSource.FALLBACK,
+                source=RealtimeSource.YFINANCE,
                 market=suffix_market or ("us" if is_us_symbol else None),
                 currency=str(ticker_info.get("currency") or "").upper() or None,
                 data_quality="partial" if missing_fields else "ok",

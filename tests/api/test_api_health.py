@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from api.app import create_app
+from src.api.app import create_app
 
 
 def _make_client():
@@ -67,7 +67,7 @@ class HealthEndpointAuthEnabledTestCase(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls._patcher = patch("api.middlewares.auth.is_auth_enabled", return_value=True)
+        cls._patcher = patch("src.api.middlewares.auth.is_auth_enabled", return_value=True)
         cls._patcher.start()
         cls._temp_dir, cls.client = _make_client()
 

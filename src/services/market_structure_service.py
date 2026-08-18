@@ -7,7 +7,7 @@ import logging
 from datetime import date
 from typing import Any, Dict, List, Optional
 
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 
 from src.schemas.market_structure import (
     MARKET_STRUCTURE_SCHEMA_VERSION,

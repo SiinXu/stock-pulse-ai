@@ -13,7 +13,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.v1.endpoints import plugins as plugins_endpoint
+from src.api.v1.endpoints import plugins as plugins_endpoint
 from src.plugins import (
     EventHookRegistration,
     ExtensionContract,

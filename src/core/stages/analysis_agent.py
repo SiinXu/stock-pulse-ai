@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from data_provider.base import normalize_stock_code
-from data_provider.realtime_types import ChipDistribution
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.base import normalize_stock_code
+from src.data_provider.realtime_types import ChipDistribution
+from src.data_provider.us_index_mapping import is_us_stock_code
 from src.analyzer import (
     AnalysisResult,
     fill_price_position_if_needed,
@@ -186,7 +186,7 @@ class _AgentAnalysisStageMixin:
             if chip_data:
                 initial_context["chip_distribution"] = self._safe_to_dict(chip_data)
             if trend_result:
-                from data_provider.data_validation import project_technical_indicators
+                from src.data_provider.data_validation import project_technical_indicators
 
                 initial_context["trend_result"] = project_technical_indicators(
                     trend_result,

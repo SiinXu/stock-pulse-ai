@@ -9,7 +9,7 @@ import uuid
 from datetime import date, datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Callable, List, Optional, Tuple, Union
 
-from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
+from src.data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from src.config import Config
 from src.utils.sanitize import log_safe_exception
 

@@ -12,7 +12,7 @@ from unittest.mock import patch
 from starlette.requests import Request
 
 import src.auth as auth
-from api.v1.endpoints.auth import AuthSettingsRequest, auth_status, auth_update_settings
+from src.api.v1.endpoints.auth import AuthSettingsRequest, auth_status, auth_update_settings
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
@@ -71,7 +71,7 @@ class AuthStatusSetupStateTestCase(unittest.TestCase):
     def test_status_no_password(self) -> None:
         """Scenario: Auth disabled and no password set."""
         request = _make_request()
-        with patch("api.v1.endpoints.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.auth.is_auth_enabled", return_value=False):
             with patch("src.auth.is_auth_enabled", return_value=False):
                 data = asyncio.run(auth_status(request))
                 self.assertEqual(data["setupState"], "no_password")
@@ -82,7 +82,7 @@ class AuthStatusSetupStateTestCase(unittest.TestCase):
         auth.set_initial_password("password123")
         request = _make_request()
 
-        with patch("api.v1.endpoints.auth.is_auth_enabled", return_value=False):
+        with patch("src.api.v1.endpoints.auth.is_auth_enabled", return_value=False):
             with patch("src.auth.is_auth_enabled", return_value=False):
                 data = asyncio.run(auth_status(request))
                 self.assertEqual(data["setupState"], "password_retained")
@@ -94,7 +94,7 @@ class AuthStatusSetupStateTestCase(unittest.TestCase):
         auth.set_initial_password("password123")
         request = _make_request()
 
-        with patch("api.v1.endpoints.auth.is_auth_enabled", return_value=True):
+        with patch("src.api.v1.endpoints.auth.is_auth_enabled", return_value=True):
             with patch("src.auth.is_auth_enabled", return_value=True):
                 data = asyncio.run(auth_status(request))
                 self.assertEqual(data["setupState"], "enabled")
@@ -110,15 +110,15 @@ class AuthStatusSetupStateTestCase(unittest.TestCase):
             passwordConfirm="newpassword123",
         )
 
-        with patch("api.v1.endpoints.auth.is_auth_enabled") as mock_endpoint_enabled:
+        with patch("src.api.v1.endpoints.auth.is_auth_enabled") as mock_endpoint_enabled:
             with patch("src.auth.is_auth_enabled") as mock_src_enabled:
                 mock_src_enabled.return_value = False
                 mock_endpoint_enabled.return_value = False
 
-                with patch("api.v1.endpoints.auth._apply_auth_enabled", return_value=True):
-                    with patch("api.v1.endpoints.auth.rotate_session_secret", return_value=True):
-                        with patch("api.v1.endpoints.auth.create_session", return_value="mock.session.sig"):
-                            with patch("api.v1.endpoints.auth._get_auth_status_dict") as mock_status_dict:
+                with patch("src.api.v1.endpoints.auth._apply_auth_enabled", return_value=True):
+                    with patch("src.api.v1.endpoints.auth.rotate_session_secret", return_value=True):
+                        with patch("src.api.v1.endpoints.auth.create_session", return_value="mock.session.sig"):
+                            with patch("src.api.v1.endpoints.auth._get_auth_status_dict") as mock_status_dict:
                                 mock_status_dict.return_value = {
                                     "authEnabled": True,
                                     "loggedIn": True,

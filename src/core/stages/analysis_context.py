@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from data_provider.base import normalize_stock_code
-from data_provider.realtime_types import ChipDistribution
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.base import normalize_stock_code
+from src.data_provider.realtime_types import ChipDistribution
+from src.data_provider.us_index_mapping import is_us_stock_code
 from src.analyzer import (
     AnalysisResult,
     fill_price_position_if_needed,
@@ -213,7 +213,7 @@ class _AnalysisContextStageMixin:
                 'signal_reasons': trend_result.signal_reasons,
                 'risk_factors': trend_result.risk_factors,
             }
-            from data_provider.data_validation import project_technical_indicators
+            from src.data_provider.data_validation import project_technical_indicators
 
             enhanced['trend_analysis'] = project_technical_indicators(
                 technical_projection,

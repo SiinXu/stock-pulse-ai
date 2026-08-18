@@ -99,7 +99,7 @@ MODULES = {
             "smtplib",
         ),
         ("Header", "MIMEImage", "MIMEMultipart", "MIMEText", "datetime", "smtplib"),
-        "a11523887685095742885b6482ee3fda42e9a432ebd0d4b080ffc3e162b8d658",
+        "1b358074843bdcfdbaec5a6e78b0ffabdf18ef1a369e8d4ed07edc35ec9fe723",
     ),
     "src.notification_sender.feishu_sender": (
         "src.notification_parts.senders.feishu_sender",

@@ -11,11 +11,11 @@ import pytest
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from api.app import create_app
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.errors import api_error
-from api.v1.schemas.common import ErrorResponse
-from api.v1.schemas.system_config import (
+from src.api.app import create_app
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.errors import api_error
+from src.api.v1.schemas.common import ErrorResponse
+from src.api.v1.schemas.system_config import (
     SystemConfigConflictResponse,
     SystemConfigValidationErrorResponse,
 )
@@ -154,7 +154,7 @@ def test_internal_exception_text_is_not_returned_to_client() -> None:
 
 
 def test_structured_server_error_discards_all_private_payload_fields(caplog) -> None:
-    caplog.set_level(logging.ERROR, logger="api.middlewares.error_handler")
+    caplog.set_level(logging.ERROR, logger="src.api.middlewares.error_handler")
     response = _client().get(
         "/internal-structured",
         headers={"X-Trace-ID": "trace-safe-server-error"},

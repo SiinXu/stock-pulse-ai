@@ -11,7 +11,7 @@ from fastapi.testclient import TestClient
 import pytest
 import yaml
 
-from api.v1.endpoints import config_profiles
+from src.api.v1.endpoints import config_profiles
 from src.services.config_presets import PROFILE_API_VERSION, PROFILE_KIND, is_secret_config_key
 from src.services.config_profile_service import ConfigProfileService
 from src.services.system_config_service import ConfigConflictError

@@ -97,7 +97,7 @@ def build_default_dispatch_ports() -> DispatchPorts:
     on that attribute keep working.
     """
 
-    from data_provider.base import normalize_stock_code
+    from src.data_provider.base import normalize_stock_code
     from src.enums import ReportType
     from src.notification import (
         ChannelAttemptResult,

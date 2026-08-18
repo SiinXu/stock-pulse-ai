@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional
 import pytest
 from pydantic import ValidationError
 
-from api.v1.schemas.analysis import AnalyzeRequest
+from src.api.v1.schemas.analysis import AnalyzeRequest
 from src.agent.bull_bear_debate import (
     DEBATE_SCHEMA_VERSION,
     DEBATE_STAGE_NAME,

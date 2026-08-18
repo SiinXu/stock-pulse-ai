@@ -64,7 +64,7 @@ class _ConfigValidationMethods:
                 field="STOCK_LIST",
             ))
         elif self.stock_email_groups:
-            from data_provider.base import normalize_stock_code
+            from src.data_provider.base import normalize_stock_code
             configured_stock_set = {
                 normalize_stock_code(code)
                 for code in self.stock_list

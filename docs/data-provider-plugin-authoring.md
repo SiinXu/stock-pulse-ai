@@ -109,7 +109,7 @@ registration, and disable results:
 
 ```bash
 PLUGINS_DIR="$PWD/examples/plugins" python - <<'PY'
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 from src.application_services import ApplicationServices
 from src.plugins import PLUGIN_APPLICATION_VERSION, PluginManager
 

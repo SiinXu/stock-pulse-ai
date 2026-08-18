@@ -18,7 +18,7 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.storage import DatabaseManager
 
@@ -181,7 +181,7 @@ class PortfolioRebalancingApiTests(unittest.TestCase):
             },
         }
         with patch(
-            "api.v1.endpoints.portfolio_rebalancing.PortfolioRebalancingService"
+            "src.api.v1.endpoints.portfolio_rebalancing.PortfolioRebalancingService"
         ) as svc_cls:
             svc_cls.return_value.get_recommendations.return_value = fake
             resp = self.client.get("/api/v1/portfolio/rebalancing-recommendations")

@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.services.paper_portfolio_service import (
     PaperAccountRequiredError,

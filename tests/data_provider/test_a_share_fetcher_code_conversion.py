@@ -7,10 +7,10 @@ import unittest
 
 import pandas as pd
 
-from data_provider.base import DataFetcherManager, normalize_stock_code
-from data_provider.baostock_fetcher import BaostockFetcher
-from data_provider.pytdx_fetcher import PytdxFetcher
-from data_provider.tushare_fetcher import TushareFetcher
+from src.data_provider.base import DataFetcherManager, normalize_stock_code
+from src.data_provider.baostock_fetcher import BaostockFetcher
+from src.data_provider.pytdx_fetcher import PytdxFetcher
+from src.data_provider.tushare_fetcher import TushareFetcher
 
 
 class _RecordingDailyFetcher:

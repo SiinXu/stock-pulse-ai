@@ -62,7 +62,7 @@ def _get_fetcher_manager():
     (~2 s each) and prevents circuit-breaker cooldown from taking effect across
     consecutive tool calls within the same agent run.
     """
-    from data_provider import DataFetcherManager
+    from src.data_provider import DataFetcherManager
     global _fetcher_manager_singleton
     if _fetcher_manager_singleton is None:
         with _fetcher_manager_lock:
@@ -132,7 +132,7 @@ def _normalize_history_days(days: Any) -> Tuple[int, Dict[str, Any]]:
 
 def _history_code_candidates(stock_code: str) -> Tuple[List[str], str]:
     """Return cache lookup candidates plus canonical write code."""
-    from data_provider.base import canonical_stock_code, normalize_stock_code
+    from src.data_provider.base import canonical_stock_code, normalize_stock_code
 
     raw_code = str(stock_code or "").strip()
     normalized_code = canonical_stock_code(normalize_stock_code(raw_code))

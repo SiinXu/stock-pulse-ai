@@ -11,8 +11,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import plugins as plugins_endpoint
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import plugins as plugins_endpoint
 from src.application_services import (
     ApplicationServices,
     reset_application_services,

@@ -75,7 +75,7 @@ describe('normalizeStockCode', () => {
     expect(normalizeStockCode('006208.tw')).toBe('006208.TW');
     expect(normalizeStockCode('6505.two')).toBe('6505.TWO');
     // Bare 4-digit numerics are HK by the shared code contract; TW requires
-    // an explicit .TW/.TWO suffix (mirrors data_provider._is_tw_market).
+    // an explicit .TW/.TWO suffix (mirrors src.data_provider.base._is_tw_market).
     expect(normalizeStockCode('2330')).toBe('HK02330');
   });
 

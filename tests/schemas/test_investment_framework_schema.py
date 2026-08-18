@@ -7,8 +7,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-import api.v1.schemas as api_schema_exports
-from api.v1.schemas.investment_framework import (
+import src.api.v1.schemas as api_schema_exports
+from src.api.v1.schemas.investment_framework import (
     InvestmentFrameworkCreateRequest,
     InvestmentFrameworkDeactivateRequest,
     InvestmentFrameworkDeleteResponse,

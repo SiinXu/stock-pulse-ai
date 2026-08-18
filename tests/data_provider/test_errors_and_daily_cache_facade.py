@@ -7,9 +7,9 @@ from __future__ import annotations
 import importlib
 from pathlib import Path
 
-import data_provider.chip_helpers as chip_helpers
-import data_provider.errors as errors
-from data_provider.base import (
+import src.data_provider.chip_helpers as chip_helpers
+import src.data_provider.errors as errors
+from src.data_provider.base import (
     CircuitOpenError,
     DataFetchError,
     DataFetcherManager,
@@ -95,4 +95,4 @@ def test_owner_modules_exist_for_extraction_slice() -> None:
     assert CACHE_METHODS_PATH.is_file()
     assert "from .errors import" in BASE_PATH.read_text(encoding="utf-8")
     assert "daily_cache_methods" in BASE_PATH.read_text(encoding="utf-8")
-    importlib.import_module("data_provider.manager_parts.daily_cache_methods")
+    importlib.import_module("src.data_provider.manager_parts.daily_cache_methods")

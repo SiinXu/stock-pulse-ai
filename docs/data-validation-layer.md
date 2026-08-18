@@ -1,6 +1,6 @@
 # Financial Data Validation Layer
 
-Issue reference: #185. The implementation lives in `data_provider/data_validation.py`; provider-candidate wiring lives in `data_provider/manager_parts/daily_source_health.py`, and final-exit/reload wiring lives in `data_provider/manager_parts/data_validation_wiring.py`.
+Issue reference: #185. The implementation lives in `src/data_provider/data_validation.py`; provider-candidate wiring lives in `src/data_provider/manager_parts/daily_source_health.py`, and final-exit/reload wiring lives in `src/data_provider/manager_parts/data_validation_wiring.py`.
 
 ## Boundary and modes
 
@@ -50,6 +50,8 @@ Before technical-indicator synthesis, OHLCV frames are validated through `prepar
 ### Cross-source consistency
 
 When a realtime quote is supplemented from a secondary provider, matching finite fields are compared. Divergences above `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` emit WARN evidence with provider attribution. Values are always kept; a single missing provider is a no-op so one source failure cannot interrupt overall analysis.
+
+Field-level trust (Issue #1129) records those comparisons, supplement attribution, lag/staleness, and provider-health attempts on the returned quote. The Web stock workspace and `GET /api/v1/stocks/{code}/trust` surface the same payload; analysis receives a provider-neutral `gaps` + `confidence` projection and must not treat a conflict as a chosen winner. See [field-trust-panel.md](./field-trust-panel.md).
 
 ## Evidence and diagnostics
 

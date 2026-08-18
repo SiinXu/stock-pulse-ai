@@ -32,7 +32,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, Dict, List, Any, Tuple, Literal, Callable, Mapping, Protocol
 
-from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.data_provider.base import canonical_stock_code, normalize_stock_code
 from src.enums import ReportType
 from src.report_language import normalize_report_language
 from src.schemas.request_context import AnalysisRequestContext

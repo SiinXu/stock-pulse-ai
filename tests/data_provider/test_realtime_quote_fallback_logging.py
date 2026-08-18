@@ -21,8 +21,8 @@ except ValueError:
 if not json_repair_available and "json_repair" not in sys.modules:
     sys.modules["json_repair"] = MagicMock()
 
-from data_provider.base import DataFetcherManager
-from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+from src.data_provider.base import DataFetcherManager
+from src.data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
 from src.core.pipeline import StockAnalysisPipeline
 from src.enums import ReportType
 
@@ -275,7 +275,7 @@ def test_pipeline_warns_once_when_all_realtime_sources_fail(caplog):
 
 
 def test_pipeline_preserves_typed_fundamental_validation_rejection():
-    from data_provider.data_validation import (
+    from src.data_provider.data_validation import (
         DataValidationRejected,
         validate_fundamental_context,
     )
@@ -348,7 +348,7 @@ def test_event_monitor_keeps_safe_manager_failure_summary_for_direct_quote_call(
     async def _run_inline(func, *args, **kwargs):
         return func(*args, **kwargs)
 
-    with patch("data_provider.DataFetcherManager", return_value=manager), patch(
+    with patch("src.data_provider.DataFetcherManager", return_value=manager), patch(
         "src.agent.events.asyncio.to_thread", new=_run_inline
     ), caplog.at_level(logging.INFO):
         result = asyncio.run(monitor._check_price(rule))

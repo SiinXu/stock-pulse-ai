@@ -15,9 +15,6 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SCOPED_DIRECTORIES = (
     REPO_ROOT / "src",
-    REPO_ROOT / "data_provider",
-    REPO_ROOT / "api",
-    REPO_ROOT / "bot",
 )
 SCOPED_FILES = (
     REPO_ROOT / "main.py",
@@ -294,7 +291,7 @@ _IMPORTED_RECEIVER_DECORATORS = {
     "contextmanager": {"contextlib"},
     "override": {"typing", "typing_extensions"},
     "property": {"builtins"},
-    "provider_retry": {"data_provider.retry_policy", "src.data_provider.retry_policy"},
+    "provider_retry": {"src.data_provider.retry_policy", "src.data_provider.retry_policy"},
     "retry": {"tenacity"},
 }
 _CALLED_RECEIVER_DECORATORS = {"provider_retry", "retry"}

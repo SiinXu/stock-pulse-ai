@@ -8,7 +8,7 @@ from typing import List, Optional, Tuple
 import pandas as pd
 import pytest
 
-from data_provider.daily_cache import (
+from src.data_provider.daily_cache import (
     DailyCacheConfig,
     DailyCacheKey,
     DailyDataCache,

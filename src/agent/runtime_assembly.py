@@ -2,7 +2,7 @@
 """Agent runtime assembly leaf for fully configured executor instances.
 
 Centralises construction to eliminate boilerplate duplicated across
-api/v1/endpoints/agent.py, bot/commands/chat.py, bot/commands/ask.py,
+src/api/v1/endpoints/agent.py, src/bot/commands/chat.py, src/bot/commands/ask.py,
 and src/core/pipeline.py.
 
 Performance notes

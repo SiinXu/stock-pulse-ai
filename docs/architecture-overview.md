@@ -30,15 +30,15 @@ flowchart LR
   CLI[CLI and scheduler<br/>main.py and src/app/cli.py] -->|direct analysis| PIPE
   WEB[React Web<br/>apps/dsa-web] -->|HTTP and SSE| API
   DESKTOP[Electron shell<br/>apps/dsa-desktop] -->|starts backend and loads Web UI| API
-  BOT[Bot adapters<br/>bot/] -->|/analyze| QUEUE
+  BOT[Bot adapters<br/>src/bot/] -->|/analyze| QUEUE
   BOT -->|/batch| PIPE
-  API[FastAPI<br/>server.py and api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue]
+  API[FastAPI<br/>server.py and src/api/] -->|async task| QUEUE[Process-local task queue<br/>src/services/task_queue]
   API -->|synchronous use case| SERVICES[Application services<br/>src/services/]
   API -->|scheduled-task CRUD| SCHEDULES[(Definitions and occurrence audit<br/>scheduled_tasks and scheduled_task_runs)]
   SCHEDULES -->|due occurrence via existing runtime scheduler| QUEUE
   QUEUE -->|execute task| SERVICES
   SERVICES -->|invoke analysis| PIPE[StockAnalysisPipeline<br/>src/core/pipeline.py]
-  PIPE -->|fetch through adapters| DATA[Market providers<br/>data_provider/]
+  PIPE -->|fetch through adapters| DATA[Market providers<br/>src/data_provider/]
   PIPE -->|retrieve and analyze| INTEL[Search, context, LLM, and Agent]
   PIPE -->|domain writes| STORE[Storage and repositories<br/>src/storage.py and src/repositories/]
   PIPE -->|render and dispatch| OUTPUT[Reports and notifications<br/>templates, renderer, delivery]
@@ -62,7 +62,7 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `src/app/cli.py` | CLI argument parsing and mode dispatch | Dispatches through `main.py` runtime helpers; it does not own a second analysis or service lifecycle. |
 | `server.py` | Direct ASGI/uvicorn entry | Installs `ApplicationServices` and exports the FastAPI application; it does not start Bot stream clients. A direct `python server.py` launch resolves the same `WEBUI_HOST` / `WEBUI_PORT` bind with the legacy `API_HOST` / `API_PORT` fallback; explicit `--host` / `--port` still win, which is why Docker is unaffected by either key. |
 | `src/api/app.py` | FastAPI factory and lifespan | Owns auth/CORS/errors, routes, static Web hosting, `RuntimeSchedulerService`, and app-scoped `SystemConfigService`. |
-| `bot/` | Platform adapters, dispatcher, and commands | Bot `/analyze` submits to the shared process-local queue. Stream clients are started by `main.py`; Bot webhooks are not FastAPI routes. |
+| `src/bot/` | Platform adapters, dispatcher, and commands | Bot `/analyze` submits to the shared process-local queue. Stream clients are started by `main.py`; Bot webhooks are not FastAPI routes. |
 | `apps/dsa-web/` | React/Vite product client | Calls `/api/v1` and observes analysis state through polling and task SSE. The production build is served by FastAPI. |
 | `apps/dsa-desktop/` | Electron packaging and desktop process coordination | Starts the packaged or local Python backend, waits for `/api/health`, then loads the FastAPI-hosted Web UI. |
 
@@ -73,23 +73,21 @@ resolve -> fetch -> intelligence -> context -> analyze -> persist -> render -> d
 | `src/` | Primary application package for orchestration, services, schemas, persistence, report rendering, and shared runtime logic. |
 | `src/market/` | Canonical market-analysis, market-context, phase-prompt, phase-summary, regime-prompt, and structure-prompt implementations. Root-level `src/market_*.py` shims for those modules have been removed. `src/market_sector_analysis.py` remains real implementation imported by `src/market/analyzer.py`. **New production code must import the canonical package**; see [legacy facade import policy](legacy-facade-import-policy.md). |
 | `src/analysis_context_pack/` | Canonical context projection and prompt-rendering implementations. Root-level `src/analysis_context_pack_overview.py` and `src/analysis_context_pack_prompt.py` shims have been removed. **New production code must import the canonical package**; see [legacy facade import policy](legacy-facade-import-policy.md). |
-| `src/utils/` | Stdlib-leaning leaf helpers (for example stock-list separators) that low-level packages may import without creating a services-layer edge. Bidirectional package pairs are ratcheted by [import-cycle ratchet](import-cycle-ratchet.md) / [ADR-010](adr/ADR-010-import-cycle-ratchet.md). Directed layer edges (`api → services → pipeline/stages → src.data_provider`) are ratcheted by [layer-direction ratchet](layer-direction-ratchet.md). Hot-path module size soft budgets for `src/data_provider/`, `src/services/`, `src/agent/`, and `src/market/` are ratcheted by [hot-path module size ratchet](hot-path-module-size-ratchet.md). |
-| `src/data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. The top-level `data_provider/` package remains a compatibility alias. Ownership after ADR-006 extractions: [data provider ownership map](data-provider-ownership.md). |
-| `src/api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. The top-level `api/` package remains a compatibility alias. |
-| `src/bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. The top-level `bot/` package remains a compatibility alias. |
+| `src/utils/` | Stdlib-leaning leaf helpers (for example stock-list separators) that low-level packages may import without creating a services-layer edge. Bidirectional package pairs are ratcheted by [import-cycle ratchet](import-cycle-ratchet.md) / [ADR-010](adr/ADR-010-import-cycle-ratchet.md). Directed layer edges (`src.api → src.services → pipeline/stages → src.data_provider`) are ratcheted by [layer-direction ratchet](layer-direction-ratchet.md). Hot-path module size soft budgets for `src/data_provider/`, `src/services/`, `src/agent/`, and `src/market/` are ratcheted by [hot-path module size ratchet](hot-path-module-size-ratchet.md). |
+| `src/data_provider/` | Provider adapters, capability routing, normalization, caching, fallback, and health control. Ownership after ADR-006 extractions: [data provider ownership map](data-provider-ownership.md). |
+| `src/api/` | FastAPI transport, middleware, lifecycle, and public HTTP schemas. |
+| `src/bot/` | Messaging-platform adapters, dispatch, commands, and stream integrations. |
 | `strategies/` | Built-in natural-language trading Skill YAML content (root plus reserved `strategies/personas/`), published as first-class `analysis_strategy` plugins; other nested YAML directories are not discovered. |
 | `templates/` | Jinja report presentation templates consumed by the report renderer. |
 
-`src/`, `data_provider/`, `api/`, and `bot/` intentionally remain separate
-top-level Python packages. They are stable ownership boundaries, not an
-unfinished migration into a single umbrella namespace. GitHub Actions path
-filters name the current `api/**` and selected `src/**` surfaces, CI and Docker
-smoke checks import all four roots directly, and imports plus documentation
-reference these paths throughout the repository. Rehousing them for namespace
-aesthetics would create a broad workflow, container, test, and documentation
-migration without changing product behavior. Any future unification therefore
-requires a separately reviewed migration plan with explicit compatibility,
-path-filter, container-smoke, and reference-update coverage.
+`src/` is the canonical backend package. After the packaged-layout move
+([ADR-012](adr/ADR-012-installable-package-layout.md), Refs #167), the real
+implementations live in `src/api/`, `src/bot/`, and `src/data_provider/`.
+
+The former root-level `api`, `bot`, and `data_provider` import packages have
+been retired. Setuptools, Docker, CI path filters, production code, tests,
+samples, and scripts use the single `src` package tree. Do not recreate the old
+roots; see the [legacy facade import policy](legacy-facade-import-policy.md).
 
 ## Ownership Boundaries
 
@@ -98,12 +96,12 @@ path-filter, container-smoke, and reference-update coverage.
 | `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection. New/touched code should prefer constructor injection or `get_application_services().config` over bare `get_config()`; growth is ratcheted by [config-access ratchet](config-access-ratchet.md) / [ADR-011](adr/ADR-011-config-access-ratchet.md). | Full dependency injection for every caller; adoption is currently incremental. |
 | `src/services/` | Application use cases, task queue adapter, scheduling, analysis, history, portfolio, alerts, intelligence, and rendering services | HTTP transport schemas or provider-specific normalization. |
 | `src/core/pipeline.py`, `src/core/stages/`, and `src/core/contracts/` | Analysis orchestration facade, stage implementations, typed stage outcomes, and formal stage IO contracts (`RunContext`, fetch/analyze/render IO, stage errors). `pipeline.py` is orchestration-only; business rules stay in stages/services. | Transport lifecycle or persistent query APIs. |
-| `src/data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control. `data_provider/` is the compatibility alias. | Product task lifecycle or report presentation. |
+| `src/data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control. | Product task lifecycle or report presentation. |
 | `src/search_service.py` and intelligence/context services | News and intelligence retrieval, context assembly, and source diagnostics | Market-price provider ownership or HTTP presentation. |
 | `src/agent/` and `src/llm/` | Native Agent execution, tools, skills, conversation/runtime contracts, and model invocation adapters | Provider configuration source of truth, task lifecycle, or public report persistence. |
 | `src/schemas/` | Internal analysis and domain contracts | HTTP request/response DTOs, which live in `src/api/v1/schemas/`. |
 | `src/storage.py`, `src/repositories/`, `src/migrations/` | ORM/database lifecycle, domain persistence adapters, and ordered schema migrations | Pipeline sequencing or transport behavior. |
-| `api/` | HTTP routing, middleware, lifespan, transport schemas, SSE and static asset delivery | A second business lifecycle or task status authority. |
+| `src/api/` | HTTP routing, middleware, lifespan, transport schemas, SSE and static asset delivery | A second business lifecycle or task status authority. |
 | Report and notification paths | `src/schemas/report_schema.py`, `src/services/report_renderer.py`, `templates/`, `src/core/stages/delivery.py`, and notification modules | A `src/reports/` package; no such package exists in the current tree. |
 
 ### API DTO Conventions
@@ -236,7 +234,7 @@ circuit, cache freshness, and stale-window rules are defined in
 | Stage | Current responsibility | Primary owners |
 | --- | --- | --- |
 | `resolve` | Resolve and freeze the effective trading date used by resume and history lookup for one stock run. | `src/core/pipeline.py`, market-time and history services |
-| `fetch` | Prepare daily, realtime, chip, fundamental, market-phase, and market-structure inputs through database/cache/provider paths. | `data_provider/`, `src/storage.py`, market services |
+| `fetch` | Prepare daily, realtime, chip, fundamental, market-phase, and market-structure inputs through database/cache/provider paths. | `src/data_provider/`, `src/storage.py`, market services |
 | `intelligence` | Retrieve fresh or persisted news, social sentiment, and other optional intelligence evidence. | search and intelligence services |
 | `context` | Assemble bounded historical, request, and prompt context with provenance and quality state. | analysis context services and schemas |
 | `analyze` | Execute normal LLM analysis or the approved Agent path, then normalize and guard the result. | `src/analyzer.py`, `src/analyzer_parts/`, `src/llm/`, `src/agent/` |

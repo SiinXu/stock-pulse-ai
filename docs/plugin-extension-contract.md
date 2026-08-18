@@ -22,7 +22,7 @@ major bump.
 
 | Point | Registration key | Author-facing types (package root) |
 | --- | --- | --- |
-| `data_provider` | `DataProviderRegistration.provider_id` | `Plugin` / `PluginContext` plus `data_provider.DataProvider` / `DataProviderRegistration` |
+| `data_provider` | `DataProviderRegistration.provider_id` | `Plugin` / `PluginContext` plus `src.data_provider.DataProvider` / `DataProviderRegistration` |
 | `analysis_strategy` | strategy `name` | `AnalysisStrategyDefinition` |
 | `agent_tool` | tool `name` | Tool definitions remain ToolSurface-owned; default process adapter is wired with fail-closed policy validation |
 | `notification_channel` | `channel_id` | `NotificationChannelAdapter`, `NotificationChannelFactory`, `NotificationRequest`, `NotificationAdapterResult` |
@@ -37,8 +37,14 @@ and must stay identical to runtime `EXTENSION_POINTS`.
 External plugins should import only from:
 
 - the `src.plugins` package root names in `PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS`
-- the `data_provider` package for provider registrations (`DataProvider`,
+- the `src.data_provider` package for provider registrations (`DataProvider`,
   `DataProviderRegistration`)
+
+The extension-point **name** stays `data_provider` — that is a registration key,
+not an import path. The retired `from data_provider import ...` root no longer
+ships; plugins must import `src.data_provider`. See
+[ADR-012](adr/ADR-012-installable-package-layout.md) and the
+[legacy facade import policy](legacy-facade-import-policy.md).
 
 Lifecycle hooks remain `Plugin.onload` / `Plugin.onunload` with
 `PluginContext.register(...)` using one of the six points above. Manifest fields

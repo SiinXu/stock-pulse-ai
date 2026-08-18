@@ -8,7 +8,7 @@ import importlib
 
 import pytest
 
-from data_provider.akshare_fetcher import (
+from src.data_provider.akshare_fetcher import (
     AkshareFetcher,
     _build_realtime_failure_message,
     _classify_realtime_http_error,
@@ -20,7 +20,7 @@ from data_provider.akshare_fetcher import (
     _to_sina_tx_symbol,
     is_hk_stock_code,
 )
-from data_provider.akshare_parts import parse_tencent, realtime_errors, symbols
+from src.data_provider.akshare_parts import parse_tencent, realtime_errors, symbols
 
 
 def test_symbol_helpers_match_facade_and_parts_identity() -> None:
@@ -138,7 +138,7 @@ def test_facade_module_line_count_is_materially_smaller() -> None:
 
 
 def test_importlib_reload_keeps_public_surface() -> None:
-    import data_provider.akshare_fetcher as mod
+    import src.data_provider.akshare_fetcher as mod
 
     reloaded = importlib.reload(mod)
     assert reloaded.AkshareFetcher is not None

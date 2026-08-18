@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from data_provider import DataFetcherManager, DataProvider, DataProviderRegistration
+from src.data_provider import DataFetcherManager, DataProvider, DataProviderRegistration
 from src.plugins import (
     PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV,
     PLUGIN_LIFECYCLE_EVENT_TYPE,

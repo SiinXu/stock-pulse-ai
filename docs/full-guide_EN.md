@@ -13,10 +13,10 @@ stock-pulse-ai/
 │   ├── analyzer.py      # AI analyzer
 │   ├── config.py        # Configuration management
 │   ├── notification.py  # Message push notifications
+│   ├── data_provider/   # Multi-source data adapters
+│   ├── bot/             # Bot interaction module
+│   ├── api/             # FastAPI backend service
 │   └── ...
-├── data_provider/       # Multi-source data adapters
-├── bot/                 # Bot interaction module
-├── api/                 # FastAPI backend service
 ├── apps/dsa-web/        # React frontend
 ├── docker/              # Docker configuration
 ├── docs/                # Project documentation

@@ -15,7 +15,7 @@ import pandas as pd
 import numpy as np
 import pytest
 
-from data_provider.data_validation import (
+from src.data_provider.data_validation import (
     ATTR_KEY,
     CODE_CROSS_SOURCE_DIVERGENCE,
     CODE_DATE_DUPLICATE,
@@ -434,7 +434,7 @@ def test_manager_wrapper_default_mode_preserves_daily_result(monkeypatch):
     monkeypatch.delenv("DATA_VALIDATION_STRICT", raising=False)
     monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
 
-    from data_provider.manager_parts.data_validation_wiring import (
+    from src.data_provider.manager_parts.data_validation_wiring import (
         ensure_validation_wrappers,
     )
 
@@ -463,7 +463,7 @@ def test_outer_manager_wrapper_does_not_mislabel_quote_rejection_as_failover(mon
     monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
     monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
 
-    from data_provider.manager_parts.data_validation_wiring import (
+    from src.data_provider.manager_parts.data_validation_wiring import (
         ensure_validation_wrappers,
     )
 
@@ -509,7 +509,7 @@ def test_outer_manager_wrapper_does_not_mislabel_quote_rejection_as_failover(mon
 
 def test_data_fetcher_manager_has_validation_wrappers_installed():
     """Facade bind path must install wrappers without touching base.py source."""
-    from data_provider.base import DataFetcherManager
+    from src.data_provider.base import DataFetcherManager
 
     for method_name in (
         "get_daily_data",
@@ -533,8 +533,8 @@ def test_empty_frame_is_reject():
 def test_strict_daily_rejection_reaches_next_provider_candidate(monkeypatch):
     from unittest.mock import patch
 
-    from data_provider.base import DataFetcherManager
-    from data_provider.realtime_types import CircuitBreaker
+    from src.data_provider.base import DataFetcherManager
+    from src.data_provider.realtime_types import CircuitBreaker
     from src.services.run_diagnostics import (
         activate_run_diagnostic_context,
         current_diagnostic_snapshot,
@@ -649,7 +649,7 @@ def test_daily_evidence_survives_dataframe_to_rows_and_strict_json(caplog):
 
 
 def test_realtime_evidence_is_readable_without_mutating_public_dict():
-    from data_provider.realtime_types import UnifiedRealtimeQuote
+    from src.data_provider.realtime_types import UnifiedRealtimeQuote
 
     quote = UnifiedRealtimeQuote(code="600519", price=10.0, pe_ratio="bad")
     result = validate_and_annotate(
@@ -667,7 +667,7 @@ def test_realtime_evidence_is_readable_without_mutating_public_dict():
 
 def test_wrappers_cover_subclass_partial_reload_and_concurrent_install(monkeypatch):
     monkeypatch.setenv("DATA_VALIDATION_ENABLED", "true")
-    import data_provider.manager_parts.data_validation_wiring as wiring
+    import src.data_provider.manager_parts.data_validation_wiring as wiring
 
     class BaseManager:
         def get_daily_data(self, _stock_code):
@@ -766,7 +766,7 @@ def test_offshore_etf_override_reaches_real_manager_strict_policy(
     symbol,
     market,
 ):
-    from data_provider.base import DataFetchError, DataFetcherManager
+    from src.data_provider.base import DataFetchError, DataFetcherManager
     from src.application_services import reset_application_services
     from src.config import Config
     from src.services.run_diagnostics import (
@@ -811,7 +811,7 @@ def test_offshore_etf_override_reaches_real_manager_strict_policy(
 
 
 def test_validation_rejected_fundamental_context_is_typed_not_pipeline_failure():
-    from data_provider.base import DataFetcherManager
+    from src.data_provider.base import DataFetcherManager
 
     result = validate_fundamental_context(
         {"valuation": {"data": {"pe_ratio": "bad"}}},

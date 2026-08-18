@@ -1,0 +1,2 @@
+- [Changed] Remove the root `api`, `bot`, and `data_provider` compatibility packages after migrating production, tests, scripts, workflows, Docker, and package discovery to canonical `src.*` paths (Refs #167).
+- [Tests] Replace compatibility-alias assertions with single-package layout, canonical import-cycle, and retired-import regression coverage (Refs #167).

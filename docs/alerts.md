@@ -514,7 +514,7 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 
 ## P0 不做
 
-- P0 阶段不新增 `api/v1/schemas/alerts.py` 或 Alert API。
+- P0 阶段不新增 `src/api/v1/schemas/alerts.py` 或 Alert API。
 - P0 阶段不新增 Web 告警中心页面、路由或侧边栏入口。
 - P0 阶段不新增数据库表、repository 或 migration。
 - P0 阶段不实现触发历史、通知结果或冷却状态写入。

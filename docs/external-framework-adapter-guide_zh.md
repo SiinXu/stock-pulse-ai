@@ -109,7 +109,7 @@ StockPulse **不会**把完整外部框架（OpenBB、Qlib、FinRL 等）嵌进�
 ### 注册示意（`data_provider`）
 
 ```python
-from data_provider import DataProvider, DataProviderRegistration
+from src.data_provider import DataProvider, DataProviderRegistration
 from src.plugins import Plugin as BasePlugin
 
 class Plugin(BasePlugin):
@@ -219,7 +219,7 @@ python -m pytest -q tests/plugins/test_external_framework_openbb_provider.py
 
 # 5) 组合冒烟（若不用假客户端直接 get_daily_data，则需要 OpenBB）
 python - <<'PY'
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 from src.application_services import ApplicationServices
 from src.plugins import PLUGIN_APPLICATION_VERSION, PluginManager
 
@@ -261,8 +261,8 @@ PY
 
 - **零**新增扩展点；
 - 不修改 `registry.py` / `manager.py` / `loader.py` / `manifest.py`；
-- 不修改 `data_provider/` 宿主实现；
-- 仅依赖公开作者导入面（`src.plugins` 包根 + `data_provider.DataProvider` /
+- 不修改 `src/data_provider/` 宿主实现；
+- 仅依赖公开作者导入面（`src.plugins` 包根 + `src.data_provider.DataProvider` /
   `DataProviderRegistration`）。
 
 ## 后续候选

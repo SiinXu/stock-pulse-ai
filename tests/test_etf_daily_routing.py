@@ -9,9 +9,9 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from data_provider.akshare_fetcher import AkshareFetcher
-from data_provider.base import BaseFetcher, DataFetchError, DataFetcherManager
-from data_provider.efinance_fetcher import EfinanceFetcher
+from src.data_provider.akshare_fetcher import AkshareFetcher
+from src.data_provider.base import BaseFetcher, DataFetchError, DataFetcherManager
+from src.data_provider.efinance_fetcher import EfinanceFetcher
 
 
 @pytest.fixture(autouse=True)
@@ -23,7 +23,7 @@ def _reset_daily_source_health():
 
 def _make_efinance_fetcher() -> EfinanceFetcher:
     with patch(
-        "data_provider.efinance_fetcher.get_config",
+        "src.data_provider.efinance_fetcher.get_config",
         return_value=SimpleNamespace(enable_eastmoney_patch=False),
     ):
         return EfinanceFetcher(sleep_min=0, sleep_max=0)
@@ -31,7 +31,7 @@ def _make_efinance_fetcher() -> EfinanceFetcher:
 
 def _make_akshare_fetcher() -> AkshareFetcher:
     with patch(
-        "data_provider.akshare_fetcher.get_config",
+        "src.data_provider.akshare_fetcher.get_config",
         return_value=SimpleNamespace(enable_eastmoney_patch=False),
     ):
         return AkshareFetcher(sleep_min=0, sleep_max=0)
@@ -61,7 +61,7 @@ def _run_efinance_daily(stock_code: str) -> tuple[pd.DataFrame, MagicMock]:
     call = MagicMock(return_value=_history_frame())
 
     with patch.dict(sys.modules, {"efinance": fake_efinance}):
-        with patch("data_provider.efinance_fetcher._ef_call_with_timeout", call):
+        with patch("src.data_provider.efinance_fetcher._ef_call_with_timeout", call):
             with patch.object(fetcher, "_set_random_user_agent"), patch.object(
                 fetcher, "_enforce_rate_limit"
             ):
@@ -131,7 +131,7 @@ def test_manager_normalizes_prefixed_etf_before_efinance_secid_route() -> None:
     call = MagicMock(return_value=_history_frame())
 
     with patch.dict(sys.modules, {"efinance": fake_efinance}):
-        with patch("data_provider.efinance_fetcher._ef_call_with_timeout", call):
+        with patch("src.data_provider.efinance_fetcher._ef_call_with_timeout", call):
             with patch.object(fetcher, "_set_random_user_agent"), patch.object(
                 fetcher, "_enforce_rate_limit"
             ):

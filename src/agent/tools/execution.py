@@ -34,7 +34,11 @@ if TYPE_CHECKING:
     from src.agent.stock_scope import StockScope
 
 from src.agent.tools.registry import ToolRegistry
-from src.utils.sanitize import redact_sensitive_data, redact_sensitive_text
+from src.utils.sanitize import (
+    log_safe_exception,
+    redact_sensitive_data,
+    redact_sensitive_text,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -165,10 +169,17 @@ def _normalize_tool_stock_code(value: Any) -> Any:
         return f"HK{text}"
 
     try:
-        from data_provider.base import canonical_stock_code, normalize_stock_code
+        from src.data_provider.base import canonical_stock_code, normalize_stock_code
 
         return canonical_stock_code(normalize_stock_code(text))
-    except Exception:
+    except Exception as exc:  # broad-exception: fallback_recorded - preserve the original tool argument after safe-logging canonicalization failure
+        log_safe_exception(
+            logger,
+            "Tool stock-code canonicalization failed",
+            exc,
+            error_code="tool_stock_code_canonicalization_failed",
+            level=logging.DEBUG,
+        )
         return text
 
 

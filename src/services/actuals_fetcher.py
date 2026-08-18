@@ -34,13 +34,13 @@ from typing import (
 
 import pandas as pd
 
-from data_provider.base import (
+from src.data_provider.base import (
     CircuitOpenError,
     DataFetchError,
     DataSourceUnavailableError,
 )
-from data_provider.daily_cache import LocalDataMissingError
-from data_provider.retry_policy import (
+from src.data_provider.daily_cache import LocalDataMissingError
+from src.data_provider.retry_policy import (
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     call_with_timeout,
 )
@@ -566,7 +566,7 @@ class ActualsFetcher:
             if self._manager_factory is not None:
                 self._manager = self._manager_factory()
             else:
-                from data_provider import DataFetcherManager
+                from src.data_provider import DataFetcherManager
 
                 self._manager = DataFetcherManager()
             return self._manager

@@ -15,8 +15,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from api.v1.endpoints import watchlist_groups as endpoints
-from api.v1.schemas.watchlist_groups import (
+from src.api.v1.endpoints import watchlist_groups as endpoints
+from src.api.v1.schemas.watchlist_groups import (
     WatchlistGroupCreateRequest,
     WatchlistGroupMemberAddRequest,
     WatchlistGroupMemberMoveRequest,

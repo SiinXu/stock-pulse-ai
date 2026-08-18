@@ -64,7 +64,7 @@ The whitelist lists **deliberately diverged path prefixes**. Classification:
 Rules of thumb:
 
 - Prefer a **small** whitelist. Only add prefixes StockPulse will not mirror on purpose (desktop packaging, AI governance assets, parity tooling itself, etc.).
-- Do **not** whitelist shared foundation paths such as `data_provider/`, `src/core/`, or shared analysis services merely to silence the report.
+- Do **not** whitelist shared foundation paths such as `src/data_provider/`, `src/core/`, or shared analysis services merely to silence the report.
 - Expanding the whitelist is a product decision: update the JSON, this document (EN + CN), and the changelog.
 
 Empty path lists (for example some merge commits) are treated as informational.

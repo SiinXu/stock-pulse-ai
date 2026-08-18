@@ -16,7 +16,7 @@ from datetime import date
 import time
 from typing import Any, Callable, Dict, Hashable, List, Optional, Set, Tuple
 
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 
 from src.schemas.market_structure import (
     MarketStructureDataQuality,

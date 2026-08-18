@@ -55,7 +55,7 @@ def run_level1_standalone(stock_code: str):
     """LongbridgeFetcher in isolation."""
     _print_header(f"Level 1: LongbridgeFetcher standalone ({stock_code})")
 
-    from data_provider.longbridge_fetcher import LongbridgeFetcher
+    from src.data_provider.longbridge_fetcher import LongbridgeFetcher
 
     fetcher = LongbridgeFetcher()
 
@@ -93,7 +93,7 @@ def run_level2_supplement(stock_code: str):
     """YFinance + Longbridge supplement flow."""
     _print_header(f"Level 2: YFinance + Longbridge supplement ({stock_code})")
 
-    from data_provider.base import DataFetcherManager
+    from src.data_provider.base import DataFetcherManager
 
     manager = DataFetcherManager()
 
@@ -155,7 +155,7 @@ def run_level3_full_pipeline(stock_code: str):
     """Full get_realtime_quote path."""
     _print_header(f"Level 3: Full DataFetcherManager.get_realtime_quote ({stock_code})")
 
-    from data_provider.base import DataFetcherManager
+    from src.data_provider.base import DataFetcherManager
 
     manager = DataFetcherManager()
     quote = manager.get_realtime_quote(stock_code)

@@ -12,7 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.services.decision_memory_service import DecisionMemoryService
 from src.services.decision_signal_service import DecisionSignalNotFoundError

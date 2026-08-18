@@ -60,7 +60,7 @@ from src.api.v1.endpoints import (
 )
 
 # Create v1 main route.
-# /api/v1 Prefix in api.app Attached, Avoid new versions FastAPI misjudge sub-routes "" For empty path.
+# /api/v1 Prefix in src.api.app Attached, Avoid new versions FastAPI misjudge sub-routes "" For empty path.
 router = APIRouter()
 
 router.include_router(

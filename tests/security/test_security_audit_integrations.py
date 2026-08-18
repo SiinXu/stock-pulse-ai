@@ -15,13 +15,13 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from api import deps as api_deps
-from api.v1.endpoints import analysis as analysis_endpoint
-from api.v1.endpoints import auth as auth_endpoint
-from api.v1.endpoints import security_audit as security_audit_endpoint
-from api.v1.endpoints import system_config as system_config_endpoint
-from api.v1.schemas.analysis import AnalyzeRequest
-from api.v1.schemas.system_config import (
+from src.api import deps as api_deps
+from src.api.v1.endpoints import analysis as analysis_endpoint
+from src.api.v1.endpoints import auth as auth_endpoint
+from src.api.v1.endpoints import security_audit as security_audit_endpoint
+from src.api.v1.endpoints import system_config as system_config_endpoint
+from src.api.v1.schemas.analysis import AnalyzeRequest
+from src.api.v1.schemas.system_config import (
     ImportSystemConfigRequest,
     RollbackSystemConfigRequest,
     UpdateSystemConfigRequest,

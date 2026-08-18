@@ -15,7 +15,7 @@ import copy
 import uuid
 from typing import Optional, Dict, Any, Callable, List
 
-from data_provider.daily_cache import LocalDataMissingError
+from src.data_provider.daily_cache import LocalDataMissingError
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
     get_sentiment_label,

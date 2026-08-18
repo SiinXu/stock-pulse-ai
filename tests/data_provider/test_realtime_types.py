@@ -8,7 +8,7 @@ into ``CircuitBreaker`` (no wall-clock ``time.sleep`` for TTL waits).
 import threading
 import unittest
 
-from data_provider.realtime_types import CircuitBreaker, RealtimeSource, UnifiedRealtimeQuote
+from src.data_provider.realtime_types import CircuitBreaker, RealtimeSource, UnifiedRealtimeQuote
 from tests.time_determinism import FakeClock
 
 

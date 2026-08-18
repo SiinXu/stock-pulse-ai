@@ -14,7 +14,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from data_provider.fundamental_adapter import AkshareFundamentalAdapter
+from src.data_provider.fundamental_adapter import AkshareFundamentalAdapter
 
 FIXTURES = Path(__file__).resolve().parents[1] / "fixtures" / "financial_reports"
 

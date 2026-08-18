@@ -20,7 +20,7 @@ from typing import Iterator
 import pandas as pd
 import pytest
 
-from data_provider import DataFetcherManager, DataProvider
+from src.data_provider import DataFetcherManager, DataProvider
 from src.application_services import ApplicationServices
 from src.plugins import PLUGIN_APPLICATION_VERSION, PluginManager
 from src.services.run_diagnostics import (

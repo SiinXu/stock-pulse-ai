@@ -29,9 +29,9 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetchError, DataFetcherManager
-from data_provider.daily_cache import DailyCacheConfig, DailyDataCache
-from data_provider.realtime_types import CircuitBreaker
+from src.data_provider.base import DataFetchError, DataFetcherManager
+from src.data_provider.daily_cache import DailyCacheConfig, DailyDataCache
+from src.data_provider.realtime_types import CircuitBreaker
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
     current_diagnostic_snapshot,

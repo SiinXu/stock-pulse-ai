@@ -9,8 +9,8 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from api.app import create_app
-from api.deps import get_database_manager
+from src.api.app import create_app
+from src.api.deps import get_database_manager
 import src.auth as auth
 
 
@@ -73,7 +73,7 @@ class UsageDashboardApiTestCase(unittest.TestCase):
     def test_dashboard_returns_token_summary_and_recent_calls(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             with (
-                patch("api.middlewares.auth.is_auth_enabled", return_value=False),
+                patch("src.api.middlewares.auth.is_auth_enabled", return_value=False),
                 patch.object(auth, "_auth_enabled", False),
             ):
                 app = create_app(static_dir=Path(temp_dir))

@@ -82,6 +82,12 @@ const LAZY_VALUATION_SCENARIOS: Record<ValuationScenarioId, PlaygroundScenarioRe
   )),
 };
 
+const LAZY_FIELD_TRUST_PANEL_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
+  'field-trust-panel': createLazyScenario(async () => (
+    (await import('./fieldTrustPanelScenarios')).FIELD_TRUST_PANEL_SCENARIOS['field-trust-panel']
+  )),
+};
+
 type WatchlistWorkspaceScenarioId = 'home-stock-workspace' | 'watchlist-score-column';
 
 // Lazy-load watchlist workspace stories so score-column product wiring does not
@@ -115,6 +121,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...LAZY_VALUATION_SCENARIOS,
   ...LAZY_REPORT_VERSION_COMPARE_SCENARIOS,
   ...LAZY_WATCHLIST_WORKSPACE_SCENARIOS,
+  ...LAZY_FIELD_TRUST_PANEL_SCENARIOS,
 };
 
 /**

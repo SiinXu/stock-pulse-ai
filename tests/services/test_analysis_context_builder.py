@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+from src.data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
 from src.schemas.analysis_context_pack import ContextFieldStatus
 import src.services.analysis_context_builder as builder_module
 from src.services.analysis_context_builder import (
@@ -403,7 +403,7 @@ def test_builder_rejects_non_mapping_artifact_to_dict() -> None:
 
 
 def test_builder_projects_validation_evidence_and_excludes_rejected_technical_value() -> None:
-    from data_provider.data_validation import project_technical_indicators
+    from src.data_provider.data_validation import project_technical_indicators
     from src.services.run_diagnostics import (
         activate_run_diagnostic_context,
         current_diagnostic_snapshot,

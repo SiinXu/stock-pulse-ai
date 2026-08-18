@@ -11,10 +11,10 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api import deps as api_deps
-from api.middlewares.auth import add_auth_middleware
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import research as endpoint
+from src.api import deps as api_deps
+from src.api.middlewares.auth import add_auth_middleware
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import research as endpoint
 from src.services.research_api_service import (
     ResearchApiNotFoundError,
     ResearchApiService,
@@ -215,8 +215,8 @@ def test_auth_middleware_requires_session_when_enabled() -> None:
     )
     app.dependency_overrides[endpoint._get_research_service] = lambda: service
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=True), patch(
-        "api.middlewares.auth.verify_session", return_value=False
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=True), patch(
+        "src.api.middlewares.auth.verify_session", return_value=False
     ):
         client = TestClient(app)
         denied = client.get("/api/v1/research/conclusions/7")
@@ -224,8 +224,8 @@ def test_auth_middleware_requires_session_when_enabled() -> None:
         assert denied.json()["error"] == "unauthorized"
         service.get_conclusion_by_record_id.assert_not_called()
 
-    with patch("api.middlewares.auth.is_auth_enabled", return_value=True), patch(
-        "api.middlewares.auth.verify_session", return_value=True
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=True), patch(
+        "src.api.middlewares.auth.verify_session", return_value=True
     ):
         client = TestClient(app)
         ok = client.get(

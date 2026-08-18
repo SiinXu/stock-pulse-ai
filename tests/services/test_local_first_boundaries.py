@@ -8,11 +8,11 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import HTTPException
 
-from api.v1.endpoints.analysis import _handle_sync_analysis
-from api.v1.endpoints.stocks import get_stock_history
-from api.v1.schemas.analysis import AnalyzeRequest
-from data_provider.base import DataFetcherManager
-from data_provider.daily_cache import (
+from src.api.v1.endpoints.analysis import _handle_sync_analysis
+from src.api.v1.endpoints.stocks import get_stock_history
+from src.api.v1.schemas.analysis import AnalyzeRequest
+from src.data_provider.base import DataFetcherManager
+from src.data_provider.daily_cache import (
     DailyCacheConfig,
     DailyDataCache,
     LocalDataMissing,
@@ -267,13 +267,13 @@ def test_history_service_and_api_do_not_collapse_local_missing() -> None:
     manager.get_daily_data.side_effect = _missing_error()
     service = StockService()
 
-    with patch("data_provider.base.DataFetcherManager", return_value=manager):
+    with patch("src.data_provider.base.DataFetcherManager", return_value=manager):
         with pytest.raises(LocalDataMissingError):
             service.get_history_data("600519", days=30)
 
     endpoint_service = MagicMock()
     endpoint_service.get_history_data.side_effect = _missing_error()
-    with patch("api.v1.endpoints.stocks.StockService", return_value=endpoint_service):
+    with patch("src.api.v1.endpoints.stocks.StockService", return_value=endpoint_service):
         with pytest.raises(HTTPException) as exc_info:
             get_stock_history("600519", period="daily", days=30)
 

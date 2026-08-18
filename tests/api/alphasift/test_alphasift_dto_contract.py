@@ -9,9 +9,9 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient as FastAPITestClient
 from pydantic import ValidationError
 
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import alphasift as alphasift_endpoint
-from api.v1.schemas.alphasift import (
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import alphasift as alphasift_endpoint
+from src.api.v1.schemas.alphasift import (
     AlphaSiftScreenRequest,
     AlphaSiftScreenResponse,
     AlphaSiftStatusResponse,
@@ -55,7 +55,7 @@ def test_legacy_screen_payload_keeps_request_coercion_and_extra_policy() -> None
         "candidate_count": 0,
     }
 
-    with patch("api.v1.endpoints.alphasift._service", return_value=service):
+    with patch("src.api.v1.endpoints.alphasift._service", return_value=service):
         response = _test_client().post(
             "/api/v1/alphasift/screen",
             json={
@@ -90,7 +90,7 @@ def test_legacy_screen_payload_keeps_request_coercion_and_extra_policy() -> None
 def test_invalid_screen_payload_uses_structured_validation_error(payload: object) -> None:
     client = _test_client()
 
-    with patch("api.v1.endpoints.alphasift._service") as service_factory:
+    with patch("src.api.v1.endpoints.alphasift._service") as service_factory:
         response = client.post("/api/v1/alphasift/screen", json=payload)
 
     assert response.status_code == 422
@@ -116,7 +116,7 @@ def test_response_boundary_preserves_known_and_extension_fields() -> None:
     service = MagicMock()
     service.status.return_value = payload
 
-    with patch("api.v1.endpoints.alphasift._service", return_value=service):
+    with patch("src.api.v1.endpoints.alphasift._service", return_value=service):
         direct_payload = alphasift_endpoint.alphasift_status(config=MagicMock())
         response = _test_client().get("/api/v1/alphasift/status")
 
@@ -143,7 +143,7 @@ def test_sync_response_rejects_coercible_core_types() -> None:
 
     service = MagicMock()
     service.status.return_value = payload
-    with patch("api.v1.endpoints.alphasift._service", return_value=service):
+    with patch("src.api.v1.endpoints.alphasift._service", return_value=service):
         response = _test_client().get("/api/v1/alphasift/status")
 
     assert response.status_code == 500
@@ -162,7 +162,7 @@ def test_invalid_service_payload_fails_closed_at_response_boundary() -> None:
         "enabled": True,
         "install_spec_is_default": True,
     }
-    with patch("api.v1.endpoints.alphasift._service", return_value=service):
+    with patch("src.api.v1.endpoints.alphasift._service", return_value=service):
         response = _test_client().get("/api/v1/alphasift/status")
 
     assert response.status_code == 500
@@ -184,7 +184,7 @@ def test_task_status_preserves_minimal_nested_result_shape() -> None:
     queue = MagicMock()
     queue.get_task.return_value = task
 
-    with patch("api.v1.endpoints.alphasift.get_task_queue", return_value=queue):
+    with patch("src.api.v1.endpoints.alphasift.get_task_queue", return_value=queue):
         response = _test_client().get("/api/v1/alphasift/screen/tasks/screen-task-1")
 
     assert response.status_code == 200
@@ -210,8 +210,8 @@ def test_background_screen_rejects_coercible_core_types() -> None:
     }
 
     with (
-        patch("api.v1.endpoints.alphasift.get_task_queue", return_value=queue),
-        patch("api.v1.endpoints.alphasift._service", return_value=service),
+        patch("src.api.v1.endpoints.alphasift.get_task_queue", return_value=queue),
+        patch("src.api.v1.endpoints.alphasift._service", return_value=service),
     ):
         alphasift_endpoint.alphasift_start_screen_task(
             AlphaSiftScreenRequest(),
@@ -237,7 +237,7 @@ def test_completed_task_rejects_coercible_core_types() -> None:
     queue = MagicMock()
     queue.get_task.return_value = task
 
-    with patch("api.v1.endpoints.alphasift.get_task_queue", return_value=queue):
+    with patch("src.api.v1.endpoints.alphasift.get_task_queue", return_value=queue):
         response = _test_client().get(
             "/api/v1/alphasift/screen/tasks/screen-task-completed",
         )

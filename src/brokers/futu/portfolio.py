@@ -9,7 +9,7 @@ import os
 from dataclasses import dataclass
 from typing import Any, Iterable, List, Optional
 
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.us_index_mapping import is_us_stock_code
 from src.services.stock_code_utils import normalize_code
 from src.services.stock_list_parser import normalize_stock_codes
 from src.utils.sanitize import log_safe_exception

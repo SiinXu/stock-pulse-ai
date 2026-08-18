@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
-from data_provider.money_flow_types import MoneyFlowOutcome, MoneyFlowSnapshot, MoneyFlowStatus
+from src.data_provider.money_flow_types import MoneyFlowOutcome, MoneyFlowSnapshot, MoneyFlowStatus
 from src.schemas.analysis_context_pack import ContextFieldStatus
 from src.services.analysis_context_builder import AnalysisContextBuilder, PipelineAnalysisArtifacts
 from src.core.stages.analysis_context import _AnalysisContextStageMixin

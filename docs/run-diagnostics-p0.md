@@ -24,7 +24,7 @@
 ### 验收边界（本轮）
 
 - 本轮为 `fix`（docs + runtime fix），变更仅收敛 A 股代码归属语义，不改 provider 列表、Base URL、`llm_call` 运行时语义与 `REPORT_*` 配置迁移路径。
-- `data_provider/baostock_fetcher.py`、`data_provider/pytdx_fetcher.py`、`data_provider/tushare_fetcher.py` 本轮只处理：
+- `src/data_provider/baostock_fetcher.py`、`src/data_provider/pytdx_fetcher.py`、`src/data_provider/tushare_fetcher.py` 本轮只处理：
   - 裸码与后缀码：`000001`、`000001.SH`、`000001.SZ`
   - 前缀码：`SH000001`、`SH.000001`、`SZ000001`、`SZ.000001`
 - `SH000001`/`SH.000001`/`SZ000001`/`SZ.000001` 场景为 correctness blocker，需由 `tests/data_provider/test_a_share_fetcher_code_conversion.py` 覆盖回归。

@@ -207,7 +207,7 @@ class SkillRouter:
         if not stock_code:
             return False
 
-        from data_provider.data_validation import infer_instrument_type
+        from src.data_provider.data_validation import infer_instrument_type
         from src.market.context import detect_market
         from src.services.stock_list_parser import ParseStatus, parse_analysis_target
 

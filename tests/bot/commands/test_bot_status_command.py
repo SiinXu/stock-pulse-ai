@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """Tests for bot /status command output."""
 
-from bot.commands.status import StatusCommand
+from src.bot.commands.status import StatusCommand
 from src.config import Config
 
 

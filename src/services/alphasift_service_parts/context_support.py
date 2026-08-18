@@ -305,7 +305,7 @@ def _get_dsa_fetcher_manager() -> Any:
     if _DSA_FETCHER_MANAGER is None:
         with _DSA_FETCHER_MANAGER_LOCK:
             if _DSA_FETCHER_MANAGER is None:
-                from data_provider import DataFetcherManager
+                from src.data_provider import DataFetcherManager
 
                 _DSA_FETCHER_MANAGER = DataFetcherManager()
     return _DSA_FETCHER_MANAGER

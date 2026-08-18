@@ -10,7 +10,7 @@ from typing import Any, Dict, List
 import pytest
 from pydantic import ValidationError
 
-from api.v1.schemas.todays_focus import TodaysFocusResponse
+from src.api.v1.schemas.todays_focus import TodaysFocusResponse
 from src.services.todays_focus_service import (
     DEFAULT_MAX_FOCUS_ITEMS,
     FocusEvidence,

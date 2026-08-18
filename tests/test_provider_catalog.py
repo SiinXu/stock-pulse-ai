@@ -116,7 +116,7 @@ class ProviderCatalogContractTestCase(unittest.TestCase):
                 f"{host} advertised as exempt but backend still requires a key",
             )
         # A remote OpenAI-compatible endpoint still requires a key.
-        self.assertNotIn("api.example.com", hosts)
+        self.assertNotIn("src.api.example.com", hosts)
         self.assertFalse(channel_allows_empty_api_key("openai", "https://api.example.com/v1"))
         # Ollama stays exempt regardless of endpoint host.
         self.assertTrue(channel_allows_empty_api_key("ollama", "https://ollama.remote.example/v1"))

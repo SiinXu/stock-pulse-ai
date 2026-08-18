@@ -60,7 +60,7 @@ StockPulse 是**本地优先的投资研究工作台**：多市场数据、可�
 
 | 区域 | 位置与职责 |
 | --- | --- |
-| 核心后端 | `src/` 承载业务与编排，`data_provider/` 适配数据源，`api/` 提供 FastAPI 路由，`bot/` 集成机器人。 |
+| 核心后端 | `src/` 承载业务与编排，其中 `src/data_provider/` 适配数据源，`src/api/` 提供 FastAPI 路由，`src/bot/` 集成机器人。 |
 | 客户端 | `apps/dsa-web/` 是 Web 工作台，`apps/dsa-desktop/` 是 Electron 桌面客户端。 |
 | 产品资源 | `strategies/` 保存内置 YAML 策略，`templates/` 保存 Jinja 报告模板。 |
 | 文档与测试 | `docs/` 保存指南与架构说明，`tests/` 按后端领域组织测试。 |

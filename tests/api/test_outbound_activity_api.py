@@ -20,7 +20,7 @@ def client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("ADMIN_AUTH_ENABLED", "false")
     monkeypatch.delenv(LOCAL_ONLY_MODE_ENV, raising=False)
     clear_outbound_activity_for_tests()
-    from api.app import create_app
+    from src.api.app import create_app
     app = create_app()
     with TestClient(app) as test_client:
         yield test_client

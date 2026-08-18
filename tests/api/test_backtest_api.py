@@ -10,8 +10,8 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import backtest as backtest_endpoint
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import backtest as backtest_endpoint
 from src.services.backtest_service import BacktestService, BacktestValidationError
 
 
@@ -61,7 +61,7 @@ def test_unexpected_value_error_is_safe_internal_error(
     service = MagicMock()
     getattr(service, service_method).side_effect = ValueError(SENSITIVE_ERROR)
 
-    caplog.set_level(logging.ERROR, logger="api.v1.endpoints.backtest")
+    caplog.set_level(logging.ERROR, logger="src.api.v1.endpoints.backtest")
     with patch.object(backtest_endpoint, "BacktestService", return_value=service):
         response = client.request(method, path, json={} if method == "POST" else None)
 

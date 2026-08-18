@@ -88,7 +88,7 @@ flowchart TB
 | --- | --- |
 | **人工审批** `/approvals` | **不在一级侧栏**；首页 **查看人工审批** / **Review human approvals** 按钮进入（需已开启管理员登录；文案以界面为准）；工程说明见 `docs/human-approvals.md` |
 | **通知中心** `/notifications` | 通知铃 → 查看全部 |
-| **个股工作区** | 命令面板输入代码，或打开 `/stocks/<code>`（例如 `/stocks/600519`） |
+| **个股工作区** | 命令面板输入代码，或打开 `/stocks/<code>`（例如 `/stocks/600519`）；页面会显示字段级来源、时滞、过期与跨源冲突，冲突不会被悄悄选定为一个真值 |
 | **登录** `/login` | 开启管理员认证后；受保护页会带 `?redirect=` |
 
 旧路径如 `/decision-signals`、`/alerts`、`/backtest`、`/screening` 一般会重定向到新地址。

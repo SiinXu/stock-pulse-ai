@@ -3,9 +3,9 @@
 
 import pytest
 
-from bot.commands.analyze import AnalyzeCommand
-from bot.commands.help import HelpCommand
-from bot.stock_symbols import (
+from src.bot.commands.analyze import AnalyzeCommand
+from src.bot.commands.help import HelpCommand
+from src.bot.stock_symbols import (
     BotStockSymbolError,
     is_recognized_stock_symbol,
     parse_bot_stock_symbol,

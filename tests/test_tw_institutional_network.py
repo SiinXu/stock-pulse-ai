@@ -24,7 +24,7 @@ import pytest
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from data_provider.tw_institutional_fetcher import (  # noqa: E402
+from src.data_provider.tw_institutional_fetcher import (  # noqa: E402
     TwInstitutionalFetcher,
     _to_int,
     _T86_CORE,

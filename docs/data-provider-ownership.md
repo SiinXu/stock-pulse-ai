@@ -13,16 +13,15 @@ Track ownership after the sequential ADR-006 extractions from
 and **how to land the next review-sized slice** without changing provider
 priority, circuit, or fallback policy (ADR-005).
 
-## Compatibility Facade
+## Canonical Facade
 
 | Public path | Role |
 | --- | --- |
-| `data_provider.base` | Compatibility facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache descriptors. |
-| `data_provider` package (`__init__.py`) | Stable package exports for plugins and callers. |
+| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache descriptors. |
+| `src.data_provider` package (`__init__.py`) | Stable package exports for plugins and callers. |
 
-Until a later retirement PR says otherwise, production and test code may keep
-importing public names from `data_provider.base`. Prefer patching
-`data_provider.base.<name>` in tests that target the public surface. Slice 1
+Production and test code import public names from `src.data_provider.base`.
+Prefer patching `src.data_provider.base.<name>` in tests that target the public surface. Slice 1
 facade attributes and Slice 2 inventory constants preserve object identity with
 their owner module for each import; Slice 2 descriptor functions are cloned
 against facade globals to preserve established patch seams. Reloading either
@@ -59,7 +58,7 @@ owner while the cohesive catalog mechanics gain Locality.
 
 ### Extracted facade names
 
-Slice 1 re-exports these pure helpers unchanged from `data_provider.base`:
+Slice 1 re-exports these pure helpers unchanged from `src.data_provider.base`:
 
 - `normalize_stock_code`
 - `canonical_stock_code`
@@ -71,14 +70,14 @@ Slice 1 re-exports these pure helpers unchanged from `data_provider.base`:
 - `_is_etf_code`, `_market_tag`
 
 Slice 3 re-exports typed failures and pure helpers unchanged from
-`data_provider.base`:
+`src.data_provider.base`:
 
 - `DataFetchError`, `RateLimitError`, `DataSourceUnavailableError`, `CircuitOpenError`
 - `unwrap_exception`, `summarize_exception`
 - `_coerce_chip_metric`, `_is_meaningful_chip_distribution`
 
 Slice 2 rebinds these `DataFetcherManager` descriptors from the private
-capability catalog while preserving their `data_provider.base` module,
+capability catalog while preserving their `src.data_provider.base` module,
 qualname, signature, class-dictionary position, globals, and patch behavior:
 
 - `plugin_registry`, `available_fetchers`, `add_fetcher`
@@ -103,7 +102,7 @@ Slice 4 rebinds daily health/circuit descriptors from
 
 Slice 5 rebinds daily-cache orchestration descriptors from
 `manager_parts/daily_cache_methods.py` while preserving their
-`data_provider.base` module, qualname, signature, globals, and patch behavior:
+`src.data_provider.base` module, qualname, signature, globals, and patch behavior:
 
 - `_get_daily_data_cache`, `is_market_data_local_only`, `_daily_adjustment_identity`
 - `_daily_cache_key`, `_record_daily_cache_result`, `_validate_daily_candidate`
@@ -121,7 +120,7 @@ Follow ADR-006:
    non-manager pure utilities). Do not duplicate capability-catalog mechanics.
    Prefer pure functions with dense offline tests.
 3. **Move bodies** into a focused `src/data_provider/<slice>.py` module.
-4. **Re-export** the same names from `data_provider.base` in the same PR.
+4. **Re-export** the same names from `src.data_provider.base` in the same PR.
    Do **not** migrate callers in the structural slice.
 5. **State** “no intentional behavior change” in the PR body.
 6. **Verify** at least:
@@ -141,7 +140,7 @@ or fallback behavior) in the same PR as a pure move.
 - Provider priority / circuit / fallback policy changes
 - Fetcher rewrites
 - Plugin provider API redesign
-- Migrating all `data_provider.base` importers off the facade
+- Migrating all `src.data_provider.base` importers off the facade
 
 ## Related Docs
 

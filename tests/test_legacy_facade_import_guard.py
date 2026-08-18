@@ -74,6 +74,13 @@ def test_legacy_facade_catalog_excludes_retired_notification_sender_shims():
             raise AssertionError("retired notification_sender facade was accepted")
 
 
+def test_legacy_facade_catalog_excludes_retired_root_package_shims():
+    """The removed root API, Bot, and provider packages are no longer facades."""
+
+    for name in ("api", "bot", "data_provider"):
+        assert name not in LEGACY_FACADES
+
+
 def test_checker_self_test_cli_passes():
     """The built-in --self-test path stays green after catalog retirement."""
 

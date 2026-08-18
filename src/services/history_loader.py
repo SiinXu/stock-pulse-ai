@@ -16,7 +16,7 @@ from typing import Any, List, Optional, Tuple
 
 import pandas as pd
 
-from data_provider.daily_cache import LocalDataMissingError
+from src.data_provider.daily_cache import LocalDataMissingError
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -55,7 +55,7 @@ def _get_fetcher_manager():
     if _fetcher_singleton is None:
         with _fetcher_lock:
             if _fetcher_singleton is None:
-                from data_provider import DataFetcherManager
+                from src.data_provider import DataFetcherManager
                 _fetcher_singleton = DataFetcherManager()
     return _fetcher_singleton
 
@@ -64,7 +64,7 @@ def _get_fetcher_manager():
 # DB-first history loader
 # ---------------------------------------------------------------------------
 def _history_code_candidates(stock_code: str) -> Tuple[List[str], str]:
-    from data_provider.base import canonical_stock_code, normalize_stock_code
+    from src.data_provider.base import canonical_stock_code, normalize_stock_code
 
     raw_code = str(stock_code or "").strip()
     normalized_code = canonical_stock_code(normalize_stock_code(raw_code))

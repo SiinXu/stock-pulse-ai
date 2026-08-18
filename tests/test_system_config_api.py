@@ -22,10 +22,10 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
-from api.middlewares.auth import add_auth_middleware
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import system_config
-from api.v1.schemas.system_config import (
+from src.api.middlewares.auth import add_auth_middleware
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import system_config
+from src.api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
     GenerationBackendStatusPreviewRequest,
     ImportSystemConfigRequest,

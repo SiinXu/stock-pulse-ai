@@ -6,7 +6,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.v1.endpoints import portfolio_level_analysis
+from src.api.v1.endpoints import portfolio_level_analysis
 from src.services.portfolio_level_analysis_service import MAX_SYMBOLS
 
 

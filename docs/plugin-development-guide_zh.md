@@ -178,7 +178,7 @@ NaN 与正负 Infinity 都会 fail-closed，且不会改变持久化文件。
 外部插件应只导入：
 
 1. `src.plugins` 上 `PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS` 列出的名称
-2. 数据源用的 `data_provider.DataProvider` / `DataProviderRegistration`
+2. 数据源用的 `src.data_provider.DataProvider` / `DataProviderRegistration`
 3. 特定扩展点需要、但不在插件包根导出的宿主类型：
    - `analysis_strategy`：`src.agent.skills.base.Skill`
    - `agent_tool`：`src.agent.tools.registry` 中的
@@ -256,7 +256,7 @@ Event Hook 合同；无效或已冲突的 registry 会以稳定错误码阻断�
 `try_build_auto_bound_registry`。
 
 ```python
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 from src.plugins import (
     PLUGIN_APPLICATION_VERSION,
     PluginManager,

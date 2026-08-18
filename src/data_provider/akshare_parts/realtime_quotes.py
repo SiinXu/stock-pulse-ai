@@ -836,7 +836,7 @@ class _RealtimeQuotesMethods:
             quote = UnifiedRealtimeQuote(
                 code=stock_code,
                 name=str(row.get('名称', '')),
-                source=RealtimeSource.AKSHARE_EM,
+                source=RealtimeSource.AKSHARE_SINA,
                 price=safe_float(row.get('最新价')),
                 change_pct=safe_float(row.get('涨跌幅')),
                 change_amount=safe_float(row.get('涨跌额')),

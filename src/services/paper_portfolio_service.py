@@ -20,7 +20,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Any, Dict, Optional
 
-from data_provider.base import canonical_stock_code
+from src.data_provider.base import canonical_stock_code
 from src.services.portfolio_service import (
     EPS,
     VALID_SIDES,

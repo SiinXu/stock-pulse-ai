@@ -34,7 +34,7 @@ def _mock_ticker(info):
 
 class TestUsRealtimeValuation(unittest.TestCase):
     def setUp(self):
-        from data_provider.yfinance_fetcher import YfinanceFetcher
+        from src.data_provider.yfinance_fetcher import YfinanceFetcher
 
         self.fetcher = YfinanceFetcher()
 

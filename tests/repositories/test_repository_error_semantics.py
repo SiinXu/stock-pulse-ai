@@ -168,20 +168,20 @@ def test_analysis_repo_delete_no_progress_raises_repository_error() -> None:
 
 def test_history_detail_maps_not_found_to_404_and_repository_error_to_500() -> None:
     try:
-        from api.v1.endpoints.history import get_history_detail
+        from src.api.v1.endpoints.history import get_history_detail
     except ModuleNotFoundError:
         pytest.skip("fastapi is not installed in this test environment")
 
     db = MagicMock()
 
-    with patch("api.v1.endpoints.history.HistoryService") as service_class:
+    with patch("src.api.v1.endpoints.history.HistoryService") as service_class:
         service_class.return_value.resolve_and_get_detail.return_value = None
         with pytest.raises(HTTPException) as not_found:
             get_history_detail("missing-id", db_manager=db)
         assert not_found.value.status_code == 404
         assert not_found.value.detail.get("error") == "not_found"
 
-    with patch("api.v1.endpoints.history.HistoryService") as service_class:
+    with patch("src.api.v1.endpoints.history.HistoryService") as service_class:
         service_class.return_value.resolve_and_get_detail.side_effect = RepositoryError(
             "analysis lookup failed",
             error_code="analysis_record_lookup_failed",
@@ -194,12 +194,12 @@ def test_history_detail_maps_not_found_to_404_and_repository_error_to_500() -> N
 
 def test_history_delete_by_code_maps_repository_error_to_500() -> None:
     try:
-        from api.v1.endpoints.history import delete_history_by_code
+        from src.api.v1.endpoints.history import delete_history_by_code
     except ModuleNotFoundError:
         pytest.skip("fastapi is not installed in this test environment")
 
     db = MagicMock()
-    with patch("api.v1.endpoints.history.HistoryService") as service_class:
+    with patch("src.api.v1.endpoints.history.HistoryService") as service_class:
         service_class.return_value.delete_history_by_code.side_effect = RepositoryError(
             "history deletion made no progress",
             error_code="analysis_history_delete_no_progress",
@@ -213,12 +213,12 @@ def test_history_delete_by_code_maps_repository_error_to_500() -> None:
 
 def test_history_list_maps_repository_error_to_500() -> None:
     try:
-        from api.v1.endpoints.history import get_history_list
+        from src.api.v1.endpoints.history import get_history_list
     except ModuleNotFoundError:
         pytest.skip("fastapi is not installed in this test environment")
 
     db = MagicMock()
-    with patch("api.v1.endpoints.history.HistoryService") as service_class:
+    with patch("src.api.v1.endpoints.history.HistoryService") as service_class:
         service_class.return_value.get_history_list.side_effect = RepositoryError(
             "list failed",
             error_code="analysis_record_list_failed",

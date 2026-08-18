@@ -302,17 +302,17 @@ class TestUSStockGating(unittest.TestCase):
     """Verify that only US stock codes are processed."""
 
     def test_a_share_code_not_us(self):
-        from data_provider.us_index_mapping import is_us_stock_code
+        from src.data_provider.us_index_mapping import is_us_stock_code
         self.assertFalse(is_us_stock_code("600519"))
         self.assertFalse(is_us_stock_code("000001"))
         self.assertFalse(is_us_stock_code("300750"))
 
     def test_hk_code_not_us(self):
-        from data_provider.us_index_mapping import is_us_stock_code
+        from src.data_provider.us_index_mapping import is_us_stock_code
         self.assertFalse(is_us_stock_code("HK00700"))
 
     def test_us_code_detected(self):
-        from data_provider.us_index_mapping import is_us_stock_code
+        from src.data_provider.us_index_mapping import is_us_stock_code
         self.assertTrue(is_us_stock_code("AAPL"))
         self.assertTrue(is_us_stock_code("TSLA"))
         self.assertTrue(is_us_stock_code("NVDA"))

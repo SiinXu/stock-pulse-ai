@@ -25,7 +25,7 @@
 
 | 區域 | 位置與職責 |
 | --- | --- |
-| 核心後端 | `src/` 承載業務與編排，`data_provider/` 適配數據源，`api/` 提供 FastAPI 路由，`bot/` 整合機器人。 |
+| 核心後端 | `src/` 承載業務與編排，其中 `src/data_provider/` 適配數據源，`src/api/` 提供 FastAPI 路由，`src/bot/` 整合機器人。 |
 | 客戶端 | `apps/dsa-web/` 是 Web 工作台，`apps/dsa-desktop/` 是 Electron 桌面客戶端。 |
 | 產品資源 | `strategies/` 保存內建 YAML 策略，`templates/` 保存 Jinja 報告模板。 |
 | 文檔與測試 | `docs/` 保存指南與架構說明，`tests/` 按後端領域組織測試。 |

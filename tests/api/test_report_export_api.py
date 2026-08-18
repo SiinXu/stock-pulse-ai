@@ -8,7 +8,7 @@ import json
 import pytest
 from fastapi import HTTPException
 
-from api.v1.endpoints import report_export as export_endpoint
+from src.api.v1.endpoints import report_export as export_endpoint
 from src.services.history_service import MarkdownReportGenerationError
 from src.services.report_export_service import (
     ReportExportBusyError,
@@ -137,7 +137,7 @@ def test_export_invalid_format_direct_call_still_returns_stable_400(monkeypatch)
 
 
 def test_export_invalid_format_http_contract_is_400():
-    from api.app import create_app
+    from src.api.app import create_app
     from fastapi.testclient import TestClient
 
     app = create_app()
@@ -181,7 +181,7 @@ def test_generation_failure_does_not_expose_raw_service_detail(monkeypatch):
 
 
 def test_openapi_has_typed_capability_enum_and_all_binary_media():
-    from api.app import create_app
+    from src.api.app import create_app
 
     schema = create_app().openapi()
     capabilities = schema["paths"]["/api/v1/history/export/capabilities"]["get"]

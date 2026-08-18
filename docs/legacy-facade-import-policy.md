@@ -1,14 +1,20 @@
 # Legacy Facade Import Policy
 
 - Status: `Living`
-- Last verified: 2026-08-05
-- Related: [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md), Issue #623
+- Last verified: 2026-08-17
+- Related: [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md), [ADR-012](adr/ADR-012-installable-package-layout.md), Issue #623, Issue #167
 
 ## Purpose
 
 ADR-006 intentionally kept top-level compatibility facades so oversized modules
 could be split without breaking imports, patches, or reflection. New production
 code must not deepen that dual path.
+
+The guard now catalogues only ADR-006 module facades (for example
+`src/market_sector_analysis.py`) left behind by behavior-preserving module
+decomposition. The ADR-012 root import packages (`api`, `bot`, and
+`data_provider`) have been retired after all production, test, script,
+packaging, and workflow references moved to `src.*`.
 
 This document records:
 
@@ -21,9 +27,11 @@ This document records:
 
 | Context | Rule |
 | --- | --- |
-| New production code under `src/`, `data_provider/`, `api/`, `bot/`, or entrypoints `main.py` / `server.py` | Import the **canonical package** only. |
+| New production code under `src/` or entrypoints `main.py` / `server.py` | Import the **canonical package** only (`src.api`, `src.bot`, `src.data_provider`, `src.market.sector_analysis`). |
+| Retired root import packages | Do not recreate `api`, `bot`, or `data_provider`; use the canonical `src.*` packages. |
+| Samples, examples, and repository scripts | Use canonical `src.*` imports. Published plugin and authoring samples are what out-of-tree authors copy, so they must not teach the shim paths. |
 | Existing allowlisted production importers | May keep the facade path until a dedicated migration PR shrinks the baseline. |
-| Tests | May import facades when patch targets, reload, or historical contracts require them. Prefer canonical paths for new tests when possible. |
+| Tests | May import a still-catalogued facade when patch targets or reload contracts require it. Use canonical `src.*` paths otherwise. |
 | Facade shim modules themselves | Remain the re-export surface; do not expand their public contract without a separate decision. |
 
 Enforcement:
@@ -51,13 +59,10 @@ Summary at the time this policy was introduced:
 
 | Legacy facade | Canonical module | Production importers | Facade definition |
 | --- | --- | --- | --- |
-| `data_provider` | `src.data_provider` | 67 | `data_provider/__init__.py` |
 | `src.market_sector_analysis` | `src.market.sector_analysis` | 1 | `src/market_sector_analysis.py` |
 
-**Total allowlisted production importer rows: 68** (one file may appear under
-multiple facades). The `data_provider` facade was registered when the package
-moved to `src/data_provider` (Refs #167); existing callers stay on the alias
-and new production code must import `src.data_provider`.
+**Total allowlisted production importer rows: 1.** The removed root packages
+are unknown facade keys; adding them to the baseline fails validation.
 
 The root-level analysis-context-pack shims
 (`src/analysis_context_pack_overview.py`, `src/analysis_context_pack_prompt.py`)
@@ -77,16 +82,18 @@ and test imports use `src.notification_parts.senders` only. The legacy facade
 guard no longer catalogues those paths; leftover baseline keys fail as
 unknown facades.
 
+The root `api/`, `bot/`, and `data_provider/` compatibility packages have also
+been removed. Production, tests, scripts, workflows, Docker, and package
+discovery use `src.api`, `src.bot`, and `src.data_provider` only.
+
 ## Phased Retirement
 
 | Phase | Goal | Success criteria |
 | --- | --- | --- |
 | **0 — Ban growth (this document)** | Stop new production facade imports | Guard green in CI; inventory published; baseline does not expand without review |
-| **1 — Leaf services** | Migrate low-risk service and bot importers to canonical packages | Baseline rows for those files removed via `--write-baseline`; offline tests for the migrated modules green |
-| **2 — Pipeline / analyzer / agent** | Migrate high-churn orchestration importers | Same as Phase 1 for `src/core/**`, `src/analyzer.py`, `src/agent/**` |
-| **3 — API surfaces** | Migrate HTTP endpoints that still bind facades | Same as Phase 1 for `api/**` |
-| **4 — Facade thinning** | Reduce shim surface to documented patch targets only | Separate PR; state intentional contract change; patch/reload tests still green |
-| **5 — Optional removal** | Delete unused facades only when no baseline importers and no required patch targets remain | Explicit PR; ADR-006 compatibility evidence completed |
+| **1 — Import migration** | Migrate every importer to its canonical package | Baseline shrinks and focused offline tests pass |
+| **2 — Facade thinning** | Reduce a shim to documented patch targets only | Separate PR; state intentional contract change; patch/reload tests stay green |
+| **3 — Removal** | Delete an unused facade when no importer or required patch target remains | Explicit compatibility evidence completed |
 
 Each phase is one or more review-sized PRs. Deleting facades is never combined
 with behavior changes.
@@ -102,4 +109,5 @@ with behavior changes.
 
 - [Architecture overview](architecture-overview.md) — directory ownership and facade notes
 - [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md)
+- [ADR-012](adr/ADR-012-installable-package-layout.md) — packaged layout; `src` is the long-term single installed package
 - Issue #623 (import ban), Issue #622 (`data_provider.base` decomposition)

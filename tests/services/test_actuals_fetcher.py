@@ -21,12 +21,12 @@ from unittest.mock import MagicMock, patch
 
 import pandas as pd
 
-from data_provider.base import (
+from src.data_provider.base import (
     DataFetchError,
     DataFetcherManager,
     DataSourceUnavailableError,
 )
-from data_provider.realtime_types import CircuitBreaker
+from src.data_provider.realtime_types import CircuitBreaker
 from src.schemas.prediction_actuals import (
     ACTUALS_STATUS_DATA_UNAVAILABLE,
     ACTUALS_STATUS_EMPTY,

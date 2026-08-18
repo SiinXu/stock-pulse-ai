@@ -21,7 +21,7 @@ from typing import Iterable, Iterator, Mapping, Sequence
 
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_BASELINE = ROOT / "scripts" / "broad_exception_baseline.json"
-SCOPED_DIRECTORIES = ("src", "data_provider", "api", "bot")
+SCOPED_DIRECTORIES = ("src",)
 SCOPED_FILES = ("main.py", "server.py")
 BASELINE_VERSION = 1
 CLASSIFICATIONS = frozenset(

@@ -13,8 +13,8 @@ import pytest
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.errors import error_body
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.errors import error_body
 from src.agent import executor as executor_module
 from src.agent.llm_adapter import ToolCall
 from src.agent.provider_trace import extract_provider_trace_turns
@@ -777,7 +777,7 @@ def test_final_review_counterexamples_are_closed_at_every_output_boundary() -> N
 
 def test_composite_text_labels_share_mapping_classification_across_boundaries() -> None:
     labelled_secrets = {
-        "api.key": PLAIN_SECRET,
+        "src.api.key": PLAIN_SECRET,
         "api key": BEARER_SECRET,
         "private.key": DSN_SECRET,
         "webhook.url": WEBHOOK_SECRET,
@@ -806,7 +806,7 @@ def test_composite_text_labels_share_mapping_classification_across_boundaries() 
         assert redact_sensitive_text(expected) == expected
 
     long_label = (
-        "api.key."
+        "src.api.key."
         + ".".join(["filler"] * sanitize_module._TEXT_FIELD_KEY_PART_LIMIT)
         + ".value"
     )
@@ -957,7 +957,7 @@ def test_prose_prefixed_diagnostic_fields_survive_composite_key_walk() -> None:
         "api: key=hunter2"
     ) == "api: key=[REDACTED]"
     long_label = (
-        "api.key."
+        "src.api.key."
         + ".".join(["filler"] * sanitize_module._TEXT_FIELD_KEY_PART_LIMIT)
         + ".value"
     )
@@ -1188,7 +1188,7 @@ def test_url_review_counterexamples_are_closed_at_final_output_boundaries() -> N
 
 def test_tool_audit_recursively_redacts_identity_and_error_fields() -> None:
     audit = build_tool_audit(
-        tool_name=f"api.key={PLAIN_SECRET}",
+        tool_name=f"src.api.key={PLAIN_SECRET}",
         arguments={"query": "public"},
         result={"status": "public"},
         error_code=f"private.key={BEARER_SECRET}",
@@ -1200,7 +1200,7 @@ def test_tool_audit_recursively_redacts_identity_and_error_fields() -> None:
     )
 
     _assert_no_secret(audit)
-    assert audit["tool_name"] == "api.key=[REDACTED]"
+    assert audit["tool_name"] == "src.api.key=[REDACTED]"
     assert audit["error_code"] == "private.key=[REDACTED]"
     assert audit["backend"] == "proxy.url=[REDACTED]"
     assert audit["session_id"] == "raw.response=[REDACTED]"
@@ -1773,7 +1773,7 @@ def test_api_client_error_payload_uses_central_recursive_redaction() -> None:
             },
             headers={
                 "Retry-After": "3",
-                "WWW-Authenticate": f'Bearer error="api.key={PLAIN_SECRET}"',
+                "WWW-Authenticate": f'Bearer error="src.api.key={PLAIN_SECRET}"',
                 "Authorization": f"Bearer {BEARER_SECRET}",
                 "X-Api-Key": PLAIN_SECRET,
             },

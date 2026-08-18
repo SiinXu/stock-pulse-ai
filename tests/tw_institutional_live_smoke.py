@@ -44,7 +44,7 @@ except Exception:  # noqa: BLE001 - cosmetic only; never block the smoke on cons
 
 import requests  # noqa: E402
 
-from data_provider.tw_institutional_fetcher import (  # noqa: E402
+from src.data_provider.tw_institutional_fetcher import (  # noqa: E402
     TwInstitutionalFetcher,
     _to_int,
     _T86_URL,
