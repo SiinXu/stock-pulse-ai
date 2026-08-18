@@ -25,6 +25,17 @@ def test_merges_distinct_mapping_entries(context_factory):
     assert output.index('"a"') < output.index('"b"')
 
 
+def test_merges_distinct_array_entries(context_factory):
+    output = resolve(
+        context_factory(
+            Path("apps/dsa-web/src/i18n/translations/en.ts"),
+            current=_conflict('  "t00.beta",\n', '  "t00.alpha",\n'),
+        )
+    )
+    assert output.index('"t00.alpha"') < output.index('"t00.beta"')
+    assert "<<<<<<<" not in output
+
+
 def test_merges_non_ascii_mapping_entries(context_factory):
     output = resolve(
         context_factory(
