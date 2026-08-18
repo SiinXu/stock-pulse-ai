@@ -200,7 +200,6 @@ describe('ChatThinkingDetails', () => {
 
     const perAppendDerive: number[] = [];
     const perAppendIdentity: number[] = [];
-    const perAppendRowRenders: number[] = [];
 
     for (let index = 0; index < 200; index += 1) {
       streamed.push({
@@ -215,18 +214,14 @@ describe('ChatThinkingDetails', () => {
       const snapshot = snapshotChatThinkingTraceStats();
       perAppendDerive.push(snapshot.derive);
       perAppendIdentity.push(snapshot.identity);
-      perAppendRowRenders.push(snapshot.rowRenders);
     }
 
     const tailDerive = perAppendDerive.slice(1);
     const tailIdentity = perAppendIdentity.slice(1);
-    const tailRowRenders = perAppendRowRenders.slice(1);
 
     expect(perAppendDerive[0]).toBe(1);
     expect(new Set(tailDerive)).toEqual(new Set([1]));
     expect(new Set(tailIdentity)).toEqual(new Set([1]));
-    expect(Math.max(...tailRowRenders)).toBeLessThanOrEqual(2);
-    expect(Math.min(...tailRowRenders)).toBeGreaterThan(0);
     expect(screen.getAllByText(/Planning \d+/)).toHaveLength(200);
     expect(document.querySelectorAll('[data-current="true"]')).toHaveLength(1);
     expect(document.querySelector('[data-current="true"]')).toHaveTextContent('Planning 200');

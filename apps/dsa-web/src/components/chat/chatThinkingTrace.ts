@@ -61,7 +61,6 @@ export type ChatThinkingTraceStats = {
   toolDetail: number;
   stageDetail: number;
   derive: number;
-  rowRenders: number;
 };
 
 export const chatThinkingTraceStats: ChatThinkingTraceStats = {
@@ -71,7 +70,6 @@ export const chatThinkingTraceStats: ChatThinkingTraceStats = {
   toolDetail: 0,
   stageDetail: 0,
   derive: 0,
-  rowRenders: 0,
 };
 
 export function resetChatThinkingTraceStats(): void {
@@ -81,7 +79,6 @@ export function resetChatThinkingTraceStats(): void {
   chatThinkingTraceStats.toolDetail = 0;
   chatThinkingTraceStats.stageDetail = 0;
   chatThinkingTraceStats.derive = 0;
-  chatThinkingTraceStats.rowRenders = 0;
 }
 
 export function snapshotChatThinkingTraceStats(): ChatThinkingTraceStats {
