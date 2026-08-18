@@ -332,4 +332,123 @@ describe('NotificationCenterPage', () => {
     });
     expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
   });
+
+  it('does not let a stale mark-read refresh overwrite a newer kind filter', async () => {
+    const markReadRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    const alertRequest = createDeferred<NotificationInboxPage>();
+    const staleRefresh = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockImplementation((params: { kind?: string } = {}) => (
+        params.kind === 'alert_triggered' ? alertRequest.promise : staleRefresh.promise
+      ));
+    markReadMock.mockReturnValue(markReadRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    await waitFor(() => {
+      expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+    });
+
+    alertRequest.resolve(emptyPage({
+      items: [inboxItem({
+        id: 'v1:alert_triggered:2:1786233500000000',
+        kind: 'alert_triggered',
+        titleKey: 'alertTriggeredTitle',
+        titleParams: { target: 'MSFT' },
+        summary: 'Threshold crossed',
+        severity: 'warning',
+        createdAt: '2026-08-09T23:58:20Z',
+        href: '/signals?tab=history&trigger=2',
+        sourceId: '2',
+      })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    markReadRequest.resolve({ markedCount: 1, unreadTotal: 0 });
+    await waitFor(() => {
+      expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+    });
+
+    staleRefresh.resolve(emptyPage({
+      items: [inboxItem({ titleParams: { label: 'STALE' }, summary: 'stale mark-read refresh' })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Analysis complete: STALE')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
+    expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+  });
+
+  it('does not apply a late mark-read error after the kind filter has changed', async () => {
+    const markReadRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockResolvedValue(emptyPage({
+        items: [inboxItem({
+          id: 'v1:alert_triggered:2:1786233500000000',
+          kind: 'alert_triggered',
+          titleKey: 'alertTriggeredTitle',
+          titleParams: { target: 'MSFT' },
+          summary: 'Threshold crossed',
+          severity: 'warning',
+          createdAt: '2026-08-09T23:58:20Z',
+          href: '/signals?tab=history&trigger=2',
+          sourceId: '2',
+        })],
+        total: 1,
+        unreadTotal: 1,
+      }));
+    markReadMock.mockReturnValue(markReadRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    markReadRequest.reject(new Error('mark-read failed'));
+    await waitFor(() => {
+      expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
+  });
+
+  it('ignores an in-flight inbox response after unmount', async () => {
+    const pending = createDeferred<NotificationInboxPage>();
+    listMock.mockReturnValue(pending.promise);
+
+    const { unmount } = renderPage();
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+    unmount();
+
+    pending.resolve(emptyPage({
+      items: [inboxItem({ titleParams: { label: 'GONE' } })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    await Promise.resolve();
+
+    expect(screen.queryByText('Analysis complete: GONE')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-page')).not.toBeInTheDocument();
+  });
 });

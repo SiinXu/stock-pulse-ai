@@ -61,6 +61,10 @@ const NotificationCenterPage: React.FC = () => {
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const requestIdRef = useRef(0);
+  const kindRef = useRef(kind);
+  const readFilterRef = useRef(readFilter);
+  kindRef.current = kind;
+  readFilterRef.current = readFilter;
 
   const load = useCallback(async (
     mode: 'initial' | 'refresh' | 'more' = 'initial',
@@ -77,8 +81,8 @@ const NotificationCenterPage: React.FC = () => {
         page: 1,
         pageSize: 50,
         cursor,
-        kind: kind || undefined,
-        unreadOnly: readFilter === 'unread',
+        kind: kindRef.current || undefined,
+        unreadOnly: readFilterRef.current === 'unread',
       });
       if (requestIdRef.current !== requestId) return;
       setPageData(response);
@@ -101,19 +105,24 @@ const NotificationCenterPage: React.FC = () => {
         setLoadingMore(false);
       }
     }
-  }, [kind, readFilter]);
+  }, []);
 
   useEffect(() => {
     void load('initial');
-  }, [load]);
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, [load, kind, readFilter]);
 
   const handleMarkRead = async (itemId: string) => {
+    const requestId = requestIdRef.current;
     setMarkingId(itemId);
     setError(null);
     try {
       await notificationInboxApi.markRead([itemId]);
       await load('refresh');
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
       setError(getParsedApiError(err));
     } finally {
       setMarkingId(null);
@@ -121,12 +130,14 @@ const NotificationCenterPage: React.FC = () => {
   };
 
   const handleMarkAllRead = async () => {
+    const requestId = requestIdRef.current;
     setMarkingAll(true);
     setError(null);
     try {
-      await notificationInboxApi.markAllRead(kind || undefined);
+      await notificationInboxApi.markAllRead(kindRef.current || undefined);
       await load('refresh');
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
       setError(getParsedApiError(err));
     } finally {
       setMarkingAll(false);
