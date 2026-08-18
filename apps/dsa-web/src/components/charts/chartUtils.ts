@@ -115,12 +115,6 @@ export function computeMovingAverages(
   return series;
 }
 
-export function changeColorToCss(color: ChangeColor): string {
-  if (color === 'red') return 'hsl(var(--danger))';
-  if (color === 'green') return 'hsl(var(--success))';
-  return 'hsl(var(--muted-foreground))';
-}
-
 export function directionMarker(direction: ChangeDirection): string {
   if (direction === 'up') return '▲';
   if (direction === 'down') return '▼';
