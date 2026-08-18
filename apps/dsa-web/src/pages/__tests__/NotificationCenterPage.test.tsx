@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ToastProvider } from '../../components/common';
 import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
@@ -64,12 +65,14 @@ function inboxItem(overrides: Partial<NotificationInboxItem> = {}): Notification
 function renderPage() {
   return render(
     <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-        <UiLanguageProvider initialLanguage="en">
-      <MemoryRouter>
-        <NotificationCenterPage />
-      </MemoryRouter>
-    </UiLanguageProvider>
-      </RouteFocusRegistrationContext.Provider>,
+      <UiLanguageProvider initialLanguage="en">
+        <ToastProvider>
+          <MemoryRouter>
+            <NotificationCenterPage />
+          </MemoryRouter>
+        </ToastProvider>
+      </UiLanguageProvider>
+    </RouteFocusRegistrationContext.Provider>,
   );
 }
 
@@ -247,7 +250,7 @@ describe('NotificationCenterPage', () => {
     renderPage();
 
     expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
     expect(screen.queryByText('No notifications yet')).not.toBeInTheDocument();
   });
@@ -265,7 +268,7 @@ describe('NotificationCenterPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
 
     expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.getByText('Analysis complete: 600519')).toBeInTheDocument();
     expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
   });
