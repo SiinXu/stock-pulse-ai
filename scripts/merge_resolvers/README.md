@@ -32,7 +32,7 @@ the merge train. If any file is refused, the whole batch is refused and the
 working tree is left untouched. Fail-open is the dangerous failure mode here.
 
 If the tool refuses, leave the conflict in place and let the pull request bump
-out. Rollback of a merge in progress is ordinary Git: `git merge --abort`.
+out.
 
 ## Why choosing a side is wrong
 
