@@ -14,14 +14,14 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from data_provider import (
+from src.data_provider import (
     BaseFetcher,
     DataFetcherManager,
     DataProvider,
     DataProviderRegistration,
 )
-from data_provider.realtime_types import UnifiedRealtimeQuote
-from data_provider.money_flow_types import MoneyFlowSnapshot, MoneyFlowStatus
+from src.data_provider.realtime_types import UnifiedRealtimeQuote
+from src.data_provider.money_flow_types import MoneyFlowSnapshot, MoneyFlowStatus
 from src.core.trading_calendar import get_effective_trading_date
 from src.plugins import Plugin, PluginContext, PluginManager, PluginManifest
 
@@ -216,25 +216,25 @@ def test_default_providers_are_registered_without_order_or_name_drift() -> None:
     }
 
     with patch("src.config.get_config", return_value=config), patch(
-        "data_provider.efinance_fetcher.EfinanceFetcher",
+        "src.data_provider.efinance_fetcher.EfinanceFetcher",
         return_value=providers["EfinanceFetcher"],
     ), patch(
-        "data_provider.tencent_fetcher.TencentFetcher",
+        "src.data_provider.tencent_fetcher.TencentFetcher",
         return_value=providers["TencentFetcher"],
     ), patch(
-        "data_provider.akshare_fetcher.AkshareFetcher",
+        "src.data_provider.akshare_fetcher.AkshareFetcher",
         return_value=providers["AkshareFetcher"],
     ), patch(
-        "data_provider.pytdx_fetcher.PytdxFetcher",
+        "src.data_provider.pytdx_fetcher.PytdxFetcher",
         return_value=providers["PytdxFetcher"],
     ), patch(
-        "data_provider.baostock_fetcher.BaostockFetcher",
+        "src.data_provider.baostock_fetcher.BaostockFetcher",
         return_value=providers["BaostockFetcher"],
     ), patch(
-        "data_provider.yfinance_fetcher.YfinanceFetcher",
+        "src.data_provider.yfinance_fetcher.YfinanceFetcher",
         return_value=providers["YfinanceFetcher"],
     ), patch(
-        "data_provider.longbridge_fetcher.LongbridgeFetcher.has_configured_credentials",
+        "src.data_provider.longbridge_fetcher.LongbridgeFetcher.has_configured_credentials",
         return_value=False,
     ):
         manager = DataFetcherManager()

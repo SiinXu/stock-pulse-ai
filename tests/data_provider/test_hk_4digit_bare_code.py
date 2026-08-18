@@ -6,7 +6,7 @@ A-share codes are 6 digits, so the bare-4-digit namespace does not collide
 with CN listings. JP/KR/TW require an explicit Yahoo suffix at this layer.
 """
 
-from data_provider.symbol_normalization import (
+from src.data_provider.symbol_normalization import (
     _is_hk_market,
     canonical_stock_code,
     normalize_stock_code,

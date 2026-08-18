@@ -6,8 +6,8 @@ import time
 import unittest
 from datetime import datetime
 
-from bot.models import BotMessage, BotResponse, ChatType
-from bot.platforms.feishu_stream import FeishuStreamHandler
+from src.bot.models import BotMessage, BotResponse, ChatType
+from src.bot.platforms.feishu_stream import FeishuStreamHandler
 
 
 class _DummyReplyClient:

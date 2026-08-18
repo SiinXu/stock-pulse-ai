@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 
 import pandas as pd
 
-from data_provider.yfinance_fundamental_adapter import (
+from src.data_provider.yfinance_fundamental_adapter import (
     YfinanceFundamentalAdapter,
     _convert_to_yf_symbol,
 )
@@ -111,7 +111,7 @@ class TestYfinanceFundamentalAdapter(unittest.TestCase):
         with (
             patch("yfinance.Ticker", return_value=ticker),
             patch(
-                "data_provider.yfinance_fundamental_adapter.pd.Timestamp.now",
+                "src.data_provider.yfinance_fundamental_adapter.pd.Timestamp.now",
                 return_value=DIVIDEND_TEST_NOW,
             ),
         ):
@@ -167,7 +167,7 @@ class TestYfinanceFundamentalAdapter(unittest.TestCase):
         with (
             patch("yfinance.Ticker", return_value=ticker),
             patch(
-                "data_provider.yfinance_fundamental_adapter.pd.Timestamp.now",
+                "src.data_provider.yfinance_fundamental_adapter.pd.Timestamp.now",
                 return_value=DIVIDEND_TEST_NOW,
             ),
         ):

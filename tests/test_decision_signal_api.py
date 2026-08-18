@@ -21,7 +21,7 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.analyzer import AnalysisResult
 from src.config import Config
 from src.services.decision_signal_extractor import extract_and_persist_from_analysis_result
@@ -1120,7 +1120,7 @@ def test_query_validation_error_envelope(client_and_db) -> None:
 def test_internal_errors_do_not_reflect_exception_details(client_and_db) -> None:
     client, _db = client_and_db
 
-    with patch("api.v1.endpoints.decision_signals.DecisionSignalService") as service_cls:
+    with patch("src.api.v1.endpoints.decision_signals.DecisionSignalService") as service_cls:
         service_cls.return_value.list_signals.side_effect = RuntimeError(
             "secret-token /private/tmp/internal-path"
         )

@@ -692,7 +692,7 @@ class Config:
         )
         # Market-data local-only intent must fail closed during application
         # configuration load, before any manager can enter a provider path.
-        from data_provider.daily_cache import parse_market_data_fetch_mode
+        from src.data_provider.daily_cache import parse_market_data_fetch_mode
 
         parse_market_data_fetch_mode(os.getenv("PROVIDER_MARKET_DATA_MODE"))
         if self.agent_arch not in self._VALID_AGENT_ARCH:

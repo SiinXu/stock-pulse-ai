@@ -10,9 +10,9 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from data_provider.base import BaseFetcher, DataFetcherManager
-from data_provider.crypto_coingecko_fetcher import CryptoCoingeckoFetcher
-from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+from src.data_provider.base import BaseFetcher, DataFetcherManager
+from src.data_provider.crypto_coingecko_fetcher import CryptoCoingeckoFetcher
+from src.data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
 from src.core.trading_calendar import (
     MarketPhase,
     MarketSessionStatus,
@@ -52,8 +52,8 @@ def test_public_identity_context_and_calendar_are_crypto_specific() -> None:
 
 
 def test_api_cli_bot_and_chat_keep_the_same_identity() -> None:
-    from api.v1.services.analysis_api_service import AnalysisApiService
-    from bot.stock_symbols import parse_bot_stock_symbol
+    from src.api.v1.services.analysis_api_service import AnalysisApiService
+    from src.bot.stock_symbols import parse_bot_stock_symbol
     from src.agent.chat_context import build_agent_chat_market_context
 
     service = AnalysisApiService()
@@ -107,7 +107,7 @@ def test_bounded_429_retry_and_cooldown(monkeypatch) -> None:
         response.raise_for_status.side_effect = RuntimeError("unexpected")
         responses.append(response)
     safe_get = MagicMock(side_effect=responses)
-    monkeypatch.setattr("data_provider.crypto_coingecko_fetcher.safe_get", safe_get)
+    monkeypatch.setattr("src.data_provider.crypto_coingecko_fetcher.safe_get", safe_get)
     sleeps = []
     fetcher = CryptoCoingeckoFetcher(
         config=_crypto_config(), sleeper=lambda delay: sleeps.append(delay)

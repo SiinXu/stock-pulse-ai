@@ -10,8 +10,8 @@ import re
 from dataclasses import dataclass
 from typing import List, Optional
 
-from data_provider.base import canonical_stock_code, is_bse_code, normalize_stock_code
-from data_provider.us_index_mapping import is_us_index_code
+from src.data_provider.base import canonical_stock_code, is_bse_code, normalize_stock_code
+from src.data_provider.us_index_mapping import is_us_index_code
 from src.market.context import detect_market
 from src.services.market_symbol_utils import (
     get_suffix_market,
@@ -117,7 +117,7 @@ def is_code_like(value: str) -> bool:
     text = value.strip().upper()
     if not text:
         return False
-    from data_provider.symbol_normalization import normalize_crypto_symbol
+    from src.data_provider.symbol_normalization import normalize_crypto_symbol
     if normalize_crypto_symbol(value) is not None:
         return True
     if text.isdigit() and len(text) in (4, 5, 6):
@@ -141,7 +141,7 @@ def normalize_code(raw: str) -> Optional[str]:
     - Prefix format: SH600519, SH.600519, SZ000001, BJ920493, HK00700 (case-insensitive)
     - US ticker symbols: AAPL, TSLA
     """
-    from data_provider.symbol_normalization import normalize_crypto_symbol
+    from src.data_provider.symbol_normalization import normalize_crypto_symbol
 
     crypto_symbol = normalize_crypto_symbol(raw)
     if crypto_symbol is not None:
@@ -406,7 +406,7 @@ def canonicalize_analysis_stock_code(raw: str) -> Optional[str]:
     if not text:
         return None
 
-    from data_provider.symbol_normalization import normalize_crypto_symbol
+    from src.data_provider.symbol_normalization import normalize_crypto_symbol
 
     crypto_symbol = normalize_crypto_symbol(text)
     if crypto_symbol is not None:

@@ -1,6 +1,6 @@
 /**
  * Backtest API type definitions
- * Mirrors api/v1/schemas/backtest.py
+ * Mirrors src/api/v1/schemas/backtest.py
  */
 import type { DecisionAction, MarketPhaseSummary } from './analysis';
 

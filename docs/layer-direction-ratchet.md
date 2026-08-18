@@ -18,16 +18,16 @@ known cycles without encoding the intended **direction**.
 This ratchet enforces the directed layer shape:
 
 ```text
-api → services → pipeline/stages → src.data_provider
+src.api → services → pipeline/stages → src.data_provider
 ```
 
 Lower layers must not import higher ones. In particular:
 
 | Forbidden reverse edge | Why |
 | --- | --- |
-| `src.data_provider` → `src.services` / `src.core` / `src.agent` / `api` | Providers are the leaf data adapters |
-| `src.services` → `api` | HTTP transport is one-way |
-| `src.core` / `src.agent` / `src.market` / `src.analyzer` → `api` | Domain and orchestration must not depend on transport |
+| `src.data_provider` → `src.services` / `src.core` / `src.agent` / `src.api` | Providers are the leaf data adapters |
+| `src.services` → `src.api` | HTTP transport is one-way |
+| `src.core` / `src.agent` / `src.market` / `src.analyzer` → `src.api` | Domain and orchestration must not depend on transport |
 | `src.core` pipeline/stages → `src.services` | Intended direction is services → pipeline |
 
 Only **module body** imports count. Lazy imports inside functions or methods are
@@ -50,11 +50,11 @@ introduction). Current categories:
 ### Cleanup plan
 
 1. Move pure market/symbol helpers consumed by providers into a leaf module
-   (`src.utils` or a `data_provider`-local helper) so providers stop importing
+   (`src.utils` or a `src.data_provider`-local helper) so providers stop importing
    `src.services`.
 2. Inject service ports into pipeline/stages from the services layer (or share
    leaf adapters) so stages stop importing application services at module level.
-3. Keep any `* → api` edge at zero forever; share DTOs via `src.schemas` or
+3. Keep any `* → src.api` edge at zero forever; share DTOs via `src.schemas` or
    dedicated contracts.
 4. After each fix, run `--write-baseline` to shrink the allowlist. **Never raise
    `hard_ceiling` or expand exceptions to green CI.**

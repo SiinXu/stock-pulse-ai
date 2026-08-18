@@ -5,7 +5,7 @@
 """Guard: stable Web catalog codes and dual taxonomy maps stay aligned.
 
 Fails when:
-1. ``STABLE_ERROR_TEXT`` keys are missing from ``api/v1/error_taxonomy.py``
+1. ``STABLE_ERROR_TEXT`` keys are missing from ``src/api/v1/error_taxonomy.py``
 2. Backend ``ERROR_CODE_TAXONOMY`` entries use invalid category/severity/action
 3. Backend and Web ``ERROR_CODE_TAXONOMY`` code sets or classification triples differ
 """
@@ -112,7 +112,7 @@ def main() -> int:
         errors.append(
             "Web STABLE_ERROR_TEXT codes missing from ERROR_CODE_TAXONOMY:\n  - "
             + "\n  - ".join(missing_in_taxonomy)
-            + "\nAdd each code to api/v1/error_taxonomy.py (and the Web taxonomy mirror)."
+            + "\nAdd each code to src/api/v1/error_taxonomy.py (and the Web taxonomy mirror)."
         )
     if invalid_entries:
         errors.append(

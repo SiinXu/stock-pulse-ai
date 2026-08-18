@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.services.decision_signal_outcome_service import (
     DECISION_SIGNAL_OUTCOME_ENGINE_VERSION,

@@ -6,7 +6,7 @@ from src.services.run_diagnostics import (
     current_diagnostic_snapshot,
     reset_run_diagnostic_context,
 )
-from data_provider.base import DataFetcherManager
+from src.data_provider.base import DataFetcherManager
 
 
 class _BoardFetcher:

@@ -543,13 +543,13 @@ def _coerce_source_mapping(source: ExtractionSource) -> Dict[str, Any]:
 
 
 def _normalize_symbol_token(raw: Any) -> Optional[str]:
-    """Return a whitespace-free symbol token without importing data_provider."""
+    """Return a whitespace-free symbol token without importing src.data_provider."""
     text = str(raw or "").strip()
     if not text or any(ch.isspace() for ch in text):
         return None
     # Prefer provider normalizer when available; never hard-fail extraction.
     try:
-        from data_provider.base import normalize_stock_code
+        from src.data_provider.base import normalize_stock_code
 
         normalized = normalize_stock_code(text)
         if normalized:
@@ -591,7 +591,7 @@ def _extract_market(payload: Mapping[str, Any], symbol: Optional[str]) -> Option
 
 
 def _infer_market_from_symbol(symbol: str) -> Optional[str]:
-    """Best-effort market tag without importing data_provider."""
+    """Best-effort market tag without importing src.data_provider."""
     text = str(symbol or "").strip().upper()
     if not text:
         return None

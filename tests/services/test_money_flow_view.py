@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from data_provider.money_flow_types import MoneyFlowOutcome, MoneyFlowSnapshot, MoneyFlowStatus
+from src.data_provider.money_flow_types import MoneyFlowOutcome, MoneyFlowSnapshot, MoneyFlowStatus
 from src.services.smartmoney_flow_service import build_money_flow_view
 
 

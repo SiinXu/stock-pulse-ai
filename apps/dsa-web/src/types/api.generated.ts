@@ -3684,6 +3684,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocks/{stock_code}/trust": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get field-level data trust for a stock quote
+         * @description Returns per-field source attribution, lag, staleness, cross-provider conflicts, and provider health for the latest realtime quote (Issue #1129). The view degrades explicitly: status=unavailable when no quote exists, and status=degraded when trust metadata is absent, fields are stale or unattributed, or providers disagree. Conflicts are surfaced, never silently resolved to one source. Analysis consumers receive the same gap/confidence projection.
+         */
+        get: operations["getStockFieldTrust"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/system/config": {
         parameters: {
             query?: never;
@@ -8717,6 +8737,158 @@ export interface components {
              * @description 股票名称（如有）
              */
             name?: string | null;
+        };
+        /**
+         * FieldTrustAnalysisInput
+         * @description Provider-neutral gap/confidence projection consumed by analysis.
+         */
+        FieldTrustAnalysisInput: {
+            /**
+             * Confidence
+             * @enum {string}
+             */
+            confidence: "high" | "medium" | "low";
+            /**
+             * Conflict Count
+             * @default 0
+             */
+            conflict_count: number;
+            /**
+             * Failed Provider Count
+             * @default 0
+             */
+            failed_provider_count: number;
+            /** Gaps */
+            gaps?: components["schemas"]["FieldTrustGap"][];
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "field_trust_analysis_input/1.0";
+        };
+        /**
+         * FieldTrustConflict
+         * @description Cross-provider divergence on one field (never silently resolved).
+         */
+        FieldTrustConflict: {
+            /** Field */
+            field: string;
+            /** Relative Difference */
+            relative_difference?: number | null;
+            /**
+             * Severity
+             * @default warn
+             */
+            severity: string;
+            /** Threshold */
+            threshold?: number | null;
+            /** Values */
+            values?: components["schemas"]["FieldTrustConflictValue"][];
+        };
+        /**
+         * FieldTrustConflictCheck
+         * @description Whether a cross-source comparison actually ran for a provider pair.
+         */
+        FieldTrustConflictCheck: {
+            /** Primary Provider */
+            primary_provider?: string | null;
+            /** Reason */
+            reason?: string | null;
+            /** Secondary Provider */
+            secondary_provider?: string | null;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "evaluated" | "skipped";
+        };
+        /**
+         * FieldTrustConflictValue
+         * @description One provider observation inside a conflict finding.
+         */
+        FieldTrustConflictValue: {
+            /** Provider */
+            provider: string;
+            /** Value */
+            value: number;
+        };
+        /**
+         * FieldTrustEntry
+         * @description Trust verdict for one quote field.
+         */
+        FieldTrustEntry: {
+            /**
+             * Conflict
+             * @description True when providers disagreed on this field
+             * @default false
+             */
+            conflict: boolean;
+            /** Field */
+            field: string;
+            /** Is Stale */
+            is_stale?: boolean | null;
+            /**
+             * Origin
+             * @description Whether the field came from the primary provider or a supplement
+             * @default unknown
+             * @enum {string}
+             */
+            origin: "primary" | "supplement" | "unknown";
+            /** Provider Timestamp */
+            provider_timestamp?: string | null;
+            /** Source */
+            source?: string | null;
+            /** Stale Seconds */
+            stale_seconds?: number | null;
+            /**
+             * Staleness
+             * @description Staleness verdict; unknown must be rendered as degraded, never trusted
+             * @default unknown
+             * @enum {string}
+             */
+            staleness: "fresh" | "stale" | "unknown";
+            /**
+             * Value
+             * @description Current field value
+             */
+            value?: number | null;
+        };
+        /**
+         * FieldTrustGap
+         * @description One analysis-input gap. Conflicts are gaps, not a chosen winner.
+         */
+        FieldTrustGap: {
+            /** Code */
+            code: string;
+            /** Detail */
+            detail?: string | null;
+            /** Field */
+            field?: string | null;
+        };
+        /**
+         * FieldTrustProviderHealth
+         * @description Provider-neutral health row reused from fallback/circuit concepts.
+         */
+        FieldTrustProviderHealth: {
+            /** Available */
+            available?: boolean | null;
+            /** Circuit State */
+            circuit_state?: string | null;
+            /** Health Score */
+            health_score?: number | null;
+            /** Provider */
+            provider: string;
+            /**
+             * Role
+             * @default attempted
+             * @enum {string}
+             */
+            role: "primary" | "supplement" | "attempted";
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "failed" | "empty" | "unavailable";
         };
         /**
          * FirstRunReadinessResponse
@@ -16622,6 +16794,57 @@ export interface components {
              * @description 不重复个股数
              */
             total: number;
+        };
+        /**
+         * StockFieldTrustResponse
+         * @description Structured field-level trust view for a stock quote (Issue #1129).
+         */
+        StockFieldTrustResponse: {
+            analysis_input?: components["schemas"]["FieldTrustAnalysisInput"] | null;
+            /** Conflict Checks */
+            conflict_checks?: components["schemas"]["FieldTrustConflictCheck"][];
+            /** Conflicts */
+            conflicts?: components["schemas"]["FieldTrustConflict"][];
+            /** Data Quality */
+            data_quality?: string | null;
+            /** Fallback From */
+            fallback_from?: string | null;
+            /** Fetched At */
+            fetched_at?: string | null;
+            /** Fields */
+            fields?: components["schemas"]["FieldTrustEntry"][];
+            /** Is Stale */
+            is_stale?: boolean | null;
+            /** Message */
+            message?: string | null;
+            /**
+             * Metadata Present
+             * @description False when the quote carried no field-level trust metadata
+             */
+            metadata_present: boolean;
+            /** Missing Fields */
+            missing_fields?: string[];
+            /** Provider Health */
+            provider_health?: components["schemas"]["FieldTrustProviderHealth"][];
+            /** Provider Timestamp */
+            provider_timestamp?: string | null;
+            /** Quote Source */
+            quote_source?: string | null;
+            /**
+             * Schema Version
+             * @constant
+             */
+            schema_version: "field_trust_view/1.0";
+            /** Stale Seconds */
+            stale_seconds?: number | null;
+            /**
+             * Status
+             * @description ok = every covered field fresh, attributed, conflict-free; degraded = stale/conflicting/unattributed fields present; unavailable = no quote could be fetched
+             * @enum {string}
+             */
+            status: "ok" | "degraded" | "unavailable";
+            /** Stock Code */
+            stock_code: string;
         };
         /**
          * StockHistoryResponse
@@ -30759,6 +30982,55 @@ export interface operations {
                 };
             };
             /** @description Invalid stock code or cursor */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getStockFieldTrust: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                stock_code: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Field-level data trust view */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StockFieldTrustResponse"];
+                };
+            };
+            /** @description Invalid stock code */
             400: {
                 headers: {
                     [name: string]: unknown;

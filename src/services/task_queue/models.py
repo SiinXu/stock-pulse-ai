@@ -42,7 +42,7 @@ from typing import (
 if TYPE_CHECKING:
     from src.services.task_queue import AnalysisTaskQueue
 
-from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.data_provider.base import canonical_stock_code, normalize_stock_code
 from src.enums import ReportType
 from src.report_language import normalize_report_language
 from src.schemas.request_context import AnalysisRequestContext

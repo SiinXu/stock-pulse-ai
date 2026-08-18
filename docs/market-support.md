@@ -107,7 +107,7 @@ A 股 ETF 在个股分析入口中被识别为独立品种，并进入 **ETF 专
   - 依赖版本：`requirements.txt` 中 `yfinance>=0.2.0`，回归覆盖路径见 `tests/test_yfinance_jp_kr_indices.py` 与 `tests/test_yfinance_hk_indices.py`。
 - 兼容性与回退：`MARKET_REVIEW_REGION` 会保留合法逗号子集（如 `cn,us`）并保持 `both` 全量行为，非法值或空值回退到 `cn`，不会清空或迁移已保存配置。
 - 运行时边界：JP/KR 指数按 market_review 的 fail-open 约定逐项抓取；单项失败不会阻断其余指数与其他市场；当两个市场均无可用主指数行情时返回本地可见 `None/空`，主流程继续可按其余市场输出或直接降级。
-- 兼容性验证依据：行情/基本面上下文在 `data_provider/base.py` 与 `realtime_types.py` 中按现有 `getattr`/可选字段约定向下游透传，不强制读写新增字段；无配置迁移脚本，未观察到 provider/model/base URL fallback 路径变更。
+- 兼容性验证依据：行情/基本面上下文在 `src/data_provider/base.py` 与 `src/data_provider/realtime_types.py` 中按现有 `getattr`/可选字段约定向下游透传，不强制读写新增字段；无配置迁移脚本，未观察到 provider/model/base URL fallback 路径变更。
 - 回退方式：若新增元数据字段在某端产生兼容问题，可先忽略这些字段并按既有市场判定+行情展示链路运行；必要时回滚本次提交或通过移除 `jp/kr` `MarketSymbol` 及路由扩展恢复旧行为。
 
 不承诺项：
@@ -136,7 +136,7 @@ A 股 ETF 在个股分析入口中被识别为独立品种，并进入 **ETF 专
 
 说明（兼容性与验收口径）：
 
-- 线上数据可用性来自 Yahoo Finance 指数页面与接口契约，当前实现仅覆盖 `data_provider/yfinance_fetcher.py` 的指数路由与降级行为；不对实时行情连通性作稳定性承诺。
+- 线上数据可用性来自 Yahoo Finance 指数页面与接口契约，当前实现仅覆盖 `src/data_provider/yfinance_fetcher.py` 的指数路由与降级行为；不对实时行情连通性作稳定性承诺。
 - 与该条目标相关的本地自动化验证默认使用离线回归：`tests/test_yfinance_jp_kr_indices.py`、`tests/test_yfinance_hk_indices.py`（共性映射/回退）与 `tests/core/test_trading_calendar.py`（交易日过滤）。如果要补充实时可用性复核，可在联网环境直接访问上述 Yahoo Finance 页面进行一次性抽检。
 
 - 外部兼容性边界（当前实现默认假设）：
@@ -185,7 +185,7 @@ PY
 - 报告 Prompt 已增加台股市场语义（新台币、三大法人、TWSE/TPEx ±10% 涨跌停），并将三大法人净买卖超注入 LLM 分析上下文，避免套用 A 股北向资金、龙虎榜等概念。
 - 交易日历注册 `tw: XTAI / Asia/Taipei`。TWSE 为 09:00–13:30 连续交易、无午休；收盘集合竞价 13:25–13:30 已按 5 分钟启发式窗口建模（`_CLOSING_AUCTION_WINDOW_MINUTES["tw"]=5`，`market_phase` 可返回 `closing_auction`）。JP/KR 也已按常规交易时段补齐收盘集合竞价窗口（JP 15:25-15:30、KR 15:20-15:30）。若本地 `exchange-calendars` 版本缺少对应日历，既有 fail-open/fail-closed 语义保持不变。
 - 主要指数提供加权指数 `^TWII` 与柜买指数 `^TWOII`。
-- 三大法人买卖超（institutional flows）资料层：`TwInstitutionalFetcher`（`data_provider/tw_institutional_fetcher.py`）提供上市（TWSE T86，legacy `rwd` 端点）/ 上柜（TPEx OpenAPI）每日外资·投信·自营商·三大法人买卖超（单位：**股数**；按日期+市场做单日全市场缓存再过滤个股，TPEx 民国年转西元有单测覆盖）。接口失败/限流/空响应/字段缺失一律 **fail-open** 返回无数据，不中断分析；仅对 `.TW`/`.TWO` 生效，不改动现有市场流程。资料来源为政府开放资料，采「政府资料开放授权条款第 1 版」(OGDL v1，允许商用与再散布，需标示来源)。
+- 三大法人买卖超（institutional flows）资料层：`TwInstitutionalFetcher`（`src/data_provider/tw_institutional_fetcher.py`）提供上市（TWSE T86，legacy `rwd` 端点）/ 上柜（TPEx OpenAPI）每日外资·投信·自营商·三大法人买卖超（单位：**股数**；按日期+市场做单日全市场缓存再过滤个股，TPEx 民国年转西元有单测覆盖）。接口失败/限流/空响应/字段缺失一律 **fail-open** 返回无数据，不中断分析；仅对 `.TW`/`.TWO` 生效，不改动现有市场流程。资料来源为政府开放资料，采「政府资料开放授权条款第 1 版」(OGDL v1，允许商用与再散布，需标示来源)。
 - 三大法人 fetcher 已具备并发缓存防击穿和按 TWSE/TPEx 分流的熔断保护；TPEx OpenAPI 仅服务最新交易日，传入与服务日期不符的明确日期会 fail-open 返回无数据，避免错日资料静默进入报告。
 - 台股财务金额会使用 TWD -> 「新台币」标注，避免落入 A 股语境下的默认「元」。
 

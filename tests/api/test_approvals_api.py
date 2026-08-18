@@ -10,9 +10,9 @@ from unittest.mock import MagicMock, patch
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api import deps as api_deps
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import approvals as endpoint
+from src.api import deps as api_deps
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import approvals as endpoint
 from src.schemas.approvals import (
     ApprovalContext,
     ApprovalProposal,

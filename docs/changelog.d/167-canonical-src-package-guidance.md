@@ -1,0 +1,5 @@
+- [Docs] Identify `src/api`, `src/bot`, and `src/data_provider` as the canonical backend packages and document retirement of the root-level import packages (Refs #167).
+- [Docs] Remove the `architecture-overview.md` claim that the four top-level packages are a stable layout rather than an unfinished migration, which contradicted ADR-012 (Refs #167).
+- [Docs] Use canonical `src.*` imports in the plugin/provider authoring samples and the bot webhook sample so out-of-tree authors stop copying the shim import roots (Refs #167).
+- [Chore] Use canonical `src.data_provider` imports in `scripts/check_env.py`, `scripts/refresh_provider_fixtures.py`, and the two in-tree provider example plugins (Refs #167).
+- [Chore] Re-key the stale import-cycle baseline pair `data_provider` / `src.services` to its canonical name `src.data_provider` / `src.services`, so the same pre-existing cycle stays registered once production imports move off the alias (Refs #167).

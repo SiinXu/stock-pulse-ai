@@ -10,8 +10,8 @@ from contextvars import ContextVar
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from data_provider.base import normalize_stock_code
-from data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
+from src.data_provider.base import normalize_stock_code
+from src.data_provider.daily_cache import LocalDataMissingError as __LocalDataMissingError__
 from src.analyzer import AnalysisResult
 from src.core.contracts import (
     FetchDailyDataOutput,

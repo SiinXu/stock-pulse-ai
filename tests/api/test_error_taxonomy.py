@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from api.v1.error_taxonomy import (
+from src.api.v1.error_taxonomy import (
     ERROR_ACTIONS,
     ERROR_CATEGORIES,
     ERROR_CODE_TAXONOMY,
@@ -17,7 +17,7 @@ from api.v1.error_taxonomy import (
     is_classified_error_code,
     registered_error_codes,
 )
-from api.v1.errors import api_error, error_body, normalize_error_body
+from src.api.v1.errors import api_error, error_body, normalize_error_body
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATH = REPO_ROOT / "apps" / "dsa-web" / "src" / "api" / "error" / "catalog.ts"

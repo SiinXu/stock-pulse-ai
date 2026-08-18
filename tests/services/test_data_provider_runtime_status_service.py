@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, List
 
-from data_provider.base import DataFetcherManager
+from src.data_provider.base import DataFetcherManager
 from src.services.data_provider_runtime_status_service import (
     SCHEMA_VERSION,
     build_data_provider_runtime_status,

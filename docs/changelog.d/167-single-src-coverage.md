@@ -1,0 +1,2 @@
+- [Tests] Measure backend coverage against the canonical `src` package only and stop counting compatibility shims as separate packages (Refs #167).
+- [Chore] Use canonical `src.data_provider` imports in shell-script Python probes (Refs #167).

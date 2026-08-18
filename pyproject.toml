@@ -163,14 +163,14 @@ Documentation = "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/INDEX.m
 License = "https://github.com/SiinXu/stock-pulse-ai/blob/main/LICENSE"
 
 # Installable package layout (ADR-012). Reverses the old "application
-# repository … not as an installed library" decision. Four import roots
-# stay first-party package names during the transition. Pin authority
-# remains constraints.txt; environments add
+# repository … not as an installed library" decision. The completed layout
+# exposes only the canonical `src` package tree. Pin authority remains
+# constraints.txt; environments add
 # `python -m pip install --build-constraint build-constraints.txt -e . --no-deps`
 # after the constrained requirements path.
 # See docs/adr/ADR-012-installable-package-layout.md.
 [tool.setuptools.packages.find]
-include = ["src*", "api*", "bot*", "data_provider*"]
+include = ["src*"]
 
 [tool.black]
 line-length = 120
@@ -198,7 +198,7 @@ line_length = 120
 skip = [".git", "__pycache__", ".env", "venv", ".venv"]
 # Import roots treated as first-party during the src-package migration.
 # Shrinks to ["src"] at the single-package end-state (Refs #167).
-known_first_party = ["src", "api", "bot", "data_provider"]
+known_first_party = ["src"]
 
 [tool.bandit]
 exclude_dirs = ["tests", "test_*.py"]

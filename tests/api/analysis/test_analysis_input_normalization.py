@@ -1,6 +1,6 @@
 """Analysis API stock-input normalization regressions."""
 
-from api.v1.services.analysis_api_service import AnalysisApiService
+from src.api.v1.services.analysis_api_service import AnalysisApiService
 
 
 def _service(index_result):

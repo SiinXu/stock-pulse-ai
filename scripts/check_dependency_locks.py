@@ -37,7 +37,7 @@ HEADER_TITLE = "# StockPulse universal Python dependency constraints"
 ALLOWED_EXCEPTION_KINDS = {"mutable-source", "unpinned-version"}
 RUNTIME_EXCEPTION_KIND = "unconstrained-install"
 CUTOFF_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
-RUNTIME_SOURCE_ROOTS = ("src", "api", "bot")
+RUNTIME_SOURCE_ROOTS = ("src",)
 
 
 @dataclass(frozen=True)

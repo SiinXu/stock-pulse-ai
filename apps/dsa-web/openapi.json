@@ -12036,6 +12036,405 @@
         "title": "ExtractItem",
         "type": "object"
       },
+      "FieldTrustAnalysisInput": {
+        "additionalProperties": false,
+        "description": "Provider-neutral gap/confidence projection consumed by analysis.",
+        "properties": {
+          "confidence": {
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ],
+            "title": "Confidence",
+            "type": "string"
+          },
+          "conflict_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Conflict Count",
+            "type": "integer"
+          },
+          "failed_provider_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Failed Provider Count",
+            "type": "integer"
+          },
+          "gaps": {
+            "items": {
+              "$ref": "#/components/schemas/FieldTrustGap"
+            },
+            "maxItems": 128,
+            "title": "Gaps",
+            "type": "array"
+          },
+          "schema_version": {
+            "const": "field_trust_analysis_input/1.0",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "confidence"
+        ],
+        "title": "FieldTrustAnalysisInput",
+        "type": "object"
+      },
+      "FieldTrustConflict": {
+        "additionalProperties": false,
+        "description": "Cross-provider divergence on one field (never silently resolved).",
+        "properties": {
+          "field": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Field",
+            "type": "string"
+          },
+          "relative_difference": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Relative Difference"
+          },
+          "severity": {
+            "default": "warn",
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Severity",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/FieldTrustConflictValue"
+            },
+            "maxItems": 16,
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "FieldTrustConflict",
+        "type": "object"
+      },
+      "FieldTrustConflictCheck": {
+        "additionalProperties": false,
+        "description": "Whether a cross-source comparison actually ran for a provider pair.",
+        "properties": {
+          "primary_provider": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary Provider"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "secondary_provider": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Secondary Provider"
+          },
+          "status": {
+            "enum": [
+              "evaluated",
+              "skipped"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "FieldTrustConflictCheck",
+        "type": "object"
+      },
+      "FieldTrustConflictValue": {
+        "additionalProperties": false,
+        "description": "One provider observation inside a conflict finding.",
+        "properties": {
+          "provider": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "number"
+          }
+        },
+        "required": [
+          "provider",
+          "value"
+        ],
+        "title": "FieldTrustConflictValue",
+        "type": "object"
+      },
+      "FieldTrustEntry": {
+        "additionalProperties": false,
+        "description": "Trust verdict for one quote field.",
+        "properties": {
+          "conflict": {
+            "default": false,
+            "description": "True when providers disagreed on this field",
+            "title": "Conflict",
+            "type": "boolean"
+          },
+          "field": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Field",
+            "type": "string"
+          },
+          "is_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Stale"
+          },
+          "origin": {
+            "default": "unknown",
+            "description": "Whether the field came from the primary provider or a supplement",
+            "enum": [
+              "primary",
+              "supplement",
+              "unknown"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "provider_timestamp": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Timestamp"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "stale_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Seconds"
+          },
+          "staleness": {
+            "default": "unknown",
+            "description": "Staleness verdict; unknown must be rendered as degraded, never trusted",
+            "enum": [
+              "fresh",
+              "stale",
+              "unknown"
+            ],
+            "title": "Staleness",
+            "type": "string"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current field value",
+            "title": "Value"
+          }
+        },
+        "required": [
+          "field"
+        ],
+        "title": "FieldTrustEntry",
+        "type": "object"
+      },
+      "FieldTrustGap": {
+        "additionalProperties": false,
+        "description": "One analysis-input gap. Conflicts are gaps, not a chosen winner.",
+        "properties": {
+          "code": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "maxLength": 240,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "field": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Field"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "FieldTrustGap",
+        "type": "object"
+      },
+      "FieldTrustProviderHealth": {
+        "additionalProperties": false,
+        "description": "Provider-neutral health row reused from fallback/circuit concepts.",
+        "properties": {
+          "available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Available"
+          },
+          "circuit_state": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Circuit State"
+          },
+          "health_score": {
+            "anyOf": [
+              {
+                "maximum": 100.0,
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Health Score"
+          },
+          "provider": {
+            "maxLength": 160,
+            "minLength": 1,
+            "title": "Provider",
+            "type": "string"
+          },
+          "role": {
+            "default": "attempted",
+            "enum": [
+              "primary",
+              "supplement",
+              "attempted"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ok",
+              "failed",
+              "empty",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "provider",
+          "status"
+        ],
+        "title": "FieldTrustProviderHealth",
+        "type": "object"
+      },
       "FirstRunReadinessResponse": {
         "description": "Zero-config first-run readiness snapshot (read-only; never mutates config).",
         "properties": {
@@ -32432,6 +32831,191 @@
           "total"
         ],
         "title": "StockBarResponse",
+        "type": "object"
+      },
+      "StockFieldTrustResponse": {
+        "additionalProperties": false,
+        "description": "Structured field-level trust view for a stock quote (Issue #1129).",
+        "properties": {
+          "analysis_input": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FieldTrustAnalysisInput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "conflict_checks": {
+            "items": {
+              "$ref": "#/components/schemas/FieldTrustConflictCheck"
+            },
+            "maxItems": 32,
+            "title": "Conflict Checks",
+            "type": "array"
+          },
+          "conflicts": {
+            "items": {
+              "$ref": "#/components/schemas/FieldTrustConflict"
+            },
+            "maxItems": 64,
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "data_quality": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Data Quality"
+          },
+          "fallback_from": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fallback From"
+          },
+          "fetched_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fetched At"
+          },
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldTrustEntry"
+            },
+            "maxItems": 64,
+            "title": "Fields",
+            "type": "array"
+          },
+          "is_stale": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Stale"
+          },
+          "message": {
+            "anyOf": [
+              {
+                "maxLength": 500,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Message"
+          },
+          "metadata_present": {
+            "description": "False when the quote carried no field-level trust metadata",
+            "title": "Metadata Present",
+            "type": "boolean"
+          },
+          "missing_fields": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 64,
+            "title": "Missing Fields",
+            "type": "array"
+          },
+          "provider_health": {
+            "items": {
+              "$ref": "#/components/schemas/FieldTrustProviderHealth"
+            },
+            "maxItems": 32,
+            "title": "Provider Health",
+            "type": "array"
+          },
+          "provider_timestamp": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Timestamp"
+          },
+          "quote_source": {
+            "anyOf": [
+              {
+                "maxLength": 160,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote Source"
+          },
+          "schema_version": {
+            "const": "field_trust_view/1.0",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "stale_seconds": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stale Seconds"
+          },
+          "status": {
+            "description": "ok = every covered field fresh, attributed, conflict-free; degraded = stale/conflicting/unattributed fields present; unavailable = no quote could be fetched",
+            "enum": [
+              "ok",
+              "degraded",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "stock_code": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Stock Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema_version",
+          "stock_code",
+          "status",
+          "metadata_present"
+        ],
+        "title": "StockFieldTrustResponse",
         "type": "object"
       },
       "StockHistoryResponse": {
@@ -56312,6 +56896,69 @@
           }
         },
         "summary": "Per-symbol research timeline",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/{stock_code}/trust": {
+      "get": {
+        "description": "Returns per-field source attribution, lag, staleness, cross-provider conflicts, and provider health for the latest realtime quote (Issue #1129). The view degrades explicitly: status=unavailable when no quote exists, and status=degraded when trust metadata is absent, fields are stale or unattributed, or providers disagree. Conflicts are surfaced, never silently resolved to one source. Analysis consumers receive the same gap/confidence projection.",
+        "operationId": "getStockFieldTrust",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "stock_code",
+            "required": true,
+            "schema": {
+              "title": "Stock Code",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockFieldTrustResponse"
+                }
+              }
+            },
+            "description": "Field-level data trust view"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid stock code"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Server error"
+          }
+        },
+        "summary": "Get field-level data trust for a stock quote",
         "tags": [
           "Stocks"
         ]

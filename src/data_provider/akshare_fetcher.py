@@ -133,11 +133,11 @@ USER_AGENTS = [
 ]
 
 # Re-exported from akshare_parts.realtime_cache for test/patch parity:
-# tests and diagnostics continue to target data_provider.akshare_fetcher._realtime_cache
+# Tests and diagnostics target src.data_provider.akshare_fetcher._realtime_cache
 # and _etf_realtime_cache (same process-local dict objects).
 
-# Pure helpers and timeout client symbols are re-exported above so historical
-# import paths (``from data_provider.akshare_fetcher import ...``) stay stable.
+# Pure helpers and timeout client symbols are re-exported above so the canonical
+# ``src.data_provider.akshare_fetcher`` public surface stays stable.
 
 
 class AkshareFetcher(BaseFetcher):
@@ -340,4 +340,3 @@ def _install_part_reload_hooks() -> None:
 
 
 _install_part_reload_hooks()
-

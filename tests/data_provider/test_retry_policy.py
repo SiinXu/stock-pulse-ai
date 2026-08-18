@@ -10,8 +10,8 @@ from unittest.mock import MagicMock, patch
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetchError
-from data_provider.retry_policy import (
+from src.data_provider.base import DataFetchError
+from src.data_provider.retry_policy import (
     DEFAULT_ATTEMPTS,
     DEFAULT_REQUEST_TIMEOUT_SECONDS,
     call_with_timeout,
@@ -52,7 +52,7 @@ def test_call_with_timeout_uses_default_when_timeout_non_positive() -> None:
     executor.submit.return_value = future
 
     with patch(
-        "data_provider.retry_policy.ThreadPoolExecutor",
+        "src.data_provider.retry_policy.ThreadPoolExecutor",
         return_value=executor,
     ):
         result = call_with_timeout(lambda: None, timeout=0, call_name="unit-default")
@@ -111,7 +111,7 @@ def test_provider_retry_succeeds_after_transient_timeout() -> None:
 
 
 def test_baostock_fetch_timeout_is_raised_and_retried() -> None:
-    from data_provider.baostock_fetcher import BaostockFetcher
+    from src.data_provider.baostock_fetcher import BaostockFetcher
 
     fetcher = BaostockFetcher(request_timeout_seconds=0.05)
     calls = {"n": 0}
@@ -122,7 +122,7 @@ def test_baostock_fetch_timeout_is_raised_and_retried() -> None:
 
     with patch.object(fetcher, "_convert_stock_code", return_value="sh.600519"):
         with patch(
-            "data_provider.baostock_fetcher.call_with_timeout",
+            "src.data_provider.baostock_fetcher.call_with_timeout",
             side_effect=_timeout,
         ):
             with patch("tenacity.nap.sleep", return_value=None):
@@ -133,7 +133,7 @@ def test_baostock_fetch_timeout_is_raised_and_retried() -> None:
 
 
 def test_baostock_non_retryable_error_not_retried() -> None:
-    from data_provider.baostock_fetcher import BaostockFetcher
+    from src.data_provider.baostock_fetcher import BaostockFetcher
 
     fetcher = BaostockFetcher()
     calls = {"n": 0}
@@ -144,7 +144,7 @@ def test_baostock_non_retryable_error_not_retried() -> None:
 
     with patch.object(fetcher, "_convert_stock_code", return_value="sh.600519"):
         with patch(
-            "data_provider.baostock_fetcher.call_with_timeout",
+            "src.data_provider.baostock_fetcher.call_with_timeout",
             side_effect=_raise_data_error,
         ):
             with pytest.raises(DataFetchError, match="查询失败"):
@@ -154,10 +154,10 @@ def test_baostock_non_retryable_error_not_retried() -> None:
 
 
 def test_baostock_unsupported_market_still_fails_fast_without_timeout() -> None:
-    from data_provider.baostock_fetcher import BaostockFetcher
+    from src.data_provider.baostock_fetcher import BaostockFetcher
 
     fetcher = BaostockFetcher()
-    with patch("data_provider.baostock_fetcher.call_with_timeout") as mock_timeout:
+    with patch("src.data_provider.baostock_fetcher.call_with_timeout") as mock_timeout:
         with pytest.raises(DataFetchError, match="不支持美股"):
             fetcher._fetch_raw_data("AAPL", "2024-01-01", "2024-01-10")
     mock_timeout.assert_not_called()
@@ -169,7 +169,7 @@ def test_baostock_unsupported_market_still_fails_fast_without_timeout() -> None:
 
 
 def test_pytdx_fetch_timeout_is_raised_and_retried() -> None:
-    from data_provider.pytdx_fetcher import PytdxFetcher
+    from src.data_provider.pytdx_fetcher import PytdxFetcher
 
     fetcher = PytdxFetcher(hosts=[("127.0.0.1", 7709)], request_timeout_seconds=0.05)
     calls = {"n": 0}
@@ -179,7 +179,7 @@ def test_pytdx_fetch_timeout_is_raised_and_retried() -> None:
         raise TimeoutError("pytdx.get_security_bars exceeded")
 
     with patch(
-        "data_provider.pytdx_fetcher.call_with_timeout",
+        "src.data_provider.pytdx_fetcher.call_with_timeout",
         side_effect=_timeout,
     ):
         with patch("tenacity.nap.sleep", return_value=None):
@@ -190,7 +190,7 @@ def test_pytdx_fetch_timeout_is_raised_and_retried() -> None:
 
 
 def test_pytdx_non_retryable_error_not_retried() -> None:
-    from data_provider.pytdx_fetcher import PytdxFetcher
+    from src.data_provider.pytdx_fetcher import PytdxFetcher
 
     fetcher = PytdxFetcher(hosts=[("127.0.0.1", 7709)])
     calls = {"n": 0}
@@ -200,7 +200,7 @@ def test_pytdx_non_retryable_error_not_retried() -> None:
         raise DataFetchError("Pytdx 未查询到 600519 的数据")
 
     with patch(
-        "data_provider.pytdx_fetcher.call_with_timeout",
+        "src.data_provider.pytdx_fetcher.call_with_timeout",
         side_effect=_raise_data_error,
     ):
         with pytest.raises(DataFetchError, match="未查询到"):
@@ -210,10 +210,10 @@ def test_pytdx_non_retryable_error_not_retried() -> None:
 
 
 def test_pytdx_unsupported_market_still_fails_fast() -> None:
-    from data_provider.pytdx_fetcher import PytdxFetcher
+    from src.data_provider.pytdx_fetcher import PytdxFetcher
 
     fetcher = PytdxFetcher(hosts=[("127.0.0.1", 7709)])
-    with patch("data_provider.pytdx_fetcher.call_with_timeout") as mock_timeout:
+    with patch("src.data_provider.pytdx_fetcher.call_with_timeout") as mock_timeout:
         with pytest.raises(DataFetchError, match="不支持港股"):
             fetcher._fetch_raw_data("HK00700", "2024-01-01", "2024-01-10")
     mock_timeout.assert_not_called()
@@ -225,7 +225,7 @@ def test_pytdx_unsupported_market_still_fails_fast() -> None:
 
 
 def test_longbridge_fetch_timeout_is_raised_and_retried() -> None:
-    from data_provider.longbridge_fetcher import LongbridgeFetcher
+    from src.data_provider.longbridge_fetcher import LongbridgeFetcher
 
     fetcher = LongbridgeFetcher(request_timeout_seconds=0.05)
     fetcher._available = True
@@ -239,7 +239,7 @@ def test_longbridge_fetch_timeout_is_raised_and_retried() -> None:
     mock_ctx = MagicMock()
     with patch.object(fetcher, "_get_ctx", return_value=mock_ctx):
         with patch(
-            "data_provider.longbridge_fetcher.call_with_timeout",
+            "src.data_provider.longbridge_fetcher.call_with_timeout",
             side_effect=_timeout,
         ):
             with patch.dict(
@@ -260,7 +260,7 @@ def test_longbridge_fetch_timeout_is_raised_and_retried() -> None:
 
 
 def test_longbridge_connection_error_still_marks_cooldown() -> None:
-    from data_provider.longbridge_fetcher import LongbridgeFetcher
+    from src.data_provider.longbridge_fetcher import LongbridgeFetcher
 
     fetcher = LongbridgeFetcher(request_timeout_seconds=1.0)
     fetcher._available = True
@@ -274,7 +274,7 @@ def test_longbridge_connection_error_still_marks_cooldown() -> None:
     mock_ctx = MagicMock()
     with patch.object(fetcher, "_get_ctx", return_value=mock_ctx):
         with patch(
-            "data_provider.longbridge_fetcher.call_with_timeout",
+            "src.data_provider.longbridge_fetcher.call_with_timeout",
             side_effect=_conn_err,
         ):
             with patch.dict(
@@ -296,7 +296,7 @@ def test_longbridge_connection_error_still_marks_cooldown() -> None:
 
 
 def test_longbridge_successful_fetch_uses_timeout_wrapper() -> None:
-    from data_provider.longbridge_fetcher import LongbridgeFetcher
+    from src.data_provider.longbridge_fetcher import LongbridgeFetcher
 
     fetcher = LongbridgeFetcher(request_timeout_seconds=12.0)
     fetcher._available = True
@@ -321,7 +321,7 @@ def test_longbridge_successful_fetch_uses_timeout_wrapper() -> None:
     mock_ctx = MagicMock()
     with patch.object(fetcher, "_get_ctx", return_value=mock_ctx):
         with patch(
-            "data_provider.longbridge_fetcher.call_with_timeout",
+            "src.data_provider.longbridge_fetcher.call_with_timeout",
             side_effect=_call,
         ):
             with patch.dict(

@@ -10,33 +10,24 @@ from scripts import ci_select_tests
 from scripts.ci_select_tests import select_targets
 
 
-def test_bot_and_src_bot_share_the_same_selective_targets() -> None:
+def test_src_bot_maps_to_bot_selective_targets() -> None:
     """src/bot/ must win over the catch-all src/ prefix (first-match)."""
 
-    shim = select_targets(["bot/__init__.py"])
     moved = select_targets(["src/bot/dispatcher.py"])
     expected = [
         "tests/bot",
         "tests/test_notification.py",
         "tests/test_notification_sender.py",
     ]
-    assert shim == expected
     assert moved == expected
     assert "tests/" not in moved
 
 
-def test_api_paths_map_to_api_tests() -> None:
-    result = select_targets(["api/v1/endpoints/analysis.py"])
-    assert result != "FULL"
-    assert isinstance(result, list)
-    assert any(path.startswith("tests/api") or path == "tests/api" for path in result)
-
-
-def test_src_api_paths_map_to_the_same_api_tests() -> None:
+def test_src_api_paths_map_to_api_tests() -> None:
     result = select_targets(["src/api/v1/endpoints/analysis.py"])
     assert result != "FULL"
     assert isinstance(result, list)
-    assert result == select_targets(["api/v1/endpoints/analysis.py"])
+    assert any(path.startswith("tests/api") or path == "tests/api" for path in result)
 
 
 def test_config_forces_full_suite() -> None:
@@ -51,11 +42,7 @@ def test_non_collectable_test_support_forces_full_suite() -> None:
 
 
 def test_data_provider_roots_map_to_provider_tests() -> None:
-    for changed in (
-        "data_provider/__init__.py",
-        "src/data_provider/base.py",
-        "src/data_provider/akshare_parts/symbols.py",
-    ):
+    for changed in ("src/data_provider/base.py", "src/data_provider/akshare_parts/symbols.py"):
         result = select_targets([changed])
         assert result == ["tests/data_provider"], changed
 

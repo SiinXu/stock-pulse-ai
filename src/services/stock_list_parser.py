@@ -238,7 +238,7 @@ _KNOWN_PREFIXES_SORTED = tuple(
 # Canonical US ticker shape: 1-5 uppercase letters optionally followed by
 # a single dot + 1-2 uppercase letters (covers ``AAPL`` / ``BRK.B`` /
 # ``SHOP.US`` / ``HKD`` / ``USFD`` etc.). This mirrors the regex used by
-# ``data_provider/us_index_mapping.py:16-17`` and
+# ``src/data_provider/us_index_mapping.py:16-17`` and
 # ``stock_code_utils._normalize_code_and_exchange`` for the US branch.
 # Used by ``parse_analysis_target`` to enforce the Phase 1 contract that
 # ``us``-prefixed tokens must use a valid uppercase US ticker base — see
@@ -351,7 +351,7 @@ class IndexRegistry:
     The registry is populated with a small built-in white-list of canonical
     A-share indices (CSI 300 / SSE 50 / STAR 50 / SZSE Component / ChiNext)
     that already exist as hard-coded white-lists across
-    ``data_provider/*_fetcher.py``. PR1 deliberately keeps the registry
+    ``src/data_provider/*_fetcher.py``. PR1 deliberately keeps the registry
     in-memory and immutable — later phases of issue #2063 will load the
     ``asset_type=index`` rows from ``apps/dsa-web/public/stocks.index.json``
     once that file carries index rows; the parser contract won't change.
@@ -411,7 +411,7 @@ class IndexRegistry:
 # Default index registry — the built-in white-list.
 # ---------------------------------------------------------------------------
 # Five canonical A-share indices, mirroring the hard-coded lists already
-# present in ``data_provider/{efinance,akshare,yfinance,tickflow}_fetcher.py``.
+# present in ``src/data_provider/{efinance,akshare,yfinance,tickflow}_fetcher.py``.
 # Keeping this list in one place + giving it a public ``IndexRegistry`` type
 # is the whole point of PR1; later phases may move the data into
 # ``apps/dsa-web/public/stocks.index.json`` and load it, but the parser
@@ -490,9 +490,9 @@ def _classify_bare_code(bare: str) -> Tuple[str, str]:
             if bare.startswith(("4", "8", "9")):
                 return "BJ", ParseStatus.STOCK
             # A-share ETF prefixes mirror the routing already living in
-            # ``data_provider/baostock_fetcher.py`` and
-            # ``data_provider/yfinance_fetcher.py`` (and the
-            # ``ETF_PREFIXES`` tuple in ``data_provider/base.py``):
+            # ``src/data_provider/baostock_fetcher.py`` and
+            # ``src/data_provider/yfinance_fetcher.py`` (and the
+            # ``ETF_PREFIXES`` tuple in ``src/data_provider/base.py``):
             #   51/52/56/58 -> sh (Shanghai ETF)
             #   15/16/18    -> sz (Shenzhen ETF)
             # Routing them through ``CN`` was a review blocker
@@ -552,7 +552,7 @@ def _canonicalize_for_stock(
         return bare.lower(), bare
     if exchange == "US":
         # US tickers are inherently alphanumeric; canonical stock codes are
-        # uppercase across ``data_provider`` (``data_provider/base.py``).
+        # uppercase across ``src.data_provider`` (``src/data_provider/base.py``).
         # All-uppercase bare input (``AAPL``/``USFD``) round-trips unchanged
         # and lowercase bare input from explicit-prefix forms
         # (``usaapl``→``(us, aapl)``) is normalized to uppercase so the
@@ -643,7 +643,7 @@ def parse_analysis_target(
     # but the ticker base must arrive in canonical uppercase US symbol
     # shape. ``us``-prefixed tokens whose base does NOT match the canonical
     # US ticker shape ``^[A-Z]{1,5}(\.[A-Z]{1,2})?$`` (the same regex used by
-    # ``data_provider/us_index_mapping.py:16-17`` and
+    # ``src/data_provider/us_index_mapping.py:16-17`` and
     # ``stock_code_utils._normalize_code_and_exchange``) — e.g. ``usfd`` /
     # ``usm`` / ``usibm`` / ``usaapl`` / ``usshop`` (all-lowercase) AND
     # ``Usfd`` / ``USibm`` / ``Usaapl`` (mixed-case prefix with lowercase

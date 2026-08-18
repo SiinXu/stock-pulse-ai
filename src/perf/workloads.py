@@ -79,7 +79,7 @@ def _run_timed(
 
 def workload_data_fetch_indicators() -> Dict[str, Any]:
     """Data-path: indicator calculation on multi-year synthetic OHLCV."""
-    from data_provider.base import BaseFetcher
+    from src.data_provider.base import BaseFetcher
 
     class _IndicatorHost(BaseFetcher):
         def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:

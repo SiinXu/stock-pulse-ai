@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from api.v1.endpoints import history as history_endpoint
+from src.api.v1.endpoints import history as history_endpoint
 
 
 class _FakeHistoryService:

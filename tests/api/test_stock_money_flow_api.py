@@ -16,8 +16,8 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 
 import src.auth as auth
-from api.app import create_app
-from data_provider.money_flow_types import MoneyFlowOutcome, MoneyFlowSnapshot, MoneyFlowStatus
+from src.api.app import create_app
+from src.data_provider.money_flow_types import MoneyFlowOutcome, MoneyFlowSnapshot, MoneyFlowStatus
 from src.config import Config
 from src.storage import DatabaseManager
 
@@ -114,7 +114,7 @@ class StockMoneyFlowApiTests(unittest.TestCase):
         config = SimpleNamespace(smartmoney_enabled=True)
         services = SimpleNamespace(config=config)
         with patch(
-            "api.v1.endpoints.stocks.get_application_services",
+            "src.api.v1.endpoints.stocks.get_application_services",
             return_value=services,
         ), patch(
             "src.services.smartmoney_flow_service.fetch_money_flow",
@@ -169,10 +169,10 @@ class StockMoneyFlowApiTests(unittest.TestCase):
             "disclaimer": "Research evidence only.",
         }
         with patch(
-            "api.v1.endpoints.stocks.get_application_services",
+            "src.api.v1.endpoints.stocks.get_application_services",
             return_value=services,
         ), patch(
-            "api.v1.endpoints.stocks.build_money_flow_view",
+            "src.api.v1.endpoints.stocks.build_money_flow_view",
             return_value=invalid_payload,
         ):
             resp = self.client.get("/api/v1/stocks/600519/money-flow")

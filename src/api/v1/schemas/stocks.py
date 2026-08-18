@@ -270,3 +270,179 @@ class StockHistoryResponse(BaseModel):
             "data": []
         }
     })
+
+
+# ---------------------------------------------------------------------------
+# Field-level data trust (Issue #1129)
+# ---------------------------------------------------------------------------
+
+FieldTrustStaleness = Literal["fresh", "stale", "unknown"]
+FieldTrustOrigin = Literal["primary", "supplement", "unknown"]
+FieldTrustStatus = Literal["ok", "degraded", "unavailable"]
+FieldTrustConfidence = Literal["high", "medium", "low"]
+FieldTrustProviderStatus = Literal["ok", "failed", "empty", "unavailable"]
+FieldTrustProviderRole = Literal["primary", "supplement", "attempted"]
+
+
+class FieldTrustEntry(BaseModel):
+    """Trust verdict for one quote field."""
+
+    field: str = Field(min_length=1, max_length=64)
+    value: Optional[FiniteFloat] = Field(default=None, description="Current field value")
+    source: Optional[str] = Field(default=None, min_length=1, max_length=160)
+    origin: FieldTrustOrigin = Field(
+        default="unknown",
+        description="Whether the field came from the primary provider or a supplement",
+    )
+    provider_timestamp: Optional[str] = Field(default=None, max_length=64)
+    stale_seconds: Optional[int] = Field(default=None, ge=0)
+    is_stale: Optional[bool] = None
+    staleness: FieldTrustStaleness = Field(
+        default="unknown",
+        description="Staleness verdict; unknown must be rendered as degraded, never trusted",
+    )
+    conflict: bool = Field(
+        default=False, description="True when providers disagreed on this field"
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FieldTrustConflictValue(BaseModel):
+    """One provider observation inside a conflict finding."""
+
+    provider: str = Field(min_length=1, max_length=160)
+    value: FiniteFloat
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FieldTrustConflict(BaseModel):
+    """Cross-provider divergence on one field (never silently resolved)."""
+
+    field: str = Field(min_length=1, max_length=64)
+    severity: str = Field(default="warn", min_length=1, max_length=32)
+    relative_difference: Optional[FiniteFloat] = Field(default=None, ge=0)
+    threshold: Optional[FiniteFloat] = Field(default=None, ge=0)
+    values: List[FieldTrustConflictValue] = Field(default_factory=list, max_length=16)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FieldTrustConflictCheck(BaseModel):
+    """Whether a cross-source comparison actually ran for a provider pair."""
+
+    primary_provider: Optional[str] = Field(default=None, max_length=160)
+    secondary_provider: Optional[str] = Field(default=None, max_length=160)
+    status: Literal["evaluated", "skipped"]
+    reason: Optional[str] = Field(default=None, max_length=120)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FieldTrustProviderHealth(BaseModel):
+    """Provider-neutral health row reused from fallback/circuit concepts."""
+
+    provider: str = Field(min_length=1, max_length=160)
+    status: FieldTrustProviderStatus
+    role: FieldTrustProviderRole = Field(default="attempted")
+    circuit_state: Optional[str] = Field(default=None, max_length=32)
+    available: Optional[bool] = None
+    health_score: Optional[FiniteFloat] = Field(default=None, ge=0, le=100)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FieldTrustGap(BaseModel):
+    """One analysis-input gap. Conflicts are gaps, not a chosen winner."""
+
+    code: str = Field(min_length=1, max_length=64)
+    field: Optional[str] = Field(default=None, max_length=64)
+    detail: Optional[str] = Field(default=None, max_length=240)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class FieldTrustAnalysisInput(BaseModel):
+    """Provider-neutral gap/confidence projection consumed by analysis."""
+
+    schema_version: Literal["field_trust_analysis_input/1.0"]
+    confidence: FieldTrustConfidence
+    gaps: List[FieldTrustGap] = Field(default_factory=list, max_length=128)
+    conflict_count: int = Field(default=0, ge=0)
+    failed_provider_count: int = Field(default=0, ge=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StockFieldTrustResponse(BaseModel):
+    """Structured field-level trust view for a stock quote (Issue #1129)."""
+
+    schema_version: Literal["field_trust_view/1.0"]
+    stock_code: str = Field(min_length=1, max_length=32)
+    status: FieldTrustStatus = Field(
+        description=(
+            "ok = every covered field fresh, attributed, conflict-free; "
+            "degraded = stale/conflicting/unattributed fields present; "
+            "unavailable = no quote could be fetched"
+        )
+    )
+    metadata_present: bool = Field(
+        description="False when the quote carried no field-level trust metadata"
+    )
+    quote_source: Optional[str] = Field(default=None, max_length=160)
+    fetched_at: Optional[str] = Field(default=None, max_length=64)
+    provider_timestamp: Optional[str] = Field(default=None, max_length=64)
+    stale_seconds: Optional[int] = Field(default=None, ge=0)
+    is_stale: Optional[bool] = None
+    fallback_from: Optional[str] = Field(default=None, max_length=160)
+    data_quality: Optional[str] = Field(default=None, max_length=32)
+    missing_fields: List[str] = Field(default_factory=list, max_length=64)
+    fields: List[FieldTrustEntry] = Field(default_factory=list, max_length=64)
+    conflicts: List[FieldTrustConflict] = Field(default_factory=list, max_length=64)
+    conflict_checks: List[FieldTrustConflictCheck] = Field(
+        default_factory=list, max_length=32
+    )
+    provider_health: List[FieldTrustProviderHealth] = Field(
+        default_factory=list, max_length=32
+    )
+    analysis_input: Optional[FieldTrustAnalysisInput] = None
+    message: Optional[str] = Field(default=None, max_length=500)
+
+    model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="after")
+    def validate_trust_invariants(self) -> "StockFieldTrustResponse":
+        if self.status == "unavailable":
+            if self.fields or self.metadata_present:
+                raise ValueError("unavailable trust view must not carry field verdicts")
+            return self
+        if not self.metadata_present and self.status == "ok":
+            raise ValueError("trust view without metadata must not report ok")
+        analysis = self.analysis_input
+        analysis_degraded = bool(
+            analysis is not None
+            and (
+                analysis.confidence != "high"
+                or analysis.gaps
+                or analysis.conflict_count > 0
+                or analysis.failed_provider_count > 0
+            )
+        )
+        health_degraded = any(row.status != "ok" for row in self.provider_health)
+        degraded_signals = (
+            any(
+                entry.staleness != "fresh" or entry.conflict or entry.source is None
+                for entry in self.fields
+            )
+            or bool(self.conflicts)
+            or not self.fields
+            or self.fallback_from is not None
+            or health_degraded
+            or analysis_degraded
+        )
+        if self.status == "ok" and degraded_signals:
+            raise ValueError("ok trust view must not contain degraded field verdicts")
+        if self.status == "degraded" and self.metadata_present and not degraded_signals:
+            raise ValueError("degraded trust view requires a degradation signal")
+        return self

@@ -11,9 +11,9 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 
-from data_provider.base import DataFetchError
-from data_provider.realtime_types import RealtimeSource
-from data_provider.tickflow_fetcher import TickFlowFetcher
+from src.data_provider.base import DataFetchError
+from src.data_provider.realtime_types import RealtimeSource
+from src.data_provider.tickflow_fetcher import TickFlowFetcher
 
 
 class _PermissionLikeError(Exception):
@@ -293,7 +293,7 @@ class TestTickFlowFetcher(unittest.TestCase):
         fetcher = TickFlowFetcher(api_key="sk-test", batch_size=1)
         fetcher._client = _FakeClient(daily_data=pd.DataFrame(), batch_data=batch_data)
 
-        with self.assertLogs("data_provider.tickflow_fetcher", level="INFO") as logs:
+        with self.assertLogs("src.data_provider.tickflow_fetcher", level="INFO") as logs:
             cached = fetcher.prefetch_daily_klines(
                 ["600519", "000001"],
                 start_date="2024-01-01",
@@ -403,7 +403,7 @@ class TestTickFlowFetcher(unittest.TestCase):
         fetcher = TickFlowFetcher(api_key="sk-test")
         fetcher._client = _FakeClient(universe_data=_PermissionLikeError("universe forbidden"))
 
-        with patch("data_provider.tickflow_fetcher.monotonic", side_effect=[100.0, 100.0, 1001.0, 1001.0]):
+        with patch("src.data_provider.tickflow_fetcher.monotonic", side_effect=[100.0, 100.0, 1001.0, 1001.0]):
             self.assertIsNone(fetcher.get_market_stats())
             self.assertIsNone(fetcher.get_market_stats())
 

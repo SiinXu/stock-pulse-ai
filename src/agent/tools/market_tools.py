@@ -22,7 +22,7 @@ _MARKET_READ_POLICY = ToolPolicy.declared(
 
 def _get_fetcher_manager():
     """Lazy import to avoid circular deps."""
-    from data_provider import DataFetcherManager
+    from src.data_provider import DataFetcherManager
     return DataFetcherManager()
 
 

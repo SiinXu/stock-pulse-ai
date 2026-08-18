@@ -16,7 +16,7 @@ import pandas as pd
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from data_provider.base import BaseFetcher, DataFetcherManager
+from src.data_provider.base import BaseFetcher, DataFetcherManager
 from src.services.run_diagnostics import (
     RunDiagnosticContext,
     activate_run_diagnostic_context,

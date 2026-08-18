@@ -22,7 +22,7 @@ except ValueError:
 if not json_repair_available and "json_repair" not in sys.modules:
     sys.modules["json_repair"] = MagicMock()
 
-from data_provider.tushare_fetcher import TushareFetcher, _TushareHttpClient
+from src.data_provider.tushare_fetcher import TushareFetcher, _TushareHttpClient
 
 
 class TestTushareHttpClient(unittest.TestCase):
@@ -43,7 +43,7 @@ class TestTushareHttpClient(unittest.TestCase):
             ),
         )
 
-        with patch("data_provider.tushare_fetcher.requests.post", return_value=response) as post_mock:
+        with patch("src.data_provider.tushare_fetcher.requests.post", return_value=response) as post_mock:
             df = client.daily(ts_code="600519.SH", start_date="20260320", end_date="20260325")
 
         post_mock.assert_called_once_with(
@@ -72,7 +72,7 @@ class TestTushareHttpClient(unittest.TestCase):
             api_url="http://127.0.0.1:8000/tushare",
         )
 
-        with patch("data_provider.tushare_fetcher.requests.post") as post_mock:
+        with patch("src.data_provider.tushare_fetcher.requests.post") as post_mock:
             with self.assertRaises(OutboundPolicyError):
                 client.daily(ts_code="600519.SH")
 
@@ -85,7 +85,7 @@ class TestTushareFetcherInit(unittest.TestCase):
     def test_init_builds_http_client_when_token_present(self) -> None:
         config = SimpleNamespace(tushare_token="demo-token")
 
-        with patch("data_provider.tushare_fetcher.get_config", return_value=config):
+        with patch("src.data_provider.tushare_fetcher.get_config", return_value=config):
             fetcher = TushareFetcher()
 
         self.assertIsInstance(fetcher._api, _TushareHttpClient)

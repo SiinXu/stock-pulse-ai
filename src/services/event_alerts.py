@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Set, Tuple
 
-from data_provider.base import normalize_stock_code
+from src.data_provider.base import normalize_stock_code
 from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)

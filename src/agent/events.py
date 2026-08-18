@@ -287,7 +287,7 @@ class EventMonitor:
         return None
 
     def _fetch_realtime_quote(self, stock_code: str) -> Any:
-        from data_provider import DataFetcherManager
+        from src.data_provider import DataFetcherManager
 
         return DataFetcherManager().get_realtime_quote(stock_code)
 
@@ -376,7 +376,7 @@ class EventMonitor:
         """Check volume spike against recent average."""
         try:
             def _fetch_daily_data():
-                from data_provider import DataFetcherManager
+                from src.data_provider import DataFetcherManager
 
                 fm = DataFetcherManager()
                 return fm.get_daily_data(rule.stock_code, days=20)
@@ -399,7 +399,7 @@ class EventMonitor:
                     message=f"📊 {rule.stock_code} volume spike: "
                             f"{latest_vol:,.0f} ({latest_vol / avg_vol:.1f}× avg)",
                 )
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - a failed volume probe is safe-logged and treated as not triggered
             log_safe_exception(
                 logger,
                 "Event monitor volume check failed",

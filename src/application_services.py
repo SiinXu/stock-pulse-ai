@@ -175,7 +175,7 @@ class ApplicationServices:
             if data_provider_auto_bind_enabled(config):
                 # Opt-in process composition: bind PluginManager to the exact
                 # DataFetcherManager.plugin_registry so provider plugins route.
-                from data_provider import DataFetcherManager
+                from src.data_provider import DataFetcherManager
 
                 if self._data_fetcher_manager is None:
                     self._data_fetcher_manager = DataFetcherManager(

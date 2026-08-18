@@ -25,9 +25,9 @@ from tests.security_audit_test_utils import SecurityAuditRecorderStub
 ensure_litellm_stub()
 
 try:
-    from api.app import create_app
-    from api.v1.endpoints import analysis as analysis_endpoint_module
-    from api.v1.endpoints.analysis import (
+    from src.api.app import create_app
+    from src.api.v1.endpoints import analysis as analysis_endpoint_module
+    from src.api.v1.endpoints.analysis import (
         trigger_analysis as _trigger_analysis,
         trigger_market_review,
         _handle_sync_analysis,

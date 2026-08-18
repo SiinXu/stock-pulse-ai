@@ -22,7 +22,7 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 import src.auth as auth
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.services.portfolio_service import PortfolioBusyError
 from src.storage import DatabaseManager
@@ -441,7 +441,7 @@ class PortfolioApiTestCase(unittest.TestCase):
         with patch(
             "src.services.portfolio_service.PortfolioService._fetch_realtime_position_price",
             return_value=(None, None),
-        ), patch("api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
+        ), patch("src.api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
             resp = self.client.post(
                 "/api/v1/portfolio/positions/600519/analysis",
                 json={"account_id": account_id, "analysis_phase": "intraday", "force": True},
@@ -479,7 +479,7 @@ class PortfolioApiTestCase(unittest.TestCase):
         with patch(
             "src.services.portfolio_service.PortfolioService._fetch_realtime_position_price",
             return_value=(None, None),
-        ), patch("api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
+        ), patch("src.api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
             resp = self.client.post(
                 "/api/v1/portfolio/positions/600519.SH/analysis",
                 json={"account_id": account_id},
@@ -509,7 +509,7 @@ class PortfolioApiTestCase(unittest.TestCase):
         with patch(
             "src.services.portfolio_service.PortfolioService._fetch_realtime_position_price",
             return_value=(None, None),
-        ), patch("api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
+        ), patch("src.api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
             resp = self.client.post(
                 "/api/v1/portfolio/positions/1810.HK/analysis",
                 json={"account_id": account_id},
@@ -550,7 +550,7 @@ class PortfolioApiTestCase(unittest.TestCase):
         with patch(
             "src.services.portfolio_service.PortfolioService._fetch_realtime_position_price",
             return_value=(None, None),
-        ), patch("api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
+        ), patch("src.api.v1.endpoints.portfolio.get_task_queue", return_value=queue):
             resp = self.client.post(
                 "/api/v1/portfolio/positions/600519/analysis",
                 json={"account_id": account_id, "force": True},
@@ -854,7 +854,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
     def test_create_trade_busy_returns_409(self) -> None:
         with patch(
-            "api.v1.endpoints.portfolio.PortfolioService.record_trade",
+            "src.api.v1.endpoints.portfolio.PortfolioService.record_trade",
             side_effect=PortfolioBusyError("Portfolio ledger is busy; please retry shortly."),
         ):
             resp = self.client.post(
@@ -879,7 +879,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
     def test_delete_trade_busy_returns_409(self) -> None:
         with patch(
-            "api.v1.endpoints.portfolio.PortfolioService.delete_trade_event",
+            "src.api.v1.endpoints.portfolio.PortfolioService.delete_trade_event",
             side_effect=PortfolioBusyError("Portfolio ledger is busy; please retry shortly."),
         ):
             resp = self.client.delete("/api/v1/portfolio/trades/1")
@@ -890,7 +890,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
     def test_create_cash_ledger_busy_returns_409(self) -> None:
         with patch(
-            "api.v1.endpoints.portfolio.PortfolioService.record_cash_ledger",
+            "src.api.v1.endpoints.portfolio.PortfolioService.record_cash_ledger",
             side_effect=PortfolioBusyError("Portfolio ledger is busy; please retry shortly."),
         ):
             resp = self.client.post(
@@ -910,7 +910,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
     def test_delete_cash_ledger_busy_returns_409(self) -> None:
         with patch(
-            "api.v1.endpoints.portfolio.PortfolioService.delete_cash_ledger_event",
+            "src.api.v1.endpoints.portfolio.PortfolioService.delete_cash_ledger_event",
             side_effect=PortfolioBusyError("Portfolio ledger is busy; please retry shortly."),
         ):
             resp = self.client.delete("/api/v1/portfolio/cash-ledger/1")
@@ -921,7 +921,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
     def test_create_corporate_action_busy_returns_409(self) -> None:
         with patch(
-            "api.v1.endpoints.portfolio.PortfolioService.record_corporate_action",
+            "src.api.v1.endpoints.portfolio.PortfolioService.record_corporate_action",
             side_effect=PortfolioBusyError("Portfolio ledger is busy; please retry shortly."),
         ):
             resp = self.client.post(
@@ -943,7 +943,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
     def test_delete_corporate_action_busy_returns_409(self) -> None:
         with patch(
-            "api.v1.endpoints.portfolio.PortfolioService.delete_corporate_action_event",
+            "src.api.v1.endpoints.portfolio.PortfolioService.delete_corporate_action_event",
             side_effect=PortfolioBusyError("Portfolio ledger is busy; please retry shortly."),
         ):
             resp = self.client.delete("/api/v1/portfolio/corporate-actions/1")

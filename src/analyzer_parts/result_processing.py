@@ -1430,7 +1430,7 @@ def get_stock_name_multi_source(
     # 3. Fetch data from data source.
     if data_manager is None:
         try:
-            from data_provider.base import DataFetcherManager
+            from src.data_provider.base import DataFetcherManager
             data_manager = DataFetcherManager()
         except Exception as e:  # broad-exception: fallback_recorded - Optional provider-manager initialization failure is logged before static-name fallback.
             log_safe_exception(

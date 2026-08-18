@@ -10,9 +10,9 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
-from data_provider.base import normalize_stock_code
-from data_provider.realtime_types import ChipDistribution
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.base import normalize_stock_code
+from src.data_provider.realtime_types import ChipDistribution
+from src.data_provider.us_index_mapping import is_us_stock_code
 from src.analyzer import (
     AnalysisResult,
     fill_price_position_if_needed,
@@ -256,7 +256,7 @@ class _StockAnalysisStageMixin:
                     if self.config.enable_realtime_quote and realtime_quote:
                         df = self._augment_historical_with_realtime(df, realtime_quote, code)
                     # Issue #185: reject non-finite OHLCV before indicator synthesis.
-                    from data_provider.data_validation import prepare_indicator_inputs
+                    from src.data_provider.data_validation import prepare_indicator_inputs
 
                     df, input_validation = prepare_indicator_inputs(
                         df,
@@ -1232,7 +1232,7 @@ class _StockAnalysisStageMixin:
         sites; disable via ``ANALYSIS_PARALLEL_FETCH_ENABLED=false`` for serial
         declaration-order execution (Issue #1126).
         """
-        from data_provider.data_validation import DataValidationRejected
+        from src.data_provider.data_validation import DataValidationRejected
         from src.services.parallel_data_fetch import (
             FetchTask,
             is_parallel_fetch_enabled,

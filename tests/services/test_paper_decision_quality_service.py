@@ -19,7 +19,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi.testclient import TestClient
 
-from api.app import create_app
+from src.api.app import create_app
 from src.config import Config
 from src.services.decision_signal_service import DecisionSignalService
 from src.services.paper_decision_quality_service import (

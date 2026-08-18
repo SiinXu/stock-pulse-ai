@@ -9,9 +9,9 @@ from typing import Any
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api import deps as api_deps
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import analysis, stocks
+from src.api import deps as api_deps
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import analysis, stocks
 from src.services.image_stock_extractor import MAX_SIZE_BYTES
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 

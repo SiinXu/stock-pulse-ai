@@ -10,7 +10,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, select
 
-from data_provider.base import canonical_stock_code, normalize_stock_code
+from src.data_provider.base import canonical_stock_code, normalize_stock_code
 from src.config import get_config
 from src.core.backtest_engine import OVERALL_SENTINEL_CODE, BacktestEngine, EvaluationConfig
 from src.core.backtest_methodology import (
@@ -63,7 +63,7 @@ class BacktestService(_BacktestSummaryMethods):
     """Service layer to run and query backtests."""
 
     MAX_DYNAMIC_SUMMARY_ROWS = 2000
-    # Keep aligned with api/v1/schemas/backtest.BacktestRunRequest field bounds.
+    # Keep aligned with src/api/v1/schemas/backtest.BacktestRunRequest field bounds.
     MIN_EVAL_WINDOW_DAYS = 1
     MAX_EVAL_WINDOW_DAYS = 120
     MIN_AGE_DAYS = 0
@@ -1170,7 +1170,7 @@ class BacktestService(_BacktestSummaryMethods):
             return
 
         try:
-            from data_provider.base import DataFetcherManager
+            from src.data_provider.base import DataFetcherManager
 
             # fetch a window that covers start + forward bars
             end_date = analysis_date + timedelta(days=max(eval_window_days * 2, 30))
@@ -1184,7 +1184,7 @@ class BacktestService(_BacktestSummaryMethods):
             if df is None or df.empty:
                 return
             self.db.save_daily_data(df, code=refill_code, data_source=source)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - the optional refill failure is safe-logged without aborting evaluation
             log_safe_exception(
                 logger,
                 "Backtest daily data refill failed",

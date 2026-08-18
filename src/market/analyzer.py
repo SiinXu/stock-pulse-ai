@@ -42,7 +42,7 @@ from src.utils.sanitize import (
     log_safe_exception,
     sanitize_diagnostic_text,
 )
-from data_provider.base import DataFetcherManager
+from src.data_provider.base import DataFetcherManager
 
 logger = logging.getLogger(__name__)
 

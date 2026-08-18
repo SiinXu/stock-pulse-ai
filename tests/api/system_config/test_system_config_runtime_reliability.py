@@ -27,8 +27,8 @@ from src.services.system_config_service import (
     SystemConfigService,
 )
 from src.services.task_queue import AnalysisTaskQueue
-from api.v1.endpoints import system_config as system_config_api
-from api.v1.schemas.system_config import RollbackSystemConfigRequest, UpdateSystemConfigRequest
+from src.api.v1.endpoints import system_config as system_config_api
+from src.api.v1.schemas.system_config import RollbackSystemConfigRequest, UpdateSystemConfigRequest
 
 
 class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):

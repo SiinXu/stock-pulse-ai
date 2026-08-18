@@ -63,5 +63,5 @@ GET /api/v1/history/{record_id}/diagnostics
 
 ```bash
 python -m pytest tests/test_run_diagnostics_p2.py tests/test_run_diagnostics_p1.py
-python -m py_compile src/services/run_diagnostics.py src/services/history_service.py api/v1/endpoints/history.py api/v1/schemas/history.py
+python -m py_compile src/services/run_diagnostics.py src/services/history_service.py src/api/v1/endpoints/history.py src/api/v1/schemas/history.py
 ```

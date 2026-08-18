@@ -12,7 +12,7 @@ flowchart TB
         More[更多平台...]
     end
 
-    subgraph BotModule [bot/ 模块]
+    subgraph BotModule [src/bot/ 模块]
         WH[Webhook Server]
         Adapters[平台适配器]
         Dispatcher[命令分发器]
@@ -42,10 +42,10 @@ flowchart TB
 
 ## 二、目录结构
 
-在项目根目录新建 `bot/` 目录：
+机器人源码位于 `src/bot/` 目录：
 
 ```
-bot/
+src/bot/
 ├── __init__.py             # 模块入口，导出主要类
 ├── models.py               # 统一的消息/响应模型
 ├── dispatcher.py           # 命令分发器（核心）
@@ -68,7 +68,7 @@ bot/
 
 ## 三、核心抽象设计
 
-### 3.1 统一消息模型 (`bot/models.py`)
+### 3.1 统一消息模型 (`src/bot/models.py`)
 
 ```python
 @dataclass
@@ -92,7 +92,7 @@ class BotResponse:
     at_user: bool = True    # 是否@发送者
 ```
 
-### 3.2 平台适配器基类 (`bot/platforms/base.py`)
+### 3.2 平台适配器基类 (`src/bot/platforms/base.py`)
 
 ```python
 class BotPlatform(ABC):
@@ -120,7 +120,7 @@ class BotPlatform(ABC):
         pass
 ```
 
-### 3.3 命令基类 (`bot/commands/base.py`)
+### 3.3 命令基类 (`src/bot/commands/base.py`)
 
 ```python
 class BotCommand(ABC):
@@ -156,7 +156,7 @@ class BotCommand(ABC):
         pass
 ```
 
-### 3.4 命令分发器 (`bot/dispatcher.py`)
+### 3.4 命令分发器 (`src/bot/dispatcher.py`)
 
 ```python
 class CommandDispatcher:
@@ -279,14 +279,14 @@ telegram_webhook_secret: str           # 新增：Webhook 密钥
 ## 扩展说明
 ### 怎样新增一个通知平台
 
-1. 在 `bot/platforms/` 创建新文件
+1. 在 `src/bot/platforms/` 创建新文件
 2. 继承 `BotPlatform` 基类
 3. 实现 `verify_request`, `parse_message`, `format_response`
 4. 在路由中注册 Webhook 端点
 
 ### 怎样新增新增命令
 
-1. 在 `bot/commands/` 创建新文件
+1. 在 `src/bot/commands/` 创建新文件
 2. 继承 `BotCommand` 基类
 3. 实现 `execute` 方法
 4. 在分发器中注册命令

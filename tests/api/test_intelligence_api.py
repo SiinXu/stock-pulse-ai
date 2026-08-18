@@ -13,8 +13,8 @@ from unittest.mock import Mock, patch
 import requests
 from fastapi.testclient import TestClient
 
-from api.app import create_app
-from api.v1.endpoints.intelligence import _internal_error
+from src.api.app import create_app
+from src.api.v1.endpoints.intelligence import _internal_error
 from src.config import Config
 from src.storage import DatabaseManager
 
@@ -33,7 +33,7 @@ class IntelligenceApiTestCase(unittest.TestCase):
     def setUp(self) -> None:
         self._temp_dir = tempfile.TemporaryDirectory()
         os.environ["DATABASE_PATH"] = os.path.join(self._temp_dir.name, "api_intel.db")
-        self._auth_patcher = patch("api.middlewares.auth.is_auth_enabled", return_value=False)
+        self._auth_patcher = patch("src.api.middlewares.auth.is_auth_enabled", return_value=False)
         self._auth_patcher.start()
         self.addCleanup(self._auth_patcher.stop)
         Config._instance = None

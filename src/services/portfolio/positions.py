@@ -716,7 +716,7 @@ class _PortfolioPositionMethods:
         # markets, cache miss, or bulk source returning fewer rows than requested).
         if len(unique_symbols) >= 5:
             try:
-                from data_provider.base import DataFetcherManager
+                from src.data_provider.base import DataFetcherManager
 
                 DataFetcherManager().prefetch_realtime_quotes(unique_symbols)
             except Exception as exc:  # broad-exception: fallback_recorded - quote prefetch is best-effort for snapshots
@@ -760,7 +760,7 @@ class _PortfolioPositionMethods:
     @staticmethod
     def _fetch_realtime_position_price(symbol: str) -> Tuple[Optional[float], Optional[str]]:
         try:
-            from data_provider.base import DataFetcherManager
+            from src.data_provider.base import DataFetcherManager
 
             fetcher_manager = DataFetcherManager()
             quote = fetcher_manager.get_realtime_quote(symbol, log_final_failure=False)

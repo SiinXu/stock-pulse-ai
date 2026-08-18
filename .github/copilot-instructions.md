@@ -7,7 +7,7 @@ If any instruction in this file conflicts with `AGENTS.md`, follow `AGENTS.md`.
 ## Core Rules
 
 - Respect directory boundaries:
-  - Backend: `src/`, `data_provider/`, `api/`, `bot/`
+  - Backend: `src/`, whose canonical packages include `src/api/`, `src/bot/`, and `src/data_provider/`. The retired root-level `api`, `bot`, and `data_provider` import packages must not be recreated.
   - Web: `apps/dsa-web/`
   - Desktop: `apps/dsa-desktop/`
   - Deployment/workflows: `scripts/`, `.github/workflows/`, `docker/`

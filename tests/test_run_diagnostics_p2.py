@@ -14,7 +14,7 @@ from fastapi import HTTPException
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from api.v1.endpoints.history import get_history_diagnostics
+from src.api.v1.endpoints.history import get_history_diagnostics
 from src.services.history_service import HistoryService
 from src.services.run_diagnostics import build_run_diagnostic_summary, sanitize_diagnostic_text
 

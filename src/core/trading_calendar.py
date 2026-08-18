@@ -145,7 +145,7 @@ def get_market_for_stock(code: str) -> Optional[str]:
     if code.startswith("CRYPTO:") and len(code) > len("CRYPTO:"):
         return "crypto"
 
-    from data_provider import is_us_stock_code, is_us_index_code, is_hk_stock_code
+    from src.data_provider import is_us_stock_code, is_us_index_code, is_hk_stock_code
 
     if is_us_stock_code(code) or is_us_index_code(code):
         return "us"

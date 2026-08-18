@@ -8,8 +8,9 @@
 1. POST /api/v1/stocks/extract-from-image 从图片提取股票代码
 2. POST /api/v1/stocks/parse-import 解析 CSV/Excel/剪贴板
 3. GET /api/v1/stocks/{code}/quote 实时行情接口
-4. GET /api/v1/stocks/{code}/history 历史行情接口
-5. GET /api/v1/stocks/{code}/research-timeline 按标的聚合的研究时间线
+4. GET /api/v1/stocks/{code}/trust 字段级数据可信度
+5. GET /api/v1/stocks/{code}/history 历史行情接口
+6. GET /api/v1/stocks/{code}/research-timeline 按标的聚合的研究时间线
 """
 
 import logging
@@ -24,6 +25,7 @@ from src.api.v1.schemas.stocks import (
     ExtractItem,
     KLineData,
     MoneyFlowViewResponse,
+    StockFieldTrustResponse,
     StockHistoryResponse,
     StockQuote,
 )
@@ -54,8 +56,8 @@ from src.services.system_config_service import SystemConfigService
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 from src.application_services import get_application_services
 from src.services.smartmoney_flow_service import build_money_flow_view
-from data_provider.daily_cache import LocalDataMissingError
-from data_provider.money_flow_types import MAX_HISTORY_DAYS, validate_history_days
+from src.data_provider.daily_cache import LocalDataMissingError
+from src.data_provider.money_flow_types import MAX_HISTORY_DAYS, validate_history_days
 from src.services.watchlist_identity import watchlist_match_key
 from src.utils.sanitize import log_safe_exception
 
@@ -653,6 +655,54 @@ def get_stock_quote(stock_code: str) -> StockQuote:
                 "message": f"获取实时行情失败: {str(e)}"
             }
         )
+
+
+@router.get(
+    "/{stock_code}/trust",
+    response_model=StockFieldTrustResponse,
+    responses={
+        200: {"description": "Field-level data trust view"},
+        400: {"description": "Invalid stock code", "model": ErrorResponse},
+        500: {"description": "Server error", "model": ErrorResponse},
+    },
+    summary="Get field-level data trust for a stock quote",
+    description=(
+        "Returns per-field source attribution, lag, staleness, cross-provider "
+        "conflicts, and provider health for the latest realtime quote "
+        "(Issue #1129). The view degrades explicitly: status=unavailable when "
+        "no quote exists, and status=degraded when trust metadata is absent, "
+        "fields are stale or unattributed, or providers disagree. Conflicts "
+        "are surfaced, never silently resolved to one source. Analysis "
+        "consumers receive the same gap/confidence projection."
+    ),
+    operation_id="getStockFieldTrust",
+)
+def get_stock_field_trust(stock_code: str) -> StockFieldTrustResponse:
+    """Field-level trust view for the stock's realtime quote."""
+    try:
+        code = _validate_and_normalize_stock_code(stock_code)
+    except HTTPException:
+        raise
+    except (TypeError, ValueError) as exc:
+        raise api_error(400, "validation_error", str(exc)) from exc
+
+    try:
+        service = StockService()
+        payload = service.get_field_trust(code)
+        return StockFieldTrustResponse.model_validate(payload)
+    except Exception as exc:  # broad-exception: fallback_recorded - map unexpected trust-view failures to a sanitized API error
+        log_safe_exception(
+            logger,
+            "Stock field trust view failed",
+            exc,
+            error_code="stock_field_trust_view_failed",
+            context={"stock_code": stock_code},
+        )
+        raise api_error(
+            500,
+            "internal_error",
+            "Failed to build field trust view",
+        ) from exc
 
 
 @router.get(

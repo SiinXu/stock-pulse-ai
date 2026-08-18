@@ -130,7 +130,7 @@ class HistoryService:
                 candidates.append(candidate)
 
         try:
-            from data_provider.base import (
+            from src.data_provider.base import (
                 canonical_stock_code,
                 is_bse_code,
                 normalize_stock_code,
@@ -138,7 +138,14 @@ class HistoryService:
 
             raw_canonical = canonical_stock_code(raw_code)
             normalized = canonical_stock_code(normalize_stock_code(raw_canonical))
-        except Exception:
+        except Exception as exc:  # broad-exception: fallback_recorded - preserve the raw lookup code after safe-logging canonicalization failure
+            log_safe_exception(
+                logger,
+                "History stock-code canonicalization failed",
+                exc,
+                error_code="history_stock_code_canonicalization_failed",
+                level=logging.DEBUG,
+            )
             add(raw_code)
             return candidates
 

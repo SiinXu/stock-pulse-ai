@@ -150,7 +150,7 @@ def test_enhance_context_passes_iopv_into_premium_path() -> None:
     """Realtime IOPV must reach etf_analysis_context for premium computation."""
     pytest.importorskip("litellm")
     from src.core.stages.analysis_context import _AnalysisContextStageMixin
-    from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+    from src.data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
 
     class _Harness(_AnalysisContextStageMixin):
         def __init__(self) -> None:
@@ -309,8 +309,8 @@ def test_format_prompt_uses_etf_path_and_marks_pe_na() -> None:
 def test_akshare_etf_realtime_maps_iopv_nav() -> None:
     """AkShare ETF spot should map IOPV/NAV aliases onto UnifiedRealtimeQuote."""
     import pandas as pd
-    from data_provider.akshare_fetcher import AkshareFetcher
-    from data_provider.akshare_parts import realtime_cache as etf_cache
+    from src.data_provider.akshare_fetcher import AkshareFetcher
+    from src.data_provider.akshare_parts import realtime_cache as etf_cache
 
     fetcher = AkshareFetcher.__new__(AkshareFetcher)
     fetcher._set_random_user_agent = lambda: None
@@ -345,13 +345,13 @@ def test_akshare_etf_realtime_maps_iopv_nav() -> None:
     etf_cache.store_etf_snapshot(frame, now=1e12)
     try:
         with patch(
-            "data_provider.akshare_fetcher.get_realtime_circuit_breaker"
+            "src.data_provider.akshare_fetcher.get_realtime_circuit_breaker"
         ) as mock_cb:
             mock_cb.return_value.record_success = MagicMock()
             mock_cb.return_value.record_failure = MagicMock()
             mock_cb.return_value.is_available = MagicMock(return_value=True)
             # Freeze time so the seeded cache is considered fresh.
-            with patch("data_provider.akshare_fetcher.time.time", return_value=1e12):
+            with patch("src.data_provider.akshare_fetcher.time.time", return_value=1e12):
                 quote = fetcher._get_etf_realtime_quote("510300")
         assert quote is not None
         assert quote.price == 4.12
@@ -363,8 +363,8 @@ def test_akshare_etf_realtime_maps_iopv_nav() -> None:
 
 
 def test_quote_supplement_includes_iopv_nav() -> None:
-    from data_provider.base import DataFetcherManager
-    from data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
+    from src.data_provider.base import DataFetcherManager
+    from src.data_provider.realtime_types import RealtimeSource, UnifiedRealtimeQuote
 
     assert "iopv" in DataFetcherManager._SUPPLEMENT_FIELDS
     assert "nav" in DataFetcherManager._SUPPLEMENT_FIELDS

@@ -120,6 +120,23 @@ const getVendorChunkName = (id: string): string | undefined => {
   if (normalizedId.endsWith('/src/locales/settingsIntelligence.ts')) {
     return 'settings-intelligence'
   }
+  // After App.tsx dropped the shared control barrel, Rollup extracted one
+  // oversized common-controls chunk. Isolate async-only modules that do not
+  // import the first-paint graph so each unnamed JS chunk stays under
+  // defaults.jsMaxGzipBytes (Refs #883). Do not add named budget entries.
+  if (normalizedId.endsWith('/src/components/common/DataTable.tsx')) {
+    return 'DataTable'
+  }
+  if (
+    normalizedId.endsWith('/src/components/common/PageHeader.tsx')
+    || normalizedId.endsWith('/src/components/common/AppPage.tsx')
+    || normalizedId.endsWith('/src/components/common/WorkspacePage.tsx')
+    || normalizedId.endsWith('/src/components/common/WorkspaceNavigation.tsx')
+    || normalizedId.endsWith('/src/components/common/Tabs.tsx')
+    || normalizedId.endsWith('/src/components/common/tabIds.ts')
+  ) {
+    return 'WorkspacePage'
+  }
   const packageName = getVendorPackageName(id)
   if (!packageName) {
     return undefined

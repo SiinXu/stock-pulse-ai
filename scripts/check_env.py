@@ -207,7 +207,7 @@ def check_data_fetch(stock_code: str = "600519"):
     """测试数据获取"""
     print_header("3. 数据获取测试")
     
-    from data_provider import DataFetcherManager
+    from src.data_provider import DataFetcherManager
     
     manager = DataFetcherManager()
     

@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.app import create_app
+from src.api.app import create_app
 
 
 class AppCorsConfigTestCase(unittest.TestCase):
@@ -30,8 +30,8 @@ class AppCorsConfigTestCase(unittest.TestCase):
 
     def test_allow_all_warns_when_auth_is_disabled(self):
         with patch.dict(os.environ, {"CORS_ALLOW_ALL": "true"}, clear=False), \
-             patch("api.app.is_auth_enabled", return_value=False), \
-             patch("api.app.logger.warning") as warning:
+             patch("src.api.app.is_auth_enabled", return_value=False), \
+             patch("src.api.app.logger.warning") as warning:
             self._build_app()
 
         warning.assert_called_once()
@@ -40,8 +40,8 @@ class AppCorsConfigTestCase(unittest.TestCase):
 
     def test_allow_all_does_not_warn_when_auth_is_enabled(self):
         with patch.dict(os.environ, {"CORS_ALLOW_ALL": "true"}, clear=False), \
-             patch("api.app.is_auth_enabled", return_value=True), \
-             patch("api.app.logger.warning") as warning:
+             patch("src.api.app.is_auth_enabled", return_value=True), \
+             patch("src.api.app.logger.warning") as warning:
             self._build_app()
 
         warning.assert_not_called()

@@ -37,8 +37,8 @@ from src.notification_parts.noise import reset_notification_noise_state
 from src.notification_parts.senders.gotify_sender import resolve_gotify_message_endpoint
 from src.notification_parts.senders.ntfy_sender import resolve_ntfy_endpoint
 from src.analyzer import AnalysisResult
-from bot.application_context import to_analysis_request_context
-from bot.models import BotMessage, ChatType
+from src.bot.application_context import to_analysis_request_context
+from src.bot.models import BotMessage, ChatType
 import requests
 
 

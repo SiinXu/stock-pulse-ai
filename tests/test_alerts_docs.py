@@ -79,7 +79,7 @@ def test_alerts_doc_keeps_p0_non_goals_explicit() -> None:
     doc = _read_doc()
 
     for token in (
-        "P0 阶段不新增 `api/v1/schemas/alerts.py`",
+        "P0 阶段不新增 `src/api/v1/schemas/alerts.py`",
         "P0 阶段不新增 Web 告警中心页面",
         "P0 阶段不新增数据库表",
         "P0 阶段不实现触发历史",
@@ -370,4 +370,3 @@ def test_alerts_doc_covers_issue_241_event_context_v0() -> None:
         "include_realtime=False",
     ):
         assert token in en_doc
-

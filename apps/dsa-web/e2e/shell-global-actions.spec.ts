@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test } from '@playwright/test';
+import { NOTIFICATIONS_TEXT } from '../src/locales/notifications';
 import { APP_ROUTE_PATHS } from '../src/routing/routes';
 import { loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';
 
@@ -53,7 +54,7 @@ test.describe('Shell global actions', () => {
     palette = page.getByRole('dialog', { name: '快速前往' });
     await expect(palette).toBeVisible();
     await expect(
-      palette.getByRole('combobox', { name: '搜索股票、报告、页面或操作' }),
+      palette.getByRole('combobox', { name: NOTIFICATIONS_TEXT.zh.searchPlaceholder }),
     ).toBeFocused();
     await expect(page.locator('button[aria-label^="通知"]')).toHaveCount(1);
 

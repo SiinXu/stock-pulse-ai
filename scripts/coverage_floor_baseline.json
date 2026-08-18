@@ -2,13 +2,11 @@
   "version": 1,
   "description": "Measured offline-suite line-coverage floor for the packages listed under packages. Floor is measured_percent - epsilon. Do not lower floor_percent without an explicit --allow-lower review; raise it only after a clean offline measurement.",
   "packages": [
-    "src",
-    "api",
-    "data_provider"
+    "src"
   ],
-  "floor_percent": 82.08,
-  "measured_percent": 82.5785,
+  "floor_percent": 83.03,
+  "measured_percent": 83.5311,
   "epsilon": 0.5,
-  "measured_command": "python -m pytest -m 'not network and not benchmark' --cov=src --cov=api --cov=data_provider --cov-report=json:coverage.json",
-  "notes": "Measured from local offline suite on 2026-08-04 (7836 passed, 5 network + 5 benchmark deselected); floor = measured - 0.5pt epsilon. Working-tree floor_percent must not fall below origin/main (see check_coverage_floor.py anti-lowering); intentional lowers require COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN=1 and an explicit review."
+  "measured_command": "python -m pytest -m 'not network and not benchmark' --cov=src --cov-report=json:coverage.json",
+  "notes": "Measured from the local offline suite on 2026-08-17 after 11,622 selected tests (5 skipped, 24 deselected); floor = measured - 0.5pt epsilon. Working-tree floor_percent must not fall below origin/main (see check_coverage_floor.py anti-lowering); intentional lowers require COVERAGE_FLOOR_ALLOW_LOWER_VS_MAIN=1 and an explicit review."
 }

@@ -247,7 +247,7 @@ def refresh_tushare_daily(output_dir: Path) -> Path:
     # Import after path setup so local package resolves.
     if str(REPO_ROOT) not in sys.path:
         sys.path.insert(0, str(REPO_ROOT))
-    from data_provider.tushare_fetcher import _TushareHttpClient, _resolve_tushare_api_url
+    from src.data_provider.tushare_fetcher import _TushareHttpClient, _resolve_tushare_api_url
 
     start, end = _date_window()
     client = _TushareHttpClient(token=token, timeout=30, api_url=_resolve_tushare_api_url())

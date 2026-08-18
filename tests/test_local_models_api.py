@@ -15,11 +15,11 @@ from unittest.mock import patch
 import httpx
 from fastapi import FastAPI
 
-from api import app as api_app
-from api.app import create_app
-from api import deps as api_deps
-from api.middlewares.error_handler import add_error_handlers
-from api.v1.endpoints import local_models
+from src.api import app as api_app
+from src.api.app import create_app
+from src.api import deps as api_deps
+from src.api.middlewares.error_handler import add_error_handlers
+from src.api.v1.endpoints import local_models
 from src.services.local_model_service import (
     LOCAL_MODEL_PULL_TASK_KIND,
     LocalModelInUseError,

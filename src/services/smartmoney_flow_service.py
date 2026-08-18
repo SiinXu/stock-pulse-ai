@@ -14,7 +14,7 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Protocol
 
-from data_provider.money_flow_types import (
+from src.data_provider.money_flow_types import (
     MoneyFlowOutcome,
     MoneyFlowStatus,
     is_meaningful_money_flow,
@@ -76,7 +76,7 @@ def fetch_money_flow(
     owned_manager = manager is None
     if owned_manager:
         try:
-            from data_provider.base import DataFetcherManager
+            from src.data_provider.base import DataFetcherManager
 
             manager = DataFetcherManager()
         except Exception as exc:  # broad-exception: fallback_recorded - manager init fail-open
@@ -88,7 +88,7 @@ def fetch_money_flow(
                 level=logging.WARNING,
                 context={"symbol": stock_code},
             )
-            from data_provider.base import _market_tag, normalize_stock_code
+            from src.data_provider.base import _market_tag, normalize_stock_code
 
             return MoneyFlowOutcome(
                 status=MoneyFlowStatus.FETCH_FAILED,
@@ -110,7 +110,7 @@ def fetch_money_flow(
             level=logging.WARNING,
             context={"symbol": stock_code},
         )
-        from data_provider.base import _market_tag, normalize_stock_code
+        from src.data_provider.base import _market_tag, normalize_stock_code
 
         return MoneyFlowOutcome(
             status=MoneyFlowStatus.FETCH_FAILED,

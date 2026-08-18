@@ -27,7 +27,7 @@ git diff --name-only origin/main...HEAD
 
 | Path hit | Scope |
 |----------|-------|
-| `main.py`, `src/**`, `data_provider/**`, `api/**`, `bot/**`, `tests/**` | backend |
+| `main.py`, `src/**`, `tests/**` | backend |
 | `apps/dsa-web/**` | web |
 | `apps/dsa-desktop/**`, `scripts/*desktop*` | desktop |
 | `README.md`, `docs/**` | docs |

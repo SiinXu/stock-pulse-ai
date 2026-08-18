@@ -15,7 +15,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.v1.endpoints import capabilities as capabilities_endpoint
+from src.api.v1.endpoints import capabilities as capabilities_endpoint
 from src.capability_registry.resolution import resolve_capability_dependencies, resolve_many
 from src.capability_registry.task_routing import resolve_task_model_route
 from src.capability_registry.write_audit import CapabilityWriteAuditor

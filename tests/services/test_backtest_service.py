@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from data_provider.base import normalize_stock_code
+from src.data_provider.base import normalize_stock_code
 from src.config import Config, get_config
 from src.core.backtest_engine import OVERALL_SENTINEL_CODE
 from src.repositories.backtest_repo import BacktestRepository
@@ -648,7 +648,7 @@ class BacktestServiceTestCase(unittest.TestCase):
                 )
 
         service = BacktestService(self.db)
-        with patch("data_provider.base.DataFetcherManager", FakeDataFetcherManager):
+        with patch("src.data_provider.base.DataFetcherManager", FakeDataFetcherManager):
             service._try_fill_daily_data(
                 code="605066",
                 analysis_date=date(2024, 7, 1),

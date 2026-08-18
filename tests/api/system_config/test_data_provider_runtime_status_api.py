@@ -7,7 +7,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.v1.endpoints import system_config as system_config_endpoint
+from src.api.v1.endpoints import system_config as system_config_endpoint
 from src.services.data_provider_runtime_status_service import SCHEMA_VERSION
 
 

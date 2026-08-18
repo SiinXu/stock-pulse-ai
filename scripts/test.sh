@@ -171,7 +171,7 @@ test_code_recognition() {
     python3 << 'PYTEST'
 import sys
 sys.path.insert(0, '.')
-from data_provider.akshare_fetcher import _is_hk_code, _is_us_code
+from src.data_provider.akshare_fetcher import _is_hk_code, _is_us_code
 
 test_cases = [
     # (symbol, expected_hk, expected_us, description)
@@ -212,7 +212,7 @@ test_yfinance_convert() {
     python3 << 'PYTEST'
 import sys
 sys.path.insert(0, '.')
-from data_provider.yfinance_fetcher import YfinanceFetcher
+from src.data_provider.yfinance_fetcher import YfinanceFetcher
 
 fetcher = YfinanceFetcher()
 
@@ -250,9 +250,9 @@ test_syntax() {
     info "Checking Python syntax..."
 
     python3 -m py_compile main.py src/config.py src/notification.py \
-        data_provider/akshare_fetcher.py \
-        data_provider/yfinance_fetcher.py \
-        bot/commands/analyze.py
+        src/data_provider/akshare_fetcher.py \
+        src/data_provider/yfinance_fetcher.py \
+        src/bot/commands/analyze.py
 
     success "Syntax check passed"
 }

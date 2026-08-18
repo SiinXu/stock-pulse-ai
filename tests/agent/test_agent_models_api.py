@@ -7,7 +7,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
-from api.v1.endpoints import agent
+from src.api.v1.endpoints import agent
 from src.config import Config
 from src.llm.backend_registry import LOCAL_CLI_GENERATION_BACKEND_IDS
 from src.services.agent_model_service import list_agent_model_deployments
@@ -278,7 +278,7 @@ class AgentModelsEndpointTestCase(unittest.TestCase):
             ],
         )
 
-        with patch("api.v1.endpoints.agent.get_config", return_value=config):
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config):
             payload = asyncio.run(agent.get_agent_models()).model_dump()
 
         self.assertEqual(len(payload["models"]), 2)
@@ -313,7 +313,7 @@ class AgentSkillsEndpointTestCase(unittest.TestCase):
             ]
         )
 
-        with patch("api.v1.endpoints.agent.get_config", return_value=config), patch(
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config), patch(
             "src.agent.factory.get_skill_manager",
             return_value=skill_manager,
         ):
@@ -337,7 +337,7 @@ class AgentSkillsEndpointTestCase(unittest.TestCase):
             ]
         )
 
-        with patch("api.v1.endpoints.agent.get_config", return_value=config), patch(
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config), patch(
             "src.agent.factory.get_skill_manager",
             return_value=skill_manager,
         ):
@@ -380,11 +380,11 @@ class AgentSkillsEndpointTestCase(unittest.TestCase):
                 future.set_result(func())
                 return future
 
-        with patch("api.v1.endpoints.agent.get_config", return_value=config), patch(
-            "api.v1.endpoints.agent._build_executor",
+        with patch("src.api.v1.endpoints.agent.get_config", return_value=config), patch(
+            "src.api.v1.endpoints.agent._build_executor",
             return_value=executor,
         ) as mock_build_executor, patch(
-            "api.v1.endpoints.agent.asyncio.get_running_loop",
+            "src.api.v1.endpoints.agent.asyncio.get_running_loop",
             side_effect=lambda: _ImmediateLoop(real_get_running_loop()),
         ):
             payload = asyncio.run(agent.agent_chat(request, session_service)).model_dump()

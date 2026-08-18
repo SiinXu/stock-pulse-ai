@@ -2567,7 +2567,7 @@ class TestEventMonitorAsync(unittest.IsolatedAsyncioTestCase):
         async def _run_inline(func, *args, **kwargs):
             return func(*args, **kwargs)
 
-        with patch("data_provider.DataFetcherManager", side_effect=managers) as manager_factory, patch(
+        with patch("src.data_provider.DataFetcherManager", side_effect=managers) as manager_factory, patch(
             "src.agent.events.asyncio.to_thread", new=_run_inline
         ):
             triggered = await monitor.check_all()
@@ -3038,8 +3038,8 @@ class TestResearchCommandTimeout(unittest.TestCase):
 
     def test_research_timeout_returns_timeout_response(self):
         """Timed-out research results should surface the timeout response text."""
-        from bot.commands.research import ResearchCommand
-        from bot.models import BotMessage
+        from src.bot.commands.research import ResearchCommand
+        from src.bot.models import BotMessage
 
         cmd = ResearchCommand()
 
@@ -3054,7 +3054,7 @@ class TestResearchCommandTimeout(unittest.TestCase):
             agent_mode=True,
         )
 
-        with patch("bot.commands.research.get_config", return_value=config), \
+        with patch("src.bot.commands.research.get_config", return_value=config), \
              patch("src.agent.factory.get_tool_registry", return_value=MagicMock()), \
              patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()), \
              patch("src.agent.research.ResearchAgent.research", return_value=SimpleNamespace(
@@ -3072,8 +3072,8 @@ class TestResearchCommandTimeout(unittest.TestCase):
         self.assertIn("超时", response.text)
 
     def test_research_recognizes_five_letter_us_ticker(self):
-        from bot.commands.research import ResearchCommand
-        from bot.models import BotMessage
+        from src.bot.commands.research import ResearchCommand
+        from src.bot.models import BotMessage
 
         cmd = ResearchCommand()
         msg = MagicMock(spec=BotMessage)
@@ -3105,7 +3105,7 @@ class TestResearchCommandTimeout(unittest.TestCase):
             agent_mode=True,
         )
 
-        with patch("bot.commands.research.get_config", return_value=config), \
+        with patch("src.bot.commands.research.get_config", return_value=config), \
              patch("src.agent.factory.get_tool_registry", return_value=MagicMock()), \
              patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()), \
              patch("src.agent.research.ResearchAgent.research", side_effect=_capture_research):
@@ -3117,8 +3117,8 @@ class TestResearchCommandTimeout(unittest.TestCase):
         self.assertTrue(captured["query"].startswith("[Stock: GOOGL]"))
 
     def test_research_canonicalizes_bare_four_digit_hk_code(self):
-        from bot.commands.research import ResearchCommand
-        from bot.models import BotMessage
+        from src.bot.commands.research import ResearchCommand
+        from src.bot.models import BotMessage
 
         cmd = ResearchCommand()
         msg = MagicMock(spec=BotMessage)
@@ -3147,7 +3147,7 @@ class TestResearchCommandTimeout(unittest.TestCase):
             litellm_model="test-model",
             agent_mode=True,
         )
-        with patch("bot.commands.research.get_config", return_value=config), patch(
+        with patch("src.bot.commands.research.get_config", return_value=config), patch(
             "src.agent.factory.get_tool_registry", return_value=MagicMock()
         ), patch(
             "src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()
@@ -3564,7 +3564,7 @@ class TestResearchAgentFilteredRegistry(unittest.TestCase):
 
 class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
     async def test_agent_research_enforces_the_api_deadline(self):
-        from api.v1.endpoints.agent import ResearchRequest, agent_research
+        from src.api.v1.endpoints.agent import ResearchRequest, agent_research
 
         config = SimpleNamespace(
             litellm_model="gemini/test-model",
@@ -3585,9 +3585,9 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
             )
 
         with (
-            patch("api.v1.endpoints.agent.get_config", return_value=config),
+            patch("src.api.v1.endpoints.agent.get_config", return_value=config),
             patch(
-                "api.v1.endpoints.agent._run_research_in_background",
+                "src.api.v1.endpoints.agent._run_research_in_background",
                 new=slow_research,
             ),
             patch("src.agent.factory.get_tool_registry", return_value=MagicMock()),
@@ -3604,7 +3604,7 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.error, "agent_research_failed")
 
     async def test_agent_research_returns_timeout_response(self):
-        from api.v1.endpoints.agent import ResearchRequest, agent_research
+        from src.api.v1.endpoints.agent import ResearchRequest, agent_research
 
         config = SimpleNamespace(
             litellm_model="gemini/test-model",
@@ -3625,8 +3625,8 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
         ))
 
         with (
-            patch("api.v1.endpoints.agent.get_config", return_value=config),
-            patch("api.v1.endpoints.agent._run_research_in_background", new=research_result),
+            patch("src.api.v1.endpoints.agent.get_config", return_value=config),
+            patch("src.api.v1.endpoints.agent._run_research_in_background", new=research_result),
             patch("src.agent.factory.get_tool_registry", return_value=MagicMock()),
             patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()),
         ):
@@ -3639,7 +3639,7 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.error, "agent_research_failed")
 
     async def test_cancelled_http_wait_keeps_research_and_persists_result(self):
-        from api.v1.endpoints.agent import ResearchRequest, agent_research
+        from src.api.v1.endpoints.agent import ResearchRequest, agent_research
 
         config = SimpleNamespace(
             litellm_model="gemini/test-model",
@@ -3664,9 +3664,9 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
 
         session_service = MagicMock()
         with (
-            patch("api.v1.endpoints.agent.get_config", return_value=config),
+            patch("src.api.v1.endpoints.agent.get_config", return_value=config),
             patch(
-                "api.v1.endpoints.agent._run_research_in_background",
+                "src.api.v1.endpoints.agent._run_research_in_background",
                 new=delayed_research,
             ),
             patch("src.agent.factory.get_tool_registry", return_value=MagicMock()),

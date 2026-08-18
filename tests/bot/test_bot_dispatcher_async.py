@@ -14,10 +14,10 @@ except ModuleNotFoundError:
     from tests.litellm_stub import ensure_litellm_stub
     ensure_litellm_stub()
 
-from bot.commands.base import BotCommand
-from bot.commands.ask import AskCommand
-from bot.dispatcher import CommandDispatcher
-from bot.models import BotMessage, BotResponse, ChatType
+from src.bot.commands.base import BotCommand
+from src.bot.commands.ask import AskCommand
+from src.bot.dispatcher import CommandDispatcher
+from src.bot.models import BotMessage, BotResponse, ChatType
 
 
 class DummyCommand(BotCommand):
@@ -62,7 +62,7 @@ class TestBotCommandAsync(unittest.IsolatedAsyncioTestCase):
         message = _make_message("/dummy")
 
         with patch(
-            "bot.commands.base.asyncio.to_thread",
+            "src.bot.commands.base.asyncio.to_thread",
             new=AsyncMock(return_value=BotResponse.text_response("ok")),
         ) as to_thread:
             result = await cmd.execute_async(message, [])
@@ -109,7 +109,7 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
         config = SimpleNamespace(litellm_model="gemini/test-model")
 
         with patch(
-            "bot.dispatcher.asyncio.to_thread",
+            "src.bot.dispatcher.asyncio.to_thread",
             new=AsyncMock(side_effect=lambda func, *args, **kwargs: func(*args, **kwargs)),
         ) as to_thread:
             with patch("src.agent.llm_adapter.LLMToolAdapter") as adapter_cls:
@@ -193,7 +193,7 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
         )
 
         with patch("src.config.get_config", return_value=config), patch(
-            "bot.commands.ask.get_config",
+            "src.bot.commands.ask.get_config",
             return_value=config,
         ), patch.object(
             dispatcher,
@@ -242,7 +242,7 @@ class TestHandleWebhookAsync(unittest.IsolatedAsyncioTestCase):
     """Test the async webhook handler path."""
 
     async def test_handle_webhook_async_dispatches_via_async(self):
-        from bot.handler import handle_webhook_async
+        from src.bot.handler import handle_webhook_async
 
         fake_platform = MagicMock()
         fake_message = _make_message("/dummy")
@@ -253,8 +253,8 @@ class TestHandleWebhookAsync(unittest.IsolatedAsyncioTestCase):
         fake_config.bot_enabled = True
 
         with patch("src.config.get_config", return_value=fake_config), \
-             patch("bot.handler.get_platform", return_value=fake_platform), \
-             patch("bot.handler.get_dispatcher") as mock_get_disp:
+             patch("src.bot.handler.get_platform", return_value=fake_platform), \
+             patch("src.bot.handler.get_dispatcher") as mock_get_disp:
             mock_dispatcher = MagicMock()
             mock_dispatcher.dispatch_async = AsyncMock(return_value=BotResponse.text_response("async-resp"))
             mock_get_disp.return_value = mock_dispatcher
@@ -264,7 +264,7 @@ class TestHandleWebhookAsync(unittest.IsolatedAsyncioTestCase):
         mock_dispatcher.dispatch_async.assert_awaited_once()
 
     async def test_handle_webhook_async_returns_success_when_bot_disabled(self):
-        from bot.handler import handle_webhook_async
+        from src.bot.handler import handle_webhook_async
 
         fake_config = MagicMock()
         fake_config.bot_enabled = False
@@ -278,7 +278,7 @@ class TestHandleWebhookAsync(unittest.IsolatedAsyncioTestCase):
 
 class TestChatCommandCompatibility(unittest.TestCase):
     def test_chat_command_reuses_legacy_session_id_when_history_exists(self):
-        from bot.commands.chat import ChatCommand
+        from src.bot.commands.chat import ChatCommand
 
         command = ChatCommand()
         config = SimpleNamespace(agent_mode=True)
@@ -287,7 +287,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         db = MagicMock()
         db.conversation_session_exists.side_effect = lambda session_id: session_id == "feishu_u1"
 
-        with patch("bot.commands.chat.get_config", return_value=config), \
+        with patch("src.bot.commands.chat.get_config", return_value=config), \
              patch("src.storage.get_db", return_value=db), \
              patch("src.agent.factory.build_agent_executor", return_value=executor):
             response = command.execute(_make_message("/chat hello"), ["hello"])
@@ -297,7 +297,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         self.assertEqual(executor.chat.call_args.kwargs["session_id"], "feishu_u1")
 
     def test_chat_command_scopes_group_session_by_chat_id(self):
-        from bot.commands.chat import ChatCommand
+        from src.bot.commands.chat import ChatCommand
 
         command = ChatCommand()
         config = SimpleNamespace(agent_mode=True)
@@ -309,7 +309,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         message.chat_type = ChatType.GROUP
         message.chat_id = "group-1"
 
-        with patch("bot.commands.chat.get_config", return_value=config), \
+        with patch("src.bot.commands.chat.get_config", return_value=config), \
              patch("src.storage.get_db", return_value=db), \
              patch("src.agent.factory.build_agent_executor", return_value=executor):
             response = command.execute(message, ["hello"])
@@ -319,7 +319,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         self.assertEqual(executor.chat.call_args.kwargs["session_id"], "feishu_u1:group-1:chat")
 
     def test_chat_command_failure_returns_only_public_message(self):
-        from bot.commands.chat import ChatCommand
+        from src.bot.commands.chat import ChatCommand
         from src.agent.public_contract import AGENT_CHAT_FAILURE_MESSAGE
 
         sensitive_error = (
@@ -336,10 +336,10 @@ class TestChatCommandCompatibility(unittest.TestCase):
         db = MagicMock()
         db.conversation_session_exists.return_value = False
 
-        with patch("bot.commands.chat.get_config", return_value=config), \
+        with patch("src.bot.commands.chat.get_config", return_value=config), \
              patch("src.storage.get_db", return_value=db), \
              patch("src.agent.factory.build_agent_executor", return_value=executor):
-            with self.assertLogs("bot.commands.chat", level="ERROR") as logs:
+            with self.assertLogs("src.bot.commands.chat", level="ERROR") as logs:
                 response = ChatCommand().execute(_make_message("/chat hello"), ["hello"])
 
         self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
@@ -350,7 +350,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         self.assertIn("[REDACTED]", "\n".join(logs.output))
 
     def test_chat_command_exception_returns_only_public_message(self):
-        from bot.commands.chat import ChatCommand
+        from src.bot.commands.chat import ChatCommand
         from src.agent.public_contract import AGENT_CHAT_FAILURE_MESSAGE
 
         sensitive_error = (
@@ -361,13 +361,13 @@ class TestChatCommandCompatibility(unittest.TestCase):
         db = MagicMock()
         db.conversation_session_exists.return_value = False
 
-        with patch("bot.commands.chat.get_config", return_value=config), \
+        with patch("src.bot.commands.chat.get_config", return_value=config), \
              patch("src.storage.get_db", return_value=db), \
              patch(
                  "src.agent.factory.build_agent_executor",
                  side_effect=RuntimeError(sensitive_error),
              ):
-            with self.assertLogs("bot.commands.chat", level="ERROR") as logs:
+            with self.assertLogs("src.bot.commands.chat", level="ERROR") as logs:
                 response = ChatCommand().execute(_make_message("/chat hello"), ["hello"])
 
         self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
@@ -378,7 +378,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
         self.assertIn("[REDACTED]", "\n".join(logs.output))
 
     def test_chat_command_configuration_exception_returns_only_public_message(self):
-        from bot.commands.chat import ChatCommand
+        from src.bot.commands.chat import ChatCommand
         from src.agent.public_contract import AGENT_CHAT_FAILURE_MESSAGE
 
         sensitive_error = (
@@ -386,10 +386,10 @@ class TestChatCommandCompatibility(unittest.TestCase):
             "https://private.example/v1/chat?token=super-secret"
         )
         with patch(
-            "bot.commands.chat.get_config",
+            "src.bot.commands.chat.get_config",
             side_effect=RuntimeError(sensitive_error),
         ):
-            with self.assertLogs("bot.commands.chat", level="ERROR") as logs:
+            with self.assertLogs("src.bot.commands.chat", level="ERROR") as logs:
                 response = ChatCommand().execute(_make_message("/chat hello"), ["hello"])
 
         self.assertEqual(response.text, f"⚠️ {AGENT_CHAT_FAILURE_MESSAGE}")
@@ -402,7 +402,7 @@ class TestChatCommandCompatibility(unittest.TestCase):
 
 class TestHistoryCommandCompatibility(unittest.TestCase):
     def test_history_clear_uses_group_scoped_session(self):
-        from bot.commands.history import HistoryCommand
+        from src.bot.commands.history import HistoryCommand
 
         command = HistoryCommand()
         db = MagicMock()
@@ -424,7 +424,7 @@ class TestDispatcherBaseException(unittest.TestCase):
     def test_error_holder_accepts_base_exception(self):
         """Ensure error_holder dict uses BaseException type hint (code review)."""
         import inspect
-        from bot.dispatcher import CommandDispatcher
+        from src.bot.dispatcher import CommandDispatcher
         source = inspect.getsource(CommandDispatcher.dispatch)
         self.assertIn("BaseException", source)
         self.assertNotIn("except Exception", source)

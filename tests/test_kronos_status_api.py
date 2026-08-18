@@ -5,7 +5,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from api.v1.endpoints import system_config
+from src.api.v1.endpoints import system_config
 
 
 def test_get_kronos_status_returns_response_model() -> None:

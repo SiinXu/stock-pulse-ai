@@ -29,9 +29,9 @@ git diff --name-only "$BASE_REF"..HEAD
 
 | Diff hits | Scout for |
 |-----------|-----------|
-| `api/**`, `src/schemas/**` | API compatibility; OpenAPI drift; Web client types |
+| `src/api/**`, `src/schemas/**` | API compatibility; OpenAPI drift; Web client types |
 | `src/core/config*`, `.env.example`, `config_registry_parts/**` | Settings controls; registry guard; inventory |
-| `data_provider/**` | Priority, timeout, fallback, cache contracts |
+| `src/data_provider/**` | Priority, timeout, fallback, cache contracts |
 | `templates/**`, report services | Report/notification structure |
 | `apps/dsa-web` pages/routes/nav | Deep links; production reachability |
 | i18n / locales | Missing keys; high-risk process |

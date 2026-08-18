@@ -58,7 +58,7 @@ Ported-from: ZhuLinsen/daily_stock_analysis@<sha>
 经验规则：
 
 - 白名单保持**尽量小**。只加入 StockPulse 明确不会镜像的前缀（桌面打包、AI 协作资产、一致性工具自身等）。
-- **不要**为了消音报告而把 `data_provider/`、`src/core/` 等共享 foundation 路径加入白名单。
+- **不要**为了消音报告而把 `src/data_provider/`、`src/core/` 等共享 foundation 路径加入白名单。
 - 扩展白名单属于产品决策：同步更新 JSON、本文（中英）与 changelog。
 
 空路径列表（例如部分 merge 提交）按 informational 处理。

@@ -1,7 +1,7 @@
 /**
  * Normalize stock code by stripping exchange prefixes/suffixes.
  *
- * Mirrors the behavior of data_provider.base.normalize_stock_code in the backend.
+ * Mirrors the behavior of src.data_provider.base.normalize_stock_code in the backend.
  *
  *   600519      → 600519     SH600519    → 600519
  *   600519.SH   → 600519     SH.600519   → 600519
@@ -37,7 +37,7 @@ export function normalizeStockCode(stockCode: string): string {
 
   // Pure 4-5 digit codes are HK stocks by validateStockCode() contract.
   // A-share codes are 6 digits; JP/KR/TW bare bases require an explicit
-  // Yahoo suffix (mirrors data_provider.symbol_normalization).
+  // Yahoo suffix (mirrors src.data_provider.symbol_normalization).
   if (/^\d{4,5}$/.test(upper)) {
     return `HK${upper.padStart(5, '0')}`;
   }

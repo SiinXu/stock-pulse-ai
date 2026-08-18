@@ -11,22 +11,22 @@ import logging
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from bot.commands.analyze import AnalyzeCommand
-from bot.commands.base import BotCommand
-from bot.commands.history import HistoryCommand
-from bot.commands.research import ResearchCommand
-from bot.commands.strategies import StrategiesCommand
-from bot.dispatcher import CommandDispatcher
-from bot.handler import handle_webhook, handle_webhook_async
-from bot.models import BotMessage, BotResponse, ChatType, WebhookResponse
-from bot.platforms.dingtalk import DingtalkPlatform
-from bot.platforms.dingtalk_stream import (
+from src.bot.commands.analyze import AnalyzeCommand
+from src.bot.commands.base import BotCommand
+from src.bot.commands.history import HistoryCommand
+from src.bot.commands.research import ResearchCommand
+from src.bot.commands.strategies import StrategiesCommand
+from src.bot.dispatcher import CommandDispatcher
+from src.bot.handler import handle_webhook, handle_webhook_async
+from src.bot.models import BotMessage, BotResponse, ChatType, WebhookResponse
+from src.bot.platforms.dingtalk import DingtalkPlatform
+from src.bot.platforms.dingtalk_stream import (
     AckMessage,
     DINGTALK_STREAM_PUBLIC_ERROR,
     DingtalkStreamHandler,
 )
-from bot.platforms.discord import DiscordPlatform
-from bot.platforms.feishu_stream import FeishuReplyClient, FeishuStreamHandler
+from src.bot.platforms.discord import DiscordPlatform
+from src.bot.platforms.feishu_stream import FeishuReplyClient, FeishuStreamHandler
 from src.services.task_queue import DuplicateTaskError
 
 
@@ -86,7 +86,7 @@ def test_dispatcher_hides_arguments_usernames_and_exception_diagnostics(caplog) 
         f"/explode api_key={CANARY}",
         user_name=f"user-{CANARY}",
     )
-    caplog.set_level(logging.DEBUG, logger="bot.dispatcher")
+    caplog.set_level(logging.DEBUG, logger="src.bot.dispatcher")
 
     sync_response = dispatcher.dispatch(message)
     async_response = asyncio.run(dispatcher.dispatch_async(message))
@@ -108,7 +108,7 @@ def test_dispatcher_does_not_log_natural_language_input_or_invalid_llm_output(ca
     chat_command.execute.return_value = BotResponse.text_response("ok")
     dispatcher.register(chat_command)
     message = _message(f"analyze AAPL api_key={CANARY}")
-    caplog.set_level(logging.DEBUG, logger="bot.dispatcher")
+    caplog.set_level(logging.DEBUG, logger="src.bot.dispatcher")
 
     config = SimpleNamespace(agent_nl_routing=True, agent_mode=True)
     with patch("src.config.get_config", return_value=config), patch.object(
@@ -138,12 +138,12 @@ def test_webhook_handler_does_not_log_payload_or_message_content(caplog) -> None
     dispatcher = MagicMock()
     dispatcher.dispatch.return_value = BotResponse.text_response("safe")
     dispatcher.dispatch_async = AsyncMock(return_value=BotResponse.text_response("safe"))
-    caplog.set_level(logging.DEBUG, logger="bot.handler")
+    caplog.set_level(logging.DEBUG, logger="src.bot.handler")
 
     with patch("src.config.get_config", return_value=SimpleNamespace(bot_enabled=True)), patch(
-        "bot.handler.get_platform",
+        "src.bot.handler.get_platform",
         return_value=platform,
-    ), patch("bot.handler.get_dispatcher", return_value=dispatcher):
+    ), patch("src.bot.handler.get_dispatcher", return_value=dispatcher):
         response = handle_webhook("discord", {}, body)
         async_response = asyncio.run(handle_webhook_async("discord", {}, body))
 
@@ -203,7 +203,7 @@ def test_command_failures_return_only_stable_public_messages(caplog) -> None:
         agent_deep_research_budget=30000,
         agent_deep_research_timeout=180,
     )
-    with patch("bot.commands.research.get_config", return_value=research_config), patch(
+    with patch("src.bot.commands.research.get_config", return_value=research_config), patch(
         "src.agent.factory.get_tool_registry",
         return_value=MagicMock(),
     ), patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()), patch(
@@ -261,7 +261,7 @@ def test_stream_logs_and_dingtalk_failure_ack_hide_message_and_exception(caplog)
         feishu_handler.shutdown(wait=True)
 
     with patch(
-        "bot.platforms.dingtalk_stream.dingtalk_stream.ChatbotMessage.from_dict",
+        "src.bot.platforms.dingtalk_stream.dingtalk_stream.ChatbotMessage.from_dict",
         side_effect=RuntimeError(SENSITIVE_DIAGNOSTIC),
     ):
         status, public_error = asyncio.run(
@@ -311,7 +311,7 @@ def test_platform_failure_diagnostics_do_not_log_response_bodies(caplog) -> None
         "token": "interaction-token",
     }
     discord_response = MagicMock(status_code=500, text=SENSITIVE_DIAGNOSTIC)
-    with patch("bot.platforms.discord.requests.patch", return_value=discord_response):
+    with patch("src.bot.platforms.discord.requests.patch", return_value=discord_response):
         assert not discord.send_followup(response, message)
 
     feishu = FeishuReplyClient.__new__(FeishuReplyClient)

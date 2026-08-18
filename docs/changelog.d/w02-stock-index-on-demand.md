@@ -1,0 +1,1 @@
+- [Fixed] Loaded the stock index on demand and shared a single parse (Refs #883).

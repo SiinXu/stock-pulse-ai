@@ -13,14 +13,14 @@ from unittest.mock import MagicMock
 import pandas as pd
 import pytest
 
-from data_provider.crypto_coingecko_fetcher import (
+from src.data_provider.crypto_coingecko_fetcher import (
     CryptoCoingeckoFetcher,
     attach_crypto_provider,
     build_crypto_provider_registration,
     ticker_to_coingecko_id,
 )
-from data_provider.plugin_registry import DATA_PROVIDER_MARKETS, DataProviderRegistration
-from data_provider.symbol_normalization import (
+from src.data_provider.plugin_registry import DATA_PROVIDER_MARKETS, DataProviderRegistration
+from src.data_provider.symbol_normalization import (
     _market_tag,
     canonical_stock_code,
     is_crypto_symbol,
@@ -28,7 +28,7 @@ from data_provider.symbol_normalization import (
     normalize_stock_code,
     parse_crypto_symbol,
 )
-from data_provider.us_index_mapping import is_us_stock_code
+from src.data_provider.us_index_mapping import is_us_stock_code
 
 
 # ---------------------------------------------------------------------------
@@ -250,7 +250,7 @@ def test_attach_crypto_provider_uses_add_fetcher() -> None:
 
 
 def test_capability_catalog_lists_crypto_fetcher() -> None:
-    from data_provider import _capability_catalog as catalog
+    from src.data_provider import _capability_catalog as catalog
 
     assert "crypto" in catalog._DAILY_MARKETS
     assert catalog._DAILY_MARKET_FETCHER_SUPPORT["CryptoCoingeckoFetcher"] == {"crypto"}

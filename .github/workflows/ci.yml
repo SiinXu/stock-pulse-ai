@@ -54,9 +54,6 @@ jobs:
               - 'apps/dsa-web/src/utils/systemConfigI18n.ts'
             docker:
               - '*.py'
-              - 'api/**'
-              - 'bot/**'
-              - 'data_provider/**'
               - 'src/**'
               - 'strategies/**'
               - 'apps/dsa-web/**'
@@ -76,10 +73,7 @@ jobs:
             # web-e2e boots a real backend; re-run when the stack it imports changes
             web_e2e:
               - 'apps/dsa-web/**'
-              - 'api/**'
               - 'src/**'
-              - 'data_provider/**'
-              - 'bot/**'
               - 'main.py'
               - 'server.py'
               - 'requirements.txt'
@@ -417,7 +411,7 @@ jobs:
   python-minimum:
     name: python-minimum
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     needs: [changes, ai-governance]
     if: needs.changes.outputs.backend == 'true'
     permissions:
@@ -558,8 +552,20 @@ jobs:
             requirements-report-export.txt
       - name: 🔤 Install host fonts for glyph coverage
         run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk
+          apt_options=(
+            -o Acquire::Retries=3
+            -o Acquire::http::Timeout=20
+            -o Acquire::https::Timeout=20
+          )
+          if ! sudo timeout --kill-after=10s 300s apt-get "${apt_options[@]}" update; then
+            echo "::error::Package index refresh failed or timed out after 300 seconds." >&2
+            exit 1
+          fi
+          if ! sudo timeout --kill-after=10s 300s apt-get "${apt_options[@]}" install \
+            -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk; then
+            echo "::error::Host font installation failed or timed out after 300 seconds." >&2
+            exit 1
+          fi
       - name: 📦 Install dependencies (native + optional report export)
         run: |
           python -m pip install --upgrade --constraint constraints.txt pip
@@ -654,10 +660,10 @@ jobs:
           assert migration_ids and migration_ids[-1] == TARGET_VERSION
           print(f'✅ migrations target {TARGET_VERSION}')
           from src.notification import NotificationService; print('✅ notification')
-          from data_provider import DataFetcherManager; print('✅ data_provider')
+          from src.data_provider import DataFetcherManager; print('✅ data_provider')
           from src.analyzer import GeminiAnalyzer; print('✅ analyzer')
           from src.patches.eastmoney_patch import eastmoney_patch; print('✅ patch')
-          from bot.dispatcher import CommandDispatcher; print('✅ bot')
+          from src.bot.dispatcher import CommandDispatcher; print('✅ bot')
           from src.api.app import app; print('✅ api')
           print('✅ All Docker imports OK')
           "

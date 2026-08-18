@@ -105,16 +105,17 @@ offline_test_suite() {
   # still collect under --strict-markers; scheduled/manual runner:
   #   .github/workflows/benchmarks.yml  (pytest -m benchmark)
   #   python -m pytest -m benchmark
-  # Coverage is measured for src/api/data_provider and enforced by the
+  # Coverage is measured for the canonical src package and enforced by the
   # checked-in floor in scripts/coverage_floor_baseline.json.
   # Keep --cov= flags in lockstep with baseline.packages (order-sensitive).
-  # bot/ now lives under src/bot; --cov=src covers it. Do not add --cov=bot.
+  # API, Bot, and provider implementations live under src, so no additional
+  # coverage roots are needed.
   echo "==> backend-gate: assert --cov packages match coverage floor baseline"
   python scripts/check_coverage_floor.py --assert-cov-flags \
-    --cov src --cov api --cov data_provider
+    --cov src
   _run_pytest_offline "${test_data_dir}" \
       --durations=30 --durations-min=0.5 \
-      --cov=src --cov=api --cov=data_provider \
+      --cov=src \
       --cov-report="json:${coverage_report}" \
     || test_exit_code=$?
   if [ "${test_exit_code}" -eq 0 ]; then
@@ -184,7 +185,7 @@ offline_test_suite_shard() {
   local test_exit_code=0
   test_data_dir="$(mktemp -d)"
   python scripts/check_coverage_floor.py --assert-cov-flags \
-    --cov src --cov api --cov data_provider
+    --cov src
   DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
     COVERAGE_FILE="${coverage_file}" \
     python scripts/ci_test_shard.py \
@@ -196,7 +197,7 @@ offline_test_suite_shard() {
       --timeout=120 --timeout-method=thread \
       -o faulthandler_timeout=300 \
       --durations=30 --durations-min=0.5 \
-      --cov=src --cov=api --cov=data_provider \
+      --cov=src \
       --cov-report="json:${shard_dir}/coverage-shard-${group}.json" \
       || test_exit_code=$?
   rm -rf "${test_data_dir}"
@@ -239,7 +240,7 @@ python_min_smoke() {
   python -c "
 from src.config import get_config
 from src.storage import DatabaseManager
-from data_provider import DataFetcherManager
+from src.data_provider import DataFetcherManager
 from src.api.app import app
 print('✅ python-minimum smoke imports OK', app.title)
 "

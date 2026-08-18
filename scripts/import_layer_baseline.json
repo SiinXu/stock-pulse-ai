@@ -4,10 +4,6 @@
   "pair_count": 11,
   "pairs": [
     [
-      "data_provider",
-      "src.services"
-    ],
-    [
       "src.agent",
       "src.services"
     ],
@@ -29,6 +25,10 @@
     ],
     [
       "src.data",
+      "src.services"
+    ],
+    [
+      "src.data_provider",
       "src.services"
     ],
     [

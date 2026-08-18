@@ -10,7 +10,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api.v1.endpoints import todays_focus
+from src.api.v1.endpoints import todays_focus
 
 
 def _payload() -> Dict[str, Any]:

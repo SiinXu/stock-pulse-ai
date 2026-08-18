@@ -7,7 +7,8 @@ import {
   RouterProvider,
   useLocation,
 } from 'react-router-dom';
-import { ApiErrorAlert, ToastProvider } from './components/common';
+import { ApiErrorAlert } from './components/common/ApiErrorAlert';
+import { ToastProvider } from './components/common/ToastProvider';
 import { Shell } from './components/layout/Shell';
 import {
   PageLoadingFallback,

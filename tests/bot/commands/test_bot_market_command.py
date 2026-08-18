@@ -13,9 +13,9 @@ except ModuleNotFoundError:
     from tests.litellm_stub import ensure_litellm_stub
     ensure_litellm_stub()
 
-from bot.commands.market import MarketCommand
-from bot.application_context import to_analysis_request_context
-from bot.models import BotMessage, ChatType
+from src.bot.commands.market import MarketCommand
+from src.bot.application_context import to_analysis_request_context
+from src.bot.models import BotMessage, ChatType
 
 
 def _make_message() -> BotMessage:
@@ -197,7 +197,7 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         )
 
         cmd = MarketCommand()
-        with self.assertLogs("bot.commands.market", level="WARNING") as logs:
+        with self.assertLogs("src.bot.commands.market", level="WARNING") as logs:
             cmd._run_market_review(
                 to_analysis_request_context(message),
                 config,
@@ -271,7 +271,7 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
 
         with patch.object(cmd, "_try_acquire_market_review_lock", return_value=lock_token), \
              patch.object(cmd, "_release_market_review_lock") as release_market_review_lock, \
-             patch("bot.commands.market.threading.Thread", return_value=fake_thread):
+             patch("src.bot.commands.market.threading.Thread", return_value=fake_thread):
             response = cmd.execute(message, [])
 
         release_market_review_lock.assert_called_once_with(lock_token)
@@ -283,7 +283,7 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
         cmd = MarketCommand()
 
         with patch(
-            "bot.commands.market.to_analysis_request_context",
+            "src.bot.commands.market.to_analysis_request_context",
             side_effect=RuntimeError("invalid boundary payload"),
         ), patch.object(cmd, "_get_config") as get_config, patch.object(
             cmd,
@@ -292,7 +292,7 @@ class MarketCommandRegionFilterTestCase(unittest.TestCase):
             cmd,
             "_release_market_review_lock",
         ) as release_lock, patch(
-            "bot.commands.market.threading.Thread"
+            "src.bot.commands.market.threading.Thread"
         ) as thread:
             response = cmd.execute(message, [])
 

@@ -13,10 +13,10 @@ stock-pulse-ai/
 │   ├── analyzer.py      # AI 分析器
 │   ├── config.py        # 配置管理
 │   ├── notification.py  # 消息推送
+│   ├── data_provider/   # 多数据源适配器
+│   ├── bot/             # 机器人交互模块
+│   ├── api/             # FastAPI 后端服务
 │   └── ...
-├── data_provider/       # 多数据源适配器
-├── bot/                 # 机器人交互模块
-├── api/                 # FastAPI 后端服务
 ├── apps/dsa-web/        # React 前端
 ├── docker/              # Docker 配置
 ├── docs/                # 项目文档

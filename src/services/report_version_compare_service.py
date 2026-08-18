@@ -597,7 +597,7 @@ class ReportVersionCompareService:
         if not text:
             return ""
         try:
-            from data_provider.base import normalize_stock_code
+            from src.data_provider.base import normalize_stock_code
 
             return normalize_stock_code(text) or text
         except (ImportError, TypeError, ValueError, AttributeError):

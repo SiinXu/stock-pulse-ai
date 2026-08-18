@@ -9,8 +9,8 @@ from typing import Optional
 import pandas as pd
 import pytest
 
-from data_provider.base import DataFetchError, DataFetcherManager
-from data_provider.daily_cache import DailyCacheConfig, DailyDataCache
+from src.data_provider.base import DataFetchError, DataFetcherManager
+from src.data_provider.daily_cache import DailyCacheConfig, DailyDataCache
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
     current_diagnostic_snapshot,

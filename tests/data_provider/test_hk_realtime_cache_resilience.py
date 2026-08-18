@@ -19,8 +19,8 @@ except ImportError:
     if "json_repair" not in sys.modules:
         sys.modules["json_repair"] = MagicMock()
 
-from data_provider import akshare_fetcher as akshare_fetcher_module
-from data_provider.akshare_fetcher import AkshareFetcher
+from src.data_provider import akshare_fetcher as akshare_fetcher_module
+from src.data_provider.akshare_fetcher import AkshareFetcher
 
 
 class _DummyCircuitBreaker:
@@ -102,7 +102,7 @@ class TestHKRealtimeCacheResilience(unittest.TestCase):
         self.fetcher._enforce_rate_limit = lambda: None
         self.fetcher._set_random_user_agent = lambda: None
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_warm_snapshot_survives_refresh_raise_within_original_ttl(self, mock_cb):
         """(a) Warm snapshot + refresh raises → still serve EM fields within TTL."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -142,7 +142,7 @@ class TestHKRealtimeCacheResilience(unittest.TestCase):
         self.assertIsNotNone(akshare_fetcher_module._realtime_cache["hk"]["data"])
         ak_mock.stock_hk_spot_em.assert_called_once()
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_cold_refresh_failure_uses_failure_ttl_and_sina(self, mock_cb):
         """(b) Cold + refresh raises → failure TTL, Sina fallback, retry after TTL."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -182,7 +182,7 @@ class TestHKRealtimeCacheResilience(unittest.TestCase):
             "success",
         )
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_validation_raise_preserves_warm_snapshot(self, mock_cb):
         """(c) Validation-raise on refresh keeps a still-usable snapshot."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -215,7 +215,7 @@ class TestHKRealtimeCacheResilience(unittest.TestCase):
         self.assertAlmostEqual(second.turnover_rate, 0.3)
         self.assertIsNotNone(akshare_fetcher_module._realtime_cache["hk"]["data"])
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_validation_raise_cold_installs_failure_ttl(self, mock_cb):
         """(c) Validation-raise when cold installs short failure TTL like network fail."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -239,7 +239,7 @@ class TestHKRealtimeCacheResilience(unittest.TestCase):
         )
         self.assertIsNotNone(again)
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_sina_fallback_missing_fields_are_none_not_zero(self, mock_cb):
         """(d) Sina path leaves EM-only fields as None, not 0."""
         mock_cb.return_value = _DummyCircuitBreaker()
@@ -261,7 +261,7 @@ class TestHKRealtimeCacheResilience(unittest.TestCase):
         self.assertNotEqual(quote.turnover_rate, 0)
         self.assertNotEqual(quote.pe_ratio, 0)
 
-    @patch("data_provider.akshare_fetcher.get_realtime_circuit_breaker")
+    @patch("src.data_provider.akshare_fetcher.get_realtime_circuit_breaker")
     def test_failed_refresh_does_not_clear_prior_snapshot_bytes(self, mock_cb):
         """Expired prior snapshot is kept (not set to None) across a failed refresh."""
         mock_cb.return_value = _DummyCircuitBreaker()

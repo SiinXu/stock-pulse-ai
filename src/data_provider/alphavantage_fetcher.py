@@ -152,7 +152,7 @@ class AlphaVantageFetcher(BaseFetcher):
 
         return UnifiedRealtimeQuote(
             code=symbol,
-            source=RealtimeSource.FALLBACK,
+            source=RealtimeSource.ALPHAVANTAGE,
             price=price,
             change_pct=round(change_pct, 2) if change_pct is not None else None,
             change_amount=round(float(gq.get('09. change', 0)), 4),

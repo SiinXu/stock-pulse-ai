@@ -45,7 +45,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             analysis_endpoint_module,
             "_try_acquire_market_review_lock",
             return_value=lock_token,
-        ), patch("api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
+        ), patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
             response = trigger_market_review(
                 request=request,
                 config=config,
@@ -92,7 +92,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "_build_market_review_runtime",
             return_value=(runtime_notifier, runtime_analyzer, runtime_search),
         ), patch("src.core.market_review.run_market_review") as run_market_review, patch(
-            "api.v1.endpoints.analysis.get_task_queue",
+            "src.api.v1.endpoints.analysis.get_task_queue",
             return_value=task_queue,
         ), patch.object(
             analysis_endpoint_module,
@@ -144,7 +144,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "_build_market_review_runtime",
             return_value=(runtime_notifier, runtime_analyzer, runtime_search),
         ), patch("src.core.market_review.run_market_review") as run_market_review, patch(
-            "api.v1.endpoints.analysis.get_task_queue",
+            "src.api.v1.endpoints.analysis.get_task_queue",
             return_value=task_queue,
         ), patch.object(
             analysis_endpoint_module,
@@ -173,7 +173,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             analysis_endpoint_module,
             "_try_acquire_market_review_lock",
             return_value=None,
-        ), patch("api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
+        ), patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
             with self.assertRaises(Exception) as ctx:
                 trigger_market_review(
                     request=request,
@@ -204,7 +204,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
             task_queue = MagicMock()
             try:
-                with patch("api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
+                with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
                     with self.assertRaises(Exception) as ctx:
                         trigger_market_review(
                             request=SimpleNamespace(send_notification=True, report_language=None, region=None),
@@ -236,7 +236,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             analysis_endpoint_module,
             "_try_acquire_market_review_lock",
             return_value=lock_token,
-        ) as acquire, patch("api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
+        ) as acquire, patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=task_queue):
             response = trigger_market_review(
                 request=request,
                 config=config,
@@ -426,7 +426,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             analysis_phase="auto",
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue):
             status = get_analysis_status("market-task-1")
 
         self.assertEqual(status.status, "completed")
@@ -459,7 +459,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                     skills=[],
                 )
 
-                with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+                with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue):
                     status = get_analysis_status(f"task-{task_status.value}")
 
                 self.assertEqual(status.status, task_status.value)
@@ -510,7 +510,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             completed_at=datetime(2026, 5, 21, 17, 45, 0),
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue):
             status = get_analysis_status("task-queue-action-conflict")
 
         self.assertEqual(status.status, "completed")
@@ -561,7 +561,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             completed_at=datetime(2026, 5, 21, 17, 45, 0),
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue):
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue):
             status = get_analysis_status("task-queue-zero-score")
 
         self.assertEqual(status.status, "completed")
@@ -613,9 +613,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             completed_at=datetime(2026, 5, 21, 17, 45, 0),
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=({}, None, None),
              ):
             status = get_analysis_status("task-queue-zero-score-enriched")
@@ -661,9 +661,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             completed_at=datetime(2026, 5, 21, 17, 45, 0),
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=(
                      None,
                      None,
@@ -750,9 +750,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             completed_at=datetime(2026, 5, 21, 17, 45, 0),
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=(None, None, None),
              ):
             status = get_analysis_status("task-in-memory-no-history")
@@ -792,9 +792,9 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             completed_at=datetime(2026, 5, 21, 17, 45, 0),
         )
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue), \
              patch(
-                 "api.v1.endpoints.analysis._load_sync_fundamental_sources",
+                 "src.api.v1.endpoints.analysis._load_sync_fundamental_sources",
                  return_value=({}, None, None),
              ):
             status = get_analysis_status("task-queue-2")
@@ -909,7 +909,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         mock_queue = MagicMock()
         mock_queue.get_task.return_value = failed_task
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue):
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue):
             response = get_analysis_status(failed_task.task_id)
 
         self.assertEqual(response.error, "analysis_failed")
@@ -952,7 +952,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             )
         ]
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             result = get_analysis_status("task-1")
 
@@ -979,7 +979,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             )
         ]
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             result = get_analysis_status("market-task-1")
 
@@ -1023,7 +1023,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             )
         ]
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             result = get_analysis_status("task-2")
 
@@ -1067,7 +1067,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             )
         ]
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=mock_queue), \
              patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             result = get_analysis_status("task-3")
 

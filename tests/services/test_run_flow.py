@@ -15,8 +15,8 @@ from tests.litellm_stub import ensure_litellm_stub
 
 ensure_litellm_stub()
 
-from api.v1.endpoints.analysis import get_task_run_flow
-from api.v1.endpoints.history import get_history_run_flow
+from src.api.v1.endpoints.analysis import get_task_run_flow
+from src.api.v1.endpoints.history import get_history_run_flow
 from src.services.run_flow import (
     build_history_run_flow_snapshot,
     build_task_run_flow_snapshot,
@@ -1210,8 +1210,8 @@ class RunFlowTestCase(unittest.TestCase):
         self.assertEqual(history_ctx.exception.status_code, 404)
 
         queue = SimpleNamespace(get_task=lambda task_id: None)
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), patch(
-            "api.v1.endpoints.analysis._load_history_run_flow_by_query_id",
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue), patch(
+            "src.api.v1.endpoints.analysis._load_history_run_flow_by_query_id",
             return_value=None,
         ):
             with self.assertRaises(HTTPException) as task_ctx:
@@ -1229,8 +1229,8 @@ class RunFlowTestCase(unittest.TestCase):
         )
         queue = SimpleNamespace(get_task=lambda task_id: task)
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), patch(
-            "api.v1.endpoints.analysis._load_history_run_flow_by_query_id",
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue), patch(
+            "src.api.v1.endpoints.analysis._load_history_run_flow_by_query_id",
             return_value=None,
         ) as load_history:
             snapshot = get_task_run_flow("query-flow")
@@ -1254,8 +1254,8 @@ class RunFlowTestCase(unittest.TestCase):
         )
         queue = SimpleNamespace(get_task=lambda task_id: task)
 
-        with patch("api.v1.endpoints.analysis.get_task_queue", return_value=queue), patch(
-            "api.v1.endpoints.analysis._load_history_run_flow_by_query_id",
+        with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=queue), patch(
+            "src.api.v1.endpoints.analysis._load_history_run_flow_by_query_id",
             return_value=None,
         ) as load_history:
             snapshot = get_task_run_flow("market-query-flow")

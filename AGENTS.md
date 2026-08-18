@@ -7,7 +7,8 @@ If this document conflicts with the repository's scripts, workflows, or current 
 ## 1. Hard Rules
 
 - Follow existing directory boundaries:
-  - Prefer `src/`, `data_provider/`, `api/`, and `bot/` for backend logic.
+  - Prefer `src/` for backend logic. The canonical backend packages are `src/api/`, `src/bot/`, and `src/data_provider/`.
+  - The retired root-level `api`, `bot`, and `data_provider` import packages must not be recreated. Import `src.api`, `src.bot`, and `src.data_provider`. See [ADR-012](docs/adr/ADR-012-installable-package-layout.md) and the [legacy facade import policy](docs/legacy-facade-import-policy.md).
   - Make Web frontend changes in `apps/dsa-web/`.
   - Make desktop client changes in `apps/dsa-desktop/`.
   - Make deployment and pipeline changes in `scripts/`, `.github/workflows/`, and `docker/`.
@@ -74,9 +75,9 @@ python scripts/check_ai_assets.py
   - `src/services/`: Business service layer
   - `src/repositories/`: Data access layer
   - `src/schemas/`: Schemas and data structures
-  - `data_provider/`: Multi-provider adapters and fallback logic
-  - `api/`: FastAPI API
-  - `bot/`: Bot integrations
+  - `src/data_provider/`: Multi-provider adapters and fallback logic
+  - `src/api/`: FastAPI API
+  - `src/bot/`: Bot integrations
   - `strategies/`: Built-in natural-language trading Skill definitions in YAML
   - `templates/`: Jinja report presentation templates
   - `scripts/`: Local scripts
@@ -177,7 +178,7 @@ If there is a corresponding CI result on the existing PR, you can directly quote
 ### Validation By Change Scope
 
 - Python backend changes:
-  - Applicable scope: `main.py`, `src/`, `data_provider/`, `api/`, `bot/`, `tests/`
+  - Applicable scope: `main.py`, `src/` (including `src/api/`, `src/bot/`, `src/data_provider/`), `tests/`
   - Preferred command: `./scripts/ci_gate.sh`
   - Minimum requirement: `python -m py_compile <changed_python_files>`
   - If it affects API, task scheduling, report generation, notification sending, data source fallback, authentication, or scheduling, the delivery instructions should specify whether the corresponding paths are covered.
@@ -193,7 +194,7 @@ If there is a corresponding CI result on the existing PR, you can directly quote
   - If platform constraints prevent complete verification, explicitly state whether the Web build output, Electron build, and release workflow were verified.
 
 - API / Schema / authentication changes:
-  - Applicable scope: `api/**`, `src/schemas/**`, `src/services/**`, `apps/dsa-web/**`, `apps/dsa-desktop/**`
+  - Applicable scope: `src/api/**`, `src/schemas/**`, `src/services/**`, `apps/dsa-web/**`, `apps/dsa-desktop/**`
   - Must cover corresponding backend validation + affected client build validation.
   - For changes to login, cookies, sessions, polling state, fields, or enum values, explicitly state the compatibility impact.
 
@@ -221,7 +222,7 @@ If there is a corresponding CI result on the existing PR, you can directly quote
   - New configuration should favor "runs without configuration, gains capabilities when configured" to avoid overlapping switches and mutually exclusive modes.
 
 - Data sources and fallback:
-  - When modifying `data_provider/`, consider provider priority, failure fallback, field normalization, caching, and timeout strategies.
+  - When modifying `src/data_provider/`, consider provider priority, failure fallback, field normalization, caching, and timeout strategies.
   - Single data source failure should not halt the entire analysis process unless explicitly required to fail-fast.
 
 - API / Web / Desktop compatibility:

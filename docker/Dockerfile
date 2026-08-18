@@ -53,15 +53,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Copy application code
 COPY *.py ./
-COPY api/ ./api/
-COPY data_provider/ ./data_provider/
-COPY bot/ ./bot/
 COPY src/ ./src/
-# ADR-012: editable install after the four import roots are on disk.
+# ADR-012: editable install after the canonical source package is on disk.
 # README.md and LICENSE are referenced by PEP 621 metadata in pyproject.toml.
 COPY pyproject.toml README.md LICENSE ./
 RUN PIP_BUILD_CONSTRAINT=build-constraints.txt pip install -e . --no-deps
-# Compatibility alias COPY above stays; implementation is under src/data_provider.
 RUN DSA_PACKAGED_IMPORT_PROBE=src.data_provider.base python main.py
 COPY strategies/ ./strategies/
 COPY --from=web-builder /app/static ./static/

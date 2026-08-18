@@ -1,7 +1,7 @@
 from unittest import mock
 
-import bot.platforms.feishu_stream as feishu_stream
-from bot.platforms.feishu_stream import (
+import src.bot.platforms.feishu_stream as feishu_stream
+from src.bot.platforms.feishu_stream import (
     FEISHU_DOMAIN,
     LARK_DOMAIN,
     FeishuReplyClient,

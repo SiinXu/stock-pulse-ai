@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import json
 
-from api.v1.endpoints.auth import AuthStatusResponse
+from src.api.v1.endpoints.auth import AuthStatusResponse
 
 
 # Golden camelCase payloads for wire stability (byte-identical serialization).

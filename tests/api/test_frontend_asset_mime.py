@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import unittest
 
-from api.app import _frontend_asset_media_type
+from src.api.app import _frontend_asset_media_type
 
 
 class FrontendAssetMimeTestCase(unittest.TestCase):

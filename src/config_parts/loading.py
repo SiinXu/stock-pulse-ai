@@ -2074,7 +2074,7 @@ class _ConfigLoadingMethods:
         Stock codes are canonicalized via normalize_stock_code so that
         runtime routing matches the same equivalence used in validation.
         """
-        from data_provider.base import normalize_stock_code
+        from src.data_provider.base import normalize_stock_code
 
         groups: dict = {}
         stock_re = re.compile(r'^STOCK_GROUP_(\d+)$', re.IGNORECASE)

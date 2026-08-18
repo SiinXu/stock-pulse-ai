@@ -6,10 +6,10 @@
 Enforces the directed dependency shape from issue #1082:
 
 ```text
-api → services → pipeline/stages → src.data_provider
+src.api → services → pipeline/stages → src.data_provider
 ```
 
-and keeps lower layers from reaching the HTTP transport (``api``).
+and keeps lower layers from reaching the HTTP transport (``src.api``).
 
 Measurement uses **module-level** imports only (function-body lazy imports are
 ignored), reusing the same production file scope as the import-cycle ratchet.
@@ -51,19 +51,13 @@ BASELINE_VERSION = 1
 
 FORBIDDEN_RULES: Tuple[Tuple[str, str], ...] = (
     ("src.data_provider", "src.services"),
-    ("src.data_provider", "api"),
     ("src.data_provider", "src.api"),
     ("src.data_provider", "src.core"),
     ("src.data_provider", "src.agent"),
-    ("src.services", "api"),
     ("src.services", "src.api"),
-    ("src.core", "api"),
     ("src.core", "src.api"),
-    ("src.agent", "api"),
     ("src.agent", "src.api"),
-    ("src.market", "api"),
     ("src.market", "src.api"),
-    ("src.analyzer", "api"),
     ("src.analyzer", "src.api"),
     ("src.core", "src.services"),
 )
@@ -352,7 +346,7 @@ def run_self_tests() -> None:
         (root / "src" / "services").mkdir(parents=True)
         (root / "src" / "core" / "stages").mkdir(parents=True)
         (root / "src" / "data_provider").mkdir(parents=True)
-        (root / "api").mkdir(parents=True)
+        (root / "src" / "api").mkdir(parents=True)
         (root / "scripts").mkdir()
 
         (root / "src" / "services" / "svc.py").write_text(
@@ -364,7 +358,7 @@ def run_self_tests() -> None:
         (root / "src" / "core" / "pipeline.py").write_text(
             "from src.services.svc import VALUE\n", encoding="utf-8"
         )
-        (root / "api" / "app.py").write_text(
+        (root / "src" / "api" / "app.py").write_text(
             "from src.services.svc import VALUE\n", encoding="utf-8"
         )
 
@@ -419,8 +413,8 @@ def run_self_tests() -> None:
             raise AssertionError("function-body import treated as reverse edge")
         cases += 1
 
-        if any(edge[1] == "api" for edge in scan_reverse_edges(root)):
-            raise AssertionError("forward api→services treated as reverse")
+        if any(edge[1] == "src.api" for edge in scan_reverse_edges(root)):
+            raise AssertionError("forward src.api→services treated as reverse")
         cases += 1
 
     print(f"Layer-direction self-tests passed ({cases} cases).")

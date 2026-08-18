@@ -18,7 +18,7 @@ flowchart TB
         More[More platforms...]
     end
 
-    subgraph BotModule [bot/ module]
+    subgraph BotModule [src/bot/ module]
         WH[Webhook Server]
         Adapters[Platform Adapters]
         Dispatcher[Command Dispatcher]
@@ -49,7 +49,7 @@ flowchart TB
 ## 2. Directory Structure
 
 ```
-bot/
+src/bot/
 ├── __init__.py             # Module entry, exports main classes
 ├── models.py               # Unified message/response models
 ├── dispatcher.py           # Command dispatcher (core)
@@ -76,7 +76,7 @@ bot/
 
 ## 3. Core Abstractions
 
-### 3.1 Unified Message Model (`bot/models.py`)
+### 3.1 Unified Message Model (`src/bot/models.py`)
 
 ```python
 @dataclass
@@ -98,7 +98,7 @@ class BotResponse:
     at_user: bool = True    # Whether to @-mention the sender
 ```
 
-### 3.2 Platform Adapter Base (`bot/platforms/base.py`)
+### 3.2 Platform Adapter Base (`src/bot/platforms/base.py`)
 
 ```python
 class BotPlatform(ABC):
@@ -122,7 +122,7 @@ class BotPlatform(ABC):
         ...
 ```
 
-### 3.3 Command Base Class (`bot/commands/base.py`)
+### 3.3 Command Base Class (`src/bot/commands/base.py`)
 
 ```python
 class BotCommand(ABC):
@@ -200,7 +200,7 @@ Agent prompts include the applicable market rules, quote currency, timezone, and
 
 ## 6. Webhook Routes
 
-Handler functions for each platform live in `bot/handler.py`.
+Handler functions for each platform live in `src/bot/handler.py`.
 These routes are **not yet wired** into the FastAPI application — you must mount them manually.
 
 | Route | Method | Status | Notes |
@@ -213,7 +213,7 @@ These routes are **not yet wired** into the FastAPI application — you must mou
 To mount the DingTalk webhook in your FastAPI app:
 
 ```python
-from bot.handler import handle_dingtalk_webhook
+from src.bot.handler import handle_dingtalk_webhook
 
 @app.post("/bot/dingtalk")
 async def dingtalk_webhook(request: Request):
@@ -259,12 +259,12 @@ TELEGRAM_WEBHOOK_SECRET=      # Webhook secret token
 
 ### Adding a new platform adapter
 
-1. Create a new file in `bot/platforms/`.
+1. Create a new file in `src/bot/platforms/`.
 2. Subclass `BotPlatform` and implement `verify_request`, `parse_message`, `format_response`.
 3. Mount the webhook route directly in your FastAPI app (for example in `src/api/app.py`) instead of `src/api/v1/router.py`, so the callback path stays `/bot/<platform>` rather than `/api/v1/bot/<platform>`.
 
 ### Adding a new command
 
-1. Create a new file in `bot/commands/`.
+1. Create a new file in `src/bot/commands/`.
 2. Subclass `BotCommand` and implement the `execute` method.
 3. Register the command in the dispatcher startup code.

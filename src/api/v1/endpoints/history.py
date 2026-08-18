@@ -105,10 +105,10 @@ def _history_share_image_payload(result: Mapping[str, Any]) -> Optional[Mapping[
 def _normalize_code_for_grouping(code: str) -> str:
     """Normalize stock code for deduplication grouping.
 
-    Delegates to data_provider.base.normalize_stock_code which handles
+    Delegates to src.data_provider.base.normalize_stock_code which handles
     SH600519, 600519.SH, HK00700, 00700.HK, BJ920748, etc.
     """
-    from data_provider.base import normalize_stock_code
+    from src.data_provider.base import normalize_stock_code
     return normalize_stock_code(code or "")
 
 
