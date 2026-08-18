@@ -147,6 +147,9 @@ def main(argv: list[str] | None = None) -> int:
         for path in SUPPORTED_DISPLAY:
             print(path)
         return 0
+    if not args.paths:
+        print("no conflict files; nothing to do")
+        return 0
     try:
         root = _repository_root()
         paths = [_normalize_path(root, value) for value in args.paths]

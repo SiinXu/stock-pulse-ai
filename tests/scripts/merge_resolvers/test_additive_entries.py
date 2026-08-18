@@ -25,6 +25,20 @@ def test_merges_distinct_mapping_entries(context_factory):
     assert output.index('"a"') < output.index('"b"')
 
 
+def test_merges_non_ascii_mapping_entries(context_factory):
+    output = resolve(
+        context_factory(
+            PATH,
+            current=_conflict('  "问候": "你好",\n', '  "farewell": "再见",\n'),
+        )
+    )
+    assert "farewell" in output
+    assert "问候" in output
+    assert "你好" in output
+    assert "再见" in output
+    assert "<<<<<<<" not in output
+
+
 def test_refuses_same_key_on_both_sides(context_factory):
     with pytest.raises(RefusalError, match="changed on both sides"):
         resolve(

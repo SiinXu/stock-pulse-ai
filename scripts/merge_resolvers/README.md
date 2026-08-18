@@ -2,17 +2,37 @@
 
 These resolvers handle conflicts where neither Git side is the merged truth.
 They plan every output before writing anything, reject unknown conflict shapes,
-refuse all-zero or no-op batches, replace all files as one batch, and stage
+refuse all-zero write batches, replace all files as one batch, and stage
 them with one Git index update.
+
+## When a coordinator runs this
+
+After `git merge` (or rebase) leaves unmerged derived files:
 
 ```bash
 python scripts/merge_resolvers/resolve.py --list
 python scripts/merge_resolvers/resolve.py $(git diff --name-only --diff-filter=U)
 ```
 
-Exit status `0` means every requested conflict was resolved and staged. Status
-`2` is a deliberate refusal with the file and reason. Status `1` is an internal
-error. A refusal writes no output.
+On a clean tree the second command is a no-op and exits `0`. Do not pass
+`--ours` / `--theirs` for these files: the correct value is recomputed or
+union-merged from the merged tree.
+
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Every requested conflict was resolved and staged, or there were no paths (clean-tree no-op) |
+| `2` | Deliberate refusal. stderr is `REFUSE <path>: <reason>`. **Nothing was written.** |
+| `1` | Internal error (bad git state, unreadable file, resolver bug). **Nothing was staged.** |
+
+**Refusal is the safe outcome.** Merging a semantic conflict as if it were
+additive silently drops one side and is far worse than bumping the PR out of
+the merge train. If any file is refused, the whole batch is refused and the
+working tree is left untouched. Fail-open is the dangerous failure mode here.
+
+If the tool refuses, leave the conflict in place and let the pull request bump
+out. Rollback of a merge in progress is ordinary Git: `git merge --abort`.
 
 ## Why choosing a side is wrong
 
