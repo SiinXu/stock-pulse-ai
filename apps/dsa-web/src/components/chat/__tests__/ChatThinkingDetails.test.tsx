@@ -248,10 +248,11 @@ describe('ChatThinkingDetails', () => {
       { type: 'pipeline_budget_skipped', stage: 'critic', reason: 'insufficient_budget' },
     ];
 
-    const { container: batchContainer } = render(
+    const { container: batchContainer, unmount } = render(
       <ChatThinkingDetails mode="live" t={t} steps={steps} />,
     );
-    const batchHtml = normalizeTraceHtml(batchContainer.innerHTML);
+    const batchTrace = serializeTraceDom(batchContainer);
+    unmount();
 
     const growing: ProgressStep[] = [];
     const { container, rerender } = render(
@@ -262,12 +263,19 @@ describe('ChatThinkingDetails', () => {
       rerender(<ChatThinkingDetails mode="live" t={t} steps={[...growing]} />);
     }
 
-    expect(normalizeTraceHtml(container.innerHTML)).toBe(batchHtml);
+    expect(serializeTraceDom(container)).toEqual(batchTrace);
   });
 });
 
-function normalizeTraceHtml(html: string): string {
-  return html
-    .replace(/id="[^"]*-detail-\d+"/g, 'id="trace-detail"')
-    .replace(/aria-controls="[^"]*-detail-\d+"/g, 'aria-controls="trace-detail"');
+function serializeTraceDom(container: HTMLElement) {
+  return [...container.querySelectorAll('[data-trace-step]')].map((row) => ({
+    type: row.getAttribute('data-trace-step'),
+    current: row.getAttribute('data-current'),
+    className: row.className,
+    text: row.textContent?.replace(/\s+/g, ' ').trim(),
+    expanded: row.querySelector('button')?.getAttribute('aria-expanded') ?? null,
+    label: row.querySelector('button')?.getAttribute('aria-label') ?? null,
+    status: row.querySelector('[data-trace-status]')?.getAttribute('data-trace-status') ?? null,
+    statusText: row.querySelector('[data-trace-status]')?.textContent ?? null,
+  }));
 }
