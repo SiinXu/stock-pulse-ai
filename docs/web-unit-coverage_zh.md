@@ -85,4 +85,4 @@ Vitest 4 的 `configDefaults.coverage.exclude` 为空，因此 baseline 把每�
 
 `web-gate` 在前端路径变更时用 `npm run test:coverage` 替换 `npm run test`。覆盖率插桩会让扫描全量源码的 glob/AST 守卫变慢，因此 `vitest.config.ts` **仅在**存在 `--coverage` 时把 `testTimeout` 提到 30 秒。默认 `npm run test` 仍是 5 秒。
 
-Testing Library 的 `findBy` / `waitFor` **不会**继承 Vitest `testTimeout`。因此 `src/setupTests.ts` 在存在 `--coverage` 时把 `asyncUtilTimeout` 设为 10 秒，本地快速循环仍保持 1 秒默认值。`React.lazy` 报告面板（例如 `ReportSummary` 中的 `ReportDiagnostics`）在 chunk 解析完成前不会出现；测试必须把这些节点纳入就绪条件，而不能只等资讯区出现后再短等。超时策略集中在 `src/test-utils/coverageTimeouts.ts`。
+Testing Library 的 `findBy` / `waitFor` **不会**继承 Vitest `testTimeout`。`vitest.config.ts` 在主进程（argv 可信）检测 `--coverage`，并通过 `test.env` 向 worker 注入 `WEB_VITEST_COVERAGE=1`。`src/setupTests.ts` 读取该标志，而不是 worker 的 `process.argv`（Vitest forks 下 argv 不含 `--coverage`），再把 `asyncUtilTimeout` 设为 10 秒。本地快速循环仍保持 1 秒默认值。`React.lazy` 报告面板（例如 `ReportSummary` 中的 `ReportDiagnostics`）在 chunk 解析完成前不会出现；测试必须把这些节点纳入就绪条件，而不能只等资讯区出现后再短等。超时策略集中在 `src/test-utils/coverageTimeouts.ts`。

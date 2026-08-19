@@ -1,2 +1,2 @@
 - [Tests] Enforce a measured Vitest v8 Web unit-test coverage floor in web-gate without a second unit-suite run (Refs #164).
-- [Fixed] Align Testing Library async waits with coverage-mode timeouts so lazy report diagnostics can resolve on Linux CI.
+- [Fixed] Detect coverage in vitest.config.ts and inject WEB_VITEST_COVERAGE so fork workers apply the 10s Testing Library wait for lazy report diagnostics.

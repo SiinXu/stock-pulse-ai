@@ -7,7 +7,9 @@ await loadAllUiLanguageTranslations();
 
 // Vitest testTimeout does not extend Testing Library findBy/waitFor. Coverage
 // instrumentation delays React.lazy chunks past the 1s default (hosted web-gate
-// failed on ReportSummary → lazy ReportDiagnostics).
+// failed on ReportSummary → lazy ReportDiagnostics). The budget comes from the
+// worker-visible WEB_VITEST_COVERAGE flag injected by vitest.config.ts — fork
+// workers do not receive `--coverage` on their argv.
 configure({ asyncUtilTimeout: getWebUnitAsyncUtilTimeoutMs() });
 
 class MemoryStorageMock implements Storage {
