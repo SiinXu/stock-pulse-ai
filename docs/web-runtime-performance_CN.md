@@ -43,6 +43,31 @@ node scripts/check-runtime-performance.mjs --strict   # 未来硬门
 - **SettingsField**：`React.memo` + 属性相等比较。
 - **SSE**：progress 事件 rAF 合批 + 聊天气泡 memo。
 
+## Bundle 体积（单文件与聚合）
+
+机器可读：`apps/dsa-web/scripts/bundle-size-budget.json`。
+
+检查器：`apps/dsa-web/scripts/check-bundle-size.mjs`（生产构建后执行 `npm run build:check`）。
+
+| 层 | 约束对象 | 防止的绕过 |
+| --- | --- | --- |
+| `rules` | 每个匹配的 `.js` / `.css` 资源 | 单个具名 chunk 超过 gzip 上限 |
+| `aggregateRules` | 一族 glob 匹配到的资源的去重 gzip 合计 | 把一个路由/组件拆成多个更小 chunk，使每个都低于单文件上限 |
+
+聚合规则用稳定家族 ID（`<named-rule>-family` 或 `home-watchlist-route` 这类路由前缀）索引。`match` 可以是一条 glob 或 glob 列表。同一家族内每个资源只计一次，即使多条 glob 命中同一带 hash 的文件名。家族匹配为零则失败，避免前缀被改名后静默掉出闸门。
+
+`vendor-misc` 仍只做 first-match 残余单文件规则。它的 `assets/vendor-*.js` 若按聚合计算会把全部 vendor chunk 加总。
+
+当前生产构建仍只产出一个产物的同模式家族继承既有具名单文件上限。当前 `main` 上的语言包已经拆成多个 `ja-*.js`（及其它语言同类文件）；这些家族使用测得的 zlib-9 合计再加 400 B。额外的路由家族（`settings-route`、`portfolio-route`、`screening-route`、`home-watchlist-route`）覆盖无法命中原具名 glob 的前缀子 chunk。不要靠抬高单文件上限来掩盖家族增长。
+
+```bash
+cd apps/dsa-web
+npm run build
+node scripts/check-bundle-size.mjs --print
+```
+
+检查器会打印命中资源、单文件 gzip、家族 gzip 合计，以及触发失败的预算。
+
 ## CI 软门
 
 前端变更时 Web gate 在单元测试后运行 `check-runtime-performance.mjs`；软模式只告警、不失败。

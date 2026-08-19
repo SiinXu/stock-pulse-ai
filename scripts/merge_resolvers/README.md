@@ -17,10 +17,11 @@ error. A refusal writes no output.
 ## Why choosing a side is wrong
 
 - `bundle-size-budget.json` is a complete budget registry. The resolver performs
-  a three-way merge by rule ID only when each side changed distinct rules. It
-  refuses overlapping rule changes, rule removal/reordering, unexplained numeric
-  changes, and top-level metadata changed differently on both sides; those cases
-  require a combined production-build measurement.
+  a three-way merge by rule ID only when each side changed distinct per-asset
+  `rules` or optional `aggregateRules`. It refuses overlapping rule changes,
+  rule removal/reordering, unexplained numeric changes, and top-level metadata
+  changed differently on both sides; those cases require a combined
+  production-build measurement. Adding `aggregateRules` on one side is allowed.
 - Public-surface tests snapshot exports, facade method lists, and implementation
   AST hashes. The resolver recomputes those values from the merged Python modules.
   It refuses conflicts outside an `EXPECTED_*` assignment or any failed import.

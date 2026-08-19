@@ -2,14 +2,19 @@
 /**
  * Assert production bundle gzip sizes against scripts/bundle-size-budget.json.
  *
+ * Per-asset rules keep each matching file under its own cap. Optional
+ * aggregateRules sum every unique asset that matches a family of globs so
+ * splitting one route or component into many smaller chunks cannot hide
+ * growth behind the per-file budgets (Refs #883).
+ *
  * Usage (from apps/dsa-web after a production build):
  *   node scripts/check-bundle-size.mjs
  *   node scripts/check-bundle-size.mjs --print
  *   node scripts/check-bundle-size.mjs --budget path/to/budget.json
  *
  * Exit codes:
- *   0 — all matching assets are within budget
- *   1 — one or more assets exceed budget, or the build output / budget is invalid
+ *   0 — all matching assets and aggregate families are within budget
+ *   1 — one or more assets or families exceed budget, or the build output / budget is invalid
  */
 
 import { readFileSync, readdirSync, statSync, existsSync } from 'node:fs';
@@ -74,6 +79,37 @@ function globToRegExp(globPattern) {
   return new RegExp(`^${escaped}$`);
 }
 
+function normalizeMatchPatterns(match, label) {
+  const values = Array.isArray(match) ? match : [match];
+  if (values.length === 0) {
+    throw new Error(`${label} requires at least one match glob`);
+  }
+  const patterns = [];
+  for (const value of values) {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw new Error(`${label} match patterns must be non-empty strings`);
+    }
+    patterns.push(value.trim());
+  }
+  return patterns;
+}
+
+function assertBudgetRuleShape(rule, label, seenIds) {
+  if (!rule || typeof rule !== 'object') {
+    throw new Error(`Each ${label} must be an object`);
+  }
+  if (typeof rule.id !== 'string' || !rule.id.trim()) {
+    throw new Error(`Each ${label} requires a non-empty id`);
+  }
+  if (seenIds.has(rule.id)) {
+    throw new Error(`Duplicate ${label} id: ${rule.id}`);
+  }
+  seenIds.add(rule.id);
+  if (typeof rule.maxGzipBytes !== 'number' || !Number.isFinite(rule.maxGzipBytes) || rule.maxGzipBytes < 0) {
+    throw new Error(`${label} ${rule.id} requires a non-negative maxGzipBytes number`);
+  }
+}
+
 function loadBudget(budgetPath) {
   if (!existsSync(budgetPath)) {
     throw new Error(`Budget file not found: ${budgetPath}`);
@@ -95,23 +131,47 @@ function loadBudget(budgetPath) {
   ) {
     throw new Error('Budget defaults must include jsMaxGzipBytes and cssMaxGzipBytes numbers');
   }
+  if (budget.aggregateRules !== undefined && !Array.isArray(budget.aggregateRules)) {
+    throw new Error('Budget aggregateRules must be an array when present');
+  }
 
+  const ruleIds = new Set();
   for (const rule of budget.rules) {
-    if (!rule || typeof rule !== 'object') {
-      throw new Error('Each budget rule must be an object');
-    }
-    if (typeof rule.id !== 'string' || !rule.id.trim()) {
-      throw new Error('Each budget rule requires a non-empty id');
-    }
+    assertBudgetRuleShape(rule, 'budget rule', ruleIds);
     if (typeof rule.match !== 'string' || !rule.match.trim()) {
       throw new Error(`Budget rule ${rule.id} requires a match glob`);
     }
-    if (typeof rule.maxGzipBytes !== 'number' || !Number.isFinite(rule.maxGzipBytes) || rule.maxGzipBytes < 0) {
-      throw new Error(`Budget rule ${rule.id} requires a non-negative maxGzipBytes number`);
-    }
   }
 
-  return budget;
+  const aggregateIds = new Set();
+  const aggregateRules = [];
+  for (const rule of budget.aggregateRules || []) {
+    assertBudgetRuleShape(rule, 'aggregate rule', aggregateIds);
+    aggregateRules.push({
+      ...rule,
+      match: normalizeMatchPatterns(rule.match, `Aggregate rule ${rule.id}`),
+    });
+  }
+
+  return { ...budget, aggregateRules };
+}
+
+function matchRelativePaths(relativePaths, patterns) {
+  const matched = [];
+  const seen = new Set();
+  for (const relativePath of relativePaths) {
+    for (const pattern of patterns) {
+      if (!globToRegExp(pattern).test(relativePath)) {
+        continue;
+      }
+      if (!seen.has(relativePath)) {
+        seen.add(relativePath);
+        matched.push(relativePath);
+      }
+      break;
+    }
+  }
+  return matched;
 }
 
 function listAssetFiles(outDir) {
@@ -180,6 +240,7 @@ function main() {
   }
 
   const results = [];
+  const gzipByRelativePath = new Map();
   const ruleHitCounts = new Map(rules.map((rule) => [rule.id, 0]));
   let failures = 0;
 
@@ -196,6 +257,7 @@ function main() {
     }
 
     const gzipBytes = gzipSizeBytes(filePath, gzipLevel);
+    gzipByRelativePath.set(relativePath, gzipBytes);
     const ok = gzipBytes <= maxGzipBytes;
     if (!ok) {
       failures += 1;
@@ -211,8 +273,31 @@ function main() {
   }
 
   results.sort((left, right) => right.gzipBytes - left.gzipBytes);
+  const relativePaths = results.map((result) => result.relativePath);
 
-  if (options.print || failures > 0) {
+  const aggregateResults = [];
+  for (const rule of budget.aggregateRules) {
+    const matchedPaths = matchRelativePaths(relativePaths, rule.match);
+    const gzipBytes = matchedPaths.reduce(
+      (total, relativePath) => total + (gzipByRelativePath.get(relativePath) || 0),
+      0,
+    );
+    const ok = matchedPaths.length > 0 && gzipBytes <= rule.maxGzipBytes;
+    if (matchedPaths.length > 0 && gzipBytes > rule.maxGzipBytes) {
+      failures += 1;
+    }
+    aggregateResults.push({
+      id: rule.id,
+      match: rule.match,
+      matchedPaths,
+      gzipBytes,
+      maxGzipBytes: rule.maxGzipBytes,
+      ok,
+    });
+  }
+
+  const shouldPrint = options.print || failures > 0 || aggregateResults.some((entry) => !entry.ok);
+  if (shouldPrint) {
     console.log(`bundle-size: checking ${results.length} assets under ${outDir}`);
     console.log(`bundle-size: budget ${options.budgetPath}`);
     console.log('bundle-size: top assets by gzip:');
@@ -221,6 +306,20 @@ function main() {
       console.log(
         `  [${status}] ${result.relativePath}  gzip=${formatBytes(result.gzipBytes)}  budget=${formatBytes(result.maxGzipBytes)}  rule=${result.ruleId}`,
       );
+    }
+    if (aggregateResults.length > 0) {
+      console.log('bundle-size: aggregate families:');
+      for (const result of aggregateResults) {
+        const status = result.ok ? 'OK' : 'FAIL';
+        console.log(
+          `  [${status}] ${result.id}  gzip=${formatBytes(result.gzipBytes)}  budget=${formatBytes(result.maxGzipBytes)}  assets=${result.matchedPaths.length}`,
+        );
+        for (const relativePath of result.matchedPaths) {
+          console.log(
+            `    ${relativePath}  gzip=${formatBytes(gzipByRelativePath.get(relativePath) || 0)}`,
+          );
+        }
+      }
     }
   }
 
@@ -239,18 +338,41 @@ function main() {
     );
   }
 
+  const missingAggregates = aggregateResults.filter((entry) => entry.matchedPaths.length === 0);
+  if (missingAggregates.length > 0) {
+    fail(
+      `Aggregate rule${missingAggregates.length === 1 ? '' : 's'} matched no build artifact: ${missingAggregates.map((entry) => entry.id).join(', ')}. `
+      + 'Update scripts/bundle-size-budget.json if chunk names intentionally changed.',
+    );
+  }
+
   if (failures > 0) {
-    console.error(`bundle-size: ${failures} asset${failures === 1 ? '' : 's'} exceeded budget:`);
-    for (const result of results.filter((entry) => !entry.ok)) {
-      console.error(
-        `  FAIL ${result.relativePath}  gzip=${formatBytes(result.gzipBytes)}  budget=${formatBytes(result.maxGzipBytes)}  rule=${result.ruleId}`,
-      );
+    const failedAssets = results.filter((entry) => !entry.ok);
+    const failedAggregates = aggregateResults.filter((entry) => entry.matchedPaths.length > 0 && !entry.ok);
+    if (failedAssets.length > 0) {
+      console.error(`bundle-size: ${failedAssets.length} asset${failedAssets.length === 1 ? '' : 's'} exceeded budget:`);
+      for (const result of failedAssets) {
+        console.error(
+          `  FAIL ${result.relativePath}  gzip=${formatBytes(result.gzipBytes)}  budget=${formatBytes(result.maxGzipBytes)}  rule=${result.ruleId}`,
+        );
+      }
+    }
+    if (failedAggregates.length > 0) {
+      console.error(`bundle-size: ${failedAggregates.length} aggregate famil${failedAggregates.length === 1 ? 'y' : 'ies'} exceeded budget:`);
+      for (const result of failedAggregates) {
+        console.error(
+          `  FAIL ${result.id}  gzip=${formatBytes(result.gzipBytes)}  budget=${formatBytes(result.maxGzipBytes)}  assets=${result.matchedPaths.join(', ')}`,
+        );
+      }
     }
     fail('Bundle size budget check failed.');
     return;
   }
 
-  console.log(`bundle-size: OK — ${results.length} assets within budget`);
+  const aggregateSuffix = aggregateResults.length > 0
+    ? `, ${aggregateResults.length} aggregate famil${aggregateResults.length === 1 ? 'y' : 'ies'}`
+    : '';
+  console.log(`bundle-size: OK — ${results.length} assets${aggregateSuffix} within budget`);
 }
 
 try {

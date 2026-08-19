@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Gzip size budgets for production Web build artifacts under static/. Initial baseline = measured gzip size * 1.10 (ceil). Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
+  "description": "Gzip size budgets for production Web build artifacts under static/. Per-asset rules cap each matching file. aggregateRules cap the unique gzip total of a family so splitting one route or component into many smaller chunks cannot bypass the per-asset budgets (Refs #883). Initial per-asset baseline = measured gzip size * 1.10 (ceil). Aggregate already-split families use measured sum + 400 B. Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-14",
@@ -215,6 +215,322 @@
       "match": "assets/vendor-*.css",
       "maxGzipBytes": 576,
       "measuredGzipBytes": 523
+    }
+  ],
+  "aggregateRules": [
+    {
+      "id": "IntelligenceSourcesPanel-family",
+      "match": [
+        "assets/IntelligenceSourcesPanel-*.js"
+      ],
+      "maxGzipBytes": 248056,
+      "measuredGzipBytes": 246979,
+      "note": "Same-pattern family for IntelligenceSourcesPanel. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 246979 B on origin/main e441a0e8."
+    },
+    {
+      "id": "js-entry-family",
+      "match": [
+        "assets/index-*.js"
+      ],
+      "maxGzipBytes": 186196,
+      "measuredGzipBytes": 176915,
+      "note": "Same-pattern family for js-entry. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 176915 B on origin/main e441a0e8."
+    },
+    {
+      "id": "locale-ja-family",
+      "match": [
+        "assets/ja-*.js"
+      ],
+      "maxGzipBytes": 171150,
+      "measuredGzipBytes": 170750,
+      "note": "Already-split same-pattern family for locale-ja (4 artifacts). Measured zlib-9 sum 170750 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-ja cap is unchanged."
+    },
+    {
+      "id": "locale-de-family",
+      "match": [
+        "assets/de-*.js"
+      ],
+      "maxGzipBytes": 163285,
+      "measuredGzipBytes": 162885,
+      "note": "Already-split same-pattern family for locale-de (4 artifacts). Measured zlib-9 sum 162885 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-de cap is unchanged."
+    },
+    {
+      "id": "locale-ko-family",
+      "match": [
+        "assets/ko-*.js"
+      ],
+      "maxGzipBytes": 163678,
+      "measuredGzipBytes": 163278,
+      "note": "Already-split same-pattern family for locale-ko (4 artifacts). Measured zlib-9 sum 163278 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-ko cap is unchanged."
+    },
+    {
+      "id": "locale-fr-family",
+      "match": [
+        "assets/fr-*.js"
+      ],
+      "maxGzipBytes": 162985,
+      "measuredGzipBytes": 162585,
+      "note": "Already-split same-pattern family for locale-fr (4 artifacts). Measured zlib-9 sum 162585 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-fr cap is unchanged."
+    },
+    {
+      "id": "locale-es-family",
+      "match": [
+        "assets/es-*.js"
+      ],
+      "maxGzipBytes": 158394,
+      "measuredGzipBytes": 157994,
+      "note": "Already-split same-pattern family for locale-es (4 artifacts). Measured zlib-9 sum 157994 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-es cap is unchanged."
+    },
+    {
+      "id": "locale-zh-TW-family",
+      "match": [
+        "assets/zh-TW-*.js"
+      ],
+      "maxGzipBytes": 158392,
+      "measuredGzipBytes": 157992,
+      "note": "Already-split same-pattern family for locale-zh-TW (4 artifacts). Measured zlib-9 sum 157992 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-zh-TW cap is unchanged."
+    },
+    {
+      "id": "locale-ms-family",
+      "match": [
+        "assets/ms-*.js"
+      ],
+      "maxGzipBytes": 147931,
+      "measuredGzipBytes": 147531,
+      "note": "Already-split same-pattern family for locale-ms (4 artifacts). Measured zlib-9 sum 147531 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-ms cap is unchanged."
+    },
+    {
+      "id": "locale-id-family",
+      "match": [
+        "assets/id-*.js"
+      ],
+      "maxGzipBytes": 148087,
+      "measuredGzipBytes": 147687,
+      "note": "Already-split same-pattern family for locale-id (4 artifacts). Measured zlib-9 sum 147687 B on origin/main e441a0e8 + 400 B headroom. Per-asset locale-id cap is unchanged."
+    },
+    {
+      "id": "vendor-charts-family",
+      "match": [
+        "assets/vendor-charts-*.js"
+      ],
+      "maxGzipBytes": 122352,
+      "measuredGzipBytes": 111231,
+      "note": "Same-pattern family for vendor-charts. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 111231 B on origin/main e441a0e8."
+    },
+    {
+      "id": "vendor-react-family",
+      "match": [
+        "assets/vendor-react-*.js"
+      ],
+      "maxGzipBytes": 66666,
+      "measuredGzipBytes": 60564,
+      "note": "Same-pattern family for vendor-react. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 60564 B on origin/main e441a0e8."
+    },
+    {
+      "id": "vendor-markdown-family",
+      "match": [
+        "assets/vendor-markdown-*.js"
+      ],
+      "maxGzipBytes": 48618,
+      "measuredGzipBytes": 44198,
+      "note": "Same-pattern family for vendor-markdown. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 44198 B on origin/main e441a0e8."
+    },
+    {
+      "id": "vendor-motion-family",
+      "match": [
+        "assets/vendor-motion-*.js"
+      ],
+      "maxGzipBytes": 43373,
+      "measuredGzipBytes": 39431,
+      "note": "Same-pattern family for vendor-motion. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 39431 B on origin/main e441a0e8."
+    },
+    {
+      "id": "vendor-router-family",
+      "match": [
+        "assets/vendor-router-*.js"
+      ],
+      "maxGzipBytes": 33202,
+      "measuredGzipBytes": 30183,
+      "note": "Same-pattern family for vendor-router. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 30183 B on origin/main e441a0e8."
+    },
+    {
+      "id": "vendor-icons-family",
+      "match": [
+        "assets/vendor-icons-*.js"
+      ],
+      "maxGzipBytes": 10861,
+      "measuredGzipBytes": 10753,
+      "note": "Same-pattern family for vendor-icons. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 10753 B on origin/main e441a0e8."
+    },
+    {
+      "id": "RunFlowPanel-family",
+      "match": [
+        "assets/RunFlowPanel-*.js"
+      ],
+      "maxGzipBytes": 73318,
+      "measuredGzipBytes": 66625,
+      "note": "Same-pattern family for RunFlowPanel. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 66625 B on origin/main e441a0e8."
+    },
+    {
+      "id": "PlaygroundRenderPage-family",
+      "match": [
+        "assets/PlaygroundRenderPage-*.js"
+      ],
+      "maxGzipBytes": 57276,
+      "measuredGzipBytes": 42413,
+      "note": "Same-pattern family for PlaygroundRenderPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 42413 B on origin/main e441a0e8."
+    },
+    {
+      "id": "SettingsPage-family",
+      "match": [
+        "assets/SettingsPage-*.js"
+      ],
+      "maxGzipBytes": 45965,
+      "measuredGzipBytes": 45727,
+      "note": "Same-pattern family for SettingsPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 45727 B on origin/main e441a0e8."
+    },
+    {
+      "id": "AlertsWorkspace-family",
+      "match": [
+        "assets/AlertsWorkspace-*.js"
+      ],
+      "maxGzipBytes": 47199,
+      "measuredGzipBytes": 46955,
+      "note": "Same-pattern family for AlertsWorkspace. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 46955 B on origin/main e441a0e8."
+    },
+    {
+      "id": "PortfolioRiskMetricsPanel-family",
+      "match": [
+        "assets/PortfolioRiskMetricsPanel-*.js"
+      ],
+      "maxGzipBytes": 10654,
+      "measuredGzipBytes": 8156,
+      "note": "Same-pattern family for PortfolioRiskMetricsPanel. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 8156 B on origin/main e441a0e8."
+    },
+    {
+      "id": "PortfolioPage-family",
+      "match": [
+        "assets/PortfolioPage-*.js"
+      ],
+      "maxGzipBytes": 26601,
+      "measuredGzipBytes": 24341,
+      "note": "Same-pattern family for PortfolioPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 24341 B on origin/main e441a0e8."
+    },
+    {
+      "id": "DecisionSignalsPage-family",
+      "match": [
+        "assets/DecisionSignalsPage-*.js"
+      ],
+      "maxGzipBytes": 23042,
+      "measuredGzipBytes": 22131,
+      "note": "Same-pattern family for DecisionSignalsPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 22131 B on origin/main e441a0e8."
+    },
+    {
+      "id": "ChatPage-family",
+      "match": [
+        "assets/ChatPage-*.js"
+      ],
+      "maxGzipBytes": 18277,
+      "measuredGzipBytes": 10794,
+      "note": "Same-pattern family for ChatPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 10794 B on origin/main e441a0e8."
+    },
+    {
+      "id": "HomeWatchlistGroupsSection-family",
+      "match": [
+        "assets/HomeWatchlistGroupsSection-*.js"
+      ],
+      "maxGzipBytes": 17129,
+      "measuredGzipBytes": 17068,
+      "note": "Same-pattern family for HomeWatchlistGroupsSection. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 17068 B on origin/main e441a0e8."
+    },
+    {
+      "id": "ChatSendFeedback-family",
+      "match": [
+        "assets/ChatSendFeedback-*.js"
+      ],
+      "maxGzipBytes": 14348,
+      "measuredGzipBytes": 13681,
+      "note": "Same-pattern family for ChatSendFeedback. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 13681 B on origin/main e441a0e8."
+    },
+    {
+      "id": "screening-family",
+      "match": [
+        "assets/screening-*.js"
+      ],
+      "maxGzipBytes": 17866,
+      "measuredGzipBytes": 17639,
+      "note": "Same-pattern family for screening. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 17639 B on origin/main e441a0e8."
+    },
+    {
+      "id": "BacktestPage-family",
+      "match": [
+        "assets/BacktestPage-*.js"
+      ],
+      "maxGzipBytes": 15368,
+      "measuredGzipBytes": 15352,
+      "note": "Same-pattern family for BacktestPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 15352 B on origin/main e441a0e8."
+    },
+    {
+      "id": "css-entry-family",
+      "match": [
+        "assets/index-*.css"
+      ],
+      "maxGzipBytes": 28791,
+      "measuredGzipBytes": 26945,
+      "note": "Same-pattern family for css-entry. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 26945 B on origin/main e441a0e8."
+    },
+    {
+      "id": "css-vendor-family",
+      "match": [
+        "assets/vendor-*.css"
+      ],
+      "maxGzipBytes": 576,
+      "measuredGzipBytes": 523,
+      "note": "Same-pattern family for css-vendor. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 523 B on origin/main e441a0e8."
+    },
+    {
+      "id": "settings-route",
+      "match": [
+        "assets/SettingsPage-*.js",
+        "assets/settings-*.js",
+        "assets/settingsPage-*.js",
+        "assets/settingsTranslations-*.js"
+      ],
+      "maxGzipBytes": 88546,
+      "measuredGzipBytes": 88146,
+      "note": "Settings route plus the named settings-* / settingsPage / settingsTranslations chunks. Measured zlib-9 sum on origin/main e441a0e8 + 400 B headroom. Per-asset SettingsPage cap is unchanged."
+    },
+    {
+      "id": "portfolio-route",
+      "match": [
+        "assets/Portfolio*-*.js",
+        "assets/portfolio*-*.js"
+      ],
+      "maxGzipBytes": 87390,
+      "measuredGzipBytes": 86990,
+      "note": "Portfolio route family (Portfolio* and portfolio* prefixes). Measured zlib-9 sum on origin/main e441a0e8 + 400 B headroom. Per-asset PortfolioPage / PortfolioRiskMetricsPanel caps are unchanged."
+    },
+    {
+      "id": "screening-route",
+      "match": [
+        "assets/screening-*.js",
+        "assets/StockScreeningPage-*.js",
+        "assets/Screening*-*.js"
+      ],
+      "maxGzipBytes": 32788,
+      "measuredGzipBytes": 32388,
+      "note": "Screening route family. Measured zlib-9 sum on origin/main e441a0e8 + 400 B headroom. Per-asset screening cap is unchanged."
+    },
+    {
+      "id": "home-watchlist-route",
+      "match": [
+        "assets/HomeWatchlistGroupsSection-*.js",
+        "assets/HomeWatchlist*-*.js",
+        "assets/Watchlist*-*.js"
+      ],
+      "maxGzipBytes": 20886,
+      "measuredGzipBytes": 20486,
+      "note": "Home watchlist family. Catches sibling Watchlist* splits that would not match HomeWatchlistGroupsSection-*.js. Measured zlib-9 sum on origin/main e441a0e8 + 400 B headroom. Per-asset HomeWatchlistGroupsSection cap is unchanged."
     }
   ]
 }
