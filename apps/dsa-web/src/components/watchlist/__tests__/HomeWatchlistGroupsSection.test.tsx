@@ -145,4 +145,24 @@ describe('HomeWatchlistGroupsSection', () => {
     expect(refreshWatchlist).toHaveBeenCalledTimes(1);
     expect(refreshGroups).toHaveBeenCalledTimes(1);
   });
+
+  it('retries the score provider from the error alert without hiding remaining cards', async () => {
+    vi.mocked(watchlistScoresApi.score)
+      .mockRejectedValueOnce(new Error('provider unavailable'))
+      .mockResolvedValueOnce(scoreResponse([
+        scoreItem('AAPL', 64),
+        scoreItem('600519', 20),
+      ]));
+    render(<HomeWatchlistGroupsSection />);
+
+    expect(await screen.findByText('AI 评分暂时不可用；刷新成功前不会显示评分或按评分排序。')).toBeInTheDocument();
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '刷新自选股' }));
+
+    await waitFor(() => expect(watchlistScoresApi.score).toHaveBeenCalledTimes(2));
+    expect(await screen.findAllByTestId('watchlist-score-column')).toHaveLength(2);
+    expect(screen.getByText('AI 64')).toBeInTheDocument();
+    expect(refreshWatchlist).toHaveBeenCalledTimes(1);
+    expect(refreshGroups).toHaveBeenCalledTimes(1);
+  });
 });

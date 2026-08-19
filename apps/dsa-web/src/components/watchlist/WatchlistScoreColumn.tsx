@@ -1,7 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useId, useState } from 'react';
+import { Component, useId, useState } from 'react';
+import type { ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Info } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UiTextKey } from '../../i18n/uiText';
@@ -11,6 +12,7 @@ import type {
   WatchlistScoreItem,
 } from '../../types/watchlistScore';
 import { getSentimentColor } from '../../types/analysis';
+import type { WatchlistScoreLoadStatus } from '../../hooks/useWatchlistScores';
 import { cn } from '../../utils/cn';
 import { Badge, InlineAlert, Tooltip } from '../common';
 
@@ -79,7 +81,7 @@ function factorDetail(
  * Mount via props after T23 merges — does not own watchlist layout or drag order.
  * Default sort remains manual; this column only renders a score / unanalyzed state.
  */
-export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
+const WatchlistScoreColumnView: React.FC<WatchlistScoreColumnProps> = ({
   item,
   expanded: expandedProp,
   onToggleExpand,
@@ -100,7 +102,7 @@ export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
     setInternalExpanded((value) => !value);
   };
 
-  if (item.status === 'unanalyzed' || item.score === null) {
+  if (item.status === 'unanalyzed' || item.score === null || !Number.isFinite(item.score)) {
     return (
       <div
         className={cn('watchlist-score-column flex min-w-0 flex-col gap-1', className)}
@@ -212,6 +214,108 @@ export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = ({
       ) : null}
     </div>
   );
+};
+
+export const WatchlistScoreColumn: React.FC<WatchlistScoreColumnProps> = (props) => {
+  const { t } = useUiLanguage();
+  return (
+    <WatchlistScoreCellBoundary
+      resetKey={props.item.stockCode}
+      fallback={(
+        <span className="px-1 py-1.5 text-xs text-muted-text" data-testid="watchlist-score-status">
+          {t('common.failure')}
+        </span>
+      )}
+    >
+      <WatchlistScoreColumnView {...props} />
+    </WatchlistScoreCellBoundary>
+  );
+};
+
+type WatchlistScoreCellBoundaryProps = {
+  resetKey: string;
+  fallback: ReactNode;
+  children: ReactNode;
+};
+
+type WatchlistScoreCellBoundaryState = {
+  hasError: boolean;
+};
+
+export class WatchlistScoreCellBoundary extends Component<
+  WatchlistScoreCellBoundaryProps,
+  WatchlistScoreCellBoundaryState
+> {
+  override state: WatchlistScoreCellBoundaryState = { hasError: false };
+
+  static getDerivedStateFromError(): WatchlistScoreCellBoundaryState {
+    return { hasError: true };
+  }
+
+  override componentDidUpdate(prevProps: WatchlistScoreCellBoundaryProps) {
+    if (this.state.hasError && prevProps.resetKey !== this.props.resetKey) {
+      this.setState({ hasError: false });
+    }
+  }
+
+  override render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
+
+export type WatchlistScoreStatusCellProps = {
+  item?: WatchlistScoreItem;
+  status: WatchlistScoreLoadStatus;
+  stale?: boolean;
+  className?: string;
+};
+
+/**
+ * Per-row score surface. Isolates a single card render failure so the rest of
+ * the watchlist stays usable, and never treats a failed/in-flight load as
+ * unanalyzed success.
+ */
+export const WatchlistScoreStatusCell: React.FC<WatchlistScoreStatusCellProps> = ({
+  item,
+  status,
+  stale = false,
+  className,
+}) => {
+  const { t } = useUiLanguage();
+  const failedFallback = (
+    <span className="px-1 py-1.5 text-xs text-muted-text" data-testid="watchlist-score-status">
+      {t('common.failure')}
+    </span>
+  );
+
+  const showItem = Boolean(
+    item && (status === 'ready' || (status === 'retrying' && stale)),
+  );
+  if (showItem && item) {
+    return (
+      <div className="flex min-w-0 flex-col items-end gap-0.5">
+        <WatchlistScoreCellBoundary resetKey={item.stockCode} fallback={failedFallback}>
+          <WatchlistScoreColumn item={item} className={className} />
+        </WatchlistScoreCellBoundary>
+        {stale ? (
+          <span className="text-label text-warning" data-testid="watchlist-score-stale">
+            {t('common.partial')}
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (status === 'loading' || status === 'retrying' || status === 'error') {
+    return (
+      <span className="px-1 py-1.5 text-xs text-muted-text" data-testid="watchlist-score-status">
+        {status === 'error' ? t('common.failure') : t('common.loading')}
+      </span>
+    );
+  }
+
+  return null;
 };
 
 export default WatchlistScoreColumn;

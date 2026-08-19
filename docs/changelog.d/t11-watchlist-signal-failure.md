@@ -1,0 +1,1 @@
+- [Fixed] Home and watchlist signal summaries now distinguish loading, empty, stale, retrying, and failure instead of rendering a failed request as a dash or empty success (Refs #879).

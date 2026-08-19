@@ -28,13 +28,13 @@ import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
 import { HOME_WORKSPACE_VALUES, type HomeWorkspaceValue } from '../../routing/routes';
 import { Spinner } from '../common/Spinner';
 import { WatchlistGroupsPanel } from './WatchlistGroupsPanel';
-import { WatchlistScoreColumn } from './WatchlistScoreColumn';
+import { WatchlistScoreStatusCell } from './WatchlistScoreColumn';
 import type { WatchlistGroup } from '../../types/watchlist';
 import {
   createUnanalyzedWatchlistScore,
-  useWatchlistScores,
   type WatchlistScoreLoadStatus,
 } from '../../hooks/useWatchlistScores';
+import { useWatchlistScoreSession } from '../../hooks/useWatchlistScoreSession';
 
 export type HomeWorkspaceTab = HomeWorkspaceValue;
 export type WatchlistAnalyzeMode = 'all' | 'pending';
@@ -136,9 +136,10 @@ const WatchlistRowItem: React.FC<{
   row: HomeWatchlistRow;
   scoreItem?: WatchlistScoreItem;
   scoreStatus: WatchlistScoreLoadStatus;
+  scoreStale: boolean;
   onRemove: (code: string) => Promise<boolean | void>;
   disabled: boolean;
-}> = ({ row, scoreItem, scoreStatus, onRemove, disabled }) => {
+}> = ({ row, scoreItem, scoreStatus, scoreStale, onRemove, disabled }) => {
   const { language, t } = useUiLanguage();
   const taskLabel = getTaskStatusLabel(row.activeTask, t);
   const item = row.latestItem;
@@ -179,13 +180,12 @@ const WatchlistRowItem: React.FC<{
           </div>
         </div>
         <div className="flex shrink-0 items-start gap-1.5">
-          {scoreStatus === 'ready' && scoreItem ? (
-            <WatchlistScoreColumn item={scoreItem} className="max-w-40" />
-          ) : (
-            <span className="px-1 py-1.5 text-xs text-muted-text" data-testid="watchlist-score-status">
-              {scoreStatus === 'error' ? t('common.failure') : t('common.loading')}
-            </span>
-          )}
+          <WatchlistScoreStatusCell
+            item={scoreItem}
+            status={scoreStatus}
+            stale={scoreStale}
+            className="max-w-40"
+          />
           <IconButton
             type="button"
             variant="danger"
@@ -296,11 +296,14 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
     }))),
     [watchlistRows],
   );
-  const scoreState = useWatchlistScores(
+  const scoreState = useWatchlistScoreSession(
     watchlistCodes,
     `${scoreLifecycleKey}\n${scoreRefreshGeneration}`,
   );
-  const effectiveScoreSort = scoreState.status === 'ready' ? scoreSort : 'manual';
+  const effectiveScoreSort = scoreState.status === 'ready'
+    || (scoreState.status === 'retrying' && scoreState.stale)
+    ? scoreSort
+    : 'manual';
 
   const pendingWatchlistCount = watchlistRows
     .filter((row) => !row.analyzedToday && !row.isTodayStatusLoading && !row.isTodayStatusUnknown)
@@ -499,6 +502,11 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 size="compact"
                 title={t('common.failure')}
                 message={t('watchlistScore.loadFailed')}
+                action={(
+                  <Button type="button" variant="secondary" size="default" onClick={scoreState.retry}>
+                    {t('common.retry')}
+                  </Button>
+                )}
               />
             ) : null}
           </>
@@ -560,6 +568,8 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                   loading={watchlistGroupsLoading}
                   actioning={watchlistGroupsActioning || watchlistActioning}
                   errorMessage={watchlistGroupsError}
+                  scoreStatus={scoreState.status}
+                  scoreItemsByCode={scoreState.itemsByCode}
                   onCreateGroup={onCreateWatchlistGroup}
                   onDeleteGroup={onDeleteWatchlistGroup}
                   onRestoreGroup={onRestoreWatchlistGroup}
@@ -592,8 +602,11 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                   row={row}
                   scoreItem={scoreState.status === 'ready'
                     ? scoreState.itemsByCode.get(row.code) ?? createUnanalyzedWatchlistScore(row.code)
-                    : undefined}
+                    : scoreState.status === 'retrying' && scoreState.stale
+                      ? scoreState.itemsByCode.get(row.code)
+                      : undefined}
                   scoreStatus={scoreState.status}
+                  scoreStale={scoreState.stale}
                   onRemove={onRemoveFromWatchlist}
                   disabled={watchlistActioning}
                 />

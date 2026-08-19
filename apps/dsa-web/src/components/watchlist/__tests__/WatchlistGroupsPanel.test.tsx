@@ -211,4 +211,15 @@ describe('WatchlistGroupsPanel', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('无法恢复该分组。请手动重建。');
     expect(screen.getByTestId('watchlist-groups-announcement')).toHaveTextContent('已删除 Growth。');
   });
+
+  it('keeps remaining member cards when score status is error', async () => {
+    renderPanel({ scoreStatus: 'error' });
+
+    expect(screen.getByTestId('watchlist-member-default-600519')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-member-default-AAPL')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-member-value-300750')).toBeInTheDocument();
+    expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();
+  });
 });

@@ -24,7 +24,7 @@ Legacy `AnalysisHistory.created_at` values are server-local naive times and are 
 
 ## Web and integration boundary
 
-`WatchlistScoreColumn` localizes factor keys and params in the Web layer; the backend sends no English presentation labels. Default sorting remains `manual`. `score_desc` and `score_asc` are non-destructive views and never overwrite T23 manual/drag order. The #963 integration contract is to pass the matching `WatchlistScoreItem` as the independent component's `item` prop; this PR does not edit `HomeStockWorkspace.tsx`.
+`WatchlistScoreColumn` localizes factor keys and params in the Web layer; the backend sends no English presentation labels. Default sorting remains `manual`. `score_desc` and `score_asc` are non-destructive views and never overwrite T23 manual/drag order. Home groups use `useWatchlistScores`; the workspace list uses `useWatchlistScoreSession` so a same-generation retry can keep last-known scores only while they are marked stale. A missing item on a successful response is `unanalyzed`. A failed request is an error with retry, never an authoritative empty or unanalyzed success. One card render failure is isolated and does not hide the rest of the list.
 
 ## Failure, risk, and rollback
 
