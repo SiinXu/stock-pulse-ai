@@ -46,6 +46,7 @@ export type ScreeningHotspotsSectionProps = {
   onRefresh: () => void;
   onSelectHotspot: (topic: string) => void;
   onAnalyzeStock: (stock: AlphaSiftHotspotDetail['stocks'][number]) => void;
+  dataSourcesAction?: React.ReactNode;
 };
 
 export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> = ({
@@ -65,6 +66,7 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
   onRefresh,
   onSelectHotspot,
   onAnalyzeStock,
+  dataSourcesAction,
 }) => (
       <Surface as="section" level="interactive" padding="md">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
@@ -104,6 +106,7 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
                 {text.refreshHotspots}
               </Button>
               ) : null}
+              {dataSourcesAction}
             </div>
             <p className="text-xs text-secondary-text">{formatUiText(text.updatedAt, { time: formatHotspotUpdatedAt(hotspotsUpdatedAt, language, text) })}</p>
           </div>

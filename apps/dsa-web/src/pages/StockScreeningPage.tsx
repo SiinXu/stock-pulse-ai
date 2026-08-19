@@ -595,9 +595,6 @@ const StockScreeningPage: React.FC = () => {
         onRetryScreen={handleRetryScreen}
       />
 
-      {(hotspotError || hotspotDetailError || (hotspotDetail?.sourceErrors || []).length > 0 || (hotspotDetail?.missingFields || []).length > 0) ? (
-        <Button size="default" variant="secondary" aria-label={`${text.openDataSources} · ${text.hotspots}`} onClick={handleOpenDataSources}>{text.openDataSources}</Button>
-      ) : null}
       <ScreeningHotspotsSection
         text={text}
         language={language}
@@ -615,6 +612,9 @@ const StockScreeningPage: React.FC = () => {
         onRefresh={() => void loadHotspots(true)}
         onSelectHotspot={handleHotspotSelect}
         onAnalyzeStock={handleAnalyzeHotspotStock}
+        dataSourcesAction={(hotspotError || hotspotDetailError || (hotspotDetail?.sourceErrors || []).length > 0 || (hotspotDetail?.missingFields || []).length > 0) ? (
+          <Button size="default" variant="secondary" aria-label={`${text.openDataSources} · ${text.hotspots}`} onClick={handleOpenDataSources}>{text.openDataSources}</Button>
+        ) : undefined}
       />
 
       <ScreeningStrategyBar
