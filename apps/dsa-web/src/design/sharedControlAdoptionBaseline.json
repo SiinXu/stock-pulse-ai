@@ -1,0 +1,330 @@
+{
+  "version": 1,
+  "files": {
+    "../../App.tsx": {
+      "file": "../../App.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../../pages/ChatPage.tsx": {
+      "file": "../../pages/ChatPage.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../../pages/HomePage.tsx": {
+      "file": "../../pages/HomePage.tsx",
+      "nativeButtonCount": 3,
+      "roleButtonCount": 0
+    },
+    "../../pages/ResearchAnalysisWorkbenchPage.tsx": {
+      "file": "../../pages/ResearchAnalysisWorkbenchPage.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../../pages/SettingsPage.tsx": {
+      "file": "../../pages/SettingsPage.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../alerts/AlertsWorkspace.tsx": {
+      "file": "../alerts/AlertsWorkspace.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../analysis/ActionableApiErrorInline.tsx": {
+      "file": "../analysis/ActionableApiErrorInline.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../analysis/AnalysisWorkbenchLaunchPanel.tsx": {
+      "file": "../analysis/AnalysisWorkbenchLaunchPanel.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../charts/KlineChart.tsx": {
+      "file": "../charts/KlineChart.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../chat/ChatComposer.tsx": {
+      "file": "../chat/ChatComposer.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../chat/ChatThinkingDetails.tsx": {
+      "file": "../chat/ChatThinkingDetails.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../chat/ChatThinkingToggle.tsx": {
+      "file": "../chat/ChatThinkingToggle.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../chat/DeepResearchPanel.tsx": {
+      "file": "../chat/DeepResearchPanel.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../command-palette/CommandPalette.tsx": {
+      "file": "../command-palette/CommandPalette.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/AppliedFilterChips.tsx": {
+      "file": "../common/AppliedFilterChips.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/Button.tsx": {
+      "file": "../common/Button.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/Collapsible.tsx": {
+      "file": "../common/Collapsible.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/DataTable.tsx": {
+      "file": "../common/DataTable.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/DatePicker.tsx": {
+      "file": "../common/DatePicker.tsx",
+      "nativeButtonCount": 3,
+      "roleButtonCount": 0
+    },
+    "../common/IconButton.tsx": {
+      "file": "../common/IconButton.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/JsonViewer.tsx": {
+      "file": "../common/JsonViewer.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/Pagination.tsx": {
+      "file": "../common/Pagination.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/Pressable.tsx": {
+      "file": "../common/Pressable.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/SearchableSelect.tsx": {
+      "file": "../common/SearchableSelect.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../common/SegmentedControl.tsx": {
+      "file": "../common/SegmentedControl.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/Select.tsx": {
+      "file": "../common/Select.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/SelectionChip.tsx": {
+      "file": "../common/SelectionChip.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/Switch.tsx": {
+      "file": "../common/Switch.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/Tabs.tsx": {
+      "file": "../common/Tabs.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../common/TimePicker.tsx": {
+      "file": "../common/TimePicker.tsx",
+      "nativeButtonCount": 3,
+      "roleButtonCount": 0
+    },
+    "../dashboard/HomeAlertsWidget.tsx": {
+      "file": "../dashboard/HomeAlertsWidget.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../dashboard/HomeDashboardLayout.tsx": {
+      "file": "../dashboard/HomeDashboardLayout.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../dashboard/HomePortfolioHealthWidget.tsx": {
+      "file": "../dashboard/HomePortfolioHealthWidget.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../dashboard/HomeRecentReportsWidget.tsx": {
+      "file": "../dashboard/HomeRecentReportsWidget.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../decision-signals/DecisionSignalCalibrationBreakdown.tsx": {
+      "file": "../decision-signals/DecisionSignalCalibrationBreakdown.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../decision-signals/DecisionSignalDisplay.tsx": {
+      "file": "../decision-signals/DecisionSignalDisplay.tsx",
+      "nativeButtonCount": 3,
+      "roleButtonCount": 0
+    },
+    "../decision-signals/DecisionSignalProfileCalibration.tsx": {
+      "file": "../decision-signals/DecisionSignalProfileCalibration.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../history/StockHistoryTrendDrawer.tsx": {
+      "file": "../history/StockHistoryTrendDrawer.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../home/TodaysFocusPanel.tsx": {
+      "file": "../home/TodaysFocusPanel.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../layout/SidebarNav.tsx": {
+      "file": "../layout/SidebarNav.tsx",
+      "nativeButtonCount": 7,
+      "roleButtonCount": 0
+    },
+    "../layout/SidebarProfile.tsx": {
+      "file": "../layout/SidebarProfile.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../market-review/MarketReviewRegionSelector.tsx": {
+      "file": "../market-review/MarketReviewRegionSelector.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../notifications/NotificationBell.tsx": {
+      "file": "../notifications/NotificationBell.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../report/ReportProcessTimeline.tsx": {
+      "file": "../report/ReportProcessTimeline.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../report/ReportStrata.tsx": {
+      "file": "../report/ReportStrata.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../report/ShareImageButton.tsx": {
+      "file": "../report/ShareImageButton.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../run-flow/ProcessTimeline.tsx": {
+      "file": "../run-flow/ProcessTimeline.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../settings/AiModelsViewCards.tsx": {
+      "file": "../settings/AiModelsViewCards.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../settings/AiOverviewMatrix.tsx": {
+      "file": "../settings/AiOverviewMatrix.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../settings/DataProvidersPanel.tsx": {
+      "file": "../settings/DataProvidersPanel.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../settings/DesktopCliVisibilityPanel.tsx": {
+      "file": "../settings/DesktopCliVisibilityPanel.tsx",
+      "nativeButtonCount": 3,
+      "roleButtonCount": 0
+    },
+    "../settings/FirstRunWizard.tsx": {
+      "file": "../settings/FirstRunWizard.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../settings/LLMChannelEditor.tsx": {
+      "file": "../settings/LLMChannelEditor.tsx",
+      "nativeButtonCount": 10,
+      "roleButtonCount": 0
+    },
+    "../settings/LLMConnectionCard.tsx": {
+      "file": "../settings/LLMConnectionCard.tsx",
+      "nativeButtonCount": 4,
+      "roleButtonCount": 0
+    },
+    "../settings/LLMConnectionModal.tsx": {
+      "file": "../settings/LLMConnectionModal.tsx",
+      "nativeButtonCount": 5,
+      "roleButtonCount": 0
+    },
+    "../settings/ModelFallbackEditor.tsx": {
+      "file": "../settings/ModelFallbackEditor.tsx",
+      "nativeButtonCount": 3,
+      "roleButtonCount": 0
+    },
+    "../settings/ModelMultiSelect.tsx": {
+      "file": "../settings/ModelMultiSelect.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../settings/MultiSelectDropdown.tsx": {
+      "file": "../settings/MultiSelectDropdown.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../settings/NotificationChannelsPanel.tsx": {
+      "file": "../settings/NotificationChannelsPanel.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../settings/SettingsErrorSummary.tsx": {
+      "file": "../settings/SettingsErrorSummary.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../settings/SettingsNavigation.tsx": {
+      "file": "../settings/SettingsNavigation.tsx",
+      "nativeButtonCount": 3,
+      "roleButtonCount": 0
+    },
+    "../theme/ThemeToggle.tsx": {
+      "file": "../theme/ThemeToggle.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
+    "../watchlist/HomeStockWorkspace.tsx": {
+      "file": "../watchlist/HomeStockWorkspace.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    },
+    "../watchlist/WatchlistGroupsPanel.tsx": {
+      "file": "../watchlist/WatchlistGroupsPanel.tsx",
+      "nativeButtonCount": 4,
+      "roleButtonCount": 0
+    },
+    "../watchlist/WatchlistScoreColumn.tsx": {
+      "file": "../watchlist/WatchlistScoreColumn.tsx",
+      "nativeButtonCount": 1,
+      "roleButtonCount": 0
+    }
+  }
+}
