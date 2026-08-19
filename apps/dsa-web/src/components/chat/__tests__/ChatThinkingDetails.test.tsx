@@ -2,6 +2,11 @@ import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ChatThinkingDetails } from '../ChatThinkingDetails';
 import { UI_TEXT, type UiTextKey } from '../../../i18n/uiText';
+import type { ProgressStep } from '../../../stores/agentChatStore';
+import {
+  resetChatThinkingTraceStats,
+  snapshotChatThinkingTraceStats,
+} from '../chatThinkingTrace';
 
 const t = (key: UiTextKey) => UI_TEXT.en[key];
 
@@ -186,4 +191,165 @@ describe('ChatThinkingDetails', () => {
     );
     expect(within(row as HTMLElement).queryByText('Running')).not.toBeInTheDocument();
   });
+
+  it('keeps per-append derivation and row work constant while streaming 200 live steps', () => {
+    const streamed: ProgressStep[] = [];
+    const { rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={streamed} />,
+    );
+
+    const perAppendDerive: number[] = [];
+    const perAppendIdentity: number[] = [];
+
+    for (let index = 0; index < 200; index += 1) {
+      streamed.push({
+        type: 'thinking',
+        step: index + 1,
+        message: `Planning ${index + 1}`,
+      });
+      resetChatThinkingTraceStats();
+      rerender(
+        <ChatThinkingDetails mode="live" t={t} steps={[...streamed]} />,
+      );
+      const snapshot = snapshotChatThinkingTraceStats();
+      perAppendDerive.push(snapshot.derive);
+      perAppendIdentity.push(snapshot.identity);
+    }
+
+    const tailDerive = perAppendDerive.slice(1);
+    const tailIdentity = perAppendIdentity.slice(1);
+
+    expect(perAppendDerive[0]).toBe(1);
+    expect(new Set(tailDerive)).toEqual(new Set([1]));
+    expect(new Set(tailIdentity)).toEqual(new Set([1]));
+    expect(screen.getAllByText(/Planning \d+/)).toHaveLength(200);
+    expect(document.querySelectorAll('[data-current="true"]')).toHaveLength(1);
+    expect(document.querySelector('[data-current="true"]')).toHaveTextContent('Planning 200');
+  });
+
+  it('renders the same live transcript HTML when steps arrive incrementally or all at once', () => {
+    const steps: ProgressStep[] = [
+      { type: 'thinking', step: 1, message: 'Planning' },
+      { type: 'tool_start', tool: 'search', display_name: 'Search' },
+      {
+        type: 'tool_done',
+        tool: 'search',
+        display_name: 'Search',
+        success: true,
+        duration: 0.4,
+        meta: { arguments: { q: '600519' }, result_preview: '{"ok":true}', result_length: 11 },
+      },
+      { type: 'stage_done', stage: 'agent_loop', status: 'completed', duration: 1.2, reason: 'budget_guard' },
+      { type: 'pipeline_budget_skipped', stage: 'critic', reason: 'insufficient_budget' },
+    ];
+
+    const { container: batchContainer, unmount } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={steps} />,
+    );
+    const batchTrace = serializeTraceDom(batchContainer);
+    unmount();
+
+    const growing: ProgressStep[] = [];
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={growing} />,
+    );
+    for (const step of steps) {
+      growing.push(step);
+      rerender(<ChatThinkingDetails mode="live" t={t} steps={[...growing]} />);
+    }
+
+    expect(serializeTraceDom(container)).toEqual(batchTrace);
+  });
+
+  it('grows the live list after a first flush of one step then another append', () => {
+    const first: ProgressStep = { type: 'thinking', step: 1, message: 'Planning 1' };
+    const second: ProgressStep = { type: 'thinking', step: 2, message: 'Planning 2' };
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={[first]} />,
+    );
+
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(1);
+    expect(container.querySelector('[data-current="true"]')).toHaveTextContent('Planning 1');
+
+    rerender(<ChatThinkingDetails mode="live" t={t} steps={[first, second]} />);
+
+    const rows = container.querySelectorAll('[data-trace-step]');
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).not.toHaveAttribute('data-current');
+    expect(rows[1]).toHaveAttribute('data-current', 'true');
+    expect(rows[1]).toHaveTextContent('Planning 2');
+  });
+
+  it('appends a later rAF-style batch onto an already mounted live list', () => {
+    const firstBatch: ProgressStep[] = [
+      { type: 'thinking', step: 1, message: 'Planning' },
+      { type: 'tool_start', tool: 'search', display_name: 'Search' },
+      { type: 'tool_done', tool: 'search', display_name: 'Search', success: true, duration: 0.2 },
+    ];
+    const secondBatch: ProgressStep[] = [
+      ...firstBatch,
+      { type: 'stage_done', stage: 'agent_loop', status: 'completed', duration: 1 },
+      { type: 'generating', message: 'Writing' },
+    ];
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={firstBatch} />,
+    );
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(3);
+
+    rerender(<ChatThinkingDetails mode="live" t={t} steps={secondBatch} />);
+
+    const rows = container.querySelectorAll('[data-trace-step]');
+    expect([...rows].map((row) => row.getAttribute('data-trace-step'))).toEqual([
+      'thinking',
+      'tool_start',
+      'tool_done',
+      'stage_done',
+      'generating',
+    ]);
+    expect(rows[4]).toHaveAttribute('data-current', 'true');
+    expect(rows[4]).toHaveTextContent('Writing');
+  });
+
+  it('clears live rows when the store cancels to an empty progress list', () => {
+    const steps: ProgressStep[] = [
+      { type: 'thinking', step: 1, message: 'Planning' },
+      { type: 'tool_start', tool: 'search', display_name: 'Search' },
+    ];
+    const { container, rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={steps} />,
+    );
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(2);
+
+    rerender(<ChatThinkingDetails mode="live" t={t} steps={[]} />);
+
+    expect(container.querySelectorAll('[data-trace-step]')).toHaveLength(0);
+    expect(container.querySelector('[data-trace-mode="live"]')).toBeInTheDocument();
+  });
+
+  it('rebuilds visible step text when the translate function identity changes', () => {
+    const steps: ProgressStep[] = [{ type: 'generating' }];
+    const tAlt = (key: UiTextKey) => `ALT:${UI_TEXT.en[key]}`;
+    const { rerender } = render(
+      <ChatThinkingDetails mode="live" t={t} steps={steps} />,
+    );
+    expect(screen.getByText(UI_TEXT.en['chat.generateAnalysis'])).toBeInTheDocument();
+
+    rerender(<ChatThinkingDetails mode="live" t={tAlt} steps={steps} />);
+
+    expect(screen.getByText(`ALT:${UI_TEXT.en['chat.generateAnalysis']}`)).toBeInTheDocument();
+    expect(screen.queryByText(UI_TEXT.en['chat.generateAnalysis'])).not.toBeInTheDocument();
+  });
 });
+
+function serializeTraceDom(container: HTMLElement) {
+  return [...container.querySelectorAll('[data-trace-step]')].map((row) => ({
+    type: row.getAttribute('data-trace-step'),
+    current: row.getAttribute('data-current'),
+    className: row.className,
+    text: row.textContent?.replace(/\s+/g, ' ').trim(),
+    expanded: row.querySelector('button')?.getAttribute('aria-expanded') ?? null,
+    label: row.querySelector('button')?.getAttribute('aria-label') ?? null,
+    status: row.querySelector('[data-trace-status]')?.getAttribute('data-trace-status') ?? null,
+    statusText: row.querySelector('[data-trace-status]')?.textContent ?? null,
+  }));
+}
