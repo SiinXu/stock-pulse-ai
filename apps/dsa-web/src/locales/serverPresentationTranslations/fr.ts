@@ -72,6 +72,7 @@ const portfolioInsightCodes = {
   rationaleExit: 'Sortir de {symbol} depuis {from}%.',
   rationaleBand: '{symbol} : actuel {current}% vs bande [{low}%, {high}%].',
   basketPriceUnavailable: 'Aucun clôture quotidienne stockée utilisable.',
+  reasonNonPositiveMarketValue: 'La valeur de marché n’est pas positive ; la position est exclue du test de stress.',
   directionPositive: 'Positive (+)',
   directionNegative: 'Négative (−)',
   kindHighCorrelation: 'Groupe fortement corrélé',

@@ -207,6 +207,16 @@ export function formatPortfolioBasketReason(
   return formatUnknownMachineCode(reason, language);
 }
 
+export function formatPortfolioStressExcludedReason(
+  reason: string | null | undefined,
+  language: UiLanguage,
+): string {
+  if (reason == null || reason === '') return formatEmptyDisplay();
+  if (reason === 'price_unavailable') return codes(language).basketPriceUnavailable;
+  if (reason === 'non_positive_market_value') return codes(language).reasonNonPositiveMarketValue;
+  return formatUnknownMachineCode(reason, language);
+}
+
 export function formatPortfolioBasketDirection(
   direction: string | null | undefined,
   language: UiLanguage,

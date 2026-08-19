@@ -72,6 +72,7 @@ const portfolioInsightCodes = {
   rationaleExit: '{symbol} を {from}% から退出します。',
   rationaleBand: '{symbol}：現在 {current}%、目標帯 [{low}%, {high}%]。',
   basketPriceUnavailable: '利用可能な保存終値がありません。',
+  reasonNonPositiveMarketValue: '時価が正ではないため、ストレステストから除外されました。',
   directionPositive: '正の相関',
   directionNegative: '負の相関',
   kindHighCorrelation: '高相関クラスタ',

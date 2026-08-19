@@ -72,6 +72,7 @@ const portfolioInsightCodes = {
   rationaleExit: '{symbol}을(를) {from}%에서 청산합니다.',
   rationaleBand: '{symbol}: 현재 {current}%, 목표 구간 [{low}%, {high}%].',
   basketPriceUnavailable: '사용 가능한 저장된 종가가 없습니다.',
+  reasonNonPositiveMarketValue: '시장 가치가 양수가 아니어서 스트레스 테스트에서 제외되었습니다.',
   directionPositive: '양의 상관',
   directionNegative: '음의 상관',
   kindHighCorrelation: '고상관 군집',

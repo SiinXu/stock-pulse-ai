@@ -22,7 +22,10 @@ import {
   formatDataQualityStatus,
   formatPortfolioStressQualityCell,
 } from '../../utils/dataQualityFormat/portfolio';
-import { formatPortfolioStressScenario } from '../../utils/dataQualityFormat/portfolioInsights';
+import {
+  formatPortfolioStressExcludedReason,
+  formatPortfolioStressScenario,
+} from '../../utils/dataQualityFormat/portfolioInsights';
 import { formatUnknownMachineCode } from '../../utils/dataQualityFormat/unknownCode';
 import { formatMoney, formatPct, formatSignedPct } from '../../utils/portfolioFormat';
 import {
@@ -331,7 +334,13 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
                     : formatPortfolioLimitation(item, language)
                 )),
                 missingData: result.missingData,
-                excludedPositions: result.excludedPositions,
+                excludedPositions: result.excludedPositions.map((position) => ({
+                  ...position,
+                  reason: formatPortfolioStressExcludedReason(
+                    typeof position.reason === 'string' ? position.reason : null,
+                    language,
+                  ),
+                })),
                 concentration: result.concentration,
                 snapshotId: result.snapshotId,
                 calculatedAt: result.calculatedAt,

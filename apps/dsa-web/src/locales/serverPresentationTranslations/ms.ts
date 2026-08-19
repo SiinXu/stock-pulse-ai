@@ -72,6 +72,7 @@ const portfolioInsightCodes = {
   rationaleExit: 'Keluar daripada {symbol} mulai {from}%.',
   rationaleBand: '{symbol}: semasa {current}% vs jalur [{low}%, {high}%].',
   basketPriceUnavailable: 'Tiada harga penutup harian tersimpan yang boleh digunakan.',
+  reasonNonPositiveMarketValue: 'Nilai pasaran tidak positif, jadi kedudukan dikecualikan daripada ujian tekanan.',
   directionPositive: 'Positif',
   directionNegative: 'Negatif',
   kindHighCorrelation: 'Kelompok korelasi tinggi',

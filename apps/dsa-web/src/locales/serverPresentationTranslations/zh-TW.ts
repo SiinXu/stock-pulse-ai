@@ -72,6 +72,7 @@ const portfolioInsightCodes = {
   rationaleExit: '將 {symbol} 從 {from}% 退出。',
   rationaleBand: '{symbol}：目前 {current}% ，目標區間 [{low}%, {high}%]。',
   basketPriceUnavailable: '沒有可用的已儲存收盤價。',
+  reasonNonPositiveMarketValue: '市值為非正數，未納入壓力測試。',
   directionPositive: '正相關',
   directionNegative: '負相關',
   kindHighCorrelation: '高相關簇',

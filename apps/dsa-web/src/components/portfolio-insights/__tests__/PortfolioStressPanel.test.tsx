@@ -127,6 +127,30 @@ describe('PortfolioStressPanel data-quality column', () => {
     expect(screen.getByText('Realtime quotes are best-effort')).toBeInTheDocument();
   });
 
+  it('localizes excluded-position reasons in the assumptions list', async () => {
+    runStressPreset.mockResolvedValueOnce(makeResult({
+      excludedPositions: [
+        { symbol: 'MSFT', reason: 'price_unavailable' },
+        { symbol: 'TSLA', reason: 'non_positive_market_value' },
+      ],
+    }));
+
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <PortfolioStressPanel accountId={1} costMethod="fifo" text={SOURCE_PORTFOLIO_INSIGHTS_TEXT.en} />
+      </UiLanguageProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Run analysis' }));
+    expect(await screen.findByText('AAPL')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Assumptions and limitations' }));
+
+    expect(screen.getByText('No usable stored daily close.')).toBeInTheDocument();
+    expect(screen.getByText('Market value is not positive, so the position is excluded from the stress run.')).toBeInTheDocument();
+    expect(screen.queryByText('price_unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText('non_positive_market_value')).not.toBeInTheDocument();
+  });
+
   it('keeps unknown quality and limitation codes visible', async () => {
     runStressPreset.mockResolvedValue(makeResult({
       snapshotDataQuality: 'weird_quality' as PortfolioStressResponse['snapshotDataQuality'],

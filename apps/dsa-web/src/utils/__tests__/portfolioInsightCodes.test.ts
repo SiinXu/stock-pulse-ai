@@ -17,6 +17,7 @@ import {
   formatPortfolioRebalanceAction,
   formatPortfolioRebalanceRationale,
   formatPortfolioSharedRisk,
+  formatPortfolioStressExcludedReason,
   formatPortfolioStressScenario,
 } from '../dataQualityFormat/portfolioInsights';
 import { formatUnknownMachineCode } from '../dataQualityFormat/unknownCode';
@@ -66,6 +67,10 @@ describe('portfolio insight presentation', () => {
 
   it('localizes basket reasons, directions, and shared-risk kinds', () => {
     expect(formatPortfolioBasketReason('price_unavailable', 'en')).toBe('No usable stored daily close.');
+    expect(formatPortfolioStressExcludedReason('price_unavailable', 'zh')).toBe('没有可用的已存储收盘价。');
+    expect(formatPortfolioStressExcludedReason('non_positive_market_value', 'en')).toBe(
+      'Market value is not positive, so the position is excluded from the stress run.',
+    );
     expect(formatPortfolioBasketDirection('positive', 'zh')).toBe('正相关');
     expect(formatPortfolioSharedRisk({
       kind: 'high_correlation_cluster',
@@ -110,6 +115,9 @@ describe('portfolio insight presentation', () => {
       formatUnknownMachineCode('zoom', 'ja'),
     );
     expect(formatPortfolioBasketReason('quote_timeout', 'ko')).toBe(
+      formatUnknownMachineCode('quote_timeout', 'ko'),
+    );
+    expect(formatPortfolioStressExcludedReason('quote_timeout', 'ko')).toBe(
       formatUnknownMachineCode('quote_timeout', 'ko'),
     );
   });
