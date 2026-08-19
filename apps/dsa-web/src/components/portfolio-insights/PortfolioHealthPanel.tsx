@@ -225,6 +225,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
             emptyState={{ title: text.noRows, description: text.noRowsDescription }}
             density="compact"
             minWidth="content"
+            virtualization={false}
           />
           <DataTable
             caption={text.insights}
@@ -235,6 +236,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
             emptyState={{ title: text.noRows, description: text.noRowsDescription }}
             density="compact"
             minWidth="content"
+            virtualization={false}
           />
           <PortfolioEvidenceSection
             title={text.dataQuality}

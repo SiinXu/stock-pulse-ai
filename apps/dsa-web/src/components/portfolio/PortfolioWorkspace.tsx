@@ -1389,6 +1389,7 @@ const PortfolioWorkspace: React.FC = () => {
             }}
             density="compact"
             minWidth="wide"
+            virtualization={false}
           />
         </Card>
       </section>

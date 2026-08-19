@@ -90,9 +90,10 @@ interface DataTableBaseProps<T> {
   isRowSelected?: (row: T, index: number) => boolean;
   getRowTestId?: (row: T, index: number) => string;
   /**
-   * Auto-window body rows once `rows.length` meets the measured threshold.
-   * Pass `false` for variable-height, rowspan, or other incompatible tables.
-   * Controlled detail rows disable windowing automatically.
+   * Auto-window body rows once `rows.length` meets the measured threshold
+   * and row height matches the shared fixed estimate. Pass `false` when
+   * cells wrap, stack, list, or otherwise exceed that estimate. Controlled
+   * detail rows disable windowing automatically.
    */
   virtualization?: DataTableVirtualizationProp;
 }

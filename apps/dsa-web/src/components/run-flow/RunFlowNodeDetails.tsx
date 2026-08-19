@@ -321,6 +321,7 @@ export const RunFlowNodeDetails: React.FC<RunFlowNodeDetailsProps> = ({
               frame="embedded"
               minWidth="container"
               separatorTone="subtle"
+              virtualization={false}
             />
           </div>
         </div>

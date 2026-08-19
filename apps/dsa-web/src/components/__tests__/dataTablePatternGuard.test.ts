@@ -18,6 +18,23 @@ const productionSources = { ...productionTs, ...productionTsx };
 
 const DATA_TABLE_OWNER = '../common/DataTable.tsx';
 
+/**
+ * Production DataTable mounts that are provably single-line at the shared
+ * compact/default estimate. Every other production mount must pass
+ * `virtualization={false}` or `renderRowDetail`.
+ */
+const FIXED_HEIGHT_DATATABLE_FILES = [
+  '/pages/StockDetailsPage.tsx',
+  '/pages/FinancialCalculatorsPage.tsx',
+  '/valuation/DcfSensitivityPanel.tsx',
+  '/skill-outcomes/SkillOutcomePerformanceTable.tsx',
+  '/report/MarketReviewReportView.tsx',
+  '/settings/SignalScorecardPanel.tsx',
+  '/stocks/FieldTrustPanel.tsx',
+  '/valuation/PeerValuationCanvas.tsx',
+  '/playground/scenarios/commonScenarios.tsx',
+] as const;
+
 type SourceFinding = {
   file: string;
   line: number;
@@ -130,6 +147,51 @@ function findRawTables(filename: string, source: string): SourceFinding[] {
   return findings;
 }
 
+function isDataTableTag(tagName: ts.JsxTagNameExpression): boolean {
+  return ts.isIdentifier(tagName) && tagName.text === 'DataTable';
+}
+
+function jsxAttributeName(attribute: ts.JsxAttribute): string | undefined {
+  return ts.isIdentifier(attribute.name) ? attribute.name.text : undefined;
+}
+
+function isFalseLiteral(expression: ts.Expression | undefined): boolean {
+  return Boolean(expression && expression.kind === ts.SyntaxKind.FalseKeyword);
+}
+
+function dataTableHasExplicitFallback(node: ts.JsxOpeningLikeElement): boolean {
+  return node.attributes.properties.some((property) => {
+    if (!ts.isJsxAttribute(property)) return false;
+    const name = jsxAttributeName(property);
+    if (name === 'renderRowDetail') return true;
+    if (name !== 'virtualization' || !property.initializer) return false;
+    if (ts.isJsxExpression(property.initializer)) {
+      return isFalseLiteral(property.initializer.expression ?? undefined);
+    }
+    return false;
+  });
+}
+
+function findAutoWindowedDataTableMounts(filename: string, source: string): SourceFinding[] {
+  if (FIXED_HEIGHT_DATATABLE_FILES.some((suffix) => filename.endsWith(suffix))) {
+    return [];
+  }
+  const sourceFile = parseSource(filename, source);
+  const findings: SourceFinding[] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node))
+      && isDataTableTag(node.tagName)
+      && !dataTableHasExplicitFallback(node)
+    ) {
+      findings.push({ file: filename, line: lineOf(sourceFile, node), token: 'DataTable' });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return findings;
+}
+
 function inventory(findings: readonly SourceFinding[]): TableDebtInventory[] {
   const counts = new Map<string, TableDebtInventory>();
   for (const finding of findings) {
@@ -194,6 +256,30 @@ describe('DataTable production guard', () => {
     const actual = inventory(Object.entries(productionSources)
       .filter(([filename]) => isProductionSource(filename) && filename !== DATA_TABLE_OWNER)
       .flatMap(([filename, source]) => findRawTables(filename, source)));
+
+    expect(actual).toEqual([]);
+  });
+
+  it('requires an explicit virtualization opt-out unless rows are fixed-height', () => {
+    const source = [
+      'const unsafe = <DataTable columns={columns} rows={rows} />;',
+      'const optedOut = <DataTable columns={columns} rows={rows} virtualization={false} />;',
+      'const details = <DataTable columns={columns} rows={rows} renderRowDetail={() => null} />;',
+    ].join('\n');
+    expect(findAutoWindowedDataTableMounts('../../pages/ExamplePage.tsx', source)).toEqual([
+      { file: '../../pages/ExamplePage.tsx', line: 1, token: 'DataTable' },
+    ]);
+    expect(findAutoWindowedDataTableMounts('../../pages/StockDetailsPage.tsx', source)).toEqual([]);
+  });
+
+  it('keeps production DataTable auto-window mounts on the fixed-height allowlist', () => {
+    const actual = inventory(Object.entries(productionSources)
+      .filter(([filename]) => (
+        isProductionSource(filename)
+        && filename !== DATA_TABLE_OWNER
+        && !filename.endsWith('/common/DataTable.tsx')
+      ))
+      .flatMap(([filename, source]) => findAutoWindowedDataTableMounts(filename, source)));
 
     expect(actual).toEqual([]);
   });

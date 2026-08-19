@@ -298,6 +298,7 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
               emptyState={{ title: text.noRows, description: text.noRowsDescription }}
               density="compact"
               minWidth="narrow"
+              virtualization={false}
             />
             <DataTable
               caption={text.degradedSymbols}
@@ -308,6 +309,7 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
               emptyState={{ title: text.noRows, description: text.noRowsDescription }}
               density="compact"
               minWidth="content"
+              virtualization={false}
             />
             <DataTable
               caption={text.correlationHighlights}
@@ -318,6 +320,7 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
               emptyState={{ title: text.noRows, description: text.noRowsDescription }}
               density="compact"
               minWidth="content"
+              virtualization={false}
             />
             <DataTable
               caption={text.correlation}
@@ -328,6 +331,7 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
               emptyState={{ title: text.noRows, description: text.noRowsDescription }}
               density="compact"
               minWidth="extra-wide"
+              virtualization={false}
             />
             <DataTable
               caption={text.sharedRisks}
@@ -338,6 +342,7 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
               emptyState={{ title: text.noRows, description: text.noRowsDescription }}
               density="compact"
               minWidth="wide"
+              virtualization={false}
             />
             <PortfolioEvidenceSection
               title={text.evidence}

@@ -475,6 +475,7 @@ export const AlertRuleList: React.FC<AlertRuleListProps> = ({
           emptyState={emptyState}
           density="compact"
           minWidth="extra-wide"
+          virtualization={false}
         />
       </div>
 

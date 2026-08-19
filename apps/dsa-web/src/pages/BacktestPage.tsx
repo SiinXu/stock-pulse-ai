@@ -1065,6 +1065,7 @@ const BacktestPage: React.FC = () => {
                 emptyState={{ title: text.noResultsTitle, description: text.noResultsDescription }}
                 density="compact"
                 minWidth="wide"
+                virtualization={false}
               />
 
               {/* Pagination */}

@@ -298,14 +298,17 @@ rows keep their original `getRowKey` identity, `cell(row, index)` index, and
 selection/activation handlers. The native table exposes `aria-rowcount` and
 `aria-rowindex` while windowed. Pass `virtualization={false}` for
 incompatible variable-height cells; controlled detail rows (`renderRowDetail`)
-disable windowing automatically. DataTable does not implement `rowspan`.
-Current production fallbacks: Screening results (detail rows),
-`RiskHeatmap` (tall score cells, explicit opt-out), the Portfolio
-risk correlation matrix (tall compact cells, explicit opt-out),
-Event Calendar (wrapping event/impact copy, explicit opt-out),
-Screening Discovery (stacked compact actions plus wrapping reasons,
-explicit opt-out), and the stock-history trend drawer (`min-h-11`
-actions plus `text-lg` scores, explicit opt-out).
+disable windowing automatically. Auto-window does not measure rendered
+height, so any table whose cells wrap, stack, list, or exceed the 48px /
+36px estimate must opt out even when the current page size is below 24.
+DataTable does not implement `rowspan`. Current production fallbacks:
+Screening results (detail rows), `RiskHeatmap`, the Portfolio risk
+correlation matrix, Event Calendar, Screening Discovery, the stock-history
+trend drawer, Portfolio position signal cells, Token Usage recent calls,
+import failed-row reasons, Personal Performance reason lists, Event
+Alerts, and the remaining wrapping or stacked production tables. Fixed-
+height numeric tables such as stock candles and compound-growth series
+stay on auto-window.
 
 An activatable row requires both `onRowActivate` and a localized
 `getRowAriaLabel`. Click, Enter, and Space invoke the same command. Events from

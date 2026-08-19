@@ -405,6 +405,57 @@ describe('DataTable virtualization', () => {
     expect(Number.parseFloat(topSpacer.style.height) % DATATABLE_COMPACT_ROW_HEIGHT_PX).toBe(0);
   });
 
+  it('does not infer variable cell height; callers must opt out', () => {
+    const tallColumns: DataTableColumn<Row>[] = [
+      {
+        id: 'symbol',
+        header: 'Symbol',
+        rowHeader: true,
+        cell: (row) => (
+          <div>
+            <div>{row.symbol}</div>
+            <p className="line-clamp-2">Wrapping compact risk copy that occupies two lines.</p>
+            <a href="#rule" className="inline-flex min-h-7 items-center">Create rule</a>
+          </div>
+        ),
+      },
+    ];
+    const rows = buildRows(30);
+    const { rerender } = render(
+      <DataTable
+        caption="Portfolio positions"
+        scrollAreaLabel="Scrollable portfolio positions"
+        columns={tallColumns}
+        rows={rows}
+        getRowKey={(row) => row.id}
+        getRowTestId={(row) => `position-${row.id}`}
+        emptyState={EMPTY_STATE}
+        density="compact"
+      />,
+    );
+    expect(scrollRegion()).toHaveAttribute('data-data-table-virtualized', 'true');
+    expect(screen.queryByTestId('position-30')).not.toBeInTheDocument();
+
+    rerender(
+      <DataTable
+        caption="Portfolio positions"
+        scrollAreaLabel="Scrollable portfolio positions"
+        columns={tallColumns}
+        rows={rows}
+        getRowKey={(row) => row.id}
+        getRowTestId={(row) => `position-${row.id}`}
+        emptyState={EMPTY_STATE}
+        density="compact"
+        virtualization={false}
+      />,
+    );
+    expect(scrollRegion()).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(scrollRegion()).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
+    expect(screen.getByTestId('position-1')).toBeVisible();
+    expect(screen.getByTestId('position-30')).toBeVisible();
+    expect(bodyRowCount()).toBe(30);
+  });
+
   it('clamps a stale window after a filter that stays above the threshold', () => {
     const allRows = buildRows(80);
     const { rerender } = renderTable(allRows);

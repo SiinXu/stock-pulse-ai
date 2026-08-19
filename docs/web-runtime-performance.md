@@ -63,7 +63,7 @@ The soft-gate checker runs the Vitest measurement suite, writes a temporary repo
 
 ## Product mitigations shipped with this budget
 
-- **DataTable**: fixed-estimate virtual window (`useVirtualWindow`) when row count ≥ 24, unless controlled detail rows are present or the caller passes `virtualization={false}`; default/compact row heights are 48px/36px with overscan 6. Windowed sticky headers use opaque `bg-card`. Tall or wrapping unpaginated hosts (Event Calendar, Screening Discovery, stock-history trend, RiskHeatmap, portfolio correlation) stay on the full table path.
+- **DataTable**: fixed-estimate virtual window (`useVirtualWindow`) when row count ≥ 24, unless controlled detail rows are present or the caller passes `virtualization={false}`; default/compact row heights are 48px/36px with overscan 6. Windowed sticky headers use opaque `bg-card`. Auto-window does not measure rendered height. Variable-height hosts (Event Calendar, Screening Discovery, stock-history trend, RiskHeatmap, portfolio correlation, Portfolio positions, Token Usage, import failed rows, Personal Performance, Event Alerts, and other wrapping or stacked tables) stay on the full table path.
 - **HistoryList**: fixed-estimate virtual window (`useVirtualWindow`) when item count ≥ 24; `HistoryListItem` memoized.
 - **SettingsField**: `React.memo` with prop equality so unchanged sibling fields skip re-render.
 - **SSE**: `agentChatStore` batches `progressSteps` commits with `requestAnimationFrame`; `ChatMessageBubble` memoized so stream progress does not re-parse every prior bubble.

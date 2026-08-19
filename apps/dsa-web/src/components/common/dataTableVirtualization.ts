@@ -48,8 +48,10 @@ export function estimatedDataTableRowHeight(density: DataTableDensity): number {
 
 /**
  * Shared DataTable virtualization decision.
- * Auto-window only above the measured threshold. Detail rows (variable extra
- * height) and explicit `virtualization={false}` keep the full native table.
+ * Auto-window only above the measured threshold when row height is the
+ * shared fixed estimate. Detail rows and explicit `virtualization={false}`
+ * keep the full native table. Callers whose cells wrap, stack, or list
+ * must opt out; auto mode does not measure rendered height.
  */
 export function resolveDataTableVirtualization(input: {
   rowCount: number;

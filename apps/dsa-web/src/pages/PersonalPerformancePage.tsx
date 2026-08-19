@@ -314,6 +314,7 @@ const PersonalPerformancePage: React.FC = () => {
                 density="compact"
                 frame="embedded"
                 minWidth="extra-wide"
+                virtualization={false}
               />
             </Surface>
           ) : null}

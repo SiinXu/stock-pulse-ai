@@ -40,7 +40,7 @@ node scripts/check-runtime-performance.mjs --strict   # 未来硬门
 
 ## 产品侧缓解（与预算同 PR）
 
-- **DataTable**：行数 ≥ 24 时用 `useVirtualWindow` 窗口化；明细行或 `virtualization={false}` 时关闭。默认/紧凑行高 48px/36px，overscan 为 6。窗口化表头使用不透明 `bg-card`。事件日历、选股发现、历史趋势抽屉、RiskHeatmap、组合相关性矩阵等变高/换行表保持全量挂载。
+- **DataTable**：行数 ≥ 24 时用 `useVirtualWindow` 窗口化；明细行或 `virtualization={false}` 时关闭。默认/紧凑行高 48px/36px，overscan 为 6。窗口化表头使用不透明 `bg-card`。自动窗口不测量真实行高。事件日历、选股发现、历史趋势抽屉、RiskHeatmap、组合相关性矩阵、持仓信号格、Token 用量、导入失败行、个人表现原因列表、事件提醒及其他换行/堆叠表保持全量挂载。
 - **HistoryList**：`useVirtualWindow` 窗口化 + `HistoryListItem` memo。
 - **SettingsField**：`React.memo` + 属性相等比较。
 - **SSE**：progress 事件 rAF 合批 + 聊天气泡 memo。
