@@ -9,16 +9,21 @@ import { formatUiText } from '../../i18n/uiText';
 import { CHARTS_TEXT } from '../../locales/charts';
 import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
 import type { StockHistoryCandle } from '../../types/stocks';
-import { changeSemantics, formatPrice, type ChangeColorPreference, type MarketId } from '../../utils/marketFormat';
+import { changeColorCssVar, changeSemantics, formatPrice, type ChangeColor, type ChangeColorPreference, type MarketId } from '../../utils/marketFormat';
 import { formatUiNumber } from '../../utils/uiLocale';
 import {
-  changeColorToCss, computeMovingAverages, directionMarker, directionWord,
+  computeMovingAverages, directionMarker, directionWord,
   normalizeMaPeriods, priceExtent, sanitizeCandles, summarizeCandleSeries, volumeExtent, type ChartCandle,
 } from './chartUtils';
 
 const DEFAULT_MA_PERIODS = [5, 10, 20] as const;
 const MA_STROKES = ['hsl(var(--primary))', 'hsl(var(--warning))', 'hsl(var(--info))'] as const;
 const MIN_VISIBLE_CANDLES = 5;
+const NEUTRAL_CANDLE_PAINT = 'hsl(var(--muted-foreground))';
+
+function candlePaint(color: ChangeColor): string {
+  return changeColorCssVar(color) ?? NEUTRAL_CANDLE_PAINT;
+}
 
 export type KlineChartProps = {
   candles: readonly StockHistoryCandle[] | null | undefined;
@@ -117,8 +122,8 @@ export const KlineChart: React.FC<KlineChartProps> = ({
     change: summary.changeText, high: formatPrice(summary.high, market, language), low: formatPrice(summary.low, market, language),
   });
   const directionLabels = { up: text.klineLegendUp, down: text.klineLegendDown, flat: text.klineLegendFlat };
-  const upPaint = changeColorToCss(changeSemantics(1, market, colorPreference).color);
-  const downPaint = changeColorToCss(changeSemantics(-1, market, colorPreference).color);
+  const upPaint = candlePaint(changeSemantics(1, market, colorPreference).color);
+  const downPaint = candlePaint(changeSemantics(-1, market, colorPreference).color);
 
   return (
     <div className={className} data-testid={testId}>
@@ -166,7 +171,7 @@ export const KlineChart: React.FC<KlineChartProps> = ({
       <div className="rounded-lg border border-border bg-card px-2 py-1 text-xs text-foreground" data-testid={`${testId}-readout`}>
         <span className="font-mono text-muted-text">{active.date}</span>
         {' · '}
-        <span aria-hidden="true" style={{ color: changeColorToCss(active.color) }}>{directionMarker(active.direction)}</span>
+        <span aria-hidden="true" style={{ color: candlePaint(active.color) }}>{directionMarker(active.direction)}</span>
         {' '}<span className="sr-only">{directionWord(active.direction, directionLabels)}</span>
         <span>{text.klineOpen} {formatPrice(active.open, market, language)}</span>{' '}
         <span>{text.klineHigh} {formatPrice(active.high, market, language)}</span>{' '}
@@ -187,7 +192,7 @@ export const KlineChart: React.FC<KlineChartProps> = ({
             const yOpen = yAt(candle.open), yClose = yAt(candle.close);
             const bodyTop = Math.min(yOpen, yClose), bodyBottom = Math.max(yOpen, yClose);
             const bodyH = Math.max(1, bodyBottom - bodyTop);
-            const stroke = changeColorToCss(candle.color);
+            const stroke = candlePaint(candle.color);
             return (
               <g key={`${candle.date}-${index}`} data-testid={`${testId}-candle-${index}`}
                 onMouseEnter={() => setHoverState({ source: sanitized, index })}>
@@ -220,7 +225,7 @@ export const KlineChart: React.FC<KlineChartProps> = ({
               return (
                 <rect key={`vol-${candle.date}-${index}`} x={cx - bodyWidth / 2} y={volYAt(candle.volume)}
                   width={bodyWidth} height={Math.max(1, volumeHeight - volYAt(candle.volume))}
-                  fill={changeColorToCss(candle.color)} opacity={0.55}
+                  fill={candlePaint(candle.color)} opacity={0.55}
                   onMouseEnter={() => setHoverState({ source: sanitized, index })} />
               );
             })}

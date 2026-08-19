@@ -68,4 +68,55 @@ describe('KlineChart', () => {
     renderChart([candle(1, 10, 11)], { height: Number.POSITIVE_INFINITY });
     expect(screen.getByTestId('kline-chart-canvas').querySelector('svg')).toHaveAttribute('viewBox', '0 0 640 222');
   });
+  it('paints CN rising/falling candles with price hue tokens, not status tokens', () => {
+    renderChart([candle(1, 10, 11), candle(2, 11, 10)], { market: 'cn' });
+    const upGroup = screen.getByTestId('kline-chart-candle-0');
+    const downGroup = screen.getByTestId('kline-chart-candle-1');
+    const upBody = upGroup.querySelector('rect[fill]:not([fill="transparent"])');
+    const downBody = downGroup.querySelector('rect[fill]:not([fill="transparent"])');
+    expect(upBody).toHaveAttribute('fill', 'var(--price-red)');
+    expect(downBody).toHaveAttribute('fill', 'var(--price-green)');
+    expect(upGroup.querySelector('line')).toHaveAttribute('stroke', 'var(--price-red)');
+    expect(downGroup.querySelector('line')).toHaveAttribute('stroke', 'var(--price-green)');
+    expect(upBody?.getAttribute('fill')).not.toContain('--danger');
+    expect(downBody?.getAttribute('fill')).not.toContain('--success');
+
+    const volumeBars = screen.getByTestId('kline-chart-volume').querySelectorAll('rect');
+    expect(volumeBars[0]).toHaveAttribute('fill', 'var(--price-red)');
+    expect(volumeBars[1]).toHaveAttribute('fill', 'var(--price-green)');
+
+    const legendMarks = screen.getByTestId('kline-chart-legend').querySelectorAll('span[aria-hidden="true"]');
+    expect(legendMarks[0]).toHaveStyle({ color: 'var(--price-red)' });
+    expect(legendMarks[1]).toHaveStyle({ color: 'var(--price-green)' });
+
+    // Active candle defaults to the last visible bar (down).
+    expect(
+      screen.getByTestId('kline-chart-readout').querySelector('span[aria-hidden="true"]'),
+    ).toHaveStyle({ color: 'var(--price-green)' });
+  });
+  it('paints US rising/falling candles with the inverse price hues', () => {
+    renderChart([candle(1, 10, 11), candle(2, 11, 10)], { market: 'us' });
+    const upBody = screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])');
+    const downBody = screen.getByTestId('kline-chart-candle-1').querySelector('rect[fill]:not([fill="transparent"])');
+    expect(upBody).toHaveAttribute('fill', 'var(--price-green)');
+    expect(downBody).toHaveAttribute('fill', 'var(--price-red)');
+  });
+  it('honors red_up preference on a US market rising candle', () => {
+    renderChart([candle(1, 10, 11)], { market: 'us', colorPreference: 'red_up' });
+    expect(
+      screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])'),
+    ).toHaveAttribute('fill', 'var(--price-red)');
+  });
+  it('honors green_up preference on a CN market rising candle', () => {
+    renderChart([candle(1, 10, 11)], { market: 'cn', colorPreference: 'green_up' });
+    expect(
+      screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])'),
+    ).toHaveAttribute('fill', 'var(--price-green)');
+  });
+  it('uses the muted-foreground fallback for a flat candle', () => {
+    renderChart([{ date: '2026-01-01', open: 10, high: 10, low: 10, close: 10, volume: 1 }], { market: 'cn' });
+    expect(
+      screen.getByTestId('kline-chart-candle-0').querySelector('rect[fill]:not([fill="transparent"])'),
+    ).toHaveAttribute('fill', 'hsl(var(--muted-foreground))');
+  });
 });

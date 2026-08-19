@@ -232,9 +232,15 @@ describe('StockDetailsPage', () => {
     const changeNode = screen.getByText(/\+20\.00/);
     expect(changeNode.getAttribute('data-change-color')).toBe('red');
     expect(changeNode.getAttribute('data-change-pref')).toBe('red_up');
+    expect(changeNode).toHaveStyle({ color: 'var(--price-red)' });
     // Product page consumes the shared KlineChart with history API candles.
     expect(screen.getByTestId('stock-details-kline-chart')).toBeTruthy();
     expect(screen.getByTestId('stock-details-kline-chart-canvas')).toBeTruthy();
+    // History fixture candles are both up; last body must share the quote hue.
+    expect(
+      screen.getByTestId('stock-details-kline-chart-candle-1')
+        .querySelector('rect[fill]:not([fill="transparent"])'),
+    ).toHaveAttribute('fill', 'var(--price-red)');
     expect(screen.getByRole('heading', { name: 'Peer relative-value canvas' })).toBeTruthy();
     expect(screen.getByTestId('stock-details-field-trust-section')).toBeTruthy();
     expect(await screen.findByTestId('field-trust-degraded')).toBeTruthy();
