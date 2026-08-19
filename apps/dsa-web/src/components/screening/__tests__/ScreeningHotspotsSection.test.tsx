@@ -1,9 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AlphaSiftHotspot, AlphaSiftHotspotDetail } from '../../../api/alphasift';
 import { SCREENING_TEXT } from '../../../locales/screening';
+import { Button } from '../../common';
 import { ScreeningHotspotsSection, type ScreeningHotspotsSectionProps } from '../ScreeningHotspotsSection';
 
 const text = SCREENING_TEXT.en;
@@ -41,26 +42,35 @@ function renderSection(overrides: Partial<ScreeningHotspotsSectionProps> = {}) {
   const onRefresh = vi.fn();
   const onOpenDataSources = vi.fn();
   const view = render(
-    <ScreeningHotspotsSection
-      text={text}
-      language="en"
-      isScreeningEnabled
-      hotspots={[]}
-      hotspotsUpdatedAt={null}
-      hotspotsExpanded
-      selectedHotspotTopic={null}
-      hotspotDetail={null}
-      loadingHotspots={false}
-      loadingHotspotDetail={false}
-      hotspotError=""
-      hotspotDetailError=""
-      onToggleExpanded={() => undefined}
-      onRefresh={onRefresh}
-      onSelectHotspot={() => undefined}
-      onAnalyzeStock={() => undefined}
-      onOpenDataSources={onOpenDataSources}
-      {...overrides}
-    />,
+    <>
+      <Button
+        size="default"
+        variant="secondary"
+        aria-label={`${text.openDataSources} · ${text.hotspots}`}
+        onClick={onOpenDataSources}
+      >
+        {text.openDataSources}
+      </Button>
+      <ScreeningHotspotsSection
+        text={text}
+        language="en"
+        isScreeningEnabled
+        hotspots={[]}
+        hotspotsUpdatedAt={null}
+        hotspotsExpanded
+        selectedHotspotTopic={null}
+        hotspotDetail={null}
+        loadingHotspots={false}
+        loadingHotspotDetail={false}
+        hotspotError=""
+        hotspotDetailError=""
+        onToggleExpanded={() => undefined}
+        onRefresh={onRefresh}
+        onSelectHotspot={() => undefined}
+        onAnalyzeStock={() => undefined}
+        {...overrides}
+      />
+    </>,
   );
   return { onRefresh, onOpenDataSources, ...view };
 }
@@ -77,7 +87,7 @@ describe('ScreeningHotspotsSection recovery contract', () => {
     });
 
     expect(screen.queryByText('eastmoney_hotspot_unavailable')).not.toBeInTheDocument();
-    const retry = screen.getByRole('button', { name: `${text.retry} · ${text.hotspots}` });
+    const retry = screen.getByRole('button', { name: text.refreshHotspots });
     const dataSources = screen.getByRole('button', { name: `${text.openDataSources} · ${text.hotspots}` });
     expect(retry).toHaveAttribute('data-control', 'button');
     expect(dataSources).toHaveAttribute('data-control', 'button');
@@ -87,15 +97,14 @@ describe('ScreeningHotspotsSection recovery contract', () => {
     expect(onOpenDataSources).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps Retry available in the expanded empty panel when no error banner is present', () => {
+  it('keeps the expanded refresh control as Retry and still offers Data Sources', () => {
     const { onRefresh, onOpenDataSources } = renderSection({
-      hotspotError: '',
+      hotspotError: text.hotspotUnavailable,
     });
 
-    const emptyPanel = screen.getByText(text.refreshDescription).closest('[data-state-panel="empty"]');
-    expect(emptyPanel).not.toBeNull();
-    fireEvent.click(within(emptyPanel as HTMLElement).getByRole('button', { name: `${text.retry} · ${text.hotspots}` }));
-    fireEvent.click(within(emptyPanel as HTMLElement).getByRole('button', { name: `${text.openDataSources} · ${text.hotspots}` }));
+    expect(screen.getByText(text.refreshDescription)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: text.refreshHotspots }));
+    fireEvent.click(screen.getByRole('button', { name: `${text.openDataSources} · ${text.hotspots}` }));
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onOpenDataSources).toHaveBeenCalledTimes(1);
   });
@@ -110,7 +119,7 @@ describe('ScreeningHotspotsSection recovery contract', () => {
     expect(screen.getByText(text.showingLastGoodTitle)).toBeInTheDocument();
     expect(screen.getByText('AI Compute')).toBeInTheDocument();
     expect(screen.getByText(text.hotspotLoadFailed)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: `${text.retry} · ${text.hotspots}` }));
+    fireEvent.click(screen.getByRole('button', { name: text.refreshHotspots }));
     fireEvent.click(screen.getByRole('button', { name: `${text.openDataSources} · ${text.hotspots}` }));
     expect(screen.getByText('AI Compute')).toBeInTheDocument();
     expect(onRefresh).toHaveBeenCalledTimes(1);
@@ -124,13 +133,12 @@ describe('ScreeningHotspotsSection recovery contract', () => {
       hotspotDetail: degradedDetail,
     });
 
-    const degradedPanel = screen.getByText(text.degradedDetail).closest('[data-state-panel="degraded"]');
-    expect(degradedPanel).not.toBeNull();
+    expect(screen.getByText(text.degradedDetail).closest('details')).not.toBeNull();
     expect(screen.getByText(text.cacheFallbackHours.replace('{hours}', '2.5'))).toBeInTheDocument();
     expect(screen.getAllByText(text.diagnosticNetwork).length).toBeGreaterThan(0);
     expect(screen.queryByText(/RemoteDisconnected/)).not.toBeInTheDocument();
-    fireEvent.click(within(degradedPanel as HTMLElement).getByRole('button', { name: `${text.retry} · ${text.hotspots}` }));
-    fireEvent.click(within(degradedPanel as HTMLElement).getByRole('button', { name: `${text.openDataSources} · ${text.hotspots}` }));
+    fireEvent.click(screen.getByRole('button', { name: text.refreshHotspots }));
+    fireEvent.click(screen.getByRole('button', { name: `${text.openDataSources} · ${text.hotspots}` }));
     expect(onRefresh).toHaveBeenCalledTimes(1);
     expect(onOpenDataSources).toHaveBeenCalledTimes(1);
   });
@@ -138,10 +146,11 @@ describe('ScreeningHotspotsSection recovery contract', () => {
   it('keeps Data Sources reachable when screening is disabled and Retry is blocked', () => {
     const { onRefresh, onOpenDataSources } = renderSection({
       isScreeningEnabled: false,
+      hotspotsExpanded: false,
       hotspotError: text.hotspotUnavailable,
     });
 
-    expect(screen.getByRole('button', { name: `${text.retry} · ${text.hotspots}` })).toBeDisabled();
+    expect(screen.getByRole('button', { name: text.refreshHotspots })).toBeDisabled();
     fireEvent.click(screen.getByRole('button', { name: `${text.openDataSources} · ${text.hotspots}` }));
     expect(onRefresh).not.toHaveBeenCalled();
     expect(onOpenDataSources).toHaveBeenCalledTimes(1);
