@@ -85,7 +85,7 @@ Aggregate rules are keyed by stable family IDs (`<named-rule>-family` or a route
 
 `vendor-misc` stays a first-match residual per-asset rule only. Its glob `assets/vendor-*.js` would otherwise sum every vendor chunk.
 
-Same-pattern families inherit the existing named per-asset cap when the current production build still emits one artifact. Locale packs on current `main` already emit several `ja-*.js` (and sibling locale) files; those families use the measured zlib-9 sum plus 400 B. Extra route families (`settings-route`, `portfolio-route`, `screening-route`, `home-watchlist-route`) cover prefix children that would not match the original named glob. Do not raise a per-asset cap to hide family growth.
+Same-pattern families inherit the existing named per-asset cap when the current production build still emits one artifact. Locale packs on current `main` already emit several `ja-*.js` (and sibling locale) files; those families use the measured zlib-9 sum plus 400 B. Extra route families (`settings-route`, `portfolio-route`, `screening-route`, `home-watchlist-route`, `backtest-route`) cover prefix children that would not match the original named glob. Do not raise a per-asset cap to hide family growth.
 
 ```bash
 cd apps/dsa-web

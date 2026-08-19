@@ -2,9 +2,12 @@ import axios, { type AxiosRequestConfig } from 'axios';
 import { API_BASE_URL } from '../utils/constants';
 import { attachParsedApiError } from './error';
 
+/** Shared Axios wait budget. Callers must not treat expiry as a server-side failure. */
+export const API_CLIENT_TIMEOUT_MS = 30_000;
+
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: API_CLIENT_TIMEOUT_MS,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',

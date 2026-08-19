@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import apiClient from './index';
+import apiClient, { API_CLIENT_TIMEOUT_MS } from './index';
 import { createApiError, createParsedApiError } from './error';
 import { toCamelCase } from './utils';
 import type {
@@ -176,14 +176,22 @@ function parseCamelCasePayload<T>(
   return camel as T;
 }
 
+export type BacktestRunRequestOptions = {
+  signal?: AbortSignal;
+};
 
 // ============ API ============
 
 export const backtestApi = {
   /**
-   * Trigger backtest evaluation
+   * Trigger backtest evaluation.
+   * Uses the shared client wait budget. Expiry is a client-side unknown
+   * outcome, not proof that the synchronous server handler stopped.
    */
-  run: async (params: BacktestRunRequest = {}): Promise<BacktestRunResponse> => {
+  run: async (
+    params: BacktestRunRequest = {},
+    options: BacktestRunRequestOptions = {},
+  ): Promise<BacktestRunResponse> => {
     const requestData: Record<string, unknown> = {};
     if (params.code?.trim()) requestData.code = params.code.trim();
     if (params.force) requestData.force = params.force;
@@ -196,6 +204,10 @@ export const backtestApi = {
     const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/backtest/run',
       requestData,
+      {
+        timeout: API_CLIENT_TIMEOUT_MS,
+        signal: options.signal,
+      },
     );
     return parseCamelCasePayload<BacktestRunResponse>(response.data, backtestRunResponseSchema, 'BacktestRunResponse');
   },

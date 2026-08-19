@@ -121,6 +121,7 @@ the sole surface for busy or for accepted long-running work.
 | Settings run-now | Disable + busy reason + tracked state + inline recovery | Poll until idle | 409/busy is not toast-only |
 | Settings first-run smoke | `attach_or_view_tasks` → workbench tasks link | Success links to Analysis Workbench tasks | Other busy kinds stay inline without a fake tasks link |
 | Stock Screening | Capability / poll errors local | Local progress + `formatTaskMessage` | Domain-specific panel OK |
+| Backtest | No 409/job attach path today | Unknown-outcome banner after client wait timeout | `POST /backtest/run` is synchronous: no task id, status, or cancel. Do not invent resume/cancel. |
 | Scheduler status API | `runNowAvailable` / `runNowBlockReason` | Tracked run lifecycle | Align copy with busy class |
 
 ## Related documents

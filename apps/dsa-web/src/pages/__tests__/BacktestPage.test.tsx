@@ -66,14 +66,18 @@ const {
   mockRun: vi.fn(),
 }));
 
-vi.mock('../../api/backtest', () => ({
-  backtestApi: {
-    getResults: mockGetResults,
-    getOverallPerformance: mockGetOverallPerformance,
-    getStockPerformance: mockGetStockPerformance,
-    run: mockRun,
-  },
-}));
+vi.mock('../../api/backtest', async () => {
+  const actual = await vi.importActual<typeof import('../../api/backtest')>('../../api/backtest');
+  return {
+    ...actual,
+    backtestApi: {
+      getResults: mockGetResults,
+      getOverallPerformance: mockGetOverallPerformance,
+      getStockPerformance: mockGetStockPerformance,
+      run: mockRun,
+    },
+  };
+});
 
 const basePerformance = {
   scope: 'overall',
@@ -122,6 +126,7 @@ const baseResultItem = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockRun.mockReset();
   window.localStorage.clear();
   window.history.replaceState({}, '', APP_ROUTE_PATHS.researchBacktest);
   mockGetOverallPerformance.mockResolvedValue(basePerformance);
@@ -171,7 +176,7 @@ describe('BacktestPage', () => {
 
   function renderEnglishPage() {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
-    render(
+    return render(
       <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <BrowserRouter>
           <UiLanguageProvider>
@@ -615,7 +620,7 @@ describe('BacktestPage', () => {
         analysisDateFrom: '2026-03-01',
         analysisDateTo: '2026-03-31',
         limit: 200,
-      });
+      }, expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
 
     await waitFor(() => {
@@ -692,7 +697,7 @@ describe('BacktestPage', () => {
         analysisDateFrom: undefined,
         analysisDateTo: undefined,
         limit: 200,
-      });
+      }, expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
     const progress = await screen.findByRole('progressbar', { name: '回测中...' });
     expect(progress).not.toHaveAttribute('aria-valuenow');
@@ -1101,6 +1106,7 @@ describe('BacktestPage', () => {
           limit: 50,
           evalWindowDays: 10,
         }),
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       );
     });
 
@@ -1139,5 +1145,112 @@ describe('BacktestPage', () => {
     expect(screen.getByLabelText('Candidate limit')).toHaveValue(50);
     expect(await screen.findByPlaceholderText('Filter by stock code (leave empty for all)')).toHaveValue('AAPL');
     expect(screen.getByPlaceholderText('10')).toHaveValue(15);
+  });
+
+  function clientTimeoutError() {
+    return Object.assign(new Error('timeout of 30000ms exceeded'), {
+      code: 'ECONNABORTED',
+    });
+  }
+
+  it('does not treat a 30s client wait timeout as a failed backtest', async () => {
+    mockRun.mockRejectedValueOnce(clientTimeoutError());
+    renderEnglishPage();
+    await screen.findByText('Win');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+
+    expect(await screen.findByTestId('backtest-unknown-outcome')).toBeInTheDocument();
+    expect(screen.getByText('The server may still be running')).toBeInTheDocument();
+    expect(screen.queryByText(/The upstream service timed out/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/连接上游服务超时/)).not.toBeInTheDocument();
+    expect(screen.queryByTestId('backtest-run-summary')).not.toBeInTheDocument();
+  });
+
+  it('does not submit a second POST while the outcome is unknown', async () => {
+    mockRun.mockRejectedValueOnce(clientTimeoutError());
+    renderEnglishPage();
+    await screen.findByText('Win');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+    expect(await screen.findByTestId('backtest-unknown-outcome')).toBeInTheDocument();
+    expect(mockRun).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+    expect(mockRun).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('button', { name: 'Run backtest' })).toBeDisabled();
+  });
+
+  it('preserves a real server error instead of the unknown-outcome banner', async () => {
+    mockRun.mockRejectedValueOnce({
+      title: 'Backtest failed',
+      message: 'The server could not complete this backtest.',
+      rawMessage: 'internal_error',
+      category: 'http_error',
+      status: 500,
+      code: 'internal_error',
+    });
+    renderEnglishPage();
+    await screen.findByText('Win');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+
+    const errorToast = await screen.findByRole('alert');
+    expect(errorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(screen.queryByTestId('backtest-unknown-outcome')).not.toBeInTheDocument();
+    expect(mockRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('aborts an in-flight run on unmount and does not leave a recoverable job', async () => {
+    const pending = createDeferred<never>();
+    mockRun.mockReturnValueOnce(pending.promise);
+    const { unmount } = renderEnglishPage();
+    await screen.findByText('Win');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+    await waitFor(() => expect(mockRun).toHaveBeenCalledTimes(1));
+    const runOptions = mockRun.mock.calls[0]?.[1] as { signal?: AbortSignal } | undefined;
+    expect(runOptions?.signal).toBeInstanceOf(AbortSignal);
+
+    unmount();
+    expect(runOptions?.signal?.aborted).toBe(true);
+
+    await act(async () => {
+      pending.reject(Object.assign(new Error('canceled'), { code: 'ERR_CANCELED', name: 'CanceledError' }));
+    });
+    expect(screen.queryByTestId('backtest-unknown-outcome')).not.toBeInTheDocument();
+  });
+
+  it('allows a new POST only after the unknown outcome is dismissed', async () => {
+    mockRun.mockRejectedValueOnce(clientTimeoutError());
+    renderEnglishPage();
+    await screen.findByText('Win');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+    expect(await screen.findByTestId('backtest-unknown-outcome')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+    expect(screen.queryByTestId('backtest-unknown-outcome')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+    await waitFor(() => expect(mockRun).toHaveBeenCalledTimes(2));
+  });
+
+  it('ignores a stale timeout after the run generation has been superseded', async () => {
+    const staleRun = createDeferred<never>();
+    mockRun.mockReturnValueOnce(staleRun.promise);
+    const { unmount } = renderEnglishPage();
+    await screen.findByText('Win');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run backtest' }));
+    await waitFor(() => expect(mockRun).toHaveBeenCalledTimes(1));
+    unmount();
+
+    await act(async () => {
+      staleRun.reject(clientTimeoutError());
+    });
+
+    renderEnglishPage();
+    await screen.findByText('Win');
+    expect(screen.queryByTestId('backtest-unknown-outcome')).not.toBeInTheDocument();
   });
 });

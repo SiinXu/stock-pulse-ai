@@ -1075,6 +1075,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.layout.route.alerts.title": "Warnungen",
   "i18n.uiText.UI_TEXT.layout.route.backtest.description": "Backtest-Jobs und Ergebnisüberprüfung",
   "i18n.uiText.UI_TEXT.layout.route.backtest.title": "Backtesting",
+  "i18n.uiText.UI_TEXT.backtest.unknownOutcomeDescription": "等待已超时，且这次回测没有任务编号。无法确认服务端是否已结束；再次运行可能重复提交。",
+  "i18n.uiText.UI_TEXT.backtest.unknownOutcomeTitle": "服务端可能仍在运行",
   "i18n.uiText.UI_TEXT.layout.route.chat.description": "Mehrrundenstrategie-Q&A und Sitzungen",
   "i18n.uiText.UI_TEXT.layout.route.chat.title": "Fragen Sie",
   "i18n.uiText.UI_TEXT.layout.route.decisionSignals.description": "Signale, Regeln, Zustellverlauf und Ergebnisauswertung",

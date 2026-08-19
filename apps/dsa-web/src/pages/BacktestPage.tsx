@@ -6,6 +6,7 @@ import { useRouteFocusTarget } from '../components/routing';
 import { backtestApi } from '../api/backtest';
 import type { ParsedApiError } from '../api/error';
 import { getParsedApiError } from '../api/error';
+import { useBacktestRunPhase } from '../hooks/useBacktestRunPhase';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DateRangePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
 import { Progress } from '../components/common/Progress';
 import { StockAutocomplete } from '../components/StockAutocomplete';
@@ -30,7 +31,6 @@ import {
   BACKTEST_OUTCOME_LABELS,
   BACKTEST_PHASE_FILTER_OPTIONS,
   BACKTEST_PHASE_LABELS,
-  BACKTEST_RESOLUTION_NOTE_LABELS,
   BACKTEST_STATUS_LABELS,
   BACKTEST_TEXT,
   BACKTEST_VALIDATION_TEXT,
@@ -43,82 +43,20 @@ import type {
 } from '../types/backtest';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../utils/decisionAction';
 import { cn } from '../utils/cn';
-import { getMarketPhaseSummaryLabel, stripMarketPhaseSummaryPrefix } from '../utils/marketPhase';
+import {
+  formatResolutionNotes,
+  isValidIsoDate,
+  labelFromMap,
+  normalizeBacktestCode,
+  parseBoundedInteger,
+  parseEvalWindowDays,
+  pct,
+  phaseLabel,
+} from '../utils/backtestPageUtils';
 
 const BACKTEST_COMPACT_INPUT_CLASS =
   'h-8 rounded-sm border border-border bg-transparent px-3 text-xs text-foreground placeholder:text-muted-text transition-colors duration-200 focus:outline-none focus:border-muted-text disabled:cursor-not-allowed disabled:opacity-60';
 type BacktestText = (typeof BACKTEST_TEXT)[UiLanguage];
-
-// ============ Helpers ============
-
-function pct(value?: number | null): string {
-  if (value == null) return '--';
-  return `${value.toFixed(1)}%`;
-}
-
-function phaseLabel(row: BacktestResultItem, language: UiLanguage): string {
-  const label = getMarketPhaseSummaryLabel(row.marketPhaseSummary, language);
-  if (label) {
-    return stripMarketPhaseSummaryPrefix(label) ?? label;
-  }
-  return (row.marketPhase ? BACKTEST_PHASE_LABELS[language][row.marketPhase] : undefined) || row.marketPhase || '--';
-}
-
-function normalizeBacktestCode(value: string): string | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) return undefined;
-  return trimmed.toUpperCase();
-}
-
-function parseEvalWindowDays(value: string): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-
-  const parsed = Number(trimmed);
-  if (!Number.isInteger(parsed) || parsed < 1 || parsed > RESEARCH_BACKTEST_LIMITS.maxWindowDays) {
-    return undefined;
-  }
-
-  return parsed;
-}
-
-function parseBoundedInteger(value: string, min: number, max: number): number | undefined {
-  const trimmed = value.trim();
-  if (!trimmed) {
-    return undefined;
-  }
-  const parsed = Number(trimmed);
-  if (!Number.isInteger(parsed) || parsed < min || parsed > max) {
-    return undefined;
-  }
-  return parsed;
-}
-
-function formatResolutionNotes(notes: string | null | undefined, language: UiLanguage): string[] {
-  if (!notes) return [];
-  const labels = BACKTEST_RESOLUTION_NOTE_LABELS[language];
-  return notes
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean)
-    .map((part) => labels[part] ?? part);
-}
-
-function isValidIsoDate(value: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const [year, month, day] = value.split('-').map(Number);
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.getUTCFullYear() === year
-    && date.getUTCMonth() === month - 1
-    && date.getUTCDate() === day;
-}
-
-function labelFromMap(value: string | null | undefined, labels: Record<string, string>): string {
-  if (!value) return '--';
-  return labels[value] ?? value;
-}
 
 function outcomeBadge(outcome: string | undefined, language: UiLanguage) {
   const labels = BACKTEST_OUTCOME_LABELS[language];
@@ -364,7 +302,14 @@ const BacktestPage: React.FC = () => {
   const [pendingForceRun, setPendingForceRun] = useState<BacktestFilterSnapshot | null>(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false); // mobile filters collapsed by default (#879 B2)
   const filtersPanelId = useId();
-  const [isRunning, setIsRunning] = useState(false);
+  const {
+    runPhase,
+    runPhaseRef,
+    runAbortRef,
+    isRunning,
+    runBlocked,
+    setTrackedRunPhase,
+  } = useBacktestRunPhase();
   const [runResult, setRunResult] = useState<BacktestRunResponse | null>(null);
   const [runError, setRunError] = useState<ParsedApiError | null>(null);
   const runRequestGenerationRef = useRef(0);
@@ -566,6 +511,7 @@ const BacktestPage: React.FC = () => {
       resultsRequestGenerationRef.current += 1;
       performanceRequestGenerationRef.current += 1;
       runRequestGenerationRef.current += 1;
+      runAbortRef.current?.abort();
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -575,11 +521,15 @@ const BacktestPage: React.FC = () => {
     force: boolean,
     runOptions: { minAgeDays?: number; limit: number },
   ) => {
+    if (runPhaseRef.current !== 'idle') return;
     setAppliedFilters(validatedFilters);
     const requestGeneration = runRequestGenerationRef.current + 1;
     runRequestGenerationRef.current = requestGeneration;
     const isLatestRequest = () => runRequestGenerationRef.current === requestGeneration;
-    setIsRunning(true);
+    runAbortRef.current?.abort();
+    const abortController = new AbortController();
+    runAbortRef.current = abortController;
+    setTrackedRunPhase('submitting');
     setRunResult(null);
     setRunError(null);
     try {
@@ -595,7 +545,7 @@ const BacktestPage: React.FC = () => {
         analysisDateFrom: dateFrom,
         analysisDateTo: dateTo,
         limit: runOptions.limit,
-      });
+      }, { signal: abortController.signal });
       if (!isLatestRequest()) return;
       setRunResult(response);
       const effectiveEvalWindowDays =
@@ -636,14 +586,38 @@ const BacktestPage: React.FC = () => {
       setAppliedFilters(nextAppliedFilters);
       void fetchResults(1, code, effectiveEvalWindowDays, dateFrom, dateTo, validatedFilters.phase);
       void fetchPerformance(code, effectiveEvalWindowDays, dateFrom, dateTo, validatedFilters.phase);
+      setTrackedRunPhase('idle');
     } catch (err) {
-      if (isLatestRequest()) setRunError(getParsedApiError(err));
-    } finally {
-      if (isLatestRequest()) setIsRunning(false);
+      if (!isLatestRequest()) return;
+      const parsed = getParsedApiError(err);
+      const code = err && typeof err === 'object' ? (err as { code?: string; name?: string }).code : undefined;
+      const name = err && typeof err === 'object' ? (err as { name?: string }).name : undefined;
+      if (code === 'ERR_CANCELED' || name === 'CanceledError' || name === 'AbortError') {
+        return;
+      }
+      const hasHttpStatus = typeof parsed.status === 'number' && parsed.status >= 400;
+      if (!hasHttpStatus && (
+        parsed.category === 'upstream_timeout'
+        || parsed.category === 'upstream_network'
+        || parsed.category === 'local_connection_failed'
+        || code === 'ECONNABORTED'
+      )) {
+        setRunError(null);
+        setTrackedRunPhase('unknown_outcome');
+        return;
+      }
+      setRunError(parsed);
+      setTrackedRunPhase('idle');
     }
   };
 
+  const handleDismissUnknownOutcome = () => {
+    if (runPhaseRef.current !== 'unknown_outcome') return;
+    setTrackedRunPhase('idle');
+  };
+
   const handleRun = () => {
+    if (runPhaseRef.current !== 'idle') return;
     const validatedFilters = validateDraftFilters();
     if (!validatedFilters) return;
     const runOptions = validateRunOptions();
@@ -924,7 +898,7 @@ const BacktestPage: React.FC = () => {
               </Tooltip>
             </div>
           </div>
-          <Button type="button" onClick={handleRun} variant="primary" size="primary" isLoading={isRunning} loadingText={text.running} className="whitespace-nowrap">
+          <Button type="button" onClick={handleRun} variant="primary" size="primary" isLoading={isRunning} disabled={runBlocked && !isRunning} loadingText={text.running} className="whitespace-nowrap">
             {text.runBacktest}
           </Button>
         </div>
@@ -933,7 +907,21 @@ const BacktestPage: React.FC = () => {
             <RunSummary data={runResult} language={language} />
           </div>
         )}
-        {runError ? <ApiErrorAlert error={runError} /> : null}
+        {runPhase === 'unknown_outcome' ? (
+          <StatePanel
+            state="partial"
+            size="compact"
+            title={t('backtest.unknownOutcomeTitle')}
+            description={t('backtest.unknownOutcomeDescription')}
+            data-testid="backtest-unknown-outcome"
+            className="mt-2 h-auto max-w-4xl"
+            action={(
+              <Button type="button" variant="secondary" size="default" onClick={handleDismissUnknownOutcome}>
+                {t('taskPanel.dismiss')}
+              </Button>
+            )}
+          />
+        ) : runError ? <ApiErrorAlert error={runError} /> : null}
         <p className="mt-2 text-xs text-muted-text">
           {isNextDayValidation
             ? text.oneDayModeDescription
@@ -1107,6 +1095,7 @@ const BacktestPage: React.FC = () => {
           const filters = pendingForceRun;
           setPendingForceRun(null);
           if (!filters) return;
+          if (runPhaseRef.current !== 'idle') return;
           const runOptions = validateRunOptions();
           if (!runOptions) return;
           void runBacktest(filters, true, runOptions);

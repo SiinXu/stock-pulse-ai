@@ -1,12 +1,18 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import apiClient from '../index';
+import apiClient, { API_CLIENT_TIMEOUT_MS } from '../index';
 import { backtestApi } from '../backtest';
-import { getParsedApiError, isApiRequestError } from '../error';
+import {
+  canSubmitBacktestRun,
+  classifyBacktestRunFailure,
+  extractBacktestRunIdentity,
+} from '../backtestRunOutcome';
+import { createParsedApiError, getParsedApiError, isApiRequestError } from '../error';
 
 vi.mock('../index', () => ({
   default: { get: vi.fn(), post: vi.fn() },
+  API_CLIENT_TIMEOUT_MS: 30_000,
 }));
 
 const mockGet = vi.mocked(apiClient.get);
@@ -32,6 +38,26 @@ describe('backtestApi.run', () => {
     expect(result.processed).toBe(10);
     expect(result.appliedEvalWindowDays).toBe(5);
     expect(result).toEqual(expect.objectContaining({ unexpectedServerField: 'keep-me' }));
+    expect(mockPost).toHaveBeenCalledWith(
+      '/api/v1/backtest/run',
+      expect.objectContaining({ code: '600519', force: true }),
+      expect.objectContaining({ timeout: API_CLIENT_TIMEOUT_MS }),
+    );
+  });
+
+  it('does not invent a run identity from the current synchronous response', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        processed: 1,
+        saved: 1,
+        completed: 1,
+        insufficient: 0,
+        errors: 0,
+        applied_eval_window_days: 10,
+      },
+    });
+    const result = await backtestApi.run();
+    expect(extractBacktestRunIdentity(result)).toBeNull();
   });
 
   it('rejects missing required counts via ParsedApiError', async () => {
@@ -118,5 +144,60 @@ describe('backtestApi performance metrics money-math', () => {
       return true;
     });
   });
+});
 
+describe('backtest run outcome classification', () => {
+  it('classifies a 30s client wait timeout as an unknown outcome', () => {
+    const timeoutError = Object.assign(new Error('timeout of 30000ms exceeded'), {
+      code: 'ECONNABORTED',
+    });
+    const classified = classifyBacktestRunFailure(timeoutError);
+    expect(classified.kind).toBe('unknown_outcome');
+    expect(classified.runIdentity).toBeNull();
+    expect(canSubmitBacktestRun('unknown_outcome')).toBe(false);
+    expect(canSubmitBacktestRun('submitting')).toBe(false);
+    expect(canSubmitBacktestRun('idle')).toBe(true);
+  });
+
+  it('classifies abort as aborted rather than a server failure', () => {
+    const canceled = Object.assign(new Error('canceled'), {
+      code: 'ERR_CANCELED',
+      name: 'CanceledError',
+    });
+    expect(classifyBacktestRunFailure(canceled)).toMatchObject({
+      kind: 'aborted',
+      error: null,
+      runIdentity: null,
+    });
+  });
+
+  it('preserves terminal HTTP failures and recovers an identity only when present', () => {
+    const terminal = createParsedApiError({
+      title: 'Backtest failed',
+      message: 'The server could not complete this backtest.',
+      rawMessage: 'internal_error',
+      category: 'http_error',
+      status: 500,
+      code: 'internal_error',
+    });
+    expect(classifyBacktestRunFailure(terminal)).toMatchObject({
+      kind: 'terminal',
+      runIdentity: null,
+    });
+
+    const busy = createParsedApiError({
+      title: 'Busy',
+      message: 'Another run is active.',
+      rawMessage: 'duplicate_task',
+      category: 'http_error',
+      status: 409,
+      code: 'duplicate_task',
+      params: { existing_task_id: 'task-123' },
+    });
+    expect(classifyBacktestRunFailure(busy)).toMatchObject({
+      kind: 'terminal',
+      runIdentity: 'task-123',
+    });
+    expect(extractBacktestRunIdentity({ task_id: '  ' })).toBeNull();
+  });
 });

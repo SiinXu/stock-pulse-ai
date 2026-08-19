@@ -349,12 +349,23 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(entryFamily.maxGzipBytes).toBe(entry.maxGzipBytes);
     expect(entryFamily.maxGzipBytes).toBeLessThan(195_814);
 
-    for (const routeId of ['settings-route', 'portfolio-route', 'screening-route', 'home-watchlist-route']) {
+    for (const routeId of ['settings-route', 'portfolio-route', 'screening-route', 'home-watchlist-route', 'backtest-route']) {
       const route = budget.aggregateRules.find((rule) => rule.id === routeId);
       expect(route, routeId).toBeTruthy();
       expect(Array.isArray(route.match)).toBe(true);
       expect(route.match.length).toBeGreaterThan(1);
       expect(route.maxGzipBytes).toBe(route.measuredGzipBytes + 400);
     }
+
+    const backtestRoute = budget.aggregateRules.find((rule) => rule.id === 'backtest-route');
+    expect(backtestRoute.match).toEqual([
+      'assets/BacktestPage-*.js',
+      'assets/Backtest*-*.js',
+      'assets/backtest*-*.js',
+    ]);
+    const backtestPage = budget.rules.find((rule) => rule.id === 'BacktestPage');
+    const backtestPageFamily = budget.aggregateRules.find((rule) => rule.id === 'BacktestPage-family');
+    expect(backtestPageFamily.match).toEqual([backtestPage.match]);
+    expect(backtestPageFamily.maxGzipBytes).toBe(backtestPage.maxGzipBytes);
   });
 });

@@ -128,6 +128,13 @@ const getVendorChunkName = (id: string): string | undefined => {
     return 'DataTable'
   }
   if (
+    normalizedId.endsWith('/src/utils/backtestPageUtils.ts')
+    || normalizedId.endsWith('/src/hooks/useBacktestRunPhase.ts')
+    || normalizedId.endsWith('/src/api/backtestRunOutcome.ts')
+  ) {
+    return 'backtest-support'
+  }
+  if (
     normalizedId.endsWith('/src/components/common/PageHeader.tsx')
     || normalizedId.endsWith('/src/components/common/AppPage.tsx')
     || normalizedId.endsWith('/src/components/common/WorkspacePage.tsx')
