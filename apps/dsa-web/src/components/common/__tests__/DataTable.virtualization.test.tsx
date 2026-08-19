@@ -222,6 +222,58 @@ describe('DataTable virtualization', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 
+  it('fits the windowed viewport inside a tighter overflow parent', () => {
+    const rows = buildRows(80);
+    render(
+      <div style={{ maxHeight: 240, overflowY: 'auto' }}>
+        <DataTable
+          caption="Portfolio positions"
+          scrollAreaLabel="Scrollable portfolio positions"
+          columns={COLUMNS}
+          rows={rows}
+          getRowKey={(row) => row.id}
+          getRowTestId={(row) => `position-${row.id}`}
+          emptyState={EMPTY_STATE}
+          frame="embedded"
+        />
+      </div>,
+    );
+
+    const region = scrollRegion();
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'true');
+    expect(region).toHaveStyle({ maxHeight: '240px' });
+    expect(region).toHaveClass('overflow-y-auto');
+
+    Object.defineProperty(region, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 79 * DATATABLE_DEFAULT_ROW_HEIGHT_PX,
+    });
+    fireEvent.scroll(region);
+    expect(screen.getByTestId('position-80')).toBeVisible();
+  });
+
+  it('walks past an overflow-hidden surface to a tighter scroll parent', () => {
+    const rows = buildRows(80);
+    render(
+      <div style={{ maxHeight: 288, overflowY: 'auto' }}>
+        <DataTable
+          caption="Portfolio positions"
+          scrollAreaLabel="Scrollable portfolio positions"
+          columns={COLUMNS}
+          rows={rows}
+          getRowKey={(row) => row.id}
+          getRowTestId={(row) => `position-${row.id}`}
+          emptyState={EMPTY_STATE}
+        />
+      </div>,
+    );
+
+    const region = scrollRegion();
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'true');
+    expect(region).toHaveStyle({ maxHeight: '288px' });
+  });
+
   it('falls back to a full table for detail rows and explicit opt-out', () => {
     const rows = buildRows(40);
     const { rerender } = render(

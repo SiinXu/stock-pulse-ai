@@ -4,8 +4,9 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
   Fragment,
   forwardRef,
-  useEffect,
+  useLayoutEffect,
   useRef,
+  useState,
   type ForwardedRef,
   type Key,
   type KeyboardEvent,
@@ -19,6 +20,8 @@ import { cn } from '../../utils/cn';
 import { StatePanel } from './StatePanel';
 import { Surface } from './Surface';
 import {
+  findBoundedVerticalScrollParent,
+  resolveDataTableViewportCap,
   resolveDataTableVirtualization,
   type DataTableVirtualizationProp,
 } from './dataTableVirtualization';
@@ -296,6 +299,8 @@ function DataTableInner<T>({
     virtualization,
   });
   const virtualize = resolvedVirtualization.enabled;
+  const defaultViewport = resolvedVirtualization.viewportMaxHeight;
+  const [viewportCap, setViewportCap] = useState(defaultViewport);
   const {
     range,
     onScroll: onVirtualScroll,
@@ -307,7 +312,7 @@ function DataTableInner<T>({
     enabled: virtualize,
   });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!virtualize) {
       return;
     }
@@ -316,8 +321,10 @@ function DataTableInner<T>({
       return;
     }
     const updateHeight = () => {
+      const cap = resolveDataTableViewportCap(container, defaultViewport);
+      setViewportCap(cap);
       const measured = container.clientHeight;
-      setViewportHeight(measured > 0 ? measured : resolvedVirtualization.viewportMaxHeight);
+      setViewportHeight(measured > 0 ? measured : cap);
     };
     updateHeight();
     if (typeof ResizeObserver === 'undefined') {
@@ -325,8 +332,12 @@ function DataTableInner<T>({
     }
     const observer = new ResizeObserver(updateHeight);
     observer.observe(container);
+    const scrollParent = findBoundedVerticalScrollParent(container, defaultViewport);
+    if (scrollParent) {
+      observer.observe(scrollParent);
+    }
     return () => observer.disconnect();
-  }, [resolvedVirtualization.viewportMaxHeight, setViewportHeight, virtualize, rows.length]);
+  }, [defaultViewport, setViewportHeight, virtualize, rows.length]);
 
   const effectiveState = status ?? (rows.length === 0
     ? { state: 'empty' as const, ...emptyState }
@@ -389,7 +400,7 @@ function DataTableInner<T>({
         data-mounted-count={virtualize ? Math.max(0, windowEnd - windowStart + 1) : rows.length}
         data-total-count={rows.length}
         onScroll={virtualize ? onVirtualScroll : undefined}
-        style={virtualize ? { maxHeight: resolvedVirtualization.viewportMaxHeight } : undefined}
+        style={virtualize ? { maxHeight: viewportCap } : undefined}
         className={cn(
           'max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/55',
           virtualize && 'overflow-y-auto overscroll-y-contain',

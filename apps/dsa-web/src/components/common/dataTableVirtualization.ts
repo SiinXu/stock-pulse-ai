@@ -105,3 +105,53 @@ export function resolveDataTableVirtualization(input: {
     viewportMaxHeight,
   };
 }
+
+function usedVerticalBoundPx(element: HTMLElement): number {
+  if (element.clientHeight > 0) {
+    return element.clientHeight;
+  }
+  const { maxHeight } = window.getComputedStyle(element);
+  if (!maxHeight.endsWith('px')) {
+    return 0;
+  }
+  const parsed = Number.parseFloat(maxHeight);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+/**
+ * Nearest ancestor that already owns a tighter vertical scrollport than the
+ * DataTable self viewport. Page-level fillers (for example Shell main) are
+ * taller than the default cap and must not steal the table's own scroller.
+ */
+export function findBoundedVerticalScrollParent(
+  element: HTMLElement,
+  maxSelfViewport: number,
+): HTMLElement | null {
+  let current = element.parentElement;
+  while (
+    current
+    && current !== document.body
+    && current !== document.documentElement
+  ) {
+    const overflowY = window.getComputedStyle(current).overflowY;
+    if (overflowY === 'auto' || overflowY === 'scroll') {
+      const bound = usedVerticalBoundPx(current);
+      return bound > 0 && bound < maxSelfViewport ? current : null;
+    }
+    current = current.parentElement;
+  }
+  return null;
+}
+
+/** Cap the windowed table to a tighter parent scroller so the two do not nest. */
+export function resolveDataTableViewportCap(
+  element: HTMLElement,
+  maxSelfViewport: number,
+): number {
+  const parent = findBoundedVerticalScrollParent(element, maxSelfViewport);
+  if (!parent) {
+    return maxSelfViewport;
+  }
+  const bound = usedVerticalBoundPx(parent);
+  return bound > 0 && bound < maxSelfViewport ? bound : maxSelfViewport;
+}
