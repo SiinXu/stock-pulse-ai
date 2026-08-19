@@ -119,8 +119,12 @@ describe('HomePortfolioHealthWidget', () => {
     renderWidget();
     expect(await screen.findByText('Portfolio health unavailable')).toBeInTheDocument();
     expect(
-      screen.getByText('Portfolio equity is negative; health scoring is undefined.'),
+      screen.getByText('Equity is negative, so health scoring is undefined.'),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Portfolio equity is negative; health scoring is undefined.'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/not investment advice/i)).not.toBeInTheDocument();
     expect(screen.queryByText('No portfolio health snapshot')).not.toBeInTheDocument();
   });
 });

@@ -17,9 +17,7 @@ import { formatUnknownMachineCode } from '../dataQualityFormat/unknownCode';
 describe('personal performance presentation', () => {
   beforeAll(async () => {
     await loadAllUiLanguageTranslations();
-    await Promise.all(UI_LANGUAGES.map((language) => (
-      loadPersonalPerformanceReasonLabels(language).catch(() => undefined)
-    )));
+    await Promise.all(UI_LANGUAGES.map((language) => loadPersonalPerformanceReasonLabels(language)));
   });
 
   it('localizes known trade sides through PORTFOLIO_SIDE_LABELS', () => {
@@ -52,13 +50,17 @@ describe('personal performance presentation', () => {
     expect(formatPaperDecisionReason({
       code: 'No DecisionSignal or analysis plan was linked to this trade.',
       message: 'No DecisionSignal or analysis plan was linked to this trade.',
-    }, 'en')).toBe(formatUnknownMachineCode('unknown', 'en'));
+    }, 'en')).toBe(formatUnknownMachineCode(
+      'No DecisionSignal or analysis plan was linked to this trade.',
+      'en',
+    ));
     expect(formatPaperDecisionReason({
       code: 'No DecisionSignal or analysis plan was linked to this trade.',
-    }, 'en')).not.toContain('DecisionSignal');
+    }, 'en')).not.toMatch(/^No DecisionSignal or analysis plan was linked to this trade\.$/);
     expect(formatPaperDecisionReason({ code: '<script>alert(1)</script>' }, 'zh')).toBe(
-      formatUnknownMachineCode('unknown', 'zh'),
+      formatUnknownMachineCode('<script>alert(1)</script>', 'zh'),
     );
+    expect(formatPaperDecisionReason({ code: '<script>alert(1)</script>' }, 'zh')).not.toContain('<script>');
   });
 
   it('has the same reason keys in every UI language', () => {

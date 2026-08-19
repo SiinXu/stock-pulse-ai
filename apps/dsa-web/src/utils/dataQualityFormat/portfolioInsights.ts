@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { formatUiText, type UiLanguage } from '../../i18n/uiText';
+import { formatUiText, UI_TEXT, type UiLanguage } from '../../i18n/uiText';
 import { ALERT_SEVERITY_LABELS } from '../../locales/alerts';
 import { getPortfolioInsightCodes } from '../../locales/portfolioInsightCodes';
 import type { PortfolioHealthInsight } from '../../types/portfolioHealth';
@@ -12,14 +12,23 @@ import {
   formatLabeledDiagnostic,
   formatUnknownMachineCode,
   sanitizeDiagnosticText,
+  sanitizeUserAuthoredText,
 } from './unknownCode';
 
-const BAND_KEYS = {
-  healthy: 'bandHealthy',
-  fair: 'bandFair',
-  caution: 'bandCaution',
-  poor: 'bandPoor',
-} as const;
+const HEALTH_BAND_UI_KEYS = {
+  healthy: 'home.dashboardLayout.widget.portfolioHealthBand.healthy',
+  fair: 'home.dashboardLayout.widget.portfolioHealthBand.fair',
+  caution: 'home.dashboardLayout.widget.portfolioHealthBand.caution',
+  poor: 'home.dashboardLayout.widget.portfolioHealthBand.poor',
+} as const satisfies Record<string, keyof (typeof UI_TEXT)['en']>;
+
+const T07_STATUS_CODES = new Set([
+  'ok',
+  'empty_portfolio',
+  'insufficient_history',
+  'partial',
+  'unavailable',
+]);
 
 const INSIGHT_KEYS = {
   concentration_top_name: 'insightConcentrationTopName',
@@ -43,6 +52,8 @@ const DIMENSION_REASON_KEYS = {
   synthetic_basket_no_holdings_pnl: 'reasonSyntheticBasketNoHoldingsPnl',
   price_or_fx_quality_partial: 'reasonPriceOrFxQualityPartial',
   zero_equity: 'reasonZeroEquity',
+  negative_equity: 'reasonNegativeEquity',
+  var_unavailable: 'reasonVarUnavailable',
   synthetic_basket_no_cash_ledger: 'reasonSyntheticBasketNoCashLedger',
   fx_stale: 'reasonFxStale',
 } as const;
@@ -86,8 +97,8 @@ export function formatPortfolioHealthBand(
   language: UiLanguage,
 ): string {
   if (band == null || band === '') return formatEmptyDisplay();
-  const key = BAND_KEYS[band as keyof typeof BAND_KEYS];
-  if (key) return codes(language)[key];
+  const key = HEALTH_BAND_UI_KEYS[band as keyof typeof HEALTH_BAND_UI_KEYS];
+  if (key) return UI_TEXT[language][key];
   return formatUnknownMachineCode(band, language);
 }
 
@@ -116,21 +127,65 @@ export function formatPortfolioHealthInsight(
   });
 }
 
+function formatKnownDimensionReason(
+  reason: string,
+  language: UiLanguage,
+): string | null {
+  const key = DIMENSION_REASON_KEYS[reason as keyof typeof DIMENSION_REASON_KEYS];
+  if (key) return codes(language)[key];
+  if (T07_STATUS_CODES.has(reason)) return formatDataQualityStatus(reason, language);
+  return null;
+}
+
+export function formatAuthoritativeStatusMessage(
+  message: string | null | undefined,
+  language: UiLanguage,
+): string {
+  if (message == null || String(message).trim() === '') return formatEmptyDisplay();
+  return formatLabeledDiagnostic(message, language);
+}
+
 export function formatPortfolioDimensionDetail(
   row: { status?: string | null; reason?: string | null; statusMessage?: string | null },
   language: UiLanguage,
 ): string {
   const reason = String(row.reason ?? '').trim();
-  if (reason) {
-    const key = DIMENSION_REASON_KEYS[reason as keyof typeof DIMENSION_REASON_KEYS];
-    if (key) return codes(language)[key];
-    if (reason === 'ok' || reason === 'unavailable' || reason === 'partial') {
-      return formatDataQualityStatus(reason, language);
-    }
-    return formatUnknownMachineCode(reason, language);
+  const mapped = reason
+    ? formatKnownDimensionReason(reason, language) ?? formatUnknownMachineCode(reason, language)
+    : row.status
+      ? formatDataQualityStatus(row.status, language)
+      : '';
+  const labeled = row.statusMessage
+    ? formatAuthoritativeStatusMessage(row.statusMessage, language)
+    : '';
+  if (mapped && labeled && labeled !== formatEmptyDisplay()) {
+    return `${mapped} · ${labeled}`;
   }
-  if (row.status) return formatDataQualityStatus(row.status, language);
+  if (mapped) return mapped;
+  if (labeled && labeled !== formatEmptyDisplay()) return labeled;
   return formatEmptyDisplay();
+}
+
+export function formatPortfolioHealthUnavailableDetail(
+  result: {
+    status?: string | null;
+    statusMessage?: string | null;
+    dimensions?: Record<string, { reason?: string | null } | null | undefined> | null;
+  },
+  language: UiLanguage,
+): string {
+  const reasons = Object.values(result.dimensions ?? {})
+    .map((dimension) => String(dimension?.reason ?? '').trim())
+    .filter(Boolean);
+  const unique = [...new Set(reasons)];
+  if (unique.length === 1) {
+    const mapped = formatKnownDimensionReason(unique[0], language);
+    if (mapped) return mapped;
+  }
+  if (result.statusMessage) {
+    return formatAuthoritativeStatusMessage(result.statusMessage, language);
+  }
+  return formatPortfolioInsightStatus(result.status, language);
 }
 
 export function formatPortfolioRebalanceAction(
@@ -277,10 +332,14 @@ export function formatPortfolioStressScenario(
       description: catalog[keys[1]],
     };
   }
+  const authoredName = String(scenario.name ?? '').trim();
+  const authoredDescription = String(scenario.description ?? '').trim();
   return {
-    name: formatUnknownMachineCode(scenario.id, language),
-    description: scenario.description
-      ? formatLabeledDiagnostic(scenario.description, language)
+    name: authoredName
+      ? sanitizeUserAuthoredText(authoredName, 80)
+      : formatUnknownMachineCode(scenario.id, language),
+    description: authoredDescription
+      ? formatLabeledDiagnostic(authoredDescription, language)
       : formatEmptyDisplay(),
   };
 }

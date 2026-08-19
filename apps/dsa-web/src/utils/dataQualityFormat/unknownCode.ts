@@ -15,6 +15,7 @@ export {
   isStableMachineCode,
   sanitizeDiagnosticText,
   sanitizeMachineCode,
+  sanitizeUserAuthoredText,
 } from './sanitizeDiagnostic';
 
 export function formatUnknownMachineCode(

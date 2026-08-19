@@ -117,8 +117,10 @@ describe('AlertTriggerHistory', () => {
     );
 
     expect(screen.getByText('未知状态 (queued)')).toBeInTheDocument();
-    expect(screen.getByText('质量：not_a_real_level')).toBeInTheDocument();
-    expect(screen.getByText('custom_block：custom_status')).toBeInTheDocument();
+    expect(screen.getByText('质量：未知编码（not_a_real_level）')).toBeInTheDocument();
+    expect(screen.getByText('未知编码（custom_block）：未知编码（custom_status）')).toBeInTheDocument();
+    expect(screen.queryByText('质量：not_a_real_level')).not.toBeInTheDocument();
+    expect(screen.queryByText('custom_block：custom_status')).not.toBeInTheDocument();
   });
 
   it('labels free-form trigger reasons as diagnostics instead of primary English copy', () => {

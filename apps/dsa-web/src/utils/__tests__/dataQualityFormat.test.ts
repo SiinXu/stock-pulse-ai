@@ -57,8 +57,9 @@ describe('formatDataQualityLevel', () => {
   it('keeps unknown levels visible instead of inventing a mapped label', () => {
     expect(formatDataQualityLevel(null, 'en')).toBeNull();
     expect(formatDataQualityLevel('', 'zh')).toBeNull();
-    expect(formatDataQualityLevel('not_a_real_level', 'en')).toBe('not_a_real_level');
-    expect(formatDataQualityLevel('not_a_real_level', 'zh')).toBe('not_a_real_level');
+    expect(formatDataQualityLevel('not_a_real_level', 'en')).toBe('Unknown code (not_a_real_level)');
+    expect(formatDataQualityLevel('not_a_real_level', 'zh')).toBe('未知编码（not_a_real_level）');
+    expect(formatDataQualityLevel('not_a_real_level', 'en')).not.toBe('not_a_real_level');
   });
 });
 
@@ -70,8 +71,11 @@ describe('formatDataQualityLimitation', () => {
   });
 
   it('leaves unrecognized fragments visible', () => {
-    expect(formatDataQualityLimitation('custom_block: custom_status', 'en')).toBe('custom_block: custom_status');
-    expect(formatDataQualityLimitation('plain prose limitation', 'zh')).toBe('plain prose limitation');
+    expect(formatDataQualityLimitation('custom_block: custom_status', 'en')).toBe(
+      'Unknown code (custom_block): Unknown code (custom_status)',
+    );
+    expect(formatDataQualityLimitation('plain prose limitation', 'zh')).toBe('诊断：plain prose limitation');
+    expect(formatDataQualityLimitation('custom_block: custom_status', 'en')).not.toBe('custom_block: custom_status');
   });
 });
 

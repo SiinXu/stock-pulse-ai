@@ -7,6 +7,7 @@ import { PORTFOLIO_SIDE_LABELS } from '../../locales/portfolio';
 import type { PortfolioSide } from '../../types/portfolio';
 import {
   formatEmptyDisplay,
+  formatLabeledDiagnostic,
   formatUnknownMachineCode,
 } from './unknownCode';
 
@@ -30,8 +31,15 @@ export function formatPaperDecisionReason(
 ): string {
   const catalog = getPersonalPerformanceReasonLabels(language);
   const code = String(reason.code ?? '').trim();
-  if (!code) return formatEmptyDisplay();
+  if (!code) {
+    const message = String(reason.message ?? '').trim();
+    return message ? formatLabeledDiagnostic(message, language) : formatEmptyDisplay();
+  }
   const label = catalog[code as keyof typeof catalog];
   if (label) return label;
+  const message = String(reason.message ?? '').trim();
+  if (message && message !== code) {
+    return `${formatUnknownMachineCode(code, language)} · ${formatLabeledDiagnostic(message, language)}`;
+  }
   return formatUnknownMachineCode(code, language);
 }

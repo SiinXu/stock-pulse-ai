@@ -9,10 +9,13 @@ import {
   SOURCE_PORTFOLIO_INSIGHT_CODES,
 } from '../../locales/portfolioInsightCodes';
 import {
+  formatAuthoritativeStatusMessage,
   formatPortfolioBasketDirection,
   formatPortfolioBasketReason,
+  formatPortfolioDimensionDetail,
   formatPortfolioHealthBand,
   formatPortfolioHealthInsight,
+  formatPortfolioHealthUnavailableDetail,
   formatPortfolioInsightStatus,
   formatPortfolioRebalanceAction,
   formatPortfolioRebalanceRationale,
@@ -25,7 +28,7 @@ import { formatUnknownMachineCode } from '../dataQualityFormat/unknownCode';
 describe('portfolio insight presentation', () => {
   beforeAll(async () => {
     await loadAllUiLanguageTranslations();
-    await Promise.all(UI_LANGUAGES.map((language) => loadPortfolioInsightCodes(language).catch(() => undefined)));
+    await Promise.all(UI_LANGUAGES.map((language) => loadPortfolioInsightCodes(language)));
   });
 
   it('localizes known health bands, insights, and statuses', () => {
@@ -93,12 +96,49 @@ describe('portfolio insight presentation', () => {
       id: 'custom_yaml_shock',
       name: 'A custom English name',
       description: 'Free-form English description',
-    }, 'en').name).toBe(formatUnknownMachineCode('custom_yaml_shock', 'en'));
+    }, 'en').name).toBe('A custom English name');
     expect(formatPortfolioStressScenario({
       id: 'custom_yaml_shock',
       name: 'A custom English name',
       description: 'Free-form English description',
     }, 'en').description).toContain('Diagnostic:');
+    expect(formatPortfolioStressScenario({
+      id: 'custom_yaml_shock',
+      name: 'A custom English name',
+      description: 'Free-form English description',
+    }, 'zh').name).toBe('A custom English name');
+  });
+
+  it('localizes known dimension reasons and labels leftover statusMessage', () => {
+    expect(formatPortfolioDimensionDetail({ reason: 'negative_equity' }, 'en')).toBe(
+      'Equity is negative, so health scoring is undefined.',
+    );
+    expect(formatPortfolioDimensionDetail({ reason: 'var_unavailable' }, 'zh')).toBe('风险价值不可用。');
+    expect(formatPortfolioDimensionDetail({ reason: 'insufficient_history' }, 'en')).toBe('Insufficient history');
+    expect(formatPortfolioDimensionDetail({
+      reason: 'insufficient_history',
+      statusMessage: 'Need at least 60 observations',
+    }, 'en')).toContain('Diagnostic: Need at least 60 observations');
+    expect(formatPortfolioHealthUnavailableDetail({
+      status: 'unavailable',
+      statusMessage: 'Portfolio equity is negative; health scoring is undefined.',
+      dimensions: {
+        concentration: { reason: 'negative_equity' },
+        riskExposure: { reason: 'negative_equity' },
+      },
+    }, 'en')).toBe('Equity is negative, so health scoring is undefined.');
+    expect(formatPortfolioHealthUnavailableDetail({
+      status: 'unavailable',
+      statusMessage: 'Portfolio equity is negative; health scoring is undefined.',
+      dimensions: {
+        concentration: { reason: 'negative_equity' },
+        riskExposure: { reason: 'negative_equity' },
+      },
+    }, 'en')).not.toContain('not investment advice');
+    expect(formatAuthoritativeStatusMessage(
+      '缺少可用价格，无法计算压力结果。',
+      'zh',
+    )).toBe('诊断：缺少可用价格，无法计算压力结果。');
   });
 
   it('keeps unknown codes visible as sanitized diagnostics', () => {
@@ -110,7 +150,10 @@ describe('portfolio insight presentation', () => {
     );
     expect(formatPortfolioHealthInsight({
       code: 'Position AAPL weight 40% exceeds concentration threshold',
-    }, 'en')).toBe(formatUnknownMachineCode('unknown', 'en'));
+    }, 'en')).toBe(formatUnknownMachineCode(
+      'Position AAPL weight 40% exceeds concentration threshold',
+      'en',
+    ));
     expect(formatPortfolioRebalanceAction('zoom', 'ja')).toBe(
       formatUnknownMachineCode('zoom', 'ja'),
     );

@@ -18,6 +18,7 @@ import type {
   RiskTolerance,
 } from '../../types/portfolioInsights';
 import {
+  formatAuthoritativeStatusMessage,
   formatPortfolioInsightDisclaimer,
   formatPortfolioInsightStatus,
   formatPortfolioRebalanceAction,
@@ -213,16 +214,24 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
             {result.status === 'insufficient_data' ? (
               <StatePanel
                 state="blocked"
-                title={text.insufficientTitle}
-                description={text.insufficientTitle}
+                title={formatPortfolioInsightStatus(result.status, language)}
+                description={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : text.insufficientTitle
+                }
                 titleAs="p"
               />
             ) : null}
             {result.status === 'refused' ? (
               <StatePanel
                 state="blocked"
-                title={text.refusedTitle}
-                description={text.refusedTitle}
+                title={formatPortfolioInsightStatus(result.status, language)}
+                description={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : text.refusedTitle
+                }
                 titleAs="p"
               />
             ) : null}

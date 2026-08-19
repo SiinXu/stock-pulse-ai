@@ -9,7 +9,6 @@ import {
   SOURCE_PORTFOLIO_INSIGHTS_TEXT,
   type PortfolioInsightsText,
 } from '../../locales/portfolioInsights';
-import { loadServerPresentationText } from '../../locales/serverPresentationCatalog';
 
 type LoadedText = {
   language: UiLanguage;
@@ -23,10 +22,7 @@ export function usePortfolioInsightsText(language: UiLanguage): PortfolioInsight
   useEffect(() => {
     if (synchronous) return undefined;
     let active = true;
-    void Promise.all([
-      loadPortfolioInsightsText(language),
-      loadServerPresentationText(language),
-    ]).then(([text]) => {
+    void loadPortfolioInsightsText(language).then((text) => {
       if (active) setLoaded({ language, text });
     });
     return () => {

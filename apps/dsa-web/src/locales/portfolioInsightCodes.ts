@@ -1,17 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
-import {
-  getServerPresentationText,
-  loadServerPresentationText,
-} from './serverPresentationCatalog';
+import { loadUiLanguageTranslations } from '../i18n/translations';
 
 const zh = {
-    bandHealthy: '健康',
-    bandFair: '一般',
-    bandCaution: '需谨慎',
-    bandPoor: '较差',
     insightConcentrationTopName: '持仓 {symbol} 权重 {value}% 超过集中度阈值 {threshold}%。',
     insightConcentrationName: '持仓 {symbol} 权重 {value}% 超过集中度阈值 {threshold}%。',
     insightLowDiversification: '分散化评分 {value} 低于阈值 {threshold}。',
@@ -30,6 +24,8 @@ const zh = {
     reasonSyntheticBasketNoHoldingsPnl: '合成篮子没有持仓盈亏。',
     reasonPriceOrFxQualityPartial: '价格或汇率质量仅为部分可用。',
     reasonZeroEquity: '权益为零，无法评分。',
+    reasonNegativeEquity: '权益为负，无法评分。',
+    reasonVarUnavailable: '风险价值不可用。',
     reasonSyntheticBasketNoCashLedger: '合成篮子没有资金流水。',
     reasonFxStale: '汇率数据过期。',
     actionTrim: '减仓',
@@ -73,10 +69,6 @@ const zh = {
 } as const;
 
 const en: Record<keyof typeof zh, string> = {
-    bandHealthy: 'Healthy',
-    bandFair: 'Fair',
-    bandCaution: 'Caution',
-    bandPoor: 'Poor',
     insightConcentrationTopName: 'Position {symbol} is {value}% of the portfolio, above the {threshold}% concentration threshold.',
     insightConcentrationName: 'Position {symbol} is {value}%, above the {threshold}% concentration threshold.',
     insightLowDiversification: 'Diversification score {value} is below the {threshold} threshold.',
@@ -95,6 +87,8 @@ const en: Record<keyof typeof zh, string> = {
     reasonSyntheticBasketNoHoldingsPnl: 'The synthetic basket has no holdings P&L.',
     reasonPriceOrFxQualityPartial: 'Price or FX quality is only partial.',
     reasonZeroEquity: 'Equity is zero, so scoring is undefined.',
+    reasonNegativeEquity: 'Equity is negative, so health scoring is undefined.',
+    reasonVarUnavailable: 'Value-at-risk is unavailable.',
     reasonSyntheticBasketNoCashLedger: 'The synthetic basket has no cash ledger.',
     reasonFxStale: 'FX data is stale.',
     actionTrim: 'Trim',
@@ -141,13 +135,18 @@ export type PortfolioInsightCodeKey = keyof typeof zh;
 
 export const SOURCE_PORTFOLIO_INSIGHT_CODES = { zh, en };
 
+export const PORTFOLIO_INSIGHT_CODES = createUiLanguageRecord(
+  'locales.portfolioInsightCodes.PORTFOLIO_INSIGHT_CODES',
+  { zh, en },
+);
+
 export function getPortfolioInsightCodes(language: UiLanguage): Record<PortfolioInsightCodeKey, string> {
-  if (language === 'zh' || language === 'en') return SOURCE_PORTFOLIO_INSIGHT_CODES[language];
-  const loaded = getServerPresentationText(language)?.portfolioInsightCodes;
-  return (loaded as Record<PortfolioInsightCodeKey, string> | undefined) ?? en;
+  return PORTFOLIO_INSIGHT_CODES[language];
 }
 
-export async function loadPortfolioInsightCodes(language: UiLanguage): Promise<Record<PortfolioInsightCodeKey, string>> {
-  if (language === 'zh' || language === 'en') return SOURCE_PORTFOLIO_INSIGHT_CODES[language];
-  return (await loadServerPresentationText(language)).portfolioInsightCodes as Record<PortfolioInsightCodeKey, string>;
+export async function loadPortfolioInsightCodes(
+  language: UiLanguage,
+): Promise<Record<PortfolioInsightCodeKey, string>> {
+  await loadUiLanguageTranslations(language);
+  return PORTFOLIO_INSIGHT_CODES[language];
 }

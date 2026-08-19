@@ -24,7 +24,6 @@ import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import { PERSONAL_PERFORMANCE_TEXT } from '../locales/personalPerformance';
-import { loadPersonalPerformanceReasonLabels } from '../locales/personalPerformanceReasons';
 import {
   formatPaperDecisionReason,
   formatPaperDecisionSide,
@@ -49,8 +48,6 @@ const PersonalPerformancePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<ParsedApiError | null>(null);
-  const [reasonCatalogGeneration, setReasonCatalogGeneration] = useState(0);
-
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.portfolioPerformance,
     headingRef: pageHeadingRef,
@@ -60,16 +57,6 @@ const PersonalPerformancePage: React.FC = () => {
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
-
-  useEffect(() => {
-    let active = true;
-    void loadPersonalPerformanceReasonLabels(language).then(() => {
-      if (active) setReasonCatalogGeneration((value) => value + 1);
-    });
-    return () => {
-      active = false;
-    };
-  }, [language]);
 
   const paperAccounts = useMemo(
     () => accounts.filter((item) => (item.accountType || 'real') === 'paper'),
@@ -189,7 +176,7 @@ const PersonalPerformancePage: React.FC = () => {
       ),
       width: 'wide',
     },
-  ], [language, reasonCatalogGeneration, text]);
+  ], [language, text]);
 
   return (
     <AppPage data-testid="personal-performance-page" className="space-y-6">

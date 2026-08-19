@@ -10,6 +10,12 @@ import { Button, EmptyState, Section, StatePanel } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import type { PortfolioHealthSummary } from '../../types/portfolioHealth';
+import {
+  formatAuthoritativeStatusMessage,
+  formatPortfolioHealthBand,
+  formatPortfolioHealthUnavailableDetail,
+  formatPortfolioInsightStatus,
+} from '../../utils/dataQualityFormat/portfolioInsights';
 
 export type HomePortfolioHealthWidgetProps = {
   refreshKey?: string | number;
@@ -18,7 +24,7 @@ export type HomePortfolioHealthWidgetProps = {
 export const HomePortfolioHealthWidget: React.FC<HomePortfolioHealthWidgetProps> = ({
   refreshKey = 0,
 }) => {
-  const { t } = useUiLanguage();
+  const { t, language } = useUiLanguage();
   const navigate = useNavigate();
   const requestIdRef = useRef(0);
   const [data, setData] = useState<PortfolioHealthSummary | null>(null);
@@ -93,7 +99,7 @@ export const HomePortfolioHealthWidget: React.FC<HomePortfolioHealthWidgetProps>
         <StatePanel
           state="blocked"
           title={t('home.dashboardLayout.widget.portfolioHealthUnavailable')}
-          description={data.statusMessage || t('home.partialDataMessage')}
+          description={formatPortfolioHealthUnavailableDetail(data, language)}
           action={(
             <Button variant="secondary" size="default" onClick={openPortfolio}>
               {t('home.dashboardLayout.widget.openPortfolio')}
@@ -122,10 +128,13 @@ export const HomePortfolioHealthWidget: React.FC<HomePortfolioHealthWidgetProps>
             </span>
             <span className="mt-1 block text-xs text-secondary-text">
               {data.band
-                ? t(`home.dashboardLayout.widget.portfolioHealthBand.${data.band}`)
+                ? formatPortfolioHealthBand(data.band, language)
                 : t('home.dashboardLayout.widget.portfolioHealthStatus', {
-                  status: data.status,
+                  status: formatPortfolioInsightStatus(data.status, language),
                 })}
+              {data.statusMessage
+                ? ` · ${formatAuthoritativeStatusMessage(data.statusMessage, language)}`
+                : null}
               {' · '}
               {data.asOf}
             </span>

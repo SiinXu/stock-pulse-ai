@@ -1,1 +1,1 @@
-- [Fixed] Stop rendering server English prose and raw enum codes as primary copy on Personal Performance, Portfolio Insights, and Alerts; map known codes through existing formatters and keep unknown codes as sanitized localized diagnostics (Refs #887).
+- [Fixed] Stop rendering server English prose and raw enum codes as primary copy on Personal Performance, Portfolio Insights, Home health, Risk Metrics, and Alerts; map known codes through T07 formatters, preserve labeled statusMessage, and keep unknown codes as sanitized localized diagnostics.

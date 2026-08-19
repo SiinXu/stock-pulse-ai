@@ -350,7 +350,7 @@ function makePortfolioHealth(options: {
   const dimension = {
     formula: 'test',
     input: {},
-    reason: null,
+    reason: null as string | null,
     score: status === 'unavailable' ? null : 80,
     status: status === 'unavailable' ? 'unavailable' : 'ok',
     statusMessage: status === 'unavailable' ? 'Metric unavailable' : 'Within threshold',
@@ -893,9 +893,25 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(await screen.findByRole('button', { name: '运行分析' }));
 
     expect(await screen.findAllByText('当前数据不足以运行该情景，未写入零风险结果。')).not.toHaveLength(0);
+    expect(screen.getByText('诊断：缺少可用价格，无法计算压力结果。')).toBeInTheDocument();
     expect(screen.queryByText('原组合市值')).not.toBeInTheDocument();
     expect(screen.queryByText('压力损益')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '假设与限制' })).toBeInTheDocument();
+  });
+
+  it('shows the localized negative-equity reason instead of the health disclaimer', async () => {
+    const unavailable = makePortfolioHealth({ accountId: 1, status: 'unavailable' });
+    Object.values(unavailable.dimensions).forEach((dimension) => {
+      dimension.reason = 'negative_equity';
+    });
+    unavailable.statusMessage = 'Portfolio equity is negative; health scoring is undefined.';
+    getPortfolioHealth.mockResolvedValue(unavailable);
+    renderPortfolioPage('/portfolio?account=1&tab=insights&view=health');
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('健康度暂不可用')).toBeInTheDocument();
+    expect(screen.getByText('权益为负，无法评分。')).toBeInTheDocument();
+    expect(screen.queryByText('Portfolio equity is negative; health scoring is undefined.')).not.toBeInTheDocument();
   });
 
   it('retries the failed portfolio health refresh operation', async () => {

@@ -1,11 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
 import type { UiLanguage } from '../i18n/uiText';
-import {
-  getServerPresentationText,
-  loadServerPresentationText,
-} from './serverPresentationCatalog';
+import { loadUiLanguageTranslations } from '../i18n/translations';
 
 const zh = {
   no_analysis_support: '这笔成交没有关联的 DecisionSignal 或分析计划。',
@@ -77,19 +75,18 @@ const en: Record<keyof typeof zh, string> = {
 
 export type PersonalPerformanceReasonText = Record<keyof typeof zh, string>;
 
-export const PERSONAL_PERFORMANCE_REASON_LABELS: Record<'zh' | 'en', PersonalPerformanceReasonText> = {
-  zh,
-  en,
-};
+export const PERSONAL_PERFORMANCE_REASON_LABELS = createUiLanguageRecord(
+  'locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS',
+  { zh, en },
+);
 
 export function getPersonalPerformanceReasonLabels(language: UiLanguage): PersonalPerformanceReasonText {
-  if (language === 'zh' || language === 'en') return PERSONAL_PERFORMANCE_REASON_LABELS[language];
-  return (getServerPresentationText(language)?.personalPerformanceReasons as PersonalPerformanceReasonText | undefined) ?? en;
+  return PERSONAL_PERFORMANCE_REASON_LABELS[language];
 }
 
 export async function loadPersonalPerformanceReasonLabels(
   language: UiLanguage,
 ): Promise<PersonalPerformanceReasonText> {
-  if (language === 'zh' || language === 'en') return PERSONAL_PERFORMANCE_REASON_LABELS[language];
-  return (await loadServerPresentationText(language)).personalPerformanceReasons as PersonalPerformanceReasonText;
+  await loadUiLanguageTranslations(language);
+  return PERSONAL_PERFORMANCE_REASON_LABELS[language];
 }

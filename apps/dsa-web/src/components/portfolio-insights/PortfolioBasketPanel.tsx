@@ -10,6 +10,7 @@ import { useContextBoundPortfolioRequest } from '../../hooks/portfolio/useContex
 import type { PortfolioInsightsText } from '../../locales/portfolioInsights';
 import type { PortfolioBasketResponse } from '../../types/portfolioInsights';
 import {
+  formatAuthoritativeStatusMessage,
   formatPortfolioBasketDirection,
   formatPortfolioBasketReason,
   formatPortfolioInsightDisclaimer,
@@ -283,7 +284,15 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
         {result ? (
           <div className="space-y-4">
             {result.status !== 'ok' ? (
-              <InlineAlert variant="warning" title={text.riskStatus} message={formatPortfolioInsightStatus(result.status, language)} />
+              <InlineAlert
+                variant="warning"
+                title={formatPortfolioInsightStatus(result.status, language)}
+                message={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : formatPortfolioInsightStatus(result.status, language)
+                }
+              />
             ) : null}
             <InlineAlert variant="info" message={formatPortfolioInsightDisclaimer('basket', language)} />
             <SummaryStrip

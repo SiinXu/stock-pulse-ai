@@ -22,8 +22,10 @@ import {
   formatPortfolioHealthBand,
   formatPortfolioHealthInsight,
   formatPortfolioDimensionDetail,
+  formatPortfolioHealthUnavailableDetail,
   formatPortfolioInsightDisclaimer,
   formatPortfolioInsightSeverity,
+  formatAuthoritativeStatusMessage,
 } from '../../utils/dataQualityFormat/portfolioInsights';
 import { formatPct } from '../../utils/portfolioFormat';
 import {
@@ -196,7 +198,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
             <StatePanel
               state="blocked"
               title={text.healthUnavailableTitle}
-              description={formatPortfolioInsightDisclaimer('health', language)}
+              description={formatPortfolioHealthUnavailableDetail(result, language)}
               titleAs="p"
             />
           ) : null}
@@ -204,7 +206,11 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
             <InlineAlert
               variant="warning"
               title={text.healthPartialTitle}
-              message={text.partialResult}
+              message={
+                result.statusMessage
+                  ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                  : text.partialResult
+              }
             />
           ) : null}
           <SummaryStrip

@@ -23,6 +23,7 @@ import {
   formatPortfolioStressQualityCell,
 } from '../../utils/dataQualityFormat/portfolio';
 import {
+  formatAuthoritativeStatusMessage,
   formatPortfolioStressExcludedReason,
   formatPortfolioStressScenario,
 } from '../../utils/dataQualityFormat/portfolioInsights';
@@ -286,11 +287,23 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               <StatePanel
                 state="blocked"
                 title={text.unavailableResult}
+                description={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : undefined
+                }
                 titleAs="p"
               />
             ) : null}
             {result.status === 'partial' ? (
-              <InlineAlert variant="warning" message={text.partialResult} />
+              <InlineAlert
+                variant="warning"
+                message={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : text.partialResult
+                }
+              />
             ) : null}
             {result.status === 'ok' || result.status === 'partial' ? (
               <>

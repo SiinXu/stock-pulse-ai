@@ -264,14 +264,16 @@ export function createUiLanguageRecord(namespace, base, overrides = {}) {
 }
 
 async function loadTranslationResources(additionalLanguages) {
+  const catalogDirectory = path.join(SOURCE_ROOT, 'i18n', 'serverPresentationCatalogs');
   const imports = [
     `import { UI_TRANSLATION_KEYS, SOURCE_UI_TRANSLATIONS } from ${JSON.stringify(ENGLISH_INVENTORY_PATH)};`,
     ...additionalLanguages.map((language, index) => (
-      `import { translations as locale${index} } from ${JSON.stringify(path.join(TRANSLATIONS_DIRECTORY, `${language}.ts`))};`
+      `import { translations as locale${index} } from ${JSON.stringify(path.join(TRANSLATIONS_DIRECTORY, `${language}.ts`))};\n`
+      + `import { SERVER_PRESENTATION_CATALOG as catalog${index} } from ${JSON.stringify(path.join(catalogDirectory, `${language}.ts`))};`
     )),
   ].join('\n');
   const translations = additionalLanguages
-    .map((language, index) => `${JSON.stringify(language)}: locale${index}`)
+    .map((language, index) => `${JSON.stringify(language)}: { ...locale${index}, ...catalog${index} }`)
     .join(', ');
   return importBundle(`${imports}\nexport { UI_TRANSLATION_KEYS, SOURCE_UI_TRANSLATIONS };\nexport const translations = { ${translations} };\n`);
 }

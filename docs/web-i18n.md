@@ -42,7 +42,7 @@ locales/reportContent.ts
 
 设置页「模型来源」连接校验同样走稳定码：`getChannelNameIssues` / `getChannelCompletenessIssues` / `getChannelSaveIssues` 返回 `{ code, field, params }`，渲染时由 `localizeModelAccessIssue()` 映射到 `MODEL_ACCESS_ISSUES`。未知码使用本地化的 `unknown` 模板并只插值经过清洗的 `{code}`，不得回退中文原文或展示后端裸枚举/散文。
 
-个人表现、组合洞察和告警界面遵循同一套按码展示的合同。已知后端枚举、状态、原因、质量和限制码通过现有 `dataQualityFormat` 与领域词表在渲染时映射。带有稳定机器身份的英文散文（`reason.code`、洞察 `code`、情景 `id`、再平衡 `action`）由客户端本地化文案替换。自由文本服务端详情会清洗、标为诊断，并只在需要排障时展示。未知码保留为带清洗 `{code}` 的本地化诊断，不得注入 HTML、不得按整句匹配，也不得静默消失。空值保持诚实（`—` / `--`）。切换语言后已加载结果立即更新。
+个人表现、组合洞察、首页组合健康、风险指标和告警界面遵循同一套按码展示的合同。已知后端枚举、状态、原因、质量和限制码通过现有 T07 `dataQualityFormat` 与 `createUiLanguageRecord` 词表在渲染时映射。额外语言词条放在既有 `i18n/serverPresentation` 包中，经 `loadUiLanguageTranslations` 加载；额外语言导入失败不得被当成完整英文回退。带有稳定机器身份的英文散文（`reason.code`、洞察 `code`、内置情景 `id`、再平衡 `action`）由客户端本地化文案替换。权威 `statusMessage` 在有已知原因码时走词表，否则标为诊断；不得丢弃，也不得用无关免责声明替换。用户自定义 YAML 情景名称只做清洗后保留，不得改写成未知码。自由文本服务端详情会清洗、标为诊断，并只在需要排障时展示。未知码保留为带清洗 `{code}` 的本地化诊断，不得注入 HTML、不得按整句匹配，也不得静默消失。空值保持诚实（`—` / `--`）。切换语言后已加载结果立即更新。
 
 Agent 会话历史遵循同一契约。失败记录由历史 API 返回安全的兼容 `content`，并通过 `error + params` 标识可本地化的失败；普通消息不携带这两个字段。Web 必须在渲染时按当前 UI language 解析错误，且消息显示、单条复制和会话导出必须复用同一份解析结果，确保切换语言后已加载的历史立即更新。服务端会将历史 `[分析失败]...` 记录适配为稳定错误码；新失败不得把 Provider 原始错误写入历史或返回给客户端。
 
