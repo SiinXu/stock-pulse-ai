@@ -67,6 +67,14 @@ class WatchlistGroupCreateRequest(_RevisionedRequest):
     name: str = Field(..., min_length=1, max_length=80)
 
 
+class WatchlistGroupRestoreRequest(_RevisionedRequest):
+    group_id: str = Field(..., min_length=1, max_length=64)
+    name: str = Field(..., min_length=1, max_length=80)
+    member_codes: List[str] = Field(default_factory=list, max_length=MAX_MEMBERS_PER_GROUP)
+    exclusive_codes: List[str] = Field(default_factory=list, max_length=MAX_MEMBERS_PER_GROUP)
+    ordered_ids: Optional[List[str]] = Field(default=None, max_length=MAX_GROUPS)
+
+
 class WatchlistGroupRenameRequest(_RevisionedRequest):
     name: str = Field(..., min_length=1, max_length=80)
 

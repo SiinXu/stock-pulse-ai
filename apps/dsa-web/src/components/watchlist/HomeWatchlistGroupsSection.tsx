@@ -109,6 +109,7 @@ export const HomeWatchlistGroupsSection: React.FC<HomeWatchlistGroupsSectionProp
         memberReorderingDisabled={effectiveScoreSort !== 'manual'}
         onCreateGroup={watchlistGroups.createGroup}
         onDeleteGroup={watchlistGroups.deleteGroup}
+        onRestoreGroup={watchlistGroups.restoreGroup}
         onReorderGroups={watchlistGroups.reorderGroups}
         onReorderMembers={watchlistGroups.reorderMembers}
         onMoveMember={watchlistGroups.moveMember}

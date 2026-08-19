@@ -3515,6 +3515,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/stocks/watchlist/groups/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore a deleted watchlist group
+         * @description Recreate a previously deleted group with the same id, name, and still-available members in one revisioned write. Members no longer placed on STOCK_LIST cannot be restored.
+         */
+        post: operations["restore_watchlist_group_api_v1_stocks_watchlist_groups_restore_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/stocks/watchlist/groups/{group_id}": {
         parameters: {
             query?: never;
@@ -19178,6 +19198,21 @@ export interface components {
             /** Ordered Ids */
             ordered_ids: string[];
         };
+        /** WatchlistGroupRestoreRequest */
+        WatchlistGroupRestoreRequest: {
+            /** Exclusive Codes */
+            exclusive_codes?: string[];
+            /** Expected Revision */
+            expected_revision: number;
+            /** Group Id */
+            group_id: string;
+            /** Member Codes */
+            member_codes?: string[];
+            /** Name */
+            name: string;
+            /** Ordered Ids */
+            ordered_ids?: string[] | null;
+        };
         /** WatchlistGroupSchema */
         WatchlistGroupSchema: {
             /**
@@ -30337,6 +30372,75 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["WatchlistGroupReorderRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WatchlistGroupsResponse"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    restore_watchlist_group_api_v1_stocks_watchlist_groups_restore_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WatchlistGroupRestoreRequest"];
             };
         };
         responses: {

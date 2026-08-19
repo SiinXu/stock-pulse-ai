@@ -21,6 +21,7 @@ from src.api.v1.errors import api_error
 from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.watchlist_groups import (
     WatchlistGroupCreateRequest,
+    WatchlistGroupRestoreRequest,
     WatchlistGroupMemberAddRequest,
     WatchlistGroupMemberMoveRequest,
     WatchlistGroupMemberReorderRequest,
@@ -139,6 +140,37 @@ def create_watchlist_group(
             "Watchlist group created",
         ),
         log_message="Watchlist group create failed",
+    )
+
+
+@router.post(
+    "/watchlist/groups/restore",
+    response_model=WatchlistGroupsResponse,
+    responses=_ERROR_RESPONSES,
+    summary="Restore a deleted watchlist group",
+    description=(
+        "Recreate a previously deleted group with the same id, name, and still-available "
+        "members in one revisioned write. Members no longer placed on STOCK_LIST cannot "
+        "be restored."
+    ),
+)
+def restore_watchlist_group(
+    request: WatchlistGroupRestoreRequest,
+    group_service: WatchlistGroupService = Depends(get_watchlist_group_service),
+) -> WatchlistGroupsResponse:
+    return _execute(
+        lambda: _response(
+            group_service.restore_group(
+                group_id=request.group_id,
+                name=request.name,
+                member_codes=request.member_codes,
+                exclusive_codes=request.exclusive_codes,
+                ordered_ids=request.ordered_ids,
+                expected_revision=request.expected_revision,
+            ),
+            "Watchlist group restored",
+        ),
+        log_message="Watchlist group restore failed",
     )
 
 

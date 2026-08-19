@@ -1,0 +1,1 @@
+- [Changed] Watchlist group deletion now requires a danger confirmation and can be undone through a revisioned restore of the same group (Refs #879).

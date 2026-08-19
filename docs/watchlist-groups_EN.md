@@ -21,6 +21,8 @@ The default bounds are 50 groups, 500 members per group, and 2,000 total members
 
 Desktop drag starts only from a visible handle; the same handle supports Arrow Up and Arrow Down. Mobile DOM is not draggable and exposes explicit move-up, move-down, and Move-to-group actions. Menus support Escape, outside click, focus return, and screen-reader live announcements. The Web client clears a new-group draft or announces reorder/move success only after the server confirms the mutation; failures retain the draft, expose the error, and never announce false success.
 
+Deleting a custom group requires a danger ConfirmDialog. Exclusive members move to Default; shared members stay in their other groups. After a successful delete, the Web toast offers Undo only because `POST /watchlist/groups/restore` can recreate the same group id, name, remaining members, and order in one revisioned write. The restore body includes `exclusive_codes` so members that were only in the deleted group move back out of Default, while shared members are copied without leaving their other groups. Undo is omitted when that restore path is unavailable, and a failed restore never claims the group came back. The default group cannot be deleted.
+
 ## Upgrade, backup, and recovery
 
 Upgrade creates `watchlist_groups`, `watchlist_group_members`, and `watchlist_group_state`. The first read creates Default and imports the existing `STOCK_LIST`; no manual migration is required. Back up the application database and the `.env` or system configuration containing `STOCK_LIST` before upgrading.

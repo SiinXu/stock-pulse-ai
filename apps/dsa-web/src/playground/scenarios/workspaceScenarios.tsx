@@ -1,6 +1,6 @@
 /* eslint-disable react-refresh/only-export-components -- Scenario modules intentionally export renderer registries. */
 import { lazy, Suspense, useState } from 'react';
-import { Button } from '../../components/common';
+import { Button, ToastProvider } from '../../components/common';
 import { StockAutocomplete } from '../../components/StockAutocomplete/StockAutocomplete';
 import { SuggestionsList } from '../../components/StockAutocomplete/SuggestionsList';
 import { HomeAlertsWidget } from '../../components/dashboard/HomeAlertsWidget';
@@ -124,6 +124,7 @@ const WATCHLIST_GROUP_FIXTURES: WatchlistGroup[] = [
 const WatchlistGroupsPanelStory = () => {
   const [groups, setGroups] = useState(WATCHLIST_GROUP_FIXTURES);
   return (
+    <ToastProvider>
     <div className="max-w-3xl rounded-xl border border-border bg-card p-4">
       <WatchlistGroupsPanel
         groups={groups}
@@ -147,6 +148,30 @@ const WatchlistGroupsPanelStory = () => {
           setGroups((current) => current.filter((group) => group.id !== groupId));
           return true;
         }}
+        onRestoreGroup={async (snapshot) => {
+          setGroups((current) => {
+            if (current.some((group) => group.id === snapshot.groupId)) return current;
+            const restored = {
+              id: snapshot.groupId,
+              name: snapshot.name,
+              sortOrder: current.length,
+              isDefault: false,
+              createdAt: '2026-08-09T00:00:00+00:00',
+              updatedAt: '2026-08-09T00:00:00+00:00',
+              members: snapshot.memberCodes.map((stockCode, sortOrder) => ({
+                stockCode,
+                sortOrder,
+                attrs: { schemaVersion: 1 as const },
+              })),
+            };
+            const byId = new Map(current.map((group) => [group.id, group]));
+            byId.set(restored.id, restored);
+            return snapshot.orderedGroupIds
+              .map((id) => byId.get(id))
+              .filter((group): group is NonNullable<typeof group> => Boolean(group));
+          });
+          return true;
+        }}
         onReorderGroups={async (orderedIds) => {
           setGroups((current) => orderedIds.map((id) => current.find((group) => group.id === id)!).filter(Boolean));
           return true;
@@ -156,6 +181,7 @@ const WatchlistGroupsPanelStory = () => {
         onRemoveFromWatchlist={async () => true}
       />
     </div>
+    </ToastProvider>
   );
 };
 

@@ -3,8 +3,8 @@
 import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp, FolderPlus, GripVertical, MoreHorizontal, Trash2 } from 'lucide-react';
-import { IconButton, Input, InlineAlert } from '../common';
-import type { HomeWatchlistRow, WatchlistGroup } from '../../types/watchlist';
+import { IconButton, InlineAlert, Input } from '../common';
+import type { HomeWatchlistRow, WatchlistGroup, WatchlistGroupRestoreSnapshot } from '../../types/watchlist';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { truncateStockName } from '../../utils/stockName';
 import type { WatchlistScoreItem } from '../../types/watchlistScore';
@@ -14,6 +14,7 @@ import {
 } from '../../hooks/useWatchlistScores';
 
 const WatchlistScoreColumn = lazy(() => import('./WatchlistScoreColumn'));
+const WatchlistGroupDeleteFlow = lazy(() => import('./WatchlistGroupDeleteFlow'));
 
 export interface WatchlistGroupsPanelProps {
   groups: WatchlistGroup[];
@@ -26,6 +27,7 @@ export interface WatchlistGroupsPanelProps {
   memberReorderingDisabled?: boolean;
   onCreateGroup: (name: string) => Promise<boolean> | boolean;
   onDeleteGroup: (groupId: string) => Promise<boolean> | boolean;
+  onRestoreGroup?: (snapshot: WatchlistGroupRestoreSnapshot) => Promise<boolean> | boolean;
   onReorderGroups: (orderedIds: string[]) => Promise<boolean> | boolean;
   onReorderMembers: (groupId: string, orderedCodes: string[]) => Promise<boolean> | boolean;
   onMoveMember: (params: {
@@ -71,6 +73,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
   memberReorderingDisabled = false,
   onCreateGroup,
   onDeleteGroup,
+  onRestoreGroup,
   onReorderGroups,
   onReorderMembers,
   onMoveMember,
@@ -81,6 +84,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [draggingOver, setDraggingOver] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState('');
+  const [pendingDelete, setPendingDelete] = useState<WatchlistGroup | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const triggerRefs = useRef(new Map<string, HTMLButtonElement>());
 
@@ -152,6 +156,11 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
     if (!name || actioning) return;
     const succeeded = await onCreateGroup(name);
     if (succeeded) setDraftName('');
+  };
+
+  const handleRequestDelete = (group: WatchlistGroup) => {
+    if (group.isDefault || actioning) return;
+    setPendingDelete(group);
   };
 
   const handleGroupDrop = async (targetGroupId: string, event: React.DragEvent) => {
@@ -277,7 +286,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
                     </IconButton>
                   </div>
                   {!group.isDefault ? (
-                    <IconButton type="button" size="default" variant="danger" disabled={actioning} aria-label={t('watchlist.deleteGroupAria', { name: displayName })} onClick={() => void onDeleteGroup(group.id)}>
+                    <IconButton type="button" size="default" variant="danger" disabled={actioning} aria-label={t('watchlist.deleteGroupAria', { name: displayName })} onClick={() => handleRequestDelete(group)}>
                       <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
                     </IconButton>
                   ) : null}
@@ -400,6 +409,20 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
       )}
 
       <p className="text-xs text-muted-text sm:hidden">{t('watchlist.mobileMoveHint')}</p>
+      {pendingDelete ? (
+        <Suspense fallback={null}>
+          <WatchlistGroupDeleteFlow
+            group={pendingDelete}
+            groups={groups}
+            actioning={actioning}
+            onDeleteGroup={onDeleteGroup}
+            onRestoreGroup={onRestoreGroup}
+            onClose={() => setPendingDelete(null)}
+            onAnnounce={setAnnouncement}
+            groupName={groupName}
+          />
+        </Suspense>
+      ) : null}
     </div>
   );
 };

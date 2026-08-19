@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
+import { ToastProvider } from '../../common';
 import { WatchlistGroupsPanel } from '../WatchlistGroupsPanel';
 import type { WatchlistGroup } from '../../../types/watchlist';
 
@@ -30,6 +31,18 @@ const groups: WatchlistGroup[] = [
     updatedAt: '2026-08-09T00:00:00+00:00',
     members: [],
   },
+  {
+    id: 'value',
+    name: 'Value',
+    nameKey: null,
+    sortOrder: 2,
+    isDefault: false,
+    createdAt: '2026-08-09T00:00:00+00:00',
+    updatedAt: '2026-08-09T00:00:00+00:00',
+    members: [
+      { stockCode: '300750', sortOrder: 0, attrs: { schemaVersion: 1 } },
+    ],
+  },
 ];
 
 function renderPanel(overrides: Partial<React.ComponentProps<typeof WatchlistGroupsPanel>> = {}) {
@@ -38,16 +51,22 @@ function renderPanel(overrides: Partial<React.ComponentProps<typeof WatchlistGro
     watchlistRows: [
       { code: '600519', analyzedToday: false },
       { code: 'AAPL', analyzedToday: true },
+      { code: '300750', analyzedToday: false },
     ],
     onCreateGroup: vi.fn(async () => true),
     onDeleteGroup: vi.fn(async () => true),
+    onRestoreGroup: vi.fn(async () => true),
     onReorderGroups: vi.fn(async () => true),
     onReorderMembers: vi.fn(async () => true),
     onMoveMember: vi.fn(async () => true),
     onRemoveFromWatchlist: vi.fn(async () => true),
     ...overrides,
   };
-  render(<WatchlistGroupsPanel {...props} />);
+  render(
+    <ToastProvider>
+      <WatchlistGroupsPanel {...props} />
+    </ToastProvider>,
+  );
   return props;
 }
 
@@ -69,7 +88,7 @@ describe('WatchlistGroupsPanel', () => {
     renderPanel({ onReorderGroups, onMoveMember });
 
     fireEvent.click(screen.getByRole('button', { name: '下移分组 默认分组' }));
-    expect(onReorderGroups).toHaveBeenCalledWith(['growth', 'default']);
+    expect(onReorderGroups).toHaveBeenCalledWith(['growth', 'default', 'value']);
     fireEvent.click(screen.getByRole('button', { name: '600519 的分组操作' }));
     fireEvent.click(screen.getByRole('menuitem', { name: 'Growth' }));
     expect(onMoveMember).toHaveBeenCalledWith({
@@ -127,5 +146,69 @@ describe('WatchlistGroupsPanel', () => {
     await waitFor(() => expect(onMoveMember).toHaveBeenCalled());
 
     expect(screen.getByTestId('watchlist-groups-announcement')).toBeEmptyDOMElement();
+  });
+
+  it('cancels group deletion without calling the delete handler', async () => {
+    const onDeleteGroup = vi.fn(async () => true);
+    renderPanel({ onDeleteGroup });
+
+    fireEvent.click(screen.getByRole('button', { name: '删除分组 Growth' }));
+    expect(await screen.findByRole('dialog', { name: '删除分组' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+
+    expect(onDeleteGroup).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: '删除分组' })).not.toBeInTheDocument();
+  });
+
+  it('deletes only after confirm and restores through the undo toast', async () => {
+    const onDeleteGroup = vi.fn(async () => true);
+    const onRestoreGroup = vi.fn(async () => true);
+    renderPanel({ onDeleteGroup, onRestoreGroup });
+
+    fireEvent.click(screen.getByRole('button', { name: '删除分组 Growth' }));
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }));
+
+    await waitFor(() => expect(onDeleteGroup).toHaveBeenCalledWith('growth'));
+    expect(await screen.findByRole('status')).toHaveTextContent('已删除 Growth。');
+    fireEvent.click(screen.getByRole('button', { name: '撤销' }));
+
+    await waitFor(() => expect(onRestoreGroup).toHaveBeenCalledWith({
+      groupId: 'growth',
+      name: 'Growth',
+      memberCodes: [],
+      exclusiveMemberCodes: [],
+      orderedGroupIds: ['default', 'growth', 'value'],
+    }));
+    expect(screen.getByTestId('watchlist-groups-announcement')).toHaveTextContent('已恢复分组 Growth');
+  });
+
+  it('asks restore to move members that existed only in the deleted group', async () => {
+    const onRestoreGroup = vi.fn(async () => true);
+    renderPanel({ onRestoreGroup });
+
+    fireEvent.click(screen.getByRole('button', { name: '删除分组 Value' }));
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }));
+    fireEvent.click(await screen.findByRole('button', { name: '撤销' }));
+
+    await waitFor(() => expect(onRestoreGroup).toHaveBeenCalledWith({
+      groupId: 'value',
+      name: 'Value',
+      memberCodes: ['300750'],
+      exclusiveMemberCodes: ['300750'],
+      orderedGroupIds: ['default', 'growth', 'value'],
+    }));
+  });
+
+  it('does not fake a successful undo when restore fails', async () => {
+    const onRestoreGroup = vi.fn(async () => false);
+    renderPanel({ onRestoreGroup });
+
+    fireEvent.click(screen.getByRole('button', { name: '删除分组 Growth' }));
+    fireEvent.click(await screen.findByRole('button', { name: '删除' }));
+    fireEvent.click(await screen.findByRole('button', { name: '撤销' }));
+
+    await waitFor(() => expect(onRestoreGroup).toHaveBeenCalled());
+    expect(screen.getByRole('alert')).toHaveTextContent('无法恢复该分组。请手动重建。');
+    expect(screen.getByTestId('watchlist-groups-announcement')).toHaveTextContent('已删除 Growth。');
   });
 });

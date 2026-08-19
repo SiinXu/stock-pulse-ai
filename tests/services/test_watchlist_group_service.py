@@ -185,6 +185,110 @@ def test_reconciliation_rejects_an_unbounded_authoritative_watchlist(tmp_path: P
     assert exc.value.error_code == "watchlist_group_member_limit_reached"
 
 
+def test_restore_group_returns_same_id_and_exclusive_members(tmp_path: Path) -> None:
+    service = WatchlistGroupService(db_manager=_db(tmp_path, "watchlist-restore.db"))
+    initial = service.list_state(stock_list_codes=["600519", "AAPL", "300750"])
+    created = service.create_group(name="Growth", expected_revision=initial.revision)
+    growth = next(group for group in created.groups if group.name == "Growth")
+    copied = service.add_member(
+        group_id=growth.id, stock_code="AAPL", expected_revision=created.revision
+    )
+    moved = service.move_member(
+        stock_code="600519",
+        source_group_id="default",
+        target_group_id=growth.id,
+        copy=False,
+        expected_revision=copied.revision,
+    )
+    ordered_ids = [group.id for group in moved.groups]
+    deleted = service.delete_group(group_id=growth.id, expected_revision=moved.revision)
+    default_after_delete = next(group for group in deleted.groups if group.is_default)
+    assert [member.stock_code for member in default_after_delete.members] == [
+        "AAPL",
+        "300750",
+        "600519",
+    ]
+    assert all(group.id != growth.id for group in deleted.groups)
+
+    restored = service.restore_group(
+        group_id=growth.id,
+        name="Growth",
+        member_codes=["600519", "AAPL"],
+        exclusive_codes=["600519"],
+        ordered_ids=ordered_ids,
+        expected_revision=deleted.revision,
+    )
+    by_id = {group.id: group for group in restored.groups}
+    assert [group.id for group in restored.groups] == ordered_ids
+    assert [member.stock_code for member in by_id[growth.id].members] == ["600519", "AAPL"]
+    assert [member.stock_code for member in by_id["default"].members] == ["AAPL", "300750"]
+
+
+def test_restore_group_fails_closed_when_a_member_left_the_watchlist(tmp_path: Path) -> None:
+    service = WatchlistGroupService(db_manager=_db(tmp_path, "watchlist-restore-gone.db"))
+    initial = service.list_state(stock_list_codes=["600519", "AAPL"])
+    created = service.create_group(name="Core", expected_revision=initial.revision)
+    core = next(group for group in created.groups if group.name == "Core")
+    placed = service.move_member(
+        stock_code="600519",
+        source_group_id="default",
+        target_group_id=core.id,
+        copy=False,
+        expected_revision=created.revision,
+    )
+    deleted = service.delete_group(group_id=core.id, expected_revision=placed.revision)
+    service.list_state(stock_list_codes=["AAPL"])
+    newest = service.list_state(stock_list_codes=["AAPL"])
+    with pytest.raises(WatchlistGroupServiceError) as exc:
+        service.restore_group(
+            group_id=core.id,
+            name="Core",
+            member_codes=["600519"],
+            exclusive_codes=["600519"],
+            ordered_ids=None,
+            expected_revision=newest.revision,
+        )
+    assert exc.value.error_code == "watchlist_group_restore_unavailable"
+    remaining = service.list_state(stock_list_codes=["AAPL"])
+    assert all(group.id != core.id for group in remaining.groups)
+
+
+def test_restore_group_rejects_stale_revision_and_existing_id(tmp_path: Path) -> None:
+    service = WatchlistGroupService(db_manager=_db(tmp_path, "watchlist-restore-race.db"))
+    initial = service.list_state(stock_list_codes=["600519"])
+    created = service.create_group(name="Core", expected_revision=initial.revision)
+    core = next(group for group in created.groups if group.name == "Core")
+    deleted = service.delete_group(group_id=core.id, expected_revision=created.revision)
+    newer = service.create_group(name="Other", expected_revision=deleted.revision)
+    with pytest.raises(WatchlistGroupConflictError):
+        service.restore_group(
+            group_id=core.id,
+            name="Core",
+            member_codes=[],
+            exclusive_codes=[],
+            ordered_ids=None,
+            expected_revision=deleted.revision,
+        )
+    restored = service.restore_group(
+        group_id=core.id,
+        name="Core",
+        member_codes=[],
+        exclusive_codes=[],
+        ordered_ids=None,
+        expected_revision=newer.revision,
+    )
+    with pytest.raises(WatchlistGroupServiceError) as exists:
+        service.restore_group(
+            group_id=core.id,
+            name="Core",
+            member_codes=[],
+            exclusive_codes=[],
+            ordered_ids=None,
+            expected_revision=restored.revision,
+        )
+    assert exists.value.error_code == "watchlist_group_already_exists"
+
+
 def test_cannot_delete_default_group(tmp_path: Path) -> None:
     service = WatchlistGroupService(db_manager=_db(tmp_path, "watchlist-default.db"))
     state = service.list_state(stock_list_codes=["600519"])

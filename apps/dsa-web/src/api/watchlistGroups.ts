@@ -3,7 +3,7 @@
 import { z } from 'zod';
 import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
-import type { WatchlistGroupState } from '../types/watchlist';
+import type { WatchlistGroupRestoreSnapshot, WatchlistGroupState } from '../types/watchlist';
 
 import type { components } from '../types/api.generated';
 type OpenApiGroupsResponse = components['schemas']['WatchlistGroupsResponse'];
@@ -86,6 +86,24 @@ export const watchlistGroupsApi = {
     const response = await apiClient.delete<Record<string, unknown>>(
       `/api/v1/stocks/watchlist/groups/${encodeURIComponent(groupId)}`,
       { params: { expected_revision: expectedRevision } },
+    );
+    return parseState(response.data);
+  },
+
+  restore: async (
+    snapshot: WatchlistGroupRestoreSnapshot,
+    expectedRevision: number,
+  ): Promise<WatchlistGroupState> => {
+    const response = await apiClient.post<Record<string, unknown>>(
+      '/api/v1/stocks/watchlist/groups/restore',
+      {
+        group_id: snapshot.groupId,
+        name: snapshot.name,
+        member_codes: snapshot.memberCodes,
+        exclusive_codes: snapshot.exclusiveMemberCodes,
+        ordered_ids: snapshot.orderedGroupIds,
+        expected_revision: expectedRevision,
+      },
     );
     return parseState(response.data);
   },

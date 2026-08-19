@@ -4,9 +4,10 @@ import { useWatchlistGroups } from '../useWatchlistGroups';
 import { createDeferred } from '../../test-utils';
 import type { WatchlistGroupState } from '../../types/watchlist';
 
-const { mockList, mockCreate } = vi.hoisted(() => ({
+const { mockList, mockCreate, mockRestore } = vi.hoisted(() => ({
   mockList: vi.fn(),
   mockCreate: vi.fn(),
+  mockRestore: vi.fn(),
 }));
 
 vi.mock('../../api/watchlistGroups', () => ({
@@ -14,6 +15,7 @@ vi.mock('../../api/watchlistGroups', () => ({
     list: mockList,
     create: mockCreate,
     remove: vi.fn(),
+    restore: mockRestore,
     reorderGroups: vi.fn(),
     reorderMembers: vi.fn(),
     moveMember: vi.fn(),
@@ -81,5 +83,32 @@ describe('useWatchlistGroups', () => {
     expect(succeeded).toBe(false);
     expect(result.current.errorMessage).toBeTruthy();
     expect(mockList).toHaveBeenCalledTimes(2);
+  });
+
+  it('restores a deleted group through the revisioned restore API', async () => {
+    mockRestore.mockResolvedValue(state(3));
+    const { result } = renderHook(() => useWatchlistGroups());
+    await waitFor(() => expect(result.current.revision).toBe(1));
+
+    let succeeded!: boolean;
+    await act(async () => {
+      succeeded = await result.current.restoreGroup({
+        groupId: 'growth',
+        name: 'Growth',
+        memberCodes: ['600519'],
+        exclusiveMemberCodes: ['600519'],
+        orderedGroupIds: ['default', 'growth'],
+      });
+    });
+
+    expect(succeeded).toBe(true);
+    expect(mockRestore).toHaveBeenCalledWith({
+      groupId: 'growth',
+      name: 'Growth',
+      memberCodes: ['600519'],
+      exclusiveMemberCodes: ['600519'],
+      orderedGroupIds: ['default', 'growth'],
+    }, 1);
+    expect(result.current.revision).toBe(3);
   });
 });

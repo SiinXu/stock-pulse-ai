@@ -82,6 +82,7 @@ describe('HomeWatchlistGroupsSection', () => {
       refresh: refreshGroups,
       createGroup: vi.fn(),
       deleteGroup: vi.fn(),
+      restoreGroup: vi.fn(),
       reorderGroups: vi.fn(),
       reorderMembers: vi.fn(),
       moveMember: vi.fn(),
