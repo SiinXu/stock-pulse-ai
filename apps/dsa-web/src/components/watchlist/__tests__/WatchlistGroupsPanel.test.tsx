@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../common';
 import { WatchlistGroupsPanel } from '../WatchlistGroupsPanel';
 import type { WatchlistGroup } from '../../../types/watchlist';
+import type { WatchlistScoreItem } from '../../../types/watchlistScore';
 
 const groups: WatchlistGroup[] = [
   {
@@ -221,5 +222,38 @@ describe('WatchlistGroupsPanel', () => {
     expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
     expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
     expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();
+  });
+
+  it('shows loading score status while retrying without last-known scores', async () => {
+    renderPanel({ scoreStatus: 'retrying' });
+
+    expect(screen.getByTestId('watchlist-member-default-600519')).toBeInTheDocument();
+    expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();
+  });
+
+  it('keeps last-known scores visible as stale while retrying', async () => {
+    const lastKnown: WatchlistScoreItem = {
+      stockCode: '600519',
+      status: 'scored',
+      score: 72,
+      asOf: '2026-08-08T09:00:00+00:00',
+      ageDays: 1,
+      analysisId: 5,
+      operationAdvice: 'Buy',
+      freshness: 'recent',
+      degradedReasons: [],
+      factors: [],
+    };
+    renderPanel({
+      scoreStatus: 'retrying',
+      scoreStale: true,
+      scoreItemsByCode: new Map([['600519', lastKnown]]),
+    });
+
+    expect(await screen.findByTestId('watchlist-score-column')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-score-stale')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-score-value')).toHaveTextContent('72');
   });
 });

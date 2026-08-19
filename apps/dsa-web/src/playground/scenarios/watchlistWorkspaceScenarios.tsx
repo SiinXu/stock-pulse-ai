@@ -5,7 +5,10 @@ import {
   type HomeWatchlistRow,
   type HomeWorkspaceTab,
 } from '../../components/watchlist/HomeStockWorkspace';
-import { WatchlistScoreColumn } from '../../components/watchlist/WatchlistScoreColumn';
+import {
+  WatchlistScoreColumn,
+  WatchlistScoreStatusCell,
+} from '../../components/watchlist/WatchlistScoreColumn';
 import type { WatchlistScoreItem } from '../../types/watchlistScore';
 import { HOME_WORKSPACE_VALUES } from '../../routing/routes';
 import { fixtureStockBarItems, fixtureTasks } from '../fixtures';
@@ -118,6 +121,29 @@ const unanalyzedFixture: WatchlistScoreItem = {
   degradedReasons: [],
 };
 
+const WatchlistScoreStatusCellStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  if (scenario === 'error') {
+    return (
+      <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreStatusCell status="error" />
+      </div>
+    );
+  }
+  if (scenario === 'loading') {
+    return (
+      <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+        <WatchlistScoreStatusCell status="loading" />
+      </div>
+    );
+  }
+  return (
+    <div className="max-w-sm rounded-lg border border-border bg-card p-4">
+      <WatchlistScoreStatusCell item={scoredFixture} status="ready" />
+    </div>
+  );
+};
+
 const WatchlistScoreColumnStory = () => {
   const { scenario } = usePlaygroundScenario();
   if (scenario === 'empty') {
@@ -145,4 +171,5 @@ const WatchlistScoreColumnStory = () => {
 export const WATCHLIST_WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-stock-workspace': HomeStockWorkspaceStory,
   'watchlist-score-column': WatchlistScoreColumnStory,
+  'watchlist-score-status-cell': WatchlistScoreStatusCellStory,
 };

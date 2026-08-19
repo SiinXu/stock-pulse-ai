@@ -8,6 +8,7 @@ import { HomeDashboardLayout } from '../../components/dashboard/HomeDashboardLay
 import { HomePortfolioHealthWidget } from '../../components/dashboard/HomePortfolioHealthWidget';
 import { HomeRecentReportsWidget } from '../../components/dashboard/HomeRecentReportsWidget';
 import { HomeReadinessCard } from '../../components/home/HomeReadinessCard';
+import { HomeSignalSummary } from '../../components/home/HomeSignalSummary';
 import { AgentOnboardingWizard } from '../../components/onboarding/AgentOnboardingWizard';
 import { HomeOnboardingSection } from '../../components/onboarding/HomeOnboardingSection';
 import { OnboardingTodayPlanCard } from '../../components/onboarding/OnboardingTodayPlanCard';
@@ -340,6 +341,37 @@ const HomeReadinessCardStory = () => {
   );
 };
 
+const HomeSignalSummaryStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const isLoading = scenario === 'loading';
+  const isError = scenario === 'error';
+  const hasSnapshot = !isLoading && !isError;
+  return (
+    <div className="max-w-xl">
+      <HomeSignalSummary
+        isLoading={isLoading}
+        availability={{
+          activeSignals: hasSnapshot,
+          reassessments: hasSnapshot,
+          alerts: hasSnapshot,
+        }}
+        data={{
+          activeSignalTotal: hasSnapshot ? 4 : null,
+          triggeredAlertTotal: hasSnapshot ? 2 : null,
+          dueReassessmentTotal: hasSnapshot ? 1 : null,
+        }}
+        stale={{
+          activeSignals: false,
+          reassessments: false,
+          alerts: false,
+        }}
+        onRetry={() => undefined}
+        onViewAll={() => undefined}
+      />
+    </div>
+  );
+};
+
 const TodaysFocusPanelStory = () => {
   return (
     <Suspense fallback={null}>
@@ -454,6 +486,7 @@ export const WORKSPACE_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'home-portfolio-health-widget': HomePortfolioHealthWidgetStory,
   'home-recent-reports-widget': HomeRecentReportsWidgetStory,
   'home-readiness-card': HomeReadinessCardStory,
+  'home-signal-summary': HomeSignalSummaryStory,
   'todays-focus-panel': TodaysFocusPanelStory,
   'home-onboarding-section': HomeOnboardingSectionStory,
   'onboarding-today-plan-card': OnboardingTodayPlanCardStory,

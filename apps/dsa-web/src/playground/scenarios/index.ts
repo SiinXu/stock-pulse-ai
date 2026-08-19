@@ -88,7 +88,10 @@ const LAZY_FIELD_TRUST_PANEL_SCENARIOS: Record<string, PlaygroundScenarioRendere
   )),
 };
 
-type WatchlistWorkspaceScenarioId = 'home-stock-workspace' | 'watchlist-score-column';
+type WatchlistWorkspaceScenarioId =
+  | 'home-stock-workspace'
+  | 'watchlist-score-column'
+  | 'watchlist-score-status-cell';
 
 // Lazy-load watchlist workspace stories so score-column product wiring does not
 // inflate the PlaygroundRenderPage entry chunk (same pattern as charts/valuation).
@@ -98,6 +101,9 @@ const LAZY_WATCHLIST_WORKSPACE_SCENARIOS: Record<WatchlistWorkspaceScenarioId, P
   )),
   'watchlist-score-column': createLazyScenario(async () => (
     (await import('./watchlistWorkspaceScenarios')).WATCHLIST_WORKSPACE_SCENARIOS['watchlist-score-column']
+  )),
+  'watchlist-score-status-cell': createLazyScenario(async () => (
+    (await import('./watchlistWorkspaceScenarios')).WATCHLIST_WORKSPACE_SCENARIOS['watchlist-score-status-cell']
   )),
 };
 

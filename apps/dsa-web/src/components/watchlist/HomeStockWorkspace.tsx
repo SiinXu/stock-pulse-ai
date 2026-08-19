@@ -569,6 +569,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                   actioning={watchlistGroupsActioning || watchlistActioning}
                   errorMessage={watchlistGroupsError}
                   scoreStatus={scoreState.status}
+                  scoreStale={scoreState.stale}
                   scoreItemsByCode={scoreState.itemsByCode}
                   onCreateGroup={onCreateWatchlistGroup}
                   onDeleteGroup={onDeleteWatchlistGroup}
