@@ -17,6 +17,7 @@ from scripts.check_config_doc_consistency import (
     INVENTORY_END,
     INVENTORY_START,
     collect_report,
+    format_human_report,
     main,
     parse_env_example,
     parse_fail_on,
@@ -50,6 +51,107 @@ def test_repository_docs_aligned_under_default_fail_on() -> None:
 
     assert main(["--fail-on", "default"]) == 0
     assert main(["--fail-on", "registry"]) == 0
+    assert main(["--fail-on", "all"]) == 0
+
+
+def _aligned_tree(
+    tmp_path: Path,
+    *,
+    env_text: str,
+    registry_keys: set[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    env = tmp_path / ".env.example"
+    env.write_text(env_text, encoding="utf-8")
+    doc_cn = tmp_path / "docs" / "environment-variables.md"
+    doc_en = tmp_path / "docs" / "environment-variables_EN.md"
+    _write_skeleton(doc_cn)
+    _write_skeleton(doc_en)
+    write_inventory_docs(
+        root=tmp_path,
+        env_path=env,
+        doc_cn_path=doc_cn,
+        doc_en_path=doc_en,
+        registry_keys=registry_keys,
+    )
+    monkeypatch.setattr(
+        "scripts.check_config_doc_consistency.load_registry_keys",
+        lambda _root: set(registry_keys),
+    )
+
+
+def test_fail_on_registry_rejects_documented_unregistered_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A documented .env.example key missing from the registry fail-closes."""
+
+    registry = {"STOCK_LIST", "DSA_WEB_DEV_API_PROXY"}
+    _aligned_tree(
+        tmp_path,
+        env_text=(
+            "STOCK_LIST=a\n"
+            "# Hidden from Web Settings, still requires registry metadata\n"
+            "DSA_WEB_DEV_API_PROXY=http://127.0.0.1:8000\n"
+            "# FUTURE_UNREGISTERED_KEY=false\n"
+        ),
+        registry_keys=registry,
+        monkeypatch=monkeypatch,
+    )
+
+    report = collect_report(
+        root=tmp_path,
+        env_path=tmp_path / ".env.example",
+        doc_cn_path=tmp_path / "docs" / "environment-variables.md",
+        doc_en_path=tmp_path / "docs" / "environment-variables_EN.md",
+        registry_keys=registry,
+    )
+
+    assert report.missing_from_registry == ["FUTURE_UNREGISTERED_KEY"]
+    assert "DSA_WEB_DEV_API_PROXY" not in report.missing_from_registry
+    assert not report.has_findings(DEFAULT_FAIL_ON)
+    assert report.has_findings({FAIL_CLASS_REGISTRY})
+    human = format_human_report(report)
+    assert "## missing_from_registry (1)" in human
+    assert "`FUTURE_UNREGISTERED_KEY`" in human
+    assert any("not in the configuration registry" in note for note in report.notes)
+    assert main(["--root", str(tmp_path), "--fail-on", "default"]) == 0
+    assert main(["--root", str(tmp_path), "--fail-on", "registry"]) == 1
+    assert main(["--root", str(tmp_path), "--fail-on", "all"]) == 1
+
+
+def test_fail_on_registry_passes_clean_zero_gap(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A fully registered documented set stays green under registry/all."""
+
+    registry = {"STOCK_LIST", "DSA_WEB_DEV_API_PROXY"}
+    _aligned_tree(
+        tmp_path,
+        env_text=(
+            "STOCK_LIST=a\n"
+            "DSA_WEB_DEV_API_PROXY=http://127.0.0.1:8000\n"
+        ),
+        registry_keys=registry,
+        monkeypatch=monkeypatch,
+    )
+
+    report = collect_report(
+        root=tmp_path,
+        env_path=tmp_path / ".env.example",
+        doc_cn_path=tmp_path / "docs" / "environment-variables.md",
+        doc_en_path=tmp_path / "docs" / "environment-variables_EN.md",
+        registry_keys=registry,
+    )
+
+    assert report.missing_from_registry == []
+    assert report.missing_from_docs == []
+    assert report.missing_from_env == []
+    assert not report.has_findings({FAIL_CLASS_REGISTRY})
+    assert not report.has_findings(DEFAULT_FAIL_ON)
+    assert main(["--root", str(tmp_path), "--fail-on", "registry"]) == 0
+    assert main(["--root", str(tmp_path), "--fail-on", "all"]) == 0
 
 
 def test_parse_env_example_captures_commented_keys(tmp_path: Path) -> None:
