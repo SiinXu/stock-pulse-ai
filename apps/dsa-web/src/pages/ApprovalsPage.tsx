@@ -211,6 +211,16 @@ const ApprovalsPage: React.FC = () => {
     setDecisionError(null);
   }, []);
 
+  const closeStaleDecisionConfirm = useCallback(async (refreshFromServer: boolean) => {
+    closeDecisionConfirm();
+    if (refreshFromServer) {
+      await pollProposals();
+    }
+    if (mountedRef.current) {
+      setNotice(text.conflictRefresh);
+    }
+  }, [closeDecisionConfirm, pollProposals, text.conflictRefresh]);
+
   useEffect(() => {
     if (!pendingDecision || decidingId) return;
     if (actionsBlocked) {
@@ -222,19 +232,22 @@ const ApprovalsPage: React.FC = () => {
       closeDecisionConfirm();
       return;
     }
-    const stillPending = current?.status === 'pending'
-      && Math.max(0, Math.ceil((new Date(current.expiresAt).getTime() - now) / 1000)) > 0;
+    const remainingSeconds = current
+      ? Math.max(0, Math.ceil((new Date(current.expiresAt).getTime() - now) / 1000))
+      : 0;
+    const stillPending = current?.status === 'pending' && remainingSeconds > 0;
     if (stillPending) return;
-    closeDecisionConfirm();
-    setNotice(text.conflictRefresh);
+    // Local countdown expiry still has status=pending until a list fetch; poll first
+    // so conflictRefresh matches the 409/stale-poll contract.
+    void closeStaleDecisionConfirm(current?.status === 'pending');
   }, [
     actionsBlocked,
     closeDecisionConfirm,
+    closeStaleDecisionConfirm,
     decidingId,
     now,
     pendingDecision,
     proposals,
-    text.conflictRefresh,
   ]);
 
   const toggleRiskSource = (source: ApprovalRiskSource, checked: boolean) => {
@@ -313,8 +326,7 @@ const ApprovalsPage: React.FC = () => {
   const confirmPendingDecision = () => {
     if (!pendingDecision || !pendingProposal || decidingRef.current || decidingId) return;
     if (pendingProposal.status !== 'pending' || pendingProposalSeconds <= 0) {
-      closeDecisionConfirm();
-      setNotice(text.conflictRefresh);
+      void closeStaleDecisionConfirm(pendingProposal.status === 'pending');
       return;
     }
     void decide(pendingProposal, pendingDecision.decision);

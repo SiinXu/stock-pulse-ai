@@ -530,6 +530,50 @@ describe('ApprovalsPage', () => {
     intervalSpy.mockRestore();
   });
 
+  it('refreshes proposals when local expiry closes the confirmation', async () => {
+    const intervalSpy = vi.spyOn(window, 'setInterval');
+    const start = Date.now();
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(start);
+    vi.mocked(approvalsApi.list).mockResolvedValue({
+      items: [
+        proposal('a'.repeat(32), 'pending', new Date(start + 2_000).toISOString()),
+        proposal('b'.repeat(32), 'approved', new Date(start + 30_000).toISOString()),
+        proposal('c'.repeat(32), 'expired', new Date(start - 1_000).toISOString()),
+      ],
+      page: 1,
+      pageSize: 50,
+      total: 3,
+    });
+    renderPage();
+    await openDecisionConfirm('Approve original signal');
+    expect(approvalsApi.list).toHaveBeenCalledTimes(1);
+
+    nowSpy.mockReturnValue(start + 3_000);
+    vi.mocked(approvalsApi.list).mockResolvedValue({
+      items: [
+        proposal('a'.repeat(32), 'expired', new Date(start - 1_000).toISOString()),
+        proposal('b'.repeat(32), 'approved', new Date(start + 30_000).toISOString()),
+        proposal('c'.repeat(32), 'expired', new Date(start - 1_000).toISOString()),
+      ],
+      page: 1,
+      pageSize: 50,
+      total: 3,
+    });
+    const countdownTick = intervalSpy.mock.calls.find(([, delay]) => delay === 1_000)?.[0];
+    expect(countdownTick).toBeTypeOf('function');
+    await act(async () => {
+      (countdownTick as () => void)();
+    });
+
+    expect(await screen.findByText('Approval state changed; the page was refreshed.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Approve original signal' })).not.toBeInTheDocument();
+    expect(approvalsApi.list).toHaveBeenCalledTimes(2);
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    expect(within(screen.getByTestId(`approval-${'a'.repeat(32)}`)).getAllByText('Expired').length).toBeGreaterThan(0);
+    nowSpy.mockRestore();
+    intervalSpy.mockRestore();
+  });
+
   it('maps known approval codes and keeps unknown codes visible', async () => {
     vi.mocked(approvalsApi.list).mockResolvedValue({
       items: [
