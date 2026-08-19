@@ -660,7 +660,7 @@ New density-aware files must be added to the JSON. This task does **not** mass-m
 | `new-density-aware-file` | A file started using density tokens. Add it to the baseline with the measured counts. |
 | `stale-exemption` / `exemption-overflow` | Fix `DENSITY_FIXED_GEOMETRY_EXEMPTIONS` (`count` is shrink-only). |
 
-The scanner follows aliases (`const STACK = 'gap-4'`), computed templates (`` `p-${size}` ``), and inline `style` padding/gap. Comments and type-only string literals are ignored.
+The scanner follows aliases (`const STACK = 'gap-4'`), computed templates (`` `p-${size}` ``), and inline `style` padding/gap. Comments and type-only string literals are ignored. The production inventory walk may skip TypeScript parse when a conservative candidate filter proves a file cannot contain those tokens; the AST remains the authority, and the filter may over-parse but must not under-scan.
 
 ### Working-region breakpoints
 

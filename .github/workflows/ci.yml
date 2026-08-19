@@ -420,10 +420,17 @@ jobs:
   # unsharded job that merge-burst cancel-in-progress routinely supersedes.
   # Required check *name* remains python-minimum. Coverage floor stays on the
   # Python 3.11 backend-gate combine; these shards only prove 3.10 execution.
+  #
+  # Job bound is 45 minutes, not the 3.11 backend-tests 30-minute bound.
+  # Module-level shard 2 on 3.10 is ~28-30 min (AST-heavy exception-log
+  # callsite scan); hosted run 32269161288 job 96121339880 cancelled at
+  # 30:24 while still passing tests at 99%. Prior post-#1378 main runs
+  # finished that shard in 29:24-29:52. This is headroom for 3.10 cost,
+  # not a return to the unsharded 60-minute python-minimum job.
   python-minimum-tests:
     name: python-minimum-tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: [changes, ai-governance]
     if: needs.changes.outputs.backend == 'true' && github.event_name == 'push'
     permissions:

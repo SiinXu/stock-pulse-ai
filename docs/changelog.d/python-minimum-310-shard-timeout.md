@@ -1,0 +1,2 @@
+- [Fixed] Give Python 3.10 `python-minimum-tests` shards a 45-minute job bound so hosted shard 2 can finish the module-level partition instead of cancelling at the 30-minute cap.
+- [Tests] Guard that the 3.10 shard timeout stays above the 3.11 `backend-tests` bound, below the unsharded 60-minute era, and that cancelled shards still fail `python-minimum`.

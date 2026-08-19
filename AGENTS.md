@@ -171,7 +171,7 @@ The current repository CI mainly contains:
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
 | `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, opt-in via `workflow_dispatch` only |
 
-**Event model:** pull requests use path-selective pytest; when mapping is `FULL` they reuse the four 30-minute `backend-tests` shards (required check name stays `backend-gate`) instead of an unsharded suite inside the 45-minute selective job. Pushes to `main` run the complete offline suite in four module-level shards on Python 3.11 (coverage combine + floor once) and the same sharded offline suite on Python 3.10 via `python-minimum`.
+**Event model:** pull requests use path-selective pytest; when mapping is `FULL` they reuse the four 30-minute `backend-tests` shards (required check name stays `backend-gate`) instead of an unsharded suite inside the 45-minute selective job. Pushes to `main` run the complete offline suite in four module-level shards on Python 3.11 (coverage combine + floor once) and the same sharded offline suite on Python 3.10 via `python-minimum` (45-minute shard bound; hosted 3.10 shard 2 is ~28-30 minutes).
 
 If there is a corresponding CI result on the existing PR, you can directly quote the CI conclusion; if the CI does not cover the changes or the local environment differs significantly from the CI environment, supplement local verification and gaps.
 
