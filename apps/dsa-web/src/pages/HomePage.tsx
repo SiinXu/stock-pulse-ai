@@ -4,7 +4,6 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowRight,
-  BellRing,
   CalendarClock,
   ChevronDown,
   ClipboardCheck,
@@ -34,6 +33,7 @@ import {
 } from '../components/common';
 import {
   HomeReadinessCard,
+  HomeSignalSummary,
   TodaysFocusPanel,
   getBrowserTimezone,
   getScheduledTaskStatusPresentation,
@@ -125,6 +125,18 @@ type HomeAttentionLoadResult = {
   data: HomeAttentionData;
   availability: HomeAttentionAvailability;
   failedSourceCount: number;
+};
+
+type HomeSignalStaleFields = {
+  activeSignals: boolean;
+  reassessments: boolean;
+  alerts: boolean;
+};
+
+const EMPTY_SIGNAL_STALE: HomeSignalStaleFields = {
+  activeSignals: false,
+  reassessments: false,
+  alerts: false,
 };
 
 const EMPTY_ATTENTION_DATA: HomeAttentionData = {
@@ -224,6 +236,8 @@ const HomePage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [scoreRefreshGeneration, setScoreRefreshGeneration] = useState(0);
   const [failedSourceCount, setFailedSourceCount] = useState(0);
+  const [signalStale, setSignalStale] = useState<HomeSignalStaleFields>(EMPTY_SIGNAL_STALE);
+  const dataRef = useRef(data);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [setupStatusLoading, setSetupStatusLoading] = useState(true);
   const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
@@ -241,8 +255,35 @@ const HomePage: React.FC = () => {
     ready: true,
   });
 
+  dataRef.current = data;
+
   const applyAttentionData = useCallback((result: HomeAttentionLoadResult) => {
-    setData(result.data);
+    const previous = dataRef.current;
+    const nextActiveTotal = result.availability.activeSignals
+      ? result.data.activeSignalTotal
+      : previous.activeSignalTotal;
+    const nextDueTotal = result.availability.reassessments
+      ? result.data.dueReassessmentTotal
+      : previous.dueReassessmentTotal;
+    const nextAlertTotal = result.availability.alerts
+      ? result.data.triggeredAlertTotal
+      : previous.triggeredAlertTotal;
+    const nextData: HomeAttentionData = {
+      ...result.data,
+      activeSignals: result.availability.activeSignals
+        ? result.data.activeSignals
+        : previous.activeSignals,
+      activeSignalTotal: nextActiveTotal,
+      dueReassessmentTotal: nextDueTotal,
+      triggeredAlertTotal: nextAlertTotal,
+    };
+    dataRef.current = nextData;
+    setData(nextData);
+    setSignalStale({
+      activeSignals: !result.availability.activeSignals && previous.activeSignalTotal !== null,
+      reassessments: !result.availability.reassessments && previous.dueReassessmentTotal !== null,
+      alerts: !result.availability.alerts && previous.triggeredAlertTotal !== null,
+    });
     setAvailability(result.availability);
     setFailedSourceCount(result.failedSourceCount);
     setIsLoading(false);
@@ -378,7 +419,13 @@ const HomePage: React.FC = () => {
       .catch(() => setSetupStatus(null));
   }, []);
   const handleRefresh = useCallback(() => {
+    const previous = dataRef.current;
     setIsLoading(true);
+    setSignalStale({
+      activeSignals: previous.activeSignalTotal !== null,
+      reassessments: previous.dueReassessmentTotal !== null,
+      alerts: previous.triggeredAlertTotal !== null,
+    });
     setScoreRefreshGeneration((generation) => generation + 1);
     void loadAttentionData();
     void loadSetupStatus();
@@ -571,44 +618,14 @@ const HomePage: React.FC = () => {
           </div>
         </Section>
 
-        <Section
-          title={t('home.signalSummary')}
-          description={t('home.signalSummaryDescription')}
-          level="interactive"
-          padding="md"
-          actions={<BellRing className="h-5 w-5 text-danger" aria-hidden="true" />}
-        >
-          {isLoading ? (
-            <StatePanel state="loading" title={t('common.loading')} size="compact" />
-          ) : (
-            <div className="space-y-4">
-              <dl className="grid grid-cols-3 gap-3">
-                <div>
-                  <dt className="text-xs text-secondary-text">{t('home.activeSignals')}</dt>
-                  <dd className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                    {data.activeSignalTotal ?? '—'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-secondary-text">{t('home.triggeredAlerts')}</dt>
-                  <dd className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                    {data.triggeredAlertTotal ?? '—'}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-secondary-text">{t('home.dueReassessments')}</dt>
-                  <dd className="mt-1 text-xl font-semibold tabular-nums text-foreground">
-                    {data.dueReassessmentTotal ?? '—'}
-                  </dd>
-                </div>
-              </dl>
-              <Button className="mx-auto" variant="secondary" size="default" onClick={() => navigate(signalCenterHref)}>
-                {t('decisionSignals.viewAll')}
-                <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
-              </Button>
-            </div>
-          )}
-        </Section>
+        <HomeSignalSummary
+          isLoading={isLoading}
+          availability={availability}
+          data={data}
+          stale={signalStale}
+          onRetry={handleRefresh}
+          onViewAll={() => navigate(signalCenterHref)}
+        />
       </div>
 
       <section className="rounded-xl border border-border p-4" aria-labelledby="home-configurable-heading">

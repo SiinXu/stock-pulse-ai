@@ -19,7 +19,7 @@ Home is an **attention hub**: it answers “what should I look at first today?�
 | --- | --- | --- |
 | **Today’s Focus** | Priority summary | Your “headline todos” |
 | **Todos** | Config gaps and unfinished items | Missing keys or empty watchlist land here |
-| **Signal summary** | Recent AI advice / alerts | Usually deep-links to **Signal Center** |
+| **Signal summary** | Recent AI advice / alerts | Usually deep-links to **Signal Center**. A source or request failure is an explicit retryable error, not a dash or a fake empty “0”. Successful zeros stay zeros. A retry may keep last-known counts only when they are marked partial/stale. |
 | **Expandable area** | Morning brief, market review, recent analyses | Often collapsed to reduce overload; expand preference is local |
 
 ```mermaid

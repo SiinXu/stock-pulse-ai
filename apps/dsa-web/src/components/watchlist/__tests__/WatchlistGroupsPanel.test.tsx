@@ -1,11 +1,18 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import fs from 'node:fs';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import path from 'node:path';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { ToastProvider } from '../../common';
 import { WatchlistGroupsPanel } from '../WatchlistGroupsPanel';
 import type { WatchlistGroup } from '../../../types/watchlist';
+import type { WatchlistScoreItem } from '../../../types/watchlistScore';
 
 const groups: WatchlistGroup[] = [
   {
@@ -210,5 +217,68 @@ describe('WatchlistGroupsPanel', () => {
     await waitFor(() => expect(onRestoreGroup).toHaveBeenCalled());
     expect(screen.getByRole('alert')).toHaveTextContent('无法恢复该分组。请手动重建。');
     expect(screen.getByTestId('watchlist-groups-announcement')).toHaveTextContent('已删除 Growth。');
+  });
+
+  it('keeps remaining member cards when score status is error', async () => {
+    renderPanel({ scoreStatus: 'error' });
+
+    expect(screen.getByTestId('watchlist-member-default-600519')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-member-default-AAPL')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-member-value-300750')).toBeInTheDocument();
+    expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();
+  });
+
+  it('lazy-loads the score status cell as a default export instead of inlining WatchlistScoreColumn', () => {
+    const source = fs.readFileSync(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../WatchlistGroupsPanel.tsx'),
+      'utf8',
+    );
+    expect(source).toMatch(/lazy\(\(\) => import\('\.\/WatchlistScoreStatusCell'\)\)/);
+    expect(source).not.toContain('createUnanalyzedWatchlistScore');
+    expect(source).not.toContain("from './WatchlistScoreColumn'");
+  });
+
+  it('shows loading score status while scores are first loading', async () => {
+    renderPanel({ scoreStatus: 'loading' });
+
+    expect(screen.getByTestId('watchlist-member-default-600519')).toBeInTheDocument();
+    expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();
+  });
+
+  it('shows loading score status while retrying without last-known scores', async () => {
+    renderPanel({ scoreStatus: 'retrying' });
+
+    expect(screen.getByTestId('watchlist-member-default-600519')).toBeInTheDocument();
+    expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();
+  });
+
+  it('keeps last-known scores visible as stale while retrying', async () => {
+    const lastKnown: WatchlistScoreItem = {
+      stockCode: '600519',
+      status: 'scored',
+      score: 72,
+      asOf: '2026-08-08T09:00:00+00:00',
+      ageDays: 1,
+      analysisId: 5,
+      operationAdvice: 'Buy',
+      freshness: 'recent',
+      degradedReasons: [],
+      factors: [],
+    };
+    renderPanel({
+      scoreStatus: 'retrying',
+      scoreStale: true,
+      scoreItemsByCode: new Map([['600519', lastKnown]]),
+    });
+
+    expect(await screen.findByTestId('watchlist-score-column')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-score-stale')).toBeInTheDocument();
+    expect(screen.getByTestId('watchlist-score-value')).toHaveTextContent('72');
   });
 });

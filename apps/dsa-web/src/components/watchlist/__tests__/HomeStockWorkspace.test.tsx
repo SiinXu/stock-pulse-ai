@@ -281,4 +281,31 @@ describe('HomeStockWorkspace', () => {
     expect(screen.getAllByTestId('watchlist-row')[0]).toHaveTextContent('AAPL');
     expect(screen.getByRole('combobox', { name: '手动排序' })).toBeDisabled();
   });
+
+  it('retries a failed score provider and restores cards without treating the failure as empty', async () => {
+    vi.mocked(watchlistScoresApi.score)
+      .mockRejectedValueOnce(new Error('provider unavailable'))
+      .mockResolvedValueOnce(scoreResponse([
+        scoreItem('AAPL', 64),
+        scoreItem('600519', 20),
+      ]));
+    render(
+      <HomeStockWorkspace
+        {...buildProps('watchlist')}
+        watchlistRows={[
+          { code: 'AAPL', analyzedToday: false },
+          { code: '600519', analyzedToday: false },
+        ]}
+      />,
+    );
+
+    expect(await screen.findByText('AI 评分暂时不可用；刷新成功前不会显示评分或按评分排序。')).toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.getAllByTestId('watchlist-row')).toHaveLength(2);
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    expect(await screen.findAllByTestId('watchlist-score-column')).toHaveLength(2);
+    expect(screen.getByText('AI 64')).toBeInTheDocument();
+    expect(screen.queryByText('AI 评分暂时不可用；刷新成功前不会显示评分或按评分排序。')).not.toBeInTheDocument();
+  });
 });

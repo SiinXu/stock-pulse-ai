@@ -88,7 +88,20 @@ const LAZY_FIELD_TRUST_PANEL_SCENARIOS: Record<string, PlaygroundScenarioRendere
   )),
 };
 
-type WatchlistWorkspaceScenarioId = 'home-stock-workspace' | 'watchlist-score-column';
+type HomeSignalSummaryScenarioId = 'home-signal-summary';
+
+type WatchlistWorkspaceScenarioId =
+  | 'home-stock-workspace'
+  | 'watchlist-score-column'
+  | 'watchlist-score-status-cell';
+
+// Keep HomeSignalSummary out of workspaceScenarios so it does not share a
+// static graph with HomeWatchlistGroupsSection (named gzip budget).
+const LAZY_HOME_SIGNAL_SUMMARY_SCENARIOS: Record<HomeSignalSummaryScenarioId, PlaygroundScenarioRenderer> = {
+  'home-signal-summary': createLazyScenario(async () => (
+    (await import('./homeSignalSummaryScenario')).default
+  )),
+};
 
 // Lazy-load watchlist workspace stories so score-column product wiring does not
 // inflate the PlaygroundRenderPage entry chunk (same pattern as charts/valuation).
@@ -98,6 +111,9 @@ const LAZY_WATCHLIST_WORKSPACE_SCENARIOS: Record<WatchlistWorkspaceScenarioId, P
   )),
   'watchlist-score-column': createLazyScenario(async () => (
     (await import('./watchlistWorkspaceScenarios')).WATCHLIST_WORKSPACE_SCENARIOS['watchlist-score-column']
+  )),
+  'watchlist-score-status-cell': createLazyScenario(async () => (
+    (await import('./watchlistWorkspaceScenarios')).WATCHLIST_WORKSPACE_SCENARIOS['watchlist-score-status-cell']
   )),
 };
 
@@ -114,6 +130,7 @@ const RENDERERS: Record<string, PlaygroundScenarioRenderer> = {
   ...LAZY_REPORT_MARKDOWN_SCENARIOS,
   ...SKILL_OUTCOME_SCENARIOS,
   ...WORKSPACE_SCENARIOS,
+  ...LAZY_HOME_SIGNAL_SUMMARY_SCENARIOS,
   ...SETTINGS_SCENARIOS,
   ...REPORT_COMPONENT_SCENARIOS,
   ...SCREENING_SCENARIOS,

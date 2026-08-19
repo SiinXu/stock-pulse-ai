@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 export { HomeReadinessCard } from './HomeReadinessCard';
 export type { HomeReadinessCardProps } from './HomeReadinessCard';
+export { HomeSignalSummary } from './HomeSignalSummary';
+export type { HomeSignalSummaryProps } from './HomeSignalSummary';
 export { TodaysFocusPanel } from './TodaysFocusPanel';
 export type { TodaysFocusPanelProps } from './TodaysFocusPanel';
 export {

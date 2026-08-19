@@ -4,7 +4,7 @@ The Home page mounts an independent **customizable dashboard board** for four ke
 
 | Widget id | Content |
 | --- | --- |
-| `watchlist` | Watchlist groups (existing Home section, including AI scores when available) |
+| `watchlist` | Watchlist groups (existing Home section, including AI scores when a score request succeeds). A failed score request is an explicit retryable error, not an unanalyzed empty list. |
 | `portfolio_health` | Read-only stored daily portfolio health snapshot |
 | `alerts` | Triggered-alert count with a deep link to Alerts |
 | `recent_reports` | Recent stock analysis reports |

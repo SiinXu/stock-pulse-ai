@@ -634,6 +634,91 @@ describe('HomePage attention hub', () => {
     await waitFor(() => expect(alertsApi.listTriggers).toHaveBeenCalledTimes(2));
   });
 
+  it('does not render a failed signal summary as a dash or empty success', async () => {
+    vi.mocked(decisionSignalsApi.list).mockRejectedValue(new Error('signals unavailable'));
+    vi.mocked(alertsApi.listTriggers).mockRejectedValue(new Error('alerts unavailable'));
+
+    renderHome();
+
+    const signalSummary = await screen.findByRole('region', { name: 'Signal summary' });
+    expect(await within(signalSummary).findByText('Home data is incomplete')).toBeInTheDocument();
+    expect(within(signalSummary).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(within(signalSummary).queryByText('—')).not.toBeInTheDocument();
+    expect(within(signalSummary).queryByText('0')).not.toBeInTheDocument();
+  });
+
+  it('renders a successful zero-signal summary as empty counts, not failure', async () => {
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 12,
+    });
+    vi.mocked(alertsApi.listTriggers).mockResolvedValue({
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: 1,
+    });
+
+    renderHome();
+
+    const signalSummary = await screen.findByRole('region', { name: 'Signal summary' });
+    await waitFor(() => {
+      expect(within(signalSummary).getAllByTestId('home-signal-metric')).toHaveLength(3);
+    });
+    expect(within(signalSummary).queryByText('Home data is incomplete')).not.toBeInTheDocument();
+    expect(within(signalSummary).queryByTestId('home-signal-metric-failure')).not.toBeInTheDocument();
+    expect(within(signalSummary).getAllByText('0')).toHaveLength(3);
+  });
+
+  it('keeps last-known signal totals marked partial after a failed refresh', async () => {
+    renderHome();
+
+    const signalSummary = await screen.findByRole('region', { name: 'Signal summary' });
+    await waitFor(() => expect(within(signalSummary).getByText('4')).toBeInTheDocument());
+    expect(within(signalSummary).getByText('2')).toBeInTheDocument();
+
+    vi.mocked(decisionSignalsApi.list).mockRejectedValue(new Error('signals unavailable'));
+    vi.mocked(alertsApi.listTriggers).mockRejectedValue(new Error('alerts unavailable'));
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh Home data' }));
+
+    await waitFor(() => {
+      expect(within(signalSummary).getAllByText('Partial').length).toBeGreaterThan(0);
+    });
+    expect(within(signalSummary).getByText('4')).toBeInTheDocument();
+    expect(within(signalSummary).getByText('2')).toBeInTheDocument();
+    expect(within(signalSummary).queryByText('—')).not.toBeInTheDocument();
+    expect(within(signalSummary).getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+  });
+
+  it('retries only the failed signal-summary source without wiping successful counts', async () => {
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => {
+      if (params?.expiresTo) {
+        throw new Error('reassessment unavailable');
+      }
+      return { items: [activeSignal], total: 4, page: 1, pageSize: 12 };
+    });
+
+    renderHome();
+
+    const signalSummary = await screen.findByRole('region', { name: 'Signal summary' });
+    await waitFor(() => expect(within(signalSummary).getByText('4')).toBeInTheDocument());
+    expect(within(signalSummary).getByTestId('home-signal-metric-failure')).toBeInTheDocument();
+    expect(within(signalSummary).getByText('2')).toBeInTheDocument();
+
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async (params) => (
+      params?.expiresTo
+        ? { items: [], total: 3, page: 1, pageSize: 1 }
+        : { items: [activeSignal], total: 4, page: 1, pageSize: 12 }
+    ));
+    fireEvent.click(within(signalSummary).getByRole('button', { name: 'Retry' }));
+
+    await waitFor(() => expect(within(signalSummary).getByText('3')).toBeInTheDocument());
+    expect(within(signalSummary).getByText('4')).toBeInTheDocument();
+    expect(within(signalSummary).queryByTestId('home-signal-metric-failure')).not.toBeInTheDocument();
+  });
+
   it('preserves the setup handoff and configurable-area preference', async () => {
     window.localStorage.setItem(HOME_CONFIGURABLE_STORAGE_KEY, '1');
     vi.mocked(systemConfigApi.getSetupStatus).mockResolvedValue({

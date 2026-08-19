@@ -7,7 +7,12 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { UiLanguage } from '../../../i18n/uiLanguages';
 import type { WatchlistScoreItem } from '../../../types/watchlistScore';
 import { orderWatchlistByScore } from '../../../utils/watchlistScoreOrder';
-import { WatchlistScoreColumn } from '../WatchlistScoreColumn';
+import {
+  WatchlistScoreCellBoundary,
+  WatchlistScoreColumn,
+  WatchlistScoreStatusCell,
+} from '../WatchlistScoreColumn';
+import { resolveWatchlistScoreStatusItem } from '../watchlistScoreStatus';
 
 afterEach(() => {
   cleanup();
@@ -151,6 +156,87 @@ describe('WatchlistScoreColumn', () => {
     renderColumn(longItem, { expanded: true, className: 'w-40' });
     expect(screen.getByRole('region').querySelector('.break-words')).toBeInTheDocument();
     expect(screen.getByTestId('watchlist-score-column')).toHaveClass('min-w-0', 'w-40');
+  });
+
+  it('does not invent an unanalyzed success for a failed or in-flight load', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <WatchlistScoreStatusCell status="error" />
+      </UiLanguageProvider>,
+    );
+    expect(screen.getByTestId('watchlist-score-status')).toHaveTextContent(/failed/i);
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).toBeNull();
+  });
+
+  it('resolves ready missing scores as unanalyzed and keeps last-known only while stale', () => {
+    const lastKnown = scoredItem;
+    const itemsByCode = new Map<string, WatchlistScoreItem>([['600519', lastKnown]]);
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'ready',
+      stockCode: 'AAPL',
+      itemsByCode,
+    })?.status).toBe('unanalyzed');
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'retrying',
+      stale: true,
+      stockCode: '600519',
+      itemsByCode,
+    })).toEqual(lastKnown);
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'retrying',
+      stale: false,
+      stockCode: '600519',
+      itemsByCode,
+    })).toBeUndefined();
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'error',
+      stockCode: '600519',
+      itemsByCode,
+    })).toBeUndefined();
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'loading',
+      stockCode: '600519',
+      itemsByCode,
+    })).toBeUndefined();
+  });
+
+  it('renders last-known scores from itemsByCode while retrying and marked stale', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <WatchlistScoreStatusCell
+          status="retrying"
+          stale
+          stockCode="600519"
+          itemsByCode={new Map([['600519', scoredItem]])}
+        />
+      </UiLanguageProvider>,
+    );
+    expect(screen.getByTestId('watchlist-score-value')).toHaveTextContent('72');
+    expect(screen.getByTestId('watchlist-score-stale')).toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).toBeNull();
+  });
+
+  it('isolates one score-cell render failure so sibling cards stay visible', () => {
+    const ThrowingChild = () => {
+      throw new Error('score render failed');
+    };
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <div>
+          <WatchlistScoreColumn item={scoredItem} />
+          <WatchlistScoreCellBoundary
+            resetKey="boom"
+            fallback={<span data-testid="watchlist-score-status">Failed</span>}
+          >
+            <ThrowingChild />
+          </WatchlistScoreCellBoundary>
+        </div>
+      </UiLanguageProvider>,
+    );
+    expect(screen.getByTestId('watchlist-score-value')).toHaveTextContent('72');
+    expect(screen.getByTestId('watchlist-score-status')).toHaveTextContent('Failed');
+    consoleError.mockRestore();
   });
 });
 
