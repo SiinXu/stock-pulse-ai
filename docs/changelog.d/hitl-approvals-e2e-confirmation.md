@@ -1,0 +1,1 @@
+- [Tests] Exercise the two-step HITL approval confirmation in the real-backend Playwright flow (Refs #879).
