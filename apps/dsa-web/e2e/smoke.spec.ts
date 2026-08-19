@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './playwright-test';
 import { getE2eAuthStatus, loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';
 import { resolvePlaywrightPorts } from './playwright-result-paths.mjs';
 

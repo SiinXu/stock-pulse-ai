@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './playwright-test';
 
 async function openPaginationFixture(page: Page, width: number, density: 'full' | 'compact' | 'auto' = 'full') {
   // Viewport wider than the host so container width is controlled by the fixture, not the chrome.

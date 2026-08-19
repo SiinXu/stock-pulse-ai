@@ -263,10 +263,14 @@ Web e2e uses Playwright with **`retries: 0`**. Flakes must not be masked by re-r
 3. **Empty is healthy**: when the flake is fixed, remove the tag and details. Shipping zero quarantined specs is the default; the mechanism is the deliverable.
 4. **No product bypass**: quarantine is for test harness isolation only. A genuine UI race still needs an English issue with trace evidence; the deterministic wait belongs in e2e helpers such as `expectAnalyzeButtonReady` in `apps/dsa-web/e2e/workbench-fixture.ts`.
 
+### Route-handler teardown
+
+Specs import `test` from `apps/dsa-web/e2e/playwright-test.ts`, not directly from `@playwright/test`. That shared `test` unroutes page and context handlers with `page.unrouteAll({ behavior: 'ignoreErrors' })` after the test body and before Playwright closes the page. Async handlers that `await route.fetch()` must not outlive that close; do not paper over the race with a per-handler try/catch.
+
 ### Example
 
 ```ts
-import { test } from '@playwright/test';
+import { test } from './playwright-test';
 import { quarantineDetails } from './quarantine';
 
 test(

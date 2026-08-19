@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test } from '@playwright/test';
+import { expect, test } from './playwright-test';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 test.describe('portfolio idempotent mobile mutations', () => {

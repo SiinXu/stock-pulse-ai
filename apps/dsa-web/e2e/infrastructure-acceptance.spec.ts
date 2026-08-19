@@ -8,7 +8,7 @@ import {
   type Locator,
   type Page,
   type Route,
-} from '@playwright/test';
+} from './playwright-test';
 import { encodeModelRef } from '../src/utils/modelRef';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { SOURCE_CANDIDATE_DISCOVERY_TEXT } from '../src/locales/candidateDiscoveryText';

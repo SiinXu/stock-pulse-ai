@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from './playwright-test';
 import { APPLICATION_NAVIGATION_ITEMS } from '../src/components/layout/navigation';
 
 const FIXTURE_PATH = '/e2e/application-shell-fixture.html';
