@@ -1,0 +1,2 @@
+- [Tests] Add a measured Web density-adoption ratchet so density-aware shared components and pages cannot revert to fixed spacing, with an explicit fixed-geometry exemption list (Refs #877).
+- [Docs] Document the D5 density contract ratchet, compact/comfortable CSS modes, and exemption policy in the Web UI foundation contract (Refs #877).

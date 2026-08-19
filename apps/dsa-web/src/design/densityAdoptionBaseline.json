@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "files": {
+    "../common/ConfirmDialog.tsx": {
+      "file": "../common/ConfirmDialog.tsx",
+      "densityTokenCount": 2,
+      "fixedSpacingCount": 6
+    },
+    "../common/DataTable.tsx": {
+      "file": "../common/DataTable.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 0
+    },
+    "../common/Drawer.tsx": {
+      "file": "../common/Drawer.tsx",
+      "densityTokenCount": 6,
+      "fixedSpacingCount": 1
+    },
+    "../common/Modal.tsx": {
+      "file": "../common/Modal.tsx",
+      "densityTokenCount": 6,
+      "fixedSpacingCount": 2
+    },
+    "../common/PageHeader.tsx": {
+      "file": "../common/PageHeader.tsx",
+      "densityTokenCount": 2,
+      "fixedSpacingCount": 0
+    },
+    "../common/Section.tsx": {
+      "file": "../common/Section.tsx",
+      "densityTokenCount": 2,
+      "fixedSpacingCount": 1
+    },
+    "../common/Sheet.tsx": {
+      "file": "../common/Sheet.tsx",
+      "densityTokenCount": 4,
+      "fixedSpacingCount": 5
+    },
+    "../common/Surface.tsx": {
+      "file": "../common/Surface.tsx",
+      "densityTokenCount": 3,
+      "fixedSpacingCount": 0
+    },
+    "../common/Toolbar.tsx": {
+      "file": "../common/Toolbar.tsx",
+      "densityTokenCount": 3,
+      "fixedSpacingCount": 1
+    },
+    "../settings/AuthSettingsCard.tsx": {
+      "file": "../settings/AuthSettingsCard.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 8
+    },
+    "../settings/GenerationBackendStatusPanel.tsx": {
+      "file": "../settings/GenerationBackendStatusPanel.tsx",
+      "densityTokenCount": 4,
+      "fixedSpacingCount": 9
+    },
+    "../settings/IntelligentImport.tsx": {
+      "file": "../settings/IntelligentImport.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 13
+    },
+    "../settings/InvestmentFrameworkSettingsCard.tsx": {
+      "file": "../settings/InvestmentFrameworkSettingsCard.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 24
+    },
+    "../settings/KronosStatusPanel.tsx": {
+      "file": "../settings/KronosStatusPanel.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 8
+    },
+    "../settings/SettingsLoading.tsx": {
+      "file": "../settings/SettingsLoading.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 1
+    },
+    "../settings/SettingsPanelErrorBoundary.tsx": {
+      "file": "../settings/SettingsPanelErrorBoundary.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 1
+    },
+    "../settings/SettingsSectionCard.tsx": {
+      "file": "../settings/SettingsSectionCard.tsx",
+      "densityTokenCount": 1,
+      "fixedSpacingCount": 1
+    }
+  }
+}

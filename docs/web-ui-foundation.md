@@ -627,7 +627,40 @@ focus traps are out of contract.
 | D2 | **Secondary blocks default collapsed.** Advanced / governance / rarely edited groups and full report strata below the Decision Card start collapsed on first visit of that section/view. User expand state may be remembered later; first paint must not show every block open. | **Progressive** on Settings advanced groups, Discover strategy copy blocks, report strata; **Immediate** when a PR adds a new advanced block |
 | D3 | **Card-in-card limit.** Nested bordered surfaces are allowed only when the inner piece is independently interactive (selectable row, activatable card). Prefer section spacing, dividers, and heading hierarchy over nested `interactive` boxes. | **Immediate** for new composition. Aligns with Surface Hierarchy “at most two visible surface boundaries” |
 | D4 | **Help text is secondary.** Helper copy must not share equal visual weight with the control row (no competing primary emphasis in the same band). | **Immediate** for new fields; **Progressive** for dense Settings rows |
-| D5 | **No per-page spacing invention.** Use the shared density token scale in `apps/dsa-web/src/index.css` (`--density-*`) and structural utilities (`density-gap-*`, `density-surface-pad-*`, `density-overlay-pad*`). Named inventory: `apps/dsa-web/src/design/density.ts`. Compact regions may set `data-density="compact"`. Do not redefine `--density-*` outside `index.css`. | **Immediate** |
+| D5 | **No per-page spacing invention.** Use the shared density token scale in `apps/dsa-web/src/index.css` (`--density-*`) and structural utilities (`density-gap-*`, `density-surface-pad-*`, `density-overlay-pad*`). Named inventory: `apps/dsa-web/src/design/density.ts`. Compact regions may set `data-density="compact"`. Do not redefine `--density-*` outside `index.css`. Density-aware shared components and pages are locked by the adoption ratchet below. | **Immediate** |
+
+### Density adoption ratchet (D5 enforcement)
+
+D5 is executable. The token inventory, parallel-definition ban, and Surface padding map remain in `apps/dsa-web/src/components/__tests__/densityContractGuard.test.ts`. The **adoption ratchet** (`densityAdoptionRatchet.test.ts`) then prevents density-aware files from reverting to fixed Tailwind / inline spacing.
+
+**What “density-aware” means.** A production TS/TSX file is density-aware when the TypeScript AST (not a comment/type grep) contains a structural density utility (`density-gap-*`, `density-surface-pad-*`, `density-overlay-pad*`), a `var(--density-*)` / `--density-*` reference, or a `data-density` attribute. Overlay elevation (`shadow-elevation-*`) is a separate #878 contract and does **not** mark a file density-aware. The catalog `src/design/density.ts` and the playground are out of the consumer inventory.
+
+**Required owners.** These shared components must stay density-aware: `Surface`, `PageHeader`, `Toolbar`, `Section`, `Modal`, `Drawer`, `Sheet`, `ConfirmDialog` (`DENSITY_REQUIRED_OWNERS`). Losing their density tokens is a regression, not a baseline edit.
+
+**Measured baseline.** `apps/dsa-web/src/design/densityAdoptionBaseline.json` is snapshotted from the current production tree. For each density-aware file:
+
+| Field | Direction | Meaning |
+| --- | --- | --- |
+| `densityTokenCount` | floor | Must not fall. Raise the baseline when a file gains density tokens. |
+| `fixedSpacingCount` | ceiling | Remaining `gap-*` / `p-*` / `space-*` / spacing `style` after exemptions. Must not rise. Lower the baseline when debt shrinks. |
+
+New density-aware files must be added to the JSON. This task does **not** mass-migrate product surfaces; leftover `gap-4` in a file that already uses one density token is recorded debt, not an exemption.
+
+**Compact / comfortable.** Comfortable is the default `:root` scale. `[data-density="compact"]` retunes `--density-space-*` so structural utilities shrink. Fixed `p-4` / `gap-4` classes do not follow that switch. DataTable’s `compact` / `default` cell padding maps are the table’s own density contract and are listed as fixed-geometry exemptions. Virtualization spacer cells (`p-0` / `padding: 0`) are collapsed geometry, not density debt, and must stay compatible with the #1377 windowing contract.
+
+**Fixed-geometry exemptions.** `DENSITY_FIXED_GEOMETRY_EXEMPTIONS` in `src/design/density.ts` is the only production exemption list. Each entry needs `file`, exact `token`, `count`, and a reason. Use it for device chrome and component-owned geometry (safe-area footer insets, DataTable cell density maps). Do **not** park leftover `p-4` debt here. Stale or overflowed entries fail CI.
+
+**How to read a failure**
+
+| Code | Meaning |
+| --- | --- |
+| `missing-required-owner` / `lost-density-aware-file` / `density-token-regression` | A density-aware file dropped tokens. Restore the utilities; do not lower the floor. |
+| `fixed-spacing-regression` | New `gap-*` / `p-*` / spacing `style` on a density-aware file. Use a density utility, or a reviewed exemption if it is genuinely fixed geometry. |
+| `baseline-needs-tightening` | The tree improved. Update `densityAdoptionBaseline.json` (raise token floors / lower spacing ceilings). |
+| `new-density-aware-file` | A file started using density tokens. Add it to the baseline with the measured counts. |
+| `stale-exemption` / `exemption-overflow` | Fix `DENSITY_FIXED_GEOMETRY_EXEMPTIONS` (`count` is shrink-only). |
+
+The scanner follows aliases (`const STACK = 'gap-4'`), computed templates (`` `p-${size}` ``), and inline `style` padding/gap. Comments and type-only string literals are ignored.
 
 ### Working-region breakpoints
 
@@ -752,6 +785,7 @@ A PR that introduces or reworks a surface fails this contract when any apply:
 6. New toolbar uses labeled Buttons for recurrent chrome tools that the matrix assigns to `IconButton`, or wraps each icon in its own border frame.
 7. New mid-width layout keeps three dense full columns that clip core content.
 8. Any new glow, glass, or non-semantic shadow treatment (also a DESIGN_GUIDE failure).
+9. A density-aware shared component or page replaces `density-*` utilities with fixed `p-*` / `gap-*` / spacing `style` without a `DENSITY_FIXED_GEOMETRY_EXEMPTIONS` entry.
 
 ## State And Alert Semantics
 

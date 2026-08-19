@@ -31,7 +31,13 @@
    - 当前 `productionDesignGuard.test.ts` 的可执行生产扫描覆盖 `TSX`，以及由 CSS 路径完整性
      断言约束的 `App.css` / `index.css`；尚未加载 `.ts` / `.js`，当前 types/utils 中的 `.ts` 与
      其它 `.ts/.js` 生产路径缺口继续登记在 `UI01-P2-06`。因此本规则尚未对所有生产源类型自动执行。
-   - 字号/圆角/间距优先用现有 tailwind 阶梯与 `--radius` 体系，不写魔法数字。
+   - 字号/圆角优先用现有 tailwind 阶梯与 `--radius` 体系，不写魔法数字。
+     **结构间距**（页面/区块/工具条/叠层 pad 与 gap）必须用 `src/index.css` 的 `--density-*`
+     与 `density-gap-*` / `density-surface-pad-*` / `density-overlay-pad*`，不要在已接入密度
+     的共享组件或页面上退回固定 `p-4` / `gap-4`。舒适密度是默认值；区域可设
+     `data-density="compact"`。可执行棘轮与固定几何豁免见
+     [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md) 的 D5 与
+     `src/design/density.ts`。
    - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑（仓库硬规则）。
 
 ## 1. 设计基调
