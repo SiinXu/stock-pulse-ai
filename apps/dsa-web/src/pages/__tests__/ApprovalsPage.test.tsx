@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -33,13 +33,14 @@ const rule: ApprovalRule = {
 
 function proposal(
   id: string,
-  status: ApprovalProposal['status'],
+  status: ApprovalProposal['status'] | string,
   expiresAt: string,
+  context: Partial<ApprovalProposal['context']> = {},
 ): ApprovalProposal {
   return {
     id,
     owner: 'local_admin',
-    status,
+    status: status as ApprovalProposal['status'],
     version: status === 'pending' ? 1 : 2,
     expiresAt,
     consumedAt: status === 'approved' ? '2026-07-25T18:01:00Z' : null,
@@ -49,8 +50,16 @@ function proposal(
       conservativeSignal: 'hold',
       riskSource: 'risk_veto',
       riskSummary: 'A risk veto would replace the original buy signal.',
+      ...context,
     },
   };
+}
+
+async function openDecisionConfirm(name: 'Approve original signal' | 'Reject and use conservative signal') {
+  const trigger = await screen.findByRole('button', { name });
+  trigger.focus();
+  fireEvent.click(trigger);
+  return screen.findByRole('dialog', { name });
 }
 
 const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
@@ -94,6 +103,13 @@ function mockHappyLoad(nextRule: ApprovalRule = rule) {
     pageSize: 50,
     total: 3,
   });
+  vi.mocked(approvalsApi.decide).mockImplementation(async (id, decision) => (
+    proposal(
+      id,
+      decision === 'cancelled' ? 'cancelled' : decision,
+      new Date(Date.now() + 60_000).toISOString(),
+    )
+  ));
 }
 
 
@@ -202,6 +218,34 @@ describe('ApprovalsPage', () => {
     intervalSpy.mockRestore();
   });
 
+  it('closes an open confirmation after a later 403 poll without submitting', async () => {
+    const intervalSpy = vi.spyOn(window, 'setInterval');
+    renderPage();
+    await openDecisionConfirm('Approve original signal');
+
+    vi.mocked(approvalsApi.list).mockRejectedValueOnce({
+      isAxiosError: true,
+      message: 'Approval access requires enabled administrator authentication',
+      response: {
+        status: 403,
+        data: {
+          error: 'approval_auth_required',
+          message: 'Approval access requires enabled administrator authentication',
+        },
+      },
+    });
+    const proposalPoll = intervalSpy.mock.calls.find(([, delay]) => delay === 5_000)?.[0];
+    expect(proposalPoll).toBeTypeOf('function');
+    await act(async () => {
+      (proposalPoll as () => void)();
+    });
+
+    expect(await screen.findByTestId('approvals-precondition-auth-disabled')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Approve original signal' })).not.toBeInTheDocument();
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    intervalSpy.mockRestore();
+  });
+
   it('explains missing session 401 and points to sign-in', async () => {
     vi.mocked(approvalsApi.getRule).mockRejectedValue({
       isAxiosError: true,
@@ -259,9 +303,10 @@ describe('ApprovalsPage', () => {
     }));
     renderPage();
 
-    const approve = await screen.findByRole('button', { name: 'Approve original signal' });
-    fireEvent.click(approve);
-    fireEvent.click(approve);
+    const dialog = await openDecisionConfirm('Approve original signal');
+    const confirm = within(dialog).getByRole('button', { name: 'Approve original signal' });
+    fireEvent.click(confirm);
+    fireEvent.click(confirm);
     expect(approvalsApi.decide).toHaveBeenCalledTimes(1);
 
     resolveDecision(proposal(
@@ -270,9 +315,13 @@ describe('ApprovalsPage', () => {
       new Date(Date.now() + 60_000).toISOString(),
     ));
     await waitFor(() => expect(screen.queryByRole(
-      'button',
+      'dialog',
       { name: 'Approve original signal' },
     )).not.toBeInTheDocument());
+    expect(screen.queryByRole(
+      'button',
+      { name: 'Approve original signal' },
+    )).not.toBeInTheDocument();
     expect(screen.getAllByText('Approved')).toHaveLength(4);
   });
 
@@ -295,8 +344,10 @@ describe('ApprovalsPage', () => {
 
     const ruleSwitch = await screen.findByRole('switch', { name: 'Enable human approval' });
     fireEvent.click(ruleSwitch);
-    fireEvent.click(await screen.findByRole('button', { name: 'Approve original signal' }));
+    const dialog = await openDecisionConfirm('Approve original signal');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve original signal' }));
     expect(await screen.findByText('Approval state changed; the page was refreshed.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Approve original signal' })).not.toBeInTheDocument();
     expect(approvalsApi.list).toHaveBeenCalledTimes(2);
     expect(approvalsApi.getRule).toHaveBeenCalledTimes(1);
     expect(ruleSwitch).toHaveAttribute('aria-checked', 'true');
@@ -337,5 +388,191 @@ describe('ApprovalsPage', () => {
 
     expect(ruleSaveToast).toBeInTheDocument();
     intervalSpy.mockRestore();
+  });
+
+  it('requires a second confirmation that names the approve action and target', async () => {
+    renderPage();
+
+    const dialog = await openDecisionConfirm('Approve original signal');
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    const target = within(dialog).getByTestId('approval-decision-confirm-target');
+    expect(target).toHaveTextContent('AAPL');
+    expect(target).toHaveTextContent('Original signal');
+    expect(target).toHaveTextContent('Buy');
+    expect(target).toHaveTextContent('Conservative signal');
+    expect(target).toHaveTextContent('Hold');
+    expect(target).toHaveTextContent('Risk veto');
+    expect(target).not.toHaveTextContent('buy');
+    expect(target).not.toHaveTextContent('risk_veto');
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve original signal' }));
+    await waitFor(() => expect(approvalsApi.decide).toHaveBeenCalledWith(
+      'a'.repeat(32),
+      'approved',
+      1,
+    ));
+  });
+
+  it('requires a danger confirmation that names the reject action and target', async () => {
+    renderPage();
+
+    const dialog = await openDecisionConfirm('Reject and use conservative signal');
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    expect(within(dialog).getByTestId('approval-decision-confirm-target')).toHaveTextContent('AAPL');
+    expect(within(dialog).getByRole('button', { name: 'Reject and use conservative signal' })).toHaveAttribute(
+      'data-variant',
+      'danger',
+    );
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Reject and use conservative signal' }));
+    await waitFor(() => expect(approvalsApi.decide).toHaveBeenCalledWith(
+      'a'.repeat(32),
+      'rejected',
+      1,
+    ));
+  });
+
+  it('cancels from the dialog without submitting a decision', async () => {
+    renderPage();
+
+    const dialog = await openDecisionConfirm('Approve original signal');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Approve original signal' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
+  });
+
+  it('treats Escape and backdrop click as a default-safe cancel and restores focus', async () => {
+    renderPage();
+
+    const trigger = await screen.findByRole('button', { name: 'Approve original signal' });
+    trigger.focus();
+    fireEvent.click(trigger);
+    const dialog = await screen.findByRole('dialog', { name: 'Approve original signal' });
+
+    fireEvent.keyDown(dialog, { key: 'Escape' });
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole(
+      'dialog',
+      { name: 'Approve original signal' },
+    )).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+
+    fireEvent.click(trigger);
+    const reopened = await screen.findByRole('dialog', { name: 'Approve original signal' });
+    fireEvent.click(reopened.closest('[data-overlay-root="confirm"]') as HTMLElement);
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.queryByRole(
+      'dialog',
+      { name: 'Approve original signal' },
+    )).not.toBeInTheDocument());
+    expect(trigger).toHaveFocus();
+  });
+
+  it('keeps the confirmation open after a server failure and allows retry', async () => {
+    vi.mocked(approvalsApi.decide)
+      .mockRejectedValueOnce({
+        isAxiosError: true,
+        message: 'decision_failed',
+        response: {
+          status: 500,
+          data: { error: 'decision_failed', message: 'decision_failed' },
+        },
+      })
+      .mockResolvedValueOnce(proposal(
+        'a'.repeat(32),
+        'approved',
+        new Date(Date.now() + 60_000).toISOString(),
+      ));
+    renderPage();
+
+    const dialog = await openDecisionConfirm('Approve original signal');
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve original signal' }));
+
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).not.toHaveTextContent('decision_failed');
+    expect(screen.getByRole('dialog', { name: 'Approve original signal' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve original signal' }));
+    await waitFor(() => expect(approvalsApi.decide).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole(
+      'dialog',
+      { name: 'Approve original signal' },
+    )).not.toBeInTheDocument());
+  });
+
+  it('closes confirmation when polling reveals a stale approval', async () => {
+    const intervalSpy = vi.spyOn(window, 'setInterval');
+    renderPage();
+    await openDecisionConfirm('Approve original signal');
+
+    vi.mocked(approvalsApi.list).mockResolvedValueOnce({
+      items: [
+        proposal('a'.repeat(32), 'expired', new Date(Date.now() - 1_000).toISOString()),
+        proposal('b'.repeat(32), 'approved', new Date(Date.now() + 30_000).toISOString()),
+        proposal('c'.repeat(32), 'expired', new Date(Date.now() - 1_000).toISOString()),
+      ],
+      page: 1,
+      pageSize: 50,
+      total: 3,
+    });
+    const proposalPoll = intervalSpy.mock.calls.find(([, delay]) => delay === 5_000)?.[0];
+    expect(proposalPoll).toBeTypeOf('function');
+    await act(async () => {
+      (proposalPoll as () => void)();
+    });
+
+    expect(await screen.findByText('Approval state changed; the page was refreshed.')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Approve original signal' })).not.toBeInTheDocument();
+    expect(approvalsApi.decide).not.toHaveBeenCalled();
+    intervalSpy.mockRestore();
+  });
+
+  it('maps known approval codes and keeps unknown codes visible', async () => {
+    vi.mocked(approvalsApi.list).mockResolvedValue({
+      items: [
+        proposal('a'.repeat(32), 'pending', new Date(Date.now() + 60_000).toISOString()),
+        proposal('e'.repeat(32), 'pending', new Date(Date.now() + 60_000).toISOString(), {
+          stockCode: 'MSFT',
+          originalSignal: 'moonshot' as ApprovalProposal['context']['originalSignal'],
+          conservativeSignal: 'hold',
+          riskSource: 'custom_risk' as ApprovalProposal['context']['riskSource'],
+        }),
+        proposal('d'.repeat(32), 'mystery_status', new Date(Date.now() + 30_000).toISOString(), {
+          originalSignal: 'moonshot' as ApprovalProposal['context']['originalSignal'],
+          conservativeSignal: 'hold',
+          riskSource: 'custom_risk' as ApprovalProposal['context']['riskSource'],
+        }),
+      ],
+      page: 1,
+      pageSize: 50,
+      total: 3,
+    });
+    renderPage();
+
+    const pendingCard = await screen.findByTestId(`approval-${'a'.repeat(32)}`);
+    expect(within(pendingCard).getByText('Buy')).toBeInTheDocument();
+    expect(within(pendingCard).getByText('Hold')).toBeInTheDocument();
+    expect(within(pendingCard).getByText('Risk veto')).toBeInTheDocument();
+    expect(within(pendingCard).queryByText('buy')).not.toBeInTheDocument();
+    expect(within(pendingCard).queryByText('risk_veto')).not.toBeInTheDocument();
+
+    const unknownCard = screen.getByTestId(`approval-${'d'.repeat(32)}`);
+    expect(within(unknownCard).getAllByText('mystery_status').length).toBeGreaterThan(0);
+    expect(within(unknownCard).getByText('moonshot')).toBeInTheDocument();
+    expect(within(unknownCard).getByText('custom_risk')).toBeInTheDocument();
+
+    fireEvent.click(within(screen.getByTestId(`approval-${'e'.repeat(32)}`)).getByRole(
+      'button',
+      { name: 'Approve original signal' },
+    ));
+    const dialog = await screen.findByRole('dialog', { name: 'Approve original signal' });
+    const target = within(dialog).getByTestId('approval-decision-confirm-target');
+    expect(target).toHaveTextContent('MSFT');
+    expect(target).toHaveTextContent('moonshot');
+    expect(target).toHaveTextContent('custom_risk');
+    expect(target).toHaveTextContent('Hold');
   });
 });
