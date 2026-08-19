@@ -49,7 +49,8 @@ This document records the **current-state audit** and **target IA options** so t
 
 | Kind | Path / entry | Assessment |
 | --- | --- | --- |
-| Reachable, unlinked in sidebar | `/approvals`, `/notifications`, `/stocks/:code`, `/event-alerts`, `/portfolio/performance`, `/research/report-compare` | **Intentional** (Home / bell / owning workspace / content context) |
+| Reachable, unlinked in sidebar | `/approvals`, `/notifications`, `/event-alerts`, `/research/report-compare` | **Intentional** — Cmd+K secondary pages; still not primary sidebar |
+| Reachable, unlinked in sidebar | `/stocks/:code`, `/portfolio/performance` | **Intentional** (content page / paper-account contextual; not palette pages) |
 | Linked but dead | — | None found in product nav or command palette after mechanical hygiene |
 | Dead page modules without routes | `AlertsPage` re-export shell | Routed via `/signals` + legacy redirect only |
 | Deep-link allowlist gap (fixed in mechanical PR) | `/research/skill-outcomes` | Was rejected as `unsupported_route`; now allowed |

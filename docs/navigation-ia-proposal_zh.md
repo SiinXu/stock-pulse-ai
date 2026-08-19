@@ -49,7 +49,8 @@
 
 | 类型 | 路径 / 入口 | 判断 |
 | --- | --- | --- |
-| 可达但侧栏无链 | `/approvals`、`/notifications`、`/stocks/:code`、`/event-alerts`、`/portfolio/performance`、`/research/report-compare` | **有意**（首页 / 铃铛 / 所属工作区 / 内容上下文） |
+| 可达但侧栏无链 | `/approvals`、`/notifications`、`/event-alerts`、`/research/report-compare` | **有意** — Cmd+K 次级页面；仍不进一级侧栏 |
+| 可达但侧栏无链 | `/stocks/:code`、`/portfolio/performance` | **有意**（内容页 / 模拟盘账户上下文；不进命令面板页面列表） |
 | 有链但死链 | — | 机械卫生后产品导航与命令面板未发现 |
 | 无路由页面模块 | `AlertsPage` 等 | 经 `/signals` 与遗留重定向承载 |
 | 深链允许列表缺口（机械 PR 已修） | `/research/skill-outcomes` | 曾被标为 `unsupported_route`；现已允许 |

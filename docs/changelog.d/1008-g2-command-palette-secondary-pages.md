@@ -1,0 +1,1 @@
+- [Fixed] Index Notification Center, Event Alerts, and Report Compare in the command palette so Cmd+K can discover those existing context-entry routes without adding them to the primary sidebar (Refs #1008).

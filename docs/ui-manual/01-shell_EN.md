@@ -86,8 +86,10 @@ tools, without a duplicate **Research overview** child. On the compact rail,
 
 | Surface | How to open |
 | --- | --- |
-| **Human approvals** `/approvals` | **Not** in the primary sidebar; open via the Home **Review human approvals** control when administrator sign-in is enabled (labels as in UI); contract: `docs/human-approvals_EN.md` |
-| **Notification Center** `/notifications` | Notification bell → View all |
+| **Human approvals** `/approvals` | **Not** in the primary sidebar; open via the Home **Review human approvals** control when administrator sign-in is enabled (labels as in UI), or search the command palette; contract: `docs/human-approvals_EN.md` |
+| **Notification Center** `/notifications` | Notification bell → View all, or search the command palette |
+| **Event Alerts** `/event-alerts` | Event Calendar / Signal Center discovery entry, or search the command palette |
+| **Report Compare** `/research/report-compare` | Stock workspace compare entry, or search the command palette |
 | **Stock workspace** | Type a code in the palette, or open `/stocks/<code>` (example: `/stocks/600519`). The page shows per-field source, lag, staleness, and cross-provider conflicts; conflicts stay visible instead of silently picking one source as truth |
 | **Login** `/login` | When admin auth is on; protected pages use `?redirect=` |
 
@@ -102,7 +104,7 @@ Legacy paths such as `/decision-signals`, `/alerts`, `/backtest`, and `/screenin
 | macOS | `Cmd + K` |
 | Windows / Linux | `Ctrl + K` |
 
-Useful queries include `analysis`, `portfolio`, `signals`, `settings`, section labels such as `Model Sources`, skill names such as `chan theory`, pipeline presets such as `standard research`, a ticker such as `600519`, or at least three characters from a saved report's stock name, code, report type, date, trend, summary, or advice. Results are grouped into stocks, reports, skills, pipelines, settings, pages, and actions. Skill matches open Discover with the strategy deep link; pipeline presets and Settings sections use the canonical Settings section/view routes. Use `Up` / `Down` and `Enter` without leaving the search field; a report result opens its exact Analysis Workbench history record. If report search is temporarily unavailable, stock, page, and action search remain available.
+Useful queries include `analysis`, `portfolio`, `signals`, `settings`, `notification center`, `event-driven alerts`, `report version compare`, section labels such as `Model Sources`, skill names such as `chan theory`, pipeline presets such as `standard research`, a ticker such as `600519`, or at least three characters from a saved report's stock name, code, report type, date, trend, summary, or advice. Results are grouped into stocks, reports, skills, pipelines, settings, pages, and actions. Skill matches open Discover with the strategy deep link; pipeline presets and Settings sections use the canonical Settings section/view routes. Use `Up` / `Down` and `Enter` without leaving the search field; a report result opens its exact Analysis Workbench history record. If report search is temporarily unavailable, stock, page, and action search remain available. Personal Performance stays a paper-account contextual entry and is not indexed as a palette page.
 
 ---
 
