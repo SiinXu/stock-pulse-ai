@@ -10,7 +10,9 @@ import {
 import type { AlphaSiftHotspot, AlphaSiftHotspotDetail } from '../../api/alphasift';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import { getUiListSeparator } from '../../utils/uiLocale';
+import { formatSignedChangePercent } from '../../utils/marketFormat';
 import { Button, InlineAlert, Pressable, Surface } from '../common';
+import { SignedChangeText } from '../theme/SignedChangeText';
 import { MiniSparkline } from './MiniSparkline';
 import {
   formatHotspotMetric,
@@ -165,7 +167,19 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
                   </span>
                 </div>
                 <div className="relative z-10 mt-4 grid min-w-0 flex-1 gap-1 pr-24 text-xs text-secondary-text">
-                  <span>{text.change} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.changePct, text)}%</strong></span>
+                  <span>
+                    {text.change}
+                    {' '}
+                    <strong className="font-semibold text-foreground">
+                      {item.changePct == null || !Number.isFinite(Number(item.changePct))
+                        ? `${formatHotspotMetric(item.changePct, text)}%`
+                        : (
+                          <SignedChangeText value={Number(item.changePct)}>
+                            {formatSignedChangePercent(Number(item.changePct))}
+                          </SignedChangeText>
+                        )}
+                    </strong>
+                  </span>
                   <span>{text.trend} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.trendScore, text)}</strong> · {text.persistence} <strong className="font-semibold text-foreground">{formatHotspotMetric(item.persistenceScore, text)}</strong></span>
                   <span>{getHotspotSampleText(item, text)} · {text.leader} {getHotspotLeadersText(item, language, text)}</span>
                 </div>
@@ -281,7 +295,19 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
                           </div>
                         </div>
                         <p className="mt-2 text-xs text-secondary-text">
-                          {text.change} {formatStockChangeText(stock.changePct, text)} · {text.heat} {formatNumber(stock.hotStockScore, 0)}
+                          {text.change}
+                          {' '}
+                          {stock.changePct == null || !Number.isFinite(Number(stock.changePct))
+                            ? formatStockChangeText(stock.changePct, text)
+                            : (
+                              <SignedChangeText value={Number(stock.changePct)} market={stock.code}>
+                                {formatSignedChangePercent(Number(stock.changePct))}
+                              </SignedChangeText>
+                            )}
+                          {' · '}
+                          {text.heat}
+                          {' '}
+                          {formatNumber(stock.hotStockScore, 0)}
                         </p>
                         {stock.source || stock.sourceConfidence != null || stock.fallbackUsed ? (
                           <p className="mt-1 text-xs text-secondary-text">

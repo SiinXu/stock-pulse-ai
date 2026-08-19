@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import type { MarketStructureContext } from '../../../types/analysis';
+import { applyPriceDirection } from '../../theme/themeRuntime';
 import { MarketStructureCard } from '../MarketStructureCard';
 
 const context: MarketStructureContext = {
@@ -62,6 +63,10 @@ const context: MarketStructureContext = {
 };
 
 describe('MarketStructureCard', () => {
+  afterEach(() => {
+    applyPriceDirection('cn', { persist: false });
+  });
+
   it('renders market layer and stock layer in Chinese', () => {
     render(<MarketStructureCard context={context} language="zh" />);
 
@@ -113,5 +118,50 @@ describe('MarketStructureCard', () => {
 
     rerender(<MarketStructureCard context={null} />);
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it('paints ranked theme change percents with price tokens for both preferences', () => {
+    applyPriceDirection('cn', { persist: false });
+    const first = render(<MarketStructureCard context={context} language="en" />);
+    const up = screen.getAllByText('+4.20%')[0];
+    expect(up).toHaveStyle({ color: 'var(--price-red)' });
+    expect(up).not.toHaveClass('text-success');
+    first.unmount();
+
+    applyPriceDirection('us', { persist: false });
+    render(<MarketStructureCard context={context} language="en" />);
+    expect(screen.getAllByText('+4.20%')[0]).toHaveStyle({ color: 'var(--price-green)' });
+  });
+
+  it('leaves a flat 0% theme change unpainted', () => {
+    const flat = {
+      ...context,
+      marketThemeContext: {
+        ...context.marketThemeContext,
+        activeThemes: [{ name: 'Flat theme', changePct: 0, rank: 1, source: 'concept' }],
+        leadingConcepts: [],
+        leadingIndustries: [],
+      },
+    } satisfies MarketStructureContext;
+    render(<MarketStructureCard context={flat} language="en" />);
+    const node = screen.getByText('0.00%');
+    expect(node).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(node).not.toHaveStyle({ color: 'var(--price-green)' });
+    expect(node).not.toHaveClass('text-success');
+  });
+
+  it('leaves unknown theme change percents unpainted', () => {
+    const unknownChange = {
+      ...context,
+      marketThemeContext: {
+        ...context.marketThemeContext,
+        activeThemes: [{ name: 'Unknown theme', changePct: Number.NaN, rank: 1, source: 'concept' }],
+        leadingConcepts: [],
+        leadingIndustries: [],
+      },
+    } satisfies MarketStructureContext;
+    render(<MarketStructureCard context={unknownChange} language="en" />);
+    expect(screen.getByText('Unknown theme')).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(screen.getByText('Unknown theme')).not.toHaveStyle({ color: 'var(--price-green)' });
   });
 });

@@ -9,7 +9,9 @@ import {
   MARKET_PRICE_FRACTION_DIGITS,
   TRADING_CALENDAR_DEPENDENCY,
   changeColorCssVar,
+  changeColorStyle,
   changeSemantics,
+  coerceMarketId,
   defaultChangeColorPreference,
   formatMarketBadge,
   formatMarketTime,
@@ -247,6 +249,37 @@ describe('marketFormat contract', () => {
       expect(changeColorCssVar('red')).toBe('var(--price-red)');
       expect(changeColorCssVar('green')).toBe('var(--price-green)');
       expect(changeColorCssVar('neutral')).toBeUndefined();
+    });
+
+    it('coerces market ids and leaves unknown markets unresolved', () => {
+      expect(coerceMarketId('cn')).toBe('cn');
+      expect(coerceMarketId('hk')).toBe('hk');
+      expect(coerceMarketId('us')).toBe('us');
+      expect(coerceMarketId('crypto')).toBe('crypto');
+      expect(coerceMarketId('600519')).toBe('cn');
+      expect(coerceMarketId('AAPL')).toBe('us');
+      expect(coerceMarketId('7203.T')).toBeNull();
+      expect(coerceMarketId('???')).toBeNull();
+      expect(coerceMarketId('jp')).toBeNull();
+      expect(coerceMarketId('kr')).toBeNull();
+      expect(coerceMarketId('tw')).toBeNull();
+      expect(coerceMarketId(null)).toBeNull();
+    });
+
+    it('builds inline style for both preferences and leaves zero/unknown unpainted', () => {
+      expect(changeColorStyle(1.25, 'cn', 'red_up')).toEqual({ color: 'var(--price-red)' });
+      expect(changeColorStyle(-1.25, 'cn', 'red_up')).toEqual({ color: 'var(--price-green)' });
+      expect(changeColorStyle(1.25, 'cn', 'green_up')).toEqual({ color: 'var(--price-green)' });
+      expect(changeColorStyle(-1.25, 'us', 'green_up')).toEqual({ color: 'var(--price-red)' });
+      expect(changeColorStyle(0, 'cn', 'red_up')).toBeUndefined();
+      expect(changeColorStyle(0, 'us', 'green_up')).toBeUndefined();
+      expect(changeColorStyle(null, 'cn', 'red_up')).toBeUndefined();
+      expect(changeColorStyle(Number.NaN, 'hk', 'green_up')).toBeUndefined();
+      expect(changeColorStyle(Number.POSITIVE_INFINITY, 'us', 'red_up')).toBeUndefined();
+      expect(changeColorStyle(1.25, null, 'green_up')).toEqual({ color: 'var(--price-green)' });
+      expect(changeColorStyle(-1.25, null, 'red_up')).toEqual({ color: 'var(--price-green)' });
+      expect(changeColorStyle(1.25, null, null)).toBeUndefined();
+      expect(changeColorStyle(1.25, undefined, undefined)).toBeUndefined();
     });
 
     it.each(

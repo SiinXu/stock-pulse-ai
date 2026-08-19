@@ -136,6 +136,20 @@ function isMarketId(value: string): value is MarketId {
 }
 
 /**
+ * Accept a market id or infer one from a stock code. Returns null when the
+ * value is outside this module's MarketId set — callers must not invent one.
+ * Backend jp/kr/tw labels are unsupported here and are not treated as tickers.
+ */
+export function coerceMarketId(value: string | null | undefined): MarketId | null {
+  if (!value || !value.trim()) return null;
+  const trimmed = value.trim();
+  if (isMarketId(trimmed)) return trimmed;
+  const lower = trimmed.toLowerCase();
+  if (lower === 'jp' || lower === 'kr' || lower === 'tw') return null;
+  return resolveMarketIdFromStockCode(trimmed);
+}
+
+/**
  * Infer cn/hk/us from a stock code for formatting adoption.
  *
  * Mirrors `src/market/context.py` `detect_market` for the three markets this
@@ -240,6 +254,40 @@ export function changeColorCssVar(color: ChangeColor): string | undefined {
   return undefined;
 }
 
+/** Inline style for signed change paint. Neutral / unknown / non-finite → undefined. */
+export type ChangeColorStyle = { readonly color: string };
+
+/**
+ * Map a signed change onto the Layer 0 hue tokens via `changeSemantics`.
+ * Zero, missing, non-finite, and unresolved-market values stay unpainted.
+ * When `market` is omitted, an explicit user preference may still paint;
+ * never invent a cn/hk/us convention for an unknown instrument.
+ * Never returns success/danger CSS — those tokens are status, not price direction.
+ */
+export function changeColorStyle(
+  value: number | null | undefined,
+  market: MarketId | null | undefined,
+  userPref?: ChangeColorPreference | null,
+): ChangeColorStyle | undefined {
+  if (value === null || value === undefined || !Number.isFinite(Number(value))) {
+    return undefined;
+  }
+  const numeric = Number(value);
+  if (numeric === 0) return undefined;
+  const direction: Exclude<ChangeDirection, 'flat'> = numeric > 0 ? 'up' : 'down';
+
+  if (market) {
+    const paint = changeColorCssVar(changeSemantics(numeric, market, userPref).color);
+    return paint ? { color: paint } : undefined;
+  }
+
+  if (userPref === 'red_up' || userPref === 'green_up') {
+    const paint = changeColorCssVar(paintColorForDirection(direction, userPref));
+    return paint ? { color: paint } : undefined;
+  }
+  return undefined;
+}
+
 /**
  * Signed change percent for display (e.g. `+1.25%`, `-0.50%`). Missing or non-finite → em dash.
  */
@@ -333,13 +381,19 @@ export function changeSemantics(
   }
 
   let color: ChangeColor = 'neutral';
-  if (direction === 'up') {
-    color = colorPreference === 'red_up' ? 'red' : 'green';
-  } else if (direction === 'down') {
-    color = colorPreference === 'red_up' ? 'green' : 'red';
+  if (direction === 'up' || direction === 'down') {
+    color = paintColorForDirection(direction, colorPreference);
   }
 
   return { direction, colorPreference, color };
+}
+
+function paintColorForDirection(
+  direction: Exclude<ChangeDirection, 'flat'>,
+  pref: ChangeColorPreference,
+): ChangeColor {
+  if (direction === 'up') return pref === 'red_up' ? 'red' : 'green';
+  return pref === 'red_up' ? 'green' : 'red';
 }
 
 function parseTimestamp(ts: string | number | Date): Date | null {

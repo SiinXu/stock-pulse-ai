@@ -19,6 +19,8 @@ Authorable theme surface for Web (Issues #162 / #880):
 
 Built-in packs: `classic` (default), `slate` (validation variant). Runtime attrs: `data-theme-pack`, `data-price-direction`. Guard: `themeContractGuard.test.ts` (baseline-only-decrease). Preference bridge: `MARKET_REVIEW_COLOR_SCHEME` ↔ `data-price-direction`.
 
+Signed price / gain / loss paint on Portfolio, Backtest, Screening results, Market Structure, and Financial Calculators uses `changeSemantics` + `changeColorCssVar` (via `SignedChangeText`). Preference is the existing ThemeAppearance / `data-price-direction` bridge (`MARKET_REVIEW_COLOR_SCHEME`) — do not add a parallel preference hook. Do not map signed values onto `text-success` / `text-danger`. Zero, missing, non-finite, and unresolved-market values stay unpainted; never invent a `cn` market for an unknown code. Sign or wording remains the non-color cue. Backtest up/down movement badges use `trend-up` / `trend-down` so they follow `data-price-direction`.
+
 
 - Foundation owns semantic tokens and shared control geometry.
 - Primitives own native semantics, refs, disabled/loading states, focus, and

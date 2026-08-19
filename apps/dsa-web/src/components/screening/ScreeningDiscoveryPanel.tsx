@@ -14,7 +14,9 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
 import { buildDeepLink } from '../../utils/deepLink';
+import { formatSignedChangePercent } from '../../utils/marketFormat';
 import { Button, DataTable, Input, Select, Surface, Textarea, type DataTableColumn } from '../common';
+import { SignedChangeText } from '../theme/SignedChangeText';
 import type { DiscoveryScreeningText } from './screeningText';
 
 const POLL_MS = 1500;
@@ -205,7 +207,15 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
     {
       id: 'change',
       header: text.change,
-      cell: (item) => item.changePct == null ? '-' : `${Number(item.changePct).toFixed(2)}%`,
+      cell: (item) => {
+        if (item.changePct == null || !Number.isFinite(Number(item.changePct))) return '-';
+        const changePct = Number(item.changePct);
+        return (
+          <SignedChangeText value={changePct} market={item.code}>
+            {formatSignedChangePercent(changePct)}
+          </SignedChangeText>
+        );
+      },
     },
     {
       id: 'summary',

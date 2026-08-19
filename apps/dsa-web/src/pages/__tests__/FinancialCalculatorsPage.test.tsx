@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { applyPriceDirection } from '../../components/theme/themeRuntime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { calculatorsApi } from '../../api/calculators';
@@ -97,6 +98,49 @@ describe('FinancialCalculatorsPage', () => {
     });
     expect(screen.getByTestId('growth-chart')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Balance path' })).toBeInTheDocument();
+  });
+
+  it('paints total gain with price tokens and leaves a zero series gain unpainted', async () => {
+    applyPriceDirection('cn', { persist: false });
+    vi.mocked(calculatorsApi.compoundGrowth).mockResolvedValue({
+      status: 'ok',
+      principal: 1000,
+      annualRate: 0.12,
+      years: 1,
+      contributionPerPeriod: 0,
+      periodsPerYear: 12,
+      periodCount: 12,
+      periodRate: 0.01,
+      finalValue: 1126.83,
+      totalContributed: 1000,
+      totalGain: 126.83,
+      seriesTotalPoints: 13,
+      seriesReturnedPoints: 2,
+      seriesSampled: true,
+      seriesStride: 12,
+      series: [
+        { period: 0, balance: 1000, totalContributed: 1000, gain: 0 },
+        { period: 12, balance: 1126.83, totalContributed: 1000, gain: 126.83 },
+      ],
+    });
+
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate' }));
+    const gains = await screen.findAllByText('+126.83');
+    expect(gains.length).toBeGreaterThan(0);
+    for (const gain of gains) {
+      expect(gain).toHaveStyle({ color: 'var(--price-red)' });
+      expect(gain).not.toHaveClass('text-success');
+      expect(gain).not.toHaveClass('text-danger');
+    }
+
+    applyPriceDirection('us', { persist: false });
+    cleanup();
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Calculate' }));
+    const flipped = await screen.findAllByText('+126.83');
+    expect(flipped[0]).toHaveStyle({ color: 'var(--price-green)' });
+    applyPriceDirection('cn', { persist: false });
   });
 
   it('shows unreachable status for duration mode', async () => {

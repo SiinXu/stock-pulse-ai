@@ -154,9 +154,9 @@ function actualMovementBadge(movement: string | null | undefined, language: UiLa
   const labels = BACKTEST_MOVEMENT_LABELS[language];
   switch (movement) {
     case 'up':
-      return <Badge variant="success">{labels.up}</Badge>;
+      return <Badge variant="trend-up">{labels.up}</Badge>;
     case 'down':
-      return <Badge variant="danger">{labels.down}</Badge>;
+      return <Badge variant="trend-down">{labels.down}</Badge>;
     case 'flat':
       return <Badge variant="warning">{labels.flat}</Badge>;
     default:
@@ -794,7 +794,7 @@ const BacktestPage: React.FC = () => {
           {actualMovementBadge(row.actualMovement, language)}
           <span className={
             row.actualReturnPct != null
-              ? row.actualReturnPct > 0 ? 'text-success' : row.actualReturnPct < 0 ? 'text-danger' : 'text-secondary-text'
+              ? row.actualReturnPct > 0 ? 'price-up' : row.actualReturnPct < 0 ? 'price-down' : 'text-secondary-text'
               : 'text-muted-text'
           }>
             {pct(row.actualReturnPct)}
