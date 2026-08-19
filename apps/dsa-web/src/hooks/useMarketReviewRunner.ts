@@ -11,6 +11,7 @@ import {
   isLaunchBlockingError,
   isTerminalTaskStatus,
   normalizeTaskProgress,
+  resolveBusyRecoveryDecision,
 } from '../utils/asyncTaskUx';
 import {
   formatMarketReviewRegionLabels,
@@ -257,7 +258,20 @@ export function useMarketReviewRunner({
     },
     onError: (triggerError: unknown) => {
       if (!activeRef.current) return;
-      setError(getParsedApiError(triggerError));
+      const parsed = getParsedApiError(triggerError);
+      const recovery = resolveBusyRecoveryDecision(parsed);
+      if (recovery.kind === 'attach_or_view_tasks' && recovery.existingTaskId) {
+        setError(null);
+        setNotice({
+          variant: 'warning',
+          title: t('home.duplicateTask'),
+          message: t('home.marketReviewInProgress'),
+        });
+        onFeedbackRef.current?.();
+        void pollStatus(recovery.existingTaskId);
+        return;
+      }
+      setError(parsed);
       setNotice(null);
       setActiveTaskId(null);
       onFeedbackRef.current?.();

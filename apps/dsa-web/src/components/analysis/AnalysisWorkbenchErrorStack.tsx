@@ -6,6 +6,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
 import { useStockPoolStore } from '../../stores/stockPoolStore';
 import { mapApiErrorToActionable } from '../../utils/apiReasonMapper';
+import { buildBusyRecoveryActions } from '../../utils/busyRecoveryActions';
 import { Button, InlineAlert } from '../common';
 import ActionableApiErrorInline, {
   type ActionableApiErrorAction,
@@ -96,12 +97,17 @@ const AnalysisWorkbenchErrorStack: React.FC<AnalysisWorkbenchErrorStackProps> = 
     retry: () => void,
     loading = false,
   ): ActionableApiErrorAction[] => {
-    const mapping = mapApiErrorToActionable(error);
-    if (mapping.class === 'busy') {
-      return [{ label: t('analysisWorkbench.tasks'), onClick: onViewTasks }];
-    }
+    const recovery = buildBusyRecoveryActions(error, t, {
+      onAttachOrViewTasks: onViewTasks,
+      onRetrySameOperation: retry,
+    }, {
+      retryDisabled: loading,
+      retryLoading: loading,
+    });
+    if (recovery.length > 0) return recovery;
     const contextual = contextualAction(error);
     if (contextual) return [contextual];
+    const mapping = mapApiErrorToActionable(error);
     if (!RETRYABLE_CLASSES.has(mapping.class)) return [];
     return [{
       label: t('common.retry'),
@@ -112,19 +118,26 @@ const AnalysisWorkbenchErrorStack: React.FC<AnalysisWorkbenchErrorStackProps> = 
   };
 
   const batchActions = batchNotice?.error ? (() => {
-    const actions: ActionableApiErrorAction[] = [];
-    const mapping = mapApiErrorToActionable(batchNotice.error);
-    if (
-      (batchNotice.confirmedCodes?.length ?? 0) > 0
-      || mapping.class === 'busy'
-    ) {
-      actions.push({ label: t('analysisWorkbench.tasks'), onClick: onViewTasks });
-    }
+    const actions: ActionableApiErrorAction[] = buildBusyRecoveryActions(
+      batchNotice.error,
+      t,
+      {
+        onAttachOrViewTasks: onViewTasks,
+        onRetrySameOperation: onRetryBatch,
+      },
+      {
+        forceAttachOrViewTasks: (batchNotice.confirmedCodes?.length ?? 0) > 0,
+        retryDisabled: isBatchSubmitting,
+        retryLoading: isBatchSubmitting,
+      },
+    );
     const contextual = contextualAction(batchNotice.error);
     if (contextual) actions.push(contextual);
+    const mapping = mapApiErrorToActionable(batchNotice.error);
     if (
       (RETRYABLE_CLASSES.has(mapping.class) || batchNotice.canRetryUnconfirmed)
       && (batchNotice.unconfirmedCodes?.length ?? 0) > 0
+      && !actions.some((action) => action.onClick === onRetryBatch)
     ) {
       actions.push({
         label: t('common.retry'),

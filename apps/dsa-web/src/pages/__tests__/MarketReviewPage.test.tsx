@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -279,5 +279,65 @@ describe('MarketReviewPage', () => {
       `/?${REPORT_ROUTE_QUERY_KEYS.recordId}=1&keep=yes#snapshot`,
     )).toBeInTheDocument();
     expect(screen.queryByText('个股报告不得留在大盘复盘页面')).not.toBeInTheDocument();
+  });
+
+  it('blocks relaunch on repeated busy 409 and recovers after dismiss', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          error: 'duplicate_market_review',
+          message: '大盘复盘正在执行中，请稍后再试',
+        },
+      },
+    });
+
+    renderMarketReview();
+    const launch = (await screen.findAllByRole('button', { name: '大盘复盘' }))[0];
+    fireEvent.click(launch);
+
+    const alert = await screen.findByTestId('actionable-api-error-inline');
+    expect(alert).toHaveAttribute('data-error-class', 'busy');
+    expect(within(alert).queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+    expect(within(alert).queryByRole('button', { name: '运行中任务' })).not.toBeInTheDocument();
+    expect(launch).toBeDisabled();
+
+    fireEvent.click(launch);
+    expect(analysisApi.triggerMarketReview).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(alert).getByRole('button', { name: '关闭' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
+    });
+    expect(launch).toBeEnabled();
+
+    vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
+      status: 'accepted',
+      region: 'cn',
+      sendNotification: true,
+      message: '大盘复盘任务已提交',
+      taskId: 'market-recovered',
+    });
+    fireEvent.click(launch);
+    await waitFor(() => expect(analysisApi.triggerMarketReview).toHaveBeenCalledTimes(2));
+  });
+
+  it('does not apply busy recovery to a non-busy market-review failure', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockRejectedValue({
+      response: {
+        status: 503,
+        data: {
+          error: 'market_review_unavailable',
+          message: 'Service unavailable',
+        },
+      },
+    });
+
+    renderMarketReview();
+    fireEvent.click((await screen.findAllByRole('button', { name: '大盘复盘' }))[0]);
+
+    const alert = await screen.findByTestId('actionable-api-error-inline');
+    expect(alert).not.toHaveAttribute('data-error-class', 'busy');
+    expect(within(alert).queryByRole('button', { name: '运行中任务' })).not.toBeInTheDocument();
   });
 });

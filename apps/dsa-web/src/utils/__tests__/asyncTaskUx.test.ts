@@ -11,6 +11,7 @@ import {
   isTerminalTaskStatus,
   mapTaskStatusToClientPhase,
   normalizeTaskProgress,
+  resolveBusyRecoveryDecision,
   resolveBusyRecoveryKind,
 } from '../asyncTaskUx';
 
@@ -126,6 +127,30 @@ describe('asyncTaskUx', () => {
         code: 'config_version_conflict',
         status: 409,
       }))).toBe('reload');
+    });
+
+    it('exposes a production decision with attachable task identity', () => {
+      expect(resolveBusyRecoveryDecision(createParsedApiError({
+        title: 'busy',
+        message: 'busy',
+        code: 'duplicate_task',
+        status: 409,
+        params: { existing_task_id: 'live-1' },
+      }))).toEqual({
+        kind: 'attach_or_view_tasks',
+        existingTaskId: 'live-1',
+        blocksLaunch: true,
+      });
+      expect(resolveBusyRecoveryDecision(createParsedApiError({
+        title: 'net',
+        message: 'net',
+        category: 'upstream_network',
+        status: 503,
+      }))).toEqual({
+        kind: 'none',
+        existingTaskId: null,
+        blocksLaunch: false,
+      });
     });
 
     it('allows operation retry only for network/rate classes', () => {

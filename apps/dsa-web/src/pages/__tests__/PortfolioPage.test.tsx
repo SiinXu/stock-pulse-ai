@@ -2062,6 +2062,100 @@ describe('PortfolioPage FX refresh', () => {
     }));
   });
 
+  it('reattaches a duplicate position analysis through the busy recovery assistant', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({
+      positions: [makePosition({ symbol: 'AAPL', market: 'us', currency: 'USD' })],
+    }));
+    analyzePosition.mockRejectedValueOnce(createApiError(createParsedApiError({
+      title: 'busy',
+      message: 'busy',
+      code: 'duplicate_task',
+      status: 409,
+      params: { existing_task_id: 'task-existing-pos' },
+    })));
+    getAnalysisTasks.mockResolvedValue({
+      total: 1,
+      pending: 0,
+      processing: 1,
+      tasks: [{
+        taskId: 'task-existing-pos',
+        stockCode: 'AAPL',
+        status: 'processing',
+        progress: 20,
+        reportType: 'detailed',
+        createdAt: '2026-08-19T00:00:00.000Z',
+      }],
+    });
+    getAnalysisStatus.mockResolvedValue({
+      taskId: 'task-existing-pos',
+      status: 'processing',
+      progress: 20,
+    });
+
+    renderPortfolioPage();
+    await waitForInitialLoad();
+    const row = screen.getByText('AAPL').closest('tr');
+    fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: '分析' }));
+
+    const taskPanel = await screen.findByTestId('portfolio-analysis-task-panel');
+    expect(await within(taskPanel).findByTestId('task-panel-item')).toHaveTextContent('AAPL');
+    expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
+    expect(analyzePosition).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers retry-same-operation for portfolio_busy and recovers on the second attempt', async () => {
+    getSnapshot.mockResolvedValue(makeSnapshot({
+      positions: [makePosition({ symbol: 'AAPL', market: 'us', currency: 'USD' })],
+    }));
+    analyzePosition
+      .mockRejectedValueOnce(createApiError(createParsedApiError({
+        title: 'busy',
+        message: 'busy',
+        code: 'portfolio_busy',
+        status: 409,
+      })))
+      .mockResolvedValueOnce({
+        taskId: 'task-recovered',
+        status: 'pending',
+        message: 'queued',
+        analysisPhase: 'auto',
+      });
+
+    renderPortfolioPage();
+    await waitForInitialLoad();
+    const row = screen.getByText('AAPL').closest('tr');
+    fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: '分析' }));
+
+    const busyAlert = await screen.findByTestId('actionable-api-error-inline');
+    expect(busyAlert).toHaveAttribute('data-error-class', 'busy');
+    fireEvent.click(within(busyAlert).getByRole('button', { name: '重试' }));
+
+    await waitFor(() => expect(analyzePosition).toHaveBeenCalledTimes(2));
+    expect(await screen.findByTestId('portfolio-analysis-task-panel')).toBeInTheDocument();
+    expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
+  });
+
+  it('does not apply busy recovery to a non-busy position analysis error', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({
+      positions: [makePosition({ symbol: 'AAPL', market: 'us', currency: 'USD' })],
+    }));
+    analyzePosition.mockRejectedValueOnce(createApiError(createParsedApiError({
+      title: 'invalid',
+      message: 'invalid',
+      code: 'validation_error',
+      status: 422,
+    })));
+
+    renderPortfolioPage();
+    await waitForInitialLoad();
+    const row = screen.getByText('AAPL').closest('tr');
+    fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: '分析' }));
+
+    await waitFor(() => expect(analyzePosition).toHaveBeenCalledTimes(1));
+    expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '运行中任务' })).not.toBeInTheDocument();
+  });
+
   it('prefers disabled feedback over empty-pair feedback when refresh is disabled', async () => {
     refreshFx.mockResolvedValueOnce({
       asOf: '2026-03-19',

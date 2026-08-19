@@ -37,10 +37,8 @@ import {
 } from '../routing/routes';
 import type { MarketReviewRegion } from '../types/analysis';
 import type { RunFlowSnapshotSource } from '../types/runFlow';
-import {
-  isOperationRetryableError,
-  isTaskBusyError,
-} from '../utils/asyncTaskUx';
+import { extractExistingTaskId } from '../utils/asyncTaskUx';
+import { buildLaunchErrorActions } from '../utils/busyRecoveryActions';
 import { normalizeReportLanguage } from '../utils/reportLanguage';
 
 type RunFlowDialogState =
@@ -290,19 +288,26 @@ const MarketReviewPage: React.FC = () => {
           <ActionableApiErrorInline
             error={runner.error}
             onDismiss={runner.dismissError}
-            actions={[
-              ...(isOperationRetryableError(runner.error) && !isTaskBusyError(runner.error)
-                ? [{
-                    label: t('common.retry'),
-                    onClick: () => {
-                      runner.dismissError();
-                      void triggerMarketReview();
+            actions={buildLaunchErrorActions(runner.error, t, {
+              ...(extractExistingTaskId(runner.error)
+                ? {
+                    onAttachOrViewTasks: (taskId: string | null) => {
+                      if (taskId) urlState.openTaskRunFlow(taskId);
                     },
-                    disabled: runner.isSubmitting,
-                    isLoading: runner.isSubmitting,
-                  }]
-                : []),
-            ]}
+                  }
+                : {}),
+              onRetrySameOperation: () => {
+                runner.dismissError();
+                void triggerMarketReview();
+              },
+              onRetry: () => {
+                runner.dismissError();
+                void triggerMarketReview();
+              },
+            }, {
+              retryDisabled: runner.isSubmitting,
+              retryLoading: runner.isSubmitting,
+            })}
           />
         ) : null}
         {urlState.urlIssue ? (

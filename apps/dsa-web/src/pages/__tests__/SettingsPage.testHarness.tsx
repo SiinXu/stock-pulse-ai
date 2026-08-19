@@ -182,6 +182,15 @@ vi.mock('react-router-dom', async (importOriginal) => ({
   },
   useSearchParams: () => [routerSearchParamsMock.params, routerSearchParamsMock.setParams] as const,
   useNavigate: () => usageNavigate,
+  useLocation: () => ({
+    pathname: '/settings',
+    search: routerSearchParamsMock.params.toString()
+      ? `?${routerSearchParamsMock.params.toString()}`
+      : '',
+    hash: '',
+    state: null,
+    key: 'settings-test',
+  }),
 }));
 
 vi.mock('../../api/scheduledTasks', () => ({

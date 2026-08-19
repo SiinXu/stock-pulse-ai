@@ -7,7 +7,10 @@ import {
   type AnalysisWorkbenchSegment,
 } from '../routing/routes';
 import type { TaskInfo } from '../types/analysis';
-import { isLaunchBlockingError } from '../utils/asyncTaskUx';
+import {
+  isLaunchBlockingError,
+  resolveBusyRecoveryDecision,
+} from '../utils/asyncTaskUx';
 
 /** Busy/conflict launch blocking + recover-to-tasks CTA for Analysis Workbench. */
 export function useAnalysisWorkbenchErrorContract(options: {
@@ -27,16 +30,33 @@ export function useAnalysisWorkbenchErrorContract(options: {
     selectSegment,
   } = options;
 
+  const duplicateRecovery = resolveBusyRecoveryDecision(duplicateError);
+  const errorRecovery = resolveBusyRecoveryDecision(error);
   const launchBlockedByBusy = Boolean(duplicateError)
     || isLaunchBlockingError(error);
 
   const openBusyTasks = useCallback(() => {
-    const existing = duplicateTask?.existingTaskId
-      ? analysisTasks.find((task) => task.taskId === duplicateTask.existingTaskId)
+    const attachTaskId = duplicateTask?.existingTaskId
+      || duplicateRecovery.existingTaskId
+      || errorRecovery.existingTaskId;
+    const existing = attachTaskId
+      ? analysisTasks.find((task) => task.taskId === attachTaskId)
       : undefined;
     if (existing) openTaskRunFlow(existing);
     else selectSegment(ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks);
-  }, [analysisTasks, duplicateTask, openTaskRunFlow, selectSegment]);
+  }, [
+    analysisTasks,
+    duplicateRecovery.existingTaskId,
+    duplicateTask,
+    errorRecovery.existingTaskId,
+    openTaskRunFlow,
+    selectSegment,
+  ]);
 
-  return { launchBlockedByBusy, openBusyTasks };
+  return {
+    launchBlockedByBusy,
+    openBusyTasks,
+    duplicateRecovery,
+    errorRecovery,
+  };
 }

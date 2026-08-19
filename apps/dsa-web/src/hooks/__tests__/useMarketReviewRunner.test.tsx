@@ -324,6 +324,95 @@ describe('useMarketReviewRunner', () => {
     expect(result.current.isLaunchBlocked).toBe(false);
   });
 
+  it('attaches an existing market-review task id instead of dead-ending on 409', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          error: 'duplicate_market_review',
+          message: '大盘复盘正在执行中，请稍后再试',
+          params: { existing_task_id: 'market-existing' },
+        },
+      },
+    });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: 'market-existing',
+      status: 'processing',
+      progress: 30,
+    });
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: true,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.error).toBeNull();
+    expect(result.current.activeTaskId).toBe('market-existing');
+    expect(result.current.isLaunchBlocked).toBe(true);
+    expect(analysisApi.getStatus).toHaveBeenCalledWith('market-existing');
+  });
+
+  it('does not attach or block launch on a non-busy trigger failure', async () => {
+    vi.mocked(analysisApi.triggerMarketReview).mockRejectedValue({
+      response: {
+        status: 422,
+        data: { error: 'validation_error', message: 'bad region' },
+      },
+    });
+    const { result } = renderHook(() => useMarketReviewRunner({
+      notify: true,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }), { wrapper: createWrapper() });
+
+    await act(async () => {
+      await result.current.triggerMarketReview();
+    });
+
+    expect(result.current.error).toMatchObject({ code: 'validation_error', status: 422 });
+    expect(result.current.isLaunchBlocked).toBe(false);
+    expect(analysisApi.getStatus).not.toHaveBeenCalled();
+  });
+
+  it('ignores a stale busy rejection after unmount', async () => {
+    let rejectTrigger!: (error: unknown) => void;
+    vi.mocked(analysisApi.triggerMarketReview).mockImplementation(
+      () => new Promise((_, reject) => {
+        rejectTrigger = reject;
+      }),
+    );
+    const { result, unmount } = renderHook(() => useMarketReviewRunner({
+      notify: true,
+      refreshMarketReviewHistory: vi.fn().mockResolvedValue(emptyHistory),
+      onPersistedReport: vi.fn(),
+    }), { wrapper: createWrapper() });
+
+    let triggerPromise: Promise<void> = Promise.resolve();
+    await act(async () => {
+      triggerPromise = result.current.triggerMarketReview();
+    });
+    unmount();
+    await act(async () => {
+      rejectTrigger({
+        response: {
+          status: 409,
+          data: { error: 'duplicate_market_review', message: 'busy' },
+        },
+      });
+      await triggerPromise;
+    });
+
+    expect(analysisApi.getStatus).not.toHaveBeenCalled();
+  });
+
   it('treats cancelled and interrupted statuses as terminal without unknown-status fallback', async () => {
     vi.mocked(analysisApi.triggerMarketReview).mockResolvedValue({
       status: 'accepted',

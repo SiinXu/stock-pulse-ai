@@ -224,7 +224,16 @@ export function registerSettingsPageSchedulerTests(): void {
   });
 
   it('shows an error when run-now is rejected because analysis is already running', async () => {
-    runSchedulerNow.mockRejectedValueOnce(new Error('A scheduled analysis is already running'));
+    runSchedulerNow.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: {
+          error: 'scheduler_busy',
+          message: 'A scheduled analysis is already running',
+          params: { reason: 'analysis_already_running' },
+        },
+      },
+    });
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'system',
@@ -278,9 +287,10 @@ export function registerSettingsPageSchedulerTests(): void {
     fireEvent.click(runNowButton);
 
     await waitFor(() => expect(runSchedulerNow).toHaveBeenCalledTimes(1));
-    const errorToast = await screen.findByRole('alert');
-    expect(errorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
-    expect(errorToast).not.toHaveTextContent('A scheduled analysis is already running');
+    const alert = await screen.findByTestId('actionable-api-error-inline');
+    expect(alert).toBeInTheDocument();
+    expect(alert.closest('[data-overlay-root="toast"]')).toBeNull();
+    expect(alert).not.toHaveTextContent('A scheduled analysis is already running');
   });
 
   it('does not show a failed run as the last successful scheduler run', async () => {

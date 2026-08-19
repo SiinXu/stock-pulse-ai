@@ -74,7 +74,9 @@ always offer at least one exit:
 Never leave the user with only a disabled button and no explanation.
 
 Helpers: `isTaskBusyError`, `isLaunchBlockingError`, `extractExistingTaskId`,
-`resolveBusyRecoveryKind`.
+`resolveBusyRecoveryKind`, `resolveBusyRecoveryDecision`. Production launch
+surfaces must invoke `resolveBusyRecoveryDecision` (or `buildBusyRecoveryActions`
+/ `buildLaunchErrorActions`) instead of inventing a second busy policy.
 
 ## Long-task progress and terminal presentation
 
@@ -113,11 +115,11 @@ the sole surface for busy or for accepted long-running work.
 
 | Entry | Busy / 409 | Progress / terminal | Notes |
 | --- | --- | --- | --- |
-| Analysis Workbench launch / batch | Actionable inline + TaskPanel / RunFlow | TaskPanel + RunFlow | Reference adoption (PR #934) |
-| Portfolio position analysis | Reattach on `duplicate_task` + TaskPanel | Shared TaskPanel | Must not dead-end on toast |
-| Market Review | Busy alert + launch block until dismiss | Runner notices + optional RunFlow | Lock 409 may omit task id |
-| Settings run-now | Disable + busy reason + tracked state | Poll until idle | Not a bare task id |
-| Settings first-run smoke | Busy/duplicate → workbench tasks link | Success links to Analysis Workbench tasks | No task-id-only success |
+| Analysis Workbench launch / batch | `resolveBusyRecoveryDecision` + Actionable inline + TaskPanel / RunFlow | TaskPanel + RunFlow | Attach/view-tasks, wait+dismiss, retry-same-operation, or reload from the shared assistant. Partial batches may still offer View Tasks after accepted work. |
+| Portfolio position analysis | Reattach when the assistant returns `attach_or_view_tasks` + task id | Shared TaskPanel | `portfolio_busy` uses retry-same-operation; non-busy errors stay on `ApiErrorAlert` |
+| Market Review | Busy alert + launch block until dismiss; attach/poll when `existing_task_id` is present | Runner notices + optional RunFlow | Lock 409 may omit task id (`wait_and_dismiss`) |
+| Settings run-now | Disable + busy reason + tracked state + inline recovery | Poll until idle | 409/busy is not toast-only |
+| Settings first-run smoke | `attach_or_view_tasks` → workbench tasks link | Success links to Analysis Workbench tasks | Other busy kinds stay inline without a fake tasks link |
 | Stock Screening | Capability / poll errors local | Local progress + `formatTaskMessage` | Domain-specific panel OK |
 | Scheduler status API | `runNowAvailable` / `runNowBlockReason` | Tracked run lifecycle | Align copy with busy class |
 
