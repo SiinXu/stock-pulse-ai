@@ -370,6 +370,7 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
               density="compact"
               frame="embedded"
               minWidth="wide"
+              virtualization={false}
             />
           )}
           <p className="text-xs text-secondary-text">{result.researchDisclaimer || text.discoveryDisclaimer}</p>

@@ -21,7 +21,7 @@ Audit and regression evidence should cover at least **320 / 768 / 1024**.
 - Shell mobile header, nav Drawer, compact/expanded desktop rail (`Shell.tsx`)
 - Coarse-pointer targets (`min-h-11` / IconButton `navigation` = 44px)
 - `Pagination` compact strip for 320px containers
-- `DataTable` contained horizontal scroll (`overflow-x-auto`) with declared min widths; tables at or above 24 rows also use a bounded vertical window with a sticky header
+- `DataTable` contained horizontal scroll (`overflow-x-auto`) with declared min widths; tables at or above 24 rows also use a bounded vertical window with an opaque sticky header
 - `ResponsiveFilterPanel` / `AdvancedFilterSheet` mobile drawers and 768 breakpoint switch
 - Home three-column core blocks only at `xl` (avoids clip at 1024 with compact rail)
 

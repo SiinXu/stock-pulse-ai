@@ -273,6 +273,42 @@ describe('StockHistoryTrendDrawer', () => {
     expect(screen.queryByText('预警')).not.toBeInTheDocument();
   });
 
+  it('keeps tall action and score cells on the full DataTable path', () => {
+    const manyItems = Array.from({ length: 30 }, (_, index) => ({
+      ...items[0],
+      id: index + 1,
+      queryId: `q-${index + 1}`,
+      createdAt: `2026-03-${String(20 - (index % 10)).padStart(2, '0')}T08:00:00Z`,
+    }));
+    window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <StockHistoryTrendDrawer
+          report={report}
+          items={manyItems}
+          total={30}
+          hasMore
+          isLoading={false}
+          isLoadingMore={false}
+          filters={{ range: 'all', model: 'all', sort: 'desc' }}
+          onClose={vi.fn()}
+          onRangeChange={vi.fn()}
+          onLoadMore={vi.fn()}
+          onSelectRecord={vi.fn()}
+          onRetry={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    const table = screen.getByRole('table');
+    const region = table.parentElement;
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(region).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
+    expect(region).toHaveAttribute('data-mounted-count', '30');
+    expect(within(table).getAllByRole('row')).toHaveLength(31);
+    expect(within(table).getAllByRole('button', { name: 'View report' })).toHaveLength(30);
+  });
+
   it('uses localized taxonomy labels before server labels in English UI mode', () => {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
 

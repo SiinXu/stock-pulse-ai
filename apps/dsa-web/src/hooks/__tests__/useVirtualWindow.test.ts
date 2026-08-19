@@ -74,17 +74,23 @@ describe('useVirtualWindow', () => {
   });
 
   it('clamps a stale scroll offset after the item count shrinks', () => {
-    const { result } = renderHook(() => useVirtualWindow({
-      itemCount: 20,
-      estimatedItemHeight: 48,
-      overscan: 6,
-      initialScrollTop: 10_000,
-    }));
+    const { result, rerender } = renderHook(
+      ({ itemCount }) => useVirtualWindow({
+        itemCount,
+        estimatedItemHeight: 48,
+        overscan: 6,
+        initialScrollTop: 10_000,
+      }),
+      { initialProps: { itemCount: 80 } },
+    );
     act(() => {
       result.current.setViewportHeight(480);
     });
-    expect(result.current.range.startIndex).toBeLessThanOrEqual(result.current.range.endIndex);
-    expect(result.current.range.endIndex).toBe(19);
+    expect(result.current.range.endIndex).toBe(79);
+
+    rerender({ itemCount: 30 });
+    expect(result.current.range.endIndex).toBe(29);
     expect(result.current.range.startIndex).toBeGreaterThanOrEqual(0);
+    expect(result.current.range.startIndex).toBeLessThanOrEqual(result.current.range.endIndex);
   });
 });

@@ -3,6 +3,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
+  DATATABLE_COMPACT_ROW_HEIGHT_PX,
   DATATABLE_DEFAULT_ROW_HEIGHT_PX,
   DATATABLE_VIRTUALIZE_THRESHOLD,
   DATATABLE_VIRTUAL_VIEWPORT_PX,
@@ -39,6 +40,7 @@ function renderTable(
   extra?: {
     sort?: DataTableSortState;
     virtualization?: false;
+    density?: 'compact' | 'default';
   },
 ) {
   return render(
@@ -51,6 +53,7 @@ function renderTable(
       getRowTestId={(row) => `position-${row.id}`}
       emptyState={EMPTY_STATE}
       sort={extra?.sort}
+      density={extra?.density}
       virtualization={extra?.virtualization}
     />,
   );
@@ -88,7 +91,9 @@ describe('DataTable virtualization', () => {
     expect(region).toHaveAttribute('data-data-table-virtual-reason', 'windowed');
     expect(region).toHaveStyle({ maxHeight: `${DATATABLE_VIRTUAL_VIEWPORT_PX}px` });
     expect(screen.getByRole('table')).toHaveAttribute('aria-rowcount', String(rows.length + 1));
-    expect((screen.getByRole('table') as HTMLTableElement).tHead).toHaveClass('sticky', 'top-0');
+    const tHead = (screen.getByRole('table') as HTMLTableElement).tHead;
+    expect(tHead).toHaveClass('sticky', 'top-0', 'bg-card');
+    expect(tHead).not.toHaveClass('bg-subtle-soft');
     expect(screen.getByTestId('position-1')).toHaveAttribute('aria-rowindex', '2');
     expect(screen.getByTestId('position-1')).toBeVisible();
     expect(screen.queryByTestId('position-80')).not.toBeInTheDocument();
@@ -310,5 +315,123 @@ describe('DataTable virtualization', () => {
     expect(scrollRegion()).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
     expect(bodyRowCount()).toBe(40);
     expect(within(screen.getByRole('table')).getAllByRole('row')).toHaveLength(41);
+  });
+
+  it('keeps a translucent header wash only when the table is not windowed', () => {
+    renderTable(buildRows(DATATABLE_VIRTUALIZE_THRESHOLD - 1));
+    const tHead = (screen.getByRole('table') as HTMLTableElement).tHead;
+    expect(tHead).toHaveClass('bg-subtle-soft');
+    expect(tHead).not.toHaveClass('sticky');
+    expect(tHead).not.toHaveClass('bg-card');
+  });
+
+  it('activates a windowed row with Enter and Space after scroll', () => {
+    const rows = buildRows(60);
+    const onRowActivate = vi.fn();
+    render(
+      <DataTable
+        caption="Portfolio positions"
+        scrollAreaLabel="Scrollable portfolio positions"
+        columns={COLUMNS}
+        rows={rows}
+        getRowKey={(row) => row.id}
+        getRowTestId={(row) => `position-${row.id}`}
+        emptyState={EMPTY_STATE}
+        onRowActivate={onRowActivate}
+        getRowAriaLabel={(row) => `Open ${row.symbol}`}
+      />,
+    );
+
+    const region = scrollRegion();
+    Object.defineProperty(region, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 50 * DATATABLE_DEFAULT_ROW_HEIGHT_PX,
+    });
+    fireEvent.scroll(region);
+
+    const target = screen.getByTestId('position-55');
+    fireEvent.keyDown(target, { key: 'Enter' });
+    fireEvent.keyDown(target, { key: ' ' });
+    expect(onRowActivate).toHaveBeenNthCalledWith(1, rows[54], 54);
+    expect(onRowActivate).toHaveBeenNthCalledWith(2, rows[54], 54);
+  });
+
+  it('keeps error and retrying status on the state surface for large row sets', () => {
+    const rows = buildRows(40);
+    const { rerender } = render(
+      <DataTable
+        caption="Portfolio positions"
+        columns={COLUMNS}
+        rows={rows}
+        getRowKey={(row) => row.id}
+        emptyState={EMPTY_STATE}
+        status={{ state: 'error', title: 'Positions unavailable' }}
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Positions unavailable');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+
+    rerender(
+      <DataTable
+        caption="Portfolio positions"
+        columns={COLUMNS}
+        rows={rows}
+        getRowKey={(row) => row.id}
+        emptyState={EMPTY_STATE}
+        status={{ state: 'retrying', title: 'Retrying positions' }}
+      />,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Retrying positions');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
+  });
+
+  it('windows compact nowrap rows with the compact estimate', () => {
+    const rows = buildRows(80);
+    renderTable(rows, { density: 'compact' });
+    const region = scrollRegion();
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'true');
+    expect(screen.getByRole('table')).toHaveAttribute('data-density', 'compact');
+    expect(screen.queryByTestId('position-80')).not.toBeInTheDocument();
+
+    Object.defineProperty(region, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 79 * DATATABLE_COMPACT_ROW_HEIGHT_PX,
+    });
+    fireEvent.scroll(region);
+    expect(screen.getByTestId('position-80')).toBeVisible();
+    const topSpacer = document.querySelector('[data-data-table-spacer="top"]') as HTMLElement;
+    expect(Number.parseFloat(topSpacer.style.height) % DATATABLE_COMPACT_ROW_HEIGHT_PX).toBe(0);
+  });
+
+  it('clamps a stale window after a filter that stays above the threshold', () => {
+    const allRows = buildRows(80);
+    const { rerender } = renderTable(allRows);
+    const region = scrollRegion();
+    Object.defineProperty(region, 'scrollTop', {
+      configurable: true,
+      writable: true,
+      value: 79 * DATATABLE_DEFAULT_ROW_HEIGHT_PX,
+    });
+    fireEvent.scroll(region);
+    expect(screen.getByTestId('position-80')).toBeVisible();
+
+    const filtered = allRows.filter((row) => row.id <= 30);
+    rerender(
+      <DataTable
+        caption="Portfolio positions"
+        scrollAreaLabel="Scrollable portfolio positions"
+        columns={COLUMNS}
+        rows={filtered}
+        getRowKey={(row) => row.id}
+        getRowTestId={(row) => `position-${row.id}`}
+        emptyState={EMPTY_STATE}
+      />,
+    );
+    expect(scrollRegion()).toHaveAttribute('data-data-table-virtualized', 'true');
+    expect(scrollRegion()).toHaveAttribute('data-total-count', '30');
+    expect(screen.getByTestId('position-30')).toBeVisible();
+    expect(screen.queryByTestId('position-80')).not.toBeInTheDocument();
   });
 });

@@ -291,7 +291,8 @@ boundary. Tables with fewer than 24 body rows stay fully mounted so browser
 find, keyboard tab order, and assistive-technology row lists remain complete.
 At or above that threshold the body is a fixed-estimate window: default rows
 are 48px, compact rows are 36px, overscan is 6, and the scroll region is
-capped at 480px with a sticky header. Top and bottom spacer rows preserve
+capped at 480px with an opaque sticky header (`bg-card`, not the 3%
+`bg-subtle-soft` wash). Top and bottom spacer rows preserve
 scroll height so the first and last business rows remain reachable. Visible
 rows keep their original `getRowKey` identity, `cell(row, index)` index, and
 selection/activation handlers. The native table exposes `aria-rowcount` and
@@ -299,8 +300,12 @@ selection/activation handlers. The native table exposes `aria-rowcount` and
 incompatible variable-height cells; controlled detail rows (`renderRowDetail`)
 disable windowing automatically. DataTable does not implement `rowspan`.
 Current production fallbacks: Screening results (detail rows),
-`RiskHeatmap` (tall score cells, explicit opt-out), and the Portfolio
-risk correlation matrix (tall compact cells, explicit opt-out).
+`RiskHeatmap` (tall score cells, explicit opt-out), the Portfolio
+risk correlation matrix (tall compact cells, explicit opt-out),
+Event Calendar (wrapping event/impact copy, explicit opt-out),
+Screening Discovery (stacked compact actions plus wrapping reasons,
+explicit opt-out), and the stock-history trend drawer (`min-h-11`
+actions plus `text-lg` scores, explicit opt-out).
 
 An activatable row requires both `onRowActivate` and a localized
 `getRowAriaLabel`. Click, Enter, and Space invoke the same command. Events from

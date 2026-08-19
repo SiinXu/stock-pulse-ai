@@ -339,6 +339,24 @@ function DataTableInner<T>({
     return () => observer.disconnect();
   }, [defaultViewport, setViewportHeight, virtualize, rows.length]);
 
+  useLayoutEffect(() => {
+    if (!virtualize) {
+      return;
+    }
+    const container = scrollAreaRef.current;
+    if (!container) {
+      return;
+    }
+    const measuredViewport = container.clientHeight > 0 ? container.clientHeight : viewportCap;
+    const maxScroll = Math.max(
+      0,
+      rows.length * resolvedVirtualization.rowHeight - measuredViewport,
+    );
+    if (container.scrollTop > maxScroll) {
+      container.scrollTop = maxScroll;
+    }
+  }, [resolvedVirtualization.rowHeight, rows.length, viewportCap, virtualize]);
+
   const effectiveState = status ?? (rows.length === 0
     ? { state: 'empty' as const, ...emptyState }
     : null);
@@ -437,9 +455,9 @@ function DataTableInner<T>({
             </colgroup>
           ) : null}
           <thead className={cn(
-            'border-b bg-subtle-soft text-xs text-secondary-text',
+            'border-b text-xs text-secondary-text',
             HEADER_SEPARATOR_STYLES[separatorTone],
-            virtualize && 'sticky top-0 z-10',
+            virtualize ? 'sticky top-0 z-10 bg-card' : 'bg-subtle-soft',
           )}
           >
             <tr aria-rowindex={virtualize ? 1 : undefined}>

@@ -1,1 +1,1 @@
-- [Changed] Shared DataTable now windows large result sets with the existing virtual-window hook while keeping small tables, detail rows, and incompatible tall cells fully mounted.
+- [Changed] Shared DataTable now windows large result sets with the existing virtual-window hook while keeping small tables, detail rows, and incompatible tall or wrapping cells fully mounted. Windowed sticky headers use an opaque card surface.

@@ -85,6 +85,24 @@ describe('resolveDataTableVirtualization', () => {
     parent.remove();
   });
 
+  it('walks past a looser overflow ancestor to a tighter scroller further up', () => {
+    const outer = document.createElement('div');
+    outer.style.overflowY = 'auto';
+    outer.style.maxHeight = '240px';
+    const inner = document.createElement('div');
+    inner.style.overflowY = 'auto';
+    Object.defineProperty(inner, 'clientHeight', { configurable: true, value: 800 });
+    const child = document.createElement('div');
+    inner.append(child);
+    outer.append(inner);
+    document.body.append(outer);
+
+    expect(findBoundedVerticalScrollParent(child, DATATABLE_VIRTUAL_VIEWPORT_PX)).toBe(outer);
+    expect(resolveDataTableViewportCap(child, DATATABLE_VIRTUAL_VIEWPORT_PX)).toBe(240);
+
+    outer.remove();
+  });
+
   it('walks past overflow-hidden frames to the tighter scroller', () => {
     const scroller = document.createElement('div');
     scroller.style.overflowY = 'auto';

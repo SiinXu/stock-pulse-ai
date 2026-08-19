@@ -136,7 +136,9 @@ export function findBoundedVerticalScrollParent(
     const overflowY = window.getComputedStyle(current).overflowY;
     if (overflowY === 'auto' || overflowY === 'scroll') {
       const bound = usedVerticalBoundPx(current);
-      return bound > 0 && bound < maxSelfViewport ? current : null;
+      if (bound > 0 && bound < maxSelfViewport) {
+        return current;
+      }
     }
     current = current.parentElement;
   }

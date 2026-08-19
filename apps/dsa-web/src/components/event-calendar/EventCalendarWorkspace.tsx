@@ -223,6 +223,7 @@ const EventCalendarWorkspace: React.FC = () => {
               getRowKey={(row) => row.eventId}
               emptyState={{ title: text.emptyTitle, description: text.emptyDescription }}
               minWidth="wide"
+              virtualization={false}
             />
           )}
         </div>
