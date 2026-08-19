@@ -21,7 +21,7 @@ import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
 import {
   formatDataQualityStatus,
   formatPortfolioStressQualityCell,
-} from '../../utils/dataQualityFormat';
+} from '../../utils/dataQualityFormat/portfolio';
 import { formatMoney, formatPct, formatSignedPct } from '../../utils/portfolioFormat';
 import {
   Button,

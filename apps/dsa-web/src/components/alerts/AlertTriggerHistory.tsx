@@ -10,10 +10,10 @@ import { formatUiText } from '../../i18n/uiText';
 import { formatUiDateTime, getUiClauseSeparator } from '../../utils/uiLocale';
 import type { UiLanguage } from '../../i18n/uiText';
 import {
-  formatAlertTriggerStatus,
   formatDataQualityLevel,
   formatDataQualityLimitation,
-} from '../../utils/dataQualityFormat';
+} from '../../utils/dataQualityFormat/analysis';
+import { formatAlertTriggerStatus } from '../../utils/dataQualityFormat/alerts';
 
 function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'default' {
   if (status === 'triggered') return 'success';

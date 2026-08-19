@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
 import {
-  formatAlertTriggerStatus,
   formatDataQualityLevel,
   formatDataQualityLimitation,
+} from '../dataQualityFormat/analysis';
+import { formatAlertTriggerStatus } from '../dataQualityFormat/alerts';
+import {
   formatDataQualityStatus,
   formatPortfolioStressQualityCell,
-} from '../dataQualityFormat';
+} from '../dataQualityFormat/portfolio';
 
 describe('formatDataQualityStatus', () => {
   it('localizes known portfolio data-quality and status codes', () => {
@@ -20,6 +22,8 @@ describe('formatDataQualityStatus', () => {
     expect(formatDataQualityStatus('insufficient_history', 'en')).toBe('Insufficient history');
     expect(formatDataQualityStatus('partial', 'ko')).toBe('부분 가능');
     expect(formatDataQualityStatus('ok', 'zh-TW')).toBe('正常');
+    expect(formatDataQualityStatus('ok', 'ja')).toBe('正常');
+    expect(formatDataQualityStatus('partial', 'fr')).toBe('Partiel');
   });
 
   it('uses an honest unknown fallback that keeps the raw code', () => {
@@ -27,6 +31,11 @@ describe('formatDataQualityStatus', () => {
     expect(formatDataQualityStatus('', 'zh')).toBe('未知状态');
     expect(formatDataQualityStatus('mystery_code', 'en')).toBe('Unknown status (mystery_code)');
     expect(formatDataQualityStatus('mystery_code', 'zh')).toBe('未知状态 (mystery_code)');
+    expect(formatDataQualityStatus('weird_quality', 'zh-TW')).toBe('未知狀態 (weird_quality)');
+    expect(formatDataQualityStatus('weird_quality', 'ko')).toBe('알 수 없는 상태 (weird_quality)');
+    expect(formatDataQualityStatus('weird_quality', 'ja')).toBe('不明な状態 (weird_quality)');
+    expect(formatDataQualityStatus('weird_quality', 'fr')).toBe('Statut inconnu (weird_quality)');
+    expect(formatDataQualityStatus('usable', 'zh')).toBe('未知状态 (usable)');
   });
 });
 
@@ -41,6 +50,8 @@ describe('formatDataQualityLevel', () => {
     expect(formatDataQualityLevel('limited', 'en')).toBe('Limited');
     expect(formatDataQualityLevel('poor', 'en')).toBe('Poor');
     expect(formatDataQualityLevel('usable', 'ko')).toBe('사용 가능');
+    expect(formatDataQualityLevel('usable', 'zh-TW')).toBe('可用');
+    expect(formatDataQualityLevel('usable', 'ja')).toBe('Usable');
   });
 
   it('keeps unknown levels visible instead of inventing a mapped label', () => {
@@ -74,12 +85,18 @@ describe('formatAlertTriggerStatus', () => {
     expect(formatAlertTriggerStatus('skipped', 'en')).toBe('Skipped');
     expect(formatAlertTriggerStatus('degraded', 'en')).toBe('Degraded');
     expect(formatAlertTriggerStatus('failed', 'en')).toBe('Failed');
+    expect(formatAlertTriggerStatus('triggered', 'zh-TW')).toBe('已觸發');
+    expect(formatAlertTriggerStatus('triggered', 'ko')).toBe('트리거');
+    expect(formatAlertTriggerStatus('triggered', 'ja')).toBe('トリガー');
+    expect(formatAlertTriggerStatus('triggered', 'fr')).toBe('Déclenché');
   });
 
   it('keeps unknown trigger statuses visible', () => {
     expect(formatAlertTriggerStatus(null, 'en')).toBe('--');
     expect(formatAlertTriggerStatus('queued', 'en')).toBe('queued');
     expect(formatAlertTriggerStatus('queued', 'zh')).toBe('queued');
+    expect(formatAlertTriggerStatus('queued', 'ko')).toBe('queued');
+    expect(formatAlertTriggerStatus('queued', 'ja')).toBe('queued');
   });
 });
 
@@ -96,6 +113,12 @@ describe('formatPortfolioStressQualityCell', () => {
       priceStale: false,
       limitations: [],
     }, 'zh', '过期')).toBe('正常');
+
+    expect(formatPortfolioStressQualityCell({
+      dataQuality: 'ok',
+      priceStale: false,
+      limitations: ['realtime_quote_best_effort'],
+    }, 'ko', '만료')).toContain('정상');
   });
 
   it('keeps unknown quality and limitation codes visible', () => {
@@ -104,5 +127,11 @@ describe('formatPortfolioStressQualityCell', () => {
       priceStale: false,
       limitations: ['brand_new_limitation'],
     }, 'en', 'Stale')).toBe('Unknown status (weird_quality) · brand_new_limitation');
+
+    expect(formatPortfolioStressQualityCell({
+      dataQuality: 'weird_quality',
+      priceStale: false,
+      limitations: ['brand_new_limitation'],
+    }, 'ja', 'Stale')).toBe('不明な状態 (weird_quality) · brand_new_limitation');
   });
 });

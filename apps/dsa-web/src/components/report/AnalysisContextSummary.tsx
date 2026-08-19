@@ -9,7 +9,7 @@ import { ANALYSIS_CONTEXT_CONTENT_TEXT } from '../../locales/reportContent';
 import {
   formatDataQualityLevel,
   formatDataQualityLimitation,
-} from '../../utils/dataQualityFormat';
+} from '../../utils/dataQualityFormat/analysis';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, InlineAlert, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';

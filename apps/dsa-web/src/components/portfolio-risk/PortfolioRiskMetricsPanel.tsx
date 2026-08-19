@@ -22,7 +22,7 @@ import type {
   PortfolioRiskMetricsStatus,
 } from '../../types/portfolioRiskMetrics';
 import type { PortfolioCostMethod } from '../../types/portfolio';
-import { formatDataQualityStatus } from '../../utils/dataQualityFormat';
+import { formatDataQualityStatus } from '../../utils/dataQualityFormat/portfolio';
 import { formatMoney, formatPct } from '../../utils/portfolioFormat';
 import { formatUiNumber } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
