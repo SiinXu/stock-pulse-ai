@@ -1,2 +1,3 @@
 - [Fixed] Treat a Web backtest client wait timeout as an unknown outcome instead of a confirmed server failure, and block a second POST until the user dismisses that state.
 - [Docs] Document that `POST /api/v1/backtest/run` is synchronous and has no job/status/cancel identifier for the Web client to resume or cancel.
+- [Tests] Count the T09 `backtest-support` split in the BacktestPage aggregate family (`backtest-route`) so those bytes cannot bypass the #1374 family budget.

@@ -531,6 +531,17 @@
       "maxGzipBytes": 21693,
       "measuredGzipBytes": 21293,
       "note": "Home watchlist family. Catches sibling Watchlist* splits that would not match HomeWatchlistGroupsSection-*.js, including the lazy WatchlistScoreStatusCell chunk. Measured zlib-9 sum on origin/main 86b0c094c + 400 B headroom. Per-asset HomeWatchlistGroupsSection cap is unchanged."
+    },
+    {
+      "id": "backtest-route",
+      "match": [
+        "assets/BacktestPage-*.js",
+        "assets/Backtest*-*.js",
+        "assets/backtest*-*.js"
+      ],
+      "maxGzipBytes": 21603,
+      "measuredGzipBytes": 21203,
+      "note": "BacktestPage aggregate family for sibling splits. Counts BacktestPage plus the T09 backtest-support chunk (and any later Backtest*/backtest* prefixes) that would not match the same-pattern BacktestPage-family glob. Measured zlib-9 sum 21203 B on origin/main 87c876ff5 + T09 + 400 B headroom. Per-asset BacktestPage cap and same-pattern BacktestPage-family inherited cap are unchanged."
     }
   ]
 }

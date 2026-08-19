@@ -58,7 +58,7 @@ node scripts/check-runtime-performance.mjs --strict   # 未来硬门
 
 `vendor-misc` 仍只做 first-match 残余单文件规则。它的 `assets/vendor-*.js` 若按聚合计算会把全部 vendor chunk 加总。
 
-当前生产构建仍只产出一个产物的同模式家族继承既有具名单文件上限。当前 `main` 上的语言包已经拆成多个 `ja-*.js`（及其它语言同类文件）；这些家族使用测得的 zlib-9 合计再加 400 B。额外的路由家族（`settings-route`、`portfolio-route`、`screening-route`、`home-watchlist-route`）覆盖无法命中原具名 glob 的前缀子 chunk。不要靠抬高单文件上限来掩盖家族增长。
+当前生产构建仍只产出一个产物的同模式家族继承既有具名单文件上限。当前 `main` 上的语言包已经拆成多个 `ja-*.js`（及其它语言同类文件）；这些家族使用测得的 zlib-9 合计再加 400 B。额外的路由家族（`settings-route`、`portfolio-route`、`screening-route`、`home-watchlist-route`、`backtest-route`）覆盖无法命中原具名 glob 的前缀子 chunk。不要靠抬高单文件上限来掩盖家族增长。
 
 ```bash
 cd apps/dsa-web
