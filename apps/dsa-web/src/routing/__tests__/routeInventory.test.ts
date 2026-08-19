@@ -30,14 +30,14 @@ const PRIMARY_NAV_ROUTES = [
 
 const COMMAND_ENTRY_ROUTES = [
   APP_ROUTE_PATHS.approvals,
+  APP_ROUTE_PATHS.notifications,
+  APP_ROUTE_PATHS.eventAlerts,
+  APP_ROUTE_PATHS.researchReportCompare,
 ] as const;
 
 const CONTEXT_ENTRY_ROUTES = [
-  APP_ROUTE_PATHS.notifications,
   APP_ROUTE_PATHS.stockDetails,
-  APP_ROUTE_PATHS.eventAlerts,
   APP_ROUTE_PATHS.portfolioPerformance,
-  APP_ROUTE_PATHS.researchReportCompare,
 ] as const;
 
 const STANDALONE_ROUTES = [
@@ -142,8 +142,15 @@ describe('navigation IA route inventory', () => {
     expect(paletteHrefs).toContain(APP_ROUTE_PATHS.signals);
     expect(paletteHrefs).toContain(APP_ROUTE_PATHS.agent);
     expect(paletteHrefs).toContain(APP_ROUTE_PATHS.approvals);
+    expect(paletteHrefs).toContain(APP_ROUTE_PATHS.notifications);
+    expect(paletteHrefs).toContain(APP_ROUTE_PATHS.eventAlerts);
+    expect(paletteHrefs).toContain(APP_ROUTE_PATHS.researchReportCompare);
+    expect(paletteHrefs).not.toContain(APP_ROUTE_PATHS.portfolioPerformance);
     expect(COMMAND_PALETTE_SECONDARY_PAGES.map((page) => page.to)).toEqual([
       APP_ROUTE_PATHS.approvals,
+      APP_ROUTE_PATHS.notifications,
+      APP_ROUTE_PATHS.eventAlerts,
+      APP_ROUTE_PATHS.researchReportCompare,
     ]);
   });
 

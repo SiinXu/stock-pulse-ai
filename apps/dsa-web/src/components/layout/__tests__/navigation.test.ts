@@ -57,7 +57,13 @@ describe('application navigation descriptor', () => {
     ]);
     expect(COMMAND_PALETTE_SECONDARY_PAGES.map(({ key, to }) => [key, to])).toEqual([
       ['approvals', APP_ROUTE_PATHS.approvals],
+      ['notifications', APP_ROUTE_PATHS.notifications],
+      ['event-alerts', APP_ROUTE_PATHS.eventAlerts],
+      ['report-compare', APP_ROUTE_PATHS.researchReportCompare],
     ]);
+    expect(COMMAND_PALETTE_SECONDARY_PAGES.map(({ to }) => to)).not.toContain(
+      APP_ROUTE_PATHS.portfolioPerformance,
+    );
   });
 
   it('uses layout.nav label keys for every primary and Research child entry', () => {
@@ -68,7 +74,10 @@ describe('application navigation descriptor', () => {
   });
 
   it('has unique descriptor keys and no legacy or dead utility targets', () => {
-    const entries = APPLICATION_NAVIGATION_ITEMS.flatMap((item) => [item, ...(item.children ?? [])]);
+    const entries = [
+      ...APPLICATION_NAVIGATION_ITEMS.flatMap((item) => [item, ...(item.children ?? [])]),
+      ...COMMAND_PALETTE_SECONDARY_PAGES,
+    ];
     const keys = entries.map(({ key }) => key);
     const targets = entries.map(({ to }) => to);
 
@@ -83,6 +92,7 @@ describe('application navigation descriptor', () => {
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.decisionSignals);
     expect(targets).not.toContain(LEGACY_ROUTE_PATHS.alerts);
     expect(targets).not.toContain('/more');
+    expect(targets).not.toContain(APP_ROUTE_PATHS.portfolioPerformance);
     expect(targets).toContain(APP_ROUTE_PATHS.signals);
     expect(targets).toContain(APP_ROUTE_PATHS.agent);
   });
@@ -105,15 +115,20 @@ describe('application navigation descriptor', () => {
       ['portfolio', APP_ROUTE_PATHS.portfolio],
       ['settings', APP_ROUTE_PATHS.settings],
       ['approvals', APP_ROUTE_PATHS.approvals],
+      ['notifications', APP_ROUTE_PATHS.notifications],
+      ['event-alerts', APP_ROUTE_PATHS.eventAlerts],
+      ['report-compare', APP_ROUTE_PATHS.researchReportCompare],
     ]);
+    expect(pages.map((page) => page.href)).not.toContain(APP_ROUTE_PATHS.portfolioPerformance);
     const sidebarTargets = new Set(
       APPLICATION_NAVIGATION_ITEMS.flatMap((item) => [
         item.to,
         ...(item.children?.map((child) => child.to) ?? []),
       ]),
     );
+    const secondaryHrefs = new Set(COMMAND_PALETTE_SECONDARY_PAGES.map((page) => page.to));
     for (const page of pages) {
-      if (page.id === 'approvals') {
+      if (secondaryHrefs.has(page.href)) {
         expect(sidebarTargets.has(page.href)).toBe(false);
       } else if (page.id === 'research-analysis') {
         expect(page.href).toBe(analysisHref);

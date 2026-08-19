@@ -99,13 +99,22 @@ export function CommandPalette({
 
   // Pages come from the shared navigation graph (sidebar + secondary palette-only).
   const pages = useMemo<CommandItem[]>(
-    () => listCommandPalettePages({ analysisHref }).map((page) => ({
-      id: page.id,
-      labelKey: page.labelKey,
-      href: page.href,
-      icon: page.icon,
-    })),
-    [analysisHref],
+    () => listCommandPalettePages({ analysisHref }).map((page) => (
+      page.labelSource === 'nav'
+        ? {
+          id: page.id,
+          labelKey: page.labelKey,
+          href: page.href,
+          icon: page.icon,
+        }
+        : {
+          id: page.id,
+          label: page.resolveLabel(language),
+          href: page.href,
+          icon: page.icon,
+        }
+    )),
+    [analysisHref, language],
   );
   const actions = useMemo<CommandItem[]>(() => [
     { id: 'run-analysis', labelKey: 'home.startAnalysisTitle', href: analysisHref, icon: Sparkles },

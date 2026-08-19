@@ -362,4 +362,31 @@ describe('CommandPalette', () => {
     fireEvent.click(screen.getByRole('option', { name: '运行大盘复盘' }));
     expect(onNavigate).toHaveBeenLastCalledWith('/research/market?action=run');
   });
+
+  it('searches and navigates to context-entry pages without indexing personal performance', async () => {
+    renderPalette();
+    const input = screen.getByRole('combobox', { name: PLACEHOLDER });
+    await waitFor(() => expect(input).toHaveFocus());
+
+    expect(screen.getByRole('option', { name: '通知中心' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '事件驱动告警' })).toBeInTheDocument();
+    expect(screen.getByRole('option', { name: '报告版本对比' })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /个人表现/ })).not.toBeInTheDocument();
+
+    fireEvent.change(input, { target: { value: '通知中心' } });
+    fireEvent.click(screen.getByRole('option', { name: '通知中心' }));
+    expect(onNavigate).toHaveBeenLastCalledWith('/notifications');
+
+    fireEvent.change(input, { target: { value: '事件驱动告警' } });
+    fireEvent.click(screen.getByRole('option', { name: '事件驱动告警' }));
+    expect(onNavigate).toHaveBeenLastCalledWith('/event-alerts');
+
+    fireEvent.change(input, { target: { value: '报告版本对比' } });
+    fireEvent.click(screen.getByRole('option', { name: '报告版本对比' }));
+    expect(onNavigate).toHaveBeenLastCalledWith('/research/report-compare');
+
+    fireEvent.change(input, { target: { value: '个人表现' } });
+    expect(screen.queryByRole('option', { name: /个人表现/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('没有匹配的结果')).toBeInTheDocument());
+  });
 });
