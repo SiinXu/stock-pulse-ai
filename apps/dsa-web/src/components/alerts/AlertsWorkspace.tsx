@@ -56,7 +56,6 @@ import {
 } from '../../hooks';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import {
-  ALERT_NOTIFICATION_CHANNEL_LABELS,
   ALERT_NOTIFICATION_STATUS_LABELS,
   ALERT_HISTORY_CONTROLS_TEXT,
   ALERT_LIST_TEXT,
@@ -64,6 +63,15 @@ import {
   ALERT_TRIGGER_TEXT,
 } from '../../locales/alerts';
 import { formatUiDateTime } from '../../utils/uiLocale';
+import {
+  formatAlertNotificationChannel,
+  formatAlertNotificationDiagnostics,
+  formatAlertNotificationErrorCode,
+  formatAlertNotificationStatus,
+  formatAlertTestMessage,
+  formatAlertTestStatus,
+  formatAlertTriggerStatus,
+} from '../../utils/dataQualityFormat/alerts';
 import {
   LEGACY_ROUTE_PATHS,
   SIGNAL_CENTER_SCOPE_VALUES,
@@ -107,15 +115,13 @@ function testVariant(result: AlertRuleTestResponse): 'success' | 'warning' | 'da
 
 function renderTestResultMessage(result: AlertRuleTestResponse, language: UiLanguage): React.ReactNode {
   const text = ALERT_PAGE_TEXT[language];
-  const controlsText = ALERT_HISTORY_CONTROLS_TEXT[language];
-  const triggerText = ALERT_TRIGGER_TEXT[language];
   const targetResults = result.targetResults ?? [];
   return (
     <div className="space-y-2">
       <div>
-        {result.message}
+        {formatAlertTestMessage(result.message, language)}
         {` · ${text.status}: `}
-        {controlsText.testStatuses[result.status] ?? result.status}
+        {formatAlertTestStatus(result.status, language)}
         {` · ${text.triggered}: `}
         {result.triggered ? text.yes : text.no}
         {` · ${text.observed}: `}
@@ -132,8 +138,8 @@ function renderTestResultMessage(result: AlertRuleTestResponse, language: UiLang
             <div key={`${item.target}-${item.status}`} className="flex flex-wrap justify-between gap-2">
               <span>{item.displayTarget ?? item.target}</span>
               <span>
-                {controlsText.testStatuses[item.status] ?? item.status}
-                {item.recordStatus ? ` / ${triggerText.statuses[item.recordStatus] ?? item.recordStatus}` : ''}
+                {formatAlertTestStatus(item.status, language)}
+                {item.recordStatus ? ` / ${formatAlertTriggerStatus(item.recordStatus, language)}` : ''}
               </span>
             </div>
           ))}
@@ -143,15 +149,7 @@ function renderTestResultMessage(result: AlertRuleTestResponse, language: UiLang
   );
 }
 
-function formatNotificationChannel(channel: string, language: UiLanguage): string {
-  return ALERT_NOTIFICATION_CHANNEL_LABELS[language][channel] ?? channel;
-}
 
-function formatNotificationStatus(notification: AlertNotificationItem, language: UiLanguage): string {
-  const labels = ALERT_NOTIFICATION_STATUS_LABELS[language];
-  if (notification.success) return labels.success;
-  return (notification.errorCode && labels[notification.errorCode]) || labels.failure;
-}
 
 export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
   activeView: controlledActiveView,
@@ -573,17 +571,17 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     {
       id: 'channel',
       header: text.channel,
-      cell: (notification) => formatNotificationChannel(notification.channel, language),
+      cell: (notification) => formatAlertNotificationChannel(notification.channel, language),
     },
     {
       id: 'status',
       header: text.status,
-      cell: (notification) => formatNotificationStatus(notification, language),
+      cell: (notification) => formatAlertNotificationStatus(notification, language),
     },
     {
       id: 'errorCode',
       header: text.errorCode,
-      cell: (notification) => notification.errorCode ?? '--',
+      cell: (notification) => formatAlertNotificationErrorCode(notification.errorCode, language),
     },
     {
       id: 'latency',
@@ -598,7 +596,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
     {
       id: 'diagnostics',
       header: text.diagnostics,
-      cell: (notification) => notification.diagnostics ?? '--',
+      cell: (notification) => formatAlertNotificationDiagnostics(notification.diagnostics, language),
     },
   ];
 
@@ -865,7 +863,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
                         '__no_channel__',
                         '__dispatch__',
                         '__context__',
-                      ].map((channel) => ({ value: channel, label: formatNotificationChannel(channel, language) })),
+                      ].map((channel) => ({ value: channel, label: formatAlertNotificationChannel(channel, language) })),
                     ]}
                   />
                   <Select

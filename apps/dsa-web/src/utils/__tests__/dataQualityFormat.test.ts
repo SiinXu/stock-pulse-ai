@@ -93,10 +93,10 @@ describe('formatAlertTriggerStatus', () => {
 
   it('keeps unknown trigger statuses visible', () => {
     expect(formatAlertTriggerStatus(null, 'en')).toBe('--');
-    expect(formatAlertTriggerStatus('queued', 'en')).toBe('queued');
-    expect(formatAlertTriggerStatus('queued', 'zh')).toBe('queued');
-    expect(formatAlertTriggerStatus('queued', 'ko')).toBe('queued');
-    expect(formatAlertTriggerStatus('queued', 'ja')).toBe('queued');
+    expect(formatAlertTriggerStatus('queued', 'en')).toBe('Unknown status (queued)');
+    expect(formatAlertTriggerStatus('queued', 'zh')).toBe('未知状态 (queued)');
+    expect(formatAlertTriggerStatus('queued', 'ko')).toBe('알 수 없는 상태 (queued)');
+    expect(formatAlertTriggerStatus('queued', 'ja')).toBe('不明な状態 (queued)');
   });
 });
 
@@ -126,12 +126,12 @@ describe('formatPortfolioStressQualityCell', () => {
       dataQuality: 'weird_quality',
       priceStale: false,
       limitations: ['brand_new_limitation'],
-    }, 'en', 'Stale')).toBe('Unknown status (weird_quality) · brand_new_limitation');
+    }, 'en', 'Stale')).toBe('Unknown status (weird_quality) · Unknown code (brand_new_limitation)');
 
     expect(formatPortfolioStressQualityCell({
       dataQuality: 'weird_quality',
       priceStale: false,
       limitations: ['brand_new_limitation'],
-    }, 'ja', 'Stale')).toBe('不明な状態 (weird_quality) · brand_new_limitation');
+    }, 'ja', 'Stale')).toBe('不明な状態 (weird_quality) · 不明なコード（brand_new_limitation）');
   });
 });

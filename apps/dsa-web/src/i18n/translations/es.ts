@@ -8,6 +8,7 @@ import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSign
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
+import { SERVER_PRESENTATION_ES as SP } from '../serverPresentation/es';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.es,
@@ -17,6 +18,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...EE.es,
   ...MMC.es,
   ...S.es,
+  ...SP,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Activa el modo Agente e inténtalo de nuevo.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "El modo agente no está activado",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Solicitud no completada; por favor, revisa los detalles e inténtalo de nuevo.",

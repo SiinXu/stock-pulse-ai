@@ -8,6 +8,7 @@ import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSign
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
+import { SERVER_PRESENTATION_ID as SP } from '../serverPresentation/id';
 
 export const translations: Record<UiTranslationKey, string> = {
   ...M.id,
@@ -17,6 +18,7 @@ export const translations: Record<UiTranslationKey, string> = {
   ...EE.id,
   ...MMC.id,
   ...S.id,
+  ...SP,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Aktifkan mode Agen dan coba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mode agen tidak diaktifkan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan belum selesai; silakan periksa detailnya dan coba lagi.",

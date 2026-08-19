@@ -119,7 +119,7 @@ describe('representative playground scenarios', () => {
     fireEvent.click(screen.getByRole('tab', { name: 'Trigger history' }));
     fireEvent.click(screen.getByRole('tab', { name: 'Notification attempts' }));
 
-    expect(await screen.findByText('fixture-notification-701')).toBeInTheDocument();
+    expect(await screen.findByText('Diagnostic: fixture-notification-701')).toBeInTheDocument();
     expect(screen.queryByText('playground_mock_not_registered')).not.toBeInTheDocument();
   });
 });

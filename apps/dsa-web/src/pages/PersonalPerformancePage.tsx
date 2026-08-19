@@ -24,6 +24,12 @@ import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText } from '../i18n/uiText';
 import { PERSONAL_PERFORMANCE_TEXT } from '../locales/personalPerformance';
+import { loadPersonalPerformanceReasonLabels } from '../locales/personalPerformanceReasons';
+import {
+  formatPaperDecisionReason,
+  formatPaperDecisionSide,
+} from '../utils/dataQualityFormat/personalPerformance';
+import { formatEmptyDisplay } from '../utils/dataQualityFormat/unknownCode';
 import { APP_ROUTE_PATHS } from '../routing/routes';
 import type {
   PaperDecisionQualityItem,
@@ -43,6 +49,7 @@ const PersonalPerformancePage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<ParsedApiError | null>(null);
+  const [reasonCatalogGeneration, setReasonCatalogGeneration] = useState(0);
 
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.portfolioPerformance,
@@ -53,6 +60,16 @@ const PersonalPerformancePage: React.FC = () => {
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
+
+  useEffect(() => {
+    let active = true;
+    void loadPersonalPerformanceReasonLabels(language).then(() => {
+      if (active) setReasonCatalogGeneration((value) => value + 1);
+    });
+    return () => {
+      active = false;
+    };
+  }, [language]);
 
   const paperAccounts = useMemo(
     () => accounts.filter((item) => (item.accountType || 'real') === 'paper'),
@@ -136,13 +153,13 @@ const PersonalPerformancePage: React.FC = () => {
     {
       id: 'side',
       header: text.colSide,
-      cell: (item) => item.side ?? '—',
+      cell: (item) => formatPaperDecisionSide(item.side, language),
       nowrap: true,
     },
     {
       id: 'date',
       header: text.colDate,
-      cell: (item) => item.tradeDate ?? '—',
+      cell: (item) => item.tradeDate || formatEmptyDisplay(),
       nowrap: true,
     },
     {
@@ -165,14 +182,14 @@ const PersonalPerformancePage: React.FC = () => {
         <ul className="list-disc space-y-1 pl-4">
           {(item.reasons ?? []).slice(0, 4).map((reason) => (
             <li key={`${reason.dimension}-${reason.code}`}>
-              {reason.message}
+              {formatPaperDecisionReason(reason, language)}
             </li>
           ))}
         </ul>
       ),
       width: 'wide',
     },
-  ], [text]);
+  ], [language, reasonCatalogGeneration, text]);
 
   return (
     <AppPage data-testid="personal-performance-page" className="space-y-6">
@@ -288,7 +305,7 @@ const PersonalPerformancePage: React.FC = () => {
                     );
                   })}
                 </div>
-                <p className="text-xs text-secondary-text">{report.disclaimer}</p>
+                <p className="text-xs text-secondary-text">{text.disclaimer}</p>
               </div>
             ) : (
               <EmptyState

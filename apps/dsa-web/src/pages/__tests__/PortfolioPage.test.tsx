@@ -892,7 +892,7 @@ describe('PortfolioPage FX refresh', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '运行分析' }));
 
-    expect(await screen.findByText('缺少可用价格，无法计算压力结果。')).toBeInTheDocument();
+    expect(await screen.findAllByText('当前数据不足以运行该情景，未写入零风险结果。')).not.toHaveLength(0);
     expect(screen.queryByText('原组合市值')).not.toBeInTheDocument();
     expect(screen.queryByText('压力损益')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '假设与限制' })).toBeInTheDocument();

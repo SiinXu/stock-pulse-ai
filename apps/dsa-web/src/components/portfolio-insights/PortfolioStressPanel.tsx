@@ -22,6 +22,8 @@ import {
   formatDataQualityStatus,
   formatPortfolioStressQualityCell,
 } from '../../utils/dataQualityFormat/portfolio';
+import { formatPortfolioStressScenario } from '../../utils/dataQualityFormat/portfolioInsights';
+import { formatUnknownMachineCode } from '../../utils/dataQualityFormat/unknownCode';
 import { formatMoney, formatPct, formatSignedPct } from '../../utils/portfolioFormat';
 import {
   Button,
@@ -203,7 +205,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               onChange={setScenarioId}
               options={scenarios.map((scenario) => ({
                 value: scenario.id,
-                label: scenario.name,
+                label: formatPortfolioStressScenario(scenario, language).name,
               }))}
               className="w-full"
               triggerClassName="w-full"
@@ -211,7 +213,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               error={Boolean(formError)}
             />
             {selectedScenario ? (
-              <p className="text-sm text-secondary-text">{selectedScenario.description}</p>
+              <p className="text-sm text-secondary-text">{formatPortfolioStressScenario(selectedScenario, language).description}</p>
             ) : null}
             {selectedScenario?.requiresTargetSector ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -273,7 +275,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               <StatePanel
                 state="empty"
                 title={text.emptyPortfolioTitle}
-                description={result.statusMessage || text.emptyPortfolioDescription}
+                description={text.emptyPortfolioDescription}
                 titleAs="p"
               />
             ) : null}
@@ -281,12 +283,11 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               <StatePanel
                 state="blocked"
                 title={text.unavailableResult}
-                description={result.statusMessage}
                 titleAs="p"
               />
             ) : null}
             {result.status === 'partial' ? (
-              <InlineAlert variant="warning" message={result.statusMessage || text.partialResult} />
+              <InlineAlert variant="warning" message={text.partialResult} />
             ) : null}
             {result.status === 'ok' || result.status === 'partial' ? (
               <>
@@ -324,7 +325,11 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               values={{
                 scenario: result.scenario,
                 assumptions: result.assumptions,
-                limitations: result.snapshotLimitations.map((item) => formatPortfolioLimitation(item, language)),
+                limitations: result.snapshotLimitations.map((item) => (
+                  formatPortfolioLimitation(item, language) === item
+                    ? formatUnknownMachineCode(item, language)
+                    : formatPortfolioLimitation(item, language)
+                )),
                 missingData: result.missingData,
                 excludedPositions: result.excludedPositions,
                 concentration: result.concentration,

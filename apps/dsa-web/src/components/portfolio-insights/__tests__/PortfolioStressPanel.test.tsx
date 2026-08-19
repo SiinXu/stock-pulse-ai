@@ -128,7 +128,7 @@ describe('PortfolioStressPanel data-quality column', () => {
   });
 
   it('keeps unknown quality and limitation codes visible', async () => {
-    runStressPreset.mockResolvedValueOnce(makeResult({
+    runStressPreset.mockResolvedValue(makeResult({
       snapshotDataQuality: 'weird_quality' as PortfolioStressResponse['snapshotDataQuality'],
       snapshotLimitations: ['brand_new_limitation'],
       positionImpacts: [makeImpact({
@@ -143,11 +143,14 @@ describe('PortfolioStressPanel data-quality column', () => {
       </UiLanguageProvider>,
     );
 
-    fireEvent.click(await screen.findByRole('button', { name: '运行分析' }));
+    expect(await screen.findByText('大盘下跌 10%')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '运行分析' }));
 
-    expect(await screen.findByText('未知状态 (weird_quality) · brand_new_limitation')).toBeInTheDocument();
+    expect(await screen.findAllByText(/未知状态 \(weird_quality\)/)).not.toHaveLength(0);
+    expect(screen.getAllByText(/未知编码（brand_new_limitation）/)).not.toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: '假设与限制' }));
-    expect(screen.getByText('未知状态 (weird_quality)')).toBeInTheDocument();
-    expect(screen.getByText('brand_new_limitation')).toBeInTheDocument();
+    expect(screen.getAllByText(/未知状态 \(weird_quality\)/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/未知编码（brand_new_limitation）/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^brand_new_limitation$/)).not.toBeInTheDocument();
   });
 });

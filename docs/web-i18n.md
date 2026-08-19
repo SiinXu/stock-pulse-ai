@@ -42,6 +42,8 @@ locales/reportContent.ts
 
 设置页「模型来源」连接校验同样走稳定码：`getChannelNameIssues` / `getChannelCompletenessIssues` / `getChannelSaveIssues` 返回 `{ code, field, params }`，渲染时由 `localizeModelAccessIssue()` 映射到 `MODEL_ACCESS_ISSUES`。未知码使用本地化的 `unknown` 模板并只插值经过清洗的 `{code}`，不得回退中文原文或展示后端裸枚举/散文。
 
+个人表现、组合洞察和告警界面遵循同一套按码展示的合同。已知后端枚举、状态、原因、质量和限制码通过现有 `dataQualityFormat` 与领域词表在渲染时映射。带有稳定机器身份的英文散文（`reason.code`、洞察 `code`、情景 `id`、再平衡 `action`）由客户端本地化文案替换。自由文本服务端详情会清洗、标为诊断，并只在需要排障时展示。未知码保留为带清洗 `{code}` 的本地化诊断，不得注入 HTML、不得按整句匹配，也不得静默消失。空值保持诚实（`—` / `--`）。切换语言后已加载结果立即更新。
+
 Agent 会话历史遵循同一契约。失败记录由历史 API 返回安全的兼容 `content`，并通过 `error + params` 标识可本地化的失败；普通消息不携带这两个字段。Web 必须在渲染时按当前 UI language 解析错误，且消息显示、单条复制和会话导出必须复用同一份解析结果，确保切换语言后已加载的历史立即更新。服务端会将历史 `[分析失败]...` 记录适配为稳定错误码；新失败不得把 Provider 原始错误写入历史或返回给客户端。
 
 诊断回退必须保持分层：已知 `error` 使用对应本地化文案和 `params`；未知 `error` 使用通用本地化错误；legacy 原始字符串、`message`、`details` 和 `trace_id` 只能保留在诊断入口，不能提升为主错误文案。历史记录的安全 `content` 仅用于旧客户端兼容，不能覆盖稳定错误码的本地化结果。

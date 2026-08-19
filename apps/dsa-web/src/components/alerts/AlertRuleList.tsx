@@ -31,6 +31,10 @@ import {
 import type { AlertRuleItem, AlertType, MarketRegion } from '../../types/alerts';
 import { formatUiDateTime, formatUiNumber } from '../../utils/uiLocale';
 import { getEffectiveAlertCooldown } from '../../utils/alertCooldown';
+import {
+  formatAlertParameterMetric,
+  formatAlertWatchlistTarget,
+} from '../../utils/dataQualityFormat/alerts';
 
 /**
  * Mirrors `DESKTOP_FILTER_QUERY` in `components/common/AdvancedFilterSheet.tsx`.
@@ -86,9 +90,11 @@ function formatParameters(rule: AlertRuleItem, language: UiLanguage): string {
   if (rule.alertType === 'portfolio_stop_loss') {
     return rule.parameters.mode === 'breach' ? directionLabels.stopLossBreach : directionLabels.stopLossNear;
   }
-  if (rule.alertType === 'portfolio_concentration') return 'top_weight_pct';
-  if (rule.alertType === 'portfolio_drawdown') return 'max_drawdown_pct';
-  if (rule.alertType === 'portfolio_price_stale') return 'price_stale / price_available';
+  if (rule.alertType === 'portfolio_concentration') return formatAlertParameterMetric('top_weight_pct', language);
+  if (rule.alertType === 'portfolio_drawdown') return formatAlertParameterMetric('max_drawdown_pct', language);
+  if (rule.alertType === 'portfolio_price_stale') {
+    return `${formatAlertParameterMetric('price_stale', language)} / ${formatAlertParameterMetric('price_available', language)}`;
+  }
   return `CCI${rule.parameters.period ?? '--'} ${rule.parameters.direction === 'below' ? directionLabels.belowThreshold : directionLabels.aboveThreshold} ${rule.parameters.threshold ?? '--'}`;
 }
 
@@ -108,7 +114,7 @@ function formatCooldownPolicy(rule: AlertRuleItem, language: UiLanguage): string
 
 function formatTarget(rule: AlertRuleItem, language: UiLanguage): string {
   if (rule.targetScope === 'market') return ALERT_MARKET_REGION_LABELS[language][rule.target as MarketRegion] ?? rule.target;
-  if (rule.targetScope === 'watchlist') return 'default';
+  if (rule.targetScope === 'watchlist') return formatAlertWatchlistTarget(rule.target === 'default' ? 'default' : rule.target, language);
   if (rule.targetScope === 'portfolio_account' || rule.targetScope === 'portfolio_holdings') {
     const text = ALERT_LIST_TEXT[language];
     return rule.target === 'all'

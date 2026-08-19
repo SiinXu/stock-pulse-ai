@@ -11,12 +11,20 @@ import {
   PortfolioResponseContextError,
   useContextBoundPortfolioRequest,
 } from '../../hooks/portfolio/useContextBoundPortfolioRequest';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { PortfolioInsightsText } from '../../locales/portfolioInsights';
 import type { PortfolioCostMethod } from '../../types/portfolio';
 import type {
   PortfolioHealthDimensionKey,
   PortfolioHealthResponse,
 } from '../../types/portfolioHealth';
+import {
+  formatPortfolioHealthBand,
+  formatPortfolioHealthInsight,
+  formatPortfolioDimensionDetail,
+  formatPortfolioInsightDisclaimer,
+  formatPortfolioInsightSeverity,
+} from '../../utils/dataQualityFormat/portfolioInsights';
 import { formatPct } from '../../utils/portfolioFormat';
 import {
   Button,
@@ -44,6 +52,7 @@ const DIMENSION_KEYS: PortfolioHealthDimensionKey[] = [
 ];
 
 const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, costMethod, text }) => {
+  const { language } = useUiLanguage();
   const query = useMemo(() => ({ accountId, costMethod }), [accountId, costMethod]);
   const contextKey = `${accountId ?? 'all'}:${costMethod}`;
   const lastOperationRef = useRef<'load' | 'refresh'>('load');
@@ -115,17 +124,17 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
     {
       id: 'detail',
       header: text.dimensionReason,
-      cell: (row) => row.statusMessage || row.reason || row.status,
+      cell: (row) => formatPortfolioDimensionDetail(row, language),
     },
   ];
 
   const insightColumns: Array<DataTableColumn<PortfolioHealthResponse['insights'][number]>> = [
-    { id: 'severity', header: text.insightSeverity, cell: (row) => row.severity },
+    { id: 'severity', header: text.insightSeverity, cell: (row) => formatPortfolioInsightSeverity(row.severity, language) },
     {
       id: 'message',
       header: text.insightMessage,
       rowHeader: true,
-      cell: (row) => <span className="text-foreground">{row.message}</span>,
+      cell: (row) => <span className="text-foreground">{formatPortfolioHealthInsight(row, language)}</span>,
     },
   ];
 
@@ -178,7 +187,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
         <StatePanel
           state="empty"
           title={text.emptyPortfolioTitle}
-          description={result.statusMessage || text.emptyPortfolioDescription}
+          description={text.emptyPortfolioDescription}
           titleAs="p"
         />
       ) : result ? (
@@ -187,7 +196,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
             <StatePanel
               state="blocked"
               title={text.healthUnavailableTitle}
-              description={result.statusMessage || result.disclaimer}
+              description={formatPortfolioInsightDisclaimer('health', language)}
               titleAs="p"
             />
           ) : null}
@@ -195,7 +204,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
             <InlineAlert
               variant="warning"
               title={text.healthPartialTitle}
-              message={result.statusMessage || text.partialResult}
+              message={text.partialResult}
             />
           ) : null}
           <SummaryStrip
@@ -211,7 +220,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
                   : Math.round(result.score),
                 tone: result.status === 'partial' ? 'warning' : 'default',
               },
-              { id: 'band', label: text.band, value: result.band || text.notAvailable },
+              { id: 'band', label: text.band, value: formatPortfolioHealthBand(result.band, language) },
               { id: 'coverage', label: text.coverage, value: formatPct(result.coverageRatio * 100) },
               { id: 'as-of', label: text.asOf, value: result.asOf },
             ]}
@@ -252,7 +261,7 @@ const PortfolioHealthPanel: React.FC<PortfolioHealthPanelProps> = ({ accountId, 
               [text.inputs]: result.inputs,
               [text.configuration]: result.config,
               [text.provenance]: result.provenance,
-              [text.assumptions]: result.disclaimer,
+              [text.assumptions]: formatPortfolioInsightDisclaimer('health', language),
             }}
             emptyLabel={text.notAvailable}
             yesLabel={text.yes}
