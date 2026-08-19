@@ -3,6 +3,7 @@
 import type { ReactElement } from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
+import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { systemConfigApi } from '../../../api/systemConfig';
@@ -17,7 +18,13 @@ const schedulerNotificationsChannelsHref = buildSettingsHref({
 });
 
 function renderCard(ui: ReactElement) {
-  return render(<MemoryRouter>{ui}</MemoryRouter>);
+  return render(
+    <MemoryRouter>
+      <UiLanguageProvider initialLanguage="en">
+        {ui}
+      </UiLanguageProvider>
+    </MemoryRouter>,
+  );
 }
 
 vi.mock('../../../api/scheduledTasks', () => ({
@@ -479,6 +486,108 @@ describe('SchedulerSettingsCard observability', () => {
     expect(skipped).toHaveTextContent(UI_TEXT.en['settings.schedulerSkipReasonBusy']);
     expect(skipped.textContent).toMatch(/GMT[+-]\d+/i);
     expect(skipped).toHaveTextContent('Asia/Shanghai');
+  });
+
+  it('renders inline wait-and-dismiss recovery for a 409 scheduler_busy run-now', async () => {
+    vi.mocked(systemConfigApi.runSchedulerNow).mockRejectedValue({
+      response: {
+        status: 409,
+        data: {
+          error: 'scheduler_busy',
+          message: 'A scheduled analysis is already running',
+          params: { reason: 'analysis_already_running' },
+        },
+      },
+    });
+
+    renderCard(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    const runNow = await screen.findByTestId('scheduler-run-now-button');
+    await waitFor(() => expect(runNow).toBeEnabled());
+    fireEvent.click(runNow);
+
+    const alert = await screen.findByTestId('actionable-api-error-inline');
+    expect(alert).toHaveAttribute('data-error-class', 'busy');
+    expect(alert).toHaveTextContent('Scheduler is busy');
+    expect(alert).not.toHaveTextContent('A scheduled analysis is already running');
+    expect(screen.queryByRole('button', { name: UI_TEXT.en['common.retry'] })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: UI_TEXT.en['common.close'] }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
+    });
+  });
+
+  it('does not apply busy recovery to a non-busy run-now failure', async () => {
+    vi.mocked(systemConfigApi.runSchedulerNow).mockRejectedValue({
+      response: {
+        status: 500,
+        data: { error: 'internal_error', message: 'boom' },
+      },
+    });
+
+    renderCard(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    const runNow = await screen.findByTestId('scheduler-run-now-button');
+    await waitFor(() => expect(runNow).toBeEnabled());
+    fireEvent.click(runNow);
+
+    const alert = await screen.findByTestId('actionable-api-error-inline');
+    expect(alert).not.toHaveAttribute('data-error-class', 'busy');
+    expect(screen.queryByRole('button', { name: UI_TEXT.en['analysisWorkbench.tasks'] })).not.toBeInTheDocument();
+  });
+
+  it('drops a stale run-now rejection after unmount', async () => {
+    let rejectRun!: (error: unknown) => void;
+    vi.mocked(systemConfigApi.runSchedulerNow).mockImplementationOnce(
+      () => new Promise((_, reject) => {
+        rejectRun = reject;
+      }),
+    );
+
+    const view = renderCard(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    const runNow = await screen.findByTestId('scheduler-run-now-button');
+    await waitFor(() => expect(runNow).toBeEnabled());
+    fireEvent.click(runNow);
+    view.unmount();
+    rejectRun({
+      response: {
+        status: 409,
+        data: { error: 'scheduler_busy', message: 'busy' },
+      },
+    });
+
+    expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
   });
 
   it('uses the both-active migration copy when a versioned task is also enabled', async () => {

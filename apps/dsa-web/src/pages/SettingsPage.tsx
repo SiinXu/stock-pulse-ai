@@ -198,6 +198,7 @@ const SettingsPage: React.FC = () => {
   // Bumped by the page-level primary action to open the add-connection dialog.
   const [llmChannelAddSignal, setLlmChannelAddSignal] = useState(0);
   const setupStatusRequestIdRef = useRef(0);
+  const setupSmokeRequestIdRef = useRef(0);
   const onboardingWizardOpenedRef = useRef(false);
   const isDesktopRuntime = Boolean(getDesktopRuntimeApi());
 
@@ -1281,6 +1282,7 @@ const SettingsPage: React.FC = () => {
   );
 
   const handleRunSetupSmoke = async () => {
+    const requestId = ++setupSmokeRequestIdRef.current;
     setSetupSmokeOutcome(null);
     setIsRunningSetupSmoke(true);
     try {
@@ -1290,19 +1292,23 @@ const SettingsPage: React.FC = () => {
         stockCode: firstSetupStockCode,
         t,
       });
+      if (requestId !== setupSmokeRequestIdRef.current) return;
       setSetupSmokeOutcome(outcome);
       if (outcome.status !== 'accepted') {
         return;
       }
       void refreshSetupStatus();
     } catch (error: unknown) {
+      if (requestId !== setupSmokeRequestIdRef.current) return;
       setSetupSmokeOutcome({
         status: 'failed',
         error: getParsedApiError(error),
         tasksHref: null,
       });
     } finally {
-      setIsRunningSetupSmoke(false);
+      if (requestId === setupSmokeRequestIdRef.current) {
+        setIsRunningSetupSmoke(false);
+      }
     }
   };
 

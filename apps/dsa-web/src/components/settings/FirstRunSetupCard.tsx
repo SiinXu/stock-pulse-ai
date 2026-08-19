@@ -4,7 +4,11 @@ import { CheckCircle2, CircleAlert, CircleDashed, Play, RefreshCw, WandSparkles 
 import { useNavigate } from 'react-router-dom';
 import type { ParsedApiError } from '../../api/error';
 import ActionableApiErrorInline from '../analysis/ActionableApiErrorInline';
-import type { SetupSmokeOutcome } from '../../utils/setupSmokeTask';
+import { buildBusyRecoveryActions } from '../../utils/busyRecoveryActions';
+import {
+  buildAnalysisTasksHref,
+  type SetupSmokeOutcome,
+} from '../../utils/setupSmokeTask';
 import type {
   SetupStatusCheck,
   SetupStatusResponse,
@@ -217,20 +221,17 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
             {firstStockCode ? t('settings.setupGuideSmokeNotReady') : t('settings.setupGuideSmokeNeedsStock')}
           </p>
         ) : null}
-        {smokeOutcome?.status !== 'accepted' ? (
-          smokeOutcome?.status === 'failed' && smokeOutcome.tasksHref ? (
-            <ActionableApiErrorInline
-              error={smokeOutcome.error}
-              actions={[{
-                label: t('analysisWorkbench.tasks'),
-                onClick: () => navigate(smokeOutcome.tasksHref!),
-              }]}
-            />
-          ) : smokeOutcome ? (
-            <ApiErrorAlert error={smokeOutcome.error} />
-          ) : (
-            null
-          )
+        {smokeOutcome?.status === 'failed' ? (
+          <ActionableApiErrorInline
+            error={smokeOutcome.error}
+            actions={buildBusyRecoveryActions(smokeOutcome.error, t, {
+              onAttachOrViewTasks: (taskId) => {
+                navigate(smokeOutcome.tasksHref || buildAnalysisTasksHref(taskId));
+              },
+            })}
+          />
+        ) : smokeOutcome && smokeOutcome.status !== 'accepted' ? (
+          <ApiErrorAlert error={smokeOutcome.error} />
         ) : null}
         {smokeOutcome?.status === 'accepted' ? (
           <SettingsAlert

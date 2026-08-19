@@ -99,4 +99,41 @@ describe('setupSmokeTask', () => {
       expect(outcome.tasksHref).toContain('existing-1');
     }
   });
+
+  it('does not invent a tasks link for wait-and-dismiss scheduler busy', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue({
+      response: {
+        status: 409,
+        data: { error: 'scheduler_busy', message: 'busy' },
+      },
+    });
+    const outcome = await runSetupSmokeAnalysis({
+      readyForSmoke: true,
+      stockCode: 'AAPL',
+      t: t as never,
+    });
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.error).toMatchObject({ code: 'scheduler_busy' });
+      expect(outcome.tasksHref).toBeNull();
+    }
+  });
+
+  it('does not treat a non-busy failure as attachable recovery', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue({
+      response: {
+        status: 422,
+        data: { error: 'validation_error', message: 'bad stock' },
+      },
+    });
+    const outcome = await runSetupSmokeAnalysis({
+      readyForSmoke: true,
+      stockCode: 'AAPL',
+      t: t as never,
+    });
+    expect(outcome.status).toBe('failed');
+    if (outcome.status === 'failed') {
+      expect(outcome.tasksHref).toBeNull();
+    }
+  });
 });

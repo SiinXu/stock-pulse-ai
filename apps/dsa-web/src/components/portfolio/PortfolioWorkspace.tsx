@@ -12,8 +12,10 @@ import { readParams, writeParams } from '../../utils/urlState';
 import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
-import { extractExistingTaskId } from '../../utils/asyncTaskUx';
+import { resolveBusyRecoveryDecision } from '../../utils/asyncTaskUx';
+import { buildLaunchErrorActions } from '../../utils/busyRecoveryActions';
 import { AnalysisPhaseSelect } from '../analysis';
+import ActionableApiErrorInline from '../analysis/ActionableApiErrorInline';
 import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
@@ -149,6 +151,9 @@ const PortfolioWorkspace: React.FC = () => {
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [writeWarning, setWriteWarning] = useState<string | null>(null);
   const [positionAnalysisLoadingKey, setPositionAnalysisLoadingKey] = useState<string | null>(null);
+  const analyzeGenerationRef = useRef(0);
+  const analyzeMountedRef = useRef(true);
+  const lastAnalyzeIntentRef = useRef<FlatPosition | null>(null);
   const portfolioAnalysisTaskControllerRef = useRef<PortfolioAnalysisTaskPanelController | null>(null);
   const queuedPortfolioAnalysisTaskActionsRef = useRef<Array<(
     controller: PortfolioAnalysisTaskPanelController,
@@ -479,8 +484,17 @@ const PortfolioWorkspace: React.FC = () => {
     t,
   });
 
+  useEffect(() => {
+    analyzeMountedRef.current = true;
+    return () => {
+      analyzeMountedRef.current = false;
+    };
+  }, []);
+
   const handleAnalyzePosition = async (row: FlatPosition) => {
     const key = `${row.accountId}-${row.symbol}-${row.market}`;
+    const generation = ++analyzeGenerationRef.current;
+    lastAnalyzeIntentRef.current = row;
     setPositionAnalysisLoadingKey(key);
     setError(null);
     try {
@@ -489,22 +503,29 @@ const PortfolioWorkspace: React.FC = () => {
         analysisPhase: positionAnalysisPhase,
         force: false,
       });
+      if (!analyzeMountedRef.current || generation !== analyzeGenerationRef.current) return;
       dispatchPortfolioAnalysisTaskAction((controller) => {
         controller.acceptTask(task, row.symbol, positionAnalysisPhase);
       });
     } catch (err) {
+      if (!analyzeMountedRef.current || generation !== analyzeGenerationRef.current) return;
       const parsed = getParsedApiError(err);
-      const existingTaskId = extractExistingTaskId(parsed);
-      // Reattach an in-flight duplicate instead of leaving the user with only an error toast.
-      if (parsed.code === 'duplicate_task' && existingTaskId) {
+      const recovery = resolveBusyRecoveryDecision(parsed);
+      if (recovery.kind === 'attach_or_view_tasks' && recovery.existingTaskId) {
         dispatchPortfolioAnalysisTaskAction((controller) => {
-          void controller.attachExistingTask(existingTaskId, row.symbol, positionAnalysisPhase);
+          void controller.attachExistingTask(
+            recovery.existingTaskId as string,
+            row.symbol,
+            positionAnalysisPhase,
+          );
         });
       } else {
         setError(parsed);
       }
     } finally {
-      setPositionAnalysisLoadingKey(null);
+      if (analyzeMountedRef.current && generation === analyzeGenerationRef.current) {
+        setPositionAnalysisLoadingKey(null);
+      }
     }
   };
 
@@ -903,7 +924,28 @@ const PortfolioWorkspace: React.FC = () => {
         />
       </section>
 
-      {error ? <ApiErrorAlert error={error} onDismiss={() => setError(null)} /> : null}
+      {error && resolveBusyRecoveryDecision(error).kind !== 'none' ? (
+        <ActionableApiErrorInline
+          error={error}
+          onDismiss={() => setError(null)}
+          actions={buildLaunchErrorActions(error, t, {
+            onAttachOrViewTasks: (taskId) => {
+              const row = lastAnalyzeIntentRef.current;
+              if (!taskId || !row) return;
+              dispatchPortfolioAnalysisTaskAction((controller) => {
+                void controller.attachExistingTask(taskId, row.symbol, positionAnalysisPhase);
+              });
+              setError(null);
+            },
+            onRetrySameOperation: () => {
+              const row = lastAnalyzeIntentRef.current;
+              if (row) void handleAnalyzePosition(row);
+            },
+          })}
+        />
+      ) : error ? (
+        <ApiErrorAlert error={error} onDismiss={() => setError(null)} />
+      ) : null}
       {accountCreateSuccess ? (
         <InlineAlert variant="success" size="compact" message={accountCreateSuccess} />
       ) : null}

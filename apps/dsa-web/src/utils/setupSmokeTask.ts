@@ -13,7 +13,7 @@ import {
   buildAnalysisWorkbenchHref,
   RUN_FLOW_ROUTE_QUERY_VALUES,
 } from '../routing/routes';
-import { extractExistingTaskId, isTaskBusyError } from './asyncTaskUx';
+import { resolveBusyRecoveryDecision } from './asyncTaskUx';
 
 type Translate = (key: UiTextKey, params?: Record<string, string | number>) => string;
 
@@ -90,11 +90,12 @@ export async function runSetupSmokeAnalysis(options: {
     };
   } catch (error: unknown) {
     const parsed = getParsedApiError(error);
+    const recovery = resolveBusyRecoveryDecision(parsed);
     return {
       status: 'failed',
       error: parsed,
-      tasksHref: isTaskBusyError(parsed)
-        ? buildAnalysisTasksHref(extractExistingTaskId(parsed))
+      tasksHref: recovery.kind === 'attach_or_view_tasks'
+        ? buildAnalysisTasksHref(recovery.existingTaskId)
         : null,
     };
   }

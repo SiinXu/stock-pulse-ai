@@ -593,6 +593,42 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     }));
   });
 
+  it('keeps a single-stock scheduler_busy launch on wait-and-dismiss', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(
+      createApiError(createParsedApiError({
+        title: 'busy',
+        message: 'busy',
+        code: 'scheduler_busy',
+        status: 409,
+      })),
+    );
+    useStockPoolStore.setState({ query: 'AAPL', selectionSource: 'manual' });
+    renderWorkbench(buildAnalysisWorkbenchHref({
+      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.launch,
+    }));
+
+    await screen.findByRole('combobox', { name: '股票搜索' });
+    const analyzeButton = (await screen.findAllByRole('button', { name: '分析' })).at(-1)!;
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+    fireEvent.click(analyzeButton);
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalled());
+
+    const alert = await screen.findByTestId('actionable-api-error-inline');
+    expect(alert).toHaveAttribute('data-error-class', 'busy');
+    expect(within(alert).queryByRole('button', { name: '运行中任务' })).not.toBeInTheDocument();
+    expect(within(alert).queryByRole('button', { name: '重试' })).not.toBeInTheDocument();
+    expect(analyzeButton).toBeDisabled();
+
+    fireEvent.click(analyzeButton);
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(within(alert).getByRole('button', { name: '关闭' }));
+    await waitFor(() => {
+      expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
+    });
+    await waitFor(() => expect(analyzeButton).toBeEnabled());
+  });
+
   it('shows generic analysis submission failures only in the top toast', async () => {
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValueOnce(
       createApiError(createParsedApiError({

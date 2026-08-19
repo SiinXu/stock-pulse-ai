@@ -628,7 +628,7 @@ and similar accepted background work, the shared **async task UX contract**
 applies on top of StatePanel / Alert / Progress primitives:
 
 - Document: [`async-task-ux-contract.md`](./async-task-ux-contract.md) (issue #885)
-- Helpers: `apps/dsa-web/src/utils/asyncTaskUx.ts`
+- Helpers: `apps/dsa-web/src/utils/asyncTaskUx.ts` (`resolveBusyRecoveryDecision`) and `apps/dsa-web/src/utils/busyRecoveryActions.ts`
 - Progress copy: `formatTaskMessage` (`apps/dsa-web/src/utils/taskMessage.ts`)
 - Never present a bare task id without a TaskPanel, RunFlow, or equivalent
   recoverable navigation path

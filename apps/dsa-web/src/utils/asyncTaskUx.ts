@@ -175,3 +175,25 @@ export function resolveBusyRecoveryKind(
   if (code === 'portfolio_busy') return 'retry_same_operation';
   return 'wait_and_dismiss';
 }
+
+/** Resolved 409/busy recovery for production launch surfaces. */
+export interface BusyRecoveryDecision {
+  kind: BusyRecoveryKind;
+  existingTaskId: string | null;
+  blocksLaunch: boolean;
+}
+
+/**
+ * Single recovery assistant for 409/busy/conflict launch failures.
+ * Callers must invoke this instead of inventing a second busy policy.
+ */
+export function resolveBusyRecoveryDecision(
+  error: ParsedApiError | null | undefined,
+): BusyRecoveryDecision {
+  const kind = resolveBusyRecoveryKind(error);
+  return {
+    kind,
+    existingTaskId: extractExistingTaskId(error),
+    blocksLaunch: kind !== 'none',
+  };
+}

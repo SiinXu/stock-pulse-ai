@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Bell, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { scheduledTasksApi } from '../../api/scheduledTasks';
@@ -11,7 +11,12 @@ import type {
   SystemConfigItem,
 } from '../../types/systemConfig';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
-import { buildSettingsHref } from '../../routing/routes';
+import {
+  ANALYSIS_WORKBENCH_SEGMENT_VALUES,
+  RUN_FLOW_ROUTE_QUERY_VALUES,
+  buildAnalysisWorkbenchHref,
+  buildSettingsHref,
+} from '../../routing/routes';
 import { getUiLocale } from '../../utils/uiLocale';
 import {
   ApiErrorAlert,
@@ -22,6 +27,8 @@ import {
   Surface,
   TimePicker,
 } from '../common';
+import ActionableApiErrorInline from '../analysis/ActionableApiErrorInline';
+import { buildLaunchErrorActions } from '../../utils/busyRecoveryActions';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
 import { SettingsSwitch } from './SettingsSwitch';
@@ -194,6 +201,8 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const [hasEnabledVersionedTasks, setHasEnabledVersionedTasks] = useState<boolean | null>(null);
   const mountedRef = useRef(true);
   const statusRequestRef = useRef(0);
+  const runNowRequestRef = useRef(0);
+  const navigate = useNavigate();
 
   useEffect(() => {
     mountedRef.current = true;
@@ -356,11 +365,13 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   };
 
   const runSchedulerNow = async () => {
+    const requestId = ++runNowRequestRef.current;
     setRunNowError(null);
     setTrackedRun(null);
     setIsRunningNow(true);
     try {
       const result = await systemConfigApi.runSchedulerNow();
+      if (!mountedRef.current || requestId !== runNowRequestRef.current) return;
       // Contract: accepted + running means work started in this process (no async task id).
       if (result.accepted) {
         setTrackedRun({
@@ -368,14 +379,24 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
           state: 'running',
         });
       } else if (result.running) {
-        setRunNowError(getParsedApiError(new Error(t('settings.schedulerBusyReason'))));
+        setRunNowError(getParsedApiError({
+          response: {
+            status: 409,
+            data: {
+              error: 'scheduler_busy',
+              message: t('settings.schedulerBusyReason'),
+              params: { reason: 'analysis_already_running' },
+            },
+          },
+        }));
       }
       await refreshSchedulerStatus();
     } catch (error: unknown) {
+      if (!mountedRef.current || requestId !== runNowRequestRef.current) return;
       setRunNowError(getParsedApiError(error));
       await refreshSchedulerStatus();
     } finally {
-      if (mountedRef.current) {
+      if (mountedRef.current && requestId === runNowRequestRef.current) {
         setIsRunningNow(false);
       }
     }
@@ -662,7 +683,33 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
           />
         ) : null}
         {statusError ? <ApiErrorAlert error={statusError} /> : null}
-        {runNowError ? <ApiErrorAlert error={runNowError} /> : null}
+        {runNowError ? (
+          <ActionableApiErrorInline
+            error={runNowError}
+            onDismiss={() => setRunNowError(null)}
+            actions={buildLaunchErrorActions(runNowError, t, {
+              onAttachOrViewTasks: (taskId) => {
+                const trimmed = typeof taskId === 'string' ? taskId.trim() : '';
+                navigate(buildAnalysisWorkbenchHref(trimmed
+                  ? {
+                      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks,
+                      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.task,
+                      runFlowTaskId: trimmed,
+                    }
+                  : { segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.tasks }));
+              },
+              onRetrySameOperation: () => {
+                void runSchedulerNow();
+              },
+              onRetry: () => {
+                void runSchedulerNow();
+              },
+            }, {
+              retryDisabled: isRunningNow,
+              retryLoading: isRunningNow,
+            })}
+          />
+        ) : null}
         {!runNowError && trackedRun?.state === 'running' ? (
           <SettingsAlert
             title={t('settings.actionSuccess')}
