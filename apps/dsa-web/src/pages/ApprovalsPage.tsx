@@ -5,6 +5,7 @@ import { useRouteFocusTarget } from '../components/routing';
 import { CheckCircle2, Clock3, RefreshCw, ShieldAlert, XCircle } from 'lucide-react';
 import { approvalsApi } from '../api/approvals';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
+import ApprovalDecisionConfirm from '../components/approvals/ApprovalDecisionConfirm';
 import {
   ApiErrorAlert,
   Badge,
@@ -32,8 +33,14 @@ import type {
   ApprovalProposal,
   ApprovalRiskSource,
   ApprovalRule,
-  ApprovalStatus,
 } from '../types/approvals';
+import {
+  formatApprovalRiskSource,
+  formatApprovalSignal,
+  formatApprovalStatus,
+  formatApprovalTarget,
+} from '../utils/approvalFormat';
+import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 
 const RULE_MIN_SECONDS = 30;
 const RULE_MAX_SECONDS = 3600;
@@ -43,7 +50,7 @@ type ApprovalPrecondition =
   | 'session_required'
   | null;
 
-function statusVariant(status: ApprovalStatus) {
+function statusVariant(status: string) {
   if (status === 'approved') return 'success' as const;
   if (status === 'pending') return 'warning' as const;
   if (status === 'rejected' || status === 'expired') return 'danger' as const;
@@ -66,8 +73,13 @@ function resolveApprovalPrecondition(error: ParsedApiError | null): ApprovalPrec
   return null;
 }
 
+type PendingApprovalDecision = {
+  proposalId: string;
+  decision: ApprovalDecision;
+};
+
 const ApprovalsPage: React.FC = () => {
-  const { language } = useUiLanguage();
+  const { language, t } = useUiLanguage();
   const navigate = useNavigate();
   const pageHeadingRef = useRef<HTMLHeadingElement>(null);
   useRouteFocusTarget({
@@ -76,6 +88,7 @@ const ApprovalsPage: React.FC = () => {
     ready: true,
   });
   const text = APPROVALS_TEXT[language];
+  const signalLabels = useMemo(() => buildDecisionActionLabelMap(t), [t]);
   const [rule, setRule] = useState<ApprovalRule | null>(null);
   const [proposals, setProposals] = useState<ApprovalProposal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,8 +100,11 @@ const ApprovalsPage: React.FC = () => {
   const [expiry, setExpiry] = useState(300);
   const [savingRule, setSavingRule] = useState(false);
   const [decidingId, setDecidingId] = useState<string | null>(null);
+  const [pendingDecision, setPendingDecision] = useState<PendingApprovalDecision | null>(null);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
   const mountedRef = useRef(true);
+  const decidingRef = useRef(false);
 
   const applyRule = useCallback((next: ApprovalRule) => {
     setRule(next);
@@ -182,6 +198,57 @@ const ApprovalsPage: React.FC = () => {
     () => proposals.filter((proposal) => proposal.status !== 'pending'),
     [proposals],
   );
+  const pendingProposal = useMemo(() => {
+    if (!pendingDecision) return null;
+    return proposals.find((item) => item.id === pendingDecision.proposalId) ?? null;
+  }, [pendingDecision, proposals]);
+  const pendingProposalSeconds = pendingProposal
+    ? Math.max(0, Math.ceil((new Date(pendingProposal.expiresAt).getTime() - now) / 1000))
+    : 0;
+
+  const closeDecisionConfirm = useCallback(() => {
+    setPendingDecision(null);
+    setDecisionError(null);
+  }, []);
+
+  const closeStaleDecisionConfirm = useCallback(async (refreshFromServer: boolean) => {
+    closeDecisionConfirm();
+    if (refreshFromServer) {
+      await pollProposals();
+    }
+    if (mountedRef.current) {
+      setNotice(text.conflictRefresh);
+    }
+  }, [closeDecisionConfirm, pollProposals, text.conflictRefresh]);
+
+  useEffect(() => {
+    if (!pendingDecision || decidingId) return;
+    if (actionsBlocked) {
+      closeDecisionConfirm();
+      return;
+    }
+    const current = proposals.find((item) => item.id === pendingDecision.proposalId);
+    if (current?.status === pendingDecision.decision) {
+      closeDecisionConfirm();
+      return;
+    }
+    const remainingSeconds = current
+      ? Math.max(0, Math.ceil((new Date(current.expiresAt).getTime() - now) / 1000))
+      : 0;
+    const stillPending = current?.status === 'pending' && remainingSeconds > 0;
+    if (stillPending) return;
+    // Local countdown expiry still has status=pending until a list fetch; poll first
+    // so conflictRefresh matches the 409/stale-poll contract.
+    void closeStaleDecisionConfirm(current?.status === 'pending');
+  }, [
+    actionsBlocked,
+    closeDecisionConfirm,
+    closeStaleDecisionConfirm,
+    decidingId,
+    now,
+    pendingDecision,
+    proposals,
+  ]);
 
   const toggleRiskSource = (source: ApprovalRiskSource, checked: boolean) => {
     if (actionsBlocked) return;
@@ -219,43 +286,59 @@ const ApprovalsPage: React.FC = () => {
     }
   };
 
+  const requestDecision = (proposal: ApprovalProposal, decision: ApprovalDecision) => {
+    if (decidingId || actionsBlocked || pendingDecision) return;
+    setNotice(null);
+    setDecisionError(null);
+    setPendingDecision({ proposalId: proposal.id, decision });
+  };
+
   const decide = async (proposal: ApprovalProposal, decision: ApprovalDecision) => {
-    if (decidingId || actionsBlocked) return;
+    if (decidingRef.current || decidingId || actionsBlocked) return;
+    decidingRef.current = true;
     setDecidingId(proposal.id);
     setNotice(null);
+    setDecisionError(null);
     try {
       const updated = await approvalsApi.decide(proposal.id, decision, proposal.version);
+      if (!mountedRef.current) return;
       setProposals((current) => current.map((item) => (
         item.id === updated.id ? updated : item
       )));
       setError(null);
+      closeDecisionConfirm();
     } catch (cause) {
       const parsed = getParsedApiError(cause, language);
       if (parsed.status === 409) {
         await pollProposals();
+        if (!mountedRef.current) return;
+        closeDecisionConfirm();
         setNotice(text.conflictRefresh);
-      } else {
-        setError(parsed);
+      } else if (mountedRef.current) {
+        setDecisionError(parsed.message);
       }
     } finally {
-      setDecidingId(null);
+      decidingRef.current = false;
+      if (mountedRef.current) setDecidingId(null);
     }
   };
 
-  const statusLabel = (status: ApprovalStatus) => ({
-    pending: text.statusPending,
-    approved: text.statusApproved,
-    rejected: text.statusRejected,
-    expired: text.statusExpired,
-    cancelled: text.statusCancelled,
-  })[status];
+  const confirmPendingDecision = () => {
+    if (!pendingDecision || !pendingProposal || decidingRef.current || decidingId) return;
+    if (pendingProposal.status !== 'pending' || pendingProposalSeconds <= 0) {
+      void closeStaleDecisionConfirm(pendingProposal.status === 'pending');
+      return;
+    }
+    void decide(pendingProposal, pendingDecision.decision);
+  };
 
   const renderProposal = (proposal: ApprovalProposal) => {
     const seconds = Math.max(0, Math.ceil((new Date(proposal.expiresAt).getTime() - now) / 1000));
     const pendingActive = proposal.status === 'pending' && seconds > 0 && !actionsBlocked;
+    const statusLabel = formatApprovalStatus(proposal.status, text);
     const timingLabel = proposal.status === 'pending'
       ? (seconds > 0 ? text.expiresIn.replace('{seconds}', String(seconds)) : text.expired)
-      : (proposal.status === 'expired' ? text.expired : statusLabel(proposal.status));
+      : (proposal.status === 'expired' ? text.expired : statusLabel);
     return (
       <Surface
         as="article"
@@ -268,10 +351,10 @@ const ApprovalsPage: React.FC = () => {
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={statusVariant(proposal.status)}>
-                {statusLabel(proposal.status)}
+                {statusLabel}
               </Badge>
               <span className="font-mono text-xs text-secondary-text">
-                {proposal.context.stockCode || '—'}
+                {formatApprovalTarget(proposal.context.stockCode)}
               </span>
             </div>
             <p className="mt-3 text-sm text-foreground">{proposal.context.riskSummary}</p>
@@ -284,15 +367,21 @@ const ApprovalsPage: React.FC = () => {
         <dl className="mt-4 grid gap-3 sm:grid-cols-3">
           <div>
             <dt className="text-xs text-secondary-text">{text.originalSignal}</dt>
-            <dd className="mt-1 text-sm font-semibold text-foreground">{proposal.context.originalSignal}</dd>
+            <dd className="mt-1 text-sm font-semibold text-foreground">
+              {formatApprovalSignal(proposal.context.originalSignal, signalLabels)}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-secondary-text">{text.conservativeSignal}</dt>
-            <dd className="mt-1 text-sm font-semibold text-foreground">{proposal.context.conservativeSignal}</dd>
+            <dd className="mt-1 text-sm font-semibold text-foreground">
+              {formatApprovalSignal(proposal.context.conservativeSignal, signalLabels)}
+            </dd>
           </div>
           <div>
             <dt className="text-xs text-secondary-text">{text.riskSummary}</dt>
-            <dd className="mt-1 text-sm text-foreground">{proposal.context.riskSource}</dd>
+            <dd className="mt-1 text-sm text-foreground">
+              {formatApprovalRiskSource(proposal.context.riskSource, text)}
+            </dd>
           </div>
         </dl>
         {proposal.status === 'pending' ? (
@@ -303,7 +392,7 @@ const ApprovalsPage: React.FC = () => {
               isLoading={decidingId === proposal.id}
               loadingText={text.processing}
               disabled={!pendingActive || decidingId !== null}
-              onClick={() => void decide(proposal, 'approved')}
+              onClick={() => requestDecision(proposal, 'approved')}
             >
               <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
               {text.approve}
@@ -312,7 +401,7 @@ const ApprovalsPage: React.FC = () => {
               variant="danger-subtle"
               size="comfortable"
               disabled={!pendingActive || decidingId !== null}
-              onClick={() => void decide(proposal, 'rejected')}
+              onClick={() => requestDecision(proposal, 'rejected')}
             >
               <XCircle className="h-4 w-4" aria-hidden="true" />
               {text.reject}
@@ -526,6 +615,19 @@ const ApprovalsPage: React.FC = () => {
           <EmptyState compact title={text.emptyHistory} />
         )}
       </Section>
+
+      {pendingDecision && pendingProposal ? (
+        <ApprovalDecisionConfirm
+          proposal={pendingProposal}
+          decision={pendingDecision.decision}
+          deciding={decidingId === pendingProposal.id}
+          error={decisionError}
+          onConfirm={confirmPendingDecision}
+          onCancel={() => {
+            if (!decidingId) closeDecisionConfirm();
+          }}
+        />
+      ) : null}
     </WorkspacePage>
   );
 };

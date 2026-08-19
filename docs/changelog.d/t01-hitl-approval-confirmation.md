@@ -1,0 +1,1 @@
+- [Fixed] Require a second confirmation for HITL approve/reject and show localized approval labels instead of raw backend codes (Refs #879).
