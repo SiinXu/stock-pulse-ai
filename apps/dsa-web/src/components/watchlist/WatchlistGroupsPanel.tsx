@@ -8,15 +8,9 @@ import type { HomeWatchlistRow, WatchlistGroup, WatchlistGroupRestoreSnapshot } 
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { truncateStockName } from '../../utils/stockName';
 import type { WatchlistScoreItem } from '../../types/watchlistScore';
-import {
-  createUnanalyzedWatchlistScore,
-  type WatchlistScoreLoadStatus,
-} from '../../hooks/useWatchlistScores';
+import type { WatchlistScoreLoadStatus } from '../../hooks/useWatchlistScores';
 
-const WatchlistScoreStatusCell = lazy(async () => {
-  const module = await import('./WatchlistScoreColumn');
-  return { default: module.WatchlistScoreStatusCell };
-});
+const WatchlistScoreStatusCell = lazy(() => import('./WatchlistScoreStatusCell'));
 const WatchlistGroupDeleteFlow = lazy(() => import('./WatchlistGroupDeleteFlow'));
 
 export interface WatchlistGroupsPanelProps {
@@ -336,18 +330,13 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
                             <p className="truncate text-sm font-medium text-foreground">{label}</p>
                             <p className="truncate font-mono text-xs text-secondary-text">{member.stockCode}</p>
                           </div>
-                          {scoreStatus === 'ready' || scoreStatus === 'loading'
-                            || scoreStatus === 'retrying' || scoreStatus === 'error' ? (
+                          {scoreStatus !== 'idle' ? (
                             <Suspense fallback={<span className="px-1 py-1.5 text-xs text-muted-text">{t('common.loading')}</span>}>
                               <WatchlistScoreStatusCell
-                                item={scoreStatus === 'ready'
-                                  ? scoreItemsByCode.get(member.stockCode)
-                                    ?? createUnanalyzedWatchlistScore(member.stockCode)
-                                  : scoreStatus === 'retrying' && scoreStale
-                                    ? scoreItemsByCode.get(member.stockCode)
-                                    : undefined}
+                                stockCode={member.stockCode}
                                 status={scoreStatus}
                                 stale={scoreStale}
+                                itemsByCode={scoreItemsByCode}
                                 className="max-w-40"
                               />
                             </Suspense>

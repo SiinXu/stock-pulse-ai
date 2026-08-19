@@ -30,10 +30,7 @@ import { Spinner } from '../common/Spinner';
 import { WatchlistGroupsPanel } from './WatchlistGroupsPanel';
 import { WatchlistScoreStatusCell } from './WatchlistScoreColumn';
 import type { WatchlistGroup } from '../../types/watchlist';
-import {
-  createUnanalyzedWatchlistScore,
-  type WatchlistScoreLoadStatus,
-} from '../../hooks/useWatchlistScores';
+import type { WatchlistScoreLoadStatus } from '../../hooks/useWatchlistScores';
 import { useWatchlistScoreSession } from '../../hooks/useWatchlistScoreSession';
 
 export type HomeWorkspaceTab = HomeWorkspaceValue;
@@ -134,12 +131,12 @@ const ScoreBadge: React.FC<{ item?: StockBarItem }> = ({ item }) => {
 
 const WatchlistRowItem: React.FC<{
   row: HomeWatchlistRow;
-  scoreItem?: WatchlistScoreItem;
   scoreStatus: WatchlistScoreLoadStatus;
   scoreStale: boolean;
+  scoreItemsByCode: ReadonlyMap<string, WatchlistScoreItem>;
   onRemove: (code: string) => Promise<boolean | void>;
   disabled: boolean;
-}> = ({ row, scoreItem, scoreStatus, scoreStale, onRemove, disabled }) => {
+}> = ({ row, scoreStatus, scoreStale, scoreItemsByCode, onRemove, disabled }) => {
   const { language, t } = useUiLanguage();
   const taskLabel = getTaskStatusLabel(row.activeTask, t);
   const item = row.latestItem;
@@ -181,9 +178,10 @@ const WatchlistRowItem: React.FC<{
         </div>
         <div className="flex shrink-0 items-start gap-1.5">
           <WatchlistScoreStatusCell
-            item={scoreItem}
+            stockCode={row.code}
             status={scoreStatus}
             stale={scoreStale}
+            itemsByCode={scoreItemsByCode}
             className="max-w-40"
           />
           <IconButton
@@ -601,13 +599,9 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                 <WatchlistRowItem
                   key={row.code}
                   row={row}
-                  scoreItem={scoreState.status === 'ready'
-                    ? scoreState.itemsByCode.get(row.code) ?? createUnanalyzedWatchlistScore(row.code)
-                    : scoreState.status === 'retrying' && scoreState.stale
-                      ? scoreState.itemsByCode.get(row.code)
-                      : undefined}
                   scoreStatus={scoreState.status}
                   scoreStale={scoreState.stale}
+                  scoreItemsByCode={scoreState.itemsByCode}
                   onRemove={onRemoveFromWatchlist}
                   disabled={watchlistActioning}
                 />

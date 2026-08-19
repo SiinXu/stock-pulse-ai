@@ -1,5 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import fs from 'node:fs';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import path from 'node:path';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
@@ -219,6 +225,25 @@ describe('WatchlistGroupsPanel', () => {
     expect(screen.getByTestId('watchlist-member-default-600519')).toBeInTheDocument();
     expect(screen.getByTestId('watchlist-member-default-AAPL')).toBeInTheDocument();
     expect(screen.getByTestId('watchlist-member-value-300750')).toBeInTheDocument();
+    expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
+    expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();
+  });
+
+  it('lazy-loads the score status cell as a default export instead of inlining WatchlistScoreColumn', () => {
+    const source = fs.readFileSync(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../WatchlistGroupsPanel.tsx'),
+      'utf8',
+    );
+    expect(source).toMatch(/lazy\(\(\) => import\('\.\/WatchlistScoreStatusCell'\)\)/);
+    expect(source).not.toContain('createUnanalyzedWatchlistScore');
+    expect(source).not.toContain("from './WatchlistScoreColumn'");
+  });
+
+  it('shows loading score status while scores are first loading', async () => {
+    renderPanel({ scoreStatus: 'loading' });
+
+    expect(screen.getByTestId('watchlist-member-default-600519')).toBeInTheDocument();
     expect(await screen.findAllByTestId('watchlist-score-status')).not.toHaveLength(0);
     expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
     expect(screen.queryByTestId('watchlist-score-unanalyzed')).not.toBeInTheDocument();

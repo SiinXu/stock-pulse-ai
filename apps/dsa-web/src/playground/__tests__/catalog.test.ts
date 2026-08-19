@@ -63,6 +63,15 @@ describe('playground catalog', () => {
     }
   });
 
+  it('keeps HomeSignalSummary out of workspace scenarios so the groups-section chunk stays split', () => {
+    const source = fs.readFileSync(
+      path.join(sourceRoot, 'playground/scenarios/workspaceScenarios.tsx'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/HomeSignalSummary/);
+    expect(hasPlaygroundRenderer('home-signal-summary')).toBe(true);
+  });
+
   it('reports catalog ids omitted from a production-shaped registry map', () => {
     // Counterexample for the pure helper owned by the production registry module.
     // Proves an omitted renderer id fails the same check used at runtime.

@@ -12,6 +12,7 @@ import {
   WatchlistScoreColumn,
   WatchlistScoreStatusCell,
 } from '../WatchlistScoreColumn';
+import { resolveWatchlistScoreStatusItem } from '../watchlistScoreStatus';
 
 afterEach(() => {
   cleanup();
@@ -164,6 +165,54 @@ describe('WatchlistScoreColumn', () => {
       </UiLanguageProvider>,
     );
     expect(screen.getByTestId('watchlist-score-status')).toHaveTextContent(/failed/i);
+    expect(screen.queryByTestId('watchlist-score-unanalyzed')).toBeNull();
+  });
+
+  it('resolves ready missing scores as unanalyzed and keeps last-known only while stale', () => {
+    const lastKnown = scoredItem;
+    const itemsByCode = new Map<string, WatchlistScoreItem>([['600519', lastKnown]]);
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'ready',
+      stockCode: 'AAPL',
+      itemsByCode,
+    })?.status).toBe('unanalyzed');
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'retrying',
+      stale: true,
+      stockCode: '600519',
+      itemsByCode,
+    })).toEqual(lastKnown);
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'retrying',
+      stale: false,
+      stockCode: '600519',
+      itemsByCode,
+    })).toBeUndefined();
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'error',
+      stockCode: '600519',
+      itemsByCode,
+    })).toBeUndefined();
+    expect(resolveWatchlistScoreStatusItem({
+      status: 'loading',
+      stockCode: '600519',
+      itemsByCode,
+    })).toBeUndefined();
+  });
+
+  it('renders last-known scores from itemsByCode while retrying and marked stale', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <WatchlistScoreStatusCell
+          status="retrying"
+          stale
+          stockCode="600519"
+          itemsByCode={new Map([['600519', scoredItem]])}
+        />
+      </UiLanguageProvider>,
+    );
+    expect(screen.getByTestId('watchlist-score-value')).toHaveTextContent('72');
+    expect(screen.getByTestId('watchlist-score-stale')).toBeInTheDocument();
     expect(screen.queryByTestId('watchlist-score-unanalyzed')).toBeNull();
   });
 

@@ -13,6 +13,7 @@ import type {
 } from '../../types/watchlistScore';
 import { getSentimentColor } from '../../types/analysis';
 import type { WatchlistScoreLoadStatus } from '../../hooks/useWatchlistScores';
+import { resolveWatchlistScoreStatusItem } from './watchlistScoreStatus';
 import { cn } from '../../utils/cn';
 import { Badge, InlineAlert, Tooltip } from '../common';
 
@@ -269,6 +270,8 @@ export type WatchlistScoreStatusCellProps = {
   status: WatchlistScoreLoadStatus;
   stale?: boolean;
   className?: string;
+  stockCode?: string;
+  itemsByCode?: ReadonlyMap<string, WatchlistScoreItem>;
 };
 
 /**
@@ -281,6 +284,8 @@ export const WatchlistScoreStatusCell: React.FC<WatchlistScoreStatusCellProps> =
   status,
   stale = false,
   className,
+  stockCode,
+  itemsByCode,
 }) => {
   const { t } = useUiLanguage();
   const failedFallback = (
@@ -288,15 +293,22 @@ export const WatchlistScoreStatusCell: React.FC<WatchlistScoreStatusCellProps> =
       {t('common.failure')}
     </span>
   );
+  const resolvedItem = resolveWatchlistScoreStatusItem({
+    item,
+    status,
+    stale,
+    stockCode,
+    itemsByCode,
+  });
 
   const showItem = Boolean(
-    item && (status === 'ready' || (status === 'retrying' && stale)),
+    resolvedItem && (status === 'ready' || (status === 'retrying' && stale)),
   );
-  if (showItem && item) {
+  if (showItem && resolvedItem) {
     return (
       <div className="flex min-w-0 flex-col items-end gap-0.5">
-        <WatchlistScoreCellBoundary resetKey={item.stockCode} fallback={failedFallback}>
-          <WatchlistScoreColumn item={item} className={className} />
+        <WatchlistScoreCellBoundary resetKey={resolvedItem.stockCode} fallback={failedFallback}>
+          <WatchlistScoreColumn item={resolvedItem} className={className} />
         </WatchlistScoreCellBoundary>
         {stale ? (
           <span className="text-label text-warning" data-testid="watchlist-score-stale">
