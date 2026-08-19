@@ -46,17 +46,23 @@ export type AdoptionDiff = {
   detail: string;
 };
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
 const DENSITY_CLASS_PATTERN = new RegExp(
-  `(?<![a-zA-Z0-9_-])(?:${DENSITY_STRUCTURAL_UTILITY_CLASSES.join('|')})(?![a-zA-Z0-9_-])`,
+  `(?<![a-zA-Z0-9_-])(?:${DENSITY_STRUCTURAL_UTILITY_CLASSES.map(escapeRegExp).join('|')})(?![a-zA-Z0-9_-])`,
   'g',
 );
 const DENSITY_VAR_PATTERN = new RegExp(
-  `(?:${DENSITY_STRUCTURAL_CSS_VARS.map((token) => token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`,
+  `(?:${DENSITY_STRUCTURAL_CSS_VARS.map(escapeRegExp).join('|')})`,
   'g',
 );
 const STRUCTURAL_SPACING_PATTERN = /(?<![a-zA-Z0-9_-])(?:[a-z-]+:)*(?:gap(?:-x|-y)?|space-[xy]|p(?:[xytlrb])?|m(?:[xytlrb])?)-(?:px|auto|\d+(?:\.\d+)?|\[[^\]]+\])(?![a-zA-Z0-9_-])/g;
 const COMPUTED_SPACING_PREFIX = /^(?:[a-z-]+:)*(?:gap(?:-x|-y)?|space-[xy]|p(?:[xytlrb])?|m(?:[xytlrb])?)-$/;
 const MICRO_OR_RESET_SPACING = /(?:^|:)(?:gap(?:-x|-y)?|space-[xy]|p(?:[xytlrb])?|m(?:[xytlrb])?)-(?:0|0\.5|1|1\.5|px|auto)$/;
+const SPACING_CLASS_CANDIDATE = /(?<![a-zA-Z0-9_-])(?:[a-z-]+:)*(?:gap(?:-x|-y)?|space-[xy]|p(?:[xytlrb])?|m(?:[xytlrb])?)-/;
+const SPACING_STYLE_CANDIDATE = /(?<![A-Za-z0-9_])(?:padding|margin|rowGap|columnGap|gap)(?![a-z])/;
 const SPACING_STYLE_PROPS = new Set([
   'padding',
   'paddingTop',
@@ -86,9 +92,68 @@ const SPACING_STYLE_PROPS = new Set([
 ]);
 const CSS_SPACING_VALUE = /^-?\d+(?:\.\d+)?(?:px|rem|em)$/;
 const DENSITY_VAR_VALUE = /^var\(--density-[\w-]+\)$/;
+const DENSITY_SCAN_CANDIDATE_PATTERN = new RegExp(
+  [
+    'data-density',
+    ...DENSITY_STRUCTURAL_UTILITY_CLASSES.map(escapeRegExp),
+    ...DENSITY_STRUCTURAL_CSS_VARS.map(escapeRegExp),
+    SPACING_CLASS_CANDIDATE.source,
+    SPACING_STYLE_CANDIDATE.source,
+  ].join('|'),
+);
 
 export const DENSITY_CATALOG_PATH = '../../design/density.ts';
 export const DENSITY_ADOPTION_BASELINE_VERSION = 1;
+/** Regression ceiling well below the 30s coverage `testTimeout`. Do not raise the test timeout instead. */
+export const DENSITY_PRODUCTION_COLLECT_BUDGET_MS = 12_000;
+
+export type DensityScanStats = {
+  cacheHits: number;
+  skippedWithoutParse: number;
+  parsedFiles: number;
+};
+
+type ScanCacheEntry = {
+  source: string;
+  findings: DensityFinding[];
+};
+
+const scanCache = new Map<string, ScanCacheEntry>();
+let scanStats: DensityScanStats = {
+  cacheHits: 0,
+  skippedWithoutParse: 0,
+  parsedFiles: 0,
+};
+
+export function getDensityScanStats(): DensityScanStats {
+  return { ...scanStats };
+}
+
+export function resetDensityScanStats(): void {
+  scanStats = {
+    cacheHits: 0,
+    skippedWithoutParse: 0,
+    parsedFiles: 0,
+  };
+}
+
+export function resetDensityScanCache(): void {
+  scanCache.clear();
+}
+
+export function resetDensityScanAccounting(): void {
+  resetDensityScanStats();
+  resetDensityScanCache();
+}
+
+/**
+ * Conservative over-approximation: if this is false, the AST scanner cannot
+ * emit a finding because every token/prop it reads is absent from `source`.
+ * Comments and type-only strings may still match and force a parse.
+ */
+export function sourceMayContainDensityFindings(source: string): boolean {
+  return DENSITY_SCAN_CANDIDATE_PATTERN.test(source);
+}
 
 function unwrapExpression(expression: ts.Expression): ts.Expression {
   let current = expression;
@@ -104,29 +169,11 @@ function unwrapExpression(expression: ts.Expression): ts.Expression {
   return current;
 }
 
-function isTypePosition(node: ts.Node): boolean {
-  let current: ts.Node | undefined = node.parent;
-  while (current) {
-    if (
-      ts.isAsExpression(current)
-      || ts.isTypeAssertionExpression(current)
-      || ts.isSatisfiesExpression(current)
-    ) {
-      return false;
-    }
-    if (
-      ts.isTypeNode(current)
-      || ts.isTypeAliasDeclaration(current)
-      || ts.isInterfaceDeclaration(current)
-      || ts.isTypeLiteralNode(current)
-      || ts.isHeritageClause(current)
-      || ts.isImportTypeNode(current)
-    ) {
-      return true;
-    }
-    current = current.parent;
-  }
-  return false;
+function shouldSkipTypeSubtree(node: ts.Node): boolean {
+  return ts.isTypeNode(node)
+    || ts.isTypeAliasDeclaration(node)
+    || ts.isInterfaceDeclaration(node)
+    || ts.isHeritageClause(node);
 }
 
 function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
@@ -134,11 +181,12 @@ function lineOf(sourceFile: ts.SourceFile, node: ts.Node): number {
 }
 
 function parseSource(filename: string, source: string): ts.SourceFile {
+  // Parent pointers are unused: type-only subtrees are skipped by node kind.
   return ts.createSourceFile(
     filename,
     source,
     ts.ScriptTarget.Latest,
-    true,
+    false,
     filename.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
   );
 }
@@ -189,13 +237,17 @@ function pushFinding(
 function collectFromText(
   findings: DensityFinding[],
   file: string,
-  line: number,
+  resolveLine: () => number,
   text: string,
 ): void {
-  for (const token of extractDensityTokens(text)) {
+  const densityTokens = extractDensityTokens(text);
+  const spacingTokens = extractSpacingTokens(text);
+  if (densityTokens.length === 0 && spacingTokens.length === 0) return;
+  const line = resolveLine();
+  for (const token of densityTokens) {
     pushFinding(findings, file, line, 'density-token', token);
   }
-  for (const token of extractSpacingTokens(text)) {
+  for (const token of spacingTokens) {
     pushFinding(findings, file, line, 'fixed-spacing', token);
   }
 }
@@ -203,13 +255,12 @@ function collectFromText(
 function collectFromTemplatePrefix(
   findings: DensityFinding[],
   file: string,
-  line: number,
+  resolveLine: () => number,
   text: string,
 ): void {
   const trimmed = text.trim();
   if (!COMPUTED_SPACING_PREFIX.test(trimmed)) return;
-  const token = `computed:${trimmed}`;
-  pushFinding(findings, file, line, 'computed-spacing', token);
+  pushFinding(findings, file, resolveLine(), 'computed-spacing', `computed:${trimmed}`);
 }
 
 function isResetSpacingValue(text: string): boolean {
@@ -258,24 +309,25 @@ function collectStyleValue(
   }
 }
 
-export function scanDensityAdoption(filename: string, source: string): DensityFinding[] {
+function scanDensityAdoptionAst(filename: string, source: string): DensityFinding[] {
   const sourceFile = parseSource(filename, source);
   const findings: DensityFinding[] = [];
   const visit = (node: ts.Node): void => {
-    if (isTypePosition(node)) {
+    if (shouldSkipTypeSubtree(node)) {
       return;
     }
 
     if (ts.isStringLiteralLike(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      collectFromText(findings, filename, lineOf(sourceFile, node), node.text);
+      collectFromText(findings, filename, () => lineOf(sourceFile, node), node.text);
     } else if (
       node.kind === ts.SyntaxKind.TemplateHead
       || node.kind === ts.SyntaxKind.TemplateMiddle
       || node.kind === ts.SyntaxKind.TemplateTail
     ) {
       const text = (node as ts.TemplateLiteralToken).text;
-      collectFromText(findings, filename, lineOf(sourceFile, node), text);
-      collectFromTemplatePrefix(findings, filename, lineOf(sourceFile, node), text);
+      const resolveLine = () => lineOf(sourceFile, node);
+      collectFromText(findings, filename, resolveLine, text);
+      collectFromTemplatePrefix(findings, filename, resolveLine, text);
     }
 
     if (ts.isJsxAttribute(node) && propertyName(node.name) === 'data-density') {
@@ -302,6 +354,25 @@ export function scanDensityAdoption(filename: string, source: string): DensityFi
     ts.forEachChild(node, visit);
   };
   visit(sourceFile);
+  return findings;
+}
+
+export function scanDensityAdoption(filename: string, source: string): DensityFinding[] {
+  const cached = scanCache.get(filename);
+  if (cached && cached.source === source) {
+    scanStats.cacheHits += 1;
+    return cached.findings;
+  }
+
+  let findings: DensityFinding[];
+  if (!sourceMayContainDensityFindings(source)) {
+    scanStats.skippedWithoutParse += 1;
+    findings = [];
+  } else {
+    scanStats.parsedFiles += 1;
+    findings = scanDensityAdoptionAst(filename, source);
+  }
+  scanCache.set(filename, { source, findings });
   return findings;
 }
 

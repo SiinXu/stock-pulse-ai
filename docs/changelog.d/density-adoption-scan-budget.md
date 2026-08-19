@@ -1,0 +1,1 @@
+- [Tests] Keep the Web density-adoption production inventory ratchet inside the coverage-suite timeout by skipping non-candidate parses and caching deterministic scan results (Refs #877).

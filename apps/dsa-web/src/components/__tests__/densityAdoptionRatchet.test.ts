@@ -12,10 +12,17 @@ import {
 import {
   applyDensityExemptions,
   collectDensityAdoption,
+  DENSITY_PRODUCTION_COLLECT_BUDGET_MS,
   diffDensityAdoption,
   formatAdoptionDiffs,
+  getDensityScanStats,
+  isDensityCatalogPath,
+  isPlaygroundPath,
+  resetDensityScanAccounting,
+  resetDensityScanStats,
   scanDensityAdoption,
   serializeAdoptionBaseline,
+  sourceMayContainDensityFindings,
   type DensityAdoptionBaseline,
 } from './densityAdoptionRatchet';
 import {
@@ -185,8 +192,16 @@ describe('density adoption ratchet fixtures', () => {
 describe('density adoption ratchet production inventory', () => {
   assertNonEmptyProductionInventory(productionTypeScriptSources, 'productionTypeScriptSources');
 
+  const scannableFiles = Object.keys(productionTypeScriptSources).filter((filename) => (
+    !isDensityCatalogPath(filename) && !isPlaygroundPath(filename)
+  ));
+
   it('keeps required owners density-aware and ratchets the measured baseline', () => {
+    resetDensityScanAccounting();
+    const started = performance.now();
     const { files, exemptionDiffs } = collectDensityAdoption(productionTypeScriptSources);
+    const elapsedMs = performance.now() - started;
+    const cold = getDensityScanStats();
     const baseline = loadBaseline();
     const diffs = [
       ...exemptionDiffs,
@@ -219,7 +234,29 @@ describe('density adoption ratchet production inventory', () => {
       expect(exemption.count).toBeGreaterThan(0);
       expect(exemption.reason.length).toBeGreaterThan(12);
     }
+    expect(scannableFiles.length).toBeGreaterThan(0);
+    expect(cold.cacheHits).toBe(0);
+    expect(cold.parsedFiles).toBeGreaterThan(0);
+    expect(cold.skippedWithoutParse).toBeGreaterThan(0);
+    expect(cold.parsedFiles + cold.skippedWithoutParse).toBe(scannableFiles.length);
+    expect(
+      elapsedMs,
+      `collectDensityAdoption took ${elapsedMs.toFixed(1)}ms `
+        + `(parsed=${cold.parsedFiles}, skipped=${cold.skippedWithoutParse})`,
+    ).toBeLessThan(DENSITY_PRODUCTION_COLLECT_BUDGET_MS);
   }, 30_000);
+
+  it('reuses the production inventory scan cache without a second parse', () => {
+    const first = collectDensityAdoption(productionTypeScriptSources);
+    resetDensityScanStats();
+    const second = collectDensityAdoption(productionTypeScriptSources);
+    expect(second).toEqual(first);
+    expect(getDensityScanStats()).toEqual({
+      cacheHits: scannableFiles.length,
+      skippedWithoutParse: 0,
+      parsedFiles: 0,
+    });
+  });
 
   it('keeps compact mode as a variable retune of the comfortable density scale', () => {
     const css = fs.readFileSync(INDEX_CSS_PATH, 'utf8');
@@ -227,5 +264,35 @@ describe('density adoption ratchet production inventory', () => {
     const compact = css.match(/\[data-density="compact"\]\s*\{([^}]+)\}/);
     expect(compact?.[1]).toMatch(/--density-space-4:\s*0\.75rem;/);
     expect(DENSITY_MODES).toEqual(['comfortable', 'compact']);
+  });
+});
+
+describe('density adoption scanner resource contract', () => {
+  it('treats the candidate filter as a conservative over-approximation', () => {
+    expect(sourceMayContainDensityFindings("const PAGE_PAD = 'p-4';")).toBe(true);
+    expect(sourceMayContainDensityFindings('const pad = `p-${size}`;')).toBe(true);
+    expect(sourceMayContainDensityFindings('<div data-density="compact" className="density-gap-stack" />')).toBe(true);
+    expect(sourceMayContainDensityFindings("style={{ padding: '16px', gap: 12 }}")).toBe(true);
+    expect(sourceMayContainDensityFindings('const box = { paddingTop: 8, rowGap: 4 };')).toBe(true);
+    expect(sourceMayContainDensityFindings('export function skipHelp(mapItems: Item[]) { return mapItems; }')).toBe(false);
+    expect(sourceMayContainDensityFindings('export const n = 1;\nexport const label = "ok";\n')).toBe(false);
+
+    resetDensityScanAccounting();
+    const empty = 'export const n = 1;\n'.repeat(4_000);
+    expect(sourceMayContainDensityFindings(empty)).toBe(false);
+    expect(scanDensityAdoption('../../utils/NoDensityCandidates.ts', empty)).toEqual([]);
+    expect(getDensityScanStats()).toEqual({
+      cacheHits: 0,
+      skippedWithoutParse: 1,
+      parsedFiles: 0,
+    });
+
+    const computed = 'const pad = `p-${size}`;';
+    expect(scanDensityAdoption('../../pages/ComputedPrefixOnly.ts', computed)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ kind: 'computed-spacing', token: 'computed:p-' }),
+      ]),
+    );
+    expect(getDensityScanStats().parsedFiles).toBe(1);
   });
 });
