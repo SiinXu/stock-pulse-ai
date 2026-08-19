@@ -11,6 +11,8 @@ import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../routes';
 /**
  * Mechanical route inventory for Navigation IA (#368 / #873).
  * Keep this table aligned with App.tsx + APPLICATION_NAVIGATION_ITEMS.
+ * Playground paths stay classified as standalone/dev-only; App.tsx mounts them
+ * only when import.meta.env.DEV, so production composition omits the routes.
  */
 const PRIMARY_NAV_ROUTES = [
   APP_ROUTE_PATHS.home,

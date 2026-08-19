@@ -57,9 +57,35 @@ const NotificationCenterPage = lazy(() => import('./pages/NotificationCenterPage
 const StockScreeningPage = lazy(() => import('./pages/StockScreeningPage'));
 const StockDetailsPage = lazy(() => import('./pages/StockDetailsPage'));
 const EventAlertsPage = lazy(() => import('./components/event-alerts/EventAlertsPanel'));
-const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
-const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPage'));
 const FinancialCalculatorsPage = lazy(() => import('./pages/FinancialCalculatorsPage'));
+
+function createPlaygroundRoutes() {
+  // Keep playground pages and mocks out of the production graph. Vite replaces
+  // import.meta.env.DEV at build time so the dynamic imports are tree-shaken.
+  if (!import.meta.env.DEV) {
+    return [];
+  }
+  const ComponentPlaygroundPage = lazy(() => import('./playground/ComponentPlaygroundPage'));
+  const PlaygroundRenderPage = lazy(() => import('./playground/PlaygroundRenderPage'));
+  return [
+    {
+      path: APP_ROUTE_PATHS.playground,
+      element: (
+        <StandaloneRouteBoundary>
+          <ComponentPlaygroundPage />
+        </StandaloneRouteBoundary>
+      ),
+    },
+    {
+      path: APP_ROUTE_PATHS.playgroundRender,
+      element: (
+        <StandaloneRouteBoundary>
+          <PlaygroundRenderPage />
+        </StandaloneRouteBoundary>
+      ),
+    },
+  ];
+}
 
 const AppLayout: React.FC = () => {
   const location = useLocation();
@@ -146,22 +172,7 @@ const routes = [
           </StandaloneRouteBoundary>
         ),
       },
-      {
-        path: APP_ROUTE_PATHS.playground,
-        element: (
-          <StandaloneRouteBoundary>
-            <ComponentPlaygroundPage />
-          </StandaloneRouteBoundary>
-        ),
-      },
-      {
-        path: APP_ROUTE_PATHS.playgroundRender,
-        element: (
-          <StandaloneRouteBoundary>
-            <PlaygroundRenderPage />
-          </StandaloneRouteBoundary>
-        ),
-      },
+      ...createPlaygroundRoutes(),
       {
         element: (
           <Shell>

@@ -31,7 +31,7 @@ This document records the **current-state audit** and **target IA options** so t
 | `/approvals` | Human approvals | **No** (Home / palette) | Admin auth gated |
 | `/stocks/:stockCode` | Stock workspace | **No** (content page) | |
 | `/login` | Login | Standalone | `?redirect=` deep-link preserve |
-| `/playground` (+ render) | Component playground | Standalone / not product nav | Dev surface; mock adapter is development-only |
+| `/playground` (+ render) | Component playground | Standalone / not product nav | Dev-only; omitted from production builds. Mock adapter is a development dependency. |
 
 ### 1.2 Legacy redirects (compatibility surface — do not rename canonical paths)
 

@@ -3,20 +3,13 @@
   "description": "Gzip size budgets for production Web build artifacts under static/. Per-asset rules cap each matching file. aggregateRules cap the unique gzip total of a family so splitting one route or component into many smaller chunks cannot bypass the per-asset budgets (Refs #883). Initial per-asset baseline = measured gzip size * 1.10 (ceil). Aggregate already-split families use measured sum + 400 B. Tighten deliberately in follow-up tasks; do not raise budgets to hide regressions without justification.",
   "outDir": "../../static",
   "gzipLevel": 9,
-  "measuredAt": "2026-08-14",
-  "baselineNote": "Remasured overflowing gzip rules from GitHub web-gate (#1273) (js-entry, locale-ja, locale-de, locale-ko, locale-fr, locale-es, locale-zh-TW, locale-id, locale-ms). Headroom: IntelligenceSourcesPanel +400, locale-fr +600, other locales +700, other named +400.",
+  "measuredAt": "2026-08-20",
+  "baselineNote": "T18 omitted the playground production graph (Refs #883). Named splits that existed only because playground was a second async importer were removed; remaining route chunks were remeasured with zlib-9 + 400 B headroom.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
   },
   "rules": [
-    {
-      "id": "IntelligenceSourcesPanel",
-      "match": "assets/IntelligenceSourcesPanel-*.js",
-      "maxGzipBytes": 248056,
-      "measuredGzipBytes": 247656,
-      "note": "Local production-build remasure after merging origin/main; measured 247656 B + 400 B retained headroom."
-    },
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
@@ -139,25 +132,11 @@
       "note": "Rebaselined after MCP Settings inventory merge onto post-#1036/#1031/#1022 main (PR #1033); measured 73118 B + 200 B headroom."
     },
     {
-      "id": "PlaygroundRenderPage",
-      "match": "assets/PlaygroundRenderPage-*.js",
-      "maxGzipBytes": 57276,
-      "measuredGzipBytes": 57076,
-      "note": "Rebaselined after adding the reasoning-trace export controls Playground story (PR #1040); measured 57076 B + 200 B headroom."
-    },
-    {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 45965,
-      "measuredGzipBytes": 45765,
-      "note": "Merge of the OpenAPI client migration Zod boundaries (PR #1242 / Refs #721) with the cost attribution and routing telemetry Settings controls (Refs #166 / #248). Keeps the larger of the two rebaselines; the merged branch measures 45624 B gzip locally, so CI should remeasure on GitHub Actions Linux before tightening."
-    },
-    {
-      "id": "AlertsWorkspace",
-      "match": "assets/AlertsWorkspace-*.js",
-      "maxGzipBytes": 47199,
-      "measuredGzipBytes": 46799,
-      "note": "Remeasured after merging origin/main (#1243); overflowing rule only, fixed headroom retained."
+      "maxGzipBytes": 294709,
+      "measuredGzipBytes": 294309,
+      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -176,34 +155,37 @@
     {
       "id": "DecisionSignalsPage",
       "match": "assets/DecisionSignalsPage-*.js",
-      "maxGzipBytes": 23042,
-      "measuredGzipBytes": 20947
+      "maxGzipBytes": 67848,
+      "measuredGzipBytes": 67448,
+      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
     },
     {
       "id": "ChatPage",
       "match": "assets/ChatPage-*.js",
-      "maxGzipBytes": 18277,
-      "measuredGzipBytes": 16615
+      "maxGzipBytes": 23827,
+      "measuredGzipBytes": 23427,
+      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
     },
     {
-      "id": "HomeWatchlistGroupsSection",
-      "match": "assets/HomeWatchlistGroupsSection-*.js",
-      "maxGzipBytes": 17129,
-      "measuredGzipBytes": 16729,
-      "note": "Restored named rule after merging origin/main (#1158); measured gzip + 400 B headroom."
+      "id": "StockDetailsPage",
+      "match": "assets/StockDetailsPage-*.js",
+      "maxGzipBytes": 27291,
+      "measuredGzipBytes": 26891,
+      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
     },
     {
-      "id": "ChatSendFeedback",
-      "match": "assets/ChatSendFeedback-*.js",
-      "maxGzipBytes": 14348,
-      "measuredGzipBytes": 13948,
-      "note": "Restored named rule after merging origin/main (#1268); measured gzip + 400 B headroom."
+      "id": "StockScreeningPage",
+      "match": "assets/StockScreeningPage-*.js",
+      "maxGzipBytes": 28117,
+      "measuredGzipBytes": 27717,
+      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
     },
     {
-      "id": "screening",
-      "match": "assets/screening-*.js",
-      "maxGzipBytes": 17866,
-      "measuredGzipBytes": 16241
+      "id": "HomePage",
+      "match": "assets/HomePage-*.js",
+      "maxGzipBytes": 25017,
+      "measuredGzipBytes": 24617,
+      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
     },
     {
       "id": "BacktestPage",
@@ -225,15 +207,6 @@
     }
   ],
   "aggregateRules": [
-    {
-      "id": "IntelligenceSourcesPanel-family",
-      "match": [
-        "assets/IntelligenceSourcesPanel-*.js"
-      ],
-      "maxGzipBytes": 248056,
-      "measuredGzipBytes": 246957,
-      "note": "Same-pattern family for IntelligenceSourcesPanel. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 246957 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
-    },
     {
       "id": "js-entry-family",
       "match": [
@@ -388,31 +361,13 @@
       "note": "Same-pattern family for RunFlowPanel. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 66718 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
     },
     {
-      "id": "PlaygroundRenderPage-family",
-      "match": [
-        "assets/PlaygroundRenderPage-*.js"
-      ],
-      "maxGzipBytes": 57276,
-      "measuredGzipBytes": 42673,
-      "note": "Same-pattern family for PlaygroundRenderPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 42673 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
-    },
-    {
       "id": "SettingsPage-family",
       "match": [
         "assets/SettingsPage-*.js"
       ],
-      "maxGzipBytes": 45965,
-      "measuredGzipBytes": 45764,
-      "note": "Same-pattern family for SettingsPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 45764 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
-    },
-    {
-      "id": "AlertsWorkspace-family",
-      "match": [
-        "assets/AlertsWorkspace-*.js"
-      ],
-      "maxGzipBytes": 47199,
-      "measuredGzipBytes": 46940,
-      "note": "Same-pattern family for AlertsWorkspace. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 46940 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
+      "maxGzipBytes": 294709,
+      "measuredGzipBytes": 294309,
+      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
       "id": "PortfolioRiskMetricsPanel-family",
@@ -437,45 +392,45 @@
       "match": [
         "assets/DecisionSignalsPage-*.js"
       ],
-      "maxGzipBytes": 23042,
-      "measuredGzipBytes": 22133,
-      "note": "Same-pattern family for DecisionSignalsPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 22133 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
+      "maxGzipBytes": 67848,
+      "measuredGzipBytes": 67448,
+      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
       "id": "ChatPage-family",
       "match": [
         "assets/ChatPage-*.js"
       ],
-      "maxGzipBytes": 18277,
-      "measuredGzipBytes": 10799,
-      "note": "Same-pattern family for ChatPage. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 10799 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
+      "maxGzipBytes": 23827,
+      "measuredGzipBytes": 23427,
+      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
-      "id": "HomeWatchlistGroupsSection-family",
+      "id": "HomePage-family",
       "match": [
-        "assets/HomeWatchlistGroupsSection-*.js"
+        "assets/HomePage-*.js"
       ],
-      "maxGzipBytes": 17129,
-      "measuredGzipBytes": 17010,
-      "note": "Same-pattern family for HomeWatchlistGroupsSection. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 17010 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
+      "maxGzipBytes": 25017,
+      "measuredGzipBytes": 24617,
+      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
-      "id": "ChatSendFeedback-family",
+      "id": "StockScreeningPage-family",
       "match": [
-        "assets/ChatSendFeedback-*.js"
+        "assets/StockScreeningPage-*.js"
       ],
-      "maxGzipBytes": 14348,
-      "measuredGzipBytes": 13680,
-      "note": "Same-pattern family for ChatSendFeedback. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 13680 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
+      "maxGzipBytes": 28117,
+      "measuredGzipBytes": 27717,
+      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
-      "id": "screening-family",
+      "id": "StockDetailsPage-family",
       "match": [
-        "assets/screening-*.js"
+        "assets/StockDetailsPage-*.js"
       ],
-      "maxGzipBytes": 17866,
-      "measuredGzipBytes": 17759,
-      "note": "Same-pattern family for screening. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 17759 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
+      "maxGzipBytes": 27291,
+      "measuredGzipBytes": 26891,
+      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
       "id": "BacktestPage-family",
@@ -512,9 +467,9 @@
         "assets/settingsPage-*.js",
         "assets/settingsTranslations-*.js"
       ],
-      "maxGzipBytes": 88574,
-      "measuredGzipBytes": 88174,
-      "note": "Settings route plus the named settings-* / settingsPage / settingsTranslations chunks. Measured zlib-9 sum on origin/main 86b0c094c + 400 B headroom. Per-asset SettingsPage cap is unchanged."
+      "maxGzipBytes": 336695,
+      "measuredGzipBytes": 336295,
+      "note": "Settings route after T18 playground omission inlined IntelligenceSourcesPanel into SettingsPage (Refs #883). Measured zlib-9 sum + 400 B headroom."
     },
     {
       "id": "portfolio-route",
@@ -524,7 +479,7 @@
       ],
       "maxGzipBytes": 94224,
       "measuredGzipBytes": 93824,
-      "note": "Portfolio route family after Insights/PP catalog modules. Measured zlib-9 sum 93824 B on this head vs origin/main 015c5c942 87057 B (+6767 B real catalog/formatter payload, 15→19 assets) + 400 B headroom. Per-asset PortfolioPage / PortfolioRiskMetricsPanel caps are unchanged."
+      "note": "Portfolio route family after Insights/PP catalog modules (#1375). Keep the merged cap; T18 playground omission must not preemptively raise this family. Per-asset PortfolioPage / PortfolioRiskMetricsPanel caps are unchanged."
     },
     {
       "id": "screening-route",
@@ -533,9 +488,9 @@
         "assets/StockScreeningPage-*.js",
         "assets/Screening*-*.js"
       ],
-      "maxGzipBytes": 33034,
-      "measuredGzipBytes": 32634,
-      "note": "Screening route family. Measured zlib-9 sum on origin/main 86b0c094c + 400 B headroom. Per-asset screening cap is unchanged."
+      "maxGzipBytes": 31626,
+      "measuredGzipBytes": 31226,
+      "note": "Screening route family after T18 playground omission inlined the former screening-* split into StockScreeningPage (Refs #883). Measured zlib-9 sum + 400 B headroom."
     },
     {
       "id": "home-watchlist-route",
@@ -546,7 +501,7 @@
       ],
       "maxGzipBytes": 21693,
       "measuredGzipBytes": 21293,
-      "note": "Home watchlist family. Catches sibling Watchlist* splits that would not match HomeWatchlistGroupsSection-*.js, including the lazy WatchlistScoreStatusCell chunk. Measured zlib-9 sum on origin/main 86b0c094c + 400 B headroom. Per-asset HomeWatchlistGroupsSection cap is unchanged."
+      "note": "Home watchlist family. Catches Watchlist* splits including the lazy WatchlistScoreStatusCell chunk after T18 omitted the playground-forced HomeWatchlistGroupsSection split (Refs #883). Measured zlib-9 sum on origin/main 86b0c094c + 400 B headroom."
     },
     {
       "id": "backtest-route",

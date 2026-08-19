@@ -245,6 +245,20 @@ describe('App routing behavior', () => {
     expect(screen.queryByRole('navigation', { name: '主导航' })).not.toBeInTheDocument();
   });
 
+  it('renders the isolated playground preview route without the product shell', async () => {
+    vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({
+      authEnabled: true,
+      loggedIn: true,
+      setupState: 'enabled',
+    }));
+    window.history.pushState({}, '', '/playground/render/button/default');
+
+    render(<App />);
+
+    expect(await screen.findByTestId('playground-render-page')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: '主导航' })).not.toBeInTheDocument();
+  });
+
   it('renders the current route page after auth is ready', async () => {
     window.history.pushState({}, '', '/chat');
 

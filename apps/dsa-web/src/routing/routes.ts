@@ -4,6 +4,7 @@
 export const APP_ROUTE_PATHS = {
   home: '/',
   login: '/login',
+  /** Developer component workbench. App.tsx mounts this only when import.meta.env.DEV. */
   playground: '/playground',
   playgroundRender: '/playground/render/:componentId/:scenarioId',
   agent: '/chat',

@@ -26,10 +26,15 @@ const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(SCRIPT_DIRECTORY, '..');
 const DEFAULT_BUDGET_PATH = path.join(SCRIPT_DIRECTORY, 'bundle-size-budget.json');
 
-// Production runtime must not resolve the playground mock adapter (Refs #883).
+// Production runtime must not resolve playground modules or the mock adapter (Refs #883).
 const FORBIDDEN_PRODUCTION_SUBSTRINGS = Object.freeze([
   'axios-mock-adapter',
   'playground_mock_not_registered',
+  'stockpulse-playground',
+]);
+const FORBIDDEN_PRODUCTION_ASSET_GLOBS = Object.freeze([
+  'assets/PlaygroundRenderPage-*.js',
+  'assets/ComponentPlaygroundPage-*.js',
 ]);
 
 function fail(message) {
@@ -235,6 +240,23 @@ function main() {
     fail('Production bundle contains development-only mock adapter code:');
     for (const finding of forbiddenFindings) {
       fail(`  ${finding.relativePath} contains ${finding.needle}`);
+    }
+    return;
+  }
+
+  const forbiddenAssets = [];
+  for (const filePath of files) {
+    const relativePath = path.relative(outDir, filePath).split(path.sep).join('/');
+    for (const pattern of FORBIDDEN_PRODUCTION_ASSET_GLOBS) {
+      if (globToRegExp(pattern).test(relativePath)) {
+        forbiddenAssets.push({ relativePath, pattern });
+      }
+    }
+  }
+  if (forbiddenAssets.length > 0) {
+    fail('Production bundle includes playground-only chunks:');
+    for (const finding of forbiddenAssets) {
+      fail(`  ${finding.relativePath} matches ${finding.pattern}`);
     }
     return;
   }

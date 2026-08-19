@@ -1,0 +1,1 @@
+- [Changed] Omit the Web component playground routes, catalog, and scenario graph from production builds while development still serves `/playground` (Refs #883).
