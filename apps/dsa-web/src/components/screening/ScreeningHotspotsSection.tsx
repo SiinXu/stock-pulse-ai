@@ -46,7 +46,54 @@ export type ScreeningHotspotsSectionProps = {
   onRefresh: () => void;
   onSelectHotspot: (topic: string) => void;
   onAnalyzeStock: (stock: AlphaSiftHotspotDetail['stocks'][number]) => void;
+  onOpenDataSources?: () => void;
 };
+
+type HotspotRecoveryActionsProps = {
+  text: ScreeningText;
+  loading: boolean;
+  retryDisabled: boolean;
+  retryLabel: string;
+  dataSourcesLabel: string;
+  onRetry: () => void;
+  onOpenDataSources?: () => void;
+};
+
+const HotspotRecoveryActions: React.FC<HotspotRecoveryActionsProps> = ({
+  text,
+  loading,
+  retryDisabled,
+  retryLabel,
+  dataSourcesLabel,
+  onRetry,
+  onOpenDataSources,
+}) => (
+  <div className="flex flex-wrap items-center gap-2">
+    <Button
+      type="button"
+      variant="primary"
+      size="default"
+      isLoading={loading}
+      loadingText={text.refreshing}
+      disabled={retryDisabled || loading}
+      aria-label={retryLabel}
+      onClick={onRetry}
+    >
+      {text.retry}
+    </Button>
+    {onOpenDataSources ? (
+      <Button
+        type="button"
+        variant="secondary"
+        size="default"
+        aria-label={dataSourcesLabel}
+        onClick={onOpenDataSources}
+      >
+        {text.openDataSources}
+      </Button>
+    ) : null}
+  </div>
+);
 
 export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> = ({
   text,
@@ -65,7 +112,27 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
   onRefresh,
   onSelectHotspot,
   onAnalyzeStock,
-}) => (
+  onOpenDataSources,
+}) => {
+  const showingLastGoodHotspots = hotspots.length > 0 && Boolean(hotspotError);
+  const retryLabel = `${text.retry} · ${text.hotspots}`;
+  const dataSourcesLabel = `${text.openDataSources} · ${text.hotspots}`;
+  const renderRecoveryActions = () => (
+    <HotspotRecoveryActions
+      text={text}
+      loading={loadingHotspots}
+      retryDisabled={!isScreeningEnabled}
+      retryLabel={retryLabel}
+      dataSourcesLabel={dataSourcesLabel}
+      onRetry={onRefresh}
+      onOpenDataSources={onOpenDataSources}
+    />
+  );
+  const degradedDetail = Boolean(
+    hotspotDetail && ((hotspotDetail.missingFields || []).length > 0 || (hotspotDetail.sourceErrors || []).length > 0),
+  );
+
+  return (
       <Surface as="section" level="interactive" padding="md">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
@@ -110,7 +177,13 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
         </div>
 
         {hotspotError ? (
-          <InlineAlert variant="warning" className="mb-3" message={hotspotError} />
+          <InlineAlert
+            variant="warning"
+            className="mb-3"
+            title={showingLastGoodHotspots ? text.showingLastGoodTitle : undefined}
+            message={hotspotError}
+            action={renderRecoveryActions()}
+          />
         ) : null}
 
         {!hotspotsExpanded ? (
@@ -123,8 +196,14 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
             <span className="text-xs">{text.liveDetailHint}</span>
           </Surface>
         ) : hotspots.length === 0 ? (
-          <Surface level="interactive" padding="sm" className="text-sm text-secondary-text">
-            {text.refreshDescription}
+          <Surface
+            level="interactive"
+            padding="sm"
+            className="flex flex-col gap-3 text-sm text-secondary-text"
+            data-state-panel="empty"
+          >
+            <span>{text.refreshDescription}</span>
+            {hotspotError ? null : renderRecoveryActions()}
           </Surface>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -226,23 +305,31 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
             </div>
 
             {hotspotDetailError ? (
-              <InlineAlert variant="warning" className="mb-3" message={hotspotDetailError} />
+              <InlineAlert
+                variant="warning"
+                className="mb-3"
+                message={hotspotDetailError}
+                action={hotspotError ? undefined : renderRecoveryActions()}
+              />
             ) : null}
 
-            {hotspotDetail && ((hotspotDetail.missingFields || []).length > 0 || (hotspotDetail.sourceErrors || []).length > 0) ? (
-              <details className="mb-3 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
-                <summary className="min-h-11 cursor-pointer font-semibold">
-                  <span className="inline-flex min-h-11 items-center">{text.degradedDetail}</span>
-                </summary>
-                <div className="mt-2 space-y-1 leading-5">
-                  {(hotspotDetail.missingFields || []).length > 0 ? (
-                    <p>{formatUiText(text.missingFields, { fields: (hotspotDetail.missingFields || []).join(getUiListSeparator(language)) })}</p>
-                  ) : null}
-                  {(hotspotDetail.sourceErrors || []).slice(0, 4).map((message, index) => (
-                    <p key={`${message}-${index}`}>{summarizeAlphaSiftDiagnostic(message, text)}</p>
-                  ))}
-                </div>
-              </details>
+            {degradedDetail ? (
+              <div className="mb-3 space-y-2" data-state-panel="degraded">
+                <details className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+                  <summary className="min-h-11 cursor-pointer font-semibold">
+                    <span className="inline-flex min-h-11 items-center">{text.degradedDetail}</span>
+                  </summary>
+                  <div className="mt-2 space-y-1 leading-5">
+                    {(hotspotDetail?.missingFields || []).length > 0 ? (
+                      <p>{formatUiText(text.missingFields, { fields: (hotspotDetail?.missingFields || []).join(getUiListSeparator(language)) })}</p>
+                    ) : null}
+                    {(hotspotDetail?.sourceErrors || []).slice(0, 4).map((message, index) => (
+                      <p key={`${message}-${index}`}>{summarizeAlphaSiftDiagnostic(message, text)}</p>
+                    ))}
+                  </div>
+                </details>
+                {hotspotError || hotspotDetailError ? null : renderRecoveryActions()}
+              </div>
             ) : null}
 
             {hotspotDetail ? (
@@ -325,5 +412,5 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
           </Surface>
         ) : null}
       </Surface>
-
-);
+  );
+};

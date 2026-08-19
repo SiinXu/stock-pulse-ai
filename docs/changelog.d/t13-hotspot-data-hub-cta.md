@@ -1,0 +1,1 @@
+- [Fixed] Empty and degraded Discover hotspots now offer Retry, labeled last-good data, and a one-click path to Data Sources instead of leaving raw source errors as the only recovery UI (Refs #871).

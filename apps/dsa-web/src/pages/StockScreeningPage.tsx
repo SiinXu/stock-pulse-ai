@@ -612,6 +612,7 @@ const StockScreeningPage: React.FC = () => {
         onRefresh={() => void loadHotspots(true)}
         onSelectHotspot={handleHotspotSelect}
         onAnalyzeStock={handleAnalyzeHotspotStock}
+        onOpenDataSources={handleOpenDataSources}
       />
 
       <ScreeningStrategyBar
