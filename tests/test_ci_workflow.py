@@ -589,6 +589,38 @@ def test_web_gate_fails_closed_when_change_detection_fails_or_is_unavailable():
     assert validation["run"].rstrip().endswith("exit 1")
 
 
+def test_ci_gate_deterministic_fail_closes_config_registry_gaps() -> None:
+    """A documented env key missing from the registry must fail the CI path."""
+
+    script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
+    deterministic = script.split("deterministic_checks() {", 1)[1].split(
+        "_run_pytest_offline() {", 1
+    )[0]
+    assert "python scripts/check_config_access.py --self-test" in deterministic
+    assert "python scripts/check_config_access.py" in deterministic
+    assert "python scripts/check_config_doc_consistency.py --self-test" in deterministic
+    assert (
+        "python scripts/check_config_doc_consistency.py --fail-on all" in deterministic
+    )
+    checker_lines = [
+        line.strip()
+        for line in deterministic.splitlines()
+        if "check_config_doc_consistency.py" in line
+    ]
+    assert checker_lines == [
+        "python scripts/check_config_doc_consistency.py --self-test",
+        "python scripts/check_config_doc_consistency.py --fail-on all",
+    ]
+    assert all("|| true" not in line for line in checker_lines)
+    access_idx = deterministic.find("python scripts/check_config_access.py\n")
+    consistency_idx = deterministic.find(
+        "python scripts/check_config_doc_consistency.py --self-test"
+    )
+    assert access_idx != -1
+    assert consistency_idx != -1
+    assert access_idx < consistency_idx
+
+
 def test_ci_gate_offline_suite_emits_slow_test_durations():
     script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
     assert "--durations=30" in script

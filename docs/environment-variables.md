@@ -36,7 +36,7 @@ python scripts/check_config_doc_consistency.py --self-test
 3. **注册表缺失**（`missing_from_registry`）：在 `.env.example` 中存在，但未在配置注册表显式登记；
 4. **注册状态不一致**（`registry_status_mismatch`）：某语言的“已注册”单元格不是该语言允许的是/否字面量，或与实时注册表不一致。
 
-默认失败类为 `docs,env,cn_en,defaults,registry_status`：历史**注册表缺口仍默认只报告、不使检查失败**，但过期或非法的文档注册状态会失败。注册表分区任务与 Task 1 守卫负责收敛历史缺口；需要把历史注册表覆盖也变成硬门禁时：
+默认失败类为 `docs,env,cn_en,defaults,registry_status`：CLI 在未指定 `--fail-on registry` 或 `--fail-on all` 时仍只报告注册表缺口、不因此失败，以保持既有本地调用兼容。过期或非法的文档注册状态会失败。常规本地/托管 CI 路径（`./scripts/ci_gate.sh` 的 deterministic 检查）会执行 `--fail-on all`，因此 `.env.example` 中已文档化但未登记注册表的键会使该路径失败关闭。
 
 ```bash
 python scripts/check_config_doc_consistency.py --fail-on all
@@ -55,7 +55,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
    - 为 Web 可编辑或需要元数据的键补充 `title` / `description` / `category` / `data_type` / `ui_control` / `default_value` / `options` / `validation` / `help_key` 等；
    - 布尔键使用开关控件，枚举键使用 select + `options`，避免落入 uncategorized 文本框；
    - 同步设置页 i18n 标题与 help（见 [settings-help.md](settings-help.md)）；
-   - **Task 1 守卫**：注册表与模板/呈现契约的自动化拦截由 Task 1 交付（仓库内既有局部契约见 `tests/test_config_registry.py::TestEnvExampleWebSettingsCoverage`；完整「未登记键」守卫合并后以该任务脚本/CI 步骤为准）。本仓库的三方文档检查脚本负责文档侧清单，**不**代替注册表登记。
+   - **注册表 CI 守卫**：`./scripts/ci_gate.sh` 的 deterministic 检查会运行 `python scripts/check_config_doc_consistency.py --fail-on all`，因此 `.env.example` 中已文档化但未写入 `src/core/config_registry_parts/` 的键会使该路径失败关闭。三方检查脚本只报告缺口，**不**代替注册表登记；对 Web 设置页隐藏的键仍须登记。
 
 3. **文档**
    - 运行 `python scripts/check_config_doc_consistency.py --write-inventory` 刷新下方中英清单表；

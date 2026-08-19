@@ -34,10 +34,13 @@ Exit codes:
 - ``1`` when a selected failure class has findings
 - ``2`` on usage / I/O / parse errors
 
-Failure classes default to ``docs,env,cn_en,defaults,registry_status``. Historical
-missing-registry debt remains informational unless ``--fail-on registry`` (or
-``all``) is selected, while stale documentation about registration fails by
-default.
+Failure classes default to ``docs,env,cn_en,defaults,registry_status``. The CLI
+still treats missing-registry findings as informational unless ``--fail-on
+registry`` (or ``all``) is selected, so existing local invocations stay
+backward compatible. ``scripts/ci_gate.sh`` deterministic checks invoke
+``--fail-on all`` so a documented ``.env.example`` key missing from the
+registry fails closed on the normal local and hosted CI path. Stale
+documentation about registration still fails by default.
 
 Usage:
 
@@ -46,6 +49,7 @@ python scripts/check_config_doc_consistency.py
 python scripts/check_config_doc_consistency.py --json
 python scripts/check_config_doc_consistency.py --write-inventory
 python scripts/check_config_doc_consistency.py --self-test
+python scripts/check_config_doc_consistency.py --fail-on all
 ```
 """
 
@@ -790,7 +794,8 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Comma-separated failure classes: docs,env,registry,"
             "registry_status,cn_en,defaults "
-            "(or all / none / default). Default fails on docs/env/cn_en/defaults."
+            "(or all / none / default). Default fails on docs/env/cn_en/"
+            "defaults/registry_status; CI uses all."
         ),
     )
     parser.add_argument(

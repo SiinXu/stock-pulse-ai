@@ -65,6 +65,8 @@ deterministic_checks() {
   python scripts/check_hot_path_module_size.py
   python scripts/check_config_access.py --self-test
   python scripts/check_config_access.py
+  python scripts/check_config_doc_consistency.py --self-test
+  python scripts/check_config_doc_consistency.py --fail-on all
   python scripts/check_coverage_floor.py --self-test
   # Anti-lowering: working-tree floor must not fall below origin/main.
   # Missing ref / first-run skips with a logged notice. Intentional lowers:

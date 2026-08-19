@@ -36,7 +36,7 @@ Primary gap classes (plus CN/EN inventory drift and default mismatches):
 3. **missing_from_registry**: present in `.env.example` but not explicitly registered;
 4. **registry_status_mismatch**: a locale's `Registered` cell is not the accepted `yes` / `no` literal or disagrees with the live registry.
 
-Default failure classes are `docs,env,cn_en,defaults,registry_status`. Historical **registry gaps remain reported but non-fatal by default**, while stale or invalid documented registration status fails. Registry partition workers and the Task 1 guard own registration. To fail on historical registry coverage as well:
+Default failure classes are `docs,env,cn_en,defaults,registry_status`. The CLI still reports registry gaps without failing unless `--fail-on registry` or `--fail-on all` is selected, so existing local invocations stay backward compatible. Stale or invalid documented registration status fails by default. The normal local and hosted CI path (`./scripts/ci_gate.sh` deterministic checks) runs `--fail-on all` and therefore fail-closes when a documented `.env.example` key is missing from the registry.
 
 ```bash
 python scripts/check_config_doc_consistency.py --fail-on all
@@ -55,7 +55,7 @@ When adding or changing a user-visible or runtime-configurable environment varia
    - Register Web-editable or metadata-backed keys with `title` / `description` / `category` / `data_type` / `ui_control` / `default_value` / `options` / `validation` / `help_key` as needed;
    - Use toggle controls for booleans and select + `options` for enums so keys do not fall into uncategorized text boxes;
    - Keep Settings i18n titles and help in sync (see [settings-help.md](settings-help.md));
-   - **Task 1 guard**: automated enforcement of the registry/presentation contract is delivered by Task 1 (partial existing coverage: `tests/test_config_registry.py::TestEnvExampleWebSettingsCoverage`; the full “unregistered key” guard lands with that task’s script/CI step). The three-way docs checker covers documentation inventory only and **does not** register keys.
+   - **Registry CI guard**: `./scripts/ci_gate.sh` deterministic checks run `python scripts/check_config_doc_consistency.py --fail-on all`, so a documented `.env.example` key missing from `src/core/config_registry_parts/` fails closed. The three-way checker reports gaps and **does not** register keys; hidden Web Settings keys must still be registered.
 
 3. **Documentation**
    - Run `python scripts/check_config_doc_consistency.py --write-inventory` to refresh both language inventory tables below;

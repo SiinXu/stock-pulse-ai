@@ -1,0 +1,1 @@
+- [Changed] Fail closed on the normal local and hosted `ci_gate` path when a documented `.env.example` key is missing from the configuration registry (Refs #1023).
