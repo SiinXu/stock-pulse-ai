@@ -1,0 +1,2 @@
+- [Fixed] Route PR-tier FULL backend fallback through the existing 4-way `backend-tests` shards so the 45-minute selective `backend-gate` job cannot run the unsharded offline suite.
+- [Tests] Guard that `offline-tests-selective` refuses FULL, planner misses fail closed to shards, and cancelled or failed shards cannot make `backend-gate` green.

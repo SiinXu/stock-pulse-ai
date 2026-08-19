@@ -6,10 +6,12 @@
 #   all                 — full offline suite with coverage floor (local single-node)
 #   syntax|flake8|deterministic — shared preflight
 #   offline-tests       — full offline suite + coverage floor
-#   offline-tests-selective — path-mapped pytest (PR tier); FULL fallback when uncertain
+#   offline-tests-selective — path-mapped pytest (PR tier); FULL is fail-closed
+#                             (hosted CI must use backend-tests shards)
 #   offline-tests-shard — one shard of the full suite; writes coverage data for combine
 #   offline-tests-combine — combine shard coverage data and enforce the floor once
 #   python-min-smoke    — 3.10 import/schema/smoke subset (PR tier)
+#                         Push-to-main runs offline-tests-shard on 3.10.
 
 set -euo pipefail
 
@@ -134,9 +136,10 @@ offline_test_suite_selective() {
   selection="$(python scripts/ci_select_tests.py --base "${base_ref}")"
   echo "==> selective mapping result: ${selection}"
   if [ "${selection}" = "FULL" ]; then
-    echo "==> mapping uncertain or infrastructure touched — full offline suite"
-    offline_test_suite
-    return $?
+    echo "==> mapping is FULL — refusing unsharded offline_test_suite in the PR-tier selective path" >&2
+    echo "Hosted CI must schedule backend-tests shards (offline-tests-shard)." >&2
+    echo "Locally run: $0 offline-tests" >&2
+    return 1
   fi
   if [ "${selection}" = "NONE" ]; then
     echo "==> no backend pytest targets for changed paths — collection smoke only"
@@ -235,7 +238,7 @@ offline_test_suite_combine() {
 python_min_smoke() {
   echo "==> python-minimum: 3.10 import/schema/smoke (PR tier)"
   # Real 3.10 execution without a second full offline suite on every PR.
-  # Push-to-main still runs the full offline suite on 3.10.
+  # Push-to-main runs the sharded full offline suite on 3.10.
   python -m py_compile main.py server.py src/config.py src/storage.py
   python -c "
 from src.config import get_config

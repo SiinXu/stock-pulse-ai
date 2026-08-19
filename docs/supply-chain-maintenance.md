@@ -27,9 +27,10 @@ Python 3.10 as the minimum and a fixed global `exclude-newer` cutoff. A reviewed
 an independently reviewed upload timestamp without moving the rest of the
 dependency graph; the lock header records both cutoffs. It retains marker forks needed by the currently released
 supported matrix: Python 3.10 through 3.14, Linux
-x86_64/aarch64, macOS x86_64/arm64, and Windows AMD64. Required pull-request CI
-runs the full backend gate on Python 3.10 through `python-minimum` and retains
-the Python 3.11 `backend-gate` on Linux. Docker exercises Python 3.11 on Linux;
+x86_64/aarch64, macOS x86_64/arm64, and Windows AMD64. Required CI keeps a Python 3.10
+floor through `python-minimum` (PR smoke; push-to-main sharded full offline
+suite) and retains the Python 3.11 `backend-gate` on Linux (PR path-selective;
+FULL reuses the four `backend-tests` shards). Docker exercises Python 3.11 on Linux;
 desktop release builds exercise Python 3.11 on Windows and both macOS
 architectures. Longbridge 4.x on Linux Python 3.12+
 requires upstream `manylinux_2_39` wheels; older-glibc Linux targets use the

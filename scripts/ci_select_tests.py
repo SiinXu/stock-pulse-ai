@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Map changed repository paths to a selective offline pytest target list.
 
-Used by the PR-tier backend gate so most pull requests avoid a full-suite
-run. When mapping is uncertain (shared infrastructure, config, conftest),
-the script prints ``FULL`` and exits 0 so the caller falls back to the full
-offline suite.
+Used by the PR-tier backend planner and selective job so most pull requests
+avoid a full-suite run. When mapping is uncertain (shared infrastructure,
+config, conftest, or an unprovable merge-base), the script prints ``FULL``
+and exits 0. Hosted CI must schedule the four ``backend-tests`` shards for
+that result; ``offline-tests-selective`` refuses to run the unsharded suite.
 
 Usage:
   python scripts/ci_select_tests.py --base origin/main

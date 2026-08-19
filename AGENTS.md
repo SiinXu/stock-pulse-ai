@@ -160,8 +160,8 @@ The current repository CI mainly contains:
 | --- | --- | --- | --- |
 | `changes` | `.github/workflows/ci.yml` | Path-filter job that drives the backend, Docker, Web, and Web E2E jobs | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
-| `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest (FULL fallback); push-to-main: full suite + coverage floor | Yes |
-| `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: full offline suite on Python 3.10 | Yes |
+| `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest; FULL fallback uses the same 4 shards as push-to-main; push-to-main: full suite + coverage floor | Yes |
+| `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: sharded full offline suite on Python 3.10 | Yes |
 | `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
 | `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
@@ -171,7 +171,7 @@ The current repository CI mainly contains:
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
 | `pr-review` | `.github/workflows/pr-review.yml` | PR static check + AI review + automatic tagging | No, opt-in via `workflow_dispatch` only |
 
-**Event model:** pull requests use path-selective pytest with a fail-closed full-suite fallback. Pushes to `main` run the complete offline suite in four module-level shards, then combine coverage and enforce the floor once.
+**Event model:** pull requests use path-selective pytest; when mapping is `FULL` they reuse the four 30-minute `backend-tests` shards (required check name stays `backend-gate`) instead of an unsharded suite inside the 45-minute selective job. Pushes to `main` run the complete offline suite in four module-level shards on Python 3.11 (coverage combine + floor once) and the same sharded offline suite on Python 3.10 via `python-minimum`.
 
 If there is a corresponding CI result on the existing PR, you can directly quote the CI conclusion; if the CI does not cover the changes or the local environment differs significantly from the CI environment, supplement local verification and gaps.
 

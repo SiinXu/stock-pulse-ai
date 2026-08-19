@@ -1,7 +1,7 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-12
+- Last verified: 2026-08-19
 - Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
@@ -20,10 +20,10 @@ The backend CI gate (`./scripts/ci_gate.sh`) must:
 
 | Event | Backend tier | What runs |
 | --- | --- | --- |
-| `pull_request` | **Fast** | `syntax` + `flake8` + `deterministic` + **selective** offline pytest via `scripts/ci_select_tests.py` (falls back to the full suite when mapping is uncertain: config, conftest, CI scripts, etc.) |
+| `pull_request` | **Fast** | `syntax` + `flake8` + `deterministic` + **selective** offline pytest via `scripts/ci_select_tests.py`. When mapping is `FULL`, the four 30-minute `backend-tests` shards run (same partition as push-to-main). The 45-minute selective `backend-gate` job must not invoke the unsharded `offline_test_suite`. |
 | `push` to `main` | **Full** | 4 sharded offline suites (`scripts/ci_test_shard.py`) + **one** combined coverage floor check |
 
-`python-minimum` (3.10) runs `python-min-smoke` (imports + a small offline subset) on pull requests and the full offline suite on pushes to `main`.
+`python-minimum` (3.10) runs `python-min-smoke` (imports + a small offline subset) on pull requests. Pushes to `main` run the same four `offline-tests-shard` partitions on Python 3.10 (`python-minimum-tests`) and fail the required `python-minimum` check unless every shard succeeds. Coverage floor remains a Python 3.11 `backend-gate` combine; the 3.10 shards prove floor-runtime execution only.
 
 Local full gate remains:
 
@@ -315,14 +315,14 @@ To avoid a doubled full offline suite on every PR:
 
 | Job | PR tier | Push-to-main |
 | --- | --- | --- |
-| `backend-gate` offline phase | `./scripts/ci_gate.sh offline-tests-selective` via `scripts/ci_select_tests.py` (prints `FULL` / `NONE` / path targets) | Four `offline-tests-shard` jobs followed by one `offline-tests-combine` coverage-floor check |
-| `python-minimum` | `./scripts/ci_gate.sh python-min-smoke` (3.10 import + small contract suite) | `./scripts/ci_gate.sh offline-tests` |
+| `backend-gate` offline phase | `./scripts/ci_gate.sh offline-tests-selective` via `scripts/ci_select_tests.py` (prints `NONE` / path targets). Mapping `FULL` is fail-closed in that script and is scheduled as four `backend-tests` shards plus `offline-tests-combine` under the same required check name. Planner and selective job pin `github.event.pull_request.base.sha` so a later `origin/main` fetch cannot remap `NONE` → `FULL`. | Four `offline-tests-shard` jobs followed by one `offline-tests-combine` coverage-floor check |
+| `python-minimum` | `./scripts/ci_gate.sh python-min-smoke` (3.10 import + small contract suite) | Four `python-minimum-tests` shards (`./scripts/ci_gate.sh offline-tests-shard` on Python 3.10); required `python-minimum` check fails unless every shard result is `success` |
 
-Selective mapping falls back to the full offline suite when infrastructure paths change (for example `tests/conftest.py`, `ci.yml`, coverage floor scripts, or top-level config).
+Selective mapping fails closed to the **sharded** full offline suite when infrastructure paths change (for example `tests/conftest.py`, `ci.yml`, coverage floor scripts, or top-level config), or when the merge-base cannot be proven. It must not run `offline_test_suite` inside the 45-minute selective job. Hosted counterexamples: PR #1375 run 32238883191 and PR #1377 run 32238746609 printed planner `NONE`, remapped to `FULL` after `git fetch --depth=1 origin main`, and cancelled at 45m21s.
 
 ## Push-to-main CI
 
-`ci.yml` triggers on `pull_request` **and** `push` to `main`. Concurrency group is `ci-${{ github.event.pull_request.number || github.ref }}` with `cancel-in-progress: true`, so a merge burst cancels the superseded `ci-refs/heads/main` run and keeps only the newest main revision.
+`ci.yml` triggers on `pull_request` **and** `push` to `main`. Concurrency group is `ci-${{ github.event.pull_request.number || github.ref }}` with `cancel-in-progress: true`, so a merge burst cancels the superseded `ci-refs/heads/main` run and keeps only the newest main revision. The Python 3.10 push suite is therefore sharded with the same 30-minute bound as `backend-tests`; an unsharded `offline-tests` job on 3.10 historically ran ~47 minutes (main runs 32223100719 and 32234145338) and was superseded before the required check could stay green.
 
 ## Local full gate
 
