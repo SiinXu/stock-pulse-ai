@@ -22,9 +22,9 @@
     "test:smoke:quarantine": "DSA_WEB_E2E_QUARANTINE_LANE=1 node e2e/run-playwright-tests.mjs --project=chromium-quarantine",
     "preview": "vite preview",
     "generate:api-types": "openapi-typescript openapi.json -o src/types/api.generated.ts",
-    "perf:runtime": "node scripts/check-runtime-performance.mjs",
-    "perf:runtime:strict": "node scripts/check-runtime-performance.mjs --strict",
-    "test:runtime-perf": "vitest run src/performance/__tests__/runtimePerformanceContracts.test.tsx"
+    "perf:runtime": "node scripts/check-runtime-performance.mjs --print",
+    "perf:runtime:strict": "node scripts/check-runtime-performance.mjs --strict --print",
+    "test:runtime-perf": "vitest run src/performance/__tests__/runtimePerformance*.test.tsx scripts/check-runtime-performance.test.mjs"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.2.9",

@@ -1,0 +1,1 @@
+- [Tests] Expand Web runtime performance budgets across the Issue #883 surfaces plus the T16 DataTable contract, block only stable structural scenarios, and keep skip/unavailable honest (Refs #883).

@@ -452,6 +452,9 @@ def test_web_gate_runs_full_matrix_for_frontend_changes():
         "🔎 Lint": "npm run lint",
         "🌐 i18n guards": "npm run test:i18n",
         "🧪 Unit tests": "npm run test:coverage",
+        "⏱ Runtime performance budgets": (
+            "node scripts/check-runtime-performance.mjs --print --warmup 1 --repeat 3"
+        ),
         "🏗️ Build": "npm run build",
         "📦 Bundle size budget": "node scripts/check-bundle-size.mjs --print",
     }
@@ -498,6 +501,25 @@ def test_web_gate_enforces_bundle_budget_immediately_after_build():
     assert all(
         step.get("continue-on-error", False) is False for step in steps
     )
+
+
+def test_web_gate_runtime_budgets_use_per_scenario_gates_not_global_soft():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    web_job = workflow["jobs"]["web-gate"]
+    steps = web_job["steps"]
+    runtime = next(
+        step for step in steps if step.get("name") == "⏱ Runtime performance budgets"
+    )
+    unit = next(step for step in steps if step.get("name") == "🧪 Unit tests")
+    build = next(step for step in steps if step.get("name") == "🏗️ Build")
+
+    assert steps.index(unit) < steps.index(runtime) < steps.index(build)
+    assert runtime["run"] == (
+        "node scripts/check-runtime-performance.mjs --print --warmup 1 --repeat 3"
+    )
+    assert "--soft" not in runtime["run"]
+    assert runtime["if"] == FRONTEND_EXECUTION_CONDITION
+    assert runtime.get("continue-on-error", False) is False
 
 
 def test_web_gate_concludes_successfully_without_frontend_changes():

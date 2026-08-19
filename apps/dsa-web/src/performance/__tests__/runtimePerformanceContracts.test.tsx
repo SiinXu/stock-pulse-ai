@@ -6,54 +6,58 @@
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mock } from 'vitest';
-// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
-import { writeFileSync, mkdirSync } from 'node:fs';
-// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
-import path from 'node:path';
+import { createRef, memo, useCallback, useState } from 'react';
 import type { ReactElement } from 'react';
-import { memo, useCallback, useState } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import { HistoryList } from '../../components/history/HistoryList';
 import { SettingsField } from '../../components/settings/SettingsField';
 import { areSettingsFieldPropsEqual } from '../../components/settings/settingsFieldMemo';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import type { HistoryItem } from '../../types/analysis';
 import type { SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
-import { useAgentChatStore } from '../../stores/agentChatStore';
+import { useAgentChatStore, type Message, type ProgressStep } from '../../stores/agentChatStore';
 import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
+import { ChatMessageList, type ChatMessageListProps } from '../../components/chat/ChatMessageList';
+import DecisionSignalFeedListSection from '../../components/decision-signals/DecisionSignalFeedListSection';
 import {
+  DEFAULT_LIST_FILTERS,
+  mergeWatchlistSignalResponses,
+  PAGE_SIZE,
+} from '../../components/decision-signals/decisionSignalsPageModel';
+import type { DecisionSignalItem } from '../../types/decisionSignals';
+import type { AlphaSiftCandidate } from '../../api/alphasift';
+import { SCREENING_TEXT } from '../../locales/screening';
+import { ScreeningResultsSection } from '../../components/screening/ScreeningResultsSection';
+import { HomeDashboardLayout } from '../../components/dashboard/HomeDashboardLayout';
+import { resetDashboardLayoutStoreForTests } from '../../stores/dashboardLayoutStore';
+import { DASHBOARD_WIDGET_IDS } from '../../types/dashboardLayout';
+import { UI_TEXT, type UiTextKey } from '../../i18n/uiText';
+import { flushRuntimePerfReport, recordRuntimePerf } from '../runtimePerfReport';
+import {
+  CHAT_MARKDOWN_MEASUREMENT_BUBBLE_COUNT,
+  CHAT_MARKDOWN_REMOUNT_BUDGET,
   DATATABLE_MAX_MOUNTED_ROWS_BUDGET,
   DATATABLE_MEASUREMENT_ITEM_COUNT,
   HISTORY_LIST_MAX_MOUNTED_ROWS_BUDGET,
   HISTORY_LIST_MEASUREMENT_ITEM_COUNT,
   HISTORY_LIST_MEASUREMENT_VIEWPORT_PX,
+  HOME_WIDGET_SLOT_BUDGET,
+  SCREENING_RESULTS_MAX_MOUNTED_ROWS_BUDGET,
+  SCREENING_RESULTS_MEASUREMENT_ITEM_COUNT,
   SETTINGS_FIELD_MEASUREMENT_COUNT,
   SETTINGS_FIELD_SIBLING_RERENDER_BUDGET,
+  SIGNALS_LIST_MEASUREMENT_ITEM_COUNT,
+  SIGNALS_LIST_PAGE_SIZE,
   SSE_PROGRESS_COMMIT_BUDGET,
   SSE_PROGRESS_MEASUREMENT_EVENT_COUNT,
 } from '../runtimeBudgets';
 
-type Measurement = { id: string; value: number; unit: string };
-const measurements: Measurement[] = [];
-
 function record(id: string, value: number, unit: string) {
-  const existing = measurements.findIndex((entry) => entry.id === id);
-  if (existing >= 0) measurements[existing] = { id, value, unit };
-  else measurements.push({ id, value, unit });
+  recordRuntimePerf(id, value, unit);
 }
 
 afterEach(() => {
-  // process is available under Vitest; browser tsconfig omits Node types.
-  const reportPath = (globalThis as { process?: { env?: Record<string, string | undefined> } })
-    .process
-    ?.env
-    ?.DSA_RUNTIME_PERF_REPORT;
-  if (reportPath && measurements.length > 0) {
-    mkdirSync(path.dirname(reportPath), { recursive: true });
-    writeFileSync(
-      reportPath,
-      JSON.stringify({ measuredAt: new Date().toISOString(), measurements }, null, 2),
-    );
-  }
+  flushRuntimePerfReport();
 });
 
 function buildHistoryItems(count: number): HistoryItem[] {
@@ -398,3 +402,207 @@ describe('runtime performance contracts (#883)', () => {
     });
   });
 });
+
+function buildSignal(index: number): DecisionSignalItem {
+  return {
+    id: index + 1,
+    stockCode: `${600000 + (index % 900)}`,
+    stockName: `Signal ${index + 1}`,
+    market: 'cn',
+    sourceType: 'analysis',
+    triggerSource: 'web',
+    action: 'hold',
+    planQuality: 'complete',
+    status: 'active',
+    createdAt: `2026-03-${String((index % 28) + 1).padStart(2, '0')}T08:00:00Z`,
+    presentation: {
+      action: 'hold',
+      label: 'Hold',
+      timestamp: `2026-03-${String((index % 28) + 1).padStart(2, '0')}T08:00:00Z`,
+    },
+  };
+}
+
+function buildScreeningCandidate(index: number): AlphaSiftCandidate {
+  return {
+    rank: index + 1,
+    code: `${600000 + (index % 900)}`,
+    name: `Candidate ${index + 1}`,
+    industry: 'Demo',
+    price: 10 + (index % 20),
+    changePct: 0.5,
+    score: 70,
+    reason: 'Deterministic screening fixture.',
+    raw: {},
+  };
+}
+
+const chatTranslate = (key: UiTextKey, params: Record<string, string | number> = {}) => {
+  let value = UI_TEXT.en[key];
+  Object.entries(params).forEach(([name, replacement]) => {
+    value = value.replace(`{${name}}`, String(replacement));
+  });
+  return value;
+};
+
+describe('signals-list-pagination', () => {
+  it(`mounts at most ${SIGNALS_LIST_PAGE_SIZE} cards from ${SIGNALS_LIST_MEASUREMENT_ITEM_COUNT} signals`, () => {
+    expect(PAGE_SIZE).toBe(SIGNALS_LIST_PAGE_SIZE);
+    const universe = Array.from(
+      { length: SIGNALS_LIST_MEASUREMENT_ITEM_COUNT },
+      (_, index) => buildSignal(index),
+    );
+    const page = mergeWatchlistSignalResponses(
+      [{ stockCode: 'ALL', response: { items: universe, total: universe.length, page: 1, pageSize: PAGE_SIZE } }],
+      1,
+    );
+    expect(page.items.length).toBe(SIGNALS_LIST_PAGE_SIZE);
+    expect(page.items.length).toBeLessThan(SIGNALS_LIST_MEASUREMENT_ITEM_COUNT);
+
+    const { container } = render(
+      <UiLanguageProvider initialLanguage="en">
+        <DecisionSignalFeedListSection
+          filters={DEFAULT_LIST_FILTERS}
+          onFiltersChange={vi.fn()}
+          onApplyFilters={vi.fn()}
+          advancedFilterCount={0}
+          appliedSourceReportId={undefined}
+          signalScopeLabel="All"
+          loading={false}
+          error={null}
+          onRetry={vi.fn()}
+          total={page.total}
+          items={page.items}
+          selectedId={null}
+          onSelect={vi.fn()}
+          page={1}
+          onPageChange={vi.fn()}
+          reassessPanel={null}
+          onCreateFirstRule={vi.fn()}
+        />
+      </UiLanguageProvider>,
+    );
+
+    const mounted = container.querySelectorAll('article').length;
+    record('signals-list-pagination', mounted, 'cards');
+    expect(mounted).toBeGreaterThan(0);
+    expect(mounted).toBeLessThanOrEqual(SIGNALS_LIST_PAGE_SIZE);
+    expect(SIGNALS_LIST_MEASUREMENT_ITEM_COUNT).toBeGreaterThanOrEqual(150);
+  });
+});
+
+describe('screening-results-mounted-rows', () => {
+  it(`records mounted rows for ${SCREENING_RESULTS_MEASUREMENT_ITEM_COUNT} candidates`, { timeout: 30_000 }, () => {
+    const candidates = Array.from(
+      { length: SCREENING_RESULTS_MEASUREMENT_ITEM_COUNT },
+      (_, index) => buildScreeningCandidate(index),
+    );
+    const { container } = render(
+      <ScreeningResultsSection
+        text={SCREENING_TEXT.en}
+        language="en"
+        candidates={candidates}
+        expandedCode={null}
+        llmDegraded={false}
+        onExpandedCodeChange={() => undefined}
+      />,
+    );
+
+    const table = container.querySelector('table');
+    const bodyRows = table?.tBodies[0]?.querySelectorAll('tr').length ?? 0;
+    record('screening-results-mounted-rows', bodyRows, 'rows');
+    expect(bodyRows).toBeGreaterThan(0);
+    expect(candidates.length).toBe(SCREENING_RESULTS_MEASUREMENT_ITEM_COUNT);
+    expect(SCREENING_RESULTS_MEASUREMENT_ITEM_COUNT).toBeGreaterThanOrEqual(150);
+    expect(SCREENING_RESULTS_MAX_MOUNTED_ROWS_BUDGET).toBe(40);
+  });
+});
+
+describe('chat-markdown-isolation', () => {
+  it(`keeps ${CHAT_MARKDOWN_MEASUREMENT_BUBBLE_COUNT} prior bubbles mounted across progress updates`, () => {
+    const messages: Message[] = Array.from(
+      { length: CHAT_MARKDOWN_MEASUREMENT_BUBBLE_COUNT },
+      (_, index) => ({
+        id: `assistant-${index + 1}`,
+        role: index % 2 === 0 ? 'assistant' as const : 'user' as const,
+        content: index % 2 === 0 ? `Completed markdown ${index + 1}.` : `User ${index + 1}`,
+      }),
+    );
+    const listProps: ChatMessageListProps = {
+      language: 'en',
+      t: chatTranslate,
+      text: { copied: 'Copied', copy: 'Copy' },
+      messages,
+      loading: true,
+      progressSteps: [{ type: 'thinking', message: 'Planning' }],
+      agentUnavailable: false,
+      quickQuestions: [],
+      onQuickQuestion: vi.fn(),
+      quickQuestionsDisabled: false,
+      expandedThinking: new Set(),
+      onToggleThinking: vi.fn(),
+      copiedMessages: new Set(),
+      onCopyMessage: vi.fn(),
+      onDownloadMessage: vi.fn(),
+      messagesViewportRef: createRef<HTMLDivElement>(),
+      messagesEndRef: createRef<HTMLDivElement>(),
+      onScroll: vi.fn(),
+    };
+
+    const { container, rerender } = render(
+      <UiLanguageProvider initialLanguage="en">
+        <ChatMessageList {...listProps} />
+      </UiLanguageProvider>,
+    );
+    const before = [...container.querySelectorAll('[data-chat-message-id]')];
+    expect(before).toHaveLength(CHAT_MARKDOWN_MEASUREMENT_BUBBLE_COUNT);
+
+    const nextProgress: ProgressStep[] = [
+      { type: 'thinking', message: 'Planning' },
+      { type: 'tool_start', tool: 'search', display_name: 'Search' },
+    ];
+    rerender(
+      <UiLanguageProvider initialLanguage="en">
+        <ChatMessageList {...listProps} progressSteps={nextProgress} />
+      </UiLanguageProvider>,
+    );
+    const after = [...container.querySelectorAll('[data-chat-message-id]')];
+    const remounts = after.reduce((count, node, index) => (
+      node === before[index] ? count : count + 1
+    ), 0);
+    record('chat-markdown-isolation', remounts, 'remounts');
+    expect(after).toHaveLength(CHAT_MARKDOWN_MEASUREMENT_BUBBLE_COUNT);
+    expect(remounts).toBeLessThanOrEqual(CHAT_MARKDOWN_REMOUNT_BUDGET);
+    expect(screen.getByTestId('chat-live-progress')).toBeInTheDocument();
+  });
+});
+
+describe('home-widget-slots', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+    resetDashboardLayoutStoreForTests();
+  });
+
+  it(`keeps ${HOME_WIDGET_SLOT_BUDGET} independent Home widget slots`, () => {
+    render(
+      <MemoryRouter>
+        <UiLanguageProvider initialLanguage="en">
+          <HomeDashboardLayout
+            widgets={{
+              watchlist: <div>Watchlist body</div>,
+              portfolio_health: <div>Health body</div>,
+              alerts: <div>Alerts body</div>,
+              recent_reports: <div>Reports body</div>,
+            }}
+          />
+        </UiLanguageProvider>
+      </MemoryRouter>,
+    );
+
+    const slots = document.querySelectorAll('[data-testid^="home-dashboard-widget-"]').length;
+    record('home-widget-slots', slots, 'slots');
+    expect(DASHBOARD_WIDGET_IDS).toHaveLength(HOME_WIDGET_SLOT_BUDGET);
+    expect(slots).toBeGreaterThanOrEqual(HOME_WIDGET_SLOT_BUDGET);
+  });
+});
+
