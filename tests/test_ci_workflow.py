@@ -300,7 +300,9 @@ def test_python_minimum_push_covers_sharded_python_310_suite() -> None:
     )
     assert job["permissions"] == {"contents": "read"}
     _assert_job_fail_closed(job)
-    assert job["timeout-minutes"] == backend_shards["timeout-minutes"] == 30
+    assert backend_shards["timeout-minutes"] == 30
+    assert job["timeout-minutes"] == 45
+    assert job["timeout-minutes"] > backend_shards["timeout-minutes"]
     assert job["strategy"]["fail-fast"] is False
     assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
 
@@ -361,6 +363,31 @@ def test_python_minimum_shards_cover_every_offline_test_module_once() -> None:
     covered = [path for group in groups for path in group]
     assert sorted(covered) == sorted(files)
     assert all(group for group in groups)
+
+
+def test_python_minimum_shard_timeout_covers_py310_shard_two_cost() -> None:
+    """3.10 shard 2 is ~28-30 min on hosted runners; a 30-minute job bound cancels it.
+
+    Hosted counterexample: main run 32269161288 job 96121339880 cancelled at
+    30:24 after the test step ran 29:16, still passing tests at 99%. Prior
+    post-#1378 main runs finished the same shard in 29:24 / 29:27 / 29:52.
+    Keep four shards, full coverage, and fail-closed aggregation; do not
+    restore the unsharded 60-minute python-minimum job.
+    """
+
+    workflow = _workflow()
+    py310 = workflow["jobs"]["python-minimum-tests"]
+    py311 = workflow["jobs"]["backend-tests"]
+    aggregator = workflow["jobs"]["python-minimum"]
+
+    assert py311["timeout-minutes"] == 30
+    assert py310["timeout-minutes"] == 45
+    assert py310["timeout-minutes"] > py311["timeout-minutes"]
+    assert py310["timeout-minutes"] < 60
+    assert py310["strategy"]["fail-fast"] is False
+    assert py310["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
+    _assert_job_fail_closed(py310)
+    _assert_job_fail_closed(aggregator)
 
 
 def test_python_minimum_aggregator_cannot_mask_failed_or_cancelled_shard() -> None:
