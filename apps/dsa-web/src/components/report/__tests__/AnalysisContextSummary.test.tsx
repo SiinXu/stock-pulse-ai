@@ -482,8 +482,12 @@ describe('ReportSummary analysis context placement', () => {
 
     render(<ReportSummary data={result} />);
 
+    // News is eager+async. ReportDiagnostics is React.lazy behind Suspense
+    // with no fallback, so the panel is absent until the chunk resolves.
+    // Ready means both surfaces exist — news alone is not enough.
     await waitFor(() => {
       expect(screen.getByText('暂无相关资讯')).toBeInTheDocument();
+      expect(screen.getByTestId('run-diagnostics')).toBeInTheDocument();
     });
 
     expect(screen.getByText('市场阶段: CN · 盘中')).toBeInTheDocument();
@@ -498,7 +502,7 @@ describe('ReportSummary analysis context placement', () => {
     );
     expect(strategySurface?.querySelector('[style*="linear-gradient"]')).toBeNull();
     const news = screen.getByText('相关资讯');
-    const diagnostics = await screen.findByTestId('run-diagnostics');
+    const diagnostics = screen.getByTestId('run-diagnostics');
     const contextSummary = screen.getByTestId('analysis-context-summary');
     expect(contextSummary).not.toHaveAttribute('open');
     expect(diagnostics).not.toHaveAttribute('open');

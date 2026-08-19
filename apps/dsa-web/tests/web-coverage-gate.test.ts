@@ -1,12 +1,31 @@
 // @vitest-environment node
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { getConfig } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import {
+  WEB_COVERAGE_ASYNC_UTIL_TIMEOUT_MS,
+  WEB_COVERAGE_TEST_TIMEOUT_MS,
+  WEB_UNIT_ASYNC_UTIL_TIMEOUT_MS,
+  WEB_UNIT_TEST_TIMEOUT_MS,
+  getWebUnitAsyncUtilTimeoutMs,
+  getWebUnitTestTimeoutMs,
+  isVitestCoverageEnabled,
+} from '../src/test-utils/coverageTimeouts';
 
 const webRoot = process.cwd();
 const baselinePath = path.join(webRoot, 'scripts', 'web-coverage-baseline.json');
 const packagePath = path.join(webRoot, 'package.json');
 const vitestConfigPath = path.join(webRoot, 'vitest.config.ts');
+const setupTestsPath = path.join(webRoot, 'src', 'setupTests.ts');
+const placementTestPath = path.join(
+  webRoot,
+  'src',
+  'components',
+  'report',
+  '__tests__',
+  'AnalysisContextSummary.test.tsx',
+);
 
 const ALLOWED_EXCLUDES = [
   'src/types/api.generated.ts',
@@ -63,6 +82,8 @@ describe('web unit coverage gate', () => {
     devDependencies: Record<string, string>;
   }>(packagePath);
   const vitestConfig = readFileSync(vitestConfigPath, 'utf8');
+  const setupTests = readFileSync(setupTestsPath, 'utf8');
+  const placementTest = readFileSync(placementTestPath, 'utf8');
 
   it('exposes a single coverage command that reuses the unit suite', () => {
     expect(packageJson.scripts.test).toBe('vitest run');
@@ -83,7 +104,34 @@ describe('web unit coverage gate', () => {
     expect(vitestConfig).toContain('all: coverageBaseline.all');
     expect(vitestConfig).toContain('thresholds: coverageBaseline.thresholds');
     expect(vitestConfig).toContain('reportOnFailure: true');
-    expect(vitestConfig).toContain('testTimeout: coverageEnabled ? 30_000 : 5_000');
+    expect(vitestConfig).toContain('testTimeout: getWebUnitTestTimeoutMs()');
+    expect(vitestConfig).not.toContain('testTimeout: coverageEnabled ? 30_000 : 5_000');
+  });
+
+  it('aligns Testing Library async waits with coverage-mode Vitest timeouts', () => {
+    expect(isVitestCoverageEnabled([])).toBe(false);
+    expect(isVitestCoverageEnabled(['vitest', 'run'])).toBe(false);
+    expect(isVitestCoverageEnabled(['vitest', 'run', '--coverage'])).toBe(true);
+    expect(isVitestCoverageEnabled(['vitest', 'run', '--coverage.reporter=text'])).toBe(true);
+    expect(getWebUnitTestTimeoutMs([])).toBe(WEB_UNIT_TEST_TIMEOUT_MS);
+    expect(getWebUnitTestTimeoutMs(['--coverage'])).toBe(WEB_COVERAGE_TEST_TIMEOUT_MS);
+    expect(getWebUnitAsyncUtilTimeoutMs([])).toBe(WEB_UNIT_ASYNC_UTIL_TIMEOUT_MS);
+    expect(getWebUnitAsyncUtilTimeoutMs(['--coverage'])).toBe(WEB_COVERAGE_ASYNC_UTIL_TIMEOUT_MS);
+    expect(WEB_COVERAGE_ASYNC_UTIL_TIMEOUT_MS).toBeGreaterThan(WEB_UNIT_ASYNC_UTIL_TIMEOUT_MS);
+    expect(WEB_COVERAGE_ASYNC_UTIL_TIMEOUT_MS).toBeLessThan(WEB_COVERAGE_TEST_TIMEOUT_MS);
+    expect(WEB_UNIT_TEST_TIMEOUT_MS).toBe(5_000);
+    expect(WEB_COVERAGE_TEST_TIMEOUT_MS).toBe(30_000);
+    expect(WEB_UNIT_ASYNC_UTIL_TIMEOUT_MS).toBe(1_000);
+    expect(WEB_COVERAGE_ASYNC_UTIL_TIMEOUT_MS).toBe(10_000);
+    expect(setupTests).toContain('configure({ asyncUtilTimeout: getWebUnitAsyncUtilTimeoutMs() })');
+    expect(getConfig().asyncUtilTimeout).toBe(getWebUnitAsyncUtilTimeoutMs());
+  });
+
+  it('waits for lazy report diagnostics together with news before asserting order', () => {
+    expect(placementTest).toContain("expect(screen.getByTestId('run-diagnostics')).toBeInTheDocument()");
+    expect(placementTest).toContain('const diagnostics = screen.getByTestId(\'run-diagnostics\')');
+    expect(placementTest).not.toMatch(/await screen\.findByTestId\('run-diagnostics'\)/);
+    expect(placementTest).toContain('ReportDiagnostics is React.lazy');
   });
 
   it('keeps exclusions limited to generated, vendor, and non-unit-testable assets', () => {

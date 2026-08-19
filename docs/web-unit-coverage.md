@@ -85,6 +85,8 @@ The 1-point epsilon is deterministic headroom for v8 rounding and coverage-instr
 
 `web-gate` replaces `npm run test` with `npm run test:coverage` when frontend paths change. Coverage instrumentation makes production-source glob/AST scans slower, so `vitest.config.ts` raises `testTimeout` to 30s only when `--coverage` is present. The default `npm run test` timeout stays 5s.
 
+Testing Library `findBy` / `waitFor` does **not** inherit Vitest `testTimeout`. `src/setupTests.ts` therefore sets `asyncUtilTimeout` to 10s when `--coverage` is present and keeps the 1s default for the fast local loop. React.lazy report panels (for example `ReportDiagnostics` in `ReportSummary`) stay absent until the chunk resolves; tests must wait for those nodes as part of ready, not after a news-only settle. Timeouts live in `src/test-utils/coverageTimeouts.ts`.
+
 ## Related
 
 - Backend coverage floor: [testing-ci-gate.md](testing-ci-gate.md)

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
+import { getWebUnitTestTimeoutMs } from './src/test-utils/coverageTimeouts';
 
 type CoverageBaseline = {
   provider: 'v8';
@@ -21,8 +22,6 @@ const coverageBaseline = JSON.parse(
   readFileSync(new URL('./scripts/web-coverage-baseline.json', import.meta.url), 'utf8'),
 ) as CoverageBaseline;
 
-const coverageEnabled = process.argv.some((argument) => argument === '--coverage' || argument.startsWith('--coverage.'));
-
 const testBase = {
   environment: 'jsdom' as const,
   globals: true,
@@ -30,7 +29,8 @@ const testBase = {
   exclude: [...configDefaults.exclude, 'e2e/**', 'playwright.config.ts'],
   // Coverage instrumentation makes production-source glob/AST scans slower than
   // the 5s default. Keep the default for `npm run test`; raise only for coverage.
-  testTimeout: coverageEnabled ? 30_000 : 5_000,
+  // Testing Library findBy/waitFor is configured separately in setupTests.ts.
+  testTimeout: getWebUnitTestTimeoutMs(),
 };
 
 const reactCompilerPlugin = react({

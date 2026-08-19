@@ -1,7 +1,14 @@
 import '@testing-library/jest-dom';
+import { configure } from '@testing-library/react';
+import { getWebUnitAsyncUtilTimeoutMs } from './test-utils/coverageTimeouts';
 import { loadAllUiLanguageTranslations } from './i18n/translations';
 
 await loadAllUiLanguageTranslations();
+
+// Vitest testTimeout does not extend Testing Library findBy/waitFor. Coverage
+// instrumentation delays React.lazy chunks past the 1s default (hosted web-gate
+// failed on ReportSummary → lazy ReportDiagnostics).
+configure({ asyncUtilTimeout: getWebUnitAsyncUtilTimeoutMs() });
 
 class MemoryStorageMock implements Storage {
   private readonly values = new Map<string, string>();
