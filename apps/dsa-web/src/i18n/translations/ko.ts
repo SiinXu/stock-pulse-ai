@@ -1075,6 +1075,8 @@ export const translations: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.layout.route.alerts.title": "경보",
   "i18n.uiText.UI_TEXT.layout.route.backtest.description": "백테스트 작업 및 결과 검토",
   "i18n.uiText.UI_TEXT.layout.route.backtest.title": "백테스트",
+  "i18n.uiText.UI_TEXT.backtest.unknownOutcomeDescription": "等待已超时，且这次回测没有任务编号。无法确认服务端是否已结束；再次运行可能重复提交。",
+  "i18n.uiText.UI_TEXT.backtest.unknownOutcomeTitle": "服务端可能仍在运行",
   "i18n.uiText.UI_TEXT.layout.route.chat.description": "다턴 전략 Q&A 및 세션",
   "i18n.uiText.UI_TEXT.layout.route.chat.title": "물어보세요",
   "i18n.uiText.UI_TEXT.layout.route.decisionSignals.description": "신호, 규칙, 전송 기록 및 사후 평가",

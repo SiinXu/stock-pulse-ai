@@ -61,6 +61,8 @@ An invalid evaluation window no longer changes the input row height: the field s
 
 Backtest run and result API failures appear as localized messages in the global Toast instead of adding content above the filters or results table; raw backend diagnostics are not exposed in the interface.
 
+If the browser wait budget expires (the shared 30-second API client timeout), the page does **not** claim the backtest failed. `POST /api/v1/backtest/run` is a synchronous request with no job, status, or cancel identifier. The page shows that the **server may still be running** and keeps **Run backtest** disabled so a second POST cannot start. **Dismiss** acknowledges the unknown outcome and re-enables run; it does not resume or cancel server work. Leaving the page aborts only the browser request.
+
 Skipped and insufficient rows stay in the results table. The **Notes** column surfaces backend `resolution_notes` such as legacy analysis-date fallback, prior-session start after a halt/gap, missing daily bars, or insufficient forward-window bars.
 
 ## How to read metrics
