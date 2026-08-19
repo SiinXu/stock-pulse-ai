@@ -7,6 +7,7 @@ import {
   Activity,
   ArrowRight,
   BarChart3,
+  Calculator,
   CalendarDays,
   FlaskConical,
   Gauge,
@@ -17,17 +18,31 @@ import { Link, useLocation } from 'react-router-dom';
 import { AppPage, Card, PageHeader } from '../components/common';
 import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
-import type { UiTextKey } from '../i18n/uiText';
+import type { UiLanguage, UiTextKey } from '../i18n/uiText';
+import { FINANCIAL_CALCULATORS_TEXT } from '../locales/financialCalculators';
 import { APP_ROUTE_PATHS } from '../routing/routes';
 import { resolveContextAwareNavigationTarget } from '../utils/sessionContinuity';
 
 type ResearchDestination = {
   key: string;
   titleKey: UiTextKey;
-  descriptionKey: UiTextKey;
   to: string;
   icon: LucideIcon;
-};
+} & (
+  | { descriptionKey: UiTextKey }
+  | { descriptionSource: 'financialCalculators' }
+);
+
+function resolveResearchDestinationDescription(
+  destination: ResearchDestination,
+  t: (key: UiTextKey) => string,
+  language: UiLanguage,
+): string {
+  if ('descriptionSource' in destination) {
+    return FINANCIAL_CALCULATORS_TEXT[language].description;
+  }
+  return t(destination.descriptionKey);
+}
 
 const RESEARCH_DESTINATIONS: readonly ResearchDestination[] = [
   {
@@ -66,6 +81,13 @@ const RESEARCH_DESTINATIONS: readonly ResearchDestination[] = [
     icon: CalendarDays,
   },
   {
+    key: 'calculators',
+    titleKey: 'layout.nav.calculators',
+    descriptionSource: 'financialCalculators',
+    to: APP_ROUTE_PATHS.calculators,
+    icon: Calculator,
+  },
+  {
     key: 'skill-outcomes',
     titleKey: 'layout.nav.skillOutcomes',
     descriptionKey: 'researchOverview.skillOutcomesDescription',
@@ -75,7 +97,7 @@ const RESEARCH_DESTINATIONS: readonly ResearchDestination[] = [
 ];
 
 const ResearchOverviewPage: React.FC = () => {
-  const { t } = useUiLanguage();
+  const { t, language } = useUiLanguage();
   const location = useLocation();
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
   const currentHref = `${location.pathname}${location.search}${location.hash}`;
@@ -102,6 +124,7 @@ const ResearchOverviewPage: React.FC = () => {
         {RESEARCH_DESTINATIONS.map((destination) => {
           const Icon = destination.icon;
           const title = t(destination.titleKey);
+          const description = resolveResearchDestinationDescription(destination, t, language);
           const target = resolveContextAwareNavigationTarget(destination.to, currentHref);
 
           return (
@@ -116,7 +139,7 @@ const ResearchOverviewPage: React.FC = () => {
                 </div>
                 <h2 className="text-lg font-semibold text-foreground">{title}</h2>
                 <p className="mt-2 flex-1 text-sm leading-6 text-secondary-text">
-                  {t(destination.descriptionKey)}
+                  {description}
                 </p>
                 <Link
                   to={target}
