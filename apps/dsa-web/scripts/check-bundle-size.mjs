@@ -21,6 +21,12 @@ const SCRIPT_DIRECTORY = path.dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = path.resolve(SCRIPT_DIRECTORY, '..');
 const DEFAULT_BUDGET_PATH = path.join(SCRIPT_DIRECTORY, 'bundle-size-budget.json');
 
+// Production runtime must not resolve the playground mock adapter (Refs #883).
+const FORBIDDEN_PRODUCTION_SUBSTRINGS = Object.freeze([
+  'axios-mock-adapter',
+  'playground_mock_not_registered',
+]);
+
 function fail(message) {
   console.error(`bundle-size: ${message}`);
   process.exitCode = 1;
@@ -151,6 +157,25 @@ function main() {
   const files = listAssetFiles(outDir);
   if (files.length === 0) {
     fail(`No .js/.css assets found under ${path.join(outDir, 'assets')}`);
+    return;
+  }
+
+  const forbiddenFindings = [];
+  for (const filePath of files) {
+    if (!filePath.endsWith('.js')) continue;
+    const contents = readFileSync(filePath, 'utf8');
+    const relativePath = path.relative(outDir, filePath).split(path.sep).join('/');
+    for (const needle of FORBIDDEN_PRODUCTION_SUBSTRINGS) {
+      if (contents.includes(needle)) {
+        forbiddenFindings.push({ relativePath, needle });
+      }
+    }
+  }
+  if (forbiddenFindings.length > 0) {
+    fail('Production bundle contains development-only mock adapter code:');
+    for (const finding of forbiddenFindings) {
+      fail(`  ${finding.relativePath} contains ${finding.needle}`);
+    }
     return;
   }
 

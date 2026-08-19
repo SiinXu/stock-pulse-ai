@@ -6,7 +6,6 @@ import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { UI_LANGUAGES, type UiLanguage } from '../i18n/uiLanguages';
 import { PLAYGROUND_TEXT } from '../locales/playground';
 import { getPlaygroundEntry, getPlaygroundScenario } from './catalog';
-import { installPlaygroundApiMock } from './mockApi';
 import { PlaygroundScenarioProvider } from './scenarioContext';
 import { hasPlaygroundRenderer, renderPlaygroundScenario } from './scenarios';
 import type { PlaygroundFixtureProfile } from './types';
@@ -44,14 +43,30 @@ const PlaygroundRenderPage = () => {
   }, [searchParams, setTheme]);
 
   useEffect(() => {
-    const sandbox = installPlaygroundApiMock(profile);
     let active = true;
-    queueMicrotask(() => {
+    let restore = () => {};
+
+    const markReady = () => {
       if (active) setMockReadyProfile(profile);
-    });
+    };
+
+    // The mock adapter is a development dependency. Keep the production
+    // playground catalog/scenario graph, but do not resolve the adapter
+    // package in the production build.
+    if (import.meta.env.DEV) {
+      void import('./mockApi').then(({ installPlaygroundApiMock }) => {
+        if (!active) return;
+        const sandbox = installPlaygroundApiMock(profile);
+        restore = () => sandbox.restore();
+        markReady();
+      });
+    } else {
+      queueMicrotask(markReady);
+    }
+
     return () => {
       active = false;
-      sandbox.restore();
+      restore();
     };
   }, [profile]);
 

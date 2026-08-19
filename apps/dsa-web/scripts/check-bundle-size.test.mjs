@@ -122,6 +122,21 @@ describe('bundle size checker', () => {
     expect(result.stderr).toContain('Run `npm run build` first.');
   });
 
+  it('fails when a production asset still contains the mock adapter', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'index-hash.js'),
+      "import AxiosMockAdapter from 'axios-mock-adapter';\n",
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('development-only mock adapter');
+    expect(result.stderr).toContain('axios-mock-adapter');
+  });
+
   it('fails when the build output contains no JavaScript or CSS assets', () => {
     const root = createOutput();
     writeFileSync(path.join(root, 'assets', 'manifest.txt'), 'not a bundle asset');
