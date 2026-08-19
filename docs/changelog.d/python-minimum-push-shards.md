@@ -1,0 +1,2 @@
+- [Fixed] Shard the Python 3.10 push-to-main offline suite so `python-minimum` finishes inside the same bound as `backend-tests` instead of a 45-50 minute unsharded job cancelled by merge-burst concurrency.
+- [Tests] Guard the 3.10 PR smoke, push-to-main shard coverage, visible timeout/failure, and aggregator fail-closed contract.

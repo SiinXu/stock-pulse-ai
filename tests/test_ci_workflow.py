@@ -100,8 +100,23 @@ def test_backend_gate_summary_combines_coverage_after_all_shards() -> None:
     assert sum("offline-tests-combine" in command for command in runs) == 1
 
 
-def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push() -> None:
-    """PR uses 3.10 smoke; push-to-main keeps a full offline suite on the floor."""
+def _assert_job_fail_closed(job: dict) -> None:
+    assert job.get("continue-on-error", False) is False
+    assert all(step.get("continue-on-error", False) is False for step in job["steps"])
+
+
+def test_python_min_smoke_script_still_executes_import_and_contract_suite() -> None:
+    script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
+    smoke = script.split("python_min_smoke() {", 1)[1].split("run_all() {", 1)[0]
+    assert "from src.api.app import app" in smoke
+    assert "tests/test_ci_workflow.py" in smoke
+    assert "tests/test_api_schema_pydantic.py" in smoke
+    assert "tests/test_error_envelope_contract.py" in smoke
+    assert "|| true" not in smoke
+
+
+def test_python_minimum_pr_smoke_remains_honest() -> None:
+    """PR still runs a real 3.10 smoke; it must not skip, degrade, or go unsharded-full."""
 
     workflow = _workflow()
     job = workflow["jobs"]["python-minimum"]
@@ -109,16 +124,12 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push() -> None:
     changes_job = workflow["jobs"]["changes"]
 
     assert job["name"] == "python-minimum"
-    assert job["needs"] == ["changes", "ai-governance"]
-    assert job["if"] == "needs.changes.outputs.backend == 'true'"
+    assert job["needs"] == ["changes", "ai-governance", "python-minimum-tests"]
+    assert job["if"] == "always() && needs.changes.outputs.backend == 'true'"
     assert job["permissions"] == {"contents": "read"}
-    assert job.get("continue-on-error", False) is False
-    assert all(
-        step.get("continue-on-error", False) is False for step in job["steps"]
-    )
-
+    _assert_job_fail_closed(job)
+    assert job["timeout-minutes"] <= 20
     assert backend_job["timeout-minutes"] >= 45
-    assert job["timeout-minutes"] >= 45
     assert "backend" in changes_job["outputs"]
     assert "docker" in changes_job["outputs"]
 
@@ -129,6 +140,7 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push() -> None:
     ]
     assert len(setup_steps) == 1
     assert setup_steps[0]["with"]["python-version"] == "3.10"
+    assert setup_steps[0]["if"] == "github.event_name == 'pull_request'"
 
     smoke_steps = [
         step
@@ -137,14 +149,120 @@ def test_python_minimum_job_uses_smoke_on_pr_and_full_offline_on_push() -> None:
     ]
     assert len(smoke_steps) == 1
     assert smoke_steps[0]["if"] == "github.event_name == 'pull_request'"
+    assert smoke_steps[0].get("continue-on-error", False) is False
 
-    full_steps = [
+    unsharded = [
         step
         for step in job["steps"]
-        if step.get("run", "").strip() == "./scripts/ci_gate.sh offline-tests"
+        if "./scripts/ci_gate.sh offline-tests" in step.get("run", "")
+        and "offline-tests-shard" not in step.get("run", "")
+        and "offline-tests-selective" not in step.get("run", "")
+        and "offline-tests-combine" not in step.get("run", "")
     ]
-    assert len(full_steps) == 1
-    assert full_steps[0]["if"] == "github.event_name != 'pull_request'"
+    assert unsharded == []
+
+
+def test_python_minimum_push_covers_sharded_python_310_suite() -> None:
+    """Push-to-main must still execute the full offline suite on Python 3.10."""
+
+    workflow = _workflow()
+    job = workflow["jobs"]["python-minimum-tests"]
+    backend_shards = workflow["jobs"]["backend-tests"]
+
+    assert job["name"] == "python-minimum-tests (${{ matrix.shard }}/4)"
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == (
+        "needs.changes.outputs.backend == 'true' && github.event_name == 'push'"
+    )
+    assert job["permissions"] == {"contents": "read"}
+    _assert_job_fail_closed(job)
+    assert job["timeout-minutes"] == backend_shards["timeout-minutes"] == 30
+    assert job["strategy"]["fail-fast"] is False
+    assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
+
+    setup_steps = [
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/setup-python@")
+    ]
+    assert len(setup_steps) == 1
+    assert setup_steps[0]["with"]["python-version"] == "3.10"
+
+    shard_steps = [
+        step
+        for step in job["steps"]
+        if "offline-tests-shard" in step.get("run", "")
+    ]
+    assert len(shard_steps) == 1
+    env = shard_steps[0]["env"]
+    assert env["PYTEST_SPLITS"] == "4"
+    assert env["PYTEST_GROUP"] == "${{ matrix.shard }}"
+    assert env["PYTEST_FIRST_SHARD_OVERHEAD"] == "0"
+    assert "COVERAGE_SHARD_DIR" in env
+
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert not any("ci_gate.sh syntax" in command for command in runs)
+    assert not any("ci_gate.sh flake8" in command for command in runs)
+    assert not any("ci_gate.sh deterministic" in command for command in runs)
+    assert not any(
+        command.strip() == "./scripts/ci_gate.sh offline-tests" for command in runs
+    )
+    assert not any(
+        step.get("uses", "").startswith("actions/upload-artifact@")
+        for step in job["steps"]
+    )
+
+
+def test_python_minimum_shards_cover_every_offline_test_module_once() -> None:
+    """The 3.10 push matrix reuses the same 4-way partitioner as backend-tests."""
+
+    from scripts.ci_test_shard import (
+        discover_test_files,
+        load_durations,
+        partition_test_files,
+    )
+
+    workflow = _workflow()
+    job = workflow["jobs"]["python-minimum-tests"]
+    backend = workflow["jobs"]["backend-tests"]
+    assert job["strategy"]["matrix"]["shard"] == backend["strategy"]["matrix"]["shard"]
+
+    files = discover_test_files()
+    groups, _totals = partition_test_files(
+        files,
+        load_durations(),
+        splits=4,
+        initial_totals=[0.0, 0.0, 0.0, 0.0],
+    )
+    covered = [path for group in groups for path in group]
+    assert sorted(covered) == sorted(files)
+    assert all(group for group in groups)
+
+
+def test_python_minimum_aggregator_cannot_mask_failed_or_cancelled_shard() -> None:
+    """Required check python-minimum must fail when any 3.10 shard is not success."""
+
+    workflow = _workflow()
+    job = workflow["jobs"]["python-minimum"]
+    require = next(
+        step
+        for step in job["steps"]
+        if step.get("name") == "✅ Require python-minimum prerequisites"
+    )
+
+    assert "if" not in require
+    assert require.get("continue-on-error", False) is False
+    env = require["env"]
+    assert env["TESTS_RESULT"] == "${{ needs.python-minimum-tests.result }}"
+    assert env["AI_RESULT"] == "${{ needs.ai-governance.result }}"
+    assert env["EVENT_NAME"] == "${{ github.event_name }}"
+    script = require["run"]
+    assert '[ "${EVENT_NAME}" = "push" ]' in script
+    assert '[ "${TESTS_RESULT}" != "success" ]' in script
+    assert "python-minimum-tests shards failed" in script
+    assert "exit 1" in script
+    assert "continue-on-error" not in script
+    assert "|| true" not in script
 
 
 def test_docker_build_skips_when_docker_paths_unchanged():

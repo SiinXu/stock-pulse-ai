@@ -119,7 +119,7 @@ docs: update the README deployment guide
 |--------|------|:--------:|
 | ai-governance | 校验 `AGENTS.md`、兼容指令和仓库协作资产 | ✅ |
 | backend-gate | `scripts/ci_gate.sh` 的 syntax、flake8、deterministic 与 offline-tests | ✅ |
-| python-minimum | 在最低支持版本 Python 3.10 上运行完整 backend gate | ✅ |
+| python-minimum | PR：Python 3.10 import/schema smoke；push-to-main：在 Python 3.10 上运行分片完整 offline suite（必需检查名仍为 `python-minimum`） | ✅ |
 | pydanticai-installed | 安装可选 PydanticAI 依赖并执行不允许跳过的实验运行时测试 | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
 | openapi-types-gate | 重新生成后端 OpenAPI 快照与 Web TypeScript 类型并拒绝已提交产物漂移 | ✅ |

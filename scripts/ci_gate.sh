@@ -10,6 +10,7 @@
 #   offline-tests-shard — one shard of the full suite; writes coverage data for combine
 #   offline-tests-combine — combine shard coverage data and enforce the floor once
 #   python-min-smoke    — 3.10 import/schema/smoke subset (PR tier)
+#                         Push-to-main runs offline-tests-shard on 3.10.
 
 set -euo pipefail
 
@@ -235,7 +236,7 @@ offline_test_suite_combine() {
 python_min_smoke() {
   echo "==> python-minimum: 3.10 import/schema/smoke (PR tier)"
   # Real 3.10 execution without a second full offline suite on every PR.
-  # Push-to-main still runs the full offline suite on 3.10.
+  # Push-to-main runs the sharded full offline suite on 3.10.
   python -m py_compile main.py server.py src/config.py src/storage.py
   python -c "
 from src.config import get_config

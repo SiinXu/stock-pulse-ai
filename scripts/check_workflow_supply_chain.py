@@ -173,6 +173,8 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/ci.yml", "backend-gate-main", "contents", "read"),
         (".github/workflows/ci.yml", "backend-tests", "contents", "read"),
         (".github/workflows/ci.yml", "python-minimum", "contents", "read"),
+        # Push-to-main 3.10 shards. Required check *name* remains "python-minimum".
+        (".github/workflows/ci.yml", "python-minimum-tests", "contents", "read"),
         (".github/workflows/ci.yml", "pydanticai-installed", "contents", "read"),
         (".github/workflows/ci.yml", "report-export-stack", "contents", "read"),
         (".github/workflows/ci.yml", "docker-build", "contents", "read"),
