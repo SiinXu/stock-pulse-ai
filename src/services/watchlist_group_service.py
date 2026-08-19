@@ -143,6 +143,10 @@ def _translate_repo_error(exc: RepositoryError) -> WatchlistGroupServiceError:
         "watchlist_group_default_delete_forbidden",
         "watchlist_group_limit_reached",
         "watchlist_group_member_limit_reached",
+        "watchlist_group_already_exists",
+        "watchlist_group_restore_unavailable",
+        "watchlist_group_restore_invalid",
+        "watchlist_group_member_code_required",
     }:
         return WatchlistGroupServiceError(str(exc), error_code=code)
     return WatchlistGroupServiceError("Watchlist group operation failed", error_code=code)
@@ -230,6 +234,41 @@ class WatchlistGroupService:
             return _state_view(
                 self.repo.delete_group(
                     group_key=group_id,
+                    expected_revision=self._revision(expected_revision),
+                )
+            )
+        except RepositoryError as exc:
+            raise _translate_repo_error(exc) from exc
+
+    def restore_group(
+        self,
+        *,
+        group_id: str,
+        name: str,
+        member_codes: Sequence[str],
+        exclusive_codes: Sequence[str],
+        ordered_ids: Optional[Sequence[str]],
+        expected_revision: int,
+    ) -> WatchlistGroupStateView:
+        restored_id = str(group_id or "").strip()
+        if not restored_id or restored_id == DEFAULT_GROUP_KEY:
+            raise WatchlistGroupServiceError(
+                "Default group cannot be deleted",
+                error_code="watchlist_group_default_delete_forbidden",
+            )
+        if len(restored_id) > 64:
+            raise WatchlistGroupServiceError(
+                "Group id is too long",
+                error_code="watchlist_group_restore_invalid",
+            )
+        try:
+            return _state_view(
+                self.repo.restore_group(
+                    group_key=restored_id,
+                    name=self._name(name),
+                    member_codes=member_codes,
+                    exclusive_codes=exclusive_codes,
+                    ordered_keys=None if ordered_ids is None else list(ordered_ids),
                     expected_revision=self._revision(expected_revision),
                 )
             )

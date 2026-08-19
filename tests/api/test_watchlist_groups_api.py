@@ -18,6 +18,7 @@ from pydantic import ValidationError
 from src.api.v1.endpoints import watchlist_groups as endpoints
 from src.api.v1.schemas.watchlist_groups import (
     WatchlistGroupCreateRequest,
+    WatchlistGroupRestoreRequest,
     WatchlistGroupMemberAddRequest,
     WatchlistGroupMemberMoveRequest,
     WatchlistGroupMemberReorderRequest,
@@ -172,6 +173,79 @@ def test_revisioned_api_flow_and_strict_json(tmp_path: Path) -> None:
     )
     json.dumps(final.model_dump(mode="json"), allow_nan=False)
     assert final.revision > listed.revision
+
+
+def test_delete_then_restore_roundtrip_keeps_group_identity(tmp_path: Path) -> None:
+    config = FakeSystemConfigService("600519,AAPL")
+    service = _service(tmp_path, "api-restore.db")
+    client = _client(config, service)
+    listed = client.get("/api/v1/stocks/watchlist/groups").json()
+    created = client.post(
+        "/api/v1/stocks/watchlist/groups",
+        json={"name": "Core", "expected_revision": listed["revision"]},
+    )
+    assert created.status_code == 200
+    core_id = next(group["id"] for group in created.json()["groups"] if group["name"] == "Core")
+    added = endpoints.add_watchlist_group_member(
+        core_id,
+        WatchlistGroupMemberAddRequest(
+            stock_code="600519", expected_revision=created.json()["revision"]
+        ),
+        service=config,
+        group_service=service,
+    )
+    deleted = client.delete(
+        f"/api/v1/stocks/watchlist/groups/{core_id}",
+        params={"expected_revision": added.revision},
+    )
+    assert deleted.status_code == 200
+    assert all(group["id"] != core_id for group in deleted.json()["groups"])
+
+    restored = client.post(
+        "/api/v1/stocks/watchlist/groups/restore",
+        json={
+            "group_id": core_id,
+            "name": "Core",
+            "member_codes": ["600519"],
+            "exclusive_codes": ["600519"],
+            "ordered_ids": [group["id"] for group in created.json()["groups"]],
+            "expected_revision": deleted.json()["revision"],
+        },
+    )
+    assert restored.status_code == 200
+    restored_core = next(group for group in restored.json()["groups"] if group["id"] == core_id)
+    assert restored_core["name"] == "Core"
+    assert [member["stock_code"] for member in restored_core["members"]] == ["600519"]
+
+    stale = client.post(
+        "/api/v1/stocks/watchlist/groups/restore",
+        json={
+            "group_id": core_id,
+            "name": "Core",
+            "member_codes": ["600519"],
+            "expected_revision": deleted.json()["revision"],
+        },
+    )
+    assert stale.status_code == 409
+    assert stale.json()["detail"]["error"] == "watchlist_group_revision_conflict"
+
+
+def test_restore_endpoint_rejects_default_group(tmp_path: Path) -> None:
+    config = FakeSystemConfigService("600519")
+    service = _service(tmp_path, "api-restore-default.db")
+    listed = endpoints.list_watchlist_groups(service=config, group_service=service)
+    with pytest.raises(HTTPException) as exc:
+        endpoints.restore_watchlist_group(
+            WatchlistGroupRestoreRequest(
+                group_id="default",
+                name="Default",
+                member_codes=["600519"],
+                expected_revision=listed.revision,
+            ),
+            group_service=service,
+        )
+    assert exc.value.status_code == 400
+    assert exc.value.detail["error"] == "watchlist_group_default_delete_forbidden"
 
 
 def test_alias_add_updates_authority_before_group_projection(tmp_path: Path) -> None:

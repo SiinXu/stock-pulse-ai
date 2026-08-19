@@ -16,7 +16,7 @@ import { Badge, Button, IconButton, InlineAlert, Input, ScrollArea, SearchInput,
 import { DashboardPanelHeader, DashboardStateBlock } from '../dashboard';
 import { StockBar } from '../history';
 import type { StockBarItem, TaskInfo } from '../../types/analysis';
-import type { HomeWatchlistRow } from '../../types/watchlist';
+import type { HomeWatchlistRow, WatchlistGroupRestoreSnapshot } from '../../types/watchlist';
 import { getSentimentColor } from '../../types/analysis';
 import type { WatchlistScoreItem, WatchlistScoreSortMode } from '../../types/watchlistScore';
 import { buildDecisionActionLabelMap, getDecisionActionLabel } from '../../utils/decisionAction';
@@ -79,6 +79,7 @@ interface HomeStockWorkspaceProps {
   watchlistGroupsError?: string | null;
   onCreateWatchlistGroup?: (name: string) => Promise<boolean> | boolean;
   onDeleteWatchlistGroup?: (groupId: string) => Promise<boolean> | boolean;
+  onRestoreWatchlistGroup?: (snapshot: WatchlistGroupRestoreSnapshot) => Promise<boolean> | boolean;
   onReorderWatchlistGroups?: (orderedIds: string[]) => Promise<boolean> | boolean;
   onReorderWatchlistGroupMembers?: (groupId: string, orderedCodes: string[]) => Promise<boolean> | boolean;
   onMoveWatchlistGroupMember?: (params: {
@@ -265,6 +266,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
   watchlistGroupsError = null,
   onCreateWatchlistGroup,
   onDeleteWatchlistGroup,
+  onRestoreWatchlistGroup,
   onReorderWatchlistGroups,
   onReorderWatchlistGroupMembers,
   onMoveWatchlistGroupMember,
@@ -560,6 +562,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
                   errorMessage={watchlistGroupsError}
                   onCreateGroup={onCreateWatchlistGroup}
                   onDeleteGroup={onDeleteWatchlistGroup}
+                  onRestoreGroup={onRestoreWatchlistGroup}
                   onReorderGroups={onReorderWatchlistGroups}
                   onReorderMembers={onReorderWatchlistGroupMembers}
                   onMoveMember={onMoveWatchlistGroupMember}

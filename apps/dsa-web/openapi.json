@@ -38398,6 +38398,66 @@
         "title": "WatchlistGroupReorderRequest",
         "type": "object"
       },
+      "WatchlistGroupRestoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "exclusive_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Exclusive Codes",
+            "type": "array"
+          },
+          "expected_revision": {
+            "minimum": 1.0,
+            "title": "Expected Revision",
+            "type": "integer"
+          },
+          "group_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Group Id",
+            "type": "string"
+          },
+          "member_codes": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "title": "Member Codes",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 80,
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "ordered_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ordered Ids"
+          }
+        },
+        "required": [
+          "expected_revision",
+          "group_id",
+          "name"
+        ],
+        "title": "WatchlistGroupRestoreRequest",
+        "type": "object"
+      },
       "WatchlistGroupSchema": {
         "additionalProperties": false,
         "properties": {
@@ -56022,6 +56082,88 @@
           }
         },
         "summary": "Atomically reorder every watchlist group",
+        "tags": [
+          "Stocks"
+        ]
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/restore": {
+      "post": {
+        "description": "Recreate a previously deleted group with the same id, name, and still-available members in one revisioned write. Members no longer placed on STOCK_LIST cannot be restored.",
+        "operationId": "restore_watchlist_group_api_v1_stocks_watchlist_groups_restore_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupRestoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "summary": "Restore a deleted watchlist group",
         "tags": [
           "Stocks"
         ]

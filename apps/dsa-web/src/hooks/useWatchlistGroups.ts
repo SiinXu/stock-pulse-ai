@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { watchlistGroupsApi } from '../api/watchlistGroups';
 import { getParsedApiError } from '../api/error';
-import type { WatchlistGroup, WatchlistGroupState } from '../types/watchlist';
+import type { WatchlistGroup, WatchlistGroupRestoreSnapshot, WatchlistGroupState } from '../types/watchlist';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 
 export interface UseWatchlistGroupsReturn {
@@ -15,6 +15,7 @@ export interface UseWatchlistGroupsReturn {
   refresh: () => Promise<boolean>;
   createGroup: (name: string) => Promise<boolean>;
   deleteGroup: (groupId: string) => Promise<boolean>;
+  restoreGroup: (snapshot: WatchlistGroupRestoreSnapshot) => Promise<boolean>;
   reorderGroups: (orderedIds: string[]) => Promise<boolean>;
   reorderMembers: (groupId: string, orderedCodes: string[]) => Promise<boolean>;
   moveMember: (params: {
@@ -122,6 +123,7 @@ export function useWatchlistGroups({ enabled = true }: { enabled?: boolean } = {
     refresh,
     createGroup: (name) => runAction((current) => watchlistGroupsApi.create(name, current)),
     deleteGroup: (groupId) => runAction((current) => watchlistGroupsApi.remove(groupId, current)),
+    restoreGroup: (snapshot) => runAction((current) => watchlistGroupsApi.restore(snapshot, current)),
     reorderGroups: (orderedIds) => runAction((current) => watchlistGroupsApi.reorderGroups(orderedIds, current)),
     reorderMembers: (groupId, orderedCodes) => runAction(
       (current) => watchlistGroupsApi.reorderMembers(groupId, orderedCodes, current),

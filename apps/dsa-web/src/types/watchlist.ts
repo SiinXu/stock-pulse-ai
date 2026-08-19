@@ -39,3 +39,12 @@ export interface WatchlistGroupState {
   revision: number;
   groups: WatchlistGroup[];
 }
+
+/** Snapshot required to restore a deleted group through the revisioned API. */
+export interface WatchlistGroupRestoreSnapshot {
+  groupId: string;
+  name: string;
+  memberCodes: string[];
+  exclusiveMemberCodes: string[];
+  orderedGroupIds: string[];
+}

@@ -500,26 +500,161 @@ class WatchlistGroupRepository(BaseRepository):
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
+    def restore_group(
+        self,
+        *,
+        group_key: str,
+        name: str,
+        member_codes: Sequence[str],
+        exclusive_codes: Sequence[str],
+        ordered_keys: Optional[Sequence[str]],
+        expected_revision: int,
+    ) -> StoredWatchlistState:
+        """Recreate a previously deleted group in one revisioned transaction."""
+        if group_key == DEFAULT_GROUP_KEY:
+            raise RepositoryError(
+                "Default group cannot be deleted",
+                error_code="watchlist_group_default_delete_forbidden",
+            )
+        identities: list[str] = []
+        seen: set[str] = set()
+        for raw_code in member_codes:
+            identity = watchlist_match_key(str(raw_code))
+            if not identity:
+                raise RepositoryError(
+                    "Stock code is required",
+                    error_code="watchlist_group_member_code_required",
+                )
+            if identity in seen:
+                raise RepositoryError(
+                    "Restore members must be unique",
+                    error_code="watchlist_group_restore_invalid",
+                )
+            seen.add(identity)
+            identities.append(identity)
+        exclusive_identities: set[str] = set()
+        for raw_code in exclusive_codes:
+            identity = watchlist_match_key(str(raw_code))
+            if identity not in seen:
+                raise RepositoryError(
+                    "Exclusive restore members must be part of the member list",
+                    error_code="watchlist_group_restore_invalid",
+                )
+            exclusive_identities.add(identity)
+        with self.db.get_session() as session:
+            current = self._acquire_revision_lease(session, expected_revision)
+            existing = session.execute(
+                select(watchlist_groups_table.c.id).where(
+                    watchlist_groups_table.c.group_key == group_key
+                )
+            ).scalar_one_or_none()
+            if existing is not None:
+                raise RepositoryError(
+                    "Group already exists",
+                    error_code="watchlist_group_already_exists",
+                )
+            count = int(session.execute(select(func.count()).select_from(watchlist_groups_table)).scalar_one())
+            if count >= MAX_GROUPS:
+                raise RepositoryError("Group limit reached", error_code="watchlist_group_limit_reached")
+            default_id = self._default_group_id(session)
+            placements: dict[str, list[int]] = {}
+            for identity in identities:
+                group_ids = [
+                    int(row[0])
+                    for row in session.execute(
+                        select(watchlist_group_members_table.c.group_id).where(
+                            watchlist_group_members_table.c.stock_code == identity
+                        )
+                    ).all()
+                ]
+                if not group_ids:
+                    raise RepositoryError(
+                        "A deleted group member is no longer available to restore",
+                        error_code="watchlist_group_restore_unavailable",
+                    )
+                placements[identity] = group_ids
+            exclusive_moves = sum(
+                1
+                for identity, group_ids in placements.items()
+                if identity in exclusive_identities and group_ids == [default_id]
+            )
+            added_memberships = len(identities) - exclusive_moves
+            if len(identities) > MAX_MEMBERS_PER_GROUP:
+                raise RepositoryError(
+                    "Membership limit reached",
+                    error_code="watchlist_group_member_limit_reached",
+                )
+            total_count = int(
+                session.execute(select(func.count()).select_from(watchlist_group_members_table)).scalar_one()
+            )
+            if total_count + added_memberships > MAX_TOTAL_MEMBERSHIPS:
+                raise RepositoryError(
+                    "Membership limit reached",
+                    error_code="watchlist_group_member_limit_reached",
+                )
+            session.execute(
+                watchlist_groups_table.insert().values(
+                    group_key=group_key,
+                    name=name,
+                    sort_order=count,
+                    is_default=False,
+                    created_at=_now(),
+                    updated_at=_now(),
+                )
+            )
+            restored_id = int(
+                session.execute(
+                    select(watchlist_groups_table.c.id).where(
+                        watchlist_groups_table.c.group_key == group_key
+                    )
+                ).scalar_one()
+            )
+            for sort_order, identity in enumerate(identities):
+                session.execute(
+                    watchlist_group_members_table.insert().values(
+                        group_id=restored_id,
+                        stock_code=identity,
+                        sort_order=sort_order,
+                        attrs_json=_attrs_json({}),
+                        created_at=_now(),
+                        updated_at=_now(),
+                    )
+                )
+                if identity in exclusive_identities and placements[identity] == [default_id]:
+                    session.execute(
+                        delete(watchlist_group_members_table).where(
+                            watchlist_group_members_table.c.group_id == default_id,
+                            watchlist_group_members_table.c.stock_code == identity,
+                        )
+                    )
+            self._normalize_all_orders(session)
+            if ordered_keys is not None:
+                self._apply_group_order(session, ordered_keys)
+            session.commit()
+            return StoredWatchlistState(current, self._groups(session))
+
+    def _apply_group_order(self, session, ordered_keys: Sequence[str]) -> None:
+        rows = session.execute(
+            select(
+                watchlist_groups_table.c.id,
+                watchlist_groups_table.c.group_key,
+                watchlist_groups_table.c.sort_order,
+            ).order_by(watchlist_groups_table.c.sort_order)
+        ).all()
+        current_keys = [str(row[1]) for row in rows]
+        requested = [str(key) for key in ordered_keys]
+        if len(requested) != len(set(requested)) or set(requested) != set(current_keys):
+            raise RepositoryError(
+                "Reorder must contain every current group exactly once",
+                error_code="watchlist_group_reorder_invalid",
+            )
+        by_key = {str(row[1]): (int(row[0]), int(row[2])) for row in rows}
+        self._rewrite_orders(session, watchlist_groups_table, [by_key[key] for key in requested])
+
     def reorder_groups(self, *, ordered_keys: Sequence[str], expected_revision: int) -> StoredWatchlistState:
         with self.db.get_session() as session:
             current = self._acquire_revision_lease(session, expected_revision)
-            rows = session.execute(
-                select(
-                    watchlist_groups_table.c.id,
-                    watchlist_groups_table.c.group_key,
-                    watchlist_groups_table.c.sort_order,
-                )
-                .order_by(watchlist_groups_table.c.sort_order)
-            ).all()
-            current_keys = [str(row[1]) for row in rows]
-            requested = [str(key) for key in ordered_keys]
-            if len(requested) != len(set(requested)) or set(requested) != set(current_keys):
-                raise RepositoryError(
-                    "Reorder must contain every current group exactly once",
-                    error_code="watchlist_group_reorder_invalid",
-                )
-            by_key = {str(row[1]): (int(row[0]), int(row[2])) for row in rows}
-            self._rewrite_orders(session, watchlist_groups_table, [by_key[key] for key in requested])
+            self._apply_group_order(session, ordered_keys)
             session.commit()
             return StoredWatchlistState(current, self._groups(session))
 
