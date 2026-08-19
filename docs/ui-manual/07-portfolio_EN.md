@@ -118,7 +118,7 @@ Open **Portfolio insights** to switch among four shareable views:
 | Stress test | `/portfolio?tab=insights&view=stress` | Replay the current portfolio with a registered deterministic scenario |
 | Rebalance | `/portfolio?tab=insights&view=rebalance` | Generate read-only suggestions and position bands for a selected risk tolerance; never place orders |
 
-Changing account or cost method immediately clears visible Health, Stress, and Rebalance results, and late responses cannot overwrite the new context. Assumptions, limitations, data quality, and provenance remain available in expandable evidence sections. Partial, unavailable, insufficient-data, and backend-refusal states stay explicit.
+Changing account or cost method immediately clears visible Health, Stress, and Rebalance results, and late responses cannot overwrite the new context. Assumptions, limitations, data quality, and provenance remain available in expandable evidence sections. The stress-test position table and evidence section show existing localized data-quality labels (for example OK / Partial) instead of raw `ok` / `partial` machine codes. Partial, unavailable, insufficient-data, and backend-refusal states stay explicit. Unknown codes remain visible instead of being rewritten as a known state.
 
 Basket analysis is temporary and never writes the account. Stress and Rebalance use the current account context. Rebalancing never writes the ledger or triggers a real order.
 

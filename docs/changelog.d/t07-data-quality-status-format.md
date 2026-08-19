@@ -1,0 +1,1 @@
+- [Fixed] Show localized Portfolio Stress and Alert Trigger History data-quality/status labels instead of raw machine codes, and keep unknown codes visible (Refs #887).

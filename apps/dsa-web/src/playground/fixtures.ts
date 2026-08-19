@@ -527,6 +527,28 @@ export const fixtureAlertTriggers: AlertTriggerItem[] = [
     triggeredAt: FIXTURE_TIMESTAMP,
     status: 'triggered',
     diagnostics: 'fixture-trigger-601',
+    analysisContextPackOverview: {
+      packVersion: '1.0',
+      subject: { code: '600519', stockName: 'Kweichow Moutai', market: 'cn' },
+      blocks: [],
+      counts: {
+        available: 0,
+        missing: 0,
+        notSupported: 0,
+        fallback: 0,
+        stale: 0,
+        estimated: 0,
+        partial: 0,
+        fetchFailed: 0,
+      },
+      dataQuality: {
+        level: 'usable',
+        limitations: ['fundamentals: fetch_failed'],
+        blockScores: {},
+      },
+      warnings: [],
+      metadata: {},
+    },
   },
   {
     id: 602,
