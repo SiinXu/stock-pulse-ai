@@ -29,7 +29,8 @@ dependency graph; the lock header records both cutoffs. It retains marker forks 
 supported matrix: Python 3.10 through 3.14, Linux
 x86_64/aarch64, macOS x86_64/arm64, and Windows AMD64. Required CI keeps a Python 3.10
 floor through `python-minimum` (PR smoke; push-to-main sharded full offline
-suite) and retains the Python 3.11 `backend-gate` on Linux. Docker exercises Python 3.11 on Linux;
+suite) and retains the Python 3.11 `backend-gate` on Linux (PR path-selective;
+FULL reuses the four `backend-tests` shards). Docker exercises Python 3.11 on Linux;
 desktop release builds exercise Python 3.11 on Windows and both macOS
 architectures. Longbridge 4.x on Linux Python 3.12+
 requires upstream `manylinux_2_39` wheels; older-glibc Linux targets use the

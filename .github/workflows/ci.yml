@@ -28,7 +28,10 @@ jobs:
       # shared runtime/config contracts change (provider templates, help copy,
       # public assets consumed outside the SPA).
       backend: ${{ steps.backend-filter.outputs.backend_non_web == 'true' || steps.filter.outputs.backend_web_contract == 'true' }}
-      backend_full: ${{ steps.backend-selection.outputs.full || 'false' }}
+      # Fail closed to the sharded full suite when the planner did not write
+      # an explicit false. Empty output must not schedule the 45-minute
+      # selective job, which cannot run the unsharded offline suite in time.
+      backend_full: ${{ steps.backend-selection.outputs.full || 'true' }}
       docker: ${{ steps.filter.outputs.docker }}
       frontend: ${{ steps.filter.outputs.frontend }}
       web_e2e: ${{ steps.filter.outputs.web_e2e }}
@@ -98,9 +101,11 @@ jobs:
           (steps.backend-filter.outputs.backend_non_web == 'true' ||
            steps.filter.outputs.backend_web_contract == 'true')
         env:
-          CI_SELECT_BASE: origin/${{ github.base_ref }}
+          # Pin the PR event base SHA. Fetching origin/main --depth=1 after
+          # checkout can move the ref to a newer main tip and drop merge-base,
+          # so the later 45-minute job remaps NONE → FULL (PRs #1375/#1377).
+          CI_SELECT_BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
           selection="$(python scripts/ci_select_tests.py --base "${CI_SELECT_BASE}")"
           if [ "${selection}" = "FULL" ]; then
             echo "full=true" >> "${GITHUB_OUTPUT}"
@@ -186,7 +191,9 @@ jobs:
 
   # ---------------------------------------------------------------------------
   # PR tier: fast backend-gate for selective pytest. FULL selections use the
-  # sharded suite and summary job below. Required check name: backend-gate.
+  # 30-minute backend-tests shards and summary job below — never the unsharded
+  # offline_test_suite inside this 45-minute job. Required check name:
+  # backend-gate.
   # ---------------------------------------------------------------------------
   backend-gate:
     name: backend-gate
@@ -200,7 +207,7 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # Selective offline tests need merge-base vs origin/main on pull_request.
+          # Selective offline tests pin github.event.pull_request.base.sha.
           fetch-depth: 0
       - name: 🐍 Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -257,10 +264,12 @@ jobs:
         run: python scripts/run_agent_benchmark.py --strict-baseline --quiet
       - name: ✅ Selective offline tests (PR tier)
         env:
-          CI_SELECT_BASE: origin/main
-        run: |
-          git fetch --no-tags --depth=1 origin main 2>/dev/null || true
-          ./scripts/ci_gate.sh offline-tests-selective
+          # Same pinned PR base as the planner. Do not fetch origin/main
+          # with --depth=1: that remapped planner NONE to FULL and ran the
+          # unsharded suite until the 45-minute cap cancelled the job
+          # (PR #1375 run 32238883191, PR #1377 run 32238746609).
+          CI_SELECT_BASE: ${{ github.event.pull_request.base.sha }}
+        run: ./scripts/ci_gate.sh offline-tests-selective
 
   # ---------------------------------------------------------------------------
   # Full-suite tier: sharded offline suite for push-to-main and PRs whose path

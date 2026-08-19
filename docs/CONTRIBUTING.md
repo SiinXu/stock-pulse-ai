@@ -118,7 +118,7 @@ docs: update the README deployment guide
 | 检查项 | 说明 | 必须通过 |
 |--------|------|:--------:|
 | ai-governance | 校验 `AGENTS.md`、兼容指令和仓库协作资产 | ✅ |
-| backend-gate | `scripts/ci_gate.sh` 的 syntax、flake8、deterministic 与 offline-tests | ✅ |
+| backend-gate | PR：path-selective offline pytest；mapping 为 FULL 时复用 `backend-tests` 四分片（必需检查名仍为 `backend-gate`）；push-to-main：分片完整 suite + coverage floor | ✅ |
 | python-minimum | PR：Python 3.10 import/schema smoke；push-to-main：在 Python 3.10 上运行分片完整 offline suite（必需检查名仍为 `python-minimum`） | ✅ |
 | pydanticai-installed | 安装可选 PydanticAI 依赖并执行不允许跳过的实验运行时测试 | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |

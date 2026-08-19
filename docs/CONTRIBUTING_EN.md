@@ -120,7 +120,7 @@ After opening a PR, CI will automatically run the following PR checks:
 | Check | Description | Required |
 |-------|-------------|:--------:|
 | `ai-governance` | Validates `AGENTS.md`, compatibility instructions, and repository collaboration assets | ✅ |
-| `backend-gate` | `scripts/ci_gate.sh` syntax, flake8, deterministic, and offline-tests stages (per-test timeout, coverage floor, strict markers) | ✅ |
+| `backend-gate` | PR: path-selective offline pytest; FULL mapping reuses the four `backend-tests` shards (required check name stays `backend-gate`); push-to-main: sharded full suite + coverage floor | ✅ |
 | `python-minimum` | PR: Python 3.10 import/schema smoke; push-to-main: sharded full offline suite on Python 3.10 (required check name stays `python-minimum`) | ✅ |
 | `pydanticai-installed` | Installs optional PydanticAI dependencies and runs experimental runtime tests with skips rejected | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |

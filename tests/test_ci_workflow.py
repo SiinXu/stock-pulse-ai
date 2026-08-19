@@ -19,6 +19,11 @@ def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
+def _assert_job_fail_closed(job: dict) -> None:
+    assert job.get("continue-on-error", False) is False
+    assert all(step.get("continue-on-error", False) is False for step in job["steps"])
+
+
 def test_ci_uses_supported_pull_request_and_push_events_only() -> None:
     workflow = _workflow()
     # PyYAML loads the bare key `on:` as boolean True.
@@ -36,11 +41,24 @@ def test_backend_gate_pr_is_selective() -> None:
         "needs.changes.outputs.backend == 'true' && "
         "needs.changes.outputs.backend_full != 'true'"
     )
+    assert job["timeout-minutes"] <= 45
+    _assert_job_fail_closed(job)
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert sum("offline-tests-selective" in command for command in runs) == 1
     assert not any(
         command.strip() == "./scripts/ci_gate.sh offline-tests" for command in runs
     )
+    assert not any("--depth=1" in command for command in runs)
+    assert not any("origin/main" in command for command in runs)
+    selective = next(
+        step
+        for step in job["steps"]
+        if "offline-tests-selective" in step.get("run", "")
+    )
+    assert selective["env"]["CI_SELECT_BASE"] == (
+        "${{ github.event.pull_request.base.sha }}"
+    )
+    assert selective.get("continue-on-error", False) is False
 
 
 def test_changes_job_plans_full_pr_suite_before_scheduling_backend_jobs() -> None:
@@ -48,6 +66,9 @@ def test_changes_job_plans_full_pr_suite_before_scheduling_backend_jobs() -> Non
     job = workflow["jobs"]["changes"]
 
     assert "backend_full" in job["outputs"]
+    assert job["outputs"]["backend_full"] == (
+        "${{ steps.backend-selection.outputs.full || 'true' }}"
+    )
     checkout = next(
         step
         for step in job["steps"]
@@ -59,6 +80,11 @@ def test_changes_job_plans_full_pr_suite_before_scheduling_backend_jobs() -> Non
     )
     assert "ci_select_tests.py" in planner["run"]
     assert 'echo "full=true" >> "${GITHUB_OUTPUT}"' in planner["run"]
+    assert planner["env"]["CI_SELECT_BASE"] == (
+        "${{ github.event.pull_request.base.sha }}"
+    )
+    assert "--depth=1" not in planner["run"]
+    assert "origin/main" not in planner["run"]
 
 
 def test_backend_tests_are_sharded_for_full_prs_and_push_to_main() -> None:
@@ -82,6 +108,33 @@ def test_backend_tests_are_sharded_for_full_prs_and_push_to_main() -> None:
     )
     assert upload["with"]["include-hidden-files"] is True
     assert upload["with"]["if-no-files-found"] == "error"
+    _assert_job_fail_closed(job)
+
+
+def test_backend_tests_shards_cover_every_offline_test_module_once() -> None:
+    """PR FULL and push-to-main reuse the same 4-way partition; no module dropped."""
+
+    from scripts.ci_test_shard import (
+        discover_test_files,
+        load_durations,
+        partition_test_files,
+    )
+
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-tests"]
+    assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
+
+    files = discover_test_files()
+    groups, _totals = partition_test_files(
+        files,
+        load_durations(),
+        splits=4,
+        initial_totals=[0.0, 0.0, 0.0, 0.0],
+    )
+    covered = [path for group in groups for path in group]
+    assert sorted(covered) == sorted(files)
+    assert all(group for group in groups)
+    assert len(covered) == len(set(covered))
 
 
 def test_backend_gate_summary_combines_coverage_after_all_shards() -> None:
@@ -96,13 +149,86 @@ def test_backend_gate_summary_combines_coverage_after_all_shards() -> None:
         "(github.event_name == 'pull_request' && "
         "needs.changes.outputs.backend_full == 'true'))"
     )
+    _assert_job_fail_closed(job)
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert sum("offline-tests-combine" in command for command in runs) == 1
 
 
-def _assert_job_fail_closed(job: dict) -> None:
-    assert job.get("continue-on-error", False) is False
-    assert all(step.get("continue-on-error", False) is False for step in job["steps"])
+def test_pr_full_fallback_uses_sharded_backend_tests_not_unsharded_suite() -> None:
+    """PR FULL must reuse backend-tests shards; the 45-minute job cannot run it."""
+
+    workflow = _workflow()
+    selective = workflow["jobs"]["backend-gate"]
+    shards = workflow["jobs"]["backend-tests"]
+    aggregator = workflow["jobs"]["backend-gate-main"]
+
+    assert selective["name"] == aggregator["name"] == "backend-gate"
+    assert "backend_full != 'true'" in selective["if"]
+    assert "backend_full == 'true'" in shards["if"]
+    assert "backend_full == 'true'" in aggregator["if"]
+    assert "always()" in aggregator["if"]
+    assert shards["timeout-minutes"] == 30
+    assert shards["strategy"]["fail-fast"] is False
+    assert shards["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
+    _assert_job_fail_closed(selective)
+    _assert_job_fail_closed(shards)
+    _assert_job_fail_closed(aggregator)
+
+    selective_runs = [step.get("run", "") for step in selective["steps"] if "run" in step]
+    shard_runs = [step.get("run", "") for step in shards["steps"] if "run" in step]
+    assert any("offline-tests-selective" in command for command in selective_runs)
+    assert any("offline-tests-shard" in command for command in shard_runs)
+    assert not any(
+        "offline-tests-shard" in command for command in selective_runs
+    )
+    assert not any(
+        command.strip() == "./scripts/ci_gate.sh offline-tests" for command in selective_runs
+    )
+    assert not any(
+        command.strip() == "./scripts/ci_gate.sh offline-tests" for command in shard_runs
+    )
+
+
+def test_backend_gate_aggregator_cannot_mask_failed_or_cancelled_shard() -> None:
+    """Required check backend-gate must fail when any PR/push shard is not success."""
+
+    workflow = _workflow()
+    job = workflow["jobs"]["backend-gate-main"]
+    require = next(
+        step for step in job["steps"] if step.get("name") == "✅ Require shard success"
+    )
+
+    assert "if" not in require
+    assert require.get("continue-on-error", False) is False
+    env = require["env"]
+    assert env["TESTS_RESULT"] == "${{ needs.backend-tests.result }}"
+    assert env["AI_RESULT"] == "${{ needs.ai-governance.result }}"
+    script = require["run"]
+    assert '[ "${TESTS_RESULT}" != "success" ]' in script
+    assert "backend-tests shards failed" in script
+    assert "exit 1" in script
+    assert "continue-on-error" not in script
+    assert "|| true" not in script
+
+
+def test_offline_tests_selective_refuses_unsharded_full_suite() -> None:
+    """FULL inside offline-tests-selective must fail closed, not run offline_test_suite."""
+
+    script = (REPOSITORY_ROOT / "scripts" / "ci_gate.sh").read_text(encoding="utf-8")
+    selective = script.split("offline_test_suite_selective() {", 1)[1].split(
+        "offline_test_suite_shard() {", 1
+    )[0]
+    assert 'if [ "${selection}" = "FULL" ]; then' in selective
+    assert "return 1" in selective.split("FULL", 1)[1].split("NONE", 1)[0]
+    call_lines = [
+        line.strip()
+        for line in selective.splitlines()
+        if line.strip() == "offline_test_suite"
+        or line.strip().startswith("offline_test_suite ")
+    ]
+    assert call_lines == []
+    assert "continue-on-error" not in selective
+    assert "offline-tests-shard" in selective.split("FULL", 1)[1].split("NONE", 1)[0]
 
 
 def test_python_min_smoke_script_still_executes_import_and_contract_suite() -> None:
@@ -120,7 +246,6 @@ def test_python_minimum_pr_smoke_remains_honest() -> None:
 
     workflow = _workflow()
     job = workflow["jobs"]["python-minimum"]
-    backend_job = workflow["jobs"]["backend-gate"]
     changes_job = workflow["jobs"]["changes"]
 
     assert job["name"] == "python-minimum"
@@ -129,7 +254,6 @@ def test_python_minimum_pr_smoke_remains_honest() -> None:
     assert job["permissions"] == {"contents": "read"}
     _assert_job_fail_closed(job)
     assert job["timeout-minutes"] <= 20
-    assert backend_job["timeout-minutes"] >= 45
     assert "backend" in changes_job["outputs"]
     assert "docker" in changes_job["outputs"]
 
