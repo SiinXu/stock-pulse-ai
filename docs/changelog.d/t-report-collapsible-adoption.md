@@ -1,0 +1,1 @@
+- [Changed] Route Report Details raw-result and analysis-snapshot tertiary blobs through the shared Collapsible primitive while keeping both collapsed by default (Refs #1332).

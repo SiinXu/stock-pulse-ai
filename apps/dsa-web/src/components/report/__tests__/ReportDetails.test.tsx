@@ -4,6 +4,33 @@ import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { ReportDetails } from '../ReportDetails';
 
+const TRACE_DETAILS = {
+  rawResult: { score: 82 },
+  contextSnapshot: { window: '30d' },
+};
+
+function getDisclosurePanel(toggle: HTMLElement): HTMLElement {
+  const panelId = toggle.getAttribute('aria-controls');
+  expect(panelId).toBeTruthy();
+  const panel = document.getElementById(panelId!);
+  expect(panel).toBeInstanceOf(HTMLElement);
+  return panel as HTMLElement;
+}
+
+/**
+ * jsdom does not synthesize a click from Enter/Space on a focused native
+ * button. Real browsers do; Collapsible relies on that native activation.
+ */
+function activateDisclosureWithKey(toggle: HTMLElement, key: 'Enter' | ' ') {
+  toggle.focus();
+  expect(toggle).toHaveFocus();
+  fireEvent.keyDown(toggle, { key });
+  if (key === ' ') {
+    fireEvent.keyUp(toggle, { key });
+  }
+  fireEvent.click(toggle);
+}
+
 describe('ReportDetails', () => {
   const writeTextMock = vi.fn().mockResolvedValue(undefined);
   let originalClipboard: Navigator['clipboard'] | undefined;
@@ -30,24 +57,67 @@ describe('ReportDetails', () => {
     vi.useRealTimers();
   });
 
-  it('keeps copied feedback scoped to the panel that was copied', async () => {
-    const details = {
-      rawResult: { score: 82 },
-      contextSnapshot: { window: '30d' },
-    };
-
+  it('keeps raw result and snapshot collapsed by default with independent aria and keyboard toggles', () => {
     render(
       <ReportDetails
         recordId={7}
-        details={details}
+        details={TRACE_DETAILS}
       />,
     );
 
     const rawToggle = screen.getByRole('button', { name: '原始分析结果' });
     const snapshotToggle = screen.getByRole('button', { name: '分析快照' });
-    expect(rawToggle).toHaveAttribute('data-control', 'button');
+
+    expect(rawToggle.tagName).toBe('BUTTON');
+    expect(rawToggle).toHaveAttribute('type', 'button');
+    expect(rawToggle).not.toHaveAttribute('data-control');
+    expect(snapshotToggle).not.toHaveAttribute('data-control');
     expect(rawToggle).toHaveAttribute('aria-expanded', 'false');
-    expect(snapshotToggle).toHaveAttribute('data-control', 'button');
+    expect(snapshotToggle).toHaveAttribute('aria-expanded', 'false');
+
+    const rawPanel = getDisclosurePanel(rawToggle);
+    const snapshotPanel = getDisclosurePanel(snapshotToggle);
+    expect(rawPanel.id).not.toBe(snapshotPanel.id);
+    expect(rawPanel).toHaveClass('grid-rows-[0fr]');
+    expect(snapshotPanel).toHaveClass('grid-rows-[0fr]');
+    expect(rawPanel).toHaveTextContent('"score": 82');
+    expect(snapshotPanel).toHaveTextContent('"window": "30d"');
+
+    fireEvent.click(rawToggle);
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(snapshotToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(rawPanel).toHaveClass('grid-rows-[1fr]');
+    expect(snapshotPanel).toHaveClass('grid-rows-[0fr]');
+
+    fireEvent.click(rawToggle);
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(rawPanel).toHaveClass('grid-rows-[0fr]');
+
+    activateDisclosureWithKey(rawToggle, 'Enter');
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(snapshotToggle).toHaveAttribute('aria-expanded', 'false');
+
+    activateDisclosureWithKey(rawToggle, 'Enter');
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'false');
+
+    activateDisclosureWithKey(snapshotToggle, ' ');
+    expect(snapshotToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(snapshotPanel).toHaveClass('grid-rows-[1fr]');
+    expect(rawPanel).toHaveClass('grid-rows-[0fr]');
+  });
+
+  it('keeps copied feedback scoped to the panel that was copied', async () => {
+    render(
+      <ReportDetails
+        recordId={7}
+        details={TRACE_DETAILS}
+      />,
+    );
+
+    const rawToggle = screen.getByRole('button', { name: '原始分析结果' });
+    const snapshotToggle = screen.getByRole('button', { name: '分析快照' });
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'false');
     expect(snapshotToggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(rawToggle);
     fireEvent.click(snapshotToggle);
@@ -64,7 +134,7 @@ describe('ReportDetails', () => {
       await Promise.resolve();
     });
 
-    expect(writeTextMock).toHaveBeenNthCalledWith(1, JSON.stringify(details.rawResult, null, 2));
+    expect(writeTextMock).toHaveBeenNthCalledWith(1, JSON.stringify(TRACE_DETAILS.rawResult, null, 2));
     expect(screen.getByRole('button', { name: '已复制' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: '复制' })).toHaveLength(1);
 
@@ -73,7 +143,7 @@ describe('ReportDetails', () => {
       await Promise.resolve();
     });
 
-    expect(writeTextMock).toHaveBeenNthCalledWith(2, JSON.stringify(details.contextSnapshot, null, 2));
+    expect(writeTextMock).toHaveBeenNthCalledWith(2, JSON.stringify(TRACE_DETAILS.contextSnapshot, null, 2));
     expect(screen.getAllByRole('button', { name: '已复制' })).toHaveLength(2);
 
     act(() => {
