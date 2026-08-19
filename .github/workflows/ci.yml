@@ -552,18 +552,62 @@ jobs:
             requirements-report-export.txt
       - name: 🔤 Install host fonts for glyph coverage
         run: |
+          set -euo pipefail
+          # GitHub-hosted Ubuntu images use mirror+file:/etc/apt/apt-mirrors.txt
+          # with azure.archive.ubuntu.com first and archive.ubuntu.com next.
+          # A degraded Azure front-end can ignore indexes until a long wrapper
+          # fires; keep apt-native timeouts short and retry once against the
+          # runner's already-listed public archive. Do not hide missing fonts.
           apt_options=(
-            -o Acquire::Retries=3
-            -o Acquire::http::Timeout=20
-            -o Acquire::https::Timeout=20
+            -o Acquire::Retries=2
+            -o Acquire::http::Timeout=15
+            -o Acquire::https::Timeout=15
           )
-          if ! sudo timeout --kill-after=10s 300s apt-get "${apt_options[@]}" update; then
-            echo "::error::Package index refresh failed or timed out after 300 seconds." >&2
+          apt_mirrors="/etc/apt/apt-mirrors.txt"
+
+          prefer_runner_public_archive() {
+            if [ ! -f "${apt_mirrors}" ]; then
+              echo "GitHub runner apt mirror list ${apt_mirrors} is absent; retrying with apt-native timeouts only."
+              return 0
+            fi
+            tmp="$(mktemp)"
+            awk '!/azure[.]archive[.]ubuntu[.]com/' "${apt_mirrors}" > "${tmp}"
+            if [ ! -s "${tmp}" ]; then
+              rm -f "${tmp}"
+              echo "::error::Runner apt mirror list has no non-Azure fallback URI." >&2
+              return 1
+            fi
+            sudo cp "${tmp}" "${apt_mirrors}"
+            rm -f "${tmp}"
+            echo "Preferred the runner public Ubuntu archive fallback in ${apt_mirrors}."
+          }
+
+          install_host_fonts() {
+            sudo timeout --kill-after=10s 90s apt-get "${apt_options[@]}" update \
+              && sudo timeout --kill-after=10s 150s apt-get "${apt_options[@]}" install \
+                -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk
+          }
+
+          if ! install_host_fonts; then
+            prefer_runner_public_archive
+            sudo rm -rf /var/lib/apt/lists/partial
+            if ! install_host_fonts; then
+              echo "::error::Host font installation failed after one bounded Azure-mirror attempt and one public-archive fallback." >&2
+              exit 1
+            fi
+          fi
+
+          if ! dpkg -s fonts-dejavu-core fonts-noto-cjk >/dev/null 2>&1; then
+            echo "::error::Required host font packages are missing after apt install." >&2
             exit 1
           fi
-          if ! sudo timeout --kill-after=10s 300s apt-get "${apt_options[@]}" install \
-            -y --no-install-recommends fonts-dejavu-core fonts-noto-cjk; then
-            echo "::error::Host font installation failed or timed out after 300 seconds." >&2
+          if [ ! -f /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf ]; then
+            echo "::error::DejaVuSans.ttf is missing after host font installation." >&2
+            exit 1
+          fi
+          if ! compgen -G '/usr/share/fonts/opentype/noto/NotoSansCJK*' >/dev/null \
+            && ! compgen -G '/usr/share/fonts/truetype/noto/NotoSansCJK*' >/dev/null; then
+            echo "::error::Noto CJK font files are missing after host font installation." >&2
             exit 1
           fi
       - name: 📦 Install dependencies (native + optional report export)

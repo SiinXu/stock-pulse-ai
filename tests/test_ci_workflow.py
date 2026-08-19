@@ -1,5 +1,6 @@
 """Guard the hosted CI contract for two-tier and minimum Python gates."""
 
+import re
 from pathlib import Path
 
 import yaml
@@ -312,3 +313,76 @@ def test_ci_gate_keeps_shard_variables_out_of_single_node_suite():
 def test_pytest_testpaths_scopes_to_tests_package():
     setup_cfg = (REPOSITORY_ROOT / "setup.cfg").read_text(encoding="utf-8")
     assert "testpaths = tests" in setup_cfg
+
+
+def _report_export_stack_job() -> dict:
+    return _workflow()["jobs"]["report-export-stack"]
+
+
+def _report_export_step(name_substring: str) -> dict:
+    job = _report_export_stack_job()
+    return next(
+        step for step in job["steps"] if name_substring in step.get("name", "")
+    )
+
+
+def test_report_export_stack_font_install_retries_mirrors_and_stays_fail_closed() -> None:
+    """Hosted Azure archive hangs must retry once, then still fail closed."""
+
+    job = _report_export_stack_job()
+    font_step = _report_export_step("Install host fonts")
+    import_step = _report_export_step("Assert report-export imports")
+    test_step = _report_export_step("Report export tests")
+    run = font_step["run"]
+
+    assert job["timeout-minutes"] == 25
+    assert job["permissions"] == {"contents": "read"}
+    assert job.get("continue-on-error", False) is False
+    assert all(step.get("continue-on-error", False) is False for step in job["steps"])
+    assert font_step.get("continue-on-error", False) is False
+
+    retries_match = re.search(r"Acquire::Retries=(\d+)", run)
+    http_timeout_match = re.search(r"Acquire::http::Timeout=(\d+)", run)
+    https_timeout_match = re.search(r"Acquire::https::Timeout=(\d+)", run)
+    assert retries_match is not None
+    assert http_timeout_match is not None
+    assert https_timeout_match is not None
+    retries = int(retries_match.group(1))
+    http_timeout = int(http_timeout_match.group(1))
+    https_timeout = int(https_timeout_match.group(1))
+    command_budgets = [
+        int(match) for match in re.findall(r"timeout --kill-after=\d+s (\d+)s", run)
+    ]
+
+    assert 1 <= retries <= 3
+    assert 5 <= http_timeout <= 20
+    assert 5 <= https_timeout <= 20
+    assert command_budgets
+    assert max(command_budgets) <= 180
+    assert min(command_budgets) >= 60
+    # Two attempts of the defined update+install budgets plus kill-after
+    # buffers must remain inside the 25-minute job timeout.
+    assert (2 * sum(command_budgets)) + 40 < job["timeout-minutes"] * 60
+    assert "300s" not in run
+    assert "while true" not in run
+    assert "|| true" not in run
+    assert "continue-on-error" not in run
+
+    assert "/etc/apt/apt-mirrors.txt" in run
+    assert "azure.archive.ubuntu.com" in run
+    assert "prefer_runner_public_archive" in run
+    assert "/var/lib/apt/lists/partial" in run
+    assert run.count("install_host_fonts") >= 3
+    assert "fonts-dejavu-core" in run
+    assert "fonts-noto-cjk" in run
+    assert "dpkg -s fonts-dejavu-core fonts-noto-cjk" in run
+    assert "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf" in run
+    assert "NotoSansCJK" in run
+    assert "exit 1" in run
+
+    assert "is_html_dependency_available" in import_step["run"]
+    assert "is_pdf_dependency_available" in import_step["run"]
+    assert "must not skip HTML/PDF tests" in test_step["run"]
+    assert "tests/services/test_report_export_service.py" in test_step["run"]
+    assert "tests/api/test_report_export_api.py" in test_step["run"]
+    assert "tests/config/test_report_export_config.py" in test_step["run"]

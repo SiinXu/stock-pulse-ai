@@ -1,0 +1,1 @@
+- [Fixed] Retry report-export CI host-font installation against the GitHub runner public Ubuntu archive after a bounded Azure mirror failure, while keeping font presence and glyph tests fail-closed.
