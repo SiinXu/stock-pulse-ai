@@ -1,0 +1,1 @@
+- [Changed] Keep axios-mock-adapter as a Web development dependency so the playground mock adapter stays out of the production runtime bundle (Refs #883).
