@@ -120,6 +120,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('layout', 'theme-appearance-provider', 'ThemeAppearanceProvider', 'components/theme/ThemeAppearanceProvider.tsx'),
   entry('layout', 'theme-pack-select', 'ThemePackSelect', 'components/theme/ThemePackSelect.tsx', ['interactive']),
   entry('layout', 'price-direction-sync', 'PriceDirectionSync', 'components/theme/PriceDirectionSync.tsx'),
+  entry('layout', 'signed-change-text', 'SignedChangeText', 'components/theme/SignedChangeText.tsx', ['default', 'states']),
   entry('layout', 'ui-language-toggle', 'UiLanguageToggle', 'components/i18n/UiLanguageToggle.tsx', ['interactive']),
 
   entry('dashboard', 'dashboard-panel-header', 'DashboardPanelHeader', 'components/dashboard/DashboardPanelHeader.tsx'),
@@ -131,6 +132,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('dashboard', 'home-portfolio-health-widget', 'HomePortfolioHealthWidget', 'components/dashboard/HomePortfolioHealthWidget.tsx', ['default', 'empty', 'loading', 'error']),
   entry('dashboard', 'home-recent-reports-widget', 'HomeRecentReportsWidget', 'components/dashboard/HomeRecentReportsWidget.tsx', ['default', 'empty', 'loading']),
   entry('dashboard', 'home-readiness-card', 'HomeReadinessCard', 'components/home/HomeReadinessCard.tsx', ['default', 'loading', 'empty', 'error']),
+  entry('dashboard', 'home-signal-summary', 'HomeSignalSummary', 'components/home/HomeSignalSummary.tsx', ['default', 'loading', 'error']),
   entry('dashboard', 'todays-focus-panel', 'TodaysFocusPanel', 'components/home/TodaysFocusPanel.tsx', ['default', 'empty', 'loading', 'error']),
   entry('dashboard', 'home-onboarding-section', 'HomeOnboardingSection', 'components/onboarding/HomeOnboardingSection.tsx', ['default', 'empty']),
   entry('dashboard', 'onboarding-today-plan-card', 'OnboardingTodayPlanCard', 'components/onboarding/OnboardingTodayPlanCard.tsx', ['default']),
@@ -271,6 +273,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('watchlist', 'money-flow-panel', 'MoneyFlowPanel', 'components/money-flow/MoneyFlowPanel.tsx', ['default', 'states']),
   entry('watchlist', 'home-stock-workspace', 'HomeStockWorkspace', 'components/watchlist/HomeStockWorkspace.tsx', ['interactive', 'loading', 'empty', 'error']),
   entry('watchlist', 'watchlist-score-column', 'WatchlistScoreColumn', 'components/watchlist/WatchlistScoreColumn.tsx', ['default', 'interactive', 'empty']),
+  entry('watchlist', 'watchlist-score-status-cell', 'WatchlistScoreStatusCell', 'components/watchlist/WatchlistScoreColumn.tsx', ['default', 'loading', 'error']),
   entry('watchlist', 'home-watchlist-groups-section', 'HomeWatchlistGroupsSection', 'components/watchlist/HomeWatchlistGroupsSection.tsx', ['default', 'loading', 'error']),
   entry('watchlist', 'watchlist-groups-panel', 'WatchlistGroupsPanel', 'components/watchlist/WatchlistGroupsPanel.tsx', ['interactive', 'empty', 'error']),
   entry('reports', 'research-pack-export-controls', 'ResearchPackExportControls', 'components/report/ResearchPackExportControls.tsx', ['default', 'states']),

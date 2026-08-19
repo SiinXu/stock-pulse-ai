@@ -8,12 +8,9 @@ import type { HomeWatchlistRow, WatchlistGroup, WatchlistGroupRestoreSnapshot } 
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { truncateStockName } from '../../utils/stockName';
 import type { WatchlistScoreItem } from '../../types/watchlistScore';
-import {
-  createUnanalyzedWatchlistScore,
-  type WatchlistScoreLoadStatus,
-} from '../../hooks/useWatchlistScores';
+import type { WatchlistScoreLoadStatus } from '../../hooks/useWatchlistScores';
 
-const WatchlistScoreColumn = lazy(() => import('./WatchlistScoreColumn'));
+const WatchlistScoreStatusCell = lazy(() => import('./WatchlistScoreStatusCell'));
 const WatchlistGroupDeleteFlow = lazy(() => import('./WatchlistGroupDeleteFlow'));
 
 export interface WatchlistGroupsPanelProps {
@@ -23,6 +20,7 @@ export interface WatchlistGroupsPanelProps {
   actioning?: boolean;
   errorMessage?: string | null;
   scoreStatus?: WatchlistScoreLoadStatus;
+  scoreStale?: boolean;
   scoreItemsByCode?: ReadonlyMap<string, WatchlistScoreItem>;
   memberReorderingDisabled?: boolean;
   onCreateGroup: (name: string) => Promise<boolean> | boolean;
@@ -69,6 +67,7 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
   actioning = false,
   errorMessage = null,
   scoreStatus = 'idle',
+  scoreStale = false,
   scoreItemsByCode = new Map(),
   memberReorderingDisabled = false,
   onCreateGroup,
@@ -331,18 +330,16 @@ export const WatchlistGroupsPanel: React.FC<WatchlistGroupsPanelProps> = ({
                             <p className="truncate text-sm font-medium text-foreground">{label}</p>
                             <p className="truncate font-mono text-xs text-secondary-text">{member.stockCode}</p>
                           </div>
-                          {scoreStatus === 'ready' ? (
+                          {scoreStatus !== 'idle' ? (
                             <Suspense fallback={<span className="px-1 py-1.5 text-xs text-muted-text">{t('common.loading')}</span>}>
-                              <WatchlistScoreColumn
-                                item={scoreItemsByCode.get(member.stockCode)
-                                  ?? createUnanalyzedWatchlistScore(member.stockCode)}
+                              <WatchlistScoreStatusCell
+                                stockCode={member.stockCode}
+                                status={scoreStatus}
+                                stale={scoreStale}
+                                itemsByCode={scoreItemsByCode}
                                 className="max-w-40"
                               />
                             </Suspense>
-                          ) : scoreStatus === 'loading' || scoreStatus === 'error' ? (
-                            <span className="px-1 py-1.5 text-xs text-muted-text" data-testid="watchlist-score-status">
-                              {scoreStatus === 'error' ? t('common.failure') : t('common.loading')}
-                            </span>
                           ) : null}
                           <div className="flex sm:hidden">
                             <IconButton type="button" size="default" variant="ghost" disabled={actioning || memberReorderingDisabled || memberIndex === 0} aria-label={t('watchlist.moveMemberUpAria', { code: member.stockCode })} onClick={() => void reorderMemberBy(group, member.stockCode, -1)}>

@@ -4,7 +4,9 @@ import { Search } from 'lucide-react';
 import type { AlphaSiftCandidate } from '../../api/alphasift';
 import { formatUiText, type UiLanguage } from '../../i18n/uiText';
 import { getUiListSeparator } from '../../utils/uiLocale';
+import { formatSignedChangePercent } from '../../utils/marketFormat';
 import { Button, DataTable, type DataTableColumn, Surface } from '../common';
+import { SignedChangeText } from '../theme/SignedChangeText';
 import {
   formatAmount, formatNumber, formatPercent, formatScore, getCandidateDetailId,
   getCandidateReason, getFactorEntries, getSignal, hasLlmInsight,
@@ -72,7 +74,17 @@ export const ScreeningResultsSection: React.FC<ScreeningResultsSectionProps> = (
       id: 'change',
       header: text.change,
       nowrap: true,
-      cell: (item) => `${formatNumber(item.changePct)}%`,
+      cell: (item) => {
+        if (item.changePct == null || !Number.isFinite(Number(item.changePct))) {
+          return `${formatNumber(item.changePct)}%`;
+        }
+        const changePct = Number(item.changePct);
+        return (
+          <SignedChangeText value={changePct} market={item.code}>
+            {formatSignedChangePercent(changePct)}
+          </SignedChangeText>
+        );
+      },
     },
     {
       id: 'score',

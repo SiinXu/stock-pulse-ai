@@ -144,7 +144,7 @@ This is the entry point for project documentation. The README covers the project
 | [Web UI Foundation Contract](web-ui-foundation.md) | Semantic controls, visible sizes, coarse-pointer targets, guardrails, and migration ownership |
 | [Web PWA (shell-only)](web-pwa.md) | Installable PWA, conservative shell cache boundary, no analysis/market data caching (#234) |
 | [Web responsive breakpoints](web-responsive-breakpoints.md) | Supported 320/768/1024 matrix, page audit gaps, and batch plan (#146 / #234) |
-| [Web Runtime Performance Budgets](web-runtime-performance.md) | List virtualization, Settings isolation, SSE batching soft gate (#883); [中文](web-runtime-performance_CN.md) |
+| [Web Runtime Performance Budgets](web-runtime-performance.md) | List virtualization, Settings isolation, SSE batching soft gate, and aggregate gzip families (#883); [中文](web-runtime-performance_CN.md) |
 | [Web Unit-Test Coverage Gate](web-unit-coverage.md) | Measured Vitest v8 coverage floor, exclusions, local reproduction, and ratchet policy (Refs #164); [中文](web-unit-coverage_zh.md) |
 | [Navigation IA proposal](navigation-ia-proposal.md) | Current-state route/nav audit, legacy redirects, orphan inventory, and **DECISION NEEDED** target options for #368 ([中文](navigation-ia-proposal_zh.md)) |
 | [Multilingual Financial Terminology Guide](financial-terminology-guide.md) | Product semantics and ten-language candidate terminology (guide body in Simplified Chinese) |

@@ -24,7 +24,7 @@
 
 ## Web 与集成边界
 
-`WatchlistScoreColumn` 通过因子 key 和 params 在 Web 层本地化，不渲染后端英文标签。默认排序始终为 `manual`；`score_desc`/`score_asc` 只是非破坏性视图，不写回或覆盖 T23 的手工/拖拽顺序。与 #963 的接线契约是把对应 `WatchlistScoreItem` 作为 `item` prop 传给独立组件；本 PR 不修改 `HomeStockWorkspace.tsx`。
+`WatchlistScoreColumn` 通过因子 key 和 params 在 Web 层本地化，不渲染后端英文标签。默认排序始终为 `manual`；`score_desc`/`score_asc` 只是非破坏性视图，不写回或覆盖 T23 的手工/拖拽顺序。首页分组使用 `useWatchlistScores`；工作台列表使用 `useWatchlistScoreSession`，同一代重试时上一轮成功分数只在显式标为陈旧时保留。成功响应中缺失的标的是 `unanalyzed`。请求失败是带重试的错误态，不会被当成权威空列表或未分析成功。单张卡片渲染失败会被隔离，不会拖垮其余自选行。
 
 ## 失败、风险与回滚
 

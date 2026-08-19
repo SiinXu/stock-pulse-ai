@@ -18,6 +18,7 @@ import { AnalysisPhaseSelect } from '../analysis';
 import ActionableApiErrorInline from '../analysis/ActionableApiErrorInline';
 import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
+import { SignedChangeText } from '../theme/SignedChangeText';
 import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
@@ -806,13 +807,13 @@ const PortfolioWorkspace: React.FC = () => {
       header: text.unrealizedPnl,
       align: 'end',
       cell: (row) => (
-        <span className={
-          hasPositionPrice(row)
-            ? row.unrealizedPnlBase >= 0 ? 'text-success' : 'text-danger'
-            : 'text-secondary'
-        }>
-          {formatPositionMoney(row.unrealizedPnlBase, row, language)}
-        </span>
+        hasPositionPrice(row) ? (
+          <SignedChangeText value={row.unrealizedPnlBase} market={row.market}>
+            {formatPositionMoney(row.unrealizedPnlBase, row, language)}
+          </SignedChangeText>
+        ) : (
+          <span className="text-secondary">{formatPositionMoney(row.unrealizedPnlBase, row, language)}</span>
+        )
       ),
     },
     {
@@ -820,13 +821,14 @@ const PortfolioWorkspace: React.FC = () => {
       header: text.returnPct,
       align: 'end',
       cell: (row) => (
-        <span className={
-          hasPositionPrice(row) && row.unrealizedPnlPct !== null && row.unrealizedPnlPct !== undefined
-            ? row.unrealizedPnlPct >= 0 ? 'text-success' : 'text-danger'
-            : 'text-secondary'
-        }>
-          {formatSignedPct(row.unrealizedPnlPct)}
-        </span>
+        hasPositionPrice(row) && row.unrealizedPnlPct !== null && row.unrealizedPnlPct !== undefined
+          ? (
+            <SignedChangeText value={row.unrealizedPnlPct} market={row.market}>
+              {formatSignedPct(row.unrealizedPnlPct)}
+            </SignedChangeText>
+          ) : (
+            <span className="text-secondary">{formatSignedPct(row.unrealizedPnlPct)}</span>
+          )
       ),
     },
     {

@@ -34,6 +34,7 @@ import {
   Surface,
 } from '../components/common';
 import { useRouteFocusTarget } from '../components/routing';
+import { SignedChangeText } from '../components/theme/SignedChangeText';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { FINANCIAL_CALCULATORS_TEXT } from '../locales/financialCalculators';
 import { APP_ROUTE_PATHS } from '../routing/routes';
@@ -72,6 +73,12 @@ function formatMoney(value: number | null | undefined, language: string): string
   return new Intl.NumberFormat(language === 'zh' ? 'zh-CN' : 'en-US', {
     maximumFractionDigits: 2,
   }).format(value);
+}
+
+function formatSignedMoney(value: number | null | undefined, language: string): string {
+  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  const formatted = formatMoney(value, language);
+  return value > 0 ? `+${formatted}` : formatted;
 }
 
 const FinancialCalculatorsPage: React.FC = () => {
@@ -323,7 +330,11 @@ const FinancialCalculatorsPage: React.FC = () => {
     {
       id: 'gain',
       header: text.seriesGain,
-      cell: (row) => formatMoney(row.gain, language),
+      cell: (row) => (
+        <SignedChangeText value={row.gain}>
+          {formatSignedMoney(row.gain, language)}
+        </SignedChangeText>
+      ),
       align: 'end',
       nowrap: true,
     },
@@ -456,8 +467,11 @@ const FinancialCalculatorsPage: React.FC = () => {
               />
               <StatCard
                 label={text.totalGain}
-                value={formatMoney(growthResult.totalGain, language)}
-                tone={growthResult.totalGain >= 0 ? 'success' : 'danger'}
+                value={(
+                  <SignedChangeText value={growthResult.totalGain}>
+                    {formatSignedMoney(growthResult.totalGain, language)}
+                  </SignedChangeText>
+                )}
               />
               <StatCard label={text.periodCount} value={String(growthResult.periodCount)} />
             </div>

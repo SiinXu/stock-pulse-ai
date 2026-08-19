@@ -1,0 +1,1 @@
+- [Fixed] Honor the user's rise/fall color preference on portfolio, backtest, screening, market-structure, and calculator gain/loss paint (Refs #881, #1300).

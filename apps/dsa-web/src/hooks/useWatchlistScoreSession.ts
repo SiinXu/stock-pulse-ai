@@ -1,53 +1,48 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { watchlistScoresApi } from '../api/watchlistScores';
 import type { WatchlistScoreItem } from '../types/watchlistScore';
-
-export type WatchlistScoreLoadStatus = 'idle' | 'loading' | 'retrying' | 'ready' | 'error';
+import type { UseWatchlistScoresResult, WatchlistScoreLoadStatus } from './useWatchlistScores';
 
 type SettledScoreRequest = {
   signature: string;
+  retryNonce: number;
   status: 'ready' | 'error';
   items: ReadonlyMap<string, WatchlistScoreItem>;
 };
 
-export type UseWatchlistScoresResult = {
+export type UseWatchlistScoreSessionResult = UseWatchlistScoresResult & {
   status: WatchlistScoreLoadStatus;
-  itemsByCode: ReadonlyMap<string, WatchlistScoreItem>;
+  stale: boolean;
+  retry: () => void;
 };
 
-export function createUnanalyzedWatchlistScore(stockCode: string): WatchlistScoreItem {
-  return {
-    stockCode,
-    status: 'unanalyzed',
-    score: null,
-    asOf: null,
-    ageDays: null,
-    analysisId: null,
-    operationAdvice: null,
-    factors: [],
-    freshness: 'none',
-    degradedReasons: [],
-  };
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const name = 'name' in error ? String(error.name) : '';
+  const code = 'code' in error ? String(error.code) : '';
+  return name === 'AbortError' || name === 'CanceledError' || code === 'ERR_CANCELED';
 }
 
 /**
- * Load the current aggregate score projection for a bounded watchlist.
- *
- * `refreshKey` belongs to the caller's analysis/refresh lifecycle. A changed
- * key invalidates the previous result immediately: display and sorting see an
- * empty map until the matching request succeeds, and a failed request never
- * falls back to scores from an older lifecycle generation.
+ * Same contract as useWatchlistScores, plus same-signature retry.
+ * Last-known ready items stay visible only while that retry is in flight
+ * and marked stale. A failed retry is error with an empty map.
  */
-export function useWatchlistScores(
+export function useWatchlistScoreSession(
   stockCodes: readonly string[],
   refreshKey: string | number = '',
-): UseWatchlistScoresResult {
+): UseWatchlistScoreSessionResult {
   const codesKey = JSON.stringify(stockCodes.map((code) => code.trim()).filter(Boolean));
   const requestSignature = `${codesKey}\n${String(refreshKey)}`;
   const requestIdRef = useRef(0);
+  const [retryNonce, setRetryNonce] = useState(0);
   const [settledRequest, setSettledRequest] = useState<SettledScoreRequest | null>(null);
+
+  const retry = useCallback(() => {
+    setRetryNonce((nonce) => nonce + 1);
+  }, []);
 
   useEffect(() => {
     const codes = JSON.parse(codesKey) as string[];
@@ -67,11 +62,18 @@ export function useWatchlistScores(
       for (const item of response.items) {
         if (requestedCodes.has(item.stockCode)) items.set(item.stockCode, item);
       }
-      setSettledRequest({ signature: requestSignature, status: 'ready', items });
-    }).catch(() => {
-      if (requestIdRef.current !== requestId) return;
       setSettledRequest({
         signature: requestSignature,
+        retryNonce,
+        status: 'ready',
+        items,
+      });
+    }).catch((error: unknown) => {
+      if (requestIdRef.current !== requestId) return;
+      if (controller.signal.aborted || isAbortError(error)) return;
+      setSettledRequest({
+        signature: requestSignature,
+        retryNonce,
         status: 'error',
         items: new Map(),
       });
@@ -81,21 +83,32 @@ export function useWatchlistScores(
       controller.abort();
       requestIdRef.current += 1;
     };
-  }, [codesKey, requestSignature]);
+  }, [codesKey, requestSignature, retryNonce]);
 
   return useMemo(() => {
     const codes = JSON.parse(codesKey) as string[];
     if (codes.length === 0) {
-      return { status: 'idle', itemsByCode: new Map() };
+      return { status: 'idle' as const, itemsByCode: new Map(), stale: false, retry };
     }
     if (!settledRequest || settledRequest.signature !== requestSignature) {
-      return { status: 'loading', itemsByCode: new Map() };
+      return { status: 'loading' as const, itemsByCode: new Map(), stale: false, retry };
+    }
+    if (retryNonce !== settledRequest.retryNonce) {
+      const keepLastKnown = settledRequest.status === 'ready';
+      return {
+        status: 'retrying' as const,
+        itemsByCode: keepLastKnown ? settledRequest.items : new Map(),
+        stale: keepLastKnown,
+        retry,
+      };
     }
     return {
       status: settledRequest.status,
       itemsByCode: settledRequest.items,
+      stale: false,
+      retry,
     };
-  }, [codesKey, requestSignature, settledRequest]);
+  }, [codesKey, requestSignature, retry, retryNonce, settledRequest]);
 }
 
-export default useWatchlistScores;
+export default useWatchlistScoreSession;

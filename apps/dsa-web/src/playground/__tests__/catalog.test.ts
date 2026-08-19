@@ -37,7 +37,7 @@ describe('playground catalog', () => {
   it('uses stable, unique ids and valid source paths', () => {
     const ids = PLAYGROUND_CATALOG.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(PLAYGROUND_CATALOG).toHaveLength(220);
+    expect(PLAYGROUND_CATALOG).toHaveLength(223);
     for (const entry of PLAYGROUND_CATALOG) {
       expect(fs.existsSync(path.join(sourceRoot, entry.sourcePath))).toBe(true);
       expect(entry.scenarios.length).toBeGreaterThan(0);
@@ -61,6 +61,15 @@ describe('playground catalog', () => {
     for (const category of PLAYGROUND_CATEGORIES) {
       expect(PLAYGROUND_CATALOG.some((entry) => entry.category === category)).toBe(true);
     }
+  });
+
+  it('keeps HomeSignalSummary out of workspace scenarios so the groups-section chunk stays split', () => {
+    const source = fs.readFileSync(
+      path.join(sourceRoot, 'playground/scenarios/workspaceScenarios.tsx'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/HomeSignalSummary/);
+    expect(hasPlaygroundRenderer('home-signal-summary')).toBe(true);
   });
 
   it('reports catalog ids omitted from a production-shaped registry map', () => {
