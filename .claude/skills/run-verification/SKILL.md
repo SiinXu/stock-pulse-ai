@@ -62,6 +62,7 @@ cd apps/dsa-web
 npm ci
 npm run lint
 npm run test
+npm run test:coverage
 npm run build
 ```
 

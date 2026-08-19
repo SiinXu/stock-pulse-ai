@@ -16,6 +16,7 @@ Deterministic command menu so agents do not invent ad-hoc gates. Authoritative p
 | Web install | `cd apps/dsa-web && npm ci` |
 | Web lint | `cd apps/dsa-web && npm run lint` |
 | Web unit | `cd apps/dsa-web && npm run test` |
+| Web unit coverage gate | `cd apps/dsa-web && npm run test:coverage` |
 | Web i18n | `cd apps/dsa-web && npm run test:i18n` |
 | Web build | `cd apps/dsa-web && npm run build` |
 | Web smoke e2e | `cd apps/dsa-web && npm run test:e2e-security-preflight && npx playwright install --with-deps chromium && npm run test:smoke` |
