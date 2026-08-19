@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export const EXTRA_UI_TRANSLATIONS = {
+    "locales.alerts.ALERT_LIST_TEXT.defaultWatchlist": "기본 관심종목",
+    "locales.alerts.ALERT_METRIC_LABELS.max_drawdown_pct": "최대 낙폭",
+    "locales.alerts.ALERT_METRIC_LABELS.price_available": "가격 있음",
+    "locales.alerts.ALERT_METRIC_LABELS.price_stale": "가격 만료",
+    "locales.alerts.ALERT_METRIC_LABELS.top_weight_pct": "최대 비중",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.diagnosticDetail": "진단: {detail}",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownCode": "알 수 없는 코드({code})",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownStatus": "알 수 없는 상태 ({code})",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "신호 동작이 거래 방향과 일치합니다.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "신호 동작이 이 거래 방향을 지지하지 않습니다.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "분석 또는 증거가 있습니다.",

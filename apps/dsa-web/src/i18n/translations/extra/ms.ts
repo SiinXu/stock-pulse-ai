@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export const EXTRA_UI_TRANSLATIONS = {
+    "locales.alerts.ALERT_LIST_TEXT.defaultWatchlist": "Senarai pantau lalai",
+    "locales.alerts.ALERT_METRIC_LABELS.max_drawdown_pct": "Susutan maksimum",
+    "locales.alerts.ALERT_METRIC_LABELS.price_available": "Harga tersedia",
+    "locales.alerts.ALERT_METRIC_LABELS.price_stale": "Harga lapuk",
+    "locales.alerts.ALERT_METRIC_LABELS.top_weight_pct": "Pemberat tertinggi",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.diagnosticDetail": "Diagnostik: {detail}",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownCode": "Kod tidak diketahui ({code})",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownStatus": "Status tidak diketahui ({code})",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "Tindakan isyarat selaras dengan sisi dagangan.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "Tindakan isyarat tidak menyokong sisi dagangan ini.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "Terdapat analisis atau bukti.",

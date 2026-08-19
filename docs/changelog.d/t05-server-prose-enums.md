@@ -1,1 +1,3 @@
 - [Fixed] Stop rendering server English prose and raw enum codes as primary copy on Personal Performance, Portfolio Insights, Home health, Risk Metrics, and Alerts; map known codes through T07 formatters, preserve labeled statusMessage, and keep unknown codes as sanitized localized diagnostics.
+- [Fixed] Keep portfolio snapshot, stress-quality, and workspace limitation codes on one formatter so known labels such as realtime-quote best-effort stay localized after Run analysis, and unknown tokens remain visible diagnostics instead of raw snake_case.
+- [Chore] Emit extra-locale catalog transport as extra-locale-* chunks so they are not billed to core locale-ja families; keep those families identical to origin/main and budget the extra family separately.

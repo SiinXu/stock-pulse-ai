@@ -8,6 +8,7 @@ import {
 import { formatAlertTriggerStatus } from '../dataQualityFormat/alerts';
 import {
   formatDataQualityStatus,
+  formatPortfolioLimitation,
   formatPortfolioStressQualityCell,
 } from '../dataQualityFormat/portfolio';
 
@@ -101,6 +102,28 @@ describe('formatAlertTriggerStatus', () => {
     expect(formatAlertTriggerStatus('queued', 'zh')).toBe('未知状态 (queued)');
     expect(formatAlertTriggerStatus('queued', 'ko')).toBe('알 수 없는 상태 (queued)');
     expect(formatAlertTriggerStatus('queued', 'ja')).toBe('不明な状態 (queued)');
+  });
+});
+
+describe('formatPortfolioLimitation', () => {
+  it('localizes known snapshot and stress limitation codes', () => {
+    expect(formatPortfolioLimitation('realtime_quote_best_effort', 'en')).toBe(
+      'Realtime quotes are best-effort',
+    );
+    expect(formatPortfolioLimitation('fx_and_cost_basis_partial', 'zh')).toBe('汇率与成本基础为部分口径');
+    expect(formatPortfolioLimitation('sector_and_risk_metrics_limited', 'en')).toBe(
+      'Sector and risk metrics are limited',
+    );
+  });
+
+  it('keeps unknown limitation codes visible as localized diagnostics', () => {
+    expect(formatPortfolioLimitation('brand_new_limitation', 'en')).toBe(
+      'Unknown code (brand_new_limitation)',
+    );
+    expect(formatPortfolioLimitation('brand_new_limitation', 'zh')).toBe(
+      '未知编码（brand_new_limitation）',
+    );
+    expect(formatPortfolioLimitation('brand_new_limitation', 'en')).not.toBe('brand_new_limitation');
   });
 });
 

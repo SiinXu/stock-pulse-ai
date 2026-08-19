@@ -1383,6 +1383,21 @@ describe('PortfolioPage FX refresh', () => {
     expect(screen.getByText(/汇率与成本基础为部分口径/)).toBeInTheDocument();
   });
 
+  it('shows unknown snapshot limitations as localized diagnostics', async () => {
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({
+      dataQuality: 'partial',
+      limitations: ['brand_new_limitation'],
+    }));
+
+    renderPortfolioPage();
+
+    await waitForInitialLoad();
+
+    expect(await screen.findByText('组合估值限制')).toBeInTheDocument();
+    expect(screen.getByText(/未知编码（brand_new_limitation）/)).toBeInTheDocument();
+    expect(screen.queryByText(/^brand_new_limitation$/)).not.toBeInTheDocument();
+  });
+
   it('renders portfolio risk drawdown labels in English UI mode', async () => {
     renderEnglishPage();
 

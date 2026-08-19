@@ -167,7 +167,8 @@ describe('PersonalPerformancePage virtualization fallback', () => {
     expect(region).toHaveAttribute('data-mounted-count', '30');
     expect(region).toHaveAttribute('data-total-count', '30');
     expect(screen.getByText('SYM001')).toBeInTheDocument();
-    expect(screen.getByText('Trade 30 stayed inside the size band.')).toBeInTheDocument();
+    expect(screen.getByText(/Unknown code \(size\).*Trade 30 stayed inside the size band/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Trade 30 stayed inside the size band\.$/)).not.toBeInTheDocument();
   });
 });
 

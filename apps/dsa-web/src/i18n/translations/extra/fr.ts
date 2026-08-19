@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export const EXTRA_UI_TRANSLATIONS = {
+    "locales.alerts.ALERT_LIST_TEXT.defaultWatchlist": "Liste de suivi par défaut",
+    "locales.alerts.ALERT_METRIC_LABELS.max_drawdown_pct": "Repli maximal",
+    "locales.alerts.ALERT_METRIC_LABELS.price_available": "Prix disponible",
+    "locales.alerts.ALERT_METRIC_LABELS.price_stale": "Prix périmé",
+    "locales.alerts.ALERT_METRIC_LABELS.top_weight_pct": "Poids maximal",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.diagnosticDetail": "Diagnostic : {detail}",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownCode": "Code inconnu ({code})",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownStatus": "Statut inconnu ({code})",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "L’action du signal correspond au côté de l’opération.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "L’action du signal ne soutient pas ce côté.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "Une analyse ou une preuve est présente.",

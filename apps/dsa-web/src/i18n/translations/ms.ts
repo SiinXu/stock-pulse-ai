@@ -7,7 +7,6 @@ import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSign
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
-import { SERVER_PRESENTATION_MS as SP } from '../serverPresentation/ms';
 
 export const translations = {
   ...M.ms,
@@ -17,7 +16,6 @@ export const translations = {
   ...EE.ms,
   ...MMC.ms,
   ...S.ms,
-  ...SP,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "Dayakan mod Ejen dan cuba lagi.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Mod ejen tidak didayakan",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "Permintaan tidak selesai; sila semak butiran dan cuba lagi.",

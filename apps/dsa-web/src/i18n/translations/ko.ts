@@ -7,7 +7,6 @@ import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSign
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
-import { SERVER_PRESENTATION_KO as SP } from '../serverPresentation/ko';
 
 export const translations = {
   ...M.ko,
@@ -17,7 +16,6 @@ export const translations = {
   ...EE.ko,
   ...MMC.ko,
   ...S.ko,
-  ...SP,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "에이전트 모드를 활성화하고 다시 시도하세요.",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "에이전트 모드는 활성화되어 있지 않습니다",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "요청이 완료되지 않음; 세부 사항을 확인하고 다시 시도해 주세요.",

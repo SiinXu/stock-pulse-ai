@@ -81,6 +81,13 @@
       "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 142596 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
     },
     {
+      "id": "locale-extra",
+      "match": "assets/extra-locale-*.js",
+      "maxGzipBytes": 3487,
+      "measuredGzipBytes": 3087,
+      "note": "Per-asset cap for extra-locale catalog transport chunks (extra/{locale}.ts). Measured zlib-9 largest extra-locale-ja 3087 B + 400 B headroom. These files must not match assets/ja-*.js. Core locale-ja per-asset cap is unchanged."
+    },
+    {
       "id": "vendor-charts",
       "match": "assets/vendor-charts-*.js",
       "maxGzipBytes": 122352,
@@ -309,6 +316,15 @@
       "note": "Already-split same-pattern family for locale-id. Measured zlib-9 sum 147686 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-id cap is unchanged."
     },
     {
+      "id": "locale-extra-family",
+      "match": [
+        "assets/extra-locale-*.js"
+      ],
+      "maxGzipBytes": 22628,
+      "measuredGzipBytes": 22228,
+      "note": "Already-split extra-locale catalog family (8 lazy extra/{locale}.ts chunks). Measured zlib-9 sum 22228 B on this head vs origin/main 015c5c942 (0 extra-locale assets) + 400 B headroom. Core locale-*-family caps are unchanged."
+    },
+    {
       "id": "vendor-charts-family",
       "match": [
         "assets/vendor-charts-*.js"
@@ -506,9 +522,9 @@
         "assets/Portfolio*-*.js",
         "assets/portfolio*-*.js"
       ],
-      "maxGzipBytes": 87586,
-      "measuredGzipBytes": 87186,
-      "note": "Portfolio route family (Portfolio* and portfolio* prefixes). Measured zlib-9 sum on origin/main 86b0c094c + 400 B headroom. Per-asset PortfolioPage / PortfolioRiskMetricsPanel caps are unchanged."
+      "maxGzipBytes": 94224,
+      "measuredGzipBytes": 93824,
+      "note": "Portfolio route family after Insights/PP catalog modules. Measured zlib-9 sum 93824 B on this head vs origin/main 015c5c942 87057 B (+6767 B real catalog/formatter payload, 15→19 assets) + 400 B headroom. Per-asset PortfolioPage / PortfolioRiskMetricsPanel caps are unchanged."
     },
     {
       "id": "screening-route",

@@ -7,7 +7,6 @@ import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSign
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
-import { SERVER_PRESENTATION_JA as SP } from '../serverPresentation/ja';
 
 export const translations = {
   ...M.ja,
@@ -17,7 +16,6 @@ export const translations = {
   ...EE.ja,
   ...MMC.ja,
   ...S.ja,
-  ...SP,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "エージェントモードを有効にして再度試してください。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "エージェントモードは有効になっていません",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "リクエスト未完了です。詳細を確認して再度お試しください。",

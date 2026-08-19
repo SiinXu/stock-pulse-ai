@@ -37,6 +37,19 @@ export function formatDataQualityStatus(
   return `${text.statusUnknown} (${sanitizeMachineCode(status)})`;
 }
 
+/**
+ * User-facing label for snapshot/stress limitation codes.
+ * Known catalog keys stay localized. Unknown tokens stay visible as
+ * sanitized diagnostics instead of raw snake_case primary copy.
+ */
+export function formatPortfolioLimitation(
+  limitation: string,
+  language: UiLanguage,
+): string {
+  return PORTFOLIO_LIMITATION_LABELS[language]?.[limitation]
+    ?? formatUnknownMachineCode(limitation, language);
+}
+
 export function formatPortfolioStressQualityCell(
   row: {
     dataQuality?: string | null;
@@ -50,8 +63,6 @@ export function formatPortfolioStressQualityCell(
   return [
     formatDataQualityStatus(row.dataQuality, language),
     row.priceStale ? staleLabel : null,
-    ...(row.limitations ?? []).map((item) => (
-      PORTFOLIO_LIMITATION_LABELS[language][item] ?? formatUnknownMachineCode(item, language)
-    )),
+    ...(row.limitations ?? []).map((item) => formatPortfolioLimitation(item, language)),
   ].filter(Boolean).join(separator);
 }

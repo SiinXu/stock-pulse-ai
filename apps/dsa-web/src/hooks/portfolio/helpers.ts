@@ -5,11 +5,11 @@
 import { decisionSignalsApi } from '../../api/decisionSignals';
 import { getParsedApiError } from '../../api/error';
 import type { DecisionSignalItem, DecisionSignalMarket } from '../../types/decisionSignals';
-import type { UiLanguage } from '../../i18n/uiText';
-import { PORTFOLIO_LIMITATION_LABELS } from '../../locales/portfolio';
 import { normalizeStockCode } from '../../utils/stockCode';
 import { parseDecisionSignalDate } from '../../utils/decisionSignalTime';
 import { getDecisionSignalPresentation } from '../../utils/decisionSignalPresentation';
+
+export { formatPortfolioLimitation } from '../../utils/dataQualityFormat/portfolio';
 
 export type PortfolioSignalLookup = {
   stockCode: string;
@@ -30,10 +30,6 @@ export function getSignalTime(item: DecisionSignalItem): number {
 export function isNewerSignal(left: DecisionSignalItem | undefined, right: DecisionSignalItem): boolean {
   if (!left) return true;
   return getSignalTime(right) > getSignalTime(left);
-}
-
-export function formatPortfolioLimitation(limitation: string, language: UiLanguage): string {
-  return PORTFOLIO_LIMITATION_LABELS[language][limitation] ?? limitation;
 }
 
 export function toDecisionSignalMarket(value: string | null | undefined): DecisionSignalMarket | undefined {

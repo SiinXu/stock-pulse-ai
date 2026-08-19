@@ -7,7 +7,6 @@ import { DECISION_SIGNAL_CALIBRATION_TRANSLATIONS as DSC } from '../decisionSign
 import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportErrorTranslations';
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
-import { SERVER_PRESENTATION_ZH_TW as SP } from '../serverPresentation/zh-TW';
 
 export const translations = {
   ...M['zh-TW'],
@@ -17,7 +16,6 @@ export const translations = {
   ...EE['zh-TW'],
   ...MMC['zh-TW'],
   ...S['zh-TW'],
-  ...SP,
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.message": "開啟 Agent 模式後重試。",
   "api.error.GENERIC_ERROR_TEXT.agent_disabled.title": "Agent 模式未開啟",
   "api.error.GENERIC_ERROR_TEXT.http_error.message": "請求未能完成，請檢視詳情後重試。",

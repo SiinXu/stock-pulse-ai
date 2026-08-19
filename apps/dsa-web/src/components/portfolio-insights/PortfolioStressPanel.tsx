@@ -17,9 +17,9 @@ import type {
   PortfolioStressResponse,
   StressScenario,
 } from '../../types/portfolioInsights';
-import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
 import {
   formatDataQualityStatus,
+  formatPortfolioLimitation,
   formatPortfolioStressQualityCell,
 } from '../../utils/dataQualityFormat/portfolio';
 import {
@@ -27,7 +27,6 @@ import {
   formatPortfolioStressExcludedReason,
   formatPortfolioStressScenario,
 } from '../../utils/dataQualityFormat/portfolioInsights';
-import { formatUnknownMachineCode } from '../../utils/dataQualityFormat/unknownCode';
 import { formatMoney, formatPct, formatSignedPct } from '../../utils/portfolioFormat';
 import {
   Button,
@@ -342,9 +341,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
                 scenario: result.scenario,
                 assumptions: result.assumptions,
                 limitations: result.snapshotLimitations.map((item) => (
-                  formatPortfolioLimitation(item, language) === item
-                    ? formatUnknownMachineCode(item, language)
-                    : formatPortfolioLimitation(item, language)
+                  formatPortfolioLimitation(item, language)
                 )),
                 missingData: result.missingData,
                 excludedPositions: result.excludedPositions.map((position) => ({

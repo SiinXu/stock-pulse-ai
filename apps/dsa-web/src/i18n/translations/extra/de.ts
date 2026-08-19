@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export const EXTRA_UI_TRANSLATIONS = {
+    "locales.alerts.ALERT_LIST_TEXT.defaultWatchlist": "Standard-Watchlist",
+    "locales.alerts.ALERT_METRIC_LABELS.max_drawdown_pct": "Maximaler Drawdown",
+    "locales.alerts.ALERT_METRIC_LABELS.price_available": "Preis verfügbar",
+    "locales.alerts.ALERT_METRIC_LABELS.price_stale": "Preis veraltet",
+    "locales.alerts.ALERT_METRIC_LABELS.top_weight_pct": "Höchstes Gewicht",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.diagnosticDetail": "Diagnose: {detail}",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownCode": "Unbekannter Code ({code})",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownStatus": "Unbekannter Status ({code})",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "Die Signalaktion passt zur Handelsseite.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "Die Signalaktion unterstützt diese Handelsseite nicht.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "Analyse oder Evidenz ist vorhanden.",

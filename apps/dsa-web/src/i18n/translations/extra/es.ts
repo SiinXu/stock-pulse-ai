@@ -2,6 +2,14 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 export const EXTRA_UI_TRANSLATIONS = {
+    "locales.alerts.ALERT_LIST_TEXT.defaultWatchlist": "Lista de seguimiento predeterminada",
+    "locales.alerts.ALERT_METRIC_LABELS.max_drawdown_pct": "Máxima caída",
+    "locales.alerts.ALERT_METRIC_LABELS.price_available": "Precio disponible",
+    "locales.alerts.ALERT_METRIC_LABELS.price_stale": "Precio caducado",
+    "locales.alerts.ALERT_METRIC_LABELS.top_weight_pct": "Peso máximo",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.diagnosticDetail": "Diagnóstico: {detail}",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownCode": "Código desconocido ({code})",
+    "locales.machineCodeDiagnostics.MACHINE_CODE_DIAGNOSTICS.unknownStatus": "Estado desconocido ({code})",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "La acción de la señal coincide con el lado de la operación.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "La acción de la señal no respalda este lado.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "Hay análisis o evidencia.",

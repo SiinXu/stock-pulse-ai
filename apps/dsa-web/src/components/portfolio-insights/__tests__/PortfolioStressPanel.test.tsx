@@ -1,10 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { SOURCE_PORTFOLIO_INSIGHTS_TEXT } from '../../../locales/portfolioInsights';
 import type { PortfolioStressResponse, StressScenario } from '../../../types/portfolioInsights';
+import type { UiLanguage } from '../../../i18n/uiText';
 import PortfolioStressPanel from '../PortfolioStressPanel';
 
 const listStressScenarios = vi.fn();
@@ -89,6 +90,25 @@ function makeResult(overrides: Partial<PortfolioStressResponse> = {}): Portfolio
   };
 }
 
+async function renderPanel(language: Extract<UiLanguage, 'en' | 'zh'> = 'en') {
+  render(
+    <UiLanguageProvider initialLanguage={language}>
+      <PortfolioStressPanel
+        accountId={1}
+        costMethod="fifo"
+        text={SOURCE_PORTFOLIO_INSIGHTS_TEXT[language]}
+      />
+    </UiLanguageProvider>,
+  );
+}
+
+async function runAnalysis(runLabel: string) {
+  const button = await screen.findByRole('button', { name: runLabel });
+  await waitFor(() => expect(button).toBeEnabled());
+  fireEvent.click(button);
+  expect(await screen.findByText('AAPL')).toBeInTheDocument();
+}
+
 describe('PortfolioStressPanel data-quality column', () => {
   beforeEach(() => {
     listStressScenarios.mockReset();
@@ -100,8 +120,8 @@ describe('PortfolioStressPanel data-quality column', () => {
     });
   });
 
-  it('renders localized known quality and limitation labels', async () => {
-    runStressPreset.mockResolvedValueOnce(makeResult({
+  it('renders localized known quality and limitation labels after Run analysis', async () => {
+    runStressPreset.mockResolvedValue(makeResult({
       snapshotDataQuality: 'partial',
       snapshotLimitations: ['realtime_quote_best_effort'],
       positionImpacts: [makeImpact({
@@ -111,38 +131,48 @@ describe('PortfolioStressPanel data-quality column', () => {
       })],
     }));
 
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <PortfolioStressPanel accountId={1} costMethod="fifo" text={SOURCE_PORTFOLIO_INSIGHTS_TEXT.en} />
-      </UiLanguageProvider>,
-    );
+    await renderPanel('en');
+    await runAnalysis('Run analysis');
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Run analysis' }));
-
-    expect(await screen.findByText('Partial · Stale · Realtime quotes are best-effort')).toBeInTheDocument();
+    expect(screen.getByText('Partial · Stale · Realtime quotes are best-effort')).toBeInTheDocument();
     expect(screen.queryByText('realtime_quote_best_effort')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Assumptions and limitations' }));
     expect(screen.getByText('Partial')).toBeInTheDocument();
     expect(screen.getByText('Realtime quotes are best-effort')).toBeInTheDocument();
+    expect(screen.queryByText('realtime_quote_best_effort')).not.toBeInTheDocument();
+  });
+
+  it('joins partial quality without stale separately from stale-only rows', async () => {
+    runStressPreset.mockResolvedValue(makeResult({
+      snapshotDataQuality: 'partial',
+      snapshotLimitations: ['fx_and_cost_basis_partial'],
+      positionImpacts: [makeImpact({
+        dataQuality: 'partial',
+        priceStale: false,
+        limitations: ['fx_and_cost_basis_partial'],
+      })],
+    }));
+
+    await renderPanel('en');
+    await runAnalysis('Run analysis');
+
+    expect(screen.getByText('Partial · FX and cost basis are partial')).toBeInTheDocument();
+    expect(screen.queryByText('Partial · Stale · FX and cost basis are partial')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Assumptions and limitations' }));
+    expect(screen.getByText('FX and cost basis are partial')).toBeInTheDocument();
   });
 
   it('localizes excluded-position reasons in the assumptions list', async () => {
-    runStressPreset.mockResolvedValueOnce(makeResult({
+    runStressPreset.mockResolvedValue(makeResult({
       excludedPositions: [
         { symbol: 'MSFT', reason: 'price_unavailable' },
         { symbol: 'TSLA', reason: 'non_positive_market_value' },
       ],
     }));
 
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <PortfolioStressPanel accountId={1} costMethod="fifo" text={SOURCE_PORTFOLIO_INSIGHTS_TEXT.en} />
-      </UiLanguageProvider>,
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Run analysis' }));
-    expect(await screen.findByText('AAPL')).toBeInTheDocument();
+    await renderPanel('en');
+    await runAnalysis('Run analysis');
     fireEvent.click(screen.getByRole('button', { name: 'Assumptions and limitations' }));
 
     expect(screen.getByText('No usable stored daily close.')).toBeInTheDocument();
@@ -161,16 +191,11 @@ describe('PortfolioStressPanel data-quality column', () => {
       })],
     }));
 
-    render(
-      <UiLanguageProvider initialLanguage="zh">
-        <PortfolioStressPanel accountId={1} costMethod="fifo" text={SOURCE_PORTFOLIO_INSIGHTS_TEXT.zh} />
-      </UiLanguageProvider>,
-    );
-
+    await renderPanel('zh');
     expect(await screen.findByText('大盘下跌 10%')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: '运行分析' }));
+    await runAnalysis('运行分析');
 
-    expect(await screen.findAllByText(/未知状态 \(weird_quality\)/)).not.toHaveLength(0);
+    expect(screen.getAllByText(/未知状态 \(weird_quality\)/)).not.toHaveLength(0);
     expect(screen.getAllByText(/未知编码（brand_new_limitation）/)).not.toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: '假设与限制' }));
     expect(screen.getAllByText(/未知状态 \(weird_quality\)/).length).toBeGreaterThan(0);
