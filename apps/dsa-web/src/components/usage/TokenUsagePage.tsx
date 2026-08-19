@@ -450,6 +450,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
                 emptyState={{ title: t('usage.noRecentCalls') }}
                 frame="embedded"
                 minWidth="container"
+                virtualization={false}
               />
             </Section>
           </>

@@ -518,4 +518,35 @@ describe('TokenUsagePage', () => {
       `${APP_ROUTE_PATHS.settings}?period=today&keep=yes&section=usage`,
     );
   });
+
+  it('keeps two-line recent-call rows on the full DataTable path', async () => {
+    const recentCalls = Array.from({ length: 50 }, (_, index) => ({
+      id: index + 1,
+      called_at: `2026-06-11T09:${String(index).padStart(2, '0')}:00`,
+      call_type: 'analysis',
+      model: `openai/gpt-test-model-${index + 1}`,
+      stock_code: `SYM${String(index + 1).padStart(3, '0')}`,
+      prompt_tokens: 40,
+      completion_tokens: 200,
+      total_tokens: 240,
+    }));
+    get.mockResolvedValue({
+      data: makeDashboardResponse({
+        total_calls: 50,
+        recent_calls: recentCalls,
+      }),
+    });
+
+    renderPage();
+
+    const table = await screen.findByRole('table', { name: '最近调用' });
+    const region = table.parentElement;
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(region).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
+    expect(region).toHaveAttribute('data-mounted-count', '50');
+    expect(region).toHaveAttribute('data-total-count', '50');
+    expect(screen.getByText('SYM001')).toBeInTheDocument();
+    expect(screen.getByText('SYM050')).toBeInTheDocument();
+    expect(screen.getByText('openai/gpt-test-model-50')).toBeInTheDocument();
+  });
 });

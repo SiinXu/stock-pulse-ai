@@ -56,15 +56,17 @@ const EventAlertList: React.FC<EventAlertListProps> = ({
     emptyState: { icon: <Activity className="h-6 w-6" />, title: text.emptyTitle, description: text.emptyDescription },
     density: 'compact' as const,
     minWidth: 'wide' as const,
+    virtualization: false as const,
   };
   const table = onSelect ? (
     <DataTable<EventAlertDisplayItem>
       {...commonTableProps}
+      virtualization={false}
       onRowActivate={onSelect}
       getRowAriaLabel={(item) => `${item.target} ${item.eventCategory ?? ''}`.trim()}
     />
   ) : (
-    <DataTable<EventAlertDisplayItem> {...commonTableProps} />
+    <DataTable<EventAlertDisplayItem> {...commonTableProps} virtualization={false} />
   );
   return <Card title={text.listTitle} level="interactive" padding="md">{table}</Card>;
 };

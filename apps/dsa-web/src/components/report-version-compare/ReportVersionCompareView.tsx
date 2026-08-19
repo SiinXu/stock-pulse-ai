@@ -333,6 +333,7 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
           density="compact"
           frame="embedded"
           minWidth="content"
+          virtualization={false}
         />
       </Surface>
 

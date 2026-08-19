@@ -2,7 +2,7 @@
 
 Issue [#883](https://github.com/SiinXu/stock-pulse-ai/issues/883) 在既有 bundle 体积预算（PR #905 / #920）之上，为 `apps/dsa-web` 的三类运行时场景建立可复现的性能预算：
 
-1. 长列表渲染（`HistoryList`）
+1. 长列表渲染（`HistoryList` 与共享 `DataTable`）
 2. Settings 大表单（`SettingsField` 隔离）
 3. SSE 聊天流（`agentChatStore` progress 批处理）
 
@@ -23,6 +23,7 @@ Issue [#883](https://github.com/SiinXu/stock-pulse-ai/issues/883) 在既有 bund
 
 | 场景 | 输入规模 | 指标 | 预算 | 依据 |
 | --- | --- | --- | --- | --- |
+| `data-table-virtualization` | 150 行 DataTable | 已挂载表体行 DOM 数 | ≤ 40 | 共享表格 ≥ 24 行时用 `useVirtualWindow` 窗口化；明细行或显式关闭时保持全量挂载。 |
 | `history-list-virtualization` | 150 条历史 | 已挂载行 DOM 数 | ≤ 40 | 超过 100 行需虚拟化或硬分页；History 已分页但会累积。 |
 | `settings-field-isolation` | 40 个字段 | 编辑一字后兄弟字段 commit 数 | 0 | 单字段编辑不得拖垮整表。 |
 | `sse-progress-batching` | 60 条 progress 事件 | `progressSteps` store commit 数 | ≤ 4 | rAF 批处理保证 Stop 可点。 |
@@ -39,6 +40,7 @@ node scripts/check-runtime-performance.mjs --strict   # 未来硬门
 
 ## 产品侧缓解（与预算同 PR）
 
+- **DataTable**：行数 ≥ 24 时用 `useVirtualWindow` 窗口化；明细行或 `virtualization={false}` 时关闭。默认/紧凑行高 48px/36px，overscan 为 6。窗口化表头使用不透明 `bg-card`。自动窗口不测量真实行高。事件日历、选股发现、历史趋势抽屉、RiskHeatmap、组合相关性矩阵、持仓信号格、Token 用量、导入失败行、个人表现原因列表、事件提醒及其他换行/堆叠表保持全量挂载。
 - **HistoryList**：`useVirtualWindow` 窗口化 + `HistoryListItem` memo。
 - **SettingsField**：`React.memo` + 属性相等比较。
 - **SSE**：progress 事件 rAF 合批 + 聊天气泡 memo。

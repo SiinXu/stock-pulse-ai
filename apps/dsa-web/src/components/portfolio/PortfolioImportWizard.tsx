@@ -536,6 +536,7 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
                     }}
                     density="compact"
                     minWidth="wide"
+                    virtualization={false}
                   />
                 ) : (
                   <InlineAlert
@@ -582,6 +583,7 @@ const PortfolioImportWizard: React.FC<PortfolioImportWizardProps> = ({
                     emptyState={{ title: importText.importWizardRowErrors }}
                     density="compact"
                     minWidth="wide"
+                    virtualization={false}
                   />
                 ) : null}
                 {csvParseResult.errors.length > 0 ? (

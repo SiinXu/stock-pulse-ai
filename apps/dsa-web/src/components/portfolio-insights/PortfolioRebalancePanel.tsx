@@ -249,6 +249,7 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
               emptyState={{ title: text.noRows, description: text.noRowsDescription }}
               density="compact"
               minWidth="extra-wide"
+              virtualization={false}
             />
             <DataTable
               caption={text.positionBands}
@@ -259,6 +260,7 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
               emptyState={{ title: text.noRows, description: text.noRowsDescription }}
               density="compact"
               minWidth="wide"
+              virtualization={false}
             />
             <PortfolioEvidenceSection
               title={text.evidence}

@@ -19,7 +19,10 @@ import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import type { HistoryItem } from '../../types/analysis';
 import type { SystemConfigFieldSchema, SystemConfigItem } from '../../types/systemConfig';
 import { useAgentChatStore } from '../../stores/agentChatStore';
+import { DataTable, type DataTableColumn } from '../../components/common/DataTable';
 import {
+  DATATABLE_MAX_MOUNTED_ROWS_BUDGET,
+  DATATABLE_MEASUREMENT_ITEM_COUNT,
   HISTORY_LIST_MAX_MOUNTED_ROWS_BUDGET,
   HISTORY_LIST_MEASUREMENT_ITEM_COUNT,
   HISTORY_LIST_MEASUREMENT_VIEWPORT_PX,
@@ -78,6 +81,40 @@ const historyBaseProps = {
 };
 
 describe('runtime performance contracts (#883)', () => {
+  describe('data-table-virtualization', () => {
+    it(`mounts at most ${DATATABLE_MAX_MOUNTED_ROWS_BUDGET} DataTable rows for ${DATATABLE_MEASUREMENT_ITEM_COUNT} items`, () => {
+      type MeasureRow = { id: number; symbol: string };
+      const rows: MeasureRow[] = Array.from(
+        { length: DATATABLE_MEASUREMENT_ITEM_COUNT },
+        (_, index) => ({ id: index + 1, symbol: `SYM${index + 1}` }),
+      );
+      const columns: DataTableColumn<MeasureRow>[] = [
+        { id: 'symbol', header: 'Symbol', cell: (row) => row.symbol },
+      ];
+      render(
+        <DataTable
+          caption="Measurement table"
+          scrollAreaLabel="Measurement table"
+          columns={columns}
+          rows={rows}
+          getRowKey={(row) => row.id}
+          getRowTestId={(row) => `measure-row-${row.id}`}
+          emptyState={{ title: 'Empty' }}
+        />,
+      );
+
+      const region = screen.getByRole('region', { name: 'Measurement table' });
+      expect(region).toHaveAttribute('data-data-table-virtualized', 'true');
+      expect(region).toHaveAttribute('data-total-count', String(DATATABLE_MEASUREMENT_ITEM_COUNT));
+
+      const mounted = document.querySelectorAll('[data-testid^="measure-row-"]').length;
+      record('data-table-virtualization', mounted, 'rows');
+      expect(mounted).toBeGreaterThan(0);
+      expect(mounted).toBeLessThan(DATATABLE_MEASUREMENT_ITEM_COUNT);
+      expect(mounted).toBeLessThanOrEqual(DATATABLE_MAX_MOUNTED_ROWS_BUDGET);
+    });
+  });
+
   describe('history-list-virtualization', () => {
     it(`mounts at most ${HISTORY_LIST_MAX_MOUNTED_ROWS_BUDGET} rows for ${HISTORY_LIST_MEASUREMENT_ITEM_COUNT} items`, () => {
       const items = buildHistoryItems(HISTORY_LIST_MEASUREMENT_ITEM_COUNT);

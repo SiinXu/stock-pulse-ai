@@ -156,6 +156,7 @@ export const SkillOutcomeRecentLists: React.FC<SkillOutcomeRecentListsProps> = (
             density="compact"
             frame="embedded"
             minWidth="wide"
+            virtualization={false}
           />
         )}
       </Surface>
@@ -174,6 +175,7 @@ export const SkillOutcomeRecentLists: React.FC<SkillOutcomeRecentListsProps> = (
             density="compact"
             frame="embedded"
             minWidth="wide"
+            virtualization={false}
           />
         )}
       </Surface>

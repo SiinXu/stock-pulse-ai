@@ -917,6 +917,7 @@ export const AlertsWorkspace: React.FC<AlertsWorkspaceProps> = ({
               }}
               density="compact"
               minWidth="content"
+              virtualization={false}
             />
             <Pagination
               currentPage={notificationsPage}

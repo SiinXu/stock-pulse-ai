@@ -181,6 +181,7 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
         }}
         density="compact"
         minWidth="wide"
+        virtualization={false}
       />
       {onPageChange ? (
         <Pagination

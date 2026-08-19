@@ -4,6 +4,9 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import {
   Fragment,
   forwardRef,
+  useLayoutEffect,
+  useRef,
+  useState,
   type ForwardedRef,
   type Key,
   type KeyboardEvent,
@@ -12,9 +15,23 @@ import {
   type ReactNode,
   type RefAttributes,
 } from 'react';
+import { useVirtualWindow } from '../../hooks/useVirtualWindow';
 import { cn } from '../../utils/cn';
 import { StatePanel } from './StatePanel';
 import { Surface } from './Surface';
+import {
+  findBoundedVerticalScrollParent,
+  resolveDataTableViewportCap,
+  resolveDataTableVirtualization,
+  type DataTableVirtualizationProp,
+} from './dataTableVirtualization';
+
+export type {
+  DataTableVirtualizationConfig,
+  DataTableVirtualizationProp,
+  DataTableVirtualizationReason,
+  ResolvedDataTableVirtualization,
+} from './dataTableVirtualization';
 
 export type DataTableAlign = 'start' | 'center' | 'end';
 export type DataTableDensity = 'compact' | 'default';
@@ -72,6 +89,13 @@ interface DataTableBaseProps<T> {
   onSortChange?: (nextSort: DataTableSortState) => void;
   isRowSelected?: (row: T, index: number) => boolean;
   getRowTestId?: (row: T, index: number) => string;
+  /**
+   * Auto-window body rows once `rows.length` meets the measured threshold
+   * and row height matches the shared fixed estimate. Pass `false` when
+   * cells wrap, stack, list, or otherwise exceed that estimate. Controlled
+   * detail rows disable windowing automatically.
+   */
+  virtualization?: DataTableVirtualizationProp;
 }
 
 interface DataTableStaticRows {
@@ -215,6 +239,32 @@ function getFixedColumnWidths<T>(
   return total > 0 ? widths.map((width) => (width / total) * 100) : null;
 }
 
+function VirtualSpacerRow({
+  position,
+  height,
+  columnCount,
+}: {
+  position: 'top' | 'bottom';
+  height: number;
+  columnCount: number;
+}) {
+  if (height <= 0 || columnCount <= 0) return null;
+  return (
+    <tr
+      aria-hidden="true"
+      data-data-table-spacer={position}
+      className="border-0"
+      style={{ height }}
+    >
+      <td
+        colSpan={columnCount}
+        className="border-0 p-0"
+        style={{ height, padding: 0, lineHeight: 0, fontSize: 0 }}
+      />
+    </tr>
+  );
+}
+
 function DataTableInner<T>({
   caption,
   captionMode = 'hidden',
@@ -233,6 +283,7 @@ function DataTableInner<T>({
   onSortChange,
   isRowSelected,
   getRowTestId,
+  virtualization,
   onRowActivate,
   getRowAriaLabel,
   isRowDisabled,
@@ -241,6 +292,72 @@ function DataTableInner<T>({
   getRowDetailId,
   getRowDetailAriaLabel,
 }: DataTableProps<T>, ref: ForwardedRef<HTMLTableElement>) {
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const resolvedVirtualization = resolveDataTableVirtualization({
+    rowCount: rows.length,
+    hasRowDetails: Boolean(renderRowDetail),
+    density,
+    virtualization,
+  });
+  const virtualize = resolvedVirtualization.enabled;
+  const defaultViewport = resolvedVirtualization.viewportMaxHeight;
+  const [viewportCap, setViewportCap] = useState(defaultViewport);
+  const {
+    range,
+    onScroll: onVirtualScroll,
+    setViewportHeight,
+  } = useVirtualWindow({
+    itemCount: rows.length,
+    estimatedItemHeight: resolvedVirtualization.rowHeight,
+    overscan: resolvedVirtualization.overscan,
+    enabled: virtualize,
+  });
+
+  useLayoutEffect(() => {
+    if (!virtualize) {
+      return;
+    }
+    const container = scrollAreaRef.current;
+    if (!container) {
+      return;
+    }
+    const updateHeight = () => {
+      const cap = resolveDataTableViewportCap(container, defaultViewport);
+      setViewportCap(cap);
+      const measured = container.clientHeight;
+      setViewportHeight(measured > 0 ? measured : cap);
+    };
+    updateHeight();
+    if (typeof ResizeObserver === 'undefined') {
+      return;
+    }
+    const observer = new ResizeObserver(updateHeight);
+    observer.observe(container);
+    const scrollParent = findBoundedVerticalScrollParent(container, defaultViewport);
+    if (scrollParent) {
+      observer.observe(scrollParent);
+    }
+    return () => observer.disconnect();
+  }, [defaultViewport, setViewportHeight, virtualize, rows.length]);
+
+  useLayoutEffect(() => {
+    if (!virtualize) {
+      return;
+    }
+    const container = scrollAreaRef.current;
+    if (!container) {
+      return;
+    }
+    const measuredViewport = container.clientHeight > 0 ? container.clientHeight : viewportCap;
+    const maxScroll = Math.max(
+      0,
+      rows.length * resolvedVirtualization.rowHeight - measuredViewport,
+    );
+    if (container.scrollTop > maxScroll) {
+      container.scrollTop = maxScroll;
+    }
+  }, [resolvedVirtualization.rowHeight, rows.length, viewportCap, virtualize]);
+
   const effectiveState = status ?? (rows.length === 0
     ? { state: 'empty' as const, ...emptyState }
     : null);
@@ -287,15 +404,25 @@ function DataTableInner<T>({
   };
 
   const fixedColumnWidths = getFixedColumnWidths(columns, layout);
+  const windowStart = virtualize ? range.startIndex : 0;
+  const windowEnd = virtualize ? range.endIndex : rows.length - 1;
   const tableContent = (
       <div
+        ref={scrollAreaRef}
         role="region"
         aria-label={scrollAreaLabel ?? caption}
         tabIndex={0}
         data-data-table-scroll="true"
         data-data-table={frame === 'embedded' ? 'ready' : undefined}
+        data-data-table-virtualized={virtualize ? 'true' : 'false'}
+        data-data-table-virtual-reason={resolvedVirtualization.reason}
+        data-mounted-count={virtualize ? Math.max(0, windowEnd - windowStart + 1) : rows.length}
+        data-total-count={rows.length}
+        onScroll={virtualize ? onVirtualScroll : undefined}
+        style={virtualize ? { maxHeight: viewportCap } : undefined}
         className={cn(
           'max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/55',
+          virtualize && 'overflow-y-auto overscroll-y-contain',
           separatorTone === 'inherit' && 'border-inherit',
         )}
       >
@@ -303,6 +430,7 @@ function DataTableInner<T>({
           ref={ref}
           data-density={density}
           data-layout={layout}
+          aria-rowcount={virtualize ? rows.length + 1 : undefined}
           className={cn(
             'w-full border-collapse',
             TABLE_TEXT_STYLES[density],
@@ -328,11 +456,12 @@ function DataTableInner<T>({
             </colgroup>
           ) : null}
           <thead className={cn(
-            'border-b bg-subtle-soft text-xs text-secondary-text',
+            'border-b text-xs text-secondary-text',
             HEADER_SEPARATOR_STYLES[separatorTone],
+            virtualize ? 'sticky top-0 z-10 bg-card' : 'bg-subtle-soft',
           )}
           >
-            <tr>
+            <tr aria-rowindex={virtualize ? 1 : undefined}>
               {columns.map((column) => {
                 const align = column.align ?? 'start';
                 const activeDirection = sort?.columnId === column.id ? sort.direction : undefined;
@@ -373,8 +502,21 @@ function DataTableInner<T>({
               })}
             </tr>
           </thead>
-          <tbody className={cn('divide-y', BODY_SEPARATOR_STYLES[separatorTone])}>
-            {rows.map((row, index) => {
+          <tbody className={cn(
+            'divide-y',
+            BODY_SEPARATOR_STYLES[separatorTone],
+            virtualize && '[&>[data-data-table-spacer]]:border-0',
+          )}
+          >
+            {virtualize ? (
+              <VirtualSpacerRow
+                position="top"
+                height={range.offsetTop}
+                columnCount={columns.length}
+              />
+            ) : null}
+            {rows.slice(windowStart, windowEnd + 1).map((row, offset) => {
+              const index = windowStart + offset;
               const rowKey = getRowKey(row, index);
               const disabled = Boolean(isRowDisabled?.(row, index));
               const interactive = Boolean(onRowActivate);
@@ -384,6 +526,7 @@ function DataTableInner<T>({
                 <Fragment key={rowKey}>
                   <tr
                     aria-label={getRowAriaLabel?.(row, index)}
+                    aria-rowindex={virtualize ? index + 2 : undefined}
                     aria-disabled={interactive && disabled ? true : undefined}
                     aria-selected={isRowSelected ? selected : undefined}
                     aria-keyshortcuts={interactive && !disabled ? 'Enter Space' : undefined}
@@ -439,6 +582,13 @@ function DataTableInner<T>({
                 </Fragment>
               );
             })}
+            {virtualize ? (
+              <VirtualSpacerRow
+                position="bottom"
+                height={range.offsetBottom}
+                columnCount={columns.length}
+              />
+            ) : null}
           </tbody>
         </table>
       </div>

@@ -2934,4 +2934,82 @@ describe('PortfolioPage FX refresh', () => {
     await waitFor(() => expect(commitCsvImport).toHaveBeenCalledTimes(2));
     expect(commitCsvImport.mock.calls[1][3]).not.toBe(firstOperationId);
   });
+
+  it('keeps stacked position signal cells on the full DataTable path', async () => {
+    const positions = Array.from({ length: 30 }, (_, index) => makePosition({
+      symbol: `SYM${String(index + 1).padStart(3, '0')}`,
+      market: 'us',
+      currency: 'USD',
+    }));
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({ positions }));
+    getLatestDecisionSignals.mockImplementation(async (stockCode: string) => ({
+      items: [makeDecisionSignal({
+        stockCode,
+        market: 'us',
+        riskSummary: 'Wrapping compact risk copy that occupies two lines in the signal cell.',
+        watchConditions: 'Watch the next two sessions for confirmation of the hold plan.',
+      })],
+      total: 1,
+      page: 1,
+      pageSize: 1,
+    }));
+
+    renderPortfolioPage();
+
+    expect(await screen.findByText('SYM030')).toBeInTheDocument();
+    await waitFor(() => expect(getLatestDecisionSignals).toHaveBeenCalledTimes(30));
+    const region = screen.getByRole('region', { name: '持仓明细' });
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(region).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
+    expect(region).toHaveAttribute('data-mounted-count', '30');
+    expect(region).toHaveAttribute('data-total-count', '30');
+    expect(screen.getByText('SYM001')).toBeInTheDocument();
+    expect(screen.getAllByRole('link', { name: '从此信号创建规则' })).toHaveLength(30);
+  });
+
+  it('keeps wrapping import failed-row reasons on the full DataTable path', async () => {
+    const failedRows = Array.from({ length: 30 }, (_, index) => ({
+      rowNumber: index + 2,
+      reasonCode: 'invalid_side',
+      reason: `Row ${index + 2} failed because the side cell is not buy or sell and the broker note wraps.`,
+      source: { 证券代码: `SYM${String(index + 1).padStart(3, '0')}`, 买卖标志: '=1+1' },
+    }));
+    parseCsvImport.mockResolvedValueOnce({
+      broker: 'huatai',
+      recordCount: 0,
+      skippedCount: 0,
+      errorCount: failedRows.length,
+      records: [],
+      errors: [],
+      failedRows,
+    });
+
+    renderPortfolioPage();
+    await waitForInitialLoad();
+    fireEvent.click(screen.getByRole('button', { name: '导入持仓' }));
+    const wizard = await screen.findByRole('region', { name: '导入持仓向导' });
+    await waitFor(() => {
+      expect(within(wizard).getByRole('button', { name: '下一步' })).toBeEnabled();
+    });
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    const file = new File(['not-a-real-workbook'], 'trades.xlsx', {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    fireEvent.change(within(wizard).getByLabelText('选择 CSV / Excel'), {
+      target: { files: [file] },
+    });
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+    await waitFor(() => expect(parseCsvImport).toHaveBeenCalledWith('huatai', file));
+    await within(wizard).findByText('CSV 解析结果');
+    fireEvent.click(within(wizard).getByRole('button', { name: '下一步' }));
+
+    const table = await within(wizard).findByRole('table', { name: '失败行（可下载修正）' });
+    const region = table.parentElement;
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(region).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
+    expect(region).toHaveAttribute('data-mounted-count', '30');
+    expect(within(table).getByText('2')).toBeInTheDocument();
+    expect(within(table).getByText('31')).toBeInTheDocument();
+    expect(within(table).getByText(failedRows[29].reason)).toBeInTheDocument();
+  });
 });

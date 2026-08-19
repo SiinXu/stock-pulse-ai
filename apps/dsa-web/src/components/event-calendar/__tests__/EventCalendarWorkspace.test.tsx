@@ -134,4 +134,34 @@ describe('EventCalendarWorkspace', () => {
     expect(link).toHaveAttribute('href', APP_ROUTE_PATHS.eventAlerts);
     expect(link).toHaveAccessibleName('Event-driven alerts');
   });
+
+  it('keeps wrapping event and impact copy on the full DataTable path', async () => {
+    const events = Array.from({ length: 30 }, (_, index) => ({
+      eventId: index + 1,
+      eventDate: '2026-08-10',
+      symbol: `SYM${String(index + 1).padStart(3, '0')}`,
+      status: 'triggered',
+      eventCategory: 'earnings' as const,
+      whatHappened: 'Earnings disclosure with wrapping multi-line description of what happened in the filing.',
+      whyItMatters: 'Profit expectations may reprice across the next two sessions and related holdings.',
+      degraded: false,
+      inWatchlist: true,
+      inPortfolio: index % 2 === 0,
+      source: 'corporate_event_service',
+    }));
+    vi.mocked(eventCalendarApi.getCalendar).mockResolvedValue({
+      events,
+      loadedCount: events.length,
+      total: events.length,
+      partialErrors: [],
+    });
+    renderWorkspace();
+    expect(await screen.findByText('SYM030')).toBeInTheDocument();
+    const region = screen.getByRole('region', { name: 'Corporate event calendar' });
+    expect(region).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(region).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
+    expect(region).toHaveAttribute('data-mounted-count', '30');
+    expect(region).toHaveAttribute('data-total-count', '30');
+    expect(screen.getByText('SYM001')).toBeInTheDocument();
+  });
 });

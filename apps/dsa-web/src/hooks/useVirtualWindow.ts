@@ -52,10 +52,11 @@ export function useVirtualWindow({
     }
 
     const safeHeight = estimatedItemHeight > 0 ? estimatedItemHeight : 1;
+    const lastIndex = Math.max(0, itemCount - 1);
     const visibleCount = Math.max(1, Math.ceil((viewportHeight || safeHeight) / safeHeight));
-    const rawStart = Math.floor(scrollTop / safeHeight);
-    const startIndex = Math.max(0, rawStart - overscan);
-    const endIndex = Math.min(itemCount - 1, rawStart + visibleCount + overscan);
+    const rawStart = Math.floor(Math.max(0, scrollTop) / safeHeight);
+    const startIndex = Math.min(lastIndex, Math.max(0, rawStart - overscan));
+    const endIndex = Math.min(lastIndex, Math.max(startIndex, rawStart + visibleCount + overscan));
     const offsetTop = startIndex * safeHeight;
     const offsetBottom = Math.max(0, (itemCount - endIndex - 1) * safeHeight);
 

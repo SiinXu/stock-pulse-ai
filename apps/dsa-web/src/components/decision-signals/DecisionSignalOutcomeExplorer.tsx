@@ -406,6 +406,7 @@ export const DecisionSignalOutcomeExplorer: React.FC<DecisionSignalOutcomeExplor
             }}
             density="compact"
             minWidth="wide"
+            virtualization={false}
           />
           <Pagination
             className="mt-4"

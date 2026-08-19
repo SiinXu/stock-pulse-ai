@@ -425,6 +425,7 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
             density="compact"
             frame="embedded"
             minWidth="wide"
+            virtualization={false}
           />
         </div>
       )}

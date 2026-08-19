@@ -56,7 +56,7 @@ Shared patterns compose these primitives:
 | `ResponsiveFilterPanel` | Keeps basic filters visible, exposes advanced filters inline at desktop, and moves those advanced filters plus Apply into a Drawer below 1024px. |
 | `AppliedFilterChips` | Presents applied filters as individually removable tokens with one clear-all command. |
 | `useFilterQueryState` | Keeps applied filters in Router search params, preserves unrelated params, keeps drafts local, and restores both after Back/Forward navigation. |
-| `DataTable` | Renders typed columns and native table semantics, framed or embedded presentation, controlled sorting/selection, fixed or automatic layout, one task state, contained narrow-screen scrolling, and isolated row activation. |
+| `DataTable` | Renders typed columns and native table semantics, framed or embedded presentation, controlled sorting/selection, fixed or automatic layout, one task state, contained scrolling, optional fixed-estimate row virtualization above a measured threshold, and isolated row activation. |
 | `AppPage` / `WorkspacePage` | Provide the full-width page canvas and optional main/rail workspace grid beneath the Shell's single `main`. |
 | `PageHeader` / `Toolbar` | Provide one programmatically focusable H1 and one semantic command group without adding a decorative page surface. |
 | `ResponsiveRail` | Keeps contextual content visible at wide desktop and exposes one labelled disclosure at narrower breakpoints. |
@@ -285,6 +285,30 @@ the native `colgroup` and normalizes a complete set of positive percentage
 widths, while the default `auto` layout leaves sizing to table content. This
 preserves dense financial columns and their headers instead of duplicating rows
 into a second card DOM.
+
+`DataTable` reuses the existing `useVirtualWindow` hook at this shared
+boundary. Tables with fewer than 24 body rows stay fully mounted so browser
+find, keyboard tab order, and assistive-technology row lists remain complete.
+At or above that threshold the body is a fixed-estimate window: default rows
+are 48px, compact rows are 36px, overscan is 6, and the scroll region is
+capped at 480px with an opaque sticky header (`bg-card`, not the 3%
+`bg-subtle-soft` wash). Top and bottom spacer rows preserve
+scroll height so the first and last business rows remain reachable. Visible
+rows keep their original `getRowKey` identity, `cell(row, index)` index, and
+selection/activation handlers. The native table exposes `aria-rowcount` and
+`aria-rowindex` while windowed. Pass `virtualization={false}` for
+incompatible variable-height cells; controlled detail rows (`renderRowDetail`)
+disable windowing automatically. Auto-window does not measure rendered
+height, so any table whose cells wrap, stack, list, or exceed the 48px /
+36px estimate must opt out even when the current page size is below 24.
+DataTable does not implement `rowspan`. Current production fallbacks:
+Screening results (detail rows), `RiskHeatmap`, the Portfolio risk
+correlation matrix, Event Calendar, Screening Discovery, the stock-history
+trend drawer, Portfolio position signal cells, Token Usage recent calls,
+import failed-row reasons, Personal Performance reason lists, Event
+Alerts, and the remaining wrapping or stacked production tables. Fixed-
+height numeric tables such as stock candles and compound-growth series
+stay on auto-window.
 
 An activatable row requires both `onRowActivate` and a localized
 `getRowAriaLabel`. Click, Enter, and Space invoke the same command. Events from

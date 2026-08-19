@@ -315,6 +315,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
                   emptyState={{ title: text.noRows, description: text.noRowsDescription }}
                   density="compact"
                   minWidth="extra-wide"
+                  virtualization={false}
                 />
               </>
             ) : null}

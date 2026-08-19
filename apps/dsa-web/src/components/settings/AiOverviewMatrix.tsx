@@ -145,6 +145,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
           frame="embedded"
           minWidth="narrow"
           separatorTone="inherit"
+          virtualization={false}
           getRowTestId={(row) => `ai-task-${row.id}`}
         />
       </div>

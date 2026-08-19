@@ -122,6 +122,9 @@ describe('PortfolioRiskMetricsPanel', () => {
     });
     expect(screen.getByTestId('portfolio-risk-var-value')).toHaveTextContent('250');
     expect(screen.getByTestId('portfolio-risk-correlation-matrix')).toBeInTheDocument();
+    const correlationRegion = screen.getByTestId('portfolio-risk-correlation-matrix').querySelector('[data-data-table-scroll="true"]');
+    expect(correlationRegion).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(correlationRegion).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
     expect(screen.getByTestId('portfolio-risk-diversification-score')).toHaveTextContent('1');
     expect(screen.getByTestId('portfolio-risk-assumptions-card')).toHaveTextContent('historical');
     expect(screen.getByTestId('portfolio-risk-assumptions-card')).toHaveTextContent(

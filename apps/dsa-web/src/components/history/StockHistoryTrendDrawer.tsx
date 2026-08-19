@@ -462,6 +462,7 @@ export const StockHistoryTrendDrawer: React.FC<StockHistoryTrendDrawerProps> = (
                 frame="embedded"
                 layout="fixed"
                 minWidth="extra-wide"
+                virtualization={false}
                 onRowActivate={(item) => setSelectedRecordId(item.id)}
                 getRowAriaLabel={(item) => (
                   `${t('stockTrend.time')}: ${formatHistoryTime(item.createdAt, language)}; `

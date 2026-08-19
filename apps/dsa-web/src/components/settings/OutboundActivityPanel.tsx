@@ -143,6 +143,7 @@ const OutboundActivityPanel: React.FC<OutboundActivityPanelProps> = ({ disabled 
               title: t('settings.outboundActivityEmptyTitle'),
               description: t('settings.outboundActivityEmptyDescription'),
             }}
+            virtualization={false}
           />
           <p className="mt-3 text-xs text-muted-foreground">{t('settings.outboundActivityReadOnlyNote')}</p>
         </div>

@@ -14,6 +14,36 @@ export const HISTORY_LIST_ESTIMATED_ROW_HEIGHT_PX = 72;
 /** Extra rows rendered above/below the visible window. */
 export const HISTORY_LIST_OVERSCAN = 6;
 
+/** Virtualize DataTable body rows when at least this many rows are present. */
+export const DATATABLE_VIRTUALIZE_THRESHOLD = 24;
+
+/**
+ * Estimated default-density DataTable row height (px).
+ * py-3 (24px) + text-sm line (~20px) + 1px divider, rounded up to 48.
+ */
+export const DATATABLE_DEFAULT_ROW_HEIGHT_PX = 48;
+
+/**
+ * Estimated compact-density DataTable row height (px).
+ * py-2 (16px) + text-xs line (~16px) + 1px divider, rounded up to 36.
+ */
+export const DATATABLE_COMPACT_ROW_HEIGHT_PX = 36;
+
+/** Extra DataTable rows rendered above/below the visible window. */
+export const DATATABLE_OVERSCAN = 6;
+
+/** Max height of the DataTable scroll viewport once virtualization is active (px). */
+export const DATATABLE_VIRTUAL_VIEWPORT_PX = 480;
+
+/**
+ * Max mounted DataTable body rows when measuring the 150-row contract case
+ * (viewport 480px → ~10 visible + 2*overscan + headroom).
+ */
+export const DATATABLE_MAX_MOUNTED_ROWS_BUDGET = 40;
+
+/** Item count used by the DataTable virtualization measurement entry. */
+export const DATATABLE_MEASUREMENT_ITEM_COUNT = 150;
+
 /**
  * Max mounted history rows when measuring the 150-item contract case
  * (viewport 480px → ~7 visible + 2*overscan + small headroom).

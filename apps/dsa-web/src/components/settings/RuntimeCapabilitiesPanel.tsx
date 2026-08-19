@@ -312,6 +312,7 @@ export function RuntimeCapabilitiesPanel() {
           density="compact"
           frame="embedded"
           minWidth="content"
+          virtualization={false}
           emptyState={{ title: `${capabilityTitle}: 0` }}
           status={capabilitiesLoading && !capabilities
             ? { state: 'loading', title: capabilityTitle }
@@ -357,6 +358,7 @@ export function RuntimeCapabilitiesPanel() {
           density="compact"
           frame="embedded"
           minWidth="content"
+          virtualization={false}
           emptyState={{ title: text.noModels }}
           status={modelsLoading && !models
             ? { state: 'loading', title: agentModelsTitle }
