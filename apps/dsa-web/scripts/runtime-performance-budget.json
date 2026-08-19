@@ -1,16 +1,107 @@
 {
-  "version": 1,
-  "description": "Runtime performance budgets for apps/dsa-web lists, Settings forms, and SSE chat streams (Issue #883). Soft gate by default: exceedances warn in CI without failing the Web gate. Use --strict to fail closed once thresholds are proven stable.",
-  "modeDefault": "soft",
-  "referenceHardware": "Apple Silicon / modern x86 laptop, production build, Chrome; wall-clock targets are guidance for manual profiling, not CI hard gates.",
-  "measuredAt": "2026-08-12",
-  "baselineNote": "Structural metrics are CI-reproducible. Wall-clock targets come from issue #883 starting points and must not be met by shrinking measurement scope or removing features.",
+  "version": 2,
+  "description": "Runtime performance budgets for the Issue #883 apps/dsa-web surfaces plus the T16 shared DataTable contract. Structural scenarios may be blocking. Timing, network, and Desktop measurements stay skip or observe and must not become CI hard gates from a single machine's wall-clock.",
+  "modeDefault": "per-scenario",
+  "referenceHardware": "Apple Silicon / modern x86 laptop, production build, Chrome. Wall-clock numbers are manual guidance only.",
+  "measuredAt": "2026-08-19",
+  "baselineNote": "Do not shrink declared input sizes, remove product features, encode one machine's absolute speed, or hide regressions with broad margins. Network and Desktop timing are never blocking.",
+  "aggregation": {
+    "warmupRuns": 1,
+    "measuredRuns": 3,
+    "stat": "median",
+    "note": "Checker discards warmup runs and compares the median of measured runs. Structural counts are deterministic; repeats exist to catch runner jitter before a scenario is blocking, not to widen budgets."
+  },
+  "flakePolicy": {
+    "structuralBlocking": "Zero flakes. Median of measuredRuns after warmupRuns must stay within the budget on CI. Do not raise the budget to swallow variance; fix the fixture or the product.",
+    "observe": "Exceedances print WARN and do not fail web-gate. Promote to blocking only after repeated CI medians are stable at the declared input size.",
+    "skipUnavailable": "Skip is a first-class result, not a pass. A skip without skipReason fails closed. Missing measurements for blocking or observe scenarios fail closed so coverage cannot be dropped to go green.",
+    "timingAndNetwork": "kind=timing and kind=network cannot use gate=blocking. Do not commit wall-clock budgets taken from a developer laptop.",
+    "retries": "CI does not retry this step. Re-run locally with the same --warmup/--repeat flags. If a structural test is order-dependent, fix the test."
+  },
+  "baselineUpdate": {
+    "structural": "Keep the declared input size. Change budget only with checker --print evidence from this suite, a product reason, and a changelog fragment. Prefer fixing the regression over raising the number.",
+    "observeToBlocking": "Require three local measured medians plus one hosted web-gate log at the same input size, all within the budget, with sample range that does not need a wider cap.",
+    "skip": "Do not convert skip to blocking without a CI-reproducible structural metric. Leave Desktop and network skip."
+  },
+  "rollback": "Revert the PR (or restore modeDefault soft + the previous three-scenario JSON). Bundle-size aggregate families stay independent.",
+  "surfaces": [
+    {
+      "id": "data-table",
+      "title": "Shared DataTable",
+      "scenarioId": "data-table-virtualization",
+      "issueArea": "Long tables without consistent virtualization (T16 shared DataTable window)"
+    },
+    {
+      "id": "history-list",
+      "title": "History list",
+      "scenarioId": "history-list-virtualization",
+      "issueArea": "Long histories without consistent virtualization"
+    },
+    {
+      "id": "signals-list",
+      "title": "Signals list",
+      "scenarioId": "signals-list-pagination",
+      "issueArea": "Signals tables without consistent virtualization or pagination"
+    },
+    {
+      "id": "screening-results",
+      "title": "Screening results",
+      "scenarioId": "screening-results-mounted-rows",
+      "issueArea": "Screening tables without consistent virtualization or pagination"
+    },
+    {
+      "id": "settings-form",
+      "title": "Settings large forms",
+      "scenarioId": "settings-field-isolation",
+      "issueArea": "Settings sections with large field graphs and autosave churn"
+    },
+    {
+      "id": "sse-progress",
+      "title": "SSE chat progress",
+      "scenarioId": "sse-progress-batching",
+      "issueArea": "SSE token streaming jank"
+    },
+    {
+      "id": "chat-markdown",
+      "title": "Chat markdown bubbles",
+      "scenarioId": "chat-markdown-isolation",
+      "issueArea": "Markdown re-parse cost during streaming"
+    },
+    {
+      "id": "home-widgets",
+      "title": "Home concurrent widgets",
+      "scenarioId": "home-widget-slots",
+      "issueArea": "Multi-column Home concurrent widgets"
+    },
+    {
+      "id": "bundle-route-split",
+      "title": "Per-route bundle split",
+      "scenarioId": "bundle-route-split",
+      "issueArea": "Unclear bundle split per route"
+    },
+    {
+      "id": "desktop-idle",
+      "title": "Desktop idle CPU/GPU",
+      "scenarioId": "desktop-idle-power",
+      "issueArea": "Desktop CPU/GPU when left open with schedules + chat"
+    },
+    {
+      "id": "first-chrome",
+      "title": "First contentful chrome",
+      "scenarioId": "first-chrome-shell",
+      "issueArea": "Shell + nav before heavy widgets; route-switch wall-clock stays manual"
+    }
+  ],
   "scenarios": [
     {
       "id": "data-table-virtualization",
+      "surfaceId": "data-table",
       "surface": "DataTable (shared business tables)",
       "metric": "mounted_row_count",
       "unit": "rows",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atMost",
       "inputItemCount": 150,
       "budget": 40,
       "rationale": "Issue #883 / T16: tables > 100 rows virtualize or hard-paginate. Shared DataTable now reuses useVirtualWindow once row count >= 24 and the table has no variable-height detail rows. Budget = ceil(viewport/estimatedRow) + 2*overscan with headroom (viewport 480px, default row 48px, overscan 6 => ~10+12=22, cap 40).",
@@ -19,9 +110,13 @@
     },
     {
       "id": "history-list-virtualization",
+      "surfaceId": "history-list",
       "surface": "HistoryList (Home / Workbench history rail)",
       "metric": "mounted_row_count",
       "unit": "rows",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atMost",
       "inputItemCount": 150,
       "budget": 40,
       "rationale": "Issue #883: tables/lists > 100 rows virtualize or hard-paginate. History already pages (20/page) but accumulates; with 150 loaded items, mounted HistoryListItem nodes must stay within viewport + overscan rather than O(n). Budget = ceil(viewport/estimatedRow) + 2*overscan with headroom (viewport 480px, row ~72px, overscan 6 => ~19+12=31, cap 40).",
@@ -29,10 +124,44 @@
       "manualTarget": "Scroll remains interactive; no multi-second main-thread freezes when the rail holds 100+ history rows."
     },
     {
+      "id": "signals-list-pagination",
+      "surfaceId": "signals-list",
+      "surface": "DecisionSignalFeedListSection (Signal Center feed)",
+      "metric": "mounted_card_count",
+      "unit": "cards",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atMost",
+      "inputItemCount": 150,
+      "budget": 20,
+      "rationale": "Issue #883: signals tables virtualize or hard-paginate. The feed page model slices merged results to PAGE_SIZE 20; the section must not mount the undeclared remainder of a 150-item universe.",
+      "measurement": "vitest contract: build 150 signals, slice with mergeWatchlistSignalResponses, render the feed; count article cards.",
+      "manualTarget": "Signal Center feed stays paginated; changing page does not mount the full result set."
+    },
+    {
+      "id": "screening-results-mounted-rows",
+      "surfaceId": "screening-results",
+      "surface": "ScreeningResultsSection (AlphaSift results table)",
+      "metric": "mounted_row_count",
+      "unit": "rows",
+      "kind": "structural",
+      "gate": "observe",
+      "direction": "atMost",
+      "inputItemCount": 150,
+      "budget": 40,
+      "rationale": "Issue #883: screening tables > 100 rows virtualize or hard-paginate. This table currently mounts every candidate and uses variable-height row details, so T16 windowing does not apply. Observe at the real 150-row input; do not raise the budget to hide the unbounded render. Promote only after pagination or a compatible window lands.",
+      "measurement": "vitest contract: render ScreeningResultsSection with 150 candidates; count body rows.",
+      "manualTarget": "Screening results stay interactive at 100+ candidates; prefer pagination or virtualization over mounting the full set."
+    },
+    {
       "id": "settings-field-isolation",
+      "surfaceId": "settings-form",
       "surface": "SettingsField (active config panel)",
       "metric": "sibling_rerender_count",
       "unit": "renders",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atMost",
       "inputFieldCount": 40,
       "budget": 0,
       "rationale": "Issue #883: Settings field edit must not full-page remount or re-render every sibling field on each keystroke. With memo boundaries, changing one field value yields 0 sibling SettingsField commits.",
@@ -41,20 +170,94 @@
     },
     {
       "id": "sse-progress-batching",
+      "surfaceId": "sse-progress",
       "surface": "agentChatStore SSE progressSteps",
       "metric": "store_commits_per_event_burst",
       "unit": "commits",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atMost",
       "inputEventCount": 60,
       "budget": 4,
       "rationale": "Issue #883: chat stream must keep Stop responsive and avoid multi-second UI freezes. Pre-fix path committed progressSteps once per SSE event (O(n) React commits per burst). rAF batching bounds commits to ~1/frame; budget of 4 allows startStream setup + flush frames + terminal cleanup without requiring exact frame timing.",
       "measurement": "vitest contract: feed 60 progress events in one readable stream chunk; count progressSteps-affecting setState commits until the stream settles; stopStream remains callable mid-stream.",
       "manualTarget": "Stop button responds within ~100ms perceived latency under long tool/progress streams; UI is not frozen multi-second."
+    },
+    {
+      "id": "chat-markdown-isolation",
+      "surfaceId": "chat-markdown",
+      "surface": "ChatMessageList markdown bubbles",
+      "metric": "prior_bubble_identity_loss",
+      "unit": "remounts",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atMost",
+      "inputItemCount": 8,
+      "budget": 0,
+      "rationale": "Issue #883: markdown re-parse during SSE must not rebuild prior bubbles. Memoized ChatMessageBubble nodes keep DOM identity while live progress updates.",
+      "measurement": "vitest contract: render 8 completed messages plus live progress; update progressSteps; count prior data-chat-message-id nodes that were replaced.",
+      "manualTarget": "Completed bubbles stay still while the live trace updates; Stop remains tappable."
+    },
+    {
+      "id": "home-widget-slots",
+      "surfaceId": "home-widgets",
+      "surface": "HomeDashboardLayout concurrent widgets",
+      "metric": "independent_widget_slots",
+      "unit": "slots",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atLeast",
+      "inputItemCount": 4,
+      "budget": 4,
+      "rationale": "Issue #883: multi-column Home concurrent widgets must remain independent slots, not one unbounded tree. Default layout ships four widgets; dropping below that is a coverage regression.",
+      "measurement": "vitest contract: render HomeDashboardLayout with the four production widget ids; count [data-testid^=home-dashboard-widget-] nodes.",
+      "manualTarget": "Home widgets can load independently; one slow widget does not replace the board."
+    },
+    {
+      "id": "bundle-route-split",
+      "surfaceId": "bundle-route-split",
+      "surface": "Production route/locale gzip families",
+      "metric": "gzip_family_bytes",
+      "unit": "bytes",
+      "kind": "external",
+      "gate": "skip",
+      "skipReason": "Per-route bundle split is enforced by apps/dsa-web/scripts/check-bundle-size.mjs aggregateRules (T20). The runtime checker must not re-measure gzip or treat bundle bytes as a runtime timing budget.",
+      "rationale": "Issue #883 called out unclear per-route bundle split. That gate already blocks in web-gate after the production build.",
+      "measurement": "none (skip). Use node scripts/check-bundle-size.mjs --print after npm run build.",
+      "manualTarget": "Named route families stay under their aggregate gzip caps; do not split chunks to hide growth."
+    },
+    {
+      "id": "desktop-idle-power",
+      "surfaceId": "desktop-idle",
+      "surface": "Desktop client idle CPU/GPU",
+      "metric": "idle_cpu_percent",
+      "unit": "percent",
+      "kind": "external",
+      "gate": "skip",
+      "skipReason": "Desktop idle CPU/GPU is not measurable in Web jsdom CI. Manual profiling on a long-lived desktop session only; never a blocking runtime-perf number.",
+      "rationale": "Issue #883 Desktop power-profile question stays open. Encoding this runner's idle percent would be machine-specific and flaky.",
+      "measurement": "none (skip / unavailable in web-gate).",
+      "manualTarget": "Desktop left open with schedules + chat should not peg CPU/GPU; collect traces outside CI."
+    },
+    {
+      "id": "first-chrome-shell",
+      "surfaceId": "first-chrome",
+      "surface": "App Shell first contentful chrome",
+      "metric": "chrome_landmark_count",
+      "unit": "landmarks",
+      "kind": "structural",
+      "gate": "blocking",
+      "direction": "atLeast",
+      "budget": 3,
+      "rationale": "Issue #883: shell + nav before heavy widgets. Sidebar, main, and mobile header must mount even when the route outlet is a pending stub. Route-switch ~300ms remains manual wall-clock guidance and is not a CI budget.",
+      "measurement": "vitest contract: render Shell with a pending child; count [data-shell-sidebar], [data-shell-main], and [data-shell-mobile-header].",
+      "manualTarget": "Primary route switch interactive under ~300ms on a reference laptop (prod build). Do not promote that wall-clock to blocking from one machine."
     }
   ],
   "wallClockGuidance": {
     "primaryRouteSwitchMs": 300,
     "settingsFieldEditLocksShell": false,
     "chatStopResponsiveMs": 100,
-    "note": "Wall-clock numbers are reference-laptop guidance for manual profiling (React Profiler + Performance panel). CI enforces only structural metrics above to avoid flake."
+    "note": "Wall-clock numbers are reference-laptop guidance for manual profiling (React Profiler + Performance panel). CI never enforces them. Do not copy this machine's milliseconds into blocking budgets."
   }
 }

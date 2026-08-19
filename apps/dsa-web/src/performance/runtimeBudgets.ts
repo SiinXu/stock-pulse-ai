@@ -70,3 +70,27 @@ export const SSE_PROGRESS_MEASUREMENT_EVENT_COUNT = 60;
  * Includes stream setup and terminal cleanup; not wall-clock frame timing.
  */
 export const SSE_PROGRESS_COMMIT_BUDGET = 4;
+
+/** Signals feed page size used by the pagination measurement. */
+export const SIGNALS_LIST_PAGE_SIZE = 20;
+
+/** Item count used by the signals pagination measurement entry. */
+export const SIGNALS_LIST_MEASUREMENT_ITEM_COUNT = 150;
+
+/** Candidate count used by the screening mounted-row measurement. */
+export const SCREENING_RESULTS_MEASUREMENT_ITEM_COUNT = 150;
+
+/** Max mounted screening body rows once pagination or windowing lands. */
+export const SCREENING_RESULTS_MAX_MOUNTED_ROWS_BUDGET = 40;
+
+/** Completed chat bubbles used by the markdown isolation measurement. */
+export const CHAT_MARKDOWN_MEASUREMENT_BUBBLE_COUNT = 8;
+
+/** Prior-bubble remounts allowed while live progress updates. */
+export const CHAT_MARKDOWN_REMOUNT_BUDGET = 0;
+
+/** Default Home dashboard widget slots that must stay independent. */
+export const HOME_WIDGET_SLOT_BUDGET = 4;
+
+/** Shell chrome landmarks (sidebar + main + mobile header). */
+export const FIRST_CHROME_LANDMARK_BUDGET = 3;
