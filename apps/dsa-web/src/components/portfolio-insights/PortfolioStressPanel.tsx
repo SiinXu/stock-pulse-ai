@@ -17,6 +17,11 @@ import type {
   PortfolioStressResponse,
   StressScenario,
 } from '../../types/portfolioInsights';
+import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
+import {
+  formatDataQualityStatus,
+  formatPortfolioStressQualityCell,
+} from '../../utils/dataQualityFormat/portfolio';
 import { formatMoney, formatPct, formatSignedPct } from '../../utils/portfolioFormat';
 import {
   Button,
@@ -160,7 +165,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
     {
       id: 'quality',
       header: text.dataQuality,
-      cell: (row) => [row.dataQuality, row.priceStale ? text.stale : null, ...row.limitations].filter(Boolean).join(' · '),
+      cell: (row) => formatPortfolioStressQualityCell(row, language, text.stale),
     },
   ];
 
@@ -318,13 +323,13 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               values={{
                 scenario: result.scenario,
                 assumptions: result.assumptions,
-                limitations: result.snapshotLimitations,
+                limitations: result.snapshotLimitations.map((item) => formatPortfolioLimitation(item, language)),
                 missingData: result.missingData,
                 excludedPositions: result.excludedPositions,
                 concentration: result.concentration,
                 snapshotId: result.snapshotId,
                 calculatedAt: result.calculatedAt,
-                snapshotDataQuality: result.snapshotDataQuality,
+                snapshotDataQuality: formatDataQualityStatus(result.snapshotDataQuality, language),
                 snapshotFxStale: result.snapshotFxStale,
                 reconciliationDelta: result.reconciliationDelta,
               }}

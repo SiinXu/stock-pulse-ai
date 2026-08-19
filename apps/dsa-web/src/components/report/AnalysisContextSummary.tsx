@@ -6,6 +6,10 @@ import type {
   ReportLanguage,
 } from '../../types/analysis';
 import { ANALYSIS_CONTEXT_CONTENT_TEXT } from '../../locales/reportContent';
+import {
+  formatDataQualityLevel,
+  formatDataQualityLimitation,
+} from '../../utils/dataQualityFormat/analysis';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { Badge, InlineAlert, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
@@ -62,27 +66,6 @@ const getCount = (
   return overview.counts[status] || 0;
 };
 
-const formatLimitation = (
-  value: string,
-  language: ReportLanguage,
-  text: (typeof ANALYSIS_CONTEXT_CONTENT_TEXT)[ReportLanguage],
-): string => {
-  const [rawKey, ...statusParts] = value.split(':');
-  if (!rawKey || statusParts.length === 0) {
-    return value;
-  }
-
-  const key = rawKey.trim();
-  const status = statusParts.join(':').trim();
-  if (!key || !status) {
-    return value;
-  }
-
-  const label = text.blockLabels[key] || key;
-  const statusLabel = (text.status as Record<string, string>)[status] || status;
-  return language === 'zh' ? `${label}：${statusLabel}` : `${label}: ${statusLabel}`;
-};
-
 const formatMissingReason = (
   reason: string,
   language: ReportLanguage,
@@ -122,9 +105,9 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
   const triggerSource = overview.metadata?.triggerSource?.trim();
   const quality = overview.dataQuality;
   const qualityLevel = quality?.level || undefined;
-  const qualityStyle = qualityLevel ? QUALITY_STYLE[qualityLevel] : undefined;
-  const qualityLabel = qualityLevel ? text.qualityLevel[qualityLevel] : undefined;
-  const limitations = quality?.limitations?.map((item) => formatLimitation(item, reportLanguage, text)) || [];
+  const qualityStyle = qualityLevel ? QUALITY_STYLE[qualityLevel as keyof typeof QUALITY_STYLE] : undefined;
+  const qualityLabel = formatDataQualityLevel(qualityLevel, reportLanguage) || undefined;
+  const limitations = quality?.limitations?.map((item) => formatDataQualityLimitation(item, reportLanguage)) || [];
 
   return (
     <Surface level="interactive" padding="none" className="overflow-hidden">

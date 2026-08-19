@@ -7,8 +7,12 @@ import type {
   MarketStructureThemePhase,
   ReportLanguage,
 } from '../types/analysis';
-
-type QualityLevel = 'good' | 'usable' | 'limited' | 'poor';
+import {
+  ANALYSIS_CONTEXT_BLOCK_LABELS,
+  ANALYSIS_CONTEXT_QUALITY_LEVEL_LABELS,
+  ANALYSIS_CONTEXT_STATUS_LABELS,
+  type AnalysisContextQualityLevel,
+} from './analysisContextQuality';
 
 type AnalysisContextContent = {
   eyebrow: string;
@@ -27,7 +31,7 @@ type AnalysisContextContent = {
   limitations: string;
   newsResultCount: string;
   triggerSource: string;
-  qualityLevel: Record<QualityLevel, string>;
+  qualityLevel: Record<AnalysisContextQualityLevel, string>;
   status: Record<AnalysisContextPackBlockStatus, string>;
   statusGuidance: Partial<Record<AnalysisContextPackBlockStatus, string>>;
   blockLabels: Record<string, string>;
@@ -52,22 +56,8 @@ export const ANALYSIS_CONTEXT_CONTENT_TEXT: Record<ReportLanguage, AnalysisConte
     limitations: '数据限制',
     newsResultCount: '新闻结果数',
     triggerSource: '触发来源',
-    qualityLevel: {
-      good: '良好',
-      usable: '可用',
-      limited: '受限',
-      poor: '较差',
-    },
-    status: {
-      available: '可用',
-      missing: '缺失',
-      not_supported: '不支持',
-      fallback: '降级',
-      stale: '过期',
-      estimated: '估算',
-      partial: '部分可用',
-      fetch_failed: '抓取失败',
-    },
+    qualityLevel: ANALYSIS_CONTEXT_QUALITY_LEVEL_LABELS.zh,
+    status: ANALYSIS_CONTEXT_STATUS_LABELS.zh,
     statusGuidance: {
       missing: '数据未进入本次分析，相关结论可能不完整；请检查数据源、配置或网络后重新分析',
       fetch_failed: '数据抓取失败，本次分析未使用该数据；请检查数据源、网络或限流后重新分析',
@@ -77,14 +67,7 @@ export const ANALYSIS_CONTEXT_CONTENT_TEXT: Record<ReportLanguage, AnalysisConte
       estimated: '本次分析使用了估算数据；请结合原始数据复核结果',
       partial: '仅部分数据进入本次分析，相关结论可能不完整；请检查告警和数据源后重新分析',
     },
-    blockLabels: {
-      quote: '行情',
-      daily_bars: '日线',
-      technical: '技术',
-      news: '新闻',
-      fundamentals: '基本面',
-      chip: '筹码',
-    },
+    blockLabels: ANALYSIS_CONTEXT_BLOCK_LABELS.zh,
     missingReasonLabels: {
       daily_bars_missing: '日线数据未进入本次分析，技术指标可能不完整；请检查日线数据源、网络或限流后重新分析',
       news_context_missing: '新闻未进入本次 LLM 分析，结论未使用新闻上下文；报告页相关资讯由独立接口补充，显示与否不代表已进入本次分析。请检查搜索配置、网络或限流后重新分析',
@@ -118,22 +101,8 @@ export const ANALYSIS_CONTEXT_CONTENT_TEXT: Record<ReportLanguage, AnalysisConte
     limitations: 'Data Limitations',
     newsResultCount: 'News Results',
     triggerSource: 'Trigger',
-    qualityLevel: {
-      good: 'Good',
-      usable: 'Usable',
-      limited: 'Limited',
-      poor: 'Poor',
-    },
-    status: {
-      available: 'Available',
-      missing: 'Missing',
-      not_supported: 'Not supported',
-      fallback: 'Fallback',
-      stale: 'Stale',
-      estimated: 'Estimated',
-      partial: 'Partial',
-      fetch_failed: 'Fetch failed',
-    },
+    qualityLevel: ANALYSIS_CONTEXT_QUALITY_LEVEL_LABELS.en,
+    status: ANALYSIS_CONTEXT_STATUS_LABELS.en,
     statusGuidance: {
       missing: 'Data was not included, so related conclusions may be incomplete; check the data source, configuration, or network and rerun',
       fetch_failed: 'Data retrieval failed and this analysis did not use the data; check the source, network, or rate limits and rerun',
@@ -143,14 +112,7 @@ export const ANALYSIS_CONTEXT_CONTENT_TEXT: Record<ReportLanguage, AnalysisConte
       estimated: 'This analysis used estimated data; cross-check the result against source data',
       partial: 'Only part of the data was included, so related conclusions may be incomplete; check warnings and the data source and rerun',
     },
-    blockLabels: {
-      quote: 'quote',
-      daily_bars: 'daily bars',
-      technical: 'technical',
-      news: 'news',
-      fundamentals: 'fundamentals',
-      chip: 'chip',
-    },
+    blockLabels: ANALYSIS_CONTEXT_BLOCK_LABELS.en,
     missingReasonLabels: {
       daily_bars_missing: 'Daily bars were not included, so technical indicators may be incomplete; check the daily data source, network, or rate limits and rerun',
       news_context_missing: 'News was not included in this LLM run, so the conclusion did not use news context; related news on the report page is loaded separately and does not indicate that it was used in this analysis. Check search configuration, network, or rate limits and rerun',
@@ -184,22 +146,8 @@ export const ANALYSIS_CONTEXT_CONTENT_TEXT: Record<ReportLanguage, AnalysisConte
     limitations: '데이터 한계',
     newsResultCount: '뉴스 결과 수',
     triggerSource: '트리거',
-    qualityLevel: {
-      good: '양호',
-      usable: '사용 가능',
-      limited: '제한적',
-      poor: '미흡',
-    },
-    status: {
-      available: '사용 가능',
-      missing: '누락',
-      not_supported: '미지원',
-      fallback: '강등',
-      stale: '만료',
-      estimated: '추정',
-      partial: '부분 사용',
-      fetch_failed: '수집 실패',
-    },
+    qualityLevel: ANALYSIS_CONTEXT_QUALITY_LEVEL_LABELS.ko,
+    status: ANALYSIS_CONTEXT_STATUS_LABELS.ko,
     statusGuidance: {
       missing: '데이터가 포함되지 않아 관련 결론이 불완전할 수 있습니다. 데이터 소스, 설정 또는 네트워크를 확인한 후 다시 분석하세요',
       fetch_failed: '데이터 수집에 실패해 이번 분석에서 사용되지 않았습니다. 데이터 소스, 네트워크 또는 제한을 확인한 후 다시 분석하세요',
@@ -209,14 +157,7 @@ export const ANALYSIS_CONTEXT_CONTENT_TEXT: Record<ReportLanguage, AnalysisConte
       estimated: '이번 분석은 추정 데이터를 사용했습니다. 원본 데이터와 결과를 교차 확인하세요',
       partial: '데이터의 일부만 포함되어 관련 결론이 불완전할 수 있습니다. 경고와 데이터 소스를 확인한 후 다시 분석하세요',
     },
-    blockLabels: {
-      quote: '시세',
-      daily_bars: '일봉',
-      technical: '기술',
-      news: '뉴스',
-      fundamentals: '펀더멘털',
-      chip: '매물대',
-    },
+    blockLabels: ANALYSIS_CONTEXT_BLOCK_LABELS.ko,
     missingReasonLabels: {
       daily_bars_missing: '일봉이 포함되지 않아 기술 지표가 불완전할 수 있습니다. 일봉 소스, 네트워크 또는 제한을 확인한 후 다시 분석하세요',
       news_context_missing: '뉴스가 이번 LLM 분석에 포함되지 않아 결론에 뉴스 맥락이 반영되지 않았습니다. 보고서 페이지의 관련 뉴스는 별도 API에서 불러오며, 표시 여부가 이번 분석에 사용되었음을 의미하지는 않습니다. 검색 설정, 네트워크 또는 제한을 확인한 후 다시 분석하세요',

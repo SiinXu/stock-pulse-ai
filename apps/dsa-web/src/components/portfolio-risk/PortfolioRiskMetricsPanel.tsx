@@ -22,6 +22,7 @@ import type {
   PortfolioRiskMetricsStatus,
 } from '../../types/portfolioRiskMetrics';
 import type { PortfolioCostMethod } from '../../types/portfolio';
+import { formatDataQualityStatus } from '../../utils/dataQualityFormat/portfolio';
 import { formatMoney, formatPct } from '../../utils/portfolioFormat';
 import { formatUiNumber } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
@@ -56,22 +57,9 @@ function statusBadgeVariant(
 
 function statusLabel(
   status: PortfolioRiskMetricsStatus | PortfolioRiskBlockStatus,
-  text: (typeof PORTFOLIO_RISK_METRICS_TEXT)['en'],
+  language: UiLanguage,
 ): string {
-  switch (status) {
-    case 'ok':
-      return text.statusOk;
-    case 'empty_portfolio':
-      return text.statusEmpty;
-    case 'insufficient_history':
-      return text.statusInsufficient;
-    case 'partial':
-      return text.statusPartial;
-    case 'unavailable':
-      return text.statusUnavailable;
-    default:
-      return text.statusUnknown;
-  }
+  return formatDataQualityStatus(status, language);
 }
 
 function formatFiniteNumber(
@@ -136,7 +124,7 @@ const VaRCard: React.FC<{
           />
         </h3>
         <Badge variant={statusBadgeVariant(block.status)} size="sm">
-          {statusLabel(block.status, text)}
+          {statusLabel(block.status, language)}
         </Badge>
       </div>
       {isOk ? (
@@ -209,8 +197,9 @@ type CorrelationRow = {
 
 const CorrelationCard: React.FC<{
   block: PortfolioCorrelationBlock;
+  language: UiLanguage;
   text: (typeof PORTFOLIO_RISK_METRICS_TEXT)['en'];
-}> = ({ block, text }) => {
+}> = ({ block, language, text }) => {
   const symbols = block.symbols ?? [];
   const matrix = block.matrix ?? [];
   const hasMatrix = block.status === 'ok' && symbols.length > 0 && matrix.length > 0;
@@ -265,7 +254,7 @@ const CorrelationCard: React.FC<{
       <div className="mb-2 flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-foreground">{text.correlationTitle}</h3>
         <Badge variant={statusBadgeVariant(block.status)} size="sm">
-          {statusLabel(block.status, text)}
+          {statusLabel(block.status, language)}
         </Badge>
       </div>
       <p className="mb-2 text-xs text-secondary">
@@ -317,7 +306,7 @@ const ConcentrationCard: React.FC<{
           />
         </h3>
         <Badge variant={statusBadgeVariant(block.status)} size="sm">
-          {statusLabel(block.status, text)}
+          {statusLabel(block.status, language)}
         </Badge>
       </div>
       <div className="space-y-1.5">
@@ -502,7 +491,7 @@ const PortfolioRiskMetricsPanel: React.FC<PortfolioRiskMetricsPanelProps> = ({
             size="sm"
             data-testid="portfolio-risk-status-badge"
           >
-            {text.statusLabel}: {statusLabel(query.data.status, text)}
+            {text.statusLabel}: {statusLabel(query.data.status, language)}
           </Badge>
         ) : null}
       </div>
@@ -540,7 +529,7 @@ const PortfolioRiskMetricsPanel: React.FC<PortfolioRiskMetricsPanelProps> = ({
               language={language}
               text={text}
             />
-            <CorrelationCard block={query.data.correlation} text={text} />
+            <CorrelationCard block={query.data.correlation} language={language} text={text} />
             <ConcentrationCard
               block={query.data.concentration}
               language={language}

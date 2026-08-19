@@ -9,6 +9,11 @@ import { ALERT_HISTORY_CONTROLS_TEXT, ALERT_TRIGGER_TEXT } from '../../locales/a
 import { formatUiText } from '../../i18n/uiText';
 import { formatUiDateTime, getUiClauseSeparator } from '../../utils/uiLocale';
 import type { UiLanguage } from '../../i18n/uiText';
+import {
+  formatDataQualityLevel,
+  formatDataQualityLimitation,
+} from '../../utils/dataQualityFormat/analysis';
+import { formatAlertTriggerStatus } from '../../utils/dataQualityFormat/alerts';
 
 function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'default' {
   if (status === 'triggered') return 'success';
@@ -25,8 +30,12 @@ function formatNullable(value?: string | number | null): string {
 function renderPhaseQuality(trigger: AlertTriggerItem, language: UiLanguage): React.ReactNode {
   const text = ALERT_TRIGGER_TEXT[language];
   const phase = getMarketPhaseSummaryLabel(trigger.marketPhaseSummary, language);
-  const quality = trigger.analysisContextPackOverview?.dataQuality?.level;
-  const limitations = trigger.analysisContextPackOverview?.dataQuality?.limitations?.slice(0, 2) ?? [];
+  const quality = formatDataQualityLevel(
+    trigger.analysisContextPackOverview?.dataQuality?.level,
+    language,
+  );
+  const limitations = (trigger.analysisContextPackOverview?.dataQuality?.limitations?.slice(0, 2) ?? [])
+    .map((item) => formatDataQualityLimitation(item, language));
   if (!phase && !quality && limitations.length === 0) {
     return <span className="text-xs text-muted-text">--</span>;
   }
@@ -82,7 +91,7 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
       header: text.status,
       cell: (trigger) => (
         <Badge variant={statusVariant(trigger.status)}>
-          {text.statuses[trigger.status as keyof typeof text.statuses] ?? trigger.status}
+          {formatAlertTriggerStatus(trigger.status, language)}
         </Badge>
       ),
     },

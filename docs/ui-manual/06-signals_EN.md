@@ -113,6 +113,8 @@ Answer two questions:
 1. Did the rule fire?  
 2. Did each channel succeed? (may use `history=notifications`)
 
+Trigger history status and phase/quality columns use the existing localized labels (Triggered / Skipped / Degraded / Failed, and Good / Usable / Limited / Poor). Unknown codes stay visible. The API still returns the machine codes.
+
 Triage order: history for a trigger → Settings **test push** if channel failed → only then recreate rules. Check cooldown and enablement before deleting and remaking ten times.
 
 ---
