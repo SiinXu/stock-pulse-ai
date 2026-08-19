@@ -14,6 +14,7 @@ import {
   splitModels,
   type ChannelConfig,
   type ChannelTestState,
+  type ChannelValidationIssue,
   type TaskModelReference,
 } from './llmChannelEditorModel';
 import { resolveModelSourceAvailability } from './modelSourceAvailability';
@@ -26,7 +27,7 @@ interface ConnectionCardProps {
   unsaved: boolean;
   busy: boolean;
   testState?: ChannelTestState;
-  issues: string[];
+  issues: ChannelValidationIssue[];
   onTest: () => void;
   canTest: boolean;
   onEdit: () => void;

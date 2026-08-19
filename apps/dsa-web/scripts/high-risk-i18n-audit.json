@@ -1101,13 +1101,16 @@
         "contract_unknown",
         "missing_api_key",
         "missing_base_url",
+        "missing_enabled",
         "missing_extra_headers",
         "missing_models",
         "missing_protocol",
         "missing_provider",
+        "name_conflict",
         "name_invalid",
         "name_required",
-        "schema_unavailable"
+        "schema_unavailable",
+        "unknown"
       ],
       "codeToDisplayKeys": {
         "contract_unknown": [
@@ -1118,6 +1121,9 @@
         ],
         "missing_base_url": [
           "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_base_url"
+        ],
+        "missing_enabled": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_enabled"
         ],
         "missing_extra_headers": [
           "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_extra_headers"
@@ -1131,6 +1137,9 @@
         "missing_provider": [
           "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.missing_provider"
         ],
+        "name_conflict": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_conflict"
+        ],
         "name_invalid": [
           "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.name_invalid"
         ],
@@ -1139,6 +1148,9 @@
         ],
         "schema_unavailable": [
           "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.schema_unavailable"
+        ],
+        "unknown": [
+          "locales.settingsModelAccess.MODEL_ACCESS_ISSUES.unknown"
         ]
       }
     },

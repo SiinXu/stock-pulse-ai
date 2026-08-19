@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
-import type { UiLanguage } from '../i18n/uiText';
+import { formatUiText, type UiLanguage } from '../i18n/uiText';
 
 const zh = {
   runtimeSecret: '运行时注入的密钥不会显示；如需在设置页测试，请重新输入 API 密钥。', localPurpose: '连接本地模型服务', customPurpose: '接入兼容的自定义模型服务', aggregatorPurpose: '接入聚合模型平台', cloudPurpose: '接入云端模型服务', connectedCount: '已接入 {count} 条', connectionSucceeded: '连接成功', testFailed: '测试失败', noDiscoveredModels: '服务已连通，但没有返回可用模型', noDiscoveredModelsHint: '请确认服务地址指向兼容的模型列表接口，或在下方手动添加模型。', discoveredModels: '已获取 {count} 个模型', discoveryFailed: '获取模型失败', customProvider: '自定义服务', unsaved: '未保存', incompleteDraft: '草稿 · 未完成', enabled: '已启用', disabled: '已停用', available: '可用', unavailable: '不可用', testPassed: '测试通过', testing: '测试中', untested: '未测试', manageModels: '管理模型 {name}', noModels: '尚未添加可用模型，点击此处获取或手动添加模型', usedBy: '被以下任务使用：{tasks}', test: '测试', edit: '编辑', moreActions: '更多操作 {name}', disableConnection: '停用连接', enableConnection: '启用连接', deleteConnection: '删除连接', loadingModels: '正在获取模型列表…', duplicateName: '连接名称已存在，请更换', editService: '编辑模型服务', addService: '添加模型服务', chooseProviderDescription: '选择要接入的模型服务商，下一步填写凭据并选择可用模型。', catalogFailed: '模型服务列表加载失败', retry: '重试', chooseProvider: '选择模型服务商', provider: '模型服务商', providerPlaceholder: '搜索或选择服务商', providerSearch: '输入服务商名称搜索', cancel: '取消', next: '下一步', connectionName: '连接名称', protocol: '协议', chooseProtocol: '选择协议', providerProtocolRequired: '该服务商要求使用 {protocol} 协议。', baseUrl: '服务地址', officialUrl: '使用服务商官方地址', officialUrlHint: '使用官方接口地址，无需填写。', customUrl: '使用自定义服务地址', restoreOfficialUrl: '恢复官方默认地址', apiKey: 'API 密钥', extraHeaders: '附加请求头（JSON）', extraHeadersPlaceholder: '输入 JSON 对象，清空可移除无效配置', localKeyOptional: '本地服务可留空', multipleKeys: '支持多个密钥，用逗号分隔', getKey: '获取密钥：', availableModels: '可用模型', removeModel: '移除模型 {model}', cannotDeleteModel: '无法直接删除模型', modelReferenced: '该模型正被以下任务引用：', replacementModel: '替代模型', chooseReplacement: '选择替代模型', searchReplacement: '搜索替代模型', replaceAndDelete: '替换引用并删除', goTaskRouting: '前往任务路由', gettingModels: '获取中…', getModels: '获取模型', discoveryDescription: '自动拉取该服务的可用模型，确认后再加入连接。', noDiscovery: '该服务暂不支持自动获取模型，请在下方手动添加模型 ID。', addModelAria: '手动添加模型', addModelPlaceholder: '输入模型 ID 后回车添加', add: '添加', manualModel: '没有找到需要的模型？手动添加模型', testConnection: '测试连接', enableThis: '启用此连接', disabledDraftHint: '停用的连接会保留为草稿，不参与任务路由。', enableAria: '启用此连接', enableRequiresTest: '启用前需先通过连接测试。测试失败的来源不会显示为可用。', missingBeforeEnable: '启用前需补齐以下内容', fixName: '连接名称需要修正', incompleteSavedDraft: '未补齐的内容会以草稿保存：{issues}', back: '上一步', saveChanges: '保存修改', addToConfig: '添加到配置', readonly: '当前模型配置由外部配置管理，网页暂时只读。', viewDetails: '查看详情', emptyTitle: '还没有接入模型服务', emptyDescription: '接入后即可在任务路由中为报告、Agent 和视觉任务选择模型。', invalidTitle: '有模型服务未完成，无法保存', invalidDescription: '以下模型服务需补全后才能保存（点击顶部“保存并应用”统一提交）：', connectionNumber: '连接 #{number}', assignModels: '前往任务路由分配模型 →', cannotDeleteConnection: '无法直接删除连接', deleteConnectionTitle: '删除连接？', referencedConnection: '模型服务「{name}」正被以下任务引用：{tasks}。请先在任务路由为这些任务改选其它模型，再回来删除该连接。', removeDraftConnection: '将从当前草稿中移除模型服务「{name}」，保存后才生效。', replaceInRouting: '前往任务路由替换',
@@ -204,15 +204,66 @@ export const MODEL_ACCESS_REASON_HINTS: Record<UiLanguage, Record<string, string
   en: { missing_api_key: 'Enter at least one valid API key before testing.', api_key_rejected: 'The provider rejected this API key. Check the key, project access, region, and account status.', rate_limit: 'The provider rate-limited the request. Reduce request frequency or retry later.', insufficient_balance: 'The provider reported insufficient balance or billing credit. Check the account and plan.', quota_exceeded: 'The provider quota is exhausted. Check the plan and project limits.', provider_blocked: 'The provider or gateway blocked the request. Check account, region, model access, gateway, and content policies.', dns_error: 'DNS resolution failed. Check the base URL, proxy, and DNS configuration.', tls_error: 'TLS negotiation failed. Check the HTTPS certificate, gateway, and corporate proxy.', connection_refused: 'The service refused the connection. Check the port, service process, and firewall.', model_access_denied: 'This account cannot access the model. Confirm model access and account visibility.', provider_prefix_mismatch: 'The model provider prefix does not match this connection. Check the compatible route.', capability_unsupported: 'The model or compatibility layer does not support this capability. Basic text access may still work.' },
 });
 
-export const MODEL_ACCESS_ISSUES: Record<UiLanguage, Record<string, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_ISSUES", {
-  zh: { name_required: '连接名称必填', name_invalid: '连接名称仅限小写字母、数字或下划线', missing_provider: '缺少模型服务商', missing_protocol: '缺少连接协议', missing_api_key: '缺少 API 密钥', missing_base_url: '缺少服务地址', missing_models: '至少配置一个模型', missing_extra_headers: '附加请求头必填', contract_unknown: '连接字段契约包含不支持的条件', schema_unavailable: '连接 Schema 不完整或不可用' },
-  en: { name_required: 'Connection name is required', name_invalid: 'Use lowercase letters, numbers, or underscores', missing_provider: 'Model provider is required', missing_protocol: 'Connection protocol is required', missing_api_key: 'API key is required', missing_base_url: 'Base URL is required', missing_models: 'Add at least one model', missing_extra_headers: 'Extra headers are required', contract_unknown: 'The Connection field contract contains an unsupported condition', schema_unavailable: 'Connection Schema is incomplete or unavailable' },
+const modelAccessIssuesZh = {
+  name_required: '连接名称必填',
+  name_invalid: '连接名称仅限小写字母、数字或下划线',
+  name_conflict: '连接名称已存在，请更换',
+  missing_provider: '缺少模型服务商',
+  missing_protocol: '缺少连接协议',
+  missing_api_key: '缺少 API 密钥',
+  missing_base_url: '缺少服务地址',
+  missing_models: '至少配置一个模型',
+  missing_extra_headers: '附加请求头必填',
+  missing_enabled: '缺少启用状态',
+  contract_unknown: '连接字段契约包含不支持的条件',
+  schema_unavailable: '连接 Schema 不完整或不可用',
+  unknown: '连接校验出现未识别问题（{code}）',
+} as const;
+
+const modelAccessIssuesEn: Record<keyof typeof modelAccessIssuesZh, string> = {
+  name_required: 'Connection name is required',
+  name_invalid: 'Use lowercase letters, numbers, or underscores',
+  name_conflict: 'Connection name already exists',
+  missing_provider: 'Model provider is required',
+  missing_protocol: 'Connection protocol is required',
+  missing_api_key: 'API key is required',
+  missing_base_url: 'Base URL is required',
+  missing_models: 'Add at least one model',
+  missing_extra_headers: 'Extra headers are required',
+  missing_enabled: 'Enabled state is required',
+  contract_unknown: 'The Connection field contract contains an unsupported condition',
+  schema_unavailable: 'Connection Schema is incomplete or unavailable',
+  unknown: 'Unexpected connection validation issue ({code})',
+};
+
+export const MODEL_ACCESS_ISSUES: Record<UiLanguage, Record<keyof typeof modelAccessIssuesZh, string>> = createUiLanguageRecord("locales.settingsModelAccess.MODEL_ACCESS_ISSUES", {
+  zh: modelAccessIssuesZh,
+  en: modelAccessIssuesEn,
 });
 
-export function localizeModelAccessIssue(issue: string, language: UiLanguage): string {
-  const codeByZh: Record<string, keyof typeof MODEL_ACCESS_ISSUES.zh> = {
-    '连接名称必填': 'name_required', '连接名称仅限小写字母、数字或下划线': 'name_invalid', '缺少模型服务商': 'missing_provider', '缺少连接协议': 'missing_protocol', '缺少 API 密钥': 'missing_api_key', '缺少服务地址': 'missing_base_url', '至少配置一个模型': 'missing_models', '附加请求头必填': 'missing_extra_headers', '连接字段契约包含不支持的条件': 'contract_unknown', '连接 Schema 不完整或不可用': 'schema_unavailable',
-  };
-  const code = codeByZh[issue];
-  return code ? MODEL_ACCESS_ISSUES[language][code] : issue;
+export type ModelAccessIssueInput = string | {
+  code?: string;
+  field?: string;
+  params?: Record<string, string | number>;
+};
+
+const SAFE_ISSUE_CODE = /^[a-z][a-z0-9_]{0,63}$/;
+
+function resolveModelAccessIssueCode(issue: ModelAccessIssueInput): string {
+  return typeof issue === 'string' ? issue : (issue.code || '');
+}
+
+function sanitizeModelAccessIssueCode(code: string): string {
+  return SAFE_ISSUE_CODE.test(code) ? code : 'unknown';
+}
+
+export function localizeModelAccessIssue(issue: ModelAccessIssueInput, language: UiLanguage): string {
+  const catalog = MODEL_ACCESS_ISSUES[language];
+  const code = resolveModelAccessIssueCode(issue);
+  const template = catalog[code as keyof typeof catalog];
+  const params = typeof issue === 'string' ? undefined : issue.params;
+  if (template) {
+    return formatUiText(template, params);
+  }
+  return formatUiText(catalog.unknown, { code: sanitizeModelAccessIssueCode(code) });
 }

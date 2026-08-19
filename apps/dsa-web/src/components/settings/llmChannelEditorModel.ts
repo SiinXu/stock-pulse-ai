@@ -68,8 +68,88 @@ export function preservesUnavailableProviderSnapshot(
 const FALSEY_VALUES = new Set(['0', 'false', 'no', 'off']);
 const HERMES_CHANNEL_NAME = 'hermes';
 const HERMES_DEFAULT_MODEL = 'hermes-agent';
-export const CONNECTION_SCHEMA_UNAVAILABLE_ISSUE = '连接 Schema 不完整或不可用';
-export const CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE = '连接字段契约包含不支持的条件';
+
+export const CHANNEL_VALIDATION_ISSUE_CODES = {
+  nameRequired: 'name_required',
+  nameInvalid: 'name_invalid',
+  nameConflict: 'name_conflict',
+  missingProvider: 'missing_provider',
+  missingProtocol: 'missing_protocol',
+  missingBaseUrl: 'missing_base_url',
+  missingApiKey: 'missing_api_key',
+  missingModels: 'missing_models',
+  missingExtraHeaders: 'missing_extra_headers',
+  missingEnabled: 'missing_enabled',
+  contractUnknown: 'contract_unknown',
+  schemaUnavailable: 'schema_unavailable',
+} as const;
+
+export type ChannelValidationIssueCode =
+  typeof CHANNEL_VALIDATION_ISSUE_CODES[keyof typeof CHANNEL_VALIDATION_ISSUE_CODES];
+
+export interface ChannelValidationIssue {
+  code: ChannelValidationIssueCode;
+  field?: string;
+  params?: Record<string, string | number>;
+}
+
+export const CONNECTION_SCHEMA_UNAVAILABLE_ISSUE = CHANNEL_VALIDATION_ISSUE_CODES.schemaUnavailable;
+export const CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE = CHANNEL_VALIDATION_ISSUE_CODES.contractUnknown;
+
+const CHANNEL_VALIDATION_FIELDS = {
+  connectionName: 'connection_name',
+  displayName: 'display_name',
+  providerId: 'provider_id',
+  protocol: 'protocol',
+  baseUrl: 'base_url',
+  apiKey: 'api_key',
+  apiKeys: 'api_keys',
+  models: 'models',
+  extraHeaders: 'extra_headers',
+  enabled: 'enabled',
+} as const;
+
+const COMPLETENESS_ISSUE_BY_FIELD: Record<string, ChannelValidationIssueCode> = {
+  [CHANNEL_VALIDATION_FIELDS.connectionName]: CHANNEL_VALIDATION_ISSUE_CODES.nameRequired,
+  [CHANNEL_VALIDATION_FIELDS.displayName]: CHANNEL_VALIDATION_ISSUE_CODES.nameRequired,
+  [CHANNEL_VALIDATION_FIELDS.providerId]: CHANNEL_VALIDATION_ISSUE_CODES.missingProvider,
+  [CHANNEL_VALIDATION_FIELDS.protocol]: CHANNEL_VALIDATION_ISSUE_CODES.missingProtocol,
+  [CHANNEL_VALIDATION_FIELDS.baseUrl]: CHANNEL_VALIDATION_ISSUE_CODES.missingBaseUrl,
+  [CHANNEL_VALIDATION_FIELDS.apiKey]: CHANNEL_VALIDATION_ISSUE_CODES.missingApiKey,
+  [CHANNEL_VALIDATION_FIELDS.apiKeys]: CHANNEL_VALIDATION_ISSUE_CODES.missingApiKey,
+  [CHANNEL_VALIDATION_FIELDS.models]: CHANNEL_VALIDATION_ISSUE_CODES.missingModels,
+  [CHANNEL_VALIDATION_FIELDS.extraHeaders]: CHANNEL_VALIDATION_ISSUE_CODES.missingExtraHeaders,
+  [CHANNEL_VALIDATION_FIELDS.enabled]: CHANNEL_VALIDATION_ISSUE_CODES.missingEnabled,
+};
+
+export function isChannelValidationIssue(
+  issue: ChannelValidationIssue,
+  code: ChannelValidationIssueCode | readonly ChannelValidationIssueCode[],
+): boolean {
+  return typeof code === 'string' ? issue.code === code : code.includes(issue.code);
+}
+
+export function findChannelValidationIssue(
+  issues: readonly ChannelValidationIssue[],
+  match: {
+    codes?: readonly ChannelValidationIssueCode[];
+    fields?: readonly string[];
+  },
+): ChannelValidationIssue | undefined {
+  return issues.find((issue) => (
+    (match.codes != null && match.codes.includes(issue.code))
+    || (issue.field != null && match.fields != null && match.fields.includes(issue.field))
+  ));
+}
+
+export function getChannelNameConflictIssue(
+  channel: ChannelConfig,
+  existingNames: string[],
+): ChannelValidationIssue | undefined {
+  return existingNames.includes(channel.name.trim().toLowerCase())
+    ? { code: CHANNEL_VALIDATION_ISSUE_CODES.nameConflict, field: CHANNEL_VALIDATION_FIELDS.connectionName }
+    : undefined;
+}
 
 export const isHermesChannel = (channel: Pick<ChannelConfig, 'name'>): boolean => (
   channel.name.trim().toLowerCase() === HERMES_CHANNEL_NAME
@@ -1207,13 +1287,19 @@ function channelNamesAreSafe(channels: ChannelConfig[]): boolean {
 // Structural completeness contract (Slice 1). Name/protocol must be valid for
 // any channel; credential / base URL / models are required only when the
 // channel is enabled. Connectivity testing is intentionally NOT a gate here.
-export function getChannelNameIssues(channel: ChannelConfig): string[] {
+export function getChannelNameIssues(channel: ChannelConfig): ChannelValidationIssue[] {
   const name = channel.name.trim();
   if (!name) {
-    return ['连接名称必填'];
+    return [{
+      code: CHANNEL_VALIDATION_ISSUE_CODES.nameRequired,
+      field: CHANNEL_VALIDATION_FIELDS.connectionName,
+    }];
   }
   if (!/^[a-z0-9_]+$/.test(name)) {
-    return ['连接名称仅限小写字母、数字或下划线'];
+    return [{
+      code: CHANNEL_VALIDATION_ISSUE_CODES.nameInvalid,
+      field: CHANNEL_VALIDATION_FIELDS.connectionName,
+    }];
   }
   return [];
 }
@@ -1221,12 +1307,15 @@ export function getChannelNameIssues(channel: ChannelConfig): string[] {
 export function getChannelDisplayNameIssues(
   channel: ChannelConfig,
   connectionFields?: LlmConnectionFieldSchema[],
-): string[] {
+): ChannelValidationIssue[] {
   // Older Catalog payloads have no dynamic schema, so preserve their display
   // name requirement. Once a schema is present, its contract is authoritative.
   return connectionFields !== undefined || channel.displayName.trim()
     ? []
-    : ['连接名称必填'];
+    : [{
+      code: CHANNEL_VALIDATION_ISSUE_CODES.nameRequired,
+      field: CHANNEL_VALIDATION_FIELDS.displayName,
+    }];
 }
 
 // Mirrors the backend `channel_allows_empty_api_key` contract: ollama never
@@ -1246,43 +1335,44 @@ export function getChannelCompletenessIssues(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
   catalogUnavailable = false,
-): string[] {
+): ChannelValidationIssue[] {
   if (connectionFields !== undefined) {
     const connectionSchemaFields = connectionFields ?? [];
     const values = buildChannelContractValues(channel, providers, emptyApiKeyHosts);
     const authority = evaluateConnectionSchemaAuthority(values, connectionSchemaFields);
     if (!authority.usable) {
-      return [authority.reason === 'unknown_condition'
-        ? CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE
-        : CONNECTION_SCHEMA_UNAVAILABLE_ISSUE];
+      return [{
+        code: authority.reason === 'unknown_condition'
+          ? CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE
+          : CONNECTION_SCHEMA_UNAVAILABLE_ISSUE,
+      }];
     }
-    const issueByField: Record<string, string> = {
-      connection_name: '连接名称必填',
-      display_name: '连接名称必填',
-      provider_id: '缺少模型服务商',
-      protocol: '缺少连接协议',
-      base_url: '缺少服务地址',
-      api_key: '缺少 API 密钥',
-      api_keys: '缺少 API 密钥',
-      models: '至少配置一个模型',
-      extra_headers: '附加请求头必填',
-      enabled: '缺少启用状态',
-    };
     const missingFields = validateConnectionContractValues(values, connectionSchemaFields);
     if (missingFields.some((field) => !SUPPORTED_CONNECTION_SCHEMA_KEYS.has(field))) {
-      return [CONNECTION_SCHEMA_UNAVAILABLE_ISSUE];
+      return [{ code: CONNECTION_SCHEMA_UNAVAILABLE_ISSUE }];
     }
-    const issues = missingFields.map(
-      (field) => issueByField[field] ?? CONNECTION_SCHEMA_UNAVAILABLE_ISSUE,
-    );
-    return Array.from(new Set(issues));
+    const seen = new Set<string>();
+    const issues: ChannelValidationIssue[] = [];
+    for (const field of missingFields) {
+      const code = COMPLETENESS_ISSUE_BY_FIELD[field] ?? CONNECTION_SCHEMA_UNAVAILABLE_ISSUE;
+      const key = `${field}:${code}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      issues.push({ code, field });
+    }
+    return issues;
   }
 
   // Rolling-upgrade compatibility for an older Catalog payload. Requirement
   // flags still come from that payload; no Provider ID table is reconstructed.
-  const issues: string[] = [];
+  const issues: ChannelValidationIssue[] = [];
   if (!channelAllowsEmptyApiKey(channel, emptyApiKeyHosts) && !channel.apiKey.trim()) {
-    issues.push('缺少 API 密钥');
+    issues.push({
+      code: CHANNEL_VALIDATION_ISSUE_CODES.missingApiKey,
+      field: CHANNEL_VALIDATION_FIELDS.apiKey,
+    });
   }
   // Known providers ship a default Base URL, and ollama/local endpoints have a
   // runtime default, so only custom remote endpoints must supply one. (The
@@ -1293,10 +1383,16 @@ export function getChannelCompletenessIssues(
     && channel.protocol !== 'ollama'
     && !channel.baseUrl.trim()
   ) {
-    issues.push('缺少服务地址');
+    issues.push({
+      code: CHANNEL_VALIDATION_ISSUE_CODES.missingBaseUrl,
+      field: CHANNEL_VALIDATION_FIELDS.baseUrl,
+    });
   }
   if (splitModels(channel.models).length === 0) {
-    issues.push('至少配置一个模型');
+    issues.push({
+      code: CHANNEL_VALIDATION_ISSUE_CODES.missingModels,
+      field: CHANNEL_VALIDATION_FIELDS.models,
+    });
   }
   return issues;
 }
@@ -1309,7 +1405,7 @@ export function getChannelSaveIssues(
   emptyApiKeyHosts: string[],
   connectionFields?: LlmConnectionFieldSchema[],
   catalogUnavailable = false,
-): string[] {
+): ChannelValidationIssue[] {
   const nameIssues = getChannelNameIssues(channel);
   const displayNameIssues = getChannelDisplayNameIssues(channel, connectionFields);
   if (nameIssues.length > 0 || displayNameIssues.length > 0) {

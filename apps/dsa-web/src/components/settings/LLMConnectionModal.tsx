@@ -28,6 +28,7 @@ import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 import { ModelMultiSelect } from './ModelMultiSelect';
 import { SettingsSwitch } from './SettingsSwitch';
 import {
+  CHANNEL_VALIDATION_ISSUE_CODES,
   CONNECTION_FIELD_BY_DRAFT_KEY,
   CONNECTION_SCHEMA_UNAVAILABLE_ISSUE,
   CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE,
@@ -42,10 +43,13 @@ import {
   describeProviderOption,
   evaluateChannelSchemaAuthority,
   findCatalogProvider,
+  findChannelValidationIssue,
   formatProtocolLabel,
   getChannelCompletenessIssues,
   getChannelDisplayNameIssues,
+  getChannelNameConflictIssue,
   getChannelNameIssues,
+  isChannelValidationIssue,
   hasRuntimeOnlyMaskedConnectionSecret,
   isHermesChannel,
   modelIdentityForConnection,
@@ -546,9 +550,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const legacyDisplayNameIssues = draft
     ? getChannelDisplayNameIssues(draft, connectionFields)
     : [];
-  const nameConflict = draft && existingNames.includes(draft.name.trim().toLowerCase())
-    ? ['连接名称已存在，请更换']
-    : [];
+  const nameConflict = draft ? getChannelNameConflictIssue(draft, existingNames) : undefined;
   const completenessIssues = draft
     ? getChannelCompletenessIssues(
       draft,
@@ -558,10 +560,10 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
       catalogUnavailable,
     )
     : [];
-  const contractDiagnostics = completenessIssues.filter(
-    (issue) => issue === CONNECTION_SCHEMA_UNAVAILABLE_ISSUE
-      || issue === CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE,
-  );
+  const contractDiagnostics = completenessIssues.filter((issue) => isChannelValidationIssue(issue, [
+    CONNECTION_SCHEMA_UNAVAILABLE_ISSUE,
+    CONNECTION_SCHEMA_UNKNOWN_CONDITION_ISSUE,
+  ]));
   const contractBlockingIssues = hasConnectionSchema
     ? completenessIssues
     : draft?.enabled
@@ -570,18 +572,46 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   const blockingIssues = [
     ...nameIssues,
     ...legacyDisplayNameIssues,
-    ...nameConflict,
+    ...(nameConflict ? [nameConflict] : []),
     ...contractBlockingIssues,
   ];
-  const nameError = [
+  const nameErrorIssue = findChannelValidationIssue([
     ...legacyDisplayNameIssues,
-    ...completenessIssues.filter((issue) => issue === '连接名称必填'),
+    ...completenessIssues,
     ...nameIssues,
-    ...nameConflict,
-  ][0];
-  const apiKeyError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少 API 密钥') : undefined;
-  const baseUrlError = draft?.enabled ? completenessIssues.find((issue) => issue === '缺少服务地址') : undefined;
-  const modelsError = draft?.enabled ? completenessIssues.find((issue) => issue === '至少配置一个模型') : undefined;
+    ...(nameConflict ? [nameConflict] : []),
+  ], {
+    codes: [
+      CHANNEL_VALIDATION_ISSUE_CODES.nameRequired,
+      CHANNEL_VALIDATION_ISSUE_CODES.nameInvalid,
+      CHANNEL_VALIDATION_ISSUE_CODES.nameConflict,
+    ],
+    fields: ['display_name', 'connection_name'],
+  });
+  const enabledFieldErrors = draft?.enabled ? completenessIssues : [];
+  const apiKeyErrorIssue = findChannelValidationIssue(enabledFieldErrors, {
+    codes: [CHANNEL_VALIDATION_ISSUE_CODES.missingApiKey],
+    fields: ['api_key', 'api_keys'],
+  });
+  const baseUrlErrorIssue = findChannelValidationIssue(enabledFieldErrors, {
+    codes: [CHANNEL_VALIDATION_ISSUE_CODES.missingBaseUrl],
+    fields: ['base_url'],
+  });
+  const extraHeadersErrorIssue = findChannelValidationIssue(enabledFieldErrors, {
+    codes: [CHANNEL_VALIDATION_ISSUE_CODES.missingExtraHeaders],
+    fields: ['extra_headers'],
+  });
+  const modelsErrorIssue = findChannelValidationIssue(enabledFieldErrors, {
+    codes: [CHANNEL_VALIDATION_ISSUE_CODES.missingModels],
+    fields: ['models'],
+  });
+  const nameError = nameErrorIssue ? localizeModelAccessIssue(nameErrorIssue, language) : undefined;
+  const apiKeyError = apiKeyErrorIssue ? localizeModelAccessIssue(apiKeyErrorIssue, language) : undefined;
+  const baseUrlError = baseUrlErrorIssue ? localizeModelAccessIssue(baseUrlErrorIssue, language) : undefined;
+  const extraHeadersError = extraHeadersErrorIssue
+    ? localizeModelAccessIssue(extraHeadersErrorIssue, language)
+    : undefined;
+  const modelsError = modelsErrorIssue ? localizeModelAccessIssue(modelsErrorIssue, language) : undefined;
 
   const providerRequirements = !hasConnectionSchema && draft && provider ? resolveConnectionRequirements({
     provider,
@@ -967,6 +997,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 value={draft.extraHeaders}
                 onChange={(event) => updateDraft('extraHeaders', event.target.value)}
                 placeholder={text.extraHeadersPlaceholder}
+                error={extraHeadersError}
                 disabled={fieldIsReadOnly('extra_headers')}
                 fieldClassName={SETTINGS_CONTROL_WIDTH_CLASS}
               />
@@ -1238,7 +1269,9 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
               message={(
                 <ul className="ml-4 list-disc space-y-0.5">
                   {blockingIssues.map((issue) => (
-                    <li key={issue}>{localizeModelAccessIssue(issue, language)}</li>
+                    <li key={`${issue.field ?? 'issue'}:${issue.code}`}>
+                      {localizeModelAccessIssue(issue, language)}
+                    </li>
                   ))}
                 </ul>
               )}
