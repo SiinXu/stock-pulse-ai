@@ -17,9 +17,41 @@ Authorable theme surface for Web (Issues #162 / #880):
 | 1 — Core semantic | Theme pack / `:root` / `.dark` | Bare HSL channels for Tailwind. Packs may recolor brand/surfaces only. |
 | Legacy aliases | `index.css` | `--home-price-up/down` → Layer 0 hues during migration. |
 
-Built-in packs: `classic` (default), `slate` (validation variant). Runtime attrs: `data-theme-pack`, `data-price-direction`. Guard: `themeContractGuard.test.ts` (baseline-only-decrease). Preference bridge: `MARKET_REVIEW_COLOR_SCHEME` ↔ `data-price-direction`.
+Built-in packs: `classic` (default), `slate` (validation variant). Runtime attrs: `data-theme-pack`, `data-price-direction`. Guard: `themeContractGuard.test.ts` (baseline-only-decrease) plus the Phase 0 token-freeze ratchet below. Preference bridge: `MARKET_REVIEW_COLOR_SCHEME` ↔ `data-price-direction`.
 
 Signed price / gain / loss paint on Portfolio, Backtest, Screening results, Market Structure, and Financial Calculators uses `changeSemantics` + `changeColorCssVar` (via `SignedChangeText`). Preference is the existing ThemeAppearance / `data-price-direction` bridge (`MARKET_REVIEW_COLOR_SCHEME`) — do not add a parallel preference hook. Do not map signed values onto `text-success` / `text-danger`. Zero, missing, non-finite, and unresolved-market values stay unpainted; never invent a `cn` market for an unknown code. Sign or wording remains the non-color cue. Backtest up/down movement badges use `trend-up` / `trend-down` so they follow `data-price-direction`.
+
+### Theme token freeze (Phase 0 / #1300)
+
+Phase 0 freezes the current Web custom-property contract. It does **not** delete page-scoped leftovers, unify value formats, or ship a second theme package. Those remain later T25/T40 work.
+
+| Surface | Owner | Freeze rule |
+| --- | --- | --- |
+| Web runtime tokens | `apps/dsa-web/src/index.css` (`:root`, `.dark`, pack selectors, `data-price-direction`, `data-density`) | Unique defined names must match `THEME_DEFINED_TOKEN_NAMES`. New names fail CI. |
+| Classification | `classifyThemeToken()` in `src/design/theme.ts` | Layer 0 / Layer 1 stay the public API. Page-scoped leftovers are `page-scoped-debt`, not Layer 1. Compat and `--home-price-*` aliases stay aliases. |
+| Page prefixes | `--home-*`, `--settings-*`, `--login-*`, `--chat-*`, `--backtest-*`, `--portfolio-*` | Frozen. Do not add names. Do not promote them to Layer 1 to green CI. |
+| Definitions outside `index.css` | production TS/TSX/CSS | Forbidden. Local `style` may override an inventoried token (see `Input` error ring); it may not invent a new name. |
+| Undefined `var(--*)` | `THEME_UNGOVERNED_REFERENCE_DEBT` in `themeTokenFreezeGuard.test.ts` | Shrink-only. Includes `--home-border`, chart `--info`, Tailwind `--color-purple`, and optional `.input-surface` slots. Do not add those names to the defined inventory. The list stays in the `.test.ts` file because `./themeTokenFreeze.ts` is not path-filtered as `__tests__` by the production source inventory. |
+| Desktop chrome | `apps/dsa-desktop/renderer/assistant.html` and `loading.html` | Isolated inventories in `DESKTOP_CHROME_DEFINED_TOKENS`. The embedded WebView still uses the Web contract. Do not copy desktop `--bg` / `--panel` into Web Layer 1. |
+
+**How to add a token.** Prefer an existing Layer 1 name plus use-site opacity (`hsl(var(--primary) / 0.12)`). If a new public token is required: add it to `THEME_LAYER1_CSS_VARS` (or Layer 0 only for market paint), define it on `:root` and `.dark`, append it to `THEME_DEFINED_TOKEN_NAMES`, and keep charts / price-direction / desktop chrome on the existing owners. Domain geometry may use `--nav-*` / `--report-*` / `--input-surface-*`. Never add a page-prefixed name.
+
+**How to read a failure**
+
+| Code | Meaning |
+| --- | --- |
+| `new-defined-token` / `ungoverned-defined-token` | `index.css` grew a name that is missing from the inventory or has no class. Follow the addition workflow; do not invent a page token. |
+| `stale-defined-token` | Inventory lists a name that left `index.css`. Remove it from the inventory in the same PR. |
+| `page-scoped-growth` | A new `--home-*` / `--settings-*` / … name. Delete it or reuse Layer 1. |
+| `outside-definition` | A custom property was defined outside `index.css`. |
+| `new-ungoverned-reference` | `var(--missing)` / `hsl(var(--missing))` is not defined and not on the shrink-only debt list. |
+| `stale-ungoverned-reference` | A recorded undefined reference is gone. Shrink `THEME_UNGOVERNED_REFERENCE_DEBT`. |
+| `blessed-page-token` | A page-prefixed name was classified as Layer 1. Keep it as `page-scoped-debt` or `legacy-alias`. |
+| `desktop-token-growth` / `stale-desktop-token` | Isolated desktop chrome tokens changed. Update `DESKTOP_CHROME_DEFINED_TOKENS` only for that surface. |
+
+Guards: `themeContractGuard.test.ts` (price-direction / pack / Layer 0) and `themeTokenFreezeGuard.test.ts` (name-set ratchet and counterexamples).
+
+**WAIT_FOR density integration.** Repeating the 18 structural spacing custom-property names as string literals in `themeTokenInventory.ts` is measured by `densityAdoptionRatchet` as `new-density-aware-file` (`../../design/themeTokenInventory.ts`, `densityTokenCount=18`, `fixedSpacingCount=0`). That is a catalog-string false positive, not theme-token consumer adoption. T24 does **not** change `densityAdoptionRatchet.ts` or weaken that scanner. The inventory composes those names from `DENSITY_STRUCTURAL_CSS_VARS` instead of repeating the literals. Density implementation/review should decide whether non-`density.ts` design catalogs belong in the consumer inventory; do not raise the density baseline or add a scanner bypass on this PR.
 
 
 - Foundation owns semantic tokens and shared control geometry.

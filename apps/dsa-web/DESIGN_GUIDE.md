@@ -102,11 +102,22 @@
 
 ### 2.5 Theme Contract v1（#162 / #880）
 
-- 目录：`src/design/theme.ts` + `themePacks.ts`；运行时：`data-theme-pack` / `data-price-direction`。
+- 目录：`src/design/theme.ts` + `themePacks.ts` + `themeTokenInventory.ts`；运行时：`data-theme-pack` / `data-price-direction`。
 - Pack 仅可写 Layer 1 核心语义；**禁止** pack 覆盖 Layer 0 涨跌色。
 - 内置 pack：`classic`（默认 / `:root`）、`slate`（中性品牌验证变体）。
 - 守卫：`themeContractGuard.test.ts` 采用与 production design guard 相同的「基线只减不增」天花板。
 - 格式策略：Layer 1 继续使用 bare HSL channel triples（Tailwind 互操作）；Layer 0 使用完整 `hsl(...)` 颜色串。
+
+### 2.6 Theme token freeze（Phase 0 / #1300）
+
+- **冻结当前自定义属性名集合**，不在本阶段删除 page-scoped 遗留、不统一格式、不引入第二套 token 系统。
+- 可执行清单：`THEME_DEFINED_TOKEN_NAMES`（`src/index.css` 的 unique 定义）+ `classifyThemeToken()`。
+- **禁止新增** `--home-*` / `--settings-*` / `--login-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。
+- 新 UI 只用 Layer 1 + `components/common`；缺色用 `hsl(var(--token) / alpha)`，不要为每个透明度再开 token。
+- 未定义的 `var(--*)`（如 `--home-border`、`--info`、`--color-purple`、`.input-surface` 可选槽）登记在 freeze 守卫测试里的 `THEME_UNGOVERNED_REFERENCE_DEBT`（`themeTokenFreezeGuard.test.ts`），只减不增，且**不得**写进已定义清单冒充合法 token。
+- Desktop 嵌入的 WebView 走同一套 Web token。`apps/dsa-desktop/renderer/assistant.html` / `loading.html` 是独立 chrome 清单，禁止把 `--bg` / `--panel` 并进 Web Layer 1。
+- 有意新增：写入 `THEME_LAYER1_CSS_VARS`（或仅市场色可写 Layer 0）→ 在 `:root` 与 `.dark` 赋值 → 追加 `THEME_DEFINED_TOKEN_NAMES`。领域几何可用 `--nav-*` / `--report-*` / `--input-surface-*`。守卫：`themeTokenFreezeGuard.test.ts`。详细失败码见 [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md)。
+- **WAIT_FOR 密度集成**：若把 18 个结构间距自定义属性名写成 `themeTokenInventory.ts` 字符串字面量，`densityAdoptionRatchet` 会把该清单测成 `new-density-aware-file`（`densityTokenCount=18`）。这是目录字符串假阳性，不是主题消费者接入。T24 **不改** 密度扫描器；间距名从已有 `DENSITY_STRUCTURAL_CSS_VARS` 组合进来。是否把非 `density.ts` 的 design catalog 排除出消费者清单，留给密度实现/审查决定。
 
 ## 3. 字体阶（全部 Geist）
 

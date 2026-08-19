@@ -1,0 +1,2 @@
+- [Added] Freeze the Web theme custom-property contract: classified inventory, no new page-scoped tokens, and shrink-only ungoverned `var(--*)` debt (Refs #1300).
+- [Docs] Document the Phase 0 token-freeze ratchet, addition workflow, desktop-chrome isolation, and the WAIT_FOR density-catalog false-positive (`themeTokenInventory.ts` string literals vs `densityAdoptionRatchet`) (Refs #1300).
