@@ -1,0 +1,1 @@
+- [Fixed] Localized LLM connection validation errors through structured issue codes instead of hardcoded Chinese strings (Refs #164).

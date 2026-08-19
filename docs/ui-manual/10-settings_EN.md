@@ -65,6 +65,8 @@ Save control is often on the top or bottom toolbar—scroll once on narrow scree
 
 The provider picker uses a rounded search field. Success, empty, and error states from **Fetch models** appear below the action instead of squeezing it; manual model entry remains available after a failure.
 
+Connection field errors (missing name, API key, Base URL, models, extra headers, and schema problems) follow the current **UI language**. They stay attached to the corresponding field and never appear as raw backend codes.
+
 ### Local models
 
 Browse catalog, pull/register, activate. Desktop may prefer bundled Ollama. Respect delete protections on catalog models.

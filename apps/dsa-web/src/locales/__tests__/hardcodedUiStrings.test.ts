@@ -126,19 +126,7 @@ const exactAllowedStrings: HardcodedUiStringAllowance[] = [
   },
 ];
 
-const expiringErrorCopyAllowance: ExpiringUiStringFileAllowance = {
-  files: [
-    'components/settings/LLMConnectionModal.tsx',
-    'components/settings/llmChannelEditorModel.ts',
-  ],
-  context: 'error',
-  reason: 'LLM connection editor still ships Chinese field-error literals through error={...}.',
-  removeWhen: 'Follow-up task localizes LLM connection field-error copy in LLMConnectionModal and llmChannelEditorModel (Refs #164).',
-};
-
-const expiringFileAllowances: readonly ExpiringUiStringFileAllowance[] = [
-  expiringErrorCopyAllowance,
-];
+const expiringFileAllowances: readonly ExpiringUiStringFileAllowance[] = [];
 
 function collectSourceFiles(directory: string): string[] {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry: { name: string; isDirectory: () => boolean; isFile: () => boolean }) => {
@@ -484,9 +472,7 @@ describe('production hardcoded UI strings', () => {
   it('keeps every allowance documented, exact, and in use', () => {
     expect(exactAllowedStrings.every((allowance) => allowance.purpose.trim().length > 0)).toBe(true);
     expect(findUnusedUiStringAllowances(productionCandidates(), exactAllowedStrings)).toEqual([]);
-    expect(expiringFileAllowances).toHaveLength(1);
-    expect(expiringErrorCopyAllowance.reason.trim().length).toBeGreaterThan(0);
-    expect(expiringErrorCopyAllowance.removeWhen).toMatch(/localizes LLM connection field-error copy/i);
+    expect(expiringFileAllowances).toHaveLength(0);
     expect(findUnusedExpiringFileAllowances(productionCandidates(), expiringFileAllowances)).toEqual([]);
   });
 });

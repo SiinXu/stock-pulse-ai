@@ -40,6 +40,8 @@ locales/reportContent.ts
 
 分析提交、股票代码校验和导入/图片上传的常见 400 校验失败使用专用稳定码（例如 `missing_stock_params`、`invalid_stock_or_name`、`analysis_batch_limit_exceeded`、`invalid_stock_code`、`missing_upload_file`、`unsupported_content_type` 和 `file_too_large`）。这些码及其 `params` 是 Web 本地化合同；中文 `message` 继续作为诊断与旧客户端回退，不应被新界面当作主文案。
 
+设置页「模型来源」连接校验同样走稳定码：`getChannelNameIssues` / `getChannelCompletenessIssues` / `getChannelSaveIssues` 返回 `{ code, field, params }`，渲染时由 `localizeModelAccessIssue()` 映射到 `MODEL_ACCESS_ISSUES`。未知码使用本地化的 `unknown` 模板并只插值经过清洗的 `{code}`，不得回退中文原文或展示后端裸枚举/散文。
+
 Agent 会话历史遵循同一契约。失败记录由历史 API 返回安全的兼容 `content`，并通过 `error + params` 标识可本地化的失败；普通消息不携带这两个字段。Web 必须在渲染时按当前 UI language 解析错误，且消息显示、单条复制和会话导出必须复用同一份解析结果，确保切换语言后已加载的历史立即更新。服务端会将历史 `[分析失败]...` 记录适配为稳定错误码；新失败不得把 Provider 原始错误写入历史或返回给客户端。
 
 诊断回退必须保持分层：已知 `error` 使用对应本地化文案和 `params`；未知 `error` 使用通用本地化错误；legacy 原始字符串、`message`、`details` 和 `trace_id` 只能保留在诊断入口，不能提升为主错误文案。历史记录的安全 `content` 仅用于旧客户端兼容，不能覆盖稳定错误码的本地化结果。
