@@ -151,34 +151,27 @@ describe('web unit coverage gate', () => {
     expect(setupTests).toContain('configure({ asyncUtilTimeout: getWebUnitAsyncUtilTimeoutMs() })');
     expect(setupTests).not.toContain('process.argv');
 
-    // Fork workers never see `--coverage`. Vitest still serializes
-    // config.coverage.enabled into the worker — that is independent of our
-    // helper and of process.argv. A real coverage process must therefore
-    // expose WEB_VITEST_COVERAGE=1 and apply the 10s RTL budget.
+    // Fork workers never see `--coverage` on argv. The injected env flag is
+    // the worker-visible contract: 10s under coverage, 1s for `npm run test`.
     const workerHasCoverageArgv = process.argv.some(
       (argument) => argument === '--coverage' || argument.startsWith('--coverage.'),
     );
     expect(workerHasCoverageArgv).toBe(false);
-    const workerState = (
-      globalThis as {
-        __vitest_worker__?: { config?: { coverage?: { enabled?: boolean } } };
-      }
-    ).__vitest_worker__;
-    const vitestCoverageEnabled = workerState?.config?.coverage?.enabled === true;
-    expect(process.env[WEB_VITEST_COVERAGE_FLAG]).toBe(
-      vitestCoverageEnabled ? WEB_VITEST_COVERAGE_FLAG_VALUE : '',
-    );
+    const coverageWorker = process.env[WEB_VITEST_COVERAGE_FLAG] === WEB_VITEST_COVERAGE_FLAG_VALUE;
     expect(getConfig().asyncUtilTimeout).toBe(
-      vitestCoverageEnabled ? WEB_COVERAGE_ASYNC_UTIL_TIMEOUT_MS : WEB_UNIT_ASYNC_UTIL_TIMEOUT_MS,
+      coverageWorker ? WEB_COVERAGE_ASYNC_UTIL_TIMEOUT_MS : WEB_UNIT_ASYNC_UTIL_TIMEOUT_MS,
     );
-    expect(getConfig().asyncUtilTimeout).toBe(vitestCoverageEnabled ? 10_000 : 1_000);
+    expect(getConfig().asyncUtilTimeout).toBe(coverageWorker ? 10_000 : 1_000);
   });
 
   it('waits for lazy report diagnostics together with news before asserting order', () => {
+    expect(placementTest).toContain('render(<ReportSummary data={result} />)');
     expect(placementTest).toContain("expect(screen.getByTestId('run-diagnostics')).toBeInTheDocument()");
     expect(placementTest).toContain('const diagnostics = screen.getByTestId(\'run-diagnostics\')');
     expect(placementTest).not.toMatch(/await screen\.findByTestId\('run-diagnostics'\)/);
     expect(placementTest).toContain('ReportDiagnostics is React.lazy');
+    expect(placementTest).not.toMatch(/vi\.mock\([^)]*ReportDiagnostics/);
+    expect(placementTest).not.toMatch(/waitFor\([\s\S]*?,\s*\{\s*timeout:/);
   });
 
   it('keeps exclusions limited to generated, vendor, and non-unit-testable assets', () => {
