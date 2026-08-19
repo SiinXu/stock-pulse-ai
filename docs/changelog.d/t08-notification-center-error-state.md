@@ -1,0 +1,1 @@
+- [Fixed] Made the Notification Center error state honest and race-safe (Refs #879).

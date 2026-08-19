@@ -60,11 +60,18 @@ const NotificationCenterPage: React.FC = () => {
   const [kind, setKind] = useState<'' | NotificationInboxKind>('');
   const [markingId, setMarkingId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const requestIdRef = useRef(0);
+  const kindRef = useRef(kind);
+  const readFilterRef = useRef(readFilter);
+  kindRef.current = kind;
+  readFilterRef.current = readFilter;
 
   const load = useCallback(async (
     mode: 'initial' | 'refresh' | 'more' = 'initial',
     cursor?: string,
   ) => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
     if (mode === 'initial') setLoading(true);
     if (mode === 'refresh') setRefreshing(true);
     if (mode === 'more') setLoadingMore(true);
@@ -74,9 +81,10 @@ const NotificationCenterPage: React.FC = () => {
         page: 1,
         pageSize: 50,
         cursor,
-        kind: kind || undefined,
-        unreadOnly: readFilter === 'unread',
+        kind: kindRef.current || undefined,
+        unreadOnly: readFilterRef.current === 'unread',
       });
+      if (requestIdRef.current !== requestId) return;
       setPageData(response);
       setItems((current) => {
         if (mode !== 'more') return response.items;
@@ -84,25 +92,38 @@ const NotificationCenterPage: React.FC = () => {
         return [...current, ...response.items.filter((item) => !existingIds.has(item.id))];
       });
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
+      if (mode === 'initial') {
+        setPageData(null);
+        setItems([]);
+      }
       setError(getParsedApiError(err));
     } finally {
-      setLoading(false);
-      setRefreshing(false);
-      setLoadingMore(false);
+      if (requestIdRef.current === requestId) {
+        setLoading(false);
+        setRefreshing(false);
+        setLoadingMore(false);
+      }
     }
-  }, [kind, readFilter]);
+  }, []);
 
   useEffect(() => {
     void load('initial');
-  }, [load]);
+    return () => {
+      requestIdRef.current += 1;
+    };
+  }, [load, kind, readFilter]);
 
   const handleMarkRead = async (itemId: string) => {
+    const requestId = requestIdRef.current;
     setMarkingId(itemId);
     setError(null);
     try {
       await notificationInboxApi.markRead([itemId]);
+      if (requestIdRef.current !== requestId) return;
       await load('refresh');
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
       setError(getParsedApiError(err));
     } finally {
       setMarkingId(null);
@@ -110,12 +131,15 @@ const NotificationCenterPage: React.FC = () => {
   };
 
   const handleMarkAllRead = async () => {
+    const requestId = requestIdRef.current;
     setMarkingAll(true);
     setError(null);
     try {
-      await notificationInboxApi.markAllRead(kind || undefined);
+      await notificationInboxApi.markAllRead(kindRef.current || undefined);
+      if (requestIdRef.current !== requestId) return;
       await load('refresh');
     } catch (err) {
+      if (requestIdRef.current !== requestId) return;
       setError(getParsedApiError(err));
     } finally {
       setMarkingAll(false);
@@ -206,7 +230,11 @@ const NotificationCenterPage: React.FC = () => {
 
       {error ? (
         <div className="mb-4" role="alert" aria-label={text.loadError}>
-          <ApiErrorAlert error={error} />
+          <ApiErrorAlert
+            error={error}
+            actionLabel={t('common.retry')}
+            onAction={() => void load('initial')}
+          />
         </div>
       ) : null}
 
@@ -224,7 +252,7 @@ const NotificationCenterPage: React.FC = () => {
         <p className="py-12 text-center text-sm text-secondary-text" role="status">
           {t('common.loading')}
         </p>
-      ) : (
+      ) : !error || items.length > 0 ? (
         <>
           <NotificationInboxList
             items={items}
@@ -234,7 +262,7 @@ const NotificationCenterPage: React.FC = () => {
             markingId={markingId}
             disabled={markingAll || loadingMore}
           />
-          {pageData?.hasMore && pageData.nextCursor ? (
+          {!error && pageData?.hasMore && pageData.nextCursor ? (
             <div className="mt-4 flex justify-center">
               <Button
                 type="button"
@@ -248,7 +276,7 @@ const NotificationCenterPage: React.FC = () => {
             </div>
           ) : null}
         </>
-      )}
+      ) : null}
     </WorkspacePage>
   );
 };

@@ -3,11 +3,14 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ToastProvider } from '../../components/common';
 import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
 } from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { chooseOption, createDeferred } from '../../test-utils';
+import type { NotificationInboxItem, NotificationInboxPage } from '../../types/notificationInbox';
 import NotificationCenterPage from '../NotificationCenterPage';
 
 const listMock = vi.fn();
@@ -28,15 +31,70 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   return () => {};
 });
 
+function emptyPage(overrides: Partial<NotificationInboxPage> = {}): NotificationInboxPage {
+  return {
+    items: [],
+    page: 1,
+    pageSize: 50,
+    total: 0,
+    unreadTotal: 0,
+    hasMore: false,
+    sourceStatuses: [],
+    retentionDays: 90,
+    maxItems: 500,
+    ...overrides,
+  };
+}
+
+function inboxItem(overrides: Partial<NotificationInboxItem> = {}): NotificationInboxItem {
+  return {
+    id: 'v1:analysis_complete:1:1786233600000000',
+    kind: 'analysis_complete',
+    titleKey: 'analysisCompleteTitle',
+    titleParams: { label: '600519' },
+    summary: 'hold',
+    severity: 'info',
+    createdAt: '2026-08-09T00:00:00Z',
+    isRead: false,
+    href: '/research/analysis?segment=history&recordId=1',
+    sourceId: '1',
+    ...overrides,
+  };
+}
+
+function alertItem(): NotificationInboxItem {
+  return inboxItem({
+    id: 'v1:alert_triggered:2:1786233500000000',
+    kind: 'alert_triggered',
+    titleKey: 'alertTriggeredTitle',
+    titleParams: { target: 'MSFT' },
+    summary: 'Threshold crossed',
+    severity: 'warning',
+    createdAt: '2026-08-09T23:58:20Z',
+    href: '/signals?tab=history&trigger=2',
+    sourceId: '2',
+  });
+}
+
+function unreadOnlyItem(): NotificationInboxItem {
+  return inboxItem({
+    id: 'v1:analysis_complete:3:1786233400000000',
+    titleParams: { label: 'UNREAD' },
+    summary: 'unread-only row',
+  });
+}
+
 function renderPage() {
   return render(
     <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-        <UiLanguageProvider initialLanguage="en">
-      <MemoryRouter>
-        <NotificationCenterPage />
-      </MemoryRouter>
-    </UiLanguageProvider>
-      </RouteFocusRegistrationContext.Provider>,
+      <UiLanguageProvider initialLanguage="en">
+        <ToastProvider>
+          <MemoryRouter>
+            <NotificationCenterPage />
+          </MemoryRouter>
+        </ToastProvider>
+      </UiLanguageProvider>
+    </RouteFocusRegistrationContext.Provider>,
   );
 }
 
@@ -207,5 +265,393 @@ describe('NotificationCenterPage', () => {
       'Some notifications are temporarily unavailable.',
     );
     expect(screen.getByTestId('notification-center-empty')).toBeInTheDocument();
+  });
+
+  it('shows a retryable error without the empty state when the inbox load fails', async () => {
+    listMock.mockRejectedValue(new Error('inbox unavailable'));
+    renderPage();
+
+    expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
+    expect(screen.queryByText('No notifications yet')).not.toBeInTheDocument();
+  });
+
+  it('keeps loaded items visible when marking one as read fails', async () => {
+    listMock.mockResolvedValue(emptyPage({
+      items: [inboxItem()],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    markReadMock.mockRejectedValue(new Error('mark-read failed'));
+    renderPage();
+
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+
+    expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByText('Analysis complete: 600519')).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
+  });
+
+  it('retries the inbox request and clears the error after a successful reload', async () => {
+    listMock
+      .mockRejectedValueOnce(new Error('inbox unavailable'))
+      .mockResolvedValueOnce(emptyPage());
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
+
+    expect(await screen.findByTestId('notification-center-empty')).toBeInTheDocument();
+    expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+    expect(listMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the latest kind filter response when requests resolve out of order', async () => {
+    const allRequest = createDeferred<NotificationInboxPage>();
+    const alertRequest = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockReturnValueOnce(allRequest.promise)
+      .mockReturnValueOnce(alertRequest.promise);
+
+    renderPage();
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(2));
+    expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+
+    alertRequest.resolve(emptyPage({
+      items: [inboxItem({
+        id: 'v1:alert_triggered:2:1786233500000000',
+        kind: 'alert_triggered',
+        titleKey: 'alertTriggeredTitle',
+        titleParams: { target: 'MSFT' },
+        summary: 'Threshold crossed',
+        severity: 'warning',
+        createdAt: '2026-08-09T23:58:20Z',
+        href: '/signals?tab=history&trigger=2',
+        sourceId: '2',
+      })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    allRequest.resolve(emptyPage({
+      items: [inboxItem({
+        id: 'v1:analysis_complete:1:1786233600000000',
+        titleParams: { label: 'STALE' },
+        summary: 'stale all-types row',
+      })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Analysis complete: STALE')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
+  });
+
+  it('does not let a stale mark-read refresh overwrite a newer kind filter', async () => {
+    const markReadRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    const alertRequest = createDeferred<NotificationInboxPage>();
+    const staleRefresh = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockImplementation((params: { kind?: string } = {}) => (
+        params.kind === 'alert_triggered' ? alertRequest.promise : staleRefresh.promise
+      ));
+    markReadMock.mockReturnValue(markReadRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    await waitFor(() => {
+      expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+    });
+
+    alertRequest.resolve(emptyPage({
+      items: [inboxItem({
+        id: 'v1:alert_triggered:2:1786233500000000',
+        kind: 'alert_triggered',
+        titleKey: 'alertTriggeredTitle',
+        titleParams: { target: 'MSFT' },
+        summary: 'Threshold crossed',
+        severity: 'warning',
+        createdAt: '2026-08-09T23:58:20Z',
+        href: '/signals?tab=history&trigger=2',
+        sourceId: '2',
+      })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    markReadRequest.resolve({ markedCount: 1, unreadTotal: 0 });
+    await waitFor(() => {
+      expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+    });
+
+    staleRefresh.resolve(emptyPage({
+      items: [inboxItem({ titleParams: { label: 'STALE' }, summary: 'stale mark-read refresh' })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+
+    await waitFor(() => {
+      expect(screen.queryByText('Analysis complete: STALE')).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
+    expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+  });
+
+  it('does not apply a late mark-read error after the kind filter has changed', async () => {
+    const markReadRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockResolvedValue(emptyPage({
+        items: [inboxItem({
+          id: 'v1:alert_triggered:2:1786233500000000',
+          kind: 'alert_triggered',
+          titleKey: 'alertTriggeredTitle',
+          titleParams: { target: 'MSFT' },
+          summary: 'Threshold crossed',
+          severity: 'warning',
+          createdAt: '2026-08-09T23:58:20Z',
+          href: '/signals?tab=history&trigger=2',
+          sourceId: '2',
+        })],
+        total: 1,
+        unreadTotal: 1,
+      }));
+    markReadMock.mockReturnValue(markReadRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    markReadRequest.reject(new Error('mark-read failed'));
+    await waitFor(() => {
+      expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+    });
+    expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
+  });
+
+  it('ignores an in-flight inbox response after unmount', async () => {
+    const pending = createDeferred<NotificationInboxPage>();
+    listMock.mockReturnValue(pending.promise);
+
+    const { unmount } = renderPage();
+    await waitFor(() => expect(listMock).toHaveBeenCalledTimes(1));
+    unmount();
+
+    pending.resolve(emptyPage({
+      items: [inboxItem({ titleParams: { label: 'GONE' } })],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    await Promise.resolve();
+
+    expect(screen.queryByText('Analysis complete: GONE')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-page')).not.toBeInTheDocument();
+  });
+
+  it('does not start a mark-read refresh after a newer kind list has painted, and a late refresh failure cannot wipe it', async () => {
+    const markReadRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    const alertRequest = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockReturnValueOnce(alertRequest.promise)
+      .mockRejectedValue(new Error('late mark-read refresh failed'));
+    markReadMock.mockReturnValue(markReadRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    alertRequest.resolve(emptyPage({
+      items: [alertItem()],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    const listCallsAfterFilter = listMock.mock.calls.length;
+    markReadRequest.resolve({ markedCount: 1, unreadTotal: 0 });
+
+    await waitFor(() => {
+      expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Analysis complete: 600519')).not.toBeInTheDocument();
+    expect(listMock).toHaveBeenCalledTimes(listCallsAfterFilter);
+  });
+
+  it('does not start a mark-all-read refresh after a newer kind list has painted, and a late refresh failure cannot wipe it', async () => {
+    const markAllRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    const alertRequest = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockReturnValueOnce(alertRequest.promise)
+      .mockRejectedValue(new Error('late mark-all refresh failed'));
+    markAllReadMock.mockReturnValue(markAllRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all read' }));
+    await waitFor(() => expect(markAllReadMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    alertRequest.resolve(emptyPage({
+      items: [alertItem()],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+
+    const listCallsAfterFilter = listMock.mock.calls.length;
+    markAllRequest.resolve({ markedCount: 1, unreadTotal: 0 });
+
+    await waitFor(() => {
+      expect(screen.getByText('Alert triggered: MSFT')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+    expect(listMock).toHaveBeenCalledTimes(listCallsAfterFilter);
+  });
+
+  it('lets a newer kind list paint after mark-read resolves while that list is still in flight', async () => {
+    const markReadRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    const alertRequest = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockReturnValueOnce(alertRequest.promise)
+      .mockRejectedValue(new Error('late mark-read refresh failed'));
+    markReadMock.mockReturnValue(markReadRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledTimes(1));
+
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+    await waitFor(() => {
+      expect(listMock).toHaveBeenCalledWith(expect.objectContaining({ kind: 'alert_triggered' }));
+    });
+
+    markReadRequest.resolve({ markedCount: 1, unreadTotal: 0 });
+    alertRequest.resolve(emptyPage({
+      items: [alertItem()],
+      total: 1,
+      unreadTotal: 1,
+    }));
+
+    expect(await screen.findByText('Alert triggered: MSFT')).toBeInTheDocument();
+    expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+  });
+
+  it('does not start a mark-read refresh after Unread only has painted, and a late refresh failure cannot wipe it', async () => {
+    const markReadRequest = createDeferred<{ markedCount: number; unreadTotal: number }>();
+    const unreadRequest = createDeferred<NotificationInboxPage>();
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockReturnValueOnce(unreadRequest.promise)
+      .mockRejectedValue(new Error('late unread refresh failed'));
+    markReadMock.mockReturnValue(markReadRequest.promise);
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Mark read' }));
+    await waitFor(() => expect(markReadMock).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Unread only' }));
+    unreadRequest.resolve(emptyPage({
+      items: [unreadOnlyItem()],
+      total: 1,
+      unreadTotal: 1,
+    }));
+    expect(await screen.findByText('Analysis complete: UNREAD')).toBeInTheDocument();
+
+    const listCallsAfterFilter = listMock.mock.calls.length;
+    markReadRequest.resolve({ markedCount: 1, unreadTotal: 0 });
+
+    await waitFor(() => {
+      expect(screen.getByText('Analysis complete: UNREAD')).toBeInTheDocument();
+    });
+    expect(screen.queryByRole('alert', { name: 'Unable to load the notification center' })).not.toBeInTheDocument();
+    expect(listMock).toHaveBeenCalledTimes(listCallsAfterFilter);
+    expect(listMock).toHaveBeenLastCalledWith(expect.objectContaining({ unreadOnly: true }));
+  });
+
+  it('keeps last-known rows when the Refresh button refetch fails', async () => {
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockRejectedValueOnce(new Error('refresh failed'));
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh' }));
+
+    expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.getByText('Analysis complete: 600519')).toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
+  });
+
+  it('does not resurrect the previous filter rows when a newer kind initial load fails', async () => {
+    listMock
+      .mockResolvedValueOnce(emptyPage({
+        items: [inboxItem()],
+        total: 1,
+        unreadTotal: 1,
+      }))
+      .mockRejectedValueOnce(new Error('alert filter unavailable'));
+
+    renderPage();
+    expect(await screen.findByText('Analysis complete: 600519')).toBeInTheDocument();
+    chooseOption(screen.getByRole('combobox', { name: 'All types' }), 'alert_triggered');
+
+    expect(await screen.findByRole('alert', { name: 'Unable to load the notification center' })).toBeInTheDocument();
+    expect(screen.queryByText('Analysis complete: 600519')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('notification-center-empty')).not.toBeInTheDocument();
   });
 });
