@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from './playwright-test';
 import { UI_TEXT } from '../src/i18n/uiText';
 import { BACKTEST_TEXT } from '../src/locales/backtest';
 import { SOURCE_CANDIDATE_DISCOVERY_TEXT } from '../src/locales/candidateDiscoveryText';

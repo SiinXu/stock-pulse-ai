@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test } from '@playwright/test';
+import { expect, test } from './playwright-test';
 import { NOTIFICATIONS_TEXT } from '../src/locales/notifications';
 import { APP_ROUTE_PATHS } from '../src/routing/routes';
 import { loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';

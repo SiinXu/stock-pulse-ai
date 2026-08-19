@@ -4,11 +4,12 @@ import {
   test,
   type Browser,
   type Page,
-} from '@playwright/test';
+} from './playwright-test';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createServer as createViteServer, type ViteDevServer } from 'vite';
 import { APP_ROUTE_PATHS } from '../src/routing/routes';
+import { disposePlaywrightRoutes } from './playwrightRouteTeardown';
 
 /**
  * Visual regression / integration smoke for MarketStructureCard on the REAL
@@ -317,13 +318,12 @@ test.describe('MarketStructureCard on the real market review page', () => {
         viewport: scenario.viewport,
         colorScheme: scenario.theme,
       });
+      await context.addInitScript(({ theme }) => {
+        window.localStorage.setItem('theme', theme);
+        window.localStorage.setItem('dsa.uiLanguage', 'zh');
+      }, { theme: scenario.theme });
+      const page = await context.newPage();
       try {
-        await context.addInitScript(({ theme }) => {
-          window.localStorage.setItem('theme', theme);
-          window.localStorage.setItem('dsa.uiLanguage', 'zh');
-        }, { theme: scenario.theme });
-
-        const page = await context.newPage();
         await installApiMocks(page);
         await page.goto(new URL(APP_ROUTE_PATHS.researchMarket, appUrl).toString(), {
           waitUntil: 'domcontentloaded',
@@ -355,8 +355,8 @@ test.describe('MarketStructureCard on the real market review page', () => {
         // Theme really applied by next-themes (class strategy on <html>).
         const isDark = await page.evaluate(() => document.documentElement.classList.contains('dark'));
         expect(isDark).toBe(scenario.theme === 'dark');
-
       } finally {
+        await disposePlaywrightRoutes(page, context);
         await context.close();
       }
     });
@@ -371,13 +371,12 @@ test.describe('MarketStructureCard on the real market review page', () => {
       viewport: { width: 1280, height: 900 },
       colorScheme: 'light',
     });
+    await context.addInitScript(() => {
+      window.localStorage.setItem('theme', 'light');
+      window.localStorage.setItem('dsa.uiLanguage', 'zh');
+    });
+    const page = await context.newPage();
     try {
-      await context.addInitScript(() => {
-        window.localStorage.setItem('theme', 'light');
-        window.localStorage.setItem('dsa.uiLanguage', 'zh');
-      });
-
-      const page = await context.newPage();
       await installApiMocks(page);
       // Override only the detail endpoint with a legacy payload (no
       // details.market_structure field), like reports created before this
@@ -404,6 +403,7 @@ test.describe('MarketStructureCard on the real market review page', () => {
       // ...but the market-structure card stays hidden and nothing crashes.
       await expect(page.getByRole('region', { name: CARD_REGION_NAME })).toHaveCount(0);
     } finally {
+      await disposePlaywrightRoutes(page, context);
       await context.close();
     }
   });

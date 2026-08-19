@@ -9,7 +9,7 @@
  * Selectors prefer roles, accessible names, and stable data-testid chrome —
  * not brittle CSS class or layout-position chains.
  */
-import { expect, test, type Page, type Route } from '@playwright/test';
+import { expect, test, type Page, type Route } from './playwright-test';
 import { loginAsE2eAdmin } from './auth-fixture';
 
 test.use({ locale: 'zh-CN' });

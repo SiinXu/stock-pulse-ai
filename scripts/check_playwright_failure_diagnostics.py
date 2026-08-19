@@ -42,7 +42,7 @@ SENSITIVE_ENV_NAME = re.compile(
     re.IGNORECASE,
 )
 SPEC_SOURCE = (
-    "import { expect, test } from '@playwright/test';\n"
+    "import { expect, test } from './playwright-test';\n"
     "import { loginAsE2eAdmin } from './auth-fixture';\n\n"
     f"test({FAILURE_TEST_TITLE!r}, async ({{ page }}) => {{\n"
     "  await loginAsE2eAdmin(page);\n"

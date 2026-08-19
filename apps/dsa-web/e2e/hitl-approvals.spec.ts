@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { expect, test, type Request } from '@playwright/test';
+import { expect, test, type Request } from './playwright-test';
 import { loginAsE2eAdmin, mockCompletedSetupStatus } from './auth-fixture';
 
 const APPROVE = /批准保留原始信号|Approve original signal/;
