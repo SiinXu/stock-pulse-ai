@@ -1,8 +1,7 @@
 import type React from 'react';
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown } from 'lucide-react';
 import type { ReportDetails as ReportDetailsType, ReportLanguage } from '../../types/analysis';
-import { Badge, Button, Card, InlineAlert, useClipboard } from '../common';
+import { Badge, Button, Card, Collapsible, InlineAlert, useClipboard } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { REPORT_CHROME_TEXT } from '../../locales/reportChrome';
@@ -23,8 +22,6 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
 
   const { language: uiLanguage } = useUiLanguage();
   const text = REPORT_CHROME_TEXT[uiLanguage];
-  const [showRaw, setShowRaw] = useState(false);
-  const [showSnapshot, setShowSnapshot] = useState(false);
   const [copiedPanels, setCopiedPanels] = useState<CopiedPanelState>({
     raw: false,
     snapshot: false,
@@ -109,56 +106,18 @@ export const ReportDetails: React.FC<ReportDetailsProps> = ({
         </div>
       )}
 
-      {/* Collapsible sections */}
+      {/* Tertiary JSON blobs stay collapsed by default. */}
       <div className="space-y-3">
-        {/* Raw analysis result */}
         {details?.rawResult && (
-          <div className="grid">
-            <Button
-              type="button"
-              variant="secondary"
-              size="primary"
-              onClick={() => setShowRaw(!showRaw)}
-              className="justify-between"
-              aria-expanded={showRaw}
-            >
-              <span className="text-xs text-foreground">{text.rawResult}</span>
-              <ChevronDown
-                className={`h-3.5 w-3.5 text-muted-text transition-transform ${showRaw ? 'rotate-180' : ''}`}
-                aria-hidden="true"
-              />
-            </Button>
-            {showRaw && (
-              <div className="mt-2 animate-fade-in min-w-0 overflow-hidden">
-                {renderJson(details.rawResult, 'raw')}
-              </div>
-            )}
-          </div>
+          <Collapsible title={text.rawResult} defaultOpen={false}>
+            {renderJson(details.rawResult, 'raw')}
+          </Collapsible>
         )}
 
-        {/* Analysis snapshot */}
         {details?.contextSnapshot && (
-          <div className="grid">
-            <Button
-              type="button"
-              variant="secondary"
-              size="primary"
-              onClick={() => setShowSnapshot(!showSnapshot)}
-              className="justify-between"
-              aria-expanded={showSnapshot}
-            >
-              <span className="text-xs text-foreground">{text.analysisSnapshot}</span>
-              <ChevronDown
-                className={`h-3.5 w-3.5 text-muted-text transition-transform ${showSnapshot ? 'rotate-180' : ''}`}
-                aria-hidden="true"
-              />
-            </Button>
-            {showSnapshot && (
-              <div className="mt-2 animate-fade-in min-w-0 overflow-hidden">
-                {renderJson(details.contextSnapshot, 'snapshot')}
-              </div>
-            )}
-          </div>
+          <Collapsible title={text.analysisSnapshot} defaultOpen={false}>
+            {renderJson(details.contextSnapshot, 'snapshot')}
+          </Collapsible>
         )}
       </div>
     </Card>
