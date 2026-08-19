@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type React from 'react';
+import { sanitizeDiagnosticText } from '../../utils/dataQualityFormat/sanitizeDiagnostic';
 import { Collapsible } from '../common';
 
 type EvidenceValue = string | number | boolean | null | undefined | EvidenceValue[] | {
@@ -33,7 +34,8 @@ function formatScalar(
 ): string {
   if (value == null || value === '') return labels.emptyLabel;
   if (typeof value === 'boolean') return value ? labels.yesLabel : labels.noLabel;
-  return String(value);
+  if (typeof value === 'number') return String(value);
+  return sanitizeDiagnosticText(String(value), 400);
 }
 
 function EvidenceValueView({

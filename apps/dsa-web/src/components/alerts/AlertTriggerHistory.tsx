@@ -13,7 +13,7 @@ import {
   formatDataQualityLevel,
   formatDataQualityLimitation,
 } from '../../utils/dataQualityFormat/analysis';
-import { formatAlertTriggerStatus } from '../../utils/dataQualityFormat/alerts';
+import { formatAlertTriggerReason, formatAlertTriggerStatus } from '../../utils/dataQualityFormat/alerts';
 
 function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'default' {
   if (status === 'triggered') return 'success';
@@ -140,7 +140,7 @@ export const AlertTriggerHistory: React.FC<AlertTriggerHistoryProps> = ({
     {
       id: 'reason',
       header: text.reason,
-      cell: (trigger) => trigger.reason || trigger.diagnostics || '--',
+      cell: (trigger) => formatAlertTriggerReason(trigger.reason, trigger.diagnostics, language),
     },
   ];
   return (

@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import type { PortfolioCostMethod } from '../../types/portfolio';
 
 export class PortfolioResponseContextError extends Error {
@@ -26,14 +26,21 @@ export function assertPortfolioResponseContext(
 export function useContextBoundPortfolioRequest<TResult>(contextKey: string) {
   const generationRef = useRef(0);
   const pendingGenerationRef = useRef<number | null>(null);
+  const seenContextKeyRef = useRef<string | null>(null);
   const [result, setResult] = useState<TResult | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [isRunning, setIsRunning] = useState(false);
   const [hasCompleted, setHasCompleted] = useState(false);
 
-  useEffect(() => {
+  // Invalidate before paint so a click on the first runnable frame cannot
+  // start against the previous generation and then be silently discarded.
+  useLayoutEffect(() => {
+    if (seenContextKeyRef.current === contextKey) return;
+    const isFirstKey = seenContextKeyRef.current === null;
+    seenContextKeyRef.current = contextKey;
     generationRef.current += 1;
     pendingGenerationRef.current = null;
+    if (isFirstKey) return;
     setResult(null);
     setError(null);
     setIsRunning(false);

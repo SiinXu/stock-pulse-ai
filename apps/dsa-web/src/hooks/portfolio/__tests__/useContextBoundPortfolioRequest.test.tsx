@@ -44,6 +44,23 @@ describe('useContextBoundPortfolioRequest', () => {
     expect(result.current.hasCompleted).toBe(false);
   });
 
+  it('keeps a result started immediately after the context key first becomes runnable', async () => {
+    const { result, rerender } = renderHook(
+      ({ contextKey }) => useContextBoundPortfolioRequest<string>(contextKey),
+      { initialProps: { contextKey: 'scenario:' } },
+    );
+
+    rerender({ contextKey: 'scenario:market_down_10' });
+
+    await act(async () => {
+      await result.current.execute(async () => 'fresh result');
+    });
+
+    expect(result.current.result).toBe('fresh result');
+    expect(result.current.hasCompleted).toBe(true);
+    expect(result.current.error).toBeNull();
+  });
+
   it('blocks duplicate pending execution for the same context', async () => {
     const pending = deferred<string>();
     const request = vi.fn(() => pending.promise);

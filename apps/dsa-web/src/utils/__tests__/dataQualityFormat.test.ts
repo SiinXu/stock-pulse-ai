@@ -8,6 +8,7 @@ import {
 import { formatAlertTriggerStatus } from '../dataQualityFormat/alerts';
 import {
   formatDataQualityStatus,
+  formatPortfolioLimitation,
   formatPortfolioStressQualityCell,
 } from '../dataQualityFormat/portfolio';
 
@@ -57,8 +58,9 @@ describe('formatDataQualityLevel', () => {
   it('keeps unknown levels visible instead of inventing a mapped label', () => {
     expect(formatDataQualityLevel(null, 'en')).toBeNull();
     expect(formatDataQualityLevel('', 'zh')).toBeNull();
-    expect(formatDataQualityLevel('not_a_real_level', 'en')).toBe('not_a_real_level');
-    expect(formatDataQualityLevel('not_a_real_level', 'zh')).toBe('not_a_real_level');
+    expect(formatDataQualityLevel('not_a_real_level', 'en')).toBe('Unknown code (not_a_real_level)');
+    expect(formatDataQualityLevel('not_a_real_level', 'zh')).toBe('未知编码（not_a_real_level）');
+    expect(formatDataQualityLevel('not_a_real_level', 'en')).not.toBe('not_a_real_level');
   });
 });
 
@@ -70,8 +72,11 @@ describe('formatDataQualityLimitation', () => {
   });
 
   it('leaves unrecognized fragments visible', () => {
-    expect(formatDataQualityLimitation('custom_block: custom_status', 'en')).toBe('custom_block: custom_status');
-    expect(formatDataQualityLimitation('plain prose limitation', 'zh')).toBe('plain prose limitation');
+    expect(formatDataQualityLimitation('custom_block: custom_status', 'en')).toBe(
+      'Unknown code (custom_block): Unknown code (custom_status)',
+    );
+    expect(formatDataQualityLimitation('plain prose limitation', 'zh')).toBe('诊断：plain prose limitation');
+    expect(formatDataQualityLimitation('custom_block: custom_status', 'en')).not.toBe('custom_block: custom_status');
   });
 });
 
@@ -93,10 +98,32 @@ describe('formatAlertTriggerStatus', () => {
 
   it('keeps unknown trigger statuses visible', () => {
     expect(formatAlertTriggerStatus(null, 'en')).toBe('--');
-    expect(formatAlertTriggerStatus('queued', 'en')).toBe('queued');
-    expect(formatAlertTriggerStatus('queued', 'zh')).toBe('queued');
-    expect(formatAlertTriggerStatus('queued', 'ko')).toBe('queued');
-    expect(formatAlertTriggerStatus('queued', 'ja')).toBe('queued');
+    expect(formatAlertTriggerStatus('queued', 'en')).toBe('Unknown status (queued)');
+    expect(formatAlertTriggerStatus('queued', 'zh')).toBe('未知状态 (queued)');
+    expect(formatAlertTriggerStatus('queued', 'ko')).toBe('알 수 없는 상태 (queued)');
+    expect(formatAlertTriggerStatus('queued', 'ja')).toBe('不明な状態 (queued)');
+  });
+});
+
+describe('formatPortfolioLimitation', () => {
+  it('localizes known snapshot and stress limitation codes', () => {
+    expect(formatPortfolioLimitation('realtime_quote_best_effort', 'en')).toBe(
+      'Realtime quotes are best-effort',
+    );
+    expect(formatPortfolioLimitation('fx_and_cost_basis_partial', 'zh')).toBe('汇率与成本基础为部分口径');
+    expect(formatPortfolioLimitation('sector_and_risk_metrics_limited', 'en')).toBe(
+      'Sector and risk metrics are limited',
+    );
+  });
+
+  it('keeps unknown limitation codes visible as localized diagnostics', () => {
+    expect(formatPortfolioLimitation('brand_new_limitation', 'en')).toBe(
+      'Unknown code (brand_new_limitation)',
+    );
+    expect(formatPortfolioLimitation('brand_new_limitation', 'zh')).toBe(
+      '未知编码（brand_new_limitation）',
+    );
+    expect(formatPortfolioLimitation('brand_new_limitation', 'en')).not.toBe('brand_new_limitation');
   });
 });
 
@@ -126,12 +153,12 @@ describe('formatPortfolioStressQualityCell', () => {
       dataQuality: 'weird_quality',
       priceStale: false,
       limitations: ['brand_new_limitation'],
-    }, 'en', 'Stale')).toBe('Unknown status (weird_quality) · brand_new_limitation');
+    }, 'en', 'Stale')).toBe('Unknown status (weird_quality) · Unknown code (brand_new_limitation)');
 
     expect(formatPortfolioStressQualityCell({
       dataQuality: 'weird_quality',
       priceStale: false,
       limitations: ['brand_new_limitation'],
-    }, 'ja', 'Stale')).toBe('不明な状態 (weird_quality) · brand_new_limitation');
+    }, 'ja', 'Stale')).toBe('不明な状態 (weird_quality) · 不明なコード（brand_new_limitation）');
   });
 });

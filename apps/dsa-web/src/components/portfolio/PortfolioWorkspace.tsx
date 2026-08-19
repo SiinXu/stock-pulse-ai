@@ -74,7 +74,7 @@ import {
   type PortfolioInsightView,
   type PortfolioTab,
 } from './portfolioUrlState';
-import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
+import { formatPortfolioLimitation } from '../../utils/dataQualityFormat/portfolio';
 import { PIE_COLORS, PORTFOLIO_DATE_TRIGGER_CLASS } from '../../hooks/portfolio/constants';
 import type {
   AccountOption,

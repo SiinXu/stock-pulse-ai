@@ -368,4 +368,27 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(backtestPageFamily.match).toEqual([backtestPage.match]);
     expect(backtestPageFamily.maxGzipBytes).toBe(backtestPage.maxGzipBytes);
   });
+
+  it('does not bill extra-locale catalog chunks to core locale-ja family', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const jaFamily = budget.aggregateRules.find((rule) => rule.id === 'locale-ja-family');
+    const extra = budget.rules.find((rule) => rule.id === 'locale-extra');
+    const extraFamily = budget.aggregateRules.find((rule) => rule.id === 'locale-extra-family');
+    expect(jaFamily.match).toEqual(['assets/ja-*.js']);
+    expect(extra.match).toBe('assets/extra-locale-*.js');
+    expect(extraFamily.match).toEqual(['assets/extra-locale-*.js']);
+
+    const toRegExp = (globPattern) => {
+      const escaped = globPattern.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '[^/]*');
+      return new RegExp(`^${escaped}$`);
+    };
+    const jaGlob = toRegExp(jaFamily.match[0]);
+    const extraGlob = toRegExp(extra.match);
+    expect(jaGlob.test('assets/ja-DXUJa6-A.js')).toBe(true);
+    expect(jaGlob.test('assets/extra-locale-ja-CjJs-L44.js')).toBe(false);
+    expect(extraGlob.test('assets/extra-locale-ja-CjJs-L44.js')).toBe(true);
+    expect(extraGlob.test('assets/ja-DXUJa6-A.js')).toBe(false);
+    expect(extraFamily.maxGzipBytes).toBe(extraFamily.measuredGzipBytes + 400);
+    expect(extraFamily.maxGzipBytes).toBeGreaterThan(extra.maxGzipBytes);
+  });
 });

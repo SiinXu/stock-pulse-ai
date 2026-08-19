@@ -1,0 +1,152 @@
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { createUiLanguageRecord } from '../i18n/createUiLanguageRecord';
+import type { UiLanguage } from '../i18n/uiText';
+import { loadUiLanguageTranslations } from '../i18n/translations';
+
+const zh = {
+    insightConcentrationTopName: '持仓 {symbol} 权重 {value}% 超过集中度阈值 {threshold}%。',
+    insightConcentrationName: '持仓 {symbol} 权重 {value}% 超过集中度阈值 {threshold}%。',
+    insightLowDiversification: '分散化评分 {value} 低于阈值 {threshold}。',
+    insightElevatedVar: '1 日历史 VaR 为 {value}%，已达到或超过告警阈值 {threshold}%。',
+    insightCashLow: '现金比例 {value}% 不高于 {threshold}%。',
+    insightCashHigh: '现金比例 {value}% 不低于 {threshold}%。',
+    insightUnrealizedLoss: '未实现盈亏为权益的 {value}%，已达到或低于亏损告警 {threshold}%。',
+    insightWithinThresholds: '本快照未触发集中度、VaR、现金或未实现亏损阈值。',
+    insightConcentrationUnavailable: '本快照未评估集中度。',
+    insightRiskExposureUnavailable: '本快照未评估风险暴露。',
+    insightDiversificationUnavailable: '本快照未评估分散化。',
+    insightPnlUnavailable: '本快照未评估未实现盈亏。',
+    insightCashRatioUnavailable: '本快照未评估现金比例。',
+    reasonConcentrationBlockUnavailable: '集中度数据块不可用。',
+    reasonDiversificationUnavailable: '分散化数据不可用。',
+    reasonSyntheticBasketNoHoldingsPnl: '合成篮子没有持仓盈亏。',
+    reasonPriceOrFxQualityPartial: '价格或汇率质量仅为部分可用。',
+    reasonZeroEquity: '权益为零，无法评分。',
+    reasonNegativeEquity: '权益为负，无法评分。',
+    reasonVarUnavailable: '风险价值不可用。',
+    reasonSyntheticBasketNoCashLedger: '合成篮子没有资金流水。',
+    reasonFxStale: '汇率数据过期。',
+    actionTrim: '减仓',
+    actionAdd: '加仓',
+    actionHold: '保持',
+    actionReduce: '降低',
+    actionExit: '退出',
+    rationaleTrim: '将 {symbol} 从 {from}% 向 {to}% 减仓。',
+    rationaleAdd: '将 {symbol} 从 {from}% 向 {to}% 加仓。',
+    rationaleHold: '保持 {symbol} 当前 {from}%，位于目标区间内。',
+    rationaleReduce: '将 {symbol} 从 {from}% 向 {to}% 降低。',
+    rationaleExit: '将 {symbol} 从 {from}% 退出。',
+    rationaleBand: '{symbol}：当前 {current}% ，目标区间 [{low}%, {high}%]。',
+    basketPriceUnavailable: '没有可用的已存储收盘价。',
+    reasonNonPositiveMarketValue: '市值为非正数，未纳入压力测试。',
+    directionPositive: '正相关',
+    directionNegative: '负相关',
+    kindHighCorrelation: '高相关簇',
+    kindSectorConcentration: '行业集中',
+    kindNameConcentration: '个股集中',
+    sharedHighCorrelation: '{size} 个标的具有偏高的两两相关性。',
+    sharedSectorConcentration: '{size} 个标的同属行业 {sector}。',
+    sharedNameConcentration: '单一标的最高权重为 {weight}%。',
+    scenarioMarketDown10Name: '大盘下跌 10%',
+    scenarioMarketDown10Description: '权益市场因子瞬时冲击 -10%。',
+    scenarioMarketDown20Name: '大盘下跌 20%',
+    scenarioMarketDown20Description: '权益市场因子瞬时冲击 -20%。',
+    scenarioSectorDown30Name: '单行业下跌 30% 模板',
+    scenarioSectorDown30Description: '参数化行业模板；需要目标行业和完整行业映射。',
+    scenarioFxUp5Name: '标的货币升值 5%',
+    scenarioFxUp5Description: '标的货币相对报告基准货币升值 5%。',
+    scenarioFxDown5Name: '标的货币贬值 5%',
+    scenarioFxDown5Description: '标的货币相对报告基准货币贬值 5%。',
+    scenarioRateUp100bpName: '政策利率上调 100bp',
+    scenarioRateUp100bpDescription: '利率平行上移 100bp，使用已披露的统一权益敏感度。',
+    statusInsufficientData: '数据不足',
+    statusRefused: '已拒绝',
+    disclaimerHealth: '健康度只反映规则评分，不是投资建议，也不表示历史或未来收益。',
+    disclaimerBasket: '多标的分析只用于研究比较，不是投资建议。',
+    disclaimerRebalance: '再平衡结果仅为建议，不会自动执行交易。',
+} as const;
+
+const en: Record<keyof typeof zh, string> = {
+    insightConcentrationTopName: 'Position {symbol} is {value}% of the portfolio, above the {threshold}% concentration threshold.',
+    insightConcentrationName: 'Position {symbol} is {value}%, above the {threshold}% concentration threshold.',
+    insightLowDiversification: 'Diversification score {value} is below the {threshold} threshold.',
+    insightElevatedVar: '1-day historical VaR is {value}%, at or above the {threshold}% alert.',
+    insightCashLow: 'Cash ratio {value}% is at or below {threshold}%.',
+    insightCashHigh: 'Cash ratio {value}% is at or above {threshold}%.',
+    insightUnrealizedLoss: 'Unrealized P&L is {value}% of equity, at or below the {threshold}% loss alert.',
+    insightWithinThresholds: 'No concentration, VaR, cash, or unrealized-loss threshold breaches for this snapshot.',
+    insightConcentrationUnavailable: 'Concentration was not scored for this snapshot.',
+    insightRiskExposureUnavailable: 'Risk exposure was not scored for this snapshot.',
+    insightDiversificationUnavailable: 'Diversification was not scored for this snapshot.',
+    insightPnlUnavailable: 'Unrealized P&L was not scored for this snapshot.',
+    insightCashRatioUnavailable: 'Cash ratio was not scored for this snapshot.',
+    reasonConcentrationBlockUnavailable: 'The concentration block is unavailable.',
+    reasonDiversificationUnavailable: 'Diversification data is unavailable.',
+    reasonSyntheticBasketNoHoldingsPnl: 'The synthetic basket has no holdings P&L.',
+    reasonPriceOrFxQualityPartial: 'Price or FX quality is only partial.',
+    reasonZeroEquity: 'Equity is zero, so scoring is undefined.',
+    reasonNegativeEquity: 'Equity is negative, so health scoring is undefined.',
+    reasonVarUnavailable: 'Value-at-risk is unavailable.',
+    reasonSyntheticBasketNoCashLedger: 'The synthetic basket has no cash ledger.',
+    reasonFxStale: 'FX data is stale.',
+    actionTrim: 'Trim',
+    actionAdd: 'Add',
+    actionHold: 'Hold',
+    actionReduce: 'Reduce',
+    actionExit: 'Exit',
+    rationaleTrim: 'Trim {symbol} from {from}% toward {to}%.',
+    rationaleAdd: 'Add {symbol} from {from}% toward {to}%.',
+    rationaleHold: 'Hold {symbol} at {from}%; it is inside the target band.',
+    rationaleReduce: 'Reduce {symbol} from {from}% toward {to}%.',
+    rationaleExit: 'Exit {symbol} from {from}%.',
+    rationaleBand: '{symbol}: current {current}% vs target band [{low}%, {high}%].',
+    basketPriceUnavailable: 'No usable stored daily close.',
+    reasonNonPositiveMarketValue: 'Market value is not positive, so the position is excluded from the stress run.',
+    directionPositive: 'Positive',
+    directionNegative: 'Negative',
+    kindHighCorrelation: 'High-correlation cluster',
+    kindSectorConcentration: 'Sector concentration',
+    kindNameConcentration: 'Name concentration',
+    sharedHighCorrelation: '{size} symbols share elevated pairwise correlation.',
+    sharedSectorConcentration: '{size} symbols share sector {sector}.',
+    sharedNameConcentration: 'Top single-name weight is {weight}%.',
+    scenarioMarketDown10Name: 'Broad market -10%',
+    scenarioMarketDown10Description: 'Instantaneous equity-market factor shock of -10%.',
+    scenarioMarketDown20Name: 'Broad market -20%',
+    scenarioMarketDown20Description: 'Instantaneous equity-market factor shock of -20%.',
+    scenarioSectorDown30Name: 'Single sector -30% template',
+    scenarioSectorDown30Description: 'Parameterized sector template; requires a target sector and a complete sector map.',
+    scenarioFxUp5Name: 'Instrument currency +5%',
+    scenarioFxUp5Description: 'The instrument currency appreciates 5% against the response base currency.',
+    scenarioFxDown5Name: 'Instrument currency -5%',
+    scenarioFxDown5Description: 'The instrument currency depreciates 5% against the response base currency.',
+    scenarioRateUp100bpName: 'Policy rates +100bp',
+    scenarioRateUp100bpDescription: 'Parallel +100bp rate move using the disclosed uniform equity sensitivity.',
+    statusInsufficientData: 'Insufficient data',
+    statusRefused: 'Refused',
+    disclaimerHealth: 'Health scores reflect rule-based process only. They are not investment advice and do not imply historical or future returns.',
+    disclaimerBasket: 'Basket analysis is for research comparison only and is not investment advice.',
+    disclaimerRebalance: 'Rebalancing results are suggestions only and never execute trades automatically.',
+};
+
+export type PortfolioInsightCodeKey = keyof typeof zh;
+
+export const SOURCE_PORTFOLIO_INSIGHT_CODES = { zh, en };
+
+export const PORTFOLIO_INSIGHT_CODES = createUiLanguageRecord(
+  'locales.portfolioInsightCodes.PORTFOLIO_INSIGHT_CODES',
+  { zh, en },
+);
+
+export function getPortfolioInsightCodes(language: UiLanguage): Record<PortfolioInsightCodeKey, string> {
+  return PORTFOLIO_INSIGHT_CODES[language];
+}
+
+export async function loadPortfolioInsightCodes(
+  language: UiLanguage,
+): Promise<Record<PortfolioInsightCodeKey, string>> {
+  await loadUiLanguageTranslations(language);
+  return PORTFOLIO_INSIGHT_CODES[language];
+}

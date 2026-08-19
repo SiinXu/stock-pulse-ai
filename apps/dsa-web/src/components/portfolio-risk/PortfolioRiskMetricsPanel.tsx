@@ -23,6 +23,7 @@ import type {
 } from '../../types/portfolioRiskMetrics';
 import type { PortfolioCostMethod } from '../../types/portfolio';
 import { formatDataQualityStatus } from '../../utils/dataQualityFormat/portfolio';
+import { formatAuthoritativeStatusMessage } from '../../utils/dataQualityFormat/portfolioInsights';
 import { formatMoney, formatPct } from '../../utils/portfolioFormat';
 import { formatUiNumber } from '../../utils/uiLocale';
 import { cn } from '../../utils/cn';
@@ -170,7 +171,9 @@ const VaRCard: React.FC<{
       ) : (
         <div className="space-y-1 text-xs text-secondary">
           <p data-testid="portfolio-risk-var-unavailable">{text.varUnavailable}</p>
-          {block.statusMessage ? <p>{block.statusMessage}</p> : null}
+          {block.statusMessage ? (
+            <p>{formatAuthoritativeStatusMessage(block.statusMessage, language)}</p>
+          ) : null}
           <p>{text.varNullHint}</p>
           <MetricRow
             label={text.varPct}
@@ -261,7 +264,9 @@ const CorrelationCard: React.FC<{
         {text.correlationObservations}: {block.observationCount}
       </p>
       {block.statusMessage ? (
-        <p className="mb-2 text-xs text-secondary">{block.statusMessage}</p>
+        <p className="mb-2 text-xs text-secondary">
+          {formatAuthoritativeStatusMessage(block.statusMessage, language)}
+        </p>
       ) : null}
       {hasMatrix ? (
         <div data-testid="portfolio-risk-correlation-matrix">
@@ -394,6 +399,7 @@ const AssumptionsCard: React.FC<{
 function topLevelBanner(
   data: PortfolioRiskMetricsResponse,
   text: (typeof PORTFOLIO_RISK_METRICS_TEXT)['en'],
+  language: UiLanguage,
 ): React.ReactNode {
   if (data.status === 'empty_portfolio') {
     return (
@@ -411,7 +417,11 @@ function topLevelBanner(
         variant="warning"
         size="compact"
         title={text.insufficientTitle}
-        message={data.statusMessage || text.insufficientDescription}
+        message={
+          data.statusMessage
+            ? formatAuthoritativeStatusMessage(data.statusMessage, language)
+            : text.insufficientDescription
+        }
         data-testid="portfolio-risk-insufficient-banner"
       />
     );
@@ -422,7 +432,11 @@ function topLevelBanner(
         variant="warning"
         size="compact"
         title={text.partialTitle}
-        message={data.statusMessage || text.partialDescription}
+        message={
+          data.statusMessage
+            ? formatAuthoritativeStatusMessage(data.statusMessage, language)
+            : text.partialDescription
+        }
         data-testid="portfolio-risk-partial-banner"
       />
     );
@@ -522,7 +536,7 @@ const PortfolioRiskMetricsPanel: React.FC<PortfolioRiskMetricsPanelProps> = ({
 
       {query.data ? (
         <>
-          {topLevelBanner(query.data, text)}
+          {topLevelBanner(query.data, text, language)}
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
             <VaRCard
               block={query.data.var}

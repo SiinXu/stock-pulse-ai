@@ -93,6 +93,13 @@ const getVendorPackageName = (id: string): string | undefined => {
 
 const getVendorChunkName = (id: string): string | undefined => {
   const normalizedId = id.replace(/\\/g, '/')
+  // Extra-locale catalog transport lives in extra/{locale}.ts. Vite's default
+  // name is the file stem (`ja.ts` → `ja-*.js`), which would be billed to the
+  // core locale-ja family. Keep that payload on its own extra-locale-* chunks.
+  const extraLocaleMatch = normalizedId.match(/\/src\/i18n\/translations\/extra\/([^/]+)\.ts$/)
+  if (extraLocaleMatch) {
+    return `extra-locale-${extraLocaleMatch[1]}`
+  }
   if (
     normalizedId.endsWith('/src/i18n/evidenceExportErrorTranslations.ts')
     || normalizedId.endsWith('/src/api/error/evidenceExportErrors.ts')

@@ -1,6 +1,5 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import type { UiTranslationKey } from './en';
 import { MODEL_SOURCE_LIFECYCLE_TRANSLATIONS as M } from '../modelSourceLifecycleTranslations';
 import { DATA_PROVIDER_RUNTIME_TRANSLATIONS as DR } from '../dataProviderRuntimeTranslations';
 import { CHECKPOINT_SETTINGS_TRANSLATIONS as CP } from '../checkpointSettingsTranslations';
@@ -9,7 +8,7 @@ import { EVIDENCE_EXPORT_ERROR_TRANSLATIONS as EE } from '../evidenceExportError
 import { MULTI_MODEL_CONSENSUS_TRANSLATIONS as MMC } from '../multiModelConsensusTranslations';
 import { SETTINGS_TRANSLATIONS as S } from '../settingsTranslations';
 
-export const translations: Record<UiTranslationKey, string> = {
+export const translations = {
   ...M['zh-TW'],
   ...DR["zh-TW"],
   ...CP["zh-TW"],

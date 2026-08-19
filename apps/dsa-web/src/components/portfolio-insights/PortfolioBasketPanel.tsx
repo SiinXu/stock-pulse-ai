@@ -5,9 +5,19 @@ import type React from 'react';
 import { useMemo, useState } from 'react';
 import { getParsedApiError } from '../../api/error';
 import { portfolioInsightsApi } from '../../api/portfolioInsights';
+import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { useContextBoundPortfolioRequest } from '../../hooks/portfolio/useContextBoundPortfolioRequest';
 import type { PortfolioInsightsText } from '../../locales/portfolioInsights';
 import type { PortfolioBasketResponse } from '../../types/portfolioInsights';
+import {
+  formatAuthoritativeStatusMessage,
+  formatPortfolioBasketDirection,
+  formatPortfolioBasketReason,
+  formatPortfolioInsightDisclaimer,
+  formatPortfolioInsightStatus,
+  formatPortfolioSharedRisk,
+  formatLabeledDiagnostic,
+} from '../../utils/dataQualityFormat/portfolioInsights';
 import { formatPct } from '../../utils/portfolioFormat';
 import {
   Button,
@@ -46,6 +56,7 @@ type PortfolioBasketPanelProps = {
 };
 
 const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => {
+  const { language } = useUiLanguage();
   const [symbolsInput, setSymbolsInput] = useState('AAPL, MSFT');
   const [weightsInput, setWeightsInput] = useState('');
   const [sectorMapInput, setSectorMapInput] = useState('');
@@ -120,18 +131,18 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
   ];
   const degradedColumns: Array<DataTableColumn<PortfolioBasketResponse['degradedSymbols'][number]>> = [
     { id: 'symbol', header: text.symbol, rowHeader: true, cell: (row) => row.stockCode },
-    { id: 'reason', header: text.reason, cell: (row) => row.reason },
-    { id: 'detail', header: text.detail, cell: (row) => row.detail || text.notAvailable },
+    { id: 'reason', header: text.reason, cell: (row) => formatPortfolioBasketReason(row.reason, language) },
+    { id: 'detail', header: text.detail, cell: (row) => row.detail ? formatLabeledDiagnostic(row.detail, language) : text.notAvailable },
   ];
   const correlationHighlightColumns: Array<DataTableColumn<PortfolioBasketResponse['correlationHighlights'][number]>> = [
     { id: 'pair', header: text.pair, rowHeader: true, cell: (row) => `${row.left} / ${row.right}` },
     { id: 'correlation', header: text.correlation, align: 'end', cell: (row) => row.correlation.toFixed(3) },
-    { id: 'direction', header: text.direction, cell: (row) => row.direction },
+    { id: 'direction', header: text.direction, cell: (row) => formatPortfolioBasketDirection(row.direction, language) },
   ];
   const sharedRiskColumns: Array<DataTableColumn<PortfolioBasketResponse['sharedRiskExposures'][number]>> = [
-    { id: 'kind', header: text.kind, rowHeader: true, cell: (row) => row.kind },
+    { id: 'kind', header: text.kind, rowHeader: true, cell: (row) => formatPortfolioSharedRisk(row, language).kindLabel },
     { id: 'symbols', header: text.symbols, cell: (row) => row.symbols.join(', ') },
-    { id: 'summary', header: text.summary, cell: (row) => row.summary },
+    { id: 'summary', header: text.summary, cell: (row) => formatPortfolioSharedRisk(row, language).summary },
   ];
   const matrixRows = useMemo(() => result?.correlation.symbols.map((symbol, index) => ({
     symbol,
@@ -272,10 +283,18 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
         ) : null}
         {result ? (
           <div className="space-y-4">
-            {result.status !== 'ok' && result.statusMessage ? (
-              <InlineAlert variant="warning" title={text.riskStatus} message={result.statusMessage} />
+            {result.status !== 'ok' ? (
+              <InlineAlert
+                variant="warning"
+                title={formatPortfolioInsightStatus(result.status, language)}
+                message={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : formatPortfolioInsightStatus(result.status, language)
+                }
+              />
             ) : null}
-            <InlineAlert variant="info" message={result.disclaimer} />
+            <InlineAlert variant="info" message={formatPortfolioInsightDisclaimer('basket', language)} />
             <SummaryStrip
               aria-label={text.basketTitle}
               items={[
@@ -286,7 +305,7 @@ const PortfolioBasketPanel: React.FC<PortfolioBasketPanelProps> = ({ text }) => 
                   label: text.diversificationScore,
                   value: result.concentration.diversificationScore?.toFixed(1) ?? text.notAvailable,
                 },
-                { id: 'status', label: text.riskStatus, value: result.riskMetricsStatus || result.status },
+                { id: 'status', label: text.riskStatus, value: formatPortfolioInsightStatus(result.riskMetricsStatus || result.status, language) },
               ]}
             />
             <DataTable

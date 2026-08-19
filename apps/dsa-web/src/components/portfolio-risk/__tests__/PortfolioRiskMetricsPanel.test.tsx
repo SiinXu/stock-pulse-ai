@@ -162,6 +162,11 @@ describe('PortfolioRiskMetricsPanel', () => {
     expect(screen.getByTestId('portfolio-risk-var-pct')).toHaveTextContent('—');
     expect(screen.getByTestId('portfolio-risk-var-value')).toHaveTextContent('—');
     expect(screen.getByTestId('portfolio-risk-var-unavailable')).toBeInTheDocument();
+    expect(screen.getByTestId('portfolio-risk-insufficient-banner')).toHaveTextContent(
+      'Diagnostic: Insufficient aligned trading-day history (10 < 60 required).',
+    );
+    expect(screen.getByText('Diagnostic: Need at least 60 observations')).toBeInTheDocument();
+    expect(screen.queryByText(/^Need at least 60 observations$/)).not.toBeInTheDocument();
     // Assumptions remain visible even when VaR is unavailable.
     expect(screen.getByTestId('portfolio-risk-assumptions-card')).toBeInTheDocument();
   });

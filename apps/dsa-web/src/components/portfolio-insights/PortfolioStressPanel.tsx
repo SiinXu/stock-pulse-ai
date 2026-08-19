@@ -17,11 +17,16 @@ import type {
   PortfolioStressResponse,
   StressScenario,
 } from '../../types/portfolioInsights';
-import { formatPortfolioLimitation } from '../../hooks/portfolio/helpers';
 import {
   formatDataQualityStatus,
+  formatPortfolioLimitation,
   formatPortfolioStressQualityCell,
 } from '../../utils/dataQualityFormat/portfolio';
+import {
+  formatAuthoritativeStatusMessage,
+  formatPortfolioStressExcludedReason,
+  formatPortfolioStressScenario,
+} from '../../utils/dataQualityFormat/portfolioInsights';
 import { formatMoney, formatPct, formatSignedPct } from '../../utils/portfolioFormat';
 import {
   Button,
@@ -203,7 +208,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               onChange={setScenarioId}
               options={scenarios.map((scenario) => ({
                 value: scenario.id,
-                label: scenario.name,
+                label: formatPortfolioStressScenario(scenario, language).name,
               }))}
               className="w-full"
               triggerClassName="w-full"
@@ -211,7 +216,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               error={Boolean(formError)}
             />
             {selectedScenario ? (
-              <p className="text-sm text-secondary-text">{selectedScenario.description}</p>
+              <p className="text-sm text-secondary-text">{formatPortfolioStressScenario(selectedScenario, language).description}</p>
             ) : null}
             {selectedScenario?.requiresTargetSector ? (
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -273,7 +278,7 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               <StatePanel
                 state="empty"
                 title={text.emptyPortfolioTitle}
-                description={result.statusMessage || text.emptyPortfolioDescription}
+                description={text.emptyPortfolioDescription}
                 titleAs="p"
               />
             ) : null}
@@ -281,12 +286,23 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               <StatePanel
                 state="blocked"
                 title={text.unavailableResult}
-                description={result.statusMessage}
+                description={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : undefined
+                }
                 titleAs="p"
               />
             ) : null}
             {result.status === 'partial' ? (
-              <InlineAlert variant="warning" message={result.statusMessage || text.partialResult} />
+              <InlineAlert
+                variant="warning"
+                message={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : text.partialResult
+                }
+              />
             ) : null}
             {result.status === 'ok' || result.status === 'partial' ? (
               <>
@@ -324,9 +340,17 @@ const PortfolioStressPanel: React.FC<PortfolioStressPanelProps> = ({ accountId, 
               values={{
                 scenario: result.scenario,
                 assumptions: result.assumptions,
-                limitations: result.snapshotLimitations.map((item) => formatPortfolioLimitation(item, language)),
+                limitations: result.snapshotLimitations.map((item) => (
+                  formatPortfolioLimitation(item, language)
+                )),
                 missingData: result.missingData,
-                excludedPositions: result.excludedPositions,
+                excludedPositions: result.excludedPositions.map((position) => ({
+                  ...position,
+                  reason: formatPortfolioStressExcludedReason(
+                    typeof position.reason === 'string' ? position.reason : null,
+                    language,
+                  ),
+                })),
                 concentration: result.concentration,
                 snapshotId: result.snapshotId,
                 calculatedAt: result.calculatedAt,

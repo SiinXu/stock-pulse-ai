@@ -17,6 +17,13 @@ import type {
   PortfolioRebalancingResponse,
   RiskTolerance,
 } from '../../types/portfolioInsights';
+import {
+  formatAuthoritativeStatusMessage,
+  formatPortfolioInsightDisclaimer,
+  formatPortfolioInsightStatus,
+  formatPortfolioRebalanceAction,
+  formatPortfolioRebalanceRationale,
+} from '../../utils/dataQualityFormat/portfolioInsights';
 import { formatMoney, formatPct, formatSignedPct } from '../../utils/portfolioFormat';
 import {
   Button,
@@ -87,7 +94,7 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
       rowHeader: true,
       cell: (row) => <span className="font-medium text-foreground">{row.symbol}</span>,
     },
-    { id: 'action', header: text.action, cell: (row) => row.action },
+    { id: 'action', header: text.action, cell: (row) => formatPortfolioRebalanceAction(row.action, language) },
     { id: 'from', header: text.fromWeight, align: 'end', cell: (row) => formatPct(row.fromWeightPct) },
     { id: 'to', header: text.toWeight, align: 'end', cell: (row) => formatPct(row.toWeightPct) },
     { id: 'delta', header: text.deltaWeight, align: 'end', cell: (row) => formatSignedPct(row.deltaWeightPct) },
@@ -97,11 +104,11 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
       align: 'end',
       cell: (row) => formatMoney(row.approxNotional, result?.currency, language),
     },
-    { id: 'rationale', header: text.rationale, cell: (row) => row.rationale },
+    { id: 'rationale', header: text.rationale, cell: (row) => formatPortfolioRebalanceRationale(row, language) },
   ];
   const positionBandColumns: Array<DataTableColumn<PortfolioRebalancingResponse['positionBands'][number]>> = [
     { id: 'symbol', header: text.symbol, rowHeader: true, cell: (row) => row.symbol },
-    { id: 'action', header: text.action, cell: (row) => row.action },
+    { id: 'action', header: text.action, cell: (row) => formatPortfolioRebalanceAction(row.action, language) },
     { id: 'current', header: text.fromWeight, align: 'end', cell: (row) => formatPct(row.currentWeightPct) },
     {
       id: 'range',
@@ -109,7 +116,7 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
       align: 'end',
       cell: (row) => `${formatPct(row.targetWeightPctLow)} – ${formatPct(row.targetWeightPctHigh)}`,
     },
-    { id: 'rationale', header: text.rationale, cell: (row) => row.rationale },
+    { id: 'rationale', header: text.rationale, cell: (row) => formatPortfolioRebalanceRationale(row, language) },
   ];
 
   return (
@@ -200,27 +207,35 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
               <StatePanel
                 state="empty"
                 title={text.emptyPortfolioTitle}
-                description={result.statusMessage || text.emptyPortfolioDescription}
+                description={text.emptyPortfolioDescription}
                 titleAs="p"
               />
             ) : null}
             {result.status === 'insufficient_data' ? (
               <StatePanel
                 state="blocked"
-                title={text.insufficientTitle}
-                description={result.statusMessage}
+                title={formatPortfolioInsightStatus(result.status, language)}
+                description={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : text.insufficientTitle
+                }
                 titleAs="p"
               />
             ) : null}
             {result.status === 'refused' ? (
               <StatePanel
                 state="blocked"
-                title={text.refusedTitle}
-                description={result.statusMessage}
+                title={formatPortfolioInsightStatus(result.status, language)}
+                description={
+                  result.statusMessage
+                    ? formatAuthoritativeStatusMessage(result.statusMessage, language)
+                    : text.refusedTitle
+                }
                 titleAs="p"
               />
             ) : null}
-            <InlineAlert variant="info" title={text.suggestionOnly} message={result.disclaimer} />
+            <InlineAlert variant="info" title={text.suggestionOnly} message={formatPortfolioInsightDisclaimer('rebalance', language)} />
             <SummaryStrip
               aria-label={text.rebalanceTitle}
               items={[
@@ -237,7 +252,7 @@ const PortfolioRebalancePanel: React.FC<PortfolioRebalancePanelProps> = ({
                     ? text.notAvailable
                     : result.current.diversificationScore.toFixed(2),
                 },
-                { id: 'status', label: text.status, value: result.status },
+                { id: 'status', label: text.status, value: formatPortfolioInsightStatus(result.status, language) },
               ]}
             />
             <DataTable

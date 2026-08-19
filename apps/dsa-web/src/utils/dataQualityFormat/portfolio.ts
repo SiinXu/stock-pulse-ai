@@ -4,6 +4,7 @@
 import type { UiLanguage } from '../../i18n/uiText';
 import { PORTFOLIO_LIMITATION_LABELS } from '../../locales/portfolio';
 import { PORTFOLIO_RISK_METRICS_TEXT } from '../../locales/portfolioRiskMetrics';
+import { formatUnknownMachineCode, sanitizeMachineCode } from './unknownCode';
 
 const PORTFOLIO_STATUS_KEYS = {
   ok: 'statusOk',
@@ -33,7 +34,20 @@ export function formatDataQualityStatus(
   if (key) {
     return text[key];
   }
-  return `${text.statusUnknown} (${status})`;
+  return `${text.statusUnknown} (${sanitizeMachineCode(status)})`;
+}
+
+/**
+ * User-facing label for snapshot/stress limitation codes.
+ * Known catalog keys stay localized. Unknown tokens stay visible as
+ * sanitized diagnostics instead of raw snake_case primary copy.
+ */
+export function formatPortfolioLimitation(
+  limitation: string,
+  language: UiLanguage,
+): string {
+  return PORTFOLIO_LIMITATION_LABELS[language]?.[limitation]
+    ?? formatUnknownMachineCode(limitation, language);
 }
 
 export function formatPortfolioStressQualityCell(
@@ -49,6 +63,6 @@ export function formatPortfolioStressQualityCell(
   return [
     formatDataQualityStatus(row.dataQuality, language),
     row.priceStale ? staleLabel : null,
-    ...(row.limitations ?? []).map((item) => PORTFOLIO_LIMITATION_LABELS[language][item] ?? item),
+    ...(row.limitations ?? []).map((item) => formatPortfolioLimitation(item, language)),
   ].filter(Boolean).join(separator);
 }
