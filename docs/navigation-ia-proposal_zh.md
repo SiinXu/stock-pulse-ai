@@ -31,7 +31,7 @@
 | `/approvals` | 人工审批 | **否**（首页 / 面板） | 需管理员认证 |
 | `/stocks/:stockCode` | 个股工作区 | **否**（内容页） | |
 | `/login` | 登录 | 独立 | 保留 `?redirect=` |
-| `/playground`（+ render） | 组件 playground | 独立 / 非产品导航 | 仅开发；生产构建不包含该路由。Mock 适配器为开发依赖 |
+| `/playground`（+ render） | 组件 playground | 独立 / 非产品导航 | 开发表面；Mock 适配器仅开发依赖 |
 
 ### 1.2 遗留重定向（兼容面 — 禁止就地改名规范路径）
 

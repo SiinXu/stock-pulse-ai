@@ -50,9 +50,9 @@ const PlaygroundRenderPage = () => {
       if (active) setMockReadyProfile(profile);
     };
 
-    // The mock adapter is a development dependency. Playground routes are
-    // omitted from production composition, and this dynamic import must stay
-    // behind the compile-time DEV flag so the adapter cannot enter the graph.
+    // The mock adapter is a development dependency. Keep the production
+    // playground catalog/scenario graph, but do not resolve the adapter
+    // package in the production build.
     if (import.meta.env.DEV) {
       void import('./mockApi').then(({ installPlaygroundApiMock }) => {
         if (!active) return;

@@ -10,7 +10,7 @@ remain authoritative.
 - Keep business and data contracts reusable without importing rendered UI.
 - Keep shared UI primitives independent of feature, layout, and theme owners.
 - Make page modules composition roots rather than reusable dependencies.
-- Keep the component playground isolated behind development-only application route composition.
+- Keep the component playground isolated behind its application-level route composition.
 - Turn known debt into explicit, shrinking exceptions instead of implicit precedent.
 
 The contract governs production TypeScript and TSX. Tests may cross production boundaries to
@@ -50,8 +50,7 @@ enforced by `src/components/__tests__/architectureImportGuard.test.ts`:
 2. A page must not import another page. Extract reusable UI to a feature component, and extract
    reusable behavior or policy to its owning lower layer.
 3. Pages, components, and lower layers must not import the playground. `App.tsx` is the sole
-   composition root allowed to mount its catalog routes, and it does so only behind
-   `import.meta.env.DEV` so production builds omit the playground graph.
+   composition root allowed to mount its catalog routes.
 4. `components/common/` must not import or re-export another UI owner's feature, layout, routing,
    or theme module. Consumers import those modules from their actual owner.
 5. `api/`, `contexts/`, `hooks/`, `i18n/`, `locales/`, `stores/`, `types/`, and `utils/` must not
