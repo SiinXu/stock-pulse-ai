@@ -1,0 +1,1 @@
+- [Fixed] Empty and degraded Discover hotspots now keep Retry on the hotspot surface (including collapsed refresh), label last-good cards, and place a shared Data Sources Button in the hotspot recovery chrome instead of leaving mapped source errors as the only recovery UI (Refs #871).

@@ -482,6 +482,8 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /刷新热点题材/ }));
 
     await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: true }));
+    expect(await screen.findByText('强势领先')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '打开数据源设置 · 热点题材' })).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: /AI算力/ }));
     await waitFor(() => expect(getHotspotDetail).toHaveBeenCalledWith({ topic: 'AI算力', provider: 'akshare', refresh: false }));
     await waitFor(() => expect(screen.getAllByText('AI算力').length).toBeGreaterThan(0));
@@ -500,6 +502,13 @@ describe('StockScreeningPage', () => {
     expect(screen.getByText('缓存回退 2.5h')).toBeInTheDocument();
     expect(screen.getByText('详情数据已降级，展开查看原因').closest('summary')).toHaveClass('min-h-11');
     expect(screen.getByText(/缺失字段：live_stocks/)).toBeInTheDocument();
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    expect(within(hotspotSection as HTMLElement).getByRole('button', { name: /刷新热点题材/ })).toHaveAttribute('data-control', 'button');
+    const dataSources = within(hotspotSection as HTMLElement).getByRole('button', { name: '打开数据源设置 · 热点题材' });
+    expect(dataSources).toHaveAttribute('data-control', 'button');
+    fireEvent.click(dataSources);
+    expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
     expect(screen.getByText('盘中发酵')).toBeInTheDocument();
     expect(screen.getByText('概念股')).toBeInTheDocument();
     expect(screen.getByText('中际旭创')).toBeInTheDocument();
@@ -534,6 +543,15 @@ describe('StockScreeningPage', () => {
 
     expect(await screen.findByText('暂无缓存热点题材，展开后可点击刷新拉取实时数据。')).toBeInTheDocument();
     expect(screen.queryByText(/No cached AlphaSift hotspot snapshot/)).not.toBeInTheDocument();
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    const alert = within(hotspotSection as HTMLElement).getByRole('status');
+    expect(within(alert).getByText('暂无缓存热点题材，展开后可点击刷新拉取实时数据。')).toBeInTheDocument();
+    expect(within(hotspotSection as HTMLElement).getByRole('button', { name: /刷新热点题材/ })).toHaveAttribute('data-control', 'button');
+    const dataSources = within(hotspotSection as HTMLElement).getByRole('button', { name: '打开数据源设置 · 热点题材' });
+    expect(dataSources).toHaveAttribute('data-control', 'button');
+    fireEvent.click(dataSources);
+    expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
   });
 
   it('shows backend hotspot empty message before raw source diagnostics', async () => {
@@ -560,6 +578,14 @@ describe('StockScreeningPage', () => {
 
     expect(await screen.findByText('热点源连接中断，暂无可用缓存。')).toBeInTheDocument();
     expect(screen.queryByText(/RemoteDisconnected/)).not.toBeInTheDocument();
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    const alert = within(hotspotSection as HTMLElement).getByRole('status');
+    expect(within(alert).getByText('热点源连接中断，暂无可用缓存。')).toBeInTheDocument();
+    fireEvent.click(within(hotspotSection as HTMLElement).getByRole('button', { name: /刷新热点题材/ }));
+    await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: true }));
+    fireEvent.click(within(hotspotSection as HTMLElement).getByRole('button', { name: '打开数据源设置 · 热点题材' }));
+    expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
   });
 
   it('prefers merged hotspot route summaries over raw timeline items', async () => {
@@ -995,10 +1021,18 @@ describe('StockScreeningPage', () => {
 
     await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: true }));
     expect(await screen.findByText(/请求未能完成，请稍后重试/)).toBeInTheDocument();
+    expect(await screen.findByText('正在显示上次成功结果')).toBeInTheDocument();
     expect(screen.queryByText(/manual refresh failed/)).not.toBeInTheDocument();
     expect(screen.getByText('强势领先')).toBeInTheDocument();
     expect(screen.getByText(/中际旭创、工业富联/)).toBeInTheDocument();
     expect(screen.queryByText(/点击刷新后会拉取热点概念/)).not.toBeInTheDocument();
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    const alert = within(hotspotSection as HTMLElement).getByRole('status');
+    expect(within(alert).getByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(within(hotspotSection as HTMLElement).getByRole('button', { name: /刷新热点题材/ })).toHaveAttribute('data-control', 'button');
+    fireEvent.click(within(hotspotSection as HTMLElement).getByRole('button', { name: '打开数据源设置 · 热点题材' }));
+    expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
   });
 
   it('shows input strategy when strategy is not in preset list', async () => {
