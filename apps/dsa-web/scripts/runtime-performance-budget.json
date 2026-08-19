@@ -7,6 +7,17 @@
   "baselineNote": "Structural metrics are CI-reproducible. Wall-clock targets come from issue #883 starting points and must not be met by shrinking measurement scope or removing features.",
   "scenarios": [
     {
+      "id": "data-table-virtualization",
+      "surface": "DataTable (shared business tables)",
+      "metric": "mounted_row_count",
+      "unit": "rows",
+      "inputItemCount": 150,
+      "budget": 40,
+      "rationale": "Issue #883 / T16: tables > 100 rows virtualize or hard-paginate. Shared DataTable now reuses useVirtualWindow once row count >= 24 and the table has no variable-height detail rows. Budget = ceil(viewport/estimatedRow) + 2*overscan with headroom (viewport 480px, default row 48px, overscan 6 => ~10+12=22, cap 40).",
+      "measurement": "vitest contract: render DataTable with 150 rows; count mounted body-row test IDs inside the shared scroll region.",
+      "manualTarget": "Scroll remains interactive; first and last rows remain reachable; find-in-page still works for tables below the threshold."
+    },
+    {
       "id": "history-list-virtualization",
       "surface": "HistoryList (Home / Workbench history rail)",
       "metric": "mounted_row_count",

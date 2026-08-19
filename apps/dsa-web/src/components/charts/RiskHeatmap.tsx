@@ -161,6 +161,7 @@ export const RiskHeatmap: React.FC<RiskHeatmapProps> = ({
           density="compact"
           frame="embedded"
           minWidth="container"
+          virtualization={false}
         />
       </div>
       <div className="flex flex-wrap items-center gap-2 text-label text-muted-text">

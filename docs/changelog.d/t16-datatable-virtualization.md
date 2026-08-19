@@ -1,0 +1,1 @@
+- [Changed] Shared DataTable now windows large result sets with the existing virtual-window hook while keeping small tables, detail rows, and incompatible tall cells fully mounted.

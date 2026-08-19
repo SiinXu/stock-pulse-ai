@@ -75,5 +75,7 @@ describe('RiskHeatmap', () => {
     renderH(cells);
     expect(screen.getAllByRole('row')).toHaveLength(MAX_RISK_HEATMAP_ROWS + 1);
     expect(screen.getAllByRole('columnheader')).toHaveLength(MAX_RISK_HEATMAP_COLUMNS + 1);
+    expect(screen.getByRole('region')).toHaveAttribute('data-data-table-virtualized', 'false');
+    expect(screen.getByRole('region')).toHaveAttribute('data-data-table-virtual-reason', 'disabled');
   });
 });

@@ -2,7 +2,7 @@
 
 Issue [#883](https://github.com/SiinXu/stock-pulse-ai/issues/883) extends the existing bundle-size budget (PR #905 / #920) with **runtime** budgets for three product surfaces in `apps/dsa-web`:
 
-1. Long list rendering (`HistoryList`)
+1. Long list rendering (`HistoryList` and shared `DataTable`)
 2. Settings large forms (`SettingsField` isolation)
 3. SSE chat streams (`agentChatStore` progress batching)
 
@@ -23,6 +23,7 @@ Shared constants: `apps/dsa-web/src/performance/runtimeBudgets.ts`.
 
 | Scenario | Input | Metric | Budget | Rationale |
 | --- | --- | --- | --- | --- |
+| `data-table-virtualization` | 150 DataTable rows | Mounted body-row DOM nodes | ≤ 40 | Shared tables ≥ 24 rows window through `useVirtualWindow`; detail-row and explicit opt-out tables stay fully mounted. |
 | `history-list-virtualization` | 150 history rows | Mounted row DOM nodes | ≤ 40 | Lists > 100 rows must virtualize or hard-paginate; History already pages (20/page) but accumulates. |
 | `settings-field-isolation` | 40 fields | Sibling field commits after one edit | 0 | Single-field edit must not re-render every sibling control. |
 | `sse-progress-batching` | 60 SSE progress events | `progressSteps` store commits | ≤ 4 | rAF-batched commits keep Stop responsive under long streams. |
@@ -62,6 +63,7 @@ The soft-gate checker runs the Vitest measurement suite, writes a temporary repo
 
 ## Product mitigations shipped with this budget
 
+- **DataTable**: fixed-estimate virtual window (`useVirtualWindow`) when row count ≥ 24, unless controlled detail rows are present or the caller passes `virtualization={false}`; default/compact row heights are 48px/36px with overscan 6.
 - **HistoryList**: fixed-estimate virtual window (`useVirtualWindow`) when item count ≥ 24; `HistoryListItem` memoized.
 - **SettingsField**: `React.memo` with prop equality so unchanged sibling fields skip re-render.
 - **SSE**: `agentChatStore` batches `progressSteps` commits with `requestAnimationFrame`; `ChatMessageBubble` memoized so stream progress does not re-parse every prior bubble.

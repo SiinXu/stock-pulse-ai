@@ -80,6 +80,22 @@ function initialView(): FixtureView {
     : 'ready';
 }
 
+function fixtureRows(): readonly SignalRow[] {
+  const requested = Number(new URLSearchParams(window.location.search).get('rows'));
+  if (!Number.isInteger(requested) || requested <= SIGNALS.length) {
+    return SIGNALS;
+  }
+  return Array.from({ length: requested }, (_, index) => {
+    const base = SIGNALS[index % SIGNALS.length];
+    return {
+      ...base,
+      id: `${base.id}-${index + 1}`,
+      symbol: `${base.symbol}${index + 1}`,
+      company: `${base.company} ${index + 1}`,
+    };
+  });
+}
+
 function DataTableFixture() {
   const [view, setView] = useState<FixtureView>(initialView);
   const [sort, setSort] = useState<DataTableSortState>({
@@ -89,6 +105,7 @@ function DataTableFixture() {
   const [openedRow, setOpenedRow] = useState('No row opened');
   const [nestedAction, setNestedAction] = useState('No nested action');
   const [selectedRow, setSelectedRow] = useState('aapl');
+  const signalRows = useMemo(() => fixtureRows(), []);
 
   const columns: readonly DataTableColumn<SignalRow>[] = [
     {
@@ -165,11 +182,11 @@ function DataTableFixture() {
 
   const sortedRows = useMemo(() => {
     const direction = sort.direction === 'ascending' ? 1 : -1;
-    return [...SIGNALS].sort((left, right) => {
+    return [...signalRows].sort((left, right) => {
       if (sort.columnId === 'price') return (left.price - right.price) * direction;
       return left.symbol.localeCompare(right.symbol) * direction;
     });
-  }, [sort]);
+  }, [signalRows, sort]);
   const embeddedColumns: readonly DataTableColumn<SignalRow>[] = [
     {
       id: 'symbol',
@@ -217,7 +234,7 @@ function DataTableFixture() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">Current result set</h2>
-            <p className="text-sm text-secondary-text">{view === 'empty' ? 0 : SIGNALS.length} tracked symbols</p>
+            <p className="text-sm text-secondary-text">{view === 'empty' ? 0 : signalRows.length} tracked symbols</p>
           </div>
           <div className="text-right text-xs text-secondary-text">
             <p data-testid="row-result" aria-live="polite">{openedRow}</p>
@@ -258,7 +275,7 @@ function DataTableFixture() {
                 caption="Embedded selected signals"
                 scrollAreaLabel="Scrollable embedded selected signals"
                 columns={embeddedColumns}
-                rows={SIGNALS}
+                rows={signalRows.length > SIGNALS.length ? SIGNALS : signalRows}
                 getRowKey={(row) => row.id}
                 emptyState={{ title: 'No embedded signals' }}
                 density="compact"
