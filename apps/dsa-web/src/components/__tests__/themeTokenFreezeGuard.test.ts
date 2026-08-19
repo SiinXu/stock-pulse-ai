@@ -269,6 +269,20 @@ describe('theme token freeze guard', () => {
     });
     expect(outside.some((diff) => diff.code === 'outside-definition' && diff.token === '--chat-new-glow')).toBe(true);
 
+    const localStyleOutside = diffThemeTokenFreeze({
+      indexCss,
+      productionSources: {
+        ...productionSources,
+        '../../pages/ExamplePage.tsx': "const style = { ['--wizard-accent' as string]: 'red' };",
+      },
+      desktopSources,
+      desktopBaseline: DESKTOP_CHROME_DEFINED_TOKENS,
+      ungovernedReferenceDebt: THEME_UNGOVERNED_REFERENCE_DEBT,
+    });
+    expect(localStyleOutside.some((diff) => (
+      diff.code === 'outside-definition' && diff.token === '--wizard-accent'
+    ))).toBe(true);
+
     const ungovernedRef = diffThemeTokenFreeze({
       indexCss,
       productionSources: {

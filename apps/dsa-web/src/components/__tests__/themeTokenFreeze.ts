@@ -130,6 +130,13 @@ export function findDefinitionsOutsideIndex(
         detail: 'defined-outside-index.css',
       });
     }
+    for (const finding of collectLocalStyleTokenDefinitions(file, raw)) {
+      if (DEFINED_NAME_SET.has(finding.token)) continue;
+      findings.push({
+        ...finding,
+        detail: 'defined-outside-index.css',
+      });
+    }
   }
   return findings;
 }
