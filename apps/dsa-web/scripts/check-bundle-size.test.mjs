@@ -30,9 +30,9 @@ function createOutput({ withAssetsDirectory = true } = {}) {
   return root;
 }
 
-function writeBudget(root, rules) {
+function writeBudget(root, rules, aggregateRules) {
   const budgetPath = path.join(root, 'budget.json');
-  writeFileSync(budgetPath, JSON.stringify({
+  const budget = {
     version: 1,
     outDir: root,
     gzipLevel: 9,
@@ -41,7 +41,11 @@ function writeBudget(root, rules) {
       cssMaxGzipBytes: 1_000_000,
     },
     rules,
-  }));
+  };
+  if (aggregateRules !== undefined) {
+    budget.aggregateRules = aggregateRules;
+  }
+  writeFileSync(budgetPath, JSON.stringify(budget));
   return budgetPath;
 }
 
@@ -149,6 +153,139 @@ describe('bundle size checker', () => {
   });
 });
 
+describe('bundle size aggregate families (Refs #883)', () => {
+  const familyContents = Buffer.from("export const family = 'aggregate-guard';\n".repeat(48));
+
+  function writeHashedAsset(root, name, contents = familyContents) {
+    writeFileSync(path.join(root, 'assets', name), contents);
+    return gzipSync(contents, { level: 9 }).length;
+  }
+
+  it('accepts a family whose unique matched gzip total is exactly at the aggregate cap', () => {
+    const root = createOutput();
+    const leftGzip = writeHashedAsset(root, 'ContractChunk-aaa.js');
+    const rightGzip = writeHashedAsset(root, 'ContractChunk-bbb.js', Buffer.from("export const extra = 'split';\n".repeat(32)));
+    const unrelatedGzip = writeHashedAsset(
+      root,
+      'vendor-charts-ccc.js',
+      Buffer.from("export const charts = 'unrelated';\n".repeat(40)),
+    );
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [{
+        id: 'contract-family',
+        match: ['assets/ContractChunk-*.js', 'assets/ContractChunk*.js'],
+        maxGzipBytes: leftGzip + rightGzip,
+      }],
+    );
+
+    const result = runChecker(budgetPath);
+    const familyBlock = result.stdout.slice(result.stdout.indexOf('bundle-size: aggregate families:'));
+
+    expect(result.status).toBe(0);
+    expect(familyBlock).toContain('[OK] contract-family');
+    expect(familyBlock).toContain(`gzip=${leftGzip + rightGzip} B`);
+    expect(familyBlock).toContain('assets/ContractChunk-aaa.js');
+    expect(familyBlock).toContain('assets/ContractChunk-bbb.js');
+    expect(familyBlock).not.toContain('vendor-charts-ccc.js');
+    expect(unrelatedGzip).toBeGreaterThan(0);
+    expect(result.stdout).toContain('1 aggregate family within budget');
+  });
+
+  it('fails a split-bypass where each sibling is under the per-asset cap but the family total is not', () => {
+    const root = createOutput();
+    const leftGzip = writeHashedAsset(root, 'ContractChunk-aaa.js');
+    const rightGzip = writeHashedAsset(root, 'ContractChunk-bbb.js', Buffer.from("export const extra = 'split';\n".repeat(32)));
+    const perAssetCap = Math.max(leftGzip, rightGzip);
+    const budgetPath = writeBudget(
+      root,
+      [{
+        id: 'contract',
+        match: 'assets/ContractChunk-*.js',
+        maxGzipBytes: perAssetCap,
+      }],
+      [{
+        id: 'contract-family',
+        match: 'assets/ContractChunk-*.js',
+        maxGzipBytes: perAssetCap,
+      }],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(leftGzip).toBeLessThanOrEqual(perAssetCap);
+    expect(rightGzip).toBeLessThanOrEqual(perAssetCap);
+    expect(leftGzip + rightGzip).toBeGreaterThan(perAssetCap);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('FAIL contract-family');
+    expect(result.stderr).toContain(`gzip=${leftGzip + rightGzip} B`);
+    expect(result.stderr).toContain(`budget=${perAssetCap} B`);
+    expect(result.stderr).toContain('assets/ContractChunk-aaa.js, assets/ContractChunk-bbb.js');
+    expect(result.stderr).toContain('aggregate family exceeded budget');
+    expect(result.stdout).toContain('assets=2');
+  });
+
+  it('counts overlapping family globs once so a renamed hash cannot be double-billed', () => {
+    const root = createOutput();
+    const gzipBytes = writeHashedAsset(root, 'ContractChunk-renamedHash.js');
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [{
+        id: 'contract-family',
+        match: ['assets/ContractChunk-*.js', 'assets/ContractChunk-renamedHash.js'],
+        maxGzipBytes: gzipBytes,
+      }],
+    );
+
+    const result = runChecker(budgetPath);
+    const familyBlock = result.stdout.slice(result.stdout.indexOf('bundle-size: aggregate families:'));
+
+    expect(result.status).toBe(0);
+    expect(familyBlock).toContain(`gzip=${gzipBytes} B`);
+    expect(familyBlock).toContain('assets=1');
+    expect(familyBlock.match(/assets\/ContractChunk-renamedHash\.js/g)).toHaveLength(1);
+  });
+
+  it('fails when an aggregate rule matches no artifact', () => {
+    const root = createOutput();
+    writeHashedAsset(root, 'OtherChunk-hash.js');
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [{
+        id: 'contract-family',
+        match: 'assets/ContractChunk-*.js',
+        maxGzipBytes: 1_000_000,
+      }],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'Aggregate rule matched no build artifact: contract-family.',
+    );
+  });
+
+  it('keeps budgets without aggregateRules backward compatible', () => {
+    const root = createOutput();
+    const gzipBytes = writeHashedAsset(root, 'ContractChunk-hash.js');
+    const budgetPath = writeBudget(root, [{
+      id: 'contract',
+      match: 'assets/ContractChunk-*.js',
+      maxGzipBytes: gzipBytes,
+    }]);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('bundle-size: OK — 1 assets within budget');
+    expect(result.stdout).not.toContain('aggregate family');
+  });
+});
+
 describe('first-paint entry budget (Refs #883)', () => {
   const budgetPath = path.join(WEB_ROOT, 'scripts', 'bundle-size-budget.json');
   const eslintPath = path.join(WEB_ROOT, 'eslint.config.js');
@@ -179,5 +316,45 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(source).toContain("'no-restricted-imports'");
     expect(source).toContain("'./components/common'");
     expect(source).toContain("'../common'");
+  });
+
+  it('adds same-pattern aggregate families without raising per-asset caps or residual vendor-misc', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const residualIds = new Set(['vendor-misc']);
+    const aggregateIds = budget.aggregateRules.map((rule) => rule.id);
+
+    expect(new Set(aggregateIds).size).toBe(aggregateIds.length);
+    expect(aggregateIds).not.toContain('vendor-misc-family');
+
+    for (const rule of budget.rules) {
+      if (residualIds.has(rule.id)) {
+        continue;
+      }
+      const family = budget.aggregateRules.find((entry) => entry.id === `${rule.id}-family`);
+      expect(family, `missing family for ${rule.id}`).toEqual(expect.objectContaining({
+        match: [rule.match],
+      }));
+      expect(family.measuredGzipBytes).toBeGreaterThan(0);
+      expect(family.maxGzipBytes).toBeGreaterThanOrEqual(family.measuredGzipBytes);
+      if (!rule.id.startsWith('locale-')) {
+        expect(family.maxGzipBytes).toBe(rule.maxGzipBytes);
+      } else {
+        expect(family.maxGzipBytes).toBe(family.measuredGzipBytes + 400);
+        expect(family.maxGzipBytes).toBeGreaterThan(rule.maxGzipBytes);
+      }
+    }
+
+    const entryFamily = budget.aggregateRules.find((rule) => rule.id === 'js-entry-family');
+    const entry = budget.rules.find((rule) => rule.id === 'js-entry');
+    expect(entryFamily.maxGzipBytes).toBe(entry.maxGzipBytes);
+    expect(entryFamily.maxGzipBytes).toBeLessThan(195_814);
+
+    for (const routeId of ['settings-route', 'portfolio-route', 'screening-route', 'home-watchlist-route']) {
+      const route = budget.aggregateRules.find((rule) => rule.id === routeId);
+      expect(route, routeId).toBeTruthy();
+      expect(Array.isArray(route.match)).toBe(true);
+      expect(route.match.length).toBeGreaterThan(1);
+      expect(route.maxGzipBytes).toBe(route.measuredGzipBytes + 400);
+    }
   });
 });

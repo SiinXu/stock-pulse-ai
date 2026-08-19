@@ -70,6 +70,31 @@ The soft-gate checker runs the Vitest measurement suite, writes a temporary repo
 
 The Web gate runs `node scripts/check-runtime-performance.mjs` after unit tests when frontend paths change. Soft mode prints warnings into the job log and **does not fail** the required Web gate. Switch to `--strict` only after budgets are validated on CI runners.
 
+## Bundle size (per-asset and aggregate)
+
+Machine-readable: `apps/dsa-web/scripts/bundle-size-budget.json`.
+
+Checker: `apps/dsa-web/scripts/check-bundle-size.mjs` (`npm run build:check` after a production build).
+
+| Layer | What it caps | Bypass it prevents |
+| --- | --- | --- |
+| `rules` | Each matching `.js` / `.css` asset | A single named chunk growing past its gzip cap |
+| `aggregateRules` | Unique gzip total of every asset matching a family of globs | Splitting one route or component into many smaller chunks that each stay under the per-asset cap |
+
+Aggregate rules are keyed by stable family IDs (`<named-rule>-family` or a route prefix such as `home-watchlist-route`). `match` is one glob or a list of globs. Each asset is counted once inside a family even when several globs hit the same hashed filename. A family that matches nothing fails, so a renamed prefix cannot silently drop out of the gate.
+
+`vendor-misc` stays a first-match residual per-asset rule only. Its glob `assets/vendor-*.js` would otherwise sum every vendor chunk.
+
+Same-pattern families inherit the existing named per-asset cap when the current production build still emits one artifact. Locale packs on current `main` already emit several `ja-*.js` (and sibling locale) files; those families use the measured zlib-9 sum plus 400 B. Extra route families (`settings-route`, `portfolio-route`, `screening-route`, `home-watchlist-route`) cover prefix children that would not match the original named glob. Do not raise a per-asset cap to hide family growth.
+
+```bash
+cd apps/dsa-web
+npm run build
+node scripts/check-bundle-size.mjs --print
+```
+
+The checker prints matched assets, per-file gzip, family gzip totals, and the budget that failed.
+
 ## Related
 
 - Bundle size budget: `apps/dsa-web/scripts/bundle-size-budget.json`, `check-bundle-size.mjs`

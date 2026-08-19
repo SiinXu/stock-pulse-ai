@@ -1,0 +1,1 @@
+- [Tests] Add aggregate Web bundle gzip family rules so splitting one named route or component into many smaller chunks cannot bypass the existing per-asset budgets (Refs #883).
