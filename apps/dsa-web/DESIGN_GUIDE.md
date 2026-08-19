@@ -87,6 +87,7 @@
   `0 88% 64%` (`#F45252`)；`--price-green` light `149 100% 42%`
   (`#00D668`) / dark `149 100% 44%` (`#00E06C`)。
 - 运行时偏好：Settings `MARKET_REVIEW_COLOR_SCHEME`（`red_up`/`green_up`）同步到 `data-price-direction`；`marketFormat.changeSemantics` 按市场惯例/用户偏好映射方向 → 色相 paint。
+- 持仓、回测、选股结果、市场结构、财务计算器的涨跌/盈亏展示走 `SignedChangeText`（`changeSemantics` + `changeColorCssVar`），偏好读取现有 ThemeAppearance / `data-price-direction`，不要再加并行 preference hook。禁止把有符号值映射到 `text-success` / `text-danger`。零值、缺失、非有限值、无法解析的市场保持未上色，禁止把未知代码默认成 `cn`。符号或文案作为非颜色线索。
 
 ### 2.5 Theme Contract v1（#162 / #880）
 

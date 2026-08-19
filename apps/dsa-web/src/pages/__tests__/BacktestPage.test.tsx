@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -13,6 +13,7 @@ import {
 } from '../../routing/routes';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import BacktestPage from '../BacktestPage';
+import { applyPriceDirection } from '../../components/theme/themeRuntime';
 import { createDeferred, chooseOption } from '../../test-utils';
 
 vi.mock('../../hooks/useStockIndex', () => ({
@@ -234,6 +235,49 @@ describe('BacktestPage', () => {
     expect(screen.getByText('方向准确率')).toBeInTheDocument();
     expect(screen.getByText('平均模拟收益')).toBeInTheDocument();
     expect(screen.getByRole('toolbar', { name: '回测结果工具栏' })).toHaveClass('border-y-0');
+  });
+
+  it('paints window return with price tokens and keeps zero/unknown unpainted', async () => {
+    applyPriceDirection('cn', { persist: false });
+    renderPage();
+    const resultRow = (await screen.findByText('600519')).closest('tr');
+    expect(resultRow).not.toBeNull();
+    const gain = within(resultRow as HTMLElement).getByText('3.8%');
+    expect(gain).toHaveClass('price-up');
+    expect(gain).not.toHaveClass('text-success');
+    expect(gain).not.toHaveClass('text-danger');
+    expect(within(resultRow as HTMLElement).getByText('上涨')).toHaveClass('badge-trend-up');
+
+    applyPriceDirection('us', { persist: false });
+    cleanup();
+    renderPage();
+    const flippedRow = (await screen.findByText('600519')).closest('tr');
+    expect(within(flippedRow as HTMLElement).getByText('3.8%')).toHaveClass('price-up');
+    expect(within(flippedRow as HTMLElement).getByText('3.8%')).not.toHaveClass('text-success');
+
+    mockGetResults.mockResolvedValueOnce({
+      total: 2,
+      page: 1,
+      limit: 20,
+      items: [
+        { ...baseResultItem, analysisHistoryId: 201, actualReturnPct: 0, actualMovement: 'flat' },
+        { ...baseResultItem, analysisHistoryId: 202, code: '000001', actualReturnPct: null, actualMovement: null },
+      ],
+    });
+    cleanup();
+    applyPriceDirection('cn', { persist: false });
+    renderPage();
+    const zeroRow = (await screen.findByText('600519')).closest('tr');
+    const unknownRow = (await screen.findByText('000001')).closest('tr');
+    expect(within(zeroRow as HTMLElement).getByText('0.0%')).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(within(zeroRow as HTMLElement).getByText('0.0%')).not.toHaveStyle({ color: 'var(--price-green)' });
+    const unknownReturns = within(unknownRow as HTMLElement).getAllByText('--', { selector: '.text-muted-text' });
+    expect(unknownReturns.length).toBeGreaterThan(0);
+    for (const node of unknownReturns) {
+      expect(node).not.toHaveStyle({ color: 'var(--price-red)' });
+      expect(node).not.toHaveStyle({ color: 'var(--price-green)' });
+    }
+    applyPriceDirection('cn', { persist: false });
   });
 
   it('renders one page-level empty state before any backtest data exists', async () => {

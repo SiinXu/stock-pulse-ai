@@ -22,6 +22,7 @@ import {
 } from '../../routing/routes';
 import { PORTFOLIO_ANALYSIS_TASK_SESSION_KEY } from '../../components/portfolio/portfolioAnalysisTaskState';
 import PortfolioPage from '../PortfolioPage';
+import { applyPriceDirection } from '../../components/theme/themeRuntime';
 import { createDeferred, chooseOption } from '../../test-utils';
 
 // jsdom does not implement scrollIntoView, while Select calls it to keep the active item visible when opening a dropdown.
@@ -1621,8 +1622,31 @@ describe('PortfolioPage FX refresh', () => {
 
     const hkRowCells = within(hkRow as HTMLTableRowElement).getAllByRole('cell');
     const aaplRowCells = within(aaplRow as HTMLTableRowElement).getAllByRole('cell');
-    expect(hkRowCells.at(-3)?.querySelector('span')).toHaveClass('text-success');
+    expect(hkRowCells.at(-3)?.querySelector('span')).toHaveStyle({ color: 'var(--price-red)' });
+    expect(hkRowCells.at(-3)?.querySelector('span')).not.toHaveClass('text-success');
+    expect(hkRowCells.at(-3)?.querySelector('span')).not.toHaveClass('text-danger');
     expect(aaplRowCells.at(-3)?.querySelector('span')).toHaveClass('text-secondary');
+    expect(aaplRowCells.at(-3)?.querySelector('span')).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(aaplRowCells.at(-3)?.querySelector('span')).not.toHaveStyle({ color: 'var(--price-green)' });
+  });
+
+  it('honors green_up preference and leaves a zero P/L unpainted', async () => {
+    applyPriceDirection('us', { persist: false });
+    getSnapshot.mockResolvedValueOnce(makeSnapshot({ positions: [
+      { symbol: '600519', market: 'cn', currency: 'CNY', quantity: 1, avgCost: 1500, totalCost: 1500, lastPrice: 1600, marketValueBase: 1600, unrealizedPnlBase: 100, unrealizedPnlPct: 6.67, valuationCurrency: 'CNY', priceSource: 'history_close', priceDate: '2026-06-17', priceStale: false, priceAvailable: true },
+      { symbol: '000001', market: 'cn', currency: 'CNY', quantity: 1, avgCost: 10, totalCost: 10, lastPrice: 10, marketValueBase: 10, unrealizedPnlBase: 0, unrealizedPnlPct: 0, valuationCurrency: 'CNY', priceSource: 'history_close', priceDate: '2026-06-17', priceStale: false, priceAvailable: true },
+    ] }));
+
+    renderPortfolioPage();
+    await waitForInitialLoad();
+
+    const gain = screen.getByText('+6.67%');
+    expect(gain).toHaveStyle({ color: 'var(--price-green)' });
+    expect(gain).not.toHaveClass('text-success');
+    const flat = screen.getByText('0.00%');
+    expect(flat).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(flat).not.toHaveStyle({ color: 'var(--price-green)' });
+    applyPriceDirection('cn', { persist: false });
   });
 
   it('loads latest active signals for holdings without scanning paginated signal lists', async () => {

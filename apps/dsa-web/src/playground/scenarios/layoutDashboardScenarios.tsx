@@ -23,6 +23,7 @@ import { ThemeToggle } from '../../components/theme/ThemeToggle';
 import { ThemeAppearanceProvider } from '../../components/theme/ThemeAppearanceProvider';
 import { ThemePackSelect } from '../../components/theme/ThemePackSelect';
 import { PriceDirectionSync } from '../../components/theme/PriceDirectionSync';
+import { SignedChangeText } from '../../components/theme/SignedChangeText';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { PLAYGROUND_TEXT } from '../../locales/playground';
 import { NOTIFICATIONS_TEXT } from '../../locales/notifications';
@@ -118,6 +119,15 @@ const PriceDirectionSyncStory = () => {
     </ThemeAppearanceProvider>
   );
 };
+
+const SignedChangeTextStory = () => (
+  <div className="flex flex-col gap-2 rounded-lg border border-border bg-card p-6 text-sm">
+    <SignedChangeText value={1.25} market="cn">+1.25%</SignedChangeText>
+    <SignedChangeText value={-0.5} market="us">-0.50%</SignedChangeText>
+    <SignedChangeText value={0} market="cn">0.00%</SignedChangeText>
+    <SignedChangeText value={1.25} market="7203.T">+1.25%</SignedChangeText>
+  </div>
+);
 
 const UiLanguageToggleStory = () => (
   <div className="flex min-h-48 items-start justify-center rounded-lg border border-border bg-card p-6">
@@ -229,6 +239,7 @@ export const LAYOUT_DASHBOARD_SCENARIOS: Record<string, PlaygroundScenarioRender
   'theme-appearance-provider': ThemeAppearanceProviderStory,
   'theme-pack-select': ThemePackSelectStory,
   'price-direction-sync': PriceDirectionSyncStory,
+  'signed-change-text': SignedChangeTextStory,
   'ui-language-toggle': UiLanguageToggleStory,
   'dashboard-panel-header': DashboardPanelHeaderStory,
   'dashboard-state-block': DashboardStateBlockStory,

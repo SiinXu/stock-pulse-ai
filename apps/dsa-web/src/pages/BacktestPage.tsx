@@ -154,9 +154,9 @@ function actualMovementBadge(movement: string | null | undefined, language: UiLa
   const labels = BACKTEST_MOVEMENT_LABELS[language];
   switch (movement) {
     case 'up':
-      return <Badge variant="success">{labels.up}</Badge>;
+      return <Badge variant="trend-up">{labels.up}</Badge>;
     case 'down':
-      return <Badge variant="danger">{labels.down}</Badge>;
+      return <Badge variant="trend-down">{labels.down}</Badge>;
     case 'flat':
       return <Badge variant="warning">{labels.flat}</Badge>;
     default:
@@ -165,37 +165,13 @@ function actualMovementBadge(movement: string | null | undefined, language: UiLa
 }
 
 function boolIcon(value: boolean | null | undefined, text: BacktestText) {
-  if (value === true) {
-    return (
-      <span
-        className="backtest-status-chip backtest-status-chip-success"
-        aria-label={text.yes}
-      >
-        <StatusDot tone="success" className="backtest-status-chip-dot" />
-        <Check className="h-3.5 w-3.5" />
-      </span>
-    );
-  }
-
-  if (value === false) {
-    return (
-      <span
-        className="backtest-status-chip backtest-status-chip-danger"
-        aria-label={text.no}
-      >
-        <StatusDot tone="danger" className="backtest-status-chip-dot" />
-        <X className="h-3.5 w-3.5" />
-      </span>
-    );
-  }
-
+  const tone = value === true ? 'success' : value === false ? 'danger' : 'neutral';
+  const label = value === true ? text.yes : value === false ? text.no : text.unknown;
+  const Icon = value === true ? Check : value === false ? X : Minus;
   return (
-    <span
-      className="backtest-status-chip backtest-status-chip-neutral"
-      aria-label={text.unknown}
-    >
-      <StatusDot tone="neutral" className="backtest-status-chip-dot" />
-      <Minus className="h-3.5 w-3.5" />
+    <span className={`backtest-status-chip backtest-status-chip-${tone}`} aria-label={label}>
+      <StatusDot tone={tone} className="backtest-status-chip-dot" />
+      <Icon className="h-3.5 w-3.5" />
     </span>
   );
 }
@@ -794,7 +770,7 @@ const BacktestPage: React.FC = () => {
           {actualMovementBadge(row.actualMovement, language)}
           <span className={
             row.actualReturnPct != null
-              ? row.actualReturnPct > 0 ? 'text-success' : row.actualReturnPct < 0 ? 'text-danger' : 'text-secondary-text'
+              ? row.actualReturnPct > 0 ? 'price-up' : row.actualReturnPct < 0 ? 'price-down' : 'text-secondary-text'
               : 'text-muted-text'
           }>
             {pct(row.actualReturnPct)}
@@ -1063,11 +1039,7 @@ const BacktestPage: React.FC = () => {
             <EmptyState
               title={text.noResultsTitle}
               description={text.noResultsDescription}
-              icon={(
-                <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>
-              )}
+              icon={<Inbox className="h-6 w-6" aria-hidden="true" />}
               action={(
                 <Button
                   type="button"

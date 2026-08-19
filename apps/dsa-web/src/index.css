@@ -1951,6 +1951,9 @@ a {
   color: var(--price-down);
 }
 
+.price-up { color: var(--price-up); }
+.price-down { color: var(--price-down); }
+
 .settings-panel-muted {
   border-color: var(--settings-border);
   background: var(--settings-surface-strong);

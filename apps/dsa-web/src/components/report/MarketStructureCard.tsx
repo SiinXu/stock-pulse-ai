@@ -10,8 +10,10 @@ import type {
 } from '../../types/analysis';
 import { MARKET_STRUCTURE_CONTENT_TEXT } from '../../locales/reportContent';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
+import { formatSignedChangePercent } from '../../utils/marketFormat';
 import { Badge, Card } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
+import { SignedChangeText } from '../theme/SignedChangeText';
 
 interface MarketStructureCardProps {
   context?: MarketStructureContext | null;
@@ -27,18 +29,26 @@ const STATUS_VARIANT: Record<MarketStructureStatus, BadgeVariant> = {
   not_supported: 'default',
 };
 
-const formatItem = (item: RankedThemeItem): string => {
-  if (typeof item.changePct === 'number') {
-    return `${item.name} ${item.changePct > 0 ? '+' : ''}${item.changePct.toFixed(2)}%`;
+const formatItem = (item: RankedThemeItem, market?: string | null): React.ReactNode => {
+  if (typeof item.changePct === 'number' && Number.isFinite(item.changePct)) {
+    return (
+      <>
+        {item.name}
+        {' '}
+        <SignedChangeText value={item.changePct} market={market}>
+          {formatSignedChangePercent(item.changePct)}
+        </SignedChangeText>
+      </>
+    );
   }
   return item.name;
 };
 
-const itemList = (items?: RankedThemeItem[], limit = 4): string[] => {
+const itemList = (items?: RankedThemeItem[], market?: string | null, limit = 4): React.ReactNode[] => {
   if (!Array.isArray(items)) {
     return [];
   }
-  return items.filter((item) => item?.name).slice(0, limit).map(formatItem);
+  return items.filter((item) => item?.name).slice(0, limit).map((item) => formatItem(item, market));
 };
 
 const valueList = (items?: string[], limit = 4): string[] => {
@@ -61,9 +71,9 @@ export const MarketStructureCard: React.FC<MarketStructureCardProps> = ({ contex
     return null;
   }
 
-  const activeThemes = itemList(marketTheme.activeThemes);
-  const leadingConcepts = itemList(marketTheme.leadingConcepts);
-  const leadingIndustries = itemList(marketTheme.leadingIndustries);
+  const activeThemes = itemList(marketTheme.activeThemes, context.market);
+  const leadingConcepts = itemList(marketTheme.leadingConcepts, context.market);
+  const leadingIndustries = itemList(marketTheme.leadingIndustries, context.market);
   const primaryTheme = stockPosition.primaryTheme?.name || text.empty;
   const themePhase = (stockPosition.themePhase || 'unknown') as MarketStructureThemePhase;
   const stockRole = (stockPosition.stockRole || 'unknown') as MarketStructureStockRole;
@@ -179,7 +189,7 @@ export const MarketStructureCard: React.FC<MarketStructureCardProps> = ({ contex
 
 interface MetricLineProps {
   label: string;
-  values: string[];
+  values: React.ReactNode[];
   emptyText: string;
 }
 
@@ -187,7 +197,14 @@ const MetricLine: React.FC<MetricLineProps> = ({ label, values, emptyText }) => 
   <div className="grid gap-1 text-sm sm:grid-cols-[7rem_1fr]">
     <span className="text-secondary-text">{label}</span>
     <span className="min-w-0 break-words text-foreground">
-      {values.length > 0 ? values.join(' / ') : emptyText}
+      {values.length > 0
+        ? values.map((value, index) => (
+          <span key={index}>
+            {index > 0 ? ' / ' : null}
+            {value}
+          </span>
+        ))
+        : emptyText}
     </span>
   </div>
 );

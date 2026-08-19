@@ -34,15 +34,11 @@ const CANONICAL_PRICE_HUE_OWNER = 'utils/marketFormat.ts';
 /**
  * Remaining production sites that map a signed change/PnL/return to
  * success/danger CSS instead of `changeColorCssVar`. Occurrence-level
- * ceiling — shrink only. Do not add MarketStructureCard: its `text-success`
- * icons are decorative, not a signed-direction mapping.
+ * ceiling — shrink only. MarketStructureCard `text-success` icons stay
+ * decorative and are not a signed-direction mapping.
  */
-const PRICE_DIRECTION_BYPASS_DEBT = [
-  'components/portfolio/PortfolioWorkspace.tsx',
-  'pages/BacktestPage.tsx',
-  'pages/FinancialCalculatorsPage.tsx',
-] as const;
-const MAX_PRICE_DIRECTION_BYPASS_DEBT = 4;
+const PRICE_DIRECTION_BYPASS_DEBT: readonly string[] = [];
+const MAX_PRICE_DIRECTION_BYPASS_DEBT = 0;
 
 function lineOf(source: string, index: number): number {
   return source.slice(0, index).split('\n').length;
@@ -330,6 +326,8 @@ describe('theme contract guard', () => {
   it('wires badge-trend classes to direction tokens', () => {
     expect(indexCss).toMatch(/\.badge-trend-up\s*\{[^}]*var\(--price-up\)/s);
     expect(indexCss).toMatch(/\.badge-trend-down\s*\{[^}]*var\(--price-down\)/s);
+    expect(indexCss).toMatch(/\.price-up\s*\{[^}]*var\(--price-up\)/s);
+    expect(indexCss).toMatch(/\.price-down\s*\{[^}]*var\(--price-down\)/s);
   });
 
   it('detects contract violations in fixtures without expanding production debt', () => {
@@ -383,6 +381,11 @@ export function changeColorToCss(color: ChangeColor): string {
       '../../utils/marketFormat.ts',
       "export const CHANGE_COLOR_CSS_VAR = { red: 'var(--price-red)', green: 'var(--price-green)' };",
     )).toEqual([]);
+
+    expect(findPriceDirectionCssMappings(
+      '../../pages/ExamplePage.tsx',
+      "const cls = value >= 0 ? 'text-success' : 'text-danger';",
+    ).map((finding) => finding.token)).toContain('signed-to-status-css');
   });
 
   it('fails closed when the TypeScript inventory is empty and still scans .ts modules', () => {
