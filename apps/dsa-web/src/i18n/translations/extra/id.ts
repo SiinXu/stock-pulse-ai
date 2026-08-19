@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export const SERVER_PRESENTATION_CATALOG = {
+export const EXTRA_UI_TRANSLATIONS = {
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "Aksi sinyal selaras dengan sisi transaksi.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "Aksi sinyal tidak mendukung sisi transaksi ini.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "Ada analisis atau bukti.",

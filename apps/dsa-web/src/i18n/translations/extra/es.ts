@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export const SERVER_PRESENTATION_CATALOG = {
+export const EXTRA_UI_TRANSLATIONS = {
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "La acción de la señal coincide con el lado de la operación.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "La acción de la señal no respalda este lado.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "Hay análisis o evidencia.",

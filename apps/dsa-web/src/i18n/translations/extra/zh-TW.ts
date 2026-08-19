@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export const SERVER_PRESENTATION_CATALOG = {
+export const EXTRA_UI_TRANSLATIONS = {
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "訊號動作與成交方向一致。",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "訊號動作不支援該成交方向。",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "存在分析或證據支撐。",

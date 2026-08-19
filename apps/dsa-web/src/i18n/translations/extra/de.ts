@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
-export const SERVER_PRESENTATION_CATALOG = {
+export const EXTRA_UI_TRANSLATIONS = {
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_aligned": "Die Signalaktion passt zur Handelsseite.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.action_misaligned": "Die Signalaktion unterstützt diese Handelsseite nicht.",
     "locales.personalPerformanceReasons.PERSONAL_PERFORMANCE_REASON_LABELS.analysis_or_evidence": "Analyse oder Evidenz ist vorhanden.",
