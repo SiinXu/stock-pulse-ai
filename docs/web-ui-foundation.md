@@ -298,8 +298,9 @@ selection/activation handlers. The native table exposes `aria-rowcount` and
 `aria-rowindex` while windowed. Pass `virtualization={false}` for
 incompatible variable-height cells; controlled detail rows (`renderRowDetail`)
 disable windowing automatically. DataTable does not implement `rowspan`.
-Current production fallbacks: Screening results (detail rows) and
-`RiskHeatmap` (tall score cells, explicit opt-out).
+Current production fallbacks: Screening results (detail rows),
+`RiskHeatmap` (tall score cells, explicit opt-out), and the Portfolio
+risk correlation matrix (tall compact cells, explicit opt-out).
 
 An activatable row requires both `onRowActivate` and a localized
 `getRowAriaLabel`. Click, Enter, and Space invoke the same command. Events from

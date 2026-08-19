@@ -274,6 +274,7 @@ const CorrelationCard: React.FC<{
             frame="embedded"
             minWidth="container"
             emptyState={{ title: text.correlationEmpty }}
+            virtualization={false}
           />
         </div>
       ) : (
