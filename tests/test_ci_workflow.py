@@ -208,7 +208,7 @@ def test_web_gate_runs_full_matrix_for_frontend_changes():
         "📦 Install": "npm ci",
         "🔎 Lint": "npm run lint",
         "🌐 i18n guards": "npm run test:i18n",
-        "🧪 Unit tests": "npm run test",
+        "🧪 Unit tests": "npm run test:coverage",
         "🏗️ Build": "npm run build",
         "📦 Bundle size budget": "node scripts/check-bundle-size.mjs --print",
     }
@@ -217,6 +217,15 @@ def test_web_gate_runs_full_matrix_for_frontend_changes():
         assert steps_by_name[name]["if"] == FRONTEND_EXECUTION_CONDITION
     for name, command in expected_commands.items():
         assert steps_by_name[name]["run"] == command
+
+
+def test_web_gate_uses_coverage_instead_of_a_second_unit_suite():
+    workflow = yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
+    web_job = workflow["jobs"]["web-gate"]
+    runs = [step.get("run") for step in web_job["steps"] if "run" in step]
+
+    assert runs.count("npm run test:coverage") == 1
+    assert "npm run test" not in runs
 
 
 def test_web_gate_enforces_bundle_budget_immediately_after_build():

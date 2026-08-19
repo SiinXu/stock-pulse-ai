@@ -47,7 +47,7 @@ For multi-PR merge trains, conflict grouping, registry guards, squash false-clos
 | Backend gate | `./scripts/ci_gate.sh` |
 | Backend minimum | `python -m py_compile <changed_python_files>` |
 | Backend offline | `python -m pytest -m "not network"` |
-| Web | `cd apps/dsa-web && npm ci && npm run lint && npm run test && npm run build` |
+| Web | `cd apps/dsa-web && npm ci && npm run lint && npm run test && npm run test:coverage && npm run build` |
 | Web i18n | `cd apps/dsa-web && npm run test:i18n` |
 | Web smoke e2e | `cd apps/dsa-web && npm run test:e2e-security-preflight && npx playwright install --with-deps chromium && npm run test:smoke` |
 | Desktop | Web build, then `cd apps/dsa-desktop && npm install && npm run build` |

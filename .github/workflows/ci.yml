@@ -868,7 +868,7 @@ jobs:
         run: npm run test:i18n
       - name: 🧪 Unit tests
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
-        run: npm run test
+        run: npm run test:coverage
       - name: ⏱ Runtime performance budget (soft)
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         working-directory: apps/dsa-web

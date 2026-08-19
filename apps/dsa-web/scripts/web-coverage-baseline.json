@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "description": "Measured Vitest v8 coverage floor for apps/dsa-web/src. Floor is floor(measured_percent - epsilon_percent). Do not lower thresholds to hide regressions; raise them only after a clean remasurement on origin/main-equivalent unit tests.",
+  "provider": "v8",
+  "all": true,
+  "reportsDirectory": "./coverage",
+  "reporters": ["text", "json-summary"],
+  "measuredCommand": "npm run test:coverage",
+  "measuredAt": "2026-08-19",
+  "measuredSha": "e441a0e8b2ff1ad15f7f26e4724fd8d4485e082c",
+  "epsilonPercent": 1,
+  "include": ["src/**/*.{ts,tsx}"],
+  "exclude": [
+    "src/types/api.generated.ts",
+    "src/dev/**",
+    "src/playground/**",
+    "src/locales/**",
+    "src/i18n/translations/**",
+    "src/assets/**",
+    "src/**/__tests__/**",
+    "src/**/*.test.*",
+    "src/**/*.spec.*",
+    "src/test-utils/**",
+    "src/setupTests.ts"
+  ],
+  "excludeReasons": {
+    "src/types/api.generated.ts": "Generated OpenAPI TypeScript snapshot; not hand-written runtime logic.",
+    "src/dev/**": "Local/dev mocks and annotator stubs, not production runtime.",
+    "src/playground/**": "Developer playground catalog and fixtures, not shipped product routes.",
+    "src/locales/**": "Translation dictionaries; structure is gated by i18n tests, not unit coverage.",
+    "src/i18n/translations/**": "Generated locale resource bundles from i18n:resources.",
+    "src/assets/**": "Static SVG/image assets with no executable logic.",
+    "src/**/__tests__/**": "Unit-test files and helpers; coverage measures production source.",
+    "src/**/*.test.*": "Colocated unit tests.",
+    "src/**/*.spec.*": "Colocated unit specs.",
+    "src/test-utils/**": "Test harness helpers, not production runtime.",
+    "src/setupTests.ts": "Vitest setup file, not production runtime."
+  },
+  "measured": {
+    "lines": 86.46,
+    "functions": 83.32,
+    "statements": 85.09,
+    "branches": 71.45
+  },
+  "thresholds": {
+    "lines": 85,
+    "functions": 82,
+    "statements": 84,
+    "branches": 70
+  }
+}

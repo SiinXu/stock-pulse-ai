@@ -1,0 +1,1 @@
+- [Tests] Enforce a measured Vitest v8 Web unit-test coverage floor in web-gate without a second unit-suite run (Refs #164).
