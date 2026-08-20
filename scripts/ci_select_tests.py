@@ -51,7 +51,10 @@ FULL_SUITE_PREFIXES: tuple[str, ...] = (
 PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("src/api/", ("tests/api", "tests/test_error_envelope_contract.py")),
     ("src/bot/", ("tests/bot", "tests/test_notification.py", "tests/test_notification_sender.py")),
-    ("src/data_provider/", ("tests/data_provider",)),
+    (
+        "src/data_provider/",
+        ("tests/data_provider", "tests/contract/test_provider_fallback.py"),
+    ),
     ("src/agent/", ("tests/agent", "tests/skill_opinion_outcomes")),
     ("src/services/", ("tests/services",)),
     ("src/repositories/", ("tests/repositories", "tests/services")),
