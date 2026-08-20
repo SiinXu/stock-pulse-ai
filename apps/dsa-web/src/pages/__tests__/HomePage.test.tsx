@@ -877,5 +877,69 @@ describe('HomePage attention hub', () => {
     expect(screen.getByText('Future readiness item')).toBeInTheDocument();
   });
 
+  it('hosts the three Home-owned interactive rows on the shared Pressable primitive', async () => {
+    renderHome();
 
+    const reassessment = await screen.findByRole('button', { name: /Due for reassessment: 1/ });
+    const configurable = screen.getByRole('button', { name: /Configurable area/ });
+    fireEvent.click(configurable);
+    const morningReport = within(
+      screen.getByRole('region', { name: 'Morning report / Market review' }),
+    ).getByRole('button', { name: /Market review/ });
+
+    for (const control of [reassessment, configurable, morningReport]) {
+      expect(control).toHaveAttribute('data-control', 'pressable');
+      expect(control).toHaveAttribute('type', 'button');
+      expect(control).not.toBeDisabled();
+      expect(control).toHaveClass(
+        'control-hit-target',
+        'focus-visible:ring-2',
+        'focus-visible:ring-primary/25',
+        'disabled:pointer-events-none',
+        'disabled:cursor-not-allowed',
+        'disabled:opacity-50',
+      );
+      control.focus();
+      expect(control).toHaveFocus();
+    }
+
+    expect(reassessment).toHaveClass(
+      'min-h-14',
+      'w-full',
+      'border-warning/25',
+      'bg-warning/10',
+      'text-left',
+    );
+    expect(configurable).toHaveClass('min-h-11', 'w-full', 'text-left');
+    expect(configurable).toHaveAttribute('aria-expanded', 'true');
+    expect(configurable).toHaveAttribute('aria-controls', 'home-configurable-content');
+    expect(morningReport).toHaveClass('min-h-14', 'w-full', 'text-left');
+    expect(document.getElementById('home-configurable-content')).toBeVisible();
+  });
+
+  it('keeps configurable aria-expanded semantics after keyboard activation', async () => {
+    renderHome();
+
+    const configurable = await screen.findByRole('button', { name: /Configurable area/ });
+    expect(configurable).toHaveAttribute('data-control', 'pressable');
+    expect(configurable).toHaveAttribute('aria-expanded', 'false');
+    expect(configurable).toHaveAttribute('aria-controls', 'home-configurable-content');
+    expect(document.getElementById('home-configurable-content')).not.toBeVisible();
+
+    configurable.focus();
+    expect(configurable).toHaveFocus();
+    fireEvent.keyDown(configurable, { key: 'Enter' });
+    fireEvent.click(configurable);
+
+    expect(configurable).toHaveAttribute('aria-expanded', 'true');
+    expect(document.getElementById('home-configurable-content')).toBeVisible();
+    expect(window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY)).toBe('1');
+
+    fireEvent.keyDown(configurable, { key: ' ' });
+    fireEvent.click(configurable);
+    expect(configurable).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById('home-configurable-content')).not.toBeVisible();
+    expect(window.localStorage.getItem(HOME_CONFIGURABLE_STORAGE_KEY)).toBe('0');
+    expect(configurable).toHaveFocus();
+  });
 });

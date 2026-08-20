@@ -11,11 +11,6 @@
       "nativeButtonCount": 1,
       "roleButtonCount": 0
     },
-    "../../pages/HomePage.tsx": {
-      "file": "../../pages/HomePage.tsx",
-      "nativeButtonCount": 3,
-      "roleButtonCount": 0
-    },
     "../../pages/ResearchAnalysisWorkbenchPage.tsx": {
       "file": "../../pages/ResearchAnalysisWorkbenchPage.tsx",
       "nativeButtonCount": 1,
