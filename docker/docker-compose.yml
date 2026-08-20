@@ -6,6 +6,12 @@
 #   Scheduled mode: docker-compose -f ./docker/docker-compose.yml up -d
 #   FastAPI Pattern: docker-compose -f ./docker/docker-compose.yml up -d server
 #   Start simultaneously: docker-compose -f ./docker/docker-compose.yml up -d analyzer server
+#
+# Default `up -d` starts analyzer + server against the same .env. analyzer
+# (`python main.py --schedule`) is the sole legacy SCHEDULE_* day-batch owner
+# and executes versioned tasks. server (`--serve-only`) ships
+# DSA_RUNTIME_SCHEDULER_SUPPRESS_START=true so SCHEDULE_ENABLED=true cannot
+# attach that day-batch in both processes.
 
 name: daily-stock-analysis
 version: '3.8'
@@ -32,12 +38,11 @@ x-common: &common
     # If you need to override frontend static resources, mount the local static directory.
     # - ../static:/app/static:ro
 
-  environment:
-    - TZ=Asia/Shanghai
-
+  environment: &common-environment
+    TZ: Asia/Shanghai
     # Web/API service bind address (must be 0.0.0.0 inside the container).
     # The server fails closed unless ADMIN_AUTH_ENABLED=true is resolved from ../.env.
-    - WEBUI_HOST=0.0.0.0
+    WEBUI_HOST: "0.0.0.0"
     # API_PORT is read from .env file, no need to hardcode it here
 
     # Proxy settings (if needed)
@@ -58,16 +63,20 @@ x-common: &common
         memory: 512M
 
 services:
-  # Scheduled task mode.
+  # Scheduled task mode. Sole legacy SCHEDULE_* owner in the default topology.
   analyzer:
     <<: *common
     container_name: stock-analyzer
+    command: ["python", "main.py", "--schedule"]
 
-  # FastAPI Mode
+  # FastAPI Mode. CRUD/status only; does not attach the legacy day-batch.
   server:
     <<: *common
     container_name: stock-server
     command: ["python", "main.py", "--serve-only", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
+    environment:
+      <<: *common-environment
+      DSA_RUNTIME_SCHEDULER_SUPPRESS_START: "true"
     # Keep ADMIN_AUTH_ENABLED=true in ../.env for this published-port service.
     # If network_mode: host is used, the following ports mapping is invalid; the port is specified in the command via --port.
     ports:

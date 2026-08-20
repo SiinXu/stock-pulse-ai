@@ -1114,6 +1114,193 @@ class MainScheduleModeTestCase(unittest.TestCase):
         run_with_schedule.assert_not_called()
         run_full_analysis.assert_not_called()
 
+    def test_compose_serve_only_preserves_suppress_start_when_schedule_enabled(self) -> None:
+        from src.services.runtime_scheduler import (
+            RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
+            RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
+            RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+            SCHEDULED_TASK_OWNER_ENV,
+        )
+
+        args = self._make_args(serve_only=True, host="127.0.0.1", port=8000)
+        config = self._make_config(webui_enabled=False, schedule_enabled=True)
+        seen_by_server = []
+
+        def fake_start_api_server(host, port, config):
+            seen_by_server.append({
+                "suppress": os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV),
+                "force_enabled": os.getenv(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV),
+                "run_immediately": os.getenv(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV),
+                "owner": os.getenv(SCHEDULED_TASK_OWNER_ENV),
+            })
+
+        with patch.dict(
+            os.environ,
+            {
+                "GITHUB_ACTIONS": "false",
+                RUNTIME_SCHEDULER_SUPPRESS_START_ENV: "true",
+            },
+            clear=False,
+        ), \
+             patch("main.parse_arguments", return_value=args), \
+             patch("main.get_config", return_value=config), \
+             patch("main.prepare_webui_frontend_assets", return_value=True), \
+             patch("main.start_api_server", side_effect=fake_start_api_server), \
+             patch("main.start_bot_stream_clients"), \
+             patch("main.time.sleep", side_effect=KeyboardInterrupt), \
+             patch("src.scheduler.run_with_schedule") as run_with_schedule, \
+             patch("main.run_full_analysis") as run_full_analysis:
+            exit_code = main.main()
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(seen_by_server, [{
+            "suppress": "true",
+            "force_enabled": None,
+            "run_immediately": None,
+            "owner": "false",
+        }])
+        run_with_schedule.assert_not_called()
+        run_full_analysis.assert_not_called()
+
+    def test_schedule_ownership_matrix_for_serve_modes(self) -> None:
+        from src.services.runtime_scheduler import (
+            RUNTIME_SCHEDULER_FORCE_ENABLED_ENV,
+            RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV,
+            RUNTIME_SCHEDULER_SUPPRESS_START_ENV,
+            SCHEDULED_TASK_OWNER_ENV,
+        )
+
+        cases = (
+            (
+                "standalone_serve_only_enabled",
+                {"serve_only": True},
+                {"schedule_enabled": True},
+                {},
+                {
+                    "suppress": None,
+                    "owner": "false",
+                    "run_immediately": "false",
+                    "force_enabled": None,
+                },
+            ),
+            (
+                "standalone_serve_only_disabled",
+                {"serve_only": True},
+                {"schedule_enabled": False},
+                {},
+                {
+                    "suppress": None,
+                    "owner": "false",
+                    "run_immediately": None,
+                    "force_enabled": None,
+                },
+            ),
+            (
+                "serve_only_schedule_flag",
+                {"serve_only": True, "schedule": True},
+                {"schedule_enabled": False},
+                {},
+                {
+                    "suppress": None,
+                    "owner": "false",
+                    "run_immediately": "false",
+                    "force_enabled": "true",
+                },
+            ),
+            (
+                "desktop_serve_only_enabled",
+                {"serve_only": True},
+                {"schedule_enabled": True},
+                {"DSA_DESKTOP_MODE": "true"},
+                {
+                    "suppress": None,
+                    "owner": "true",
+                    "run_immediately": "false",
+                    "force_enabled": None,
+                },
+            ),
+            (
+                "compose_server_enabled",
+                {"serve_only": True},
+                {"schedule_enabled": True},
+                {RUNTIME_SCHEDULER_SUPPRESS_START_ENV: "true"},
+                {
+                    "suppress": "true",
+                    "owner": "false",
+                    "run_immediately": None,
+                    "force_enabled": None,
+                },
+            ),
+            (
+                "compose_server_schedule_flag_keeps_suppress",
+                {"serve_only": True, "schedule": True},
+                {"schedule_enabled": True},
+                {RUNTIME_SCHEDULER_SUPPRESS_START_ENV: "true"},
+                {
+                    "suppress": "true",
+                    "owner": "false",
+                    "run_immediately": None,
+                    "force_enabled": None,
+                },
+            ),
+            (
+                "serve_enabled",
+                {"serve": True},
+                {"schedule_enabled": True},
+                {},
+                {
+                    "suppress": None,
+                    "owner": "true",
+                    "run_immediately": "true",
+                    "force_enabled": None,
+                },
+            ),
+            (
+                "serve_clears_compose_suppress",
+                {"serve": True},
+                {"schedule_enabled": True},
+                {RUNTIME_SCHEDULER_SUPPRESS_START_ENV: "true"},
+                {
+                    "suppress": None,
+                    "owner": "true",
+                    "run_immediately": "true",
+                    "force_enabled": None,
+                },
+            ),
+        )
+
+        for name, arg_overrides, config_overrides, extra_env, expected in cases:
+            with self.subTest(name):
+                args = self._make_args(host="127.0.0.1", port=8000, **arg_overrides)
+                config = self._make_config(webui_enabled=False, **config_overrides)
+                seen_by_server = []
+
+                def fake_start_api_server(host, port, config):
+                    seen_by_server.append({
+                        "suppress": os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV),
+                        "owner": os.getenv(SCHEDULED_TASK_OWNER_ENV),
+                        "run_immediately": os.getenv(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV),
+                        "force_enabled": os.getenv(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV),
+                    })
+
+                env = {"GITHUB_ACTIONS": "false", **extra_env}
+                with patch.dict(os.environ, env, clear=False), \
+                     patch("main.parse_arguments", return_value=args), \
+                     patch("main.get_config", return_value=config), \
+                     patch("main.prepare_webui_frontend_assets", return_value=True), \
+                     patch("main.start_api_server", side_effect=fake_start_api_server), \
+                     patch("main.start_bot_stream_clients"), \
+                     patch("main.time.sleep", side_effect=KeyboardInterrupt), \
+                     patch("src.scheduler.run_with_schedule") as run_with_schedule, \
+                     patch("main.run_full_analysis") as run_full_analysis:
+                    exit_code = main.main()
+
+                self.assertEqual(exit_code, 0, name)
+                self.assertEqual(seen_by_server, [expected], name)
+                run_with_schedule.assert_not_called()
+                if arg_overrides.get("serve_only"):
+                    run_full_analysis.assert_not_called()
+
     def test_reload_runtime_config_preserves_process_env_overrides(self) -> None:
         self.env_path.write_text(
             "OPENAI_API_KEY=stale-file\nSCHEDULE_TIME=09:30\n",

@@ -106,7 +106,7 @@ python scripts/check_config_doc_consistency.py
 - `WEBUI_HOST`、`WEBUI_PORT`：监听地址和端口只在进程启动时绑定，保存后必须重启当前进程、Docker 容器或服务管理器才会生效。
 - `RUN_IMMEDIATELY`：非 schedule 模式启动期单次运行配置，保存后不会让已运行的 WebUI/API 进程立即触发分析。
 - Web 设置页不直接暴露 `SCHEDULE_TIME` / `SCHEDULE_TIMES` / `SCHEDULE_RUN_IMMEDIATELY` 等内部键；用户通过“定时任务”卡片维护启用状态、多个执行时间和立即执行一次。
-- `SCHEDULE_ENABLED`：已挂载的 WebUI/API/Desktop runtime scheduler 会在保存后热协调启动/停止（**不是** `restart_required`）；重启 `--serve-only` 或 Desktop 进程时也会恢复已启用的 daily jobs，但不会因此立即执行分析。纯 CLI schedule 模式（`python main.py --schedule`）仍按启动时所有权运行。Web 调度卡片仅在本进程 `attached=true` 时显示「保存后热加载」标记。
+- `SCHEDULE_ENABLED`：已挂载的 WebUI/API/Desktop runtime scheduler 会在保存后热协调启动/停止（**不是** `restart_required`）；独立进程或 Desktop 重启 `--serve-only` 时也会恢复已启用的 daily jobs，但不会因此立即执行分析。默认 Compose `server` 不挂载遗留日批（`DSA_RUNTIME_SCHEDULER_SUPPRESS_START=true`），由 `analyzer`（`python main.py --schedule`）独占。纯 CLI schedule 模式（`python main.py --schedule`）仍按启动时所有权运行。Web 调度卡片仅在本进程 `attached=true` 时显示「保存后热加载」标记。
 - `SCHEDULE_TIME`、`SCHEDULE_TIMES`：不是重启必需项。`SCHEDULE_TIMES` 为空时使用 `SCHEDULE_TIME`；已挂载的 runtime scheduler 会按新时间重建 daily jobs（同样仅在 `attached=true` 时标注热加载）。
 - `SCHEDULE_RUN_IMMEDIATELY`：schedule 模式**启动期**行为，保存后不会让当前进程立即执行一次分析（`restart_required`）；手动执行请使用 runtime scheduler 的 run-now API。
 - runtime scheduler 的 run-now API 仅在本 API 进程已挂载且启用遗留批处理、并且没有分析任务运行时接受请求；否则会返回稳定的未挂载、未启用、状态不可用或忙碌原因。

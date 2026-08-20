@@ -350,7 +350,6 @@ def _coordinate_service_runtime(
         # This keeps Web settings, status, and run-now actions attached to the real
         # scheduler instead of a separate CLI loop.
         os.environ.pop(CLI_SCHEDULER_OWNER_ENV, None)
-        os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
         if args.serve_only:
             desktop_mode = os.getenv("DSA_DESKTOP_MODE", "").strip().lower() in {
                 "1",
@@ -361,10 +360,19 @@ def _coordinate_service_runtime(
             os.environ[SCHEDULED_TASK_OWNER_ENV] = (
                 "true" if desktop_mode else "false"
             )
+            # Preserve Compose/operator suppress-start so default analyzer+server
+            # keeps exactly one legacy day-batch owner. Standalone and Desktop
+            # ``--serve-only`` leave this unset and restore enabled SCHEDULE_*.
         else:
+            os.environ.pop(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, None)
             os.environ[SCHEDULED_TASK_OWNER_ENV] = "true"
-        runtime_schedule_requested = args.schedule or config.schedule_enabled
-        if args.schedule:
+        suppress_start = os.getenv(
+            RUNTIME_SCHEDULER_SUPPRESS_START_ENV, ""
+        ).strip().lower() in {"1", "true", "yes", "on"}
+        runtime_schedule_requested = (
+            not suppress_start and (args.schedule or config.schedule_enabled)
+        )
+        if runtime_schedule_requested and args.schedule:
             os.environ[RUNTIME_SCHEDULER_FORCE_ENABLED_ENV] = "true"
         else:
             os.environ.pop(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV, None)

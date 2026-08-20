@@ -554,7 +554,7 @@ Pin a concrete tag in production instead of relying on the mutable `latest` tag.
 |------|------|------|
 | `docker-compose -f ./docker/docker-compose.yml up -d server` | Web service mode, provides API & WebUI | 8000 |
 | `docker-compose -f ./docker/docker-compose.yml up -d analyzer` | Scheduled task mode, daily auto execution | - |
-| `docker-compose -f ./docker/docker-compose.yml up -d` | Start both modes simultaneously | 8000 |
+| `docker-compose -f ./docker/docker-compose.yml up -d` | Start both modes simultaneously (`analyzer` owns the legacy day-batch and versioned execution; `server` is API-only) | 8000 |
 
 ### Docker Compose Configuration
 
@@ -585,16 +585,20 @@ x-common: &common
         memory: 512M
 
 services:
-  # Scheduled task mode
+  # Scheduled task mode (sole legacy day-batch and versioned-task executor)
   analyzer:
     <<: *common
     container_name: stock-analyzer
+    command: ["python", "main.py", "--schedule"]
 
-  # FastAPI mode
+  # FastAPI mode (API/CRUD; does not attach the legacy day-batch)
   server:
     <<: *common
     container_name: stock-server
     command: ["python", "main.py", "--serve-only", "--host", "0.0.0.0", "--port", "${API_PORT:-8000}"]
+    environment:
+      - TZ=Asia/Shanghai
+      - DSA_RUNTIME_SCHEDULER_SUPPRESS_START=true
     ports:
       - "${API_PORT:-8000}:${API_PORT:-8000}"
 ```
@@ -804,7 +808,7 @@ crontab -e
 
 > Note: Scheduled mode reloads the saved `STOCK_LIST` before each run. If you also pass `--stocks`, it will not pin future scheduled executions to the startup snapshot; use a normal one-off run when you want to analyze a temporary stock list.
 >
-> When the built-in scheduler is started via `python main.py --schedule` or an equivalent CLI-only mode, saving a new `SCHEDULE_TIME` / `SCHEDULE_TIMES` from the WebUI will rebind the daily jobs on the next scheduler poll without restarting the process. The previous trigger times are removed instead of being kept alongside the new ones. `python main.py --serve --schedule` is owned by the Web/API runtime scheduler, so long-running WebUI/API/Desktop processes start, stop, or rebuild the runtime scheduler after saving `SCHEDULE_ENABLED`, `SCHEDULE_TIME`, or `SCHEDULE_TIMES`. Restarting `python main.py --serve-only` or Desktop restores enabled daily jobs, while service startup itself never runs an immediate analysis.
+> When the built-in scheduler is started via `python main.py --schedule` or an equivalent CLI-only mode, saving a new `SCHEDULE_TIME` / `SCHEDULE_TIMES` from the WebUI will rebind the daily jobs on the next scheduler poll without restarting the process. The previous trigger times are removed instead of being kept alongside the new ones. `python main.py --serve --schedule` is owned by the Web/API runtime scheduler, so long-running WebUI/API/Desktop processes that have it attached start, stop, or rebuild the runtime scheduler after saving `SCHEDULE_ENABLED`, `SCHEDULE_TIME`, or `SCHEDULE_TIMES`. Restarting standalone `python main.py --serve-only` or Desktop restores enabled daily jobs, while service startup itself never runs an immediate analysis. Default Compose `analyzer` + `server` keeps `analyzer` as the sole legacy day-batch owner; `server` does not attach it.
 >
 > The Web/API runtime scheduler run-now endpoint only accepts a request when no analysis is already running; if an analysis is in progress, it returns a busy response instead of reporting a queued run.
 
@@ -1611,7 +1615,7 @@ FastAPI provides RESTful API service for configuration management and triggering
 | Command | Description |
 |------|------|
 | `python main.py --serve` | Start API service + run full analysis once |
-| `python main.py --serve-only` | Start API service only; allow manual runs and restore enabled schedules without an immediate startup analysis |
+| `python main.py --serve-only` | Start API service only; allow manual runs. Standalone restores enabled schedules without an immediate startup analysis; default Compose `server` does not attach the legacy day-batch |
 
 ### Features
 

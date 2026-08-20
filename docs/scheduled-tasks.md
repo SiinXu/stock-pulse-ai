@@ -388,12 +388,16 @@ No new scheduler loop is introduced:
 - `python main.py --serve --schedule` keeps the existing API-owned schedule
   handoff and therefore has one owner.
 - Generic `python main.py --serve-only` is a persisted-task non-owner. In the
-  provided Docker Compose topology, the `analyzer` service executes persisted
-  tasks and the `server` service provides CRUD/status APIs. Starting only
-  `server` stores definitions but does not execute them; start `analyzer` for
-  scheduled execution. The same `--serve-only` process still restores the
-  legacy `SCHEDULE_*` day-batch when `SCHEDULE_ENABLED` or `--schedule` is on,
-  without running an immediate analysis at startup.
+  provided Docker Compose topology, the `analyzer` service (`python main.py
+  --schedule`) is the sole legacy `SCHEDULE_*` day-batch owner and executes
+  persisted tasks; the `server` service (`python main.py --serve-only` with
+  `DSA_RUNTIME_SCHEDULER_SUPPRESS_START=true`) provides CRUD/status APIs and
+  does not attach or run that day-batch even when the shared `.env` has
+  `SCHEDULE_ENABLED=true`. Starting only `server` stores definitions but does
+  not execute them; start `analyzer` for scheduled execution. Standalone
+  `--serve-only` (no suppress-start) still restores the legacy `SCHEDULE_*`
+  day-batch when `SCHEDULE_ENABLED` or `--schedule` is on, without running an
+  immediate analysis at startup.
 - Desktop starts the same `--serve-only` entrypoint with
   `DSA_DESKTOP_MODE=true`; that backend owns persisted tasks and restores
   enabled legacy daily jobs at startup without immediately running analysis.
