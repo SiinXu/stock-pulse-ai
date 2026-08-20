@@ -146,8 +146,20 @@ function renderValueChanges(
   );
 }
 
-function optionalSectionLabel(section: OptionalSectionId | string): string {
-  return section;
+function optionalSectionLabel(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  section: OptionalSectionId | string,
+): string {
+  switch (section) {
+    case 'catalysts':
+      return text.optionalSectionCatalysts;
+    case 'structured_risk':
+      return text.optionalSectionStructuredRisk;
+    case 'multi_agent':
+      return text.optionalSectionMultiAgent;
+    default:
+      return section;
+  }
 }
 
 function optionalStatusLabel(
@@ -156,15 +168,15 @@ function optionalStatusLabel(
 ): string {
   switch (status) {
     case 'both_missing':
-      return text.optBoth;
+      return text.optionalStatusBothMissing;
     case 'base_missing':
-      return text.optBase;
+      return text.optionalStatusBaseMissing;
     case 'target_missing':
-      return text.optTgt;
+      return text.optionalStatusTargetMissing;
     case 'present_identical':
-      return text.optSame;
+      return text.optionalStatusPresentIdentical;
     case 'present_different':
-      return text.optDiff;
+      return text.optionalStatusPresentDifferent;
     default:
       return status;
   }
@@ -188,8 +200,8 @@ function optionalPresenceLabel(
   present: boolean,
   count: number,
 ): string {
-  if (!present) return text.optAbs;
-  return String(count);
+  if (!present) return text.optionalSectionAbsent;
+  return text.optionalSectionPresent.replace('{count}', String(count));
 }
 
 function renderOptionalPreview(
@@ -201,7 +213,7 @@ function renderOptionalPreview(
     return null;
   }
   if (!items || items.length === 0) {
-    return <p className="text-sm text-secondary-text">{text.emptyValue}</p>;
+    return <p className="text-sm text-secondary-text">{text.optionalPreviewEmpty}</p>;
   }
   return (
     <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
@@ -441,6 +453,8 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
       </Surface>
 
       <Surface className="space-y-3 p-4" data-testid="report-version-optional-sections">
+        <h3 className="text-sm font-semibold text-foreground">{text.optionalSectionsTitle}</h3>
+        <p className="text-sm text-secondary-text">{text.optionalSectionsDescription}</p>
         <ul className="space-y-2">
           {(result.optionalSections ?? []).map((row: OptionalSectionPresence) => (
             <li
@@ -451,7 +465,7 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
             >
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-sm font-medium text-foreground">
-                  {optionalSectionLabel(row.section)}
+                  {optionalSectionLabel(text, row.section)}
                 </span>
                 <Badge variant={optionalStatusBadgeVariant(row.comparisonStatus)} size="sm">
                   {optionalStatusLabel(text, row.comparisonStatus)}

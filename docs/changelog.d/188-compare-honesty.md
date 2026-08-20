@@ -1,1 +1,2 @@
 - [Added] Report version compare labels missing optional multi-agent, structured-risk, and catalyst sections instead of treating absence as matching empty content (Refs #188).
+- [Fixed] Restore localized optional-section honesty labels without raising the locale-ja-family gzip cap (Refs #188).

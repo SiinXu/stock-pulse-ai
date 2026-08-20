@@ -265,15 +265,17 @@ export function createUiLanguageRecord(namespace, base, overrides = {}) {
 
 async function loadTranslationResources(additionalLanguages) {
   const extraDirectory = path.join(TRANSLATIONS_DIRECTORY, 'extra');
+  const optionalSectionsDirectory = path.join(TRANSLATIONS_DIRECTORY, 'optionalSections');
   const imports = [
     `import { UI_TRANSLATION_KEYS, SOURCE_UI_TRANSLATIONS } from ${JSON.stringify(ENGLISH_INVENTORY_PATH)};`,
     ...additionalLanguages.map((language, index) => (
       `import { translations as locale${index} } from ${JSON.stringify(path.join(TRANSLATIONS_DIRECTORY, `${language}.ts`))};\n`
-      + `import { EXTRA_UI_TRANSLATIONS as extra${index} } from ${JSON.stringify(path.join(extraDirectory, `${language}.ts`))};`
+      + `import { EXTRA_UI_TRANSLATIONS as extra${index} } from ${JSON.stringify(path.join(extraDirectory, `${language}.ts`))};\n`
+      + `import { OPTIONAL_SECTION_HONESTY_TRANSLATIONS as optionalSections${index} } from ${JSON.stringify(path.join(optionalSectionsDirectory, `${language}.ts`))};`
     )),
   ].join('\n');
   const translations = additionalLanguages
-    .map((language, index) => `${JSON.stringify(language)}: { ...locale${index}, ...extra${index} }`)
+    .map((language, index) => `${JSON.stringify(language)}: { ...locale${index}, ...extra${index}, ...optionalSections${index} }`)
     .join(', ');
   return importBundle(`${imports}\nexport { UI_TRANSLATION_KEYS, SOURCE_UI_TRANSLATIONS };\nexport const translations = { ${translations} };\n`);
 }

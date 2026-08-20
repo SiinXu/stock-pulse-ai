@@ -292,16 +292,20 @@ describe('ReportVersionCompareView', () => {
   it('labels both-missing optional sections instead of inventing empty parity', () => {
     render(<ReportVersionCompareView language="en" result={buildResult()} />);
     const panel = screen.getByTestId('report-version-optional-sections');
-    expect(panel).toBeInTheDocument();
+    expect(within(panel).getByRole('heading', { name: 'Optional section honesty' })).toBeInTheDocument();
+    expect(within(panel).getByText(/Absence is labeled explicitly/i)).toBeInTheDocument();
+    expect(within(panel).getByText('Catalysts')).toBeInTheDocument();
+    expect(within(panel).getByText('Structured risk')).toBeInTheDocument();
+    expect(within(panel).getByText('Multi-agent')).toBeInTheDocument();
     expect(screen.getByTestId('report-version-optional-section-catalysts')).toHaveAttribute(
       'data-comparison-status',
       'both_missing',
     );
     expect(within(screen.getByTestId('report-version-optional-section-catalysts')).getAllByText(
-      /Not produced/i,
+      /Section not produced/i,
     )).toHaveLength(2);
     expect(within(screen.getByTestId('report-version-optional-section-structured_risk')).getByText(
-      /Neither produced/i,
+      /Neither run produced this section/i,
     )).toBeInTheDocument();
   });
 
@@ -323,7 +327,8 @@ describe('ReportVersionCompareView', () => {
     );
     const row = screen.getByTestId('report-version-optional-section-catalysts');
     expect(row).toHaveAttribute('data-comparison-status', 'base_missing');
-    expect(within(row).getByText(/Baseline missing/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Baseline did not produce this section/i)).toBeInTheDocument();
+    expect(within(row).getByText('Produced (1)')).toBeInTheDocument();
     expect(within(row).getByText('Export recovery')).toBeInTheDocument();
     expect(within(row).queryByText(/^n\/a$/i)).not.toBeInTheDocument();
   });
@@ -346,7 +351,7 @@ describe('ReportVersionCompareView', () => {
     );
     const row = screen.getByTestId('report-version-optional-section-structured_risk');
     expect(row).toHaveAttribute('data-comparison-status', 'target_missing');
-    expect(within(row).getByText(/Candidate missing/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Candidate did not produce this section/i)).toBeInTheDocument();
     expect(within(row).getByText('Elevated PE')).toBeInTheDocument();
   });
 
@@ -382,8 +387,14 @@ describe('ReportVersionCompareView', () => {
       'data-comparison-status',
       'present_different',
     );
+    expect(within(screen.getByTestId('report-version-optional-section-catalysts')).getByText(
+      'Produced (1)',
+    )).toBeInTheDocument();
+    expect(within(screen.getByTestId('report-version-optional-section-catalysts')).getByText(
+      'Produced (2)',
+    )).toBeInTheDocument();
     expect(within(screen.getByTestId('report-version-optional-section-structured_risk')).getByText(
-      /same content/i,
+      /Both runs include this section with the same content/i,
     )).toBeInTheDocument();
     expect(within(screen.getByTestId('report-version-optional-section-multi_agent')).getByText(
       'committee_deliberation',

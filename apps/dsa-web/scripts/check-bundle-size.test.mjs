@@ -386,8 +386,10 @@ describe('first-paint entry budget (Refs #883)', () => {
     const extraGlob = toRegExp(extra.match);
     expect(jaGlob.test('assets/ja-DXUJa6-A.js')).toBe(true);
     expect(jaGlob.test('assets/extra-locale-ja-CjJs-L44.js')).toBe(false);
+    expect(jaGlob.test('assets/optional-sections-ja-hash.js')).toBe(false);
     expect(extraGlob.test('assets/extra-locale-ja-CjJs-L44.js')).toBe(true);
     expect(extraGlob.test('assets/ja-DXUJa6-A.js')).toBe(false);
+    expect(extraGlob.test('assets/optional-sections-ja-hash.js')).toBe(false);
     expect(extraFamily.maxGzipBytes).toBe(extraFamily.measuredGzipBytes + 400);
     expect(extraFamily.maxGzipBytes).toBeGreaterThan(extra.maxGzipBytes);
   });
