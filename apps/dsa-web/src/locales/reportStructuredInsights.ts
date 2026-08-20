@@ -40,6 +40,8 @@ type StructuredInsightContent = {
   committeeDivergence: string;
   committeeStatus: string;
   committeeInvalid: string;
+  showAll: string;
+  showLess: string;
   attributionLabels: Record<string, string>;
   phaseLabels: Record<string, string>;
   signalLabels: Record<string, string>;
@@ -90,6 +92,8 @@ export const REPORT_STRUCTURED_INSIGHTS_TEXT: Record<
     committeeDivergence: '分歧记录',
     committeeStatus: '状态',
     committeeInvalid: '无效',
+    showAll: '展开全部（{count}）',
+    showLess: '收起',
     attributionLabels: {
       technicalIndicators: '技术指标',
       newsSentiment: '新闻情绪',
@@ -172,6 +176,8 @@ export const REPORT_STRUCTURED_INSIGHTS_TEXT: Record<
     committeeDivergence: 'Divergence Record',
     committeeStatus: 'Status',
     committeeInvalid: 'Invalid',
+    showAll: 'Show all ({count})',
+    showLess: 'Show less',
     attributionLabels: {
       technicalIndicators: 'Technical Indicators',
       newsSentiment: 'News Sentiment',
@@ -254,6 +260,8 @@ export const REPORT_STRUCTURED_INSIGHTS_TEXT: Record<
     committeeDivergence: '이견 기록',
     committeeStatus: '상태',
     committeeInvalid: '무효',
+    showAll: '모두 보기 ({count})',
+    showLess: '간략히',
     attributionLabels: {
       technicalIndicators: '기술 지표',
       newsSentiment: '뉴스 심리',

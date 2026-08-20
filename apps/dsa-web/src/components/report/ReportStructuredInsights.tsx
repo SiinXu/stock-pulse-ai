@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { useId, useState } from 'react';
 import type {
   ReportCommitteeDeliberation,
   ReportCommitteeMember,
@@ -13,12 +14,68 @@ import type {
   ReportStructuredInsights as ReportStructuredInsightsType,
 } from '../../types/analysis';
 import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
-import { Badge, Card, Progress } from '../common';
+import { Badge, Button, Card, Progress } from '../common';
 import { HelpKeyButton } from '../help';
 import { DashboardPanelHeader } from '../dashboard';
 import { REPORT_STRUCTURED_INSIGHTS_TEXT } from '../../locales/reportStructuredInsights';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { normalizeReportStructuredInsights } from './reportStructuredInsightsUtils';
+
+export const REPORT_INSIGHT_LIST_PREVIEW_LIMIT = 3;
+
+const formatInsightCountLabel = (template: string, count: number): string => (
+  template.replaceAll('{count}', String(count))
+);
+
+const useInsightListOverflow = (itemCount: number) => {
+  const [expanded, setExpanded] = useState(false);
+  const listId = useId();
+  const needsDisclosure = itemCount > REPORT_INSIGHT_LIST_PREVIEW_LIMIT;
+  return {
+    expanded,
+    listId,
+    needsDisclosure,
+    toggle: () => setExpanded((current) => !current),
+    isOverflowHidden: (index: number) => (
+      needsDisclosure && !expanded && index >= REPORT_INSIGHT_LIST_PREVIEW_LIMIT
+    ),
+  };
+};
+
+const InsightOverflowToggle: React.FC<{
+  expanded: boolean;
+  onToggle: () => void;
+  controlsId: string;
+  testId: string;
+  sectionTitle: string;
+  showAllLabel: string;
+  showLessLabel: string;
+}> = ({
+  expanded,
+  onToggle,
+  controlsId,
+  testId,
+  sectionTitle,
+  showAllLabel,
+  showLessLabel,
+}) => {
+  const visibleLabel = expanded ? showLessLabel : showAllLabel;
+  return (
+    <Button
+      type="button"
+      variant="ghost"
+      size="default"
+      className="mt-2"
+      aria-expanded={expanded}
+      aria-controls={controlsId}
+      aria-label={`${sectionTitle}: ${visibleLabel}`}
+      data-testid={testId}
+      onClick={onToggle}
+    >
+      {visibleLabel}
+    </Button>
+  );
+};
 
 interface ReportStructuredInsightsProps {
   insights?: ReportStructuredInsightsType | null;
@@ -214,7 +271,10 @@ const StrategySkillList: React.FC<{
   skills?: ReportStrategySynthesisSkill[];
   signalLabels: Record<string, string>;
   testId: string;
-}> = ({ title, skills, signalLabels, testId }) => {
+  showAllLabel: string;
+  showLessLabel: string;
+}> = ({ title, skills, signalLabels, testId, showAllLabel, showLessLabel }) => {
+  const overflow = useInsightListOverflow(skills?.length ?? 0);
   if (!skills?.length) {
     return null;
   }
@@ -223,13 +283,15 @@ const StrategySkillList: React.FC<{
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
         {title}
       </h4>
-      <div className="space-y-2">
+      <div className="space-y-2" id={overflow.listId}>
         {skills.map((skill, index) => {
           const name = skill.skillId || skill.agentName || `#${index + 1}`;
           const confidence = confidencePercent(skill.confidence);
           return (
             <div
               key={`${name}-${index}`}
+              data-insight-item={name}
+              hidden={overflow.isOverflowHidden(index) || undefined}
               className="rounded-lg border border-border/55 bg-elevated/40 px-3 py-2"
             >
               <div className="flex flex-wrap items-center gap-2">
@@ -250,6 +312,79 @@ const StrategySkillList: React.FC<{
           );
         })}
       </div>
+      {overflow.needsDisclosure ? (
+        <InsightOverflowToggle
+          expanded={overflow.expanded}
+          onToggle={overflow.toggle}
+          controlsId={overflow.listId}
+          testId={`${testId}-disclosure`}
+          sectionTitle={title}
+          showAllLabel={formatInsightCountLabel(showAllLabel, skills.length)}
+          showLessLabel={showLessLabel}
+        />
+      ) : null}
+    </section>
+  );
+};
+
+const StrategyConflictList: React.FC<{
+  title: string;
+  conflicts?: Array<{
+    conflictType?: string;
+    descriptionKey?: string;
+    severity?: string;
+    participants?: string[];
+  }>;
+  language: ReportLanguage;
+  testId: string;
+}> = ({ title, conflicts, language, testId }) => {
+  const text = REPORT_STRUCTURED_INSIGHTS_TEXT[language];
+  const overflow = useInsightListOverflow(conflicts?.length ?? 0);
+  if (!conflicts?.length) {
+    return null;
+  }
+  return (
+    <section className="mt-4" data-testid={testId}>
+      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
+        {title}
+      </h4>
+      <ul className="space-y-2" id={overflow.listId}>
+        {conflicts.map((conflict, index) => {
+          const label = localizedValue(conflict.conflictType, text.conflictLabels)
+            ?? conflict.descriptionKey
+            ?? `#${index + 1}`;
+          const severity = localizedValue(conflict.severity, text.severityLabels);
+          const itemKey = `${conflict.conflictType ?? 'conflict'}-${index}`;
+          return (
+            <li
+              key={itemKey}
+              data-insight-item={itemKey}
+              hidden={overflow.isOverflowHidden(index) || undefined}
+              className="rounded-lg border border-warning/25 bg-warning/5 px-3 py-2 text-sm"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="font-medium text-foreground">{label}</span>
+                {severity ? <Badge variant="warning">{severity}</Badge> : null}
+              </div>
+              <p className="mt-1 text-xs text-secondary-text">
+                {text.participants}:{' '}
+                {conflict.participants?.join(', ') || text.noParticipants}
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+      {overflow.needsDisclosure ? (
+        <InsightOverflowToggle
+          expanded={overflow.expanded}
+          onToggle={overflow.toggle}
+          controlsId={overflow.listId}
+          testId={`${testId}-disclosure`}
+          sectionTitle={title}
+          showAllLabel={formatInsightCountLabel(text.showAll, conflicts.length)}
+          showLessLabel={text.showLess}
+        />
+      ) : null}
     </section>
   );
 };
@@ -310,45 +445,25 @@ const StrategySynthesisCard: React.FC<{
           skills={synthesis.supportingSkills}
           signalLabels={text.signalLabels}
           testId="report-supporting-skills"
+          showAllLabel={text.showAll}
+          showLessLabel={text.showLess}
         />
         <StrategySkillList
           title={text.opposingSkills}
           skills={synthesis.opposingSkills}
           signalLabels={text.signalLabels}
           testId="report-opposing-skills"
+          showAllLabel={text.showAll}
+          showLessLabel={text.showLess}
         />
       </div>
 
-      {conflicts.length > 0 ? (
-        <section className="mt-4" data-testid="report-strategy-conflicts">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
-            {text.conflicts}
-          </h4>
-          <ul className="space-y-2">
-            {conflicts.map((conflict, index) => {
-              const label = localizedValue(conflict.conflictType, text.conflictLabels)
-                ?? conflict.descriptionKey
-                ?? `#${index + 1}`;
-              const severity = localizedValue(conflict.severity, text.severityLabels);
-              return (
-                <li
-                  key={`${conflict.conflictType ?? 'conflict'}-${index}`}
-                  className="rounded-lg border border-warning/25 bg-warning/5 px-3 py-2 text-sm"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground">{label}</span>
-                    {severity ? <Badge variant="warning">{severity}</Badge> : null}
-                  </div>
-                  <p className="mt-1 text-xs text-secondary-text">
-                    {text.participants}:{' '}
-                    {conflict.participants?.join(', ') || text.noParticipants}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
+      <StrategyConflictList
+        title={text.conflicts}
+        conflicts={conflicts}
+        language={language}
+        testId="report-strategy-conflicts"
+      />
     </Card>
   );
 };
@@ -360,7 +475,10 @@ const CommitteeOpinionList: React.FC<{
   signalLabels: Record<string, string>;
   invalidLabel: string;
   testId: string;
-}> = ({ title, items, signalLabels, invalidLabel, testId }) => {
+  showAllLabel: string;
+  showLessLabel: string;
+}> = ({ title, items, signalLabels, invalidLabel, testId, showAllLabel, showLessLabel }) => {
+  const overflow = useInsightListOverflow(items?.length ?? 0);
   if (!items?.length) {
     return null;
   }
@@ -369,7 +487,7 @@ const CommitteeOpinionList: React.FC<{
       <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
         {title}
       </h4>
-      <div className="space-y-2">
+      <div className="space-y-2" id={overflow.listId}>
         {items.map((item, index) => {
           const name = item.displayName || item.personaId || item.agentName || `#${index + 1}`;
           const confidence = confidencePercent(item.confidence);
@@ -379,6 +497,8 @@ const CommitteeOpinionList: React.FC<{
           return (
             <div
               key={`${name}-${index}`}
+              data-insight-item={name}
+              hidden={overflow.isOverflowHidden(index) || undefined}
               className="rounded-lg border border-border/55 bg-elevated/40 px-3 py-2"
             >
               <div className="flex flex-wrap items-center gap-2">
@@ -400,6 +520,17 @@ const CommitteeOpinionList: React.FC<{
           );
         })}
       </div>
+      {overflow.needsDisclosure ? (
+        <InsightOverflowToggle
+          expanded={overflow.expanded}
+          onToggle={overflow.toggle}
+          controlsId={overflow.listId}
+          testId={`${testId}-disclosure`}
+          sectionTitle={title}
+          showAllLabel={formatInsightCountLabel(showAllLabel, items.length)}
+          showLessLabel={showLessLabel}
+        />
+      ) : null}
     </section>
   );
 };
@@ -469,6 +600,8 @@ const CommitteeDeliberationCard: React.FC<{
           signalLabels={text.signalLabels}
           invalidLabel={text.committeeInvalid}
           testId="report-committee-members"
+          showAllLabel={text.showAll}
+          showLessLabel={text.showLess}
         />
         <CommitteeOpinionList
           title={text.committeeDissent}
@@ -476,39 +609,17 @@ const CommitteeDeliberationCard: React.FC<{
           signalLabels={text.signalLabels}
           invalidLabel={text.committeeInvalid}
           testId="report-committee-dissent"
+          showAllLabel={text.showAll}
+          showLessLabel={text.showLess}
         />
       </div>
 
-      {divergences.length > 0 ? (
-        <section className="mt-4" data-testid="report-committee-divergence">
-          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
-            {text.committeeDivergence}
-          </h4>
-          <ul className="space-y-2">
-            {divergences.map((point, index) => {
-              const label = localizedValue(point.conflictType, text.conflictLabels)
-                ?? point.descriptionKey
-                ?? `#${index + 1}`;
-              const severity = localizedValue(point.severity, text.severityLabels);
-              return (
-                <li
-                  key={`${point.conflictType ?? 'divergence'}-${index}`}
-                  className="rounded-lg border border-warning/25 bg-warning/5 px-3 py-2 text-sm"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground">{label}</span>
-                    {severity ? <Badge variant="warning">{severity}</Badge> : null}
-                  </div>
-                  <p className="mt-1 text-xs text-secondary-text">
-                    {text.participants}:{' '}
-                    {point.participants?.join(', ') || text.noParticipants}
-                  </p>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
+      <StrategyConflictList
+        title={text.committeeDivergence}
+        conflicts={divergences}
+        language={language}
+        testId="report-committee-divergence"
+      />
     </Card>
   );
 };

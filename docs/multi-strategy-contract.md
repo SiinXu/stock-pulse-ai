@@ -212,7 +212,7 @@ Phase 2 只在 Phase 1 契约下新增 2–4 策略并发调度与阶段调度�
 
 报告详情消费面已通过共享 Web 组件完成多语言展示；Phase 2 的并发调度仍保持未实现，二者不互相伪装为已交付。实现边界如下：
 
-- Web 报告详情页展示 `final_signal` / `consensus_level` / `supporting_skills` / `opposing_skills` / `conflicts` / `invalid_opinion_count`。
+- Web 报告详情页展示 `final_signal` / `consensus_level` / `supporting_skills` / `opposing_skills` / `conflicts` / `invalid_opinion_count`。支持 / 反方策略与冲突列表默认只展开前 3 条，完整列表仍可通过「展开全部」到达；空列表、部分 payload 与坏数据回退语义不变。
 - 桌面端复用 Web 展示逻辑。
 - 同步分析、任务状态和历史详情都从权威 `dashboard.strategy_synthesis` 生成同一个可选 `details.structured_insights` 展示投影；投影同时容纳阶段决策和信号归因，不修改权威 dashboard payload。
 - 前端 zh/en/ko 标签与 `src/report_language.py` 的 canonical signal、共识和冲突枚举保持语义一致，只展示结构化字段，不解析本地化叙事。
