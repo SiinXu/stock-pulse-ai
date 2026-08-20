@@ -1,0 +1,1 @@
+- [Changed] Show ReportStrata risks and disclaimer by default, keep facts/gaps/inference/framework in a collapsed supporting-evidence disclosure, hide source/asOf behind details, and stop promoting empty-list raw technical/volume/fundamental blobs into verified facts or gaps (Refs #1332).

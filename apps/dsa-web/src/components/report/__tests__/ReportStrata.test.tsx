@@ -1,13 +1,34 @@
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import fs from 'node:fs';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import path from 'node:path';
+// @ts-expect-error Node types are intentionally excluded from the browser tsconfig.
+import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReportStrata } from '../ReportStrata';
 import { resolveReportStrataFromDetails } from '../reportStrataUtils';
 import type { ReportDetails } from '../../../types/analysis';
+import { getReportText } from '../../../utils/reportLanguage';
 
 const expandStrata = () => {
   const toggle = screen.getByTestId('report-strata-toggle');
   fireEvent.click(toggle);
 };
+
+/**
+ * jsdom does not synthesize a click from Enter/Space on a focused native
+ * button. Real browsers do; shared Button / Collapsible rely on that activation.
+ */
+function activateDisclosureWithKey(toggle: HTMLElement, key: 'Enter' | ' ') {
+  toggle.focus();
+  expect(toggle).toHaveFocus();
+  fireEvent.keyDown(toggle, { key });
+  if (key === ' ') {
+    fireEvent.keyUp(toggle, { key });
+  }
+  fireEvent.click(toggle);
+}
 
 const strataPayload = {
   schemaVersion: 'report-strata-v1',
@@ -34,19 +55,48 @@ const strataPayload = {
   disclaimer: 'AI-generated content for reference only. Not investment advice.',
 };
 
+const emptyStrataWithRawBlobs = {
+  reportStrata: {
+    schemaVersion: 'report-strata-v1',
+    verifiedFacts: [],
+    missingOrConflicts: [],
+    modelInference: [],
+    risksCounterEvidence: [],
+  },
+  rawResult: {
+    technicalAnalysis: '价格位于主要均线上方。',
+    volumeAnalysis: '成交量放大但缺少独立确认。',
+    fundamentalAnalysis: '关键财务数据缺失。',
+    analysisSummary: '等待量价确认。',
+    riskWarning: '跌破支撑位时优先控制风险。',
+  },
+} satisfies ReportDetails;
+
 describe('ReportStrata', () => {
-  it('keeps full strata collapsed by default while disclaimer stays visible', () => {
+  it('shows risks and disclaimer on first paint while secondary evidence stays collapsed', () => {
     const details: ReportDetails = { reportStrata: strataPayload };
     render(<ReportStrata details={details} language="en" />);
 
     const root = screen.getByTestId('report-strata');
     expect(root).toHaveAttribute('data-collapsed', 'true');
-    expect(screen.getByTestId('report-strata-body')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-risks')).toBeVisible();
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent(
+      'Break below support invalidates the constructive case.',
+    );
     expect(screen.getByTestId('report-strata-disclaimer')).toBeVisible();
+    expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent(
+      'Not investment advice',
+    );
+    expect(screen.getByTestId('report-strata-facts')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-gaps')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-inference')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-framework')).not.toBeVisible();
+    expect(screen.queryByText('ohlcv:daily')).not.toBeInTheDocument();
+    expect(screen.queryByText('2026-07-25T15:00:00+08:00')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-strata-toggle')).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('renders six strata sections in product order and keeps inference out of facts', () => {
+  it('keeps expanded product order facts → gaps → inference → risks → framework → disclaimer', () => {
     const details: ReportDetails = { reportStrata: strataPayload };
     render(<ReportStrata details={details} language="en" />);
     expandStrata();
@@ -76,39 +126,140 @@ describe('ReportStrata', () => {
     expect(framework.compareDocumentPosition(disclaimer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it('hides source and asOf until the existing details annotation is opened', () => {
+    const details: ReportDetails = { reportStrata: strataPayload };
+    render(<ReportStrata details={details} language="en" />);
+    expandStrata();
+
+    const annotations = screen.getByTestId('report-strata-fact-annotations');
+    const statement = screen.getByText(/Close was 1680/);
+    expect(annotations).not.toHaveAttribute('open');
+    expect(statement).not.toHaveTextContent('ohlcv:daily');
+    expect(statement).not.toHaveTextContent('2026-07-25T15:00:00+08:00');
+    expect(statement.closest('span')).not.toHaveTextContent('Source');
+
+    fireEvent.click(within(annotations).getByText('View details'));
+    expect(annotations).toHaveAttribute('open');
+    expect(within(annotations).getByText(/Source: ohlcv:daily/)).toBeVisible();
+    expect(within(annotations).getByText(/As of: 2026-07-25T15:00:00\+08:00/)).toBeVisible();
+  });
+
+  it('does not promote empty-list raw technical/volume/fundamental blobs into default facts or gaps', () => {
+    render(<ReportStrata language="zh" details={emptyStrataWithRawBlobs} />);
+
+    expect(screen.getByTestId('report-strata-risks')).toBeVisible();
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent('跌破支撑位');
+    expect(screen.getByTestId('report-strata-facts')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-secondary-after')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-facts')).not.toHaveTextContent('价格位于主要均线上方');
+    expect(screen.getByTestId('report-strata-gaps')).not.toHaveTextContent('关键财务数据缺失');
+    expect(screen.getByTestId('report-strata-inference')).not.toHaveTextContent('等待量价确认');
+
+    expandStrata();
+    expect(screen.getByTestId('report-strata-facts')).toBeVisible();
+    expect(screen.getByTestId('report-strata-facts')).not.toHaveTextContent('价格位于主要均线上方');
+    expect(screen.getByTestId('report-strata-gaps')).not.toHaveTextContent('关键财务数据缺失');
+    expect(screen.getByTestId('report-strata-inference')).not.toHaveTextContent('等待量价确认');
+
+    const rawToggle = within(screen.getByTestId('report-strata-raw-fallback'))
+      .getByRole('button', { name: '原始分析结果' });
+    const rawPanelId = rawToggle.getAttribute('aria-controls');
+    expect(rawPanelId).toBeTruthy();
+    const rawPanel = document.getElementById(rawPanelId!);
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(rawPanel).toHaveClass('grid-rows-[0fr]');
+    fireEvent.click(rawToggle);
+    expect(rawToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(rawPanel).toHaveClass('grid-rows-[1fr]');
+    expect(screen.getByText('价格位于主要均线上方。')).toBeVisible();
+    expect(screen.getByText('关键财务数据缺失。')).toBeVisible();
+    expect(screen.getByText('等待量价确认。')).toBeVisible();
+    expect(screen.getByTestId('report-strata-facts')).not.toHaveTextContent('价格位于主要均线上方');
+    expect(screen.getByTestId('report-strata-gaps')).not.toHaveTextContent('关键财务数据缺失');
+  });
+
+  it('uses a shared Button disclosure with aria-expanded/aria-controls and no native button', () => {
+    const details: ReportDetails = { reportStrata: strataPayload };
+    render(<ReportStrata details={details} language="en" />);
+
+    const toggle = screen.getByTestId('report-strata-toggle');
+    expect(toggle.tagName).toBe('BUTTON');
+    expect(toggle).toHaveAttribute('type', 'button');
+    expect(toggle).toHaveAttribute('data-control', 'button');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const controlledIds = (toggle.getAttribute('aria-controls') ?? '').split(/\s+/).filter(Boolean);
+    expect(controlledIds).toHaveLength(2);
+    const before = document.getElementById(controlledIds[0]);
+    const after = document.getElementById(controlledIds[1]);
+    expect(before).toBe(screen.getByTestId('report-strata-secondary-before'));
+    expect(after).toBe(screen.getByTestId('report-strata-secondary-after'));
+    expect(before).not.toBeVisible();
+    expect(after).not.toBeVisible();
+
+    activateDisclosureWithKey(toggle, 'Enter');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(before).toBeVisible();
+    expect(after).toBeVisible();
+
+    activateDisclosureWithKey(toggle, ' ');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(before).not.toBeVisible();
+
+    const source = fs.readFileSync(
+      path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../ReportStrata.tsx'),
+      'utf8',
+    );
+    expect(source).not.toMatch(/<button\b/);
+  });
+
+  it('localizes first-paint and secondary disclosure copy in zh, en, and ko', () => {
+    const details: ReportDetails = { reportStrata: strataPayload };
+
+    const { unmount } = render(<ReportStrata details={details} language="zh" />);
+    const zh = getReportText('zh');
+    expect(screen.getByTestId('report-strata-toggle')).toHaveTextContent(zh.evidenceDetails);
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent(zh.risksCounterEvidence);
+    expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent(zh.disclaimerHeading);
+    unmount();
+
+    const { unmount: unmountEn } = render(<ReportStrata details={details} language="en" />);
+    const en = getReportText('en');
+    expect(screen.getByTestId('report-strata-toggle')).toHaveTextContent(en.evidenceDetails);
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent(en.risksCounterEvidence);
+    expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent(en.disclaimerHeading);
+    expandStrata();
+    expect(screen.getByTestId('report-strata-fact-annotations')).toHaveTextContent(en.details);
+    unmountEn();
+
+    render(<ReportStrata details={details} language="ko" />);
+    const ko = getReportText('ko');
+    expect(screen.getByTestId('report-strata-toggle')).toHaveTextContent(ko.evidenceDetails);
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent(ko.risksCounterEvidence);
+    expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent(ko.disclaimerHeading);
+    expandStrata();
+    expect(screen.getByTestId('report-strata-fact-annotations')).toHaveTextContent(ko.details);
+    expect(screen.getByTestId('report-strata-toggle')).toHaveTextContent(ko.evidenceDetailsCollapse);
+  });
+
   it('shows disclaimer for historical reports without strata', () => {
-    render(<ReportStrata details={{}} language="zh" alwaysShowDisclaimer />);
+    render(
+      <ReportStrata
+        details={{
+          rawResult: {
+            analysis_summary: 'Historical payload without report strata.',
+            risk_warning: '波动风险',
+            technical_analysis: '价格位于主要均线上方。',
+          },
+        }}
+        language="zh"
+        alwaysShowDisclaimer
+      />,
+    );
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('不构成投资建议');
     expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
     expect(screen.queryByTestId('report-strata-toggle')).not.toBeInTheDocument();
-  });
-
-  it('uses existing report fields when the structured strata lists are empty', () => {
-    render(
-      <ReportStrata
-        language="zh"
-        details={{
-          reportStrata: {
-            schemaVersion: 'report-strata-v1',
-            verifiedFacts: [],
-            missingOrConflicts: [],
-            modelInference: [],
-            risksCounterEvidence: [],
-          },
-          rawResult: {
-            technicalAnalysis: '价格位于主要均线上方。',
-            fundamentalAnalysis: '关键财务数据缺失。',
-            analysisSummary: '等待量价确认。',
-            riskWarning: '跌破支撑位时优先控制风险。',
-          },
-        }}
-      />,
-    );
-
-    expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('价格位于主要均线上方');
-    expect(screen.getByTestId('report-strata-gaps')).toHaveTextContent('关键财务数据缺失');
-    expect(screen.getByTestId('report-strata-inference')).toHaveTextContent('等待量价确认');
-    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent('跌破支撑位');
+    expect(screen.queryByTestId('report-strata-raw-fallback')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-strata-risks')).not.toBeInTheDocument();
   });
 
   it('resolves strata from rawResult.dashboard when projection is absent', () => {
@@ -122,6 +273,7 @@ describe('ReportStrata', () => {
     const resolved = resolveReportStrataFromDetails(details);
     expect(resolved).toBeTruthy();
     render(<ReportStrata details={details} language="en" />);
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent('Break below support');
     expandStrata();
     expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
   });
@@ -158,6 +310,7 @@ describe('ReportStrata', () => {
       },
     };
     render(<ReportStrata details={details} language="en" />);
+    expect(screen.getByTestId('report-strata-risks')).toBeVisible();
     expandStrata();
     expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
     expect(screen.getByTestId('report-strata-inference')).toHaveTextContent('Momentum may improve');

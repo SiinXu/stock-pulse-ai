@@ -31,7 +31,7 @@ Successful JSON parse paths call `attach_report_strata_to_dashboard`: existing L
 | Surface | Behavior |
 | --- | --- |
 | Markdown / brief / WeChat templates | When strata present, emit facts/gaps/inference/risks/framework without merging inference into facts; always print a single report-level disclaimer |
-| Web full-report (`ReportSummary` → `ReportStrata`) | Same section order; disclaimer always shown even when strata are absent |
+| Web full-report (`ReportSummary` → `ReportStrata`) | Decision Card stays the conclusion. Default view shows risks/counter-evidence and the disclaimer. Verified facts, gaps/conflicts, model inference, and framework alignment stay in a default-collapsed supporting-evidence disclosure (shared Button with `aria-expanded` / `aria-controls`). `source` / `asOf` are not inline; they open through the existing details annotation. Empty structured lists do not promote raw technical/volume/fundamental blobs into facts or gaps — those blobs stay behind an explicit secondary/raw Collapsible. Disclaimer still renders when strata are absent |
 | API `ReportDetails.report_strata` | Projected when resolvable from `raw_result` / dashboard |
 
 ## Defaults
