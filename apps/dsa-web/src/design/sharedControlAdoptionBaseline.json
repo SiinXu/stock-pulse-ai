@@ -221,11 +221,6 @@
       "nativeButtonCount": 1,
       "roleButtonCount": 0
     },
-    "../report/ReportStrata.tsx": {
-      "file": "../report/ReportStrata.tsx",
-      "nativeButtonCount": 1,
-      "roleButtonCount": 0
-    },
     "../report/ShareImageButton.tsx": {
       "file": "../report/ShareImageButton.tsx",
       "nativeButtonCount": 1,
