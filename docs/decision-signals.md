@@ -35,7 +35,7 @@
 
 Web 展示必须把这些 wire value 映射为当前 UI 语言的用户可读标签；API 响应继续保留原始枚举值。
 
-`src/schemas/decision_signal_presentation.py` 是持久化信号展示字段的唯一构建入口。顶层 `action` 是唯一方向权威；`presentation.action` 只是由它派生的只读镜像，不能在冲突载荷中反向覆盖顶层动作。`presentation.label` 根据报告语言或已知 canonical 标签语言生成，不信任可能与方向冲突的兼容字段 `action_label`。只有合法字符串 `metadata.report_language` 才参与语言选择；非字符串或不支持的值仍作为普通 caller metadata 保留，但会被 presentation 忽略，不能让 create/list/detail 序列化失败。`confidence/summary/risk/timestamp` 分别映射正式字段 `confidence/reason/risk_summary/created_at`。旧平铺字段继续返回，保证既有 API 客户端兼容；新通知、Web 和 API JSON 序列化消费者必须以顶层 `action` 决定方向，并优先从 `presentation` 读取 `label/confidence/summary/risk/timestamp`，只有滚动升级连接旧后端时才回退对应平铺字段。当前没有独立的 DecisionSignal 导出端点或导出 UI，API JSON 是现有唯一导出面。通知会读取本次 worker 的 `REPORT_LANGUAGE`（`zh/en/ko`）重新本地化顶层 action，Web 会按当前 UI 语言本地化同一 action。
+`src/schemas/decision_signal_presentation.py` 是持久化信号展示字段的唯一构建入口。顶层 `action` 是唯一方向权威；`presentation.action` 只是由它派生的只读镜像，不能在冲突载荷中反向覆盖顶层动作。`presentation.label` 根据报告语言或已知 canonical 标签语言生成，不信任可能与方向冲突的兼容字段 `action_label`。只有合法字符串 `metadata.report_language` 才参与语言选择；非字符串或不支持的值仍作为普通 caller metadata 保留，但会被 presentation 忽略，不能让 create/list/detail 序列化失败。`confidence/summary/risk/timestamp` 分别映射正式字段 `confidence/reason/risk_summary/created_at`。旧平铺字段继续返回，保证既有 API 客户端兼容；新通知、Web 和 API JSON 序列化消费者必须以顶层 `action` 决定方向，并优先从 `presentation` 读取 `label/confidence/summary/risk/timestamp`，只有滚动升级连接旧后端时才回退对应平铺字段。没有独立的 DecisionSignal 导出端点。详情页在存在正整数 `sourceReportId` 时复用历史报告的 Markdown/HTML/PDF 一键导出（`reportExportApi.download`）；没有来源报告时不渲染导出控件。API JSON 仍是信号记录本身的唯一序列化面。通知会读取本次 worker 的 `REPORT_LANGUAGE`（`zh/en/ko`）重新本地化顶层 action，Web 会按当前 UI 语言本地化同一 action。
 
 该模型只属于独立 `DecisionSignal` 资源和低敏 `decision_signal_summary`。主报告、历史列表、StockBar 与回测 schema 继续保持字段隔离，不嵌入完整 signal presentation；但主报告与历史已有的结构化 `action/action_label` 仍以 `action` 为方向权威，Web 报告动作卡与历史 badge 复用同一 taxonomy 标签工具，只有缺少结构化 action 的 legacy 报告才原样回退 `operation_advice`。
 
@@ -236,6 +236,7 @@ Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会�
 - 卡片、详情、组合摘要和时间线统一以顶层 `action` 决定方向，并读取 `presentation` 的 confidence、summary、risk、timestamp；`presentation.action` 只作为同值派生镜像返回。时间线 rank、颜色和 tooltip 不再各自解释方向，排序与持仓等价代码匹配只按 canonical timestamp 选择最新信号。
 - market filter 在 API / 服务层与 Web 前端均已支持 `cn/hk/us/jp/kr/tw`；`jp/kr/tw` 的前端本地化标签均已补齐，`tw` 信号可经 API 正常写入、按 `market=tw` 查询，并可在 Web DecisionSignal 页面通过市场筛选项选择台股（tw）；告警（大盘红绿灯）市场支持 `cn/hk/us/jp/kr`。
 - 详情抽屉展示动作、状态、评分、置信度、周期、计划质量、市场阶段、价格计划、风险、观察条件、证据、数据质量和 metadata。打开详情时还会从服务端加载“重点记忆”和“忽略”两个独立开关，保存期间串行化修改并以响应为准；切换信号时旧请求不能覆盖新信号。两者同时开启时界面明确提示“忽略”优先，加载或保存失败均提供可见重试。
+- 详情在 `sourceReportId` 为正整数时复用报告 Markdown 面板的同一组 Markdown/HTML/PDF 下载控件和 `reportExportApi.download`；没有来源报告时不渲染导出控件，也不新增独立导出端点。
 - 详情抽屉或已有来源报告 ID 的页面上下文可以发起 reassess preview；没有可用来源报告 ID 时入口禁用。Preview 本身不加入列表、latest 或时间线；通过 guardrail 后可由用户二次确认保存。保存会重新请求 `persist=true`，成功后只使用响应中的后端 `item`；`created`、`existing`、`refreshed` 使用不同反馈，existing 不会被描述为新建，终态 existing 不会被乐观注入 active latest/时间线，created/refreshed 才按返回状态更新并刷新相关视图。Web 不会把 preview 拼成本地信号。
 - 保存时的 guardrail 调整 warning 会保留显示。如果 persist 重算被 guardrail 阻断，Web 会显示 `blocked_reason` 和结构化 warning，保留 preview 供用户理解，且不会把失败结果加入时间线。
 - 分析工作台发起表单不提供 `decision_profile`；默认自动生成路径仍只使用 `balanced`。

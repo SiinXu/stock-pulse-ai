@@ -8,9 +8,10 @@ import {
   decisionSignalsApi,
   getDecisionSignalReassessBlockedError,
 } from '../../api/decisionSignals';
+import { alertsApi } from '../../api/alerts';
 import { createApiError, createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
-import { alertsApi } from '../../api/alerts';
+import { reportExportApi } from '../../api/reportExport';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
 import {
   RouteFocusRegistrationContext,
@@ -93,6 +94,13 @@ vi.mock('../../api/decisionSignals', () => ({
 vi.mock('../../api/history', () => ({
   historyApi: {
     getStockBarList: vi.fn(),
+  },
+}));
+
+vi.mock('../../api/reportExport', () => ({
+  reportExportApi: {
+    getCapabilities: vi.fn(),
+    download: vi.fn(),
   },
 }));
 
@@ -552,6 +560,14 @@ beforeEach(() => {
   vi.mocked(alertsApi.listTriggers).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
   vi.mocked(alertsApi.listNotifications).mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
   vi.mocked(alertsApi.getRule).mockResolvedValue(alertRule);
+  vi.mocked(reportExportApi.getCapabilities).mockResolvedValue({
+    formats: {
+      md: { available: true },
+      html: { available: true },
+      pdf: { available: true },
+    },
+  });
+  vi.mocked(reportExportApi.download).mockResolvedValue({ filename: 'stockpulse-report-3001.md' });
 });
 
 describe('DecisionSignalsPage', { timeout: 15_000 }, () => {

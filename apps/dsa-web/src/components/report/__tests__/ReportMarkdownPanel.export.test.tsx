@@ -21,6 +21,19 @@ vi.mock('../../../api/reportExport', () => ({
   },
 }));
 
+function renderPanel() {
+  return render(
+    <UiLanguageProvider initialLanguage="en">
+      <ReportMarkdownPanel
+        recordId={7}
+        stockName="Demo"
+        stockCode="600519"
+        onRequestClose={() => undefined}
+      />
+    </UiLanguageProvider>,
+  );
+}
+
 describe('ReportMarkdownPanel export controls', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -37,16 +50,7 @@ describe('ReportMarkdownPanel export controls', () => {
   });
 
   it('exposes markdown, html, and pdf export actions that call the export API', async () => {
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <ReportMarkdownPanel
-          recordId={7}
-          stockName="Demo"
-          stockCode="600519"
-          onRequestClose={() => undefined}
-        />
-      </UiLanguageProvider>,
-    );
+    renderPanel();
 
     expect(await screen.findByTestId('report-export-md')).toBeInTheDocument();
     expect(screen.getByTestId('report-export-html')).toBeInTheDocument();
@@ -67,30 +71,42 @@ describe('ReportMarkdownPanel export controls', () => {
     });
   });
 
-  it('disables html export when capabilities report it unavailable', async () => {
-    vi.mocked(reportExportApi.getCapabilities).mockResolvedValue({
-      formats: {
-        md: { available: true },
-        html: { available: false },
-        pdf: { available: false },
-      },
-    });
+  it.each([
+    ['html', 'report-export-html', 'report-export-pdf', 'HTML export is unavailable'],
+    ['pdf', 'report-export-pdf', 'report-export-html', 'PDF export is unavailable'],
+  ] as const)(
+    'disables %s export when capabilities report it unavailable',
+    async (format, testId, otherTestId, ariaLabel) => {
+      vi.mocked(reportExportApi.getCapabilities).mockResolvedValue({
+        formats: {
+          md: { available: true },
+          html: { available: format !== 'html' },
+          pdf: { available: format !== 'pdf' },
+        },
+      });
 
-    render(
-      <UiLanguageProvider initialLanguage="en">
-        <ReportMarkdownPanel
-          recordId={7}
-          stockName="Demo"
-          stockCode="600519"
-          onRequestClose={() => undefined}
-        />
-      </UiLanguageProvider>,
-    );
+      renderPanel();
 
-    const htmlButton = await screen.findByTestId('report-export-html');
+      const button = await screen.findByTestId(testId);
+      await waitFor(() => {
+        expect(button).toBeDisabled();
+      });
+      expect(button).toHaveAttribute('aria-label', ariaLabel);
+      expect(screen.getByTestId(otherTestId)).not.toBeDisabled();
+      fireEvent.click(button);
+      expect(reportExportApi.download).not.toHaveBeenCalled();
+    },
+  );
+
+  it('surfaces the parsed export error without a second download path', async () => {
+    vi.mocked(reportExportApi.download).mockRejectedValue(new Error('export denied'));
+
+    renderPanel();
+
+    fireEvent.click(await screen.findByTestId('report-export-md'));
+    expect(await screen.findByTestId('report-export-error')).toBeInTheDocument();
     await waitFor(() => {
-      expect(htmlButton).toBeDisabled();
+      expect(reportExportApi.download).toHaveBeenCalledWith(7, 'md');
     });
-    expect(htmlButton).toHaveAttribute('aria-label', 'HTML export is unavailable');
   });
 });

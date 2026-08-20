@@ -93,11 +93,13 @@ GET /api/v1/history/{record_id}/export?format=pdf
 
 报告 Markdown 面板提供一键下载：Markdown（始终可用）、HTML（`markdown-it-py` 就绪时）、PDF（可选 PDF 栈与字形覆盖就绪时）。前端通过 `GET /api/v1/history/export/capabilities` 探测能力；不可用的可选格式仍可见但禁用，并带有明确的“不可用”文案。
 
+Decision Signal 详情在 `sourceReportId` 为正整数时复用同一组下载控件和
+`reportExportApi.download` 路径。没有来源报告的信号不渲染导出控件，也不新增第二套导出实现。
+
 ## Issue #163 剩余范围
 
 - 原生 DOCX 二进制导出（若产品仍需要 OOXML）
 - XLSX 评分/指标工作表
 - 可选证据/审计附录开关（#127）
-- DecisionSignal 一键导出入口（报告 Markdown 面板已覆盖）
 
 本链路不改报告模板、分析生成、Desktop、`pdf_parsing_service.py`、分享图或 `md2img`。
