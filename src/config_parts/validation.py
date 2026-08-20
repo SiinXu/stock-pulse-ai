@@ -416,8 +416,11 @@ class _ConfigValidationMethods:
             ))
 
         # --- Notification channels ---
+        # DingTalk Stream app credentials are interactive-only and are not a
+        # static scheduled push channel; only the webhook counts here.
         has_notification = bool(
             self.wechat_webhook_url
+            or self.dingtalk_webhook_url
             or self.feishu_webhook_url
             or (
                 (self.feishu_app_id or "")
