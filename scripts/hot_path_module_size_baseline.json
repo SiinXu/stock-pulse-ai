@@ -16,7 +16,7 @@
     "src/agent/orchestrator_parts/pipeline.py": 1564,
     "src/data_provider/base.py": 4609,
     "src/data_provider/data_validation.py": 1715,
-    "src/market/analyzer.py": 2079,
+    "src/market/analyzer.py": 2026,
     "src/services/history_service.py": 1581,
     "src/services/local_model_service.py": 1548,
     "src/services/reasoning_trace_export_service.py": 1730,

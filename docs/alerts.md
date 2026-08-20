@@ -367,7 +367,7 @@ scope/type 校验是双向约束：`target_scope=market` 只能使用两类 Mark
 
 结构化快照字段为：`region`、`trade_date`、`status`、`score`、`label`、`temperature_label`、`reasons`、`guidance`、`dimensions`、`data_quality`。`trade_date` 首版固定取 `MarketOverview.date`；P7 不解析 provider quote as-of。
 
-`dimensions` 使用 canonical scorer 单一来源，`build_market_light_snapshot()`、大盘复盘注入块和告警 service 不重复实现 scoring。`_build_market_temperature()` 只是 thin wrapper；红绿灯 `status` 阈值保持 `60/40`，temperature label 阈值保持 `70/55/40`。
+`dimensions` 使用 canonical scorer 单一来源（`src.market.metrics.build_market_light_scores`；`src.market.analyzer` 仍通过同名模块级 seam 委托），`build_market_light_snapshot()`、大盘复盘注入块和告警 service 不重复实现 scoring。`_build_market_temperature()` 只是 thin wrapper；红绿灯 `status` 阈值保持 `60/40`，temperature label 阈值保持 `70/55/40`。
 
 | dimension | `available=true` 条件 | fallback score |
 | --- | --- | --- |
