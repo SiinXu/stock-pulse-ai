@@ -73,8 +73,10 @@ DIAGNOSTIC_SNAPSHOT_OPTIONAL_KEYS = (
     "skill_versions",
 )
 
-# User-facing summary payload after ``RunDiagnosticSummary.to_dict()``.
-# Optional identity fields are omitted when None; ``copy_text`` is always set.
+# User-facing exported summary payload from ``build_run_diagnostic_summary``.
+# Optional identity fields are omitted when None; ``copy_text`` is always set
+# by export. ``RunDiagnosticSummary.to_dict()`` emits the same keys except
+# ``copy_text`` and must not import export.
 DIAGNOSTIC_SUMMARY_KEYS = (
     "trace_id",
     "task_id",
@@ -566,7 +568,8 @@ class RunDiagnosticSummary:
     trigger_source: Optional[str] = None
     components: Dict[str, RunDiagnosticComponent] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def _schema_payload(self) -> Dict[str, Any]:
+        """Return the typed summary fields without export ``copy_text``."""
         payload = {
             "trace_id": self.trace_id,
             "task_id": self.task_id,
@@ -581,8 +584,13 @@ class RunDiagnosticSummary:
                 for key, component in self.components.items()
             },
         }
-        from src.services.diagnostics.export import format_copyable_diagnostics
+        return {key: value for key, value in payload.items() if value is not None}
 
-        payload["copy_text"] = format_copyable_diagnostics(payload)
-        compact = {key: value for key, value in payload.items() if value is not None}
-        return _redact_diagnostic_payload(_copy_diagnostic_value(compact))
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize schema fields with redaction and copy isolation.
+
+        This boundary does not import export and does not emit ``copy_text``.
+        The public diagnostics JSON attaches ``copy_text`` in
+        ``build_run_diagnostic_summary``.
+        """
+        return _redact_diagnostic_payload(_copy_diagnostic_value(self._schema_payload()))

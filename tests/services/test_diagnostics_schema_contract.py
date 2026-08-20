@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Frozen run-diagnostics schema contract for issue #1076 first slice."""
+"""Frozen run-diagnostics schema contract for issue #1076."""
 
 from __future__ import annotations
 
@@ -53,30 +53,24 @@ _CREATED_AT = "2026-08-20T00:00:00"
 
 def test_schema_module_does_not_import_collect() -> None:
     source = Path("src/services/diagnostics/schema.py").read_text(encoding="utf-8")
-    assert "diagnostics.collect" not in source
     assert "from src.services.diagnostics.collect" not in source
+    assert "import src.services.diagnostics.collect" not in source
 
 
-def test_schema_keeps_export_import_lazy() -> None:
+def test_schema_import_and_to_dict_load_none_of_export_collect_or_facade() -> None:
     source = Path("src/services/diagnostics/schema.py").read_text(encoding="utf-8")
     tree = ast.parse(source)
-    module_level_modules = []
-    for node in tree.body:
+    imported_modules = []
+    for node in ast.walk(tree):
         if isinstance(node, ast.ImportFrom) and node.module:
-            module_level_modules.append(node.module)
+            imported_modules.append(node.module)
         elif isinstance(node, ast.Import):
-            module_level_modules.extend(alias.name for alias in node.names)
-    assert all("diagnostics.export" not in name for name in module_level_modules)
-    assert all("diagnostics.collect" not in name for name in module_level_modules)
-
-    lazy_export_imports = [
-        node
-        for node in ast.walk(tree)
-        if isinstance(node, ast.ImportFrom)
-        and node.module == "src.services.diagnostics.export"
-        and node.col_offset > 0
-    ]
-    assert lazy_export_imports
+            imported_modules.extend(alias.name for alias in node.names)
+    assert all("diagnostics.export" not in name for name in imported_modules)
+    assert all("diagnostics.collect" not in name for name in imported_modules)
+    assert all(name != "src.services.run_diagnostics" for name in imported_modules)
+    assert "from src.services.diagnostics.export" not in source
+    assert "import src.services.diagnostics.export" not in source
 
     script = (
         "import sys\n"
@@ -91,7 +85,13 @@ def test_schema_keeps_export_import_lazy() -> None:
         "import src.services.diagnostics.schema as schema\n"
         "loaded = [name for name in banned if name in sys.modules]\n"
         "assert not loaded, loaded\n"
-        "assert schema._copy_diagnostic_value({'k': {'n': 1}}) is not None\n"
+        "payload = schema.RunDiagnosticSummary("
+        "status='unknown', status_label='未知', reason='x'"
+        ").to_dict()\n"
+        "assert 'copy_text' not in payload, sorted(payload)\n"
+        "assert 'copy_text' in schema.DIAGNOSTIC_SUMMARY_KEYS\n"
+        "loaded = [name for name in banned if name in sys.modules]\n"
+        "assert not loaded, loaded\n"
     )
     repo_root = str(Path(__file__).resolve().parents[2])
     env = os.environ.copy()
@@ -232,6 +232,15 @@ def test_degraded_run_payloads_include_error_fields() -> None:
 
 
 def test_empty_and_degraded_summary_shapes() -> None:
+    schema_payload = RunDiagnosticSummary(
+        status="unknown",
+        status_label="未知",
+        reason="旧报告或诊断证据不足，无法判断本次运行状态",
+    ).to_dict()
+    assert "copy_text" not in schema_payload
+    assert "copy_text" in DIAGNOSTIC_SUMMARY_KEYS
+    assert set(schema_payload) <= set(key for key in DIAGNOSTIC_SUMMARY_KEYS if key != "copy_text")
+
     empty = build_run_diagnostic_summary()
     assert empty["status"] == "unknown"
     assert empty["status"] in DIAGNOSTIC_SUMMARY_STATUSES
@@ -409,6 +418,7 @@ def test_to_dict_does_not_alias_or_mutate_dataclass_fields() -> None:
         },
     )
     encoded = summary.to_dict()
+    assert "copy_text" not in encoded
     encoded["reason"] = "mutated"
     encoded["components"]["llm"]["details"]["model"] = "mutated"
     assert summary.reason == "ok"

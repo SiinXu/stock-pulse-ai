@@ -1,0 +1,1 @@
+- [Changed] Keep run-diagnostics schema serialization free of export `copy_text`; `build_run_diagnostic_summary` is the only producer of the public copy field (Refs #1076).
