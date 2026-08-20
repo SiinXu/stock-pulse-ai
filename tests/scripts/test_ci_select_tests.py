@@ -42,9 +42,13 @@ def test_non_collectable_test_support_forces_full_suite() -> None:
 
 
 def test_data_provider_roots_map_to_provider_tests() -> None:
+    expected = [
+        "tests/contract/test_provider_fallback.py",
+        "tests/data_provider",
+    ]
     for changed in ("src/data_provider/base.py", "src/data_provider/akshare_parts/symbols.py"):
         result = select_targets([changed])
-        assert result == ["tests/data_provider"], changed
+        assert result == expected, changed
 
 
 def test_docs_only_is_none() -> None:
