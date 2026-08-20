@@ -177,11 +177,12 @@ end-to-end.” Issue #1076 remains open.
 
 ### Not accepted evidence
 
-Open draft
+Merged
 [PR #1402](https://github.com/SiinXu/stock-pulse-ai/pull/1402)
-(`refactor: freeze run diagnostics schema boundary`) is an **unverified
-candidate** on the #1352 layout. Do not cite it as accepted evidence that #1076
-or #1088 is closed.
+(`refactor: freeze run diagnostics schema boundary`) landed the diagnostics
+schema boundary on `main`. It is a later serial change on the #1352 layout,
+not a split that follows this template end-to-end. Do not cite it as
+accepted evidence that #1076 or #1088 is closed.
 
 ## Issue Closing Rule
 
