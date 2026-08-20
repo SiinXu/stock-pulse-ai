@@ -255,6 +255,8 @@ Defaults and framing:
 
 ## Occurrence And Execution Semantics
 
+Admission-status field builders live in internal `src/services/scheduled_task_parts/admission_fields.py` and are rebound onto `src.services.scheduled_task_service`; import the facade, not the internal owner.
+
 Each due slot is claimed by atomically advancing the definition's
 `next_run_at`. `scheduled_task_runs` has a unique `(task_id, scheduled_for)`
 constraint, so repeated polls cannot claim or dispatch the same occurrence.

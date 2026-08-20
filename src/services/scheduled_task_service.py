@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import logging
 import threading
@@ -1395,103 +1396,6 @@ class ScheduledTaskService:
         self._admit_run(run, now)
         return "claimed"
 
-    @staticmethod
-    def _conflict_wait_fields(now: datetime) -> Dict[str, Any]:
-        return {
-            "status": ScheduledRunStatus.RETRY_WAIT.value,
-            "dispatch_token": None,
-            "error_code": "scheduled_task_execution_conflict",
-            "next_attempt_at": now
-            + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS),
-            "finished_at": None,
-            "updated_at": now,
-        }
-
-    @staticmethod
-    def _interrupted_admission_fields(
-        now: datetime,
-        *,
-        error_code: str,
-    ) -> Dict[str, Any]:
-        return {
-            "status": ScheduledRunStatus.INTERRUPTED.value,
-            "dispatch_token": None,
-            "error_code": error_code,
-            "next_attempt_at": None,
-            "finished_at": now,
-            "updated_at": now,
-        }
-
-    @staticmethod
-    def _dispatch_failure_fields(
-        run,
-        now: datetime,
-        *,
-        error_code: str,
-    ) -> Dict[str, Any]:
-        failure_count = _exact_persisted_int(
-            run.dispatch_failure_count,
-            field_name="run dispatch failure count",
-            minimum=0,
-            maximum=_MAX_DISPATCH_FAILURES,
-        ) + 1
-        terminal = failure_count >= _MAX_DISPATCH_FAILURES
-        return {
-            "status": (
-                ScheduledRunStatus.FAILED.value
-                if terminal
-                else ScheduledRunStatus.RETRY_WAIT.value
-            ),
-            "dispatch_token": None,
-            "dispatch_failure_count": failure_count,
-            "error_code": error_code,
-            "next_attempt_at": (
-                None
-                if terminal
-                else now + timedelta(seconds=SCHEDULED_TASK_RETRY_DELAY_SECONDS)
-            ),
-            "finished_at": now if terminal else None,
-            "updated_at": now,
-        }
-
-    @staticmethod
-    def _running_admission_fields(
-        run,
-        now: datetime,
-        *,
-        execution_id: str,
-        owned: bool,
-    ) -> Dict[str, Any]:
-        execution_history = _json_list(
-            run.execution_task_ids_json,
-            field_name="execution_task_ids",
-        )
-        owned_history = _json_list(
-            run.owned_execution_task_ids_json,
-            field_name="owned_execution_task_ids",
-        )
-        return {
-            "status": ScheduledRunStatus.RUNNING.value,
-            "dispatch_token": None,
-            "attempt_count": _exact_persisted_int(
-                run.attempt_count,
-                field_name="run attempt count",
-                minimum=0,
-                maximum=_MAX_ATTEMPTS,
-            ) + 1,
-            "execution_task_ids_json": json.dumps(
-                execution_history + [execution_id]
-            ),
-            "owned_execution_task_ids_json": json.dumps(
-                owned_history + ([execution_id] if owned else [])
-            ),
-            "error_code": None,
-            "next_attempt_at": None,
-            "started_at": run.started_at or now,
-            "finished_at": None,
-            "updated_at": now,
-        }
-
     def _admit_run(self, run, now: datetime) -> None:
         """Resolve one reserved occurrence to a durable queue execution identity."""
         dispatch_token = str(run.dispatch_token or "")
@@ -2078,6 +1982,36 @@ class ScheduledTaskService:
         if attempt_count is not None:
             fields["attempt_count"] = attempt_count
         self.repository.update_run(run_id, fields)
+
+
+_ADMISSION_FIELDS_MODULE_NAME = "src.services.scheduled_task_parts.admission_fields"
+_admission_fields_module = importlib.import_module(_ADMISSION_FIELDS_MODULE_NAME)
+
+
+def _assemble_admission_fields_facade(
+    fields_module=_admission_fields_module,
+) -> None:
+    """Rebind admission field builders onto ScheduledTaskService."""
+    bound_method_names = fields_module.bind_admission_fields_facade(
+        ScheduledTaskService,
+        globals(),
+    )
+    if bound_method_names != fields_module.EXPECTED_ADMISSION_FIELD_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected ScheduledTaskService admission field methods: "
+            f"{bound_method_names!r}"
+        )
+
+
+_assemble_admission_fields_facade()
+_admission_fields_module._install_facade_reload_hook(
+    _assemble_admission_fields_facade
+)
+del (
+    _ADMISSION_FIELDS_MODULE_NAME,
+    _assemble_admission_fields_facade,
+    _admission_fields_module,
+)
 
 
 __all__ = [
