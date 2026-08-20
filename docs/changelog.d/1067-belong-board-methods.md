@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager belong-board missing-value and normalization helpers into `src/data_provider/manager_parts/belong_board_methods.py` behind the existing `src.data_provider.base` facade without changing `get_belong_boards` routing, provider fallback, or public imports (Refs #1067).
