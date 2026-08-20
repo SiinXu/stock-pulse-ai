@@ -51,6 +51,23 @@ def test_data_provider_roots_map_to_provider_tests() -> None:
         assert result == expected, changed
 
 
+def test_diagnostics_schema_maps_to_run_diagnostics_and_services_tests() -> None:
+    """Schema/facade edits must run the characterization suite, not only tests/services."""
+
+    expected = [
+        "tests/services",
+        "tests/test_run_diagnostics_p1.py",
+        "tests/test_run_diagnostics_p2.py",
+    ]
+    for changed in (
+        "src/services/diagnostics/schema.py",
+        "src/services/diagnostics/collect.py",
+        "src/services/run_diagnostics.py",
+    ):
+        result = select_targets([changed])
+        assert result == expected, changed
+
+
 def test_docs_only_is_none() -> None:
     assert select_targets(["docs/CHANGELOG.md", "docs/FAQ.md"]) == []
 
