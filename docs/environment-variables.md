@@ -642,7 +642,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SCHEDULE_TIME` | `18:00` | 是 | Daily execution time (HH:MM format, 24-hour clock) |
 | `SCHEDULE_TIMES` | `空` | 是 | List execution over multiple time periods (comma-separated, use SCHEDULE_TIME if empty) |
 | `SEARXNG_BASE_URLS` | `空` | 是 | SearXNG instance address (comma-separated, private deployments have no quotas; enable format: json in settings.yml) P... |
-| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | `true` | 是 |  |
+| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | `false` | 是 |  |
 | `SECURITY_AUDIT_MAX_EVENTS` | `10000` | 是 | 模板中注释; Hard capacity (max retained rows) |
 | `SECURITY_AUDIT_RETENTION_DAYS` | `90` | 是 | 模板中注释; =========================================== Durable security audit (privileged operations) ==========================... |
 | `SERPAPI_API_KEYS` | `空` | 是 | SerpAPI Keys (supports multiple, comma-separated) |
