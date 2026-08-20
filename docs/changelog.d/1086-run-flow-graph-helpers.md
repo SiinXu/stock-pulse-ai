@@ -1,0 +1,1 @@
+- [Changed] Extracted run-flow graph mutators and scalar helpers into `src/services/run_flow_parts/graph.py` behind the existing `src.services.run_flow` facade without changing snapshot keys, status vocabulary, sanitization, or public builders (Refs #1086).
