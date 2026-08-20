@@ -47,7 +47,7 @@ WEBUI_HOST=0.0.0.0
 在项目根目录执行：
 
 ```bash
-# 只启动 Web 界面（不自动执行分析）
+# 只启动 Web 界面（启动时不执行分析；已启用的定时任务会恢复）
 python main.py --webui-only
 
 # 或者：启动 Web 界面（启动时执行一次分析；需每日定时分析请加 --schedule 或设 SCHEDULE_ENABLED=true）

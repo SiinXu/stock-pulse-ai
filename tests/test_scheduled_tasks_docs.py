@@ -41,6 +41,8 @@ def test_scheduled_task_topic_is_indexed_and_documents_runtime_boundaries() -> N
         "fall-back fold",
         "append-only audit history",
         "DSA_DESKTOP_MODE=true",
+        "DSA_RUNTIME_SCHEDULER_SUPPRESS_START=true",
+        "sole legacy `SCHEDULE_*` day-batch owner",
         "scheduled_task_runtime_reconcile_deferred",
         "expected schema version",
         "after disable is interrupted",
