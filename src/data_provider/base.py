@@ -793,180 +793,11 @@ class DataFetcherManager:
                 for key, _ in sorted_items[:overflow]:
                     self._fundamental_cache.pop(key, None)
 
-    @staticmethod
-    def _try_scalar_isna(value: Any, context: str) -> Optional[bool]:
-        """Return scalar ``pd.isna`` result, or ``None`` when callers should use fallback logic."""
-        if isinstance(value, (dict, list, tuple, set, pd.DataFrame, pd.Series, pd.Index)):
-            return None
+    # Rebound from manager_parts.belong_board_methods after the class is built.
+    _try_scalar_isna = None
+    _is_missing_board_value = None
+    _normalize_belong_boards = None
 
-        if isinstance(value, np.ndarray):
-            if value.ndim != 0:
-                return None
-            value = value.item()
-
-        try:
-            isna_result = pd.isna(value)
-        except (TypeError, ValueError) as exc:
-            if hasattr(value, "__array__"):
-                logger.debug(
-                    "[%s] pd.isna failed for array-like object; re-raise: value_type=%s error_type=%s",
-                    context,
-                    type(value).__name__,
-                    type(exc).__name__,
-                )
-                raise
-            logger.debug(
-                "[%s] pd.isna fallback: value_type=%s error_type=%s",
-                context,
-                type(value).__name__,
-                type(exc).__name__,
-            )
-            return None
-
-        if isinstance(isna_result, (bool, np.bool_)):
-            return bool(isna_result)
-
-        if isinstance(isna_result, np.ndarray):
-            if isna_result.ndim == 0:
-                return bool(isna_result.item())
-            logger.debug(
-                "[%s] pd.isna returned non-scalar result: value_type=%s result_type=%s",
-                context,
-                type(value).__name__,
-                type(isna_result).__name__,
-            )
-            return None
-
-        logger.debug(
-            "[%s] pd.isna returned unexpected result type: value_type=%s result_type=%s",
-            context,
-            type(value).__name__,
-            type(isna_result).__name__,
-        )
-        return None
-
-    @staticmethod
-    def _is_missing_board_value(value: Any) -> bool:
-        """Return True when a board field value should be treated as missing."""
-        if value is None:
-            return True
-        is_missing = DataFetcherManager._try_scalar_isna(value, "board_value")
-        if is_missing is True:
-            return True
-        text = str(value).strip()
-        return text == "" or text.lower() in {"nan", "none", "null", "na", "n/a"}
-
-    @staticmethod
-    def _normalize_belong_boards(raw_data: Any) -> List[Dict[str, Any]]:
-        """Normalize belong-board results from heterogeneous providers."""
-        if DataFetcherManager._is_missing_board_value(raw_data):
-            return []
-
-        normalized: List[Dict[str, Any]] = []
-        dedupe = set()
-
-        if isinstance(raw_data, pd.DataFrame):
-            if raw_data.empty:
-                return []
-            name_col = next(
-                (
-                    col
-                    for col in raw_data.columns
-                    if str(col) in {"板块名称", "板块", "所属板块", "板块名", "name", "industry"}
-                ),
-                None,
-            )
-            code_col = next(
-                (
-                    col
-                    for col in raw_data.columns
-                    if str(col) in {"板块代码", "代码", "code"}
-                ),
-                None,
-            )
-            type_col = next(
-                (
-                    col
-                    for col in raw_data.columns
-                    if str(col) in {"板块类型", "类别", "type"}
-                ),
-                None,
-            )
-            if name_col is None:
-                return []
-            for _, row in raw_data.iterrows():
-                board_name_raw = row.get(name_col, "")
-                if DataFetcherManager._is_missing_board_value(board_name_raw):
-                    continue
-                board_name = str(board_name_raw).strip()
-                if board_name in dedupe:
-                    continue
-                dedupe.add(board_name)
-                item = {"name": board_name}
-                if code_col is not None:
-                    board_code_raw = row.get(code_col, "")
-                    if not DataFetcherManager._is_missing_board_value(board_code_raw):
-                        item["code"] = str(board_code_raw).strip()
-                if type_col is not None:
-                    board_type_raw = row.get(type_col, "")
-                    if not DataFetcherManager._is_missing_board_value(board_type_raw):
-                        item["type"] = str(board_type_raw).strip()
-                normalized.append(item)
-            return normalized
-
-        if isinstance(raw_data, dict):
-            raw_data = [raw_data]
-
-        if isinstance(raw_data, (list, tuple, set)):
-            for item in raw_data:
-                if isinstance(item, dict):
-                    board_name_raw = (
-                        item.get("name")
-                        or item.get("board_name")
-                        or item.get("板块名称")
-                        or item.get("板块")
-                        or item.get("所属板块")
-                        or item.get("板块名")
-                        or item.get("industry")
-                        or item.get("行业")
-                    )
-                    if DataFetcherManager._is_missing_board_value(board_name_raw):
-                        continue
-                    board_name = str(board_name_raw).strip()
-                    if board_name in dedupe:
-                        continue
-                    dedupe.add(board_name)
-                    normalized_item: Dict[str, Any] = {"name": board_name}
-                    code_raw = (
-                        item.get("code")
-                        or item.get("板块代码")
-                        or item.get("代码")
-                    )
-                    if not DataFetcherManager._is_missing_board_value(code_raw):
-                        normalized_item["code"] = str(code_raw).strip()
-                    type_raw = (
-                        item.get("type")
-                        or item.get("板块类型")
-                        or item.get("类别")
-                    )
-                    if not DataFetcherManager._is_missing_board_value(type_raw):
-                        normalized_item["type"] = str(type_raw).strip()
-                    normalized.append(normalized_item)
-                    continue
-                if DataFetcherManager._is_missing_board_value(item):
-                    continue
-                board_name = str(item).strip()
-                if board_name in dedupe:
-                    continue
-                dedupe.add(board_name)
-                normalized.append({"name": board_name})
-            return normalized
-
-        if not DataFetcherManager._is_missing_board_value(raw_data):
-            board_name = str(raw_data).strip()
-            return [{"name": board_name}]
-        return []
-    
     _register_builtin_data_provider = None
 
     def _init_default_fetchers(self) -> None:
@@ -4398,13 +4229,14 @@ class DataFetcherManager:
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006
 # compatibility facade while focused parts own inventory/selection, daily
 # health/circuit, daily-cache orchestration, realtime field-trust
-# bookkeeping, and money-flow cache lookup/store. Rebinding preserves method
-# globals so existing patches against this module continue to intercept moved
-# implementations.
+# bookkeeping, money-flow cache lookup/store, and belong-board
+# normalization. Rebinding preserves method globals so existing patches
+# against this module continue to intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
 from .manager_parts import (  # noqa: E402
+    belong_board_methods as _belong_board_methods_module,
     money_flow_cache_methods as _money_flow_cache_methods_module,
     realtime_field_trust_methods as _realtime_field_trust_methods_module,
 )
@@ -4515,12 +4347,27 @@ def _assemble_money_flow_cache_methods_facade(
         )
 
 
+def _assemble_belong_board_methods_facade(
+    board_module=_belong_board_methods_module,
+) -> None:
+    bound_method_names = board_module.bind_belong_board_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != board_module.EXPECTED_BELONG_BOARD_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager belong-board methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_data_fetcher_manager_facades(
     assemble_capability=_assemble_capability_catalog_facade,
     assemble_health=_assemble_daily_source_health_facade,
     assemble_daily_cache=_assemble_daily_cache_methods_facade,
     assemble_realtime=_assemble_realtime_field_trust_methods_facade,
     assemble_money_flow=_assemble_money_flow_cache_methods_facade,
+    assemble_belong_board=_assemble_belong_board_methods_facade,
 ) -> None:
     # Default args capture the assembler callables so reload hooks keep working
     # after the facade module deletes the temporary assembly names.
@@ -4529,6 +4376,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_daily_cache()
     assemble_realtime()
     assemble_money_flow()
+    assemble_belong_board()
 
 
 _assemble_data_fetcher_manager_facades()
@@ -4547,6 +4395,9 @@ _realtime_field_trust_methods_module._install_facade_reload_hook(
 _money_flow_cache_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_belong_board_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 
 del (
     _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
@@ -4555,10 +4406,12 @@ del (
     _assemble_daily_cache_methods_facade,
     _assemble_realtime_field_trust_methods_facade,
     _assemble_money_flow_cache_methods_facade,
+    _assemble_belong_board_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
     _daily_source_health_module,
     _daily_cache_methods_module,
     _realtime_field_trust_methods_module,
     _money_flow_cache_methods_module,
+    _belong_board_methods_module,
 )
