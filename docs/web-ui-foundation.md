@@ -977,13 +977,15 @@ concrete `removeWhen` condition. No page-track `removeBy` entry remains.
 
 ## Component Playground
 
-The production build includes an authenticated, intentionally hidden component
+Development builds include an authenticated, intentionally hidden component
 workbench at `/playground`. It is not part of `SidebarNav`. The route uses the
 same `AuthProvider` boundary as the rest of the Web application, so a signed-out
-request preserves the complete playground deep link through `/login?redirect=`.
-The Axios mock adapter that powers deterministic fixture profiles is a
-development-only dependency: development builds install it before mounting a
-story, and production builds omit that package from the runtime bundle.
+development request preserves the complete playground deep link through
+`/login?redirect=`. Production composition omits the playground routes,
+catalog, and scenario graph; unknown `/playground` URLs follow the normal
+authenticated 404 path. The Axios mock adapter that powers deterministic
+fixture profiles is a development-only dependency and is not resolved by the
+production runtime bundle.
 
 The catalog covers every exported visual component under `src/components`,
 including shared primitives, layout patterns, and business components. Pages,
@@ -1011,8 +1013,8 @@ fixtures, while every unregistered request is rejected with
 `501 playground_mock_not_registered`. Passthrough is prohibited. Request-log
 messages contain only method, path without query or hash, status, duration, and
 a local request id; payloads, headers, credentials, and response bodies must
-never cross the iframe boundary. Production builds keep the playground catalog
-and scenario graph but do not resolve the mock adapter package.
+never cross the iframe boundary. Production builds omit the playground catalog,
+scenario graph, and mock adapter package.
 
 ## Migration And Deletion
 
