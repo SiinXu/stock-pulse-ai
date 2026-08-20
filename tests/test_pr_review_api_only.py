@@ -72,6 +72,11 @@ def test_pr_review_dispatch_requires_pr_number() -> None:
 
 def test_security_check_is_checkout_free_and_api_only() -> None:
     job = _security_check_job()
+    assert job["permissions"] == {"contents": "read", "pull-requests": "read"}
+    outputs = job["outputs"]
+    assert isinstance(outputs, dict)
+    assert outputs["base_sha"] == "${{ steps.trust.outputs.base_sha }}"
+    assert outputs["head_sha"] == "${{ steps.trust.outputs.head_sha }}"
     steps = job["steps"]
     assert isinstance(steps, list)
     assert [step["id"] for step in steps] == ["trust", "check_sensitive"]
@@ -91,6 +96,8 @@ def test_security_check_is_checkout_free_and_api_only() -> None:
     assert JS_PULLS_GET in scripts["trust"]
     assert JS_FORK_COMPARE in scripts["trust"]
     assert JS_DEFAULT_BRANCH_COMPARE in scripts["trust"]
+    assert "core.setOutput('base_sha', pull.base.sha);" in scripts["trust"]
+    assert "core.setOutput('head_sha', pull.head.sha);" in scripts["trust"]
     assert "toLowerCase()" not in scripts["trust"]
     assert JS_LIST_FILES in scripts["check_sensitive"]
     assert JS_SENSITIVE_PATTERN in scripts["check_sensitive"]
@@ -98,6 +105,21 @@ def test_security_check_is_checkout_free_and_api_only() -> None:
     assert "core.setFailed(`Unable to list files for pull request ${prNumber}: ${status}`)" in scripts[
         "check_sensitive"
     ]
+
+
+def test_ai_review_checkouts_use_api_shas_without_dispatch_fallback() -> None:
+    document = _load_workflow()
+    jobs = document["jobs"]
+    assert isinstance(jobs, dict)
+    ai_review = jobs["ai-review"]
+    assert isinstance(ai_review, dict)
+    steps = {step["id"]: step for step in ai_review["steps"]}
+    trusted_ref = steps["trusted-review-inputs"]["with"]["ref"]
+    analysis_ref = steps["pull-request-analysis-inputs"]["with"]["ref"]
+    assert trusted_ref == "${{ needs.security-check.outputs.base_sha }}"
+    assert analysis_ref == "${{ needs.security-check.outputs.head_sha }}"
+    assert "github.sha" not in trusted_ref
+    assert "github.sha" not in analysis_ref
 
 
 def test_pr_review_workflow_supply_chain_contract() -> None:

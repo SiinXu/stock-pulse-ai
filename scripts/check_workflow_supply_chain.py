@@ -80,8 +80,8 @@ TRUSTED_REVIEW_RUN_LINES = (
     'mv -- ai_review_result.txt "${trusted_output}"',
     "fi",
 )
-TRUSTED_REVIEW_REF = "${{ github.event.pull_request.base.sha || github.sha }}"
-PULL_REQUEST_REVIEW_REF = "${{ github.event.pull_request.head.sha || github.sha }}"
+TRUSTED_REVIEW_REF = "${{ needs.security-check.outputs.base_sha }}"
+PULL_REQUEST_REVIEW_REF = "${{ needs.security-check.outputs.head_sha }}"
 TRUSTED_REVIEW_BASE_ENV = {
     "BASE_REF": "${{ github.base_ref || github.event.repository.default_branch }}",
 }
@@ -93,6 +93,8 @@ SECURITY_CHECK_OUTPUTS = {
     "sensitive_files_changed": "${{ steps.check_sensitive.outputs.sensitive_files_changed }}",
     "is_fork": "${{ steps.trust.outputs.is_fork }}",
     "is_default_branch": "${{ steps.trust.outputs.is_default_branch }}",
+    "base_sha": "${{ steps.trust.outputs.base_sha }}",
+    "head_sha": "${{ steps.trust.outputs.head_sha }}",
 }
 PR_REVIEW_DISPATCH_INPUT = {
     "description": "Pull request number to review (required positive integer)",
@@ -143,7 +145,7 @@ TRUST_CLASSIFIER_SCRIPT_LINES = (
     "core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);",
     "return;",
     "}",
-    "if (!pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref) {",
+    "if (!pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha) {",
     "core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);",
     "return;",
     "}",
@@ -151,6 +153,8 @@ TRUST_CLASSIFIER_SCRIPT_LINES = (
     "const isDefaultBranch = pull.base.ref === defaultBranch;",
     "core.setOutput('is_fork', isFork ? 'true' : 'false');",
     "core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');",
+    "core.setOutput('base_sha', pull.base.sha);",
+    "core.setOutput('head_sha', pull.head.sha);",
     "if (isFork) {",
     "core.summary.addRaw('## Fork Pull Request Policy\\n\\nThis run is limited to read-only static checks.\\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\\n');",
     "await core.summary.write();",
@@ -285,6 +289,7 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/config-check.yml", "config-check", "contents", "read"),
         (".github/workflows/benchmarks.yml", "benchmark", "contents", "read"),
         (".github/workflows/pr-review.yml", "security-check", "contents", "read"),
+        (".github/workflows/pr-review.yml", "security-check", "pull-requests", "read"),
         (".github/workflows/pr-review.yml", "auto-check", "contents", "read"),
         (".github/workflows/pr-review.yml", "ai-review", "contents", "read"),
         (".github/workflows/pr-review.yml", "labeler", "pull-requests", "write"),

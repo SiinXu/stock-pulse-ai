@@ -41,11 +41,14 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
       safe_to_run: ${{ steps.check_sensitive.outputs.safe_to_run }}
       sensitive_files_changed: ${{ steps.check_sensitive.outputs.sensitive_files_changed }}
       is_fork: ${{ steps.trust.outputs.is_fork }}
       is_default_branch: ${{ steps.trust.outputs.is_default_branch }}
+      base_sha: ${{ steps.trust.outputs.base_sha }}
+      head_sha: ${{ steps.trust.outputs.head_sha }}
     
     steps:
       - name: 🔐 Classify Pull Request Trust
@@ -83,7 +86,7 @@ jobs:
               core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);
               return;
             }
-            if (!pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref) {
+            if (!pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha) {
               core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);
               return;
             }
@@ -91,6 +94,8 @@ jobs:
             const isDefaultBranch = pull.base.ref === defaultBranch;
             core.setOutput('is_fork', isFork ? 'true' : 'false');
             core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');
+            core.setOutput('base_sha', pull.base.sha);
+            core.setOutput('head_sha', pull.head.sha);
             if (isFork) {
               core.summary.addRaw('## Fork Pull Request Policy\n\nThis run is limited to read-only static checks.\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\n');
               await core.summary.write();
@@ -365,7 +370,7 @@ jobs:
         id: trusted-review-inputs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          ref: ${{ needs.security-check.outputs.base_sha }}
           sparse-checkout: |
             .github/scripts
             .github/requirements-review.txt
@@ -379,7 +384,7 @@ jobs:
         id: pull-request-analysis-inputs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.security-check.outputs.head_sha }}
           fetch-depth: 0
           path: pr-code
       
