@@ -128,6 +128,8 @@ describe('HomePage query key helpers', () => {
     expect(resolveFocusLanguage('fr')).toBe('en');
     expect(buildTodaysFocusQueryKey('zh')).toEqual([...TODAYS_FOCUS_QUERY_KEY_ROOT, 'zh']);
     expect(buildTodaysFocusQueryKey('en')).toEqual([...TODAYS_FOCUS_QUERY_KEY_ROOT, 'en']);
+    expect(buildTodaysFocusQueryKey('zh')).toBe(buildTodaysFocusQueryKey('zh'));
+    expect(buildTodaysFocusQueryKey('en')).toBe(buildTodaysFocusQueryKey('fr'));
   });
 });
 
@@ -166,6 +168,9 @@ describe('fetchHomeAttentionData', () => {
     expect(historyApi.getList).toHaveBeenCalledWith(
       expect.objectContaining({ reportType: 'market_review' }),
     );
+    expect(scheduledTasksApi.getToday).toHaveBeenCalledWith({
+      timezone: expect.any(String),
+    });
     expect(vi.mocked(historyApi.getList).mock.calls[0]).toHaveLength(1);
   });
 });
@@ -301,6 +306,26 @@ describe('useTodaysFocusQuery', () => {
     await waitFor(() => expect(result.current.data?.emptyMessage).toContain('今日无需特别关注'));
     expect(getTodaysFocus).toHaveBeenCalledWith({ language: 'zh' });
     expect(result.current.data?.emptyMessage).not.toContain('No symbols');
+  });
+
+  it('keeps the observed Today\'s Focus cache across same-language rerenders', async () => {
+    vi.mocked(getTodaysFocus).mockResolvedValue(emptyTodaysFocus('en'));
+    const { wrapper, client } = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ language }: { language: string }) => useTodaysFocusQuery(language),
+      { wrapper, initialProps: { language: 'en' } },
+    );
+
+    await waitFor(() => expect(result.current.data).not.toBeNull());
+    expect(getTodaysFocus).toHaveBeenCalledTimes(1);
+    const cached = client.getQueryData(buildTodaysFocusQueryKey('en'));
+    expect(cached).toEqual({ data: emptyTodaysFocus('en'), error: null });
+
+    rerender({ language: 'en' });
+    expect(result.current.data).not.toBeNull();
+    expect(result.current.isLoading).toBe(false);
+    expect(getTodaysFocus).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(buildTodaysFocusQueryKey('en'))).toBe(cached);
   });
 
   it('clears previous copy while a locale-keyed fetch is in flight', async () => {

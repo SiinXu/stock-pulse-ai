@@ -9,7 +9,6 @@ import { historyApi } from '../api/history';
 import { scheduledTasksApi } from '../api/scheduledTasks';
 import { systemConfigApi } from '../api/systemConfig';
 import { getTodaysFocus } from '../api/todaysFocus';
-import { getBrowserTimezone } from '../components/home/scheduledTaskPresentation';
 import type { HistoryItem, StockReportType } from '../types/analysis';
 import type { DecisionSignalItem } from '../types/decisionSignals';
 import type { ScheduledTaskTodayItem } from '../types/scheduledTasks';
@@ -21,6 +20,10 @@ export const HOME_ATTENTION_QUERY_KEY = ['home', 'attention'] as const;
 
 /** Query key family for Today's Focus. Language is part of identity. */
 export const TODAYS_FOCUS_QUERY_KEY_ROOT = ['home', 'todays-focus'] as const;
+
+/** Stable per-language keys so unmount cleanup does not tear down a live observer. */
+const TODAYS_FOCUS_QUERY_KEY_ZH = [...TODAYS_FOCUS_QUERY_KEY_ROOT, 'zh'] as const;
+const TODAYS_FOCUS_QUERY_KEY_EN = [...TODAYS_FOCUS_QUERY_KEY_ROOT, 'en'] as const;
 
 /** Stable query key for Home setup-status (mount + manual refresh). */
 export const HOME_SETUP_STATUS_QUERY_KEY = ['home', 'setup-status'] as const;
@@ -38,7 +41,9 @@ const HOME_PAGE_QUERY_SCHEDULE = {
 } as const;
 
 export function buildTodaysFocusQueryKey(language: string): readonly unknown[] {
-  return [...TODAYS_FOCUS_QUERY_KEY_ROOT, resolveFocusLanguage(language)] as const;
+  return resolveFocusLanguage(language) === 'zh'
+    ? TODAYS_FOCUS_QUERY_KEY_ZH
+    : TODAYS_FOCUS_QUERY_KEY_EN;
 }
 
 export function resolveFocusLanguage(language: string): 'zh' | 'en' {
@@ -124,6 +129,14 @@ const EMPTY_ATTENTION_QUERY_RESULT: HomeAttentionQueryResult = {
   failedSourceCount: 0,
   signalStale: EMPTY_SIGNAL_STALE,
 };
+
+function getBrowserTimezone(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
+}
 
 /**
  * Fetch the Home attention pack with allSettled isolation.
