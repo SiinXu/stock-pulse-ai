@@ -283,7 +283,7 @@ class SearchService:
         serpapi_keys: Optional[List[str]] = None,
         minimax_keys: Optional[List[str]] = None,
         searxng_base_urls: Optional[List[str]] = None,
-        searxng_public_instances_enabled: bool = True,
+        searxng_public_instances_enabled: bool = False,
         rss_news_feed_urls: Optional[List[str]] = None,
         rss_news_fetch_timeout_sec: float = 8.0,
         news_max_age_days: int = 3,
@@ -350,7 +350,7 @@ class SearchService:
             self._providers.append(MiniMaxSearchProvider(minimax_keys))
             logger.info(f"已配置 MiniMax 搜索，共 {len(minimax_keys)} 个 API Key")
 
-        # 6. SearXNG (prioritize self-hosted instances; automatically discover public instances if not configured)
+        # 6. SearXNG (self-hosted first; public searx.space discovery is opt-in)
         searxng_provider = SearXNGSearchProvider(
             searxng_base_urls,
             use_public_instances=bool(searxng_public_instances_enabled and not searxng_base_urls),

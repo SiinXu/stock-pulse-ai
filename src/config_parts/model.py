@@ -277,7 +277,7 @@ class Config:
     brave_api_keys: List[str] = field(default_factory=list)  # Brave Search API Keys
     serpapi_keys: List[str] = field(default_factory=list)  # SerpAPI Keys
     searxng_base_urls: List[str] = field(default_factory=list)  # SearXNG instance URLs (self-hosted, no quota)
-    searxng_public_instances_enabled: bool = True  # Auto-discover public SearXNG instances when base URLs are absent
+    searxng_public_instances_enabled: bool = False  # Opt in to public discovery when base URLs are absent
     # Optional RSS/Atom feeds for on-demand news search (supplement to SearXNG; empty = inert)
     rss_news_feed_urls: List[str] = field(default_factory=list)
     rss_news_fetch_timeout_sec: float = 8.0  # Per-feed pull timeout for search-pipeline RSS/Atom

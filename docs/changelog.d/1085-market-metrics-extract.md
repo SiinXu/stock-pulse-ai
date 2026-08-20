@@ -1,0 +1,1 @@
+- [Changed] Extracted Market Light score helpers from `src/market/analyzer.py` into `src/market/metrics.py` without changing scoring behavior or public analyzer signatures (Refs #1085).

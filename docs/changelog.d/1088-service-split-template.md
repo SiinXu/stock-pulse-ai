@@ -1,0 +1,1 @@
+- [Docs] Add a repo-local service-split template for facade-preserving gravity-module splits, with a historical audit of merged PR #1352 and explicit deviations (Refs #1088).

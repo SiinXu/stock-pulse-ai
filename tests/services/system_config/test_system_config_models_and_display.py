@@ -1221,6 +1221,33 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(items["LLM_USAGE_HMAC_KEY_VERSION"]["value"], "test-v1")
         self.assertFalse(items["LLM_USAGE_HMAC_KEY_VERSION"]["is_masked"])
 
+    def test_get_config_defaults_public_searxng_instances_off(self) -> None:
+        os.environ.pop("SEARXNG_PUBLIC_INSTANCES_ENABLED", None)
+        payload = self.service.get_config(include_schema=True)
+        items = {item["key"]: item for item in payload["items"]}
+        public_instances = items["SEARXNG_PUBLIC_INSTANCES_ENABLED"]
+
+        self.assertEqual(public_instances["value"], "false")
+        self.assertFalse(public_instances["raw_value_exists"])
+        self.assertEqual(public_instances["schema"]["default_value"], "false")
+        self.assertIn("Default: false", public_instances["schema"]["description"])
+
+    def test_get_config_preserves_explicit_public_searxng_instances_true(self) -> None:
+        self._rewrite_env(
+            "STOCK_LIST=600519,000001",
+            "GEMINI_API_KEY=secret-key-value",
+            "SCHEDULE_TIME=18:00",
+            "LOG_LEVEL=INFO",
+            "SEARXNG_PUBLIC_INSTANCES_ENABLED=true",
+        )
+        payload = self.service.get_config(include_schema=True)
+        items = {item["key"]: item for item in payload["items"]}
+        public_instances = items["SEARXNG_PUBLIC_INSTANCES_ENABLED"]
+
+        self.assertEqual(public_instances["value"], "true")
+        self.assertTrue(public_instances["raw_value_exists"])
+        self.assertEqual(public_instances["schema"]["default_value"], "false")
+
     def test_get_config_uses_switch_default_for_missing_report_model_toggle(self) -> None:
         payload = self.service.get_config(include_schema=True)
         items = {item["key"]: item for item in payload["items"]}

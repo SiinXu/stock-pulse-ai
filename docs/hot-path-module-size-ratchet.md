@@ -4,6 +4,7 @@
 - Last verified: 2026-08-13
 - Related: [architecture overview](architecture-overview.md),
   [layer-direction ratchet](layer-direction-ratchet.md),
+  [service-split template](service-split-template.md),
   `scripts/check_hot_path_module_size.py`,
   `scripts/hot_path_module_size_baseline.json`,
   issue [#1087](https://github.com/SiinXu/stock-pulse-ai/issues/1087)
@@ -53,13 +54,14 @@ introduction (remeasured against current `main`) the inventory includes
 gravity modules such as:
 
 - `src/data_provider/base.py`
-- `src/services/run_diagnostics.py`
 - `src/services/scheduled_task_service.py`
 - `src/market/analyzer.py`
 
 plus other hot-path modules between 1500 and 2000 lines. Splits that already
-landed on `main` (`akshare_fetcher`, `task_queue`, `portfolio_service`) are
-under the soft budget and are not allowlisted.
+landed on `main` (`akshare_fetcher`, `task_queue`, `portfolio_service`,
+`run_diagnostics`) are under the soft budget and are not allowlisted.
+`src/services/run_diagnostics.py` is now a compatibility facade over
+`src/services/diagnostics/`; do not re-grow it past the soft budget.
 
 ### Cleanup plan
 

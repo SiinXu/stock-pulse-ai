@@ -122,6 +122,14 @@ GET /api/v1/capabilities?domain=data&domain=tool
 
 - 变更必须经过特权操作审计链（`event_type=capability.write`）。审计不可用时返回
   `503` / `security_audit_unavailable`，**不会**落盘写入。
+- 当 `ADMIN_AUTH_ENABLED=true` 时，未认证的登记 / 更新 / 下线请求在
+  `AuthMiddleware` 边界以 `401 unauthorized` 拒绝。中间件会写入
+  `capability.write` completion，`outcome=denied`，actor 为
+  `unauthenticated`，`target_type=capability`，`target_id` 来自请求体
+  （登记）或路径（更新/下线），缺失时回退为 `unknown-capability`。
+  **不会**把 `/api/v1/capabilities` 加入认证豁免。若这次拒绝无法落审计，则
+  返回 `503 security_audit_unavailable` 且不改注册表。GET 清单/注册表读取
+  以及其他 API 的 401 **不会**产生 `capability.write`。
 - 校验失败、身份冲突、存储损坏返回明确错误码；注册失败绝不能伪造成功快照。
 - 默认存储路径为
   `<DATABASE_PATH 目录>/capability_write_registry.json`

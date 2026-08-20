@@ -187,6 +187,16 @@ Hard rules:
 - Mutations require the privileged-operation security audit chain
   (`event_type=capability.write`). Audit unavailability returns `503` with
   `security_audit_unavailable` and **does not** apply the write.
+- When `ADMIN_AUTH_ENABLED=true`, unauthenticated register / update / retire
+  requests are denied at `AuthMiddleware` with `401 unauthorized`. The
+  middleware records a `capability.write` completion with `outcome=denied`,
+  actor `unauthenticated`, `target_type=capability`, and `target_id` from the
+  JSON body (register) or path (update/retire), falling back to
+  `unknown-capability`. `/api/v1/capabilities` routes are **not** exempted
+  from authentication. If that denial cannot be audited, the response is
+  `503 security_audit_unavailable` and the registry is not mutated. GET
+  inventory/registry reads and unrelated API 401s do not emit
+  `capability.write`.
 - Validation, identity conflicts, and store corruption return explicit error
   codes. The API never returns a fabricated success snapshot for a failed
   registration.

@@ -9,8 +9,8 @@ re-assert cases already locked elsewhere. Inventory (main baseline):
 | Primary fails → secondary used | ``tests/data_provider/test_provider_fallback_contract.py`` | multi-hop order (3 providers) |
 | All fail → typed ``DataFetchError`` | ``test_provider_fallback_contract.py`` | multi-provider + ``provider_failure_count`` |
 | All fail → stale cache (enabled) | ``test_daily_provider_cache.py`` (single provider) | multi-provider chain then stale |
-| Open circuit → skip unhealthy | ``test_provider_resilience.py`` | open/close with ordered failover |
-| Partial / missing fields | fixtures + validation suite | manager-level missing-column reject |
+| Open circuit → skip unhealthy | ``test_provider_resilience.py`` | open/close with ordered failover; all-open typed fail |
+| Partial / missing fields | fixtures + validation suite | manager-level reject + all-missing typed fail |
 | Cache hit + expiry | ``test_daily_provider_cache.py`` | multi-provider: hit skips chain; expiry re-enters |
 | Single source failure does not abort analysis | single-request failover | multi-symbol isolation |
 
@@ -272,6 +272,47 @@ def test_all_providers_fail_without_stale_raises_typed_data_fetch_error() -> Non
     assert backup.calls == 1
 
 
+def test_all_providers_missing_required_columns_raise_typed_failure() -> None:
+    """Every provider returning a non-empty incomplete frame is a typed failure.
+
+    A missing ``close`` column must not become a successful empty (or partial)
+    daily payload when no later source can complete the schema.
+    """
+    primary = _SequencedProvider("EfinanceFetcher", 0, [_partial_missing_close()])
+    backup = _SequencedProvider("TencentFetcher", 1, [_partial_missing_close()])
+    manager = DataFetcherManager(fetchers=[primary, backup])
+
+    with patch.object(DataFetcherManager, "_daily_source_health", _fresh_breaker()):
+        token = activate_run_diagnostic_context(
+            trace_id="trace-1069-all-missing-columns",
+            stock_code="600519",
+        )
+        try:
+            with pytest.raises(DataFetchError) as exc_info:
+                result = manager.get_daily_data("600519")
+                pytest.fail(f"expected DataFetchError, got success: {result!r}")
+            diagnostics = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+    err = exc_info.value
+    message = str(err)
+    assert "600519" in message
+    assert "EfinanceFetcher" in message
+    assert "TencentFetcher" in message
+    assert "close" in message
+    assert err.provider_failure_count >= 2
+    assert primary.calls == 1
+    assert backup.calls == 1
+    failed = [run for run in diagnostics["provider_runs"] if not run["success"]]
+    assert {run["provider"] for run in failed} >= {"EfinanceFetcher", "TencentFetcher"}
+    assert all(run["error_type"] == "DataFetchError" for run in failed)
+    assert all(
+        "close" in (run.get("error_message_sanitized") or run.get("error_message") or "")
+        for run in failed
+    )
+
+
 # ---------------------------------------------------------------------------
 # Circuit open / close (manager seam; real CircuitBreaker)
 # ---------------------------------------------------------------------------
@@ -325,6 +366,125 @@ def test_open_circuit_skips_provider_and_recovers_after_cooldown() -> None:
         assert float(frame.iloc[0]["close"]) == pytest.approx(15.0)
         assert primary.calls == 3
         assert breaker.get_status()[health_key] == CircuitBreaker.CLOSED
+
+
+def test_all_open_circuits_raise_typed_failure_and_skip_providers() -> None:
+    """When every eligible circuit is open the request fails closed.
+
+    Provider bodies must not run during cooldown. The manager raises
+    ``DataFetchError`` with per-provider ``CircuitOpen`` detail rather than
+    returning an empty successful frame.
+    """
+    clock = _Clock(now=8_000.0)
+    breaker = _fresh_breaker(failure_threshold=1, cooldown_seconds=30.0, clock=clock)
+    primary = _SequencedProvider(
+        "EfinanceFetcher",
+        0,
+        [TimeoutError("primary down"), _ok_frame(15.0)],
+    )
+    backup = _SequencedProvider(
+        "TencentFetcher",
+        1,
+        [TimeoutError("backup down"), _ok_frame(16.0)],
+    )
+    manager = DataFetcherManager(fetchers=[primary, backup])
+
+    with patch.object(DataFetcherManager, "_daily_source_health", breaker):
+        with pytest.raises(DataFetchError):
+            manager.get_daily_data("600519")
+        assert primary.calls == 1
+        assert backup.calls == 1
+        assert breaker.get_status()[DataFetcherManager._daily_health_key(primary, "cn")] == (
+            CircuitBreaker.OPEN
+        )
+        assert breaker.get_status()[DataFetcherManager._daily_health_key(backup, "cn")] == (
+            CircuitBreaker.OPEN
+        )
+
+        token = activate_run_diagnostic_context(
+            trace_id="trace-1069-all-circuits-open",
+            stock_code="600519",
+        )
+        try:
+            with pytest.raises(DataFetchError) as exc_info:
+                result = manager.get_daily_data("600519")
+                pytest.fail(f"expected DataFetchError, got success: {result!r}")
+            diagnostics = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+    err = exc_info.value
+    message = str(err)
+    assert "600519" in message
+    assert "EfinanceFetcher" in message
+    assert "TencentFetcher" in message
+    assert "CircuitOpen" in message
+    assert err.provider_failure_count >= 2
+    assert primary.calls == 1
+    assert backup.calls == 1
+    skipped = [run for run in diagnostics["provider_runs"] if not run["success"]]
+    assert [run["provider"] for run in skipped] == ["EfinanceFetcher", "TencentFetcher"]
+    assert all(run["error_type"] == "CircuitOpen" for run in skipped)
+
+
+def test_all_open_circuits_use_stale_cache_when_enabled(tmp_path: Path) -> None:
+    """Open circuits still degrade to eligible stale cache instead of aborting."""
+    clock = _Clock()
+    breaker = _fresh_breaker(failure_threshold=1, cooldown_seconds=60.0, clock=clock)
+    primary = _SequencedProvider(
+        "EfinanceFetcher",
+        0,
+        [_ok_frame(10.2), TimeoutError("primary down")],
+    )
+    backup = _SequencedProvider(
+        "TencentFetcher",
+        1,
+        [TimeoutError("backup down")],
+    )
+    manager = DataFetcherManager(fetchers=[primary, backup])
+    manager._daily_data_cache = _cache(
+        tmp_path,
+        clock,
+        memory_ttl=5.0,
+        persistent_ttl=10.0,
+        stale_if_error=60.0,
+    )
+
+    with patch.object(DataFetcherManager, "_daily_source_health", breaker):
+        seed, seed_source = manager.get_daily_data("600519")
+        assert seed_source == "EfinanceFetcher"
+        clock.advance(11.0)
+        stale, source = manager.get_daily_data("600519")
+        assert source == "EfinanceFetcher"
+        assert float(stale.iloc[0]["close"]) == pytest.approx(10.2)
+        assert stale.attrs["provider_cache"]["is_stale"] is True
+        assert primary.calls == 2
+        assert backup.calls == 1
+        assert breaker.get_status()[DataFetcherManager._daily_health_key(primary, "cn")] == (
+            CircuitBreaker.OPEN
+        )
+        assert breaker.get_status()[DataFetcherManager._daily_health_key(backup, "cn")] == (
+            CircuitBreaker.OPEN
+        )
+
+        token = activate_run_diagnostic_context(
+            trace_id="trace-1069-all-open-stale",
+            stock_code="600519",
+        )
+        try:
+            skipped_stale, skipped_source = manager.get_daily_data("600519")
+            diagnostics = current_diagnostic_snapshot()
+        finally:
+            reset_run_diagnostic_context(token)
+
+    assert skipped_source == "EfinanceFetcher"
+    assert float(skipped_stale.iloc[0]["close"]) == pytest.approx(10.2)
+    assert skipped_stale.attrs["provider_cache"]["is_stale"] is True
+    # Open circuits must not re-enter provider bodies on the stale retry.
+    assert primary.calls == 2
+    assert backup.calls == 1
+    skipped = [run for run in diagnostics["provider_runs"] if run.get("error_type") == "CircuitOpen"]
+    assert {run["provider"] for run in skipped} >= {"EfinanceFetcher", "TencentFetcher"}
 
 
 # ---------------------------------------------------------------------------

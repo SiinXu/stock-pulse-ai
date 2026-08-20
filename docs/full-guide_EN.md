@@ -172,8 +172,8 @@ Cause codes (shared vocabulary with Config Check #847): `missing_llm`, `missing_
 | `BOCHA_API_KEYS` | [Bocha Search](https://open.bocha.cn/) Web Search API (Chinese search optimized, supports AI summaries, multiple keys comma-separated) | Optional |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/) API (privacy-first, US-stock news enrichment, comma-separated for multiple keys) | Optional |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search (structured search results) | Optional |
-| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
-| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty, `searx.space` discovery is used only if public instances are explicitly enabled | Optional |
+| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `false`). Public instances are commonly rate-limited or do not return JSON, so enabling this can add 30-60s per run and still yield no news | Optional |
 | `RSS_NEWS_FEED_URLS` | Optional RSS/Atom feed URLs (comma-separated) as a free on-demand news search supplement; empty keeps the feature inert. See Search Service Configuration and [Outbound HTTP Security Policy](security-outbound-policy.md) | Optional |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | Per-feed timeout seconds for on-demand RSS/Atom search (default 8) | Optional |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) token | Optional |
@@ -342,8 +342,8 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `MINIMAX_API_KEYS` | MiniMax Coding Plan Web Search (structured results) | Optional |
 | `SOCIAL_SENTIMENT_API_KEY` | Stock Sentiment API Key (Reddit / X / Polymarket, US stocks optional) | Optional |
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API endpoint (default `https://api.adanos.org`) | Optional |
-| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
-| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
+| `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty, `searx.space` discovery is used only if public instances are explicitly enabled | Optional |
+| `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `false`). Public instances are commonly rate-limited or do not return JSON, so enabling this can add 30-60s per run and still yield no news | Optional |
 | `RSS_NEWS_FEED_URLS` | Optional comma-separated RSS/Atom feed URLs used as a free **supplement** in the on-demand news search pipeline (not a replacement for SearXNG or paid search, and distinct from the local intelligence pool `NEWS_INTEL_*`). Empty keeps the feature inert. Feed fetching uses the fail-closed outbound policy; public feeds need no allowlist entry, while private/loopback hosts require an exact `OUTBOUND_HTTP_ALLOWLIST` entry. See [Outbound HTTP Security Policy](security-outbound-policy.md) | Optional |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | Per-feed timeout in seconds for on-demand RSS/Atom news search (1–30; default `8`). Independent of `NEWS_INTEL_FETCH_TIMEOUT_SEC` | Optional |
 

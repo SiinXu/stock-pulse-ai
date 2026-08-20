@@ -1,0 +1,1 @@
+- [Fixed] Count a configured DingTalk webhook as a notification channel so webhook-only operators are not warned that no channel is configured; DingTalk Stream app credentials remain interactive-only and are not treated as a static scheduled push channel (Refs #1221).
