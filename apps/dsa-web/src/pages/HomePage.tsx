@@ -16,7 +16,7 @@ import {
   useHomeAttentionQuery,
   useHomeSetupStatusQuery,
   useTodaysFocusQuery,
-} from '../hooks';
+} from '../hooks/useHomePageQueries';
 import {
   Badge,
   Button,

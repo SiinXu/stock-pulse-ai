@@ -183,9 +183,9 @@
     {
       "id": "HomePage",
       "match": "assets/HomePage-*.js",
-      "maxGzipBytes": 25017,
-      "measuredGzipBytes": 24617,
-      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
+      "maxGzipBytes": 27296,
+      "measuredGzipBytes": 26896,
+      "note": "Rebaselined for #789 Batch B Home Query scheduling (useHomePageQueries on the Home lazy chunk). Local zlib-9 26896 B after a deep hook import; cap = measured + 400 B headroom (Refs #789)."
     },
     {
       "id": "BacktestPage",
@@ -410,9 +410,9 @@
       "match": [
         "assets/HomePage-*.js"
       ],
-      "maxGzipBytes": 25017,
-      "measuredGzipBytes": 24617,
-      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
+      "maxGzipBytes": 27296,
+      "measuredGzipBytes": 26896,
+      "note": "Same-pattern family for HomePage after #789 Batch B Query scheduling. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total (Refs #789)."
     },
     {
       "id": "StockScreeningPage-family",
