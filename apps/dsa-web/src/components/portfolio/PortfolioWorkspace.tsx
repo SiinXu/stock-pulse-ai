@@ -19,7 +19,7 @@ import ActionableApiErrorInline from '../analysis/ActionableApiErrorInline';
 import { RiskHeatmap } from '../charts';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DatePicker, EmptyState, InlineAlert, Input, Loading, Modal, PageHeader, Select, Surface } from '../common';
 import { SignedChangeText } from '../theme/SignedChangeText';
-import { PortfolioSignalSummary } from '../decision-signals/DecisionSignalDisplay';
+import { PortfolioSignalSummary } from '../decision-signals/PortfolioSignalSummary';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { getUiClauseSeparator } from '../../utils/uiLocale';
 import { formatUiText } from '../../i18n/uiText';
