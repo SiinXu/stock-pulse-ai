@@ -186,12 +186,15 @@ contains every read-only job permission. Docker publish
 jobs do not request `id-token: write` because they authenticate with registry
 credentials and do not perform OIDC attestation.
 
-The PR Review workflow remains a `pull_request` workflow. Fork runs stay
+The PR Review workflow is opt-in via `workflow_dispatch` with a required
+`pr_number`. The `security-check` job is checkout-free and reads pull-request
+metadata plus the changed-file inventory through the GitHub API only; it does
+not checkout, fetch, or `git diff` PR-head or fork code. Fork runs stay
 read-only and secret-free. Same-repository runs targeting the default branch
 may use the two reviewed LLM secrets only inside `ai-review`. Write-capable jobs
 require a same-repository head, a branch ref, and an exact, case-sensitive
-default-branch match. Pinning, permission declarations, base-ref handling, the
-AI gate, and the secret allowlist must not weaken that isolation.
+default-branch match. Pinning, permission declarations, API-only security-check,
+the AI gate, and the secret allowlist must not weaken that isolation.
 
 ## Time-Bounded Exceptions
 

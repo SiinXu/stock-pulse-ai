@@ -1,0 +1,1 @@
+- [Changed] Opt-in PR Review now requires a positive integer `pr_number` and inventories changed files through the GitHub API without checking out the PR head (Refs #1422).

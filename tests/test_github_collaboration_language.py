@@ -74,7 +74,7 @@ def test_github_collaboration_assets_use_english() -> None:
 def test_pr_review_fetches_every_changed_file() -> None:
     workflow = (GITHUB_DIR / "workflows" / "pr-review.yml").read_text(encoding="utf-8")
 
-    assert workflow.count("github.paginate(github.rest.pulls.listFiles") == 2
+    assert workflow.count("github.paginate(github.rest.pulls.listFiles") == 3
     assert "const escapeDynamicText = value => value.replace(unsafeDynamicPattern" in workflow
     assert "const displayFilename = escapeDynamicText(file.filename);" in workflow
     assert "\\`${file.filename}\\`" not in workflow
@@ -95,13 +95,15 @@ def test_pr_review_fetches_every_changed_file() -> None:
 def test_pr_review_escapes_dynamic_step_summary_paths() -> None:
     workflow = (GITHUB_DIR / "workflows" / "pr-review.yml").read_text(encoding="utf-8")
 
-    assert workflow.count("escape_dynamic_text() {") == 5
+    assert workflow.count("escape_dynamic_text() {") == 4
     assert "([^\\x00-\\x7F]|&)" in workflow
     assert "const unsafeDynamicPattern = /[^\\x00-\\x7F]|&/gu;" in workflow
-    assert 'echo "$SENSITIVE_FILES" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY' in workflow
+    assert "const escapeDynamicText = value => value.replace(unsafeDynamicPattern" in workflow
+    assert "sensitiveFiles.map(escapeDynamicText)" in workflow
     assert 'echo -e "$ERRORS" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY' in workflow
     assert 'echo "$RESULT" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY' in workflow
     assert 'echo "$STATS" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY' in workflow
+    assert 'echo "$SENSITIVE_FILES" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY' not in workflow
     assert 'echo "$SENSITIVE_FILES" >> $GITHUB_STEP_SUMMARY' not in workflow
     assert 'echo -e "$ERRORS" >> $GITHUB_STEP_SUMMARY' not in workflow
     assert 'echo "$RESULT" >> $GITHUB_STEP_SUMMARY' not in workflow
