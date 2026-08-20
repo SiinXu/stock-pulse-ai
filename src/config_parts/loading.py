@@ -545,7 +545,7 @@ class _ConfigLoadingMethods:
             )
         searxng_public_instances_enabled = parse_env_bool(
             os.getenv('SEARXNG_PUBLIC_INSTANCES_ENABLED'),
-            default=True,
+            default=False,
         )
 
         # Optional RSS/Atom feeds for on-demand news search (supplement; empty = inert)

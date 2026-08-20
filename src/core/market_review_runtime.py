@@ -104,7 +104,7 @@ def build_market_review_runtime(
             searxng_public_instances_enabled=getattr(
                 config,
                 "searxng_public_instances_enabled",
-                True,
+                False,
             ),
             rss_news_feed_urls=getattr(config, "rss_news_feed_urls", None),
             rss_news_fetch_timeout_sec=getattr(config, "rss_news_fetch_timeout_sec", 8.0),
