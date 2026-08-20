@@ -144,15 +144,20 @@ def parse_env_float(
     return parsed
 
 
+CATEGORY_TOOL_TIMEOUT_MAX_S = 3600.0
+
+
 def parse_optional_category_tool_timeout(
     value: Optional[str],
     *,
     field_name: str,
+    maximum: float = CATEGORY_TOOL_TIMEOUT_MAX_S,
 ) -> float:
     """Parse an optional per-category tool timeout.
 
-    ``0`` or unset means no category cap. Invalid, non-finite, or negative
-    values warn and degrade to ``0`` without failing startup.
+    ``0`` or unset means no category cap. Values above *maximum* warn and
+    clamp to that maximum. Invalid, non-finite, or negative values warn and
+    degrade to ``0`` without failing startup.
     """
     raw_value = value
     if raw_value is None or not str(raw_value).strip():
@@ -173,6 +178,15 @@ def parse_optional_category_tool_timeout(
             raw_value,
         )
         return 0.0
+    if parsed > maximum:
+        logger.warning(
+            "%s=%r is above maximum %s; clamping to %s",
+            field_name,
+            raw_value,
+            maximum,
+            maximum,
+        )
+        parsed = maximum
     return parsed
 
 

@@ -66,8 +66,7 @@ class _SystemConfigCoreMethods:
         """Return grouped schema metadata for UI rendering."""
         return build_schema_response()
 
-    @staticmethod
-    def _reload_runtime_singletons() -> None:
+    def _reload_runtime_singletons(self) -> None:
         """Reset runtime singleton services after config reload."""
         from src.agent.runtime_assembly import apply_tool_category_timeouts
         from src.agent.tools.data_tools import reset_fetcher_manager
@@ -75,7 +74,7 @@ class _SystemConfigCoreMethods:
 
         reset_fetcher_manager()
         reset_search_service()
-        apply_tool_category_timeouts()
+        apply_tool_category_timeouts(config=self._runtime_config_provider())
 
     @classmethod
     def _build_display_config_map(cls, raw_config_map: Dict[str, str]) -> Dict[str, str]:

@@ -256,9 +256,9 @@ def peek_process_tool_registry():
 def _load_category_timeout_config():
     """Return the live Config used to refresh category tool timeouts."""
     try:
-        from src.config import get_config
+        from src.application_services import get_application_services
 
-        return get_config()
+        return get_application_services().config
     except Exception as exc:  # broad-exception: fallback_recorded - registry construction stays available without live config
         log_safe_exception(
             logger,

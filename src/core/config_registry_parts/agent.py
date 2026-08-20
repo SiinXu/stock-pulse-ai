@@ -3367,6 +3367,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "Optional timeout in seconds for tools in the data category, including "
             "market-style network data tools. Default 0 means no category cap and "
             "defers to AGENT_TOOL_TIMEOUT_S / remaining orchestrator budget. "
+            "Accepted range is 0-3600; values above 3600 warn and clamp to 3600. "
             "Invalid, non-finite, or negative values warn and degrade to no category cap."
         ),
         "category": "agent",
@@ -3395,7 +3396,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Optional timeout in seconds for tools in the search category. "
             "Default 0 means no category cap and defers to AGENT_TOOL_TIMEOUT_S / "
-            "remaining orchestrator budget. Invalid, non-finite, or negative values "
+            "remaining orchestrator budget. Accepted range is 0-3600; values above "
+            "3600 warn and clamp to 3600. Invalid, non-finite, or negative values "
             "warn and degrade to no category cap."
         ),
         "category": "agent",
@@ -3424,7 +3426,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Optional timeout in seconds for tools in the analysis category. "
             "Default 0 means no category cap and defers to AGENT_TOOL_TIMEOUT_S / "
-            "remaining orchestrator budget. Invalid, non-finite, or negative values "
+            "remaining orchestrator budget. Accepted range is 0-3600; values above "
+            "3600 warn and clamp to 3600. Invalid, non-finite, or negative values "
             "warn and degrade to no category cap."
         ),
         "category": "agent",
@@ -3453,7 +3456,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Optional timeout in seconds for tools in the action category. "
             "Default 0 means no category cap and defers to AGENT_TOOL_TIMEOUT_S / "
-            "remaining orchestrator budget. Invalid, non-finite, or negative values "
+            "remaining orchestrator budget. Accepted range is 0-3600; values above "
+            "3600 warn and clamp to 3600. Invalid, non-finite, or negative values "
             "warn and degrade to no category cap."
         ),
         "category": "agent",

@@ -15,6 +15,7 @@ from enum import Enum
 from types import MappingProxyType
 from typing import Any, Mapping, Optional
 
+from src.config_parts.parsers import CATEGORY_TOOL_TIMEOUT_MAX_S
 from src.utils.sanitize import sanitize_diagnostic_text
 
 
@@ -92,6 +93,7 @@ def resolve_category_tool_timeouts(config: Any = None) -> Mapping[str, float]:
             attr_name=attr_name,
             env_name=env_name,
             default=0.0,
+            maximum=CATEGORY_TOOL_TIMEOUT_MAX_S,
         )
         for category, (attr_name, env_name) in CATEGORY_TOOL_TIMEOUT_SOURCES.items()
     }
@@ -159,6 +161,7 @@ def _read_non_negative_float(
     attr_name: str,
     env_name: str,
     default: float,
+    maximum: Optional[float] = None,
 ) -> float:
     """Read a finite non-negative float or return the documented default."""
     raw_value = _read_source(config, attr_name, env_name)
@@ -172,6 +175,9 @@ def _read_non_negative_float(
     if not math.isfinite(value) or value < 0:
         _log_config_fallback(env_name, default, "out_of_range")
         return default
+    if maximum is not None and value > maximum:
+        _log_config_fallback(env_name, maximum, "above_maximum")
+        return maximum
     return value
 
 

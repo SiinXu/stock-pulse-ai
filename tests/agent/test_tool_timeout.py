@@ -33,7 +33,10 @@ from src.agent.tools.registry import (
     ToolRegistry,
     normalize_tool_timeout_category,
 )
-from src.config_parts.parsers import parse_optional_category_tool_timeout
+from src.config_parts.parsers import (
+    CATEGORY_TOOL_TIMEOUT_MAX_S,
+    parse_optional_category_tool_timeout,
+)
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
@@ -125,6 +128,21 @@ def test_optional_category_timeout_invalid_degrades_to_zero(raw, caplog):
     assert any("AGENT_DATA_TOOL_TIMEOUT_S" in record.getMessage() for record in caplog.records)
 
 
+@pytest.mark.parametrize("raw", ["3600", "3600.0"])
+def test_optional_category_timeout_accepts_documented_maximum(raw):
+    assert parse_optional_category_tool_timeout(raw, field_name="AGENT_DATA_TOOL_TIMEOUT_S") == CATEGORY_TOOL_TIMEOUT_MAX_S
+
+
+@pytest.mark.parametrize("raw", ["3600.1", "5000", "1e4"])
+def test_optional_category_timeout_clamps_above_maximum(raw, caplog):
+    with caplog.at_level(logging.WARNING):
+        assert (
+            parse_optional_category_tool_timeout(raw, field_name="AGENT_DATA_TOOL_TIMEOUT_S")
+            == CATEGORY_TOOL_TIMEOUT_MAX_S
+        )
+    assert any("AGENT_DATA_TOOL_TIMEOUT_S" in record.getMessage() for record in caplog.records)
+
+
 def test_config_load_degrades_invalid_category_timeouts(monkeypatch, caplog):
     from src.config import Config
 
@@ -163,6 +181,24 @@ def test_config_load_preserves_positive_and_zero_category_timeouts(monkeypatch):
     assert config.agent_action_tool_timeout_s == 3.0
 
 
+def test_config_load_clamps_category_timeouts_above_maximum(monkeypatch, caplog):
+    from src.config import Config
+
+    monkeypatch.setenv("AGENT_DATA_TOOL_TIMEOUT_S", "5000")
+    monkeypatch.setenv("AGENT_SEARCH_TOOL_TIMEOUT_S", "3600.1")
+    monkeypatch.setenv("AGENT_ANALYSIS_TOOL_TIMEOUT_S", "3600")
+    monkeypatch.setenv("AGENT_ACTION_TOOL_TIMEOUT_S", "4")
+    with caplog.at_level(logging.WARNING):
+        config = Config._load_from_env()
+    assert config.agent_data_tool_timeout_s == CATEGORY_TOOL_TIMEOUT_MAX_S
+    assert config.agent_search_tool_timeout_s == CATEGORY_TOOL_TIMEOUT_MAX_S
+    assert config.agent_analysis_tool_timeout_s == CATEGORY_TOOL_TIMEOUT_MAX_S
+    assert config.agent_action_tool_timeout_s == 4.0
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("AGENT_DATA_TOOL_TIMEOUT_S" in message for message in messages)
+    assert any("AGENT_SEARCH_TOOL_TIMEOUT_S" in message for message in messages)
+
+
 def test_resolve_category_tool_timeouts_from_config_and_env(monkeypatch):
     monkeypatch.setenv("AGENT_DATA_TOOL_TIMEOUT_S", "9")
     monkeypatch.setenv("AGENT_SEARCH_TOOL_TIMEOUT_S", "bad")
@@ -180,6 +216,25 @@ def test_resolve_category_tool_timeouts_from_config_and_env(monkeypatch):
     assert from_config["data"] == 1.5
     assert from_config["analysis"] == 4.0
     assert from_config["search"] == 0.0
+
+
+def test_resolve_category_tool_timeouts_clamps_env_and_config_above_maximum(monkeypatch):
+    monkeypatch.setenv("AGENT_DATA_TOOL_TIMEOUT_S", "5000")
+    monkeypatch.setenv("AGENT_SEARCH_TOOL_TIMEOUT_S", "3601")
+    resolved = resolve_category_tool_timeouts()
+    assert resolved["data"] == CATEGORY_TOOL_TIMEOUT_MAX_S
+    assert resolved["search"] == CATEGORY_TOOL_TIMEOUT_MAX_S
+    from_config = resolve_category_tool_timeouts(
+        SimpleNamespace(
+            agent_data_tool_timeout_s=5000,
+            agent_search_tool_timeout_s=0,
+            agent_analysis_tool_timeout_s=3600,
+            agent_action_tool_timeout_s=4,
+        )
+    )
+    assert from_config["data"] == CATEGORY_TOOL_TIMEOUT_MAX_S
+    assert from_config["analysis"] == CATEGORY_TOOL_TIMEOUT_MAX_S
+    assert from_config["action"] == 4.0
 
 
 def test_registry_category_map_and_market_alias():
@@ -208,7 +263,11 @@ def test_get_tool_registry_loads_category_map_and_refreshes_cache(monkeypatch):
             agent_action_tool_timeout_s=state["action"],
         )
 
-    monkeypatch.setattr("src.config.get_config", _fake_config)
+    monkeypatch.setattr(
+        runtime_assembly,
+        "_load_category_timeout_config",
+        _fake_config,
+    )
     runtime_assembly._TOOL_REGISTRY = None
     runtime_assembly._TOOL_REGISTRY_BUILDING = None
     try:
@@ -226,6 +285,40 @@ def test_get_tool_registry_loads_category_map_and_refreshes_cache(monkeypatch):
     finally:
         runtime_assembly._TOOL_REGISTRY = original
         runtime_assembly._TOOL_REGISTRY_BUILDING = original_building
+
+
+def test_load_category_timeout_config_uses_application_services(monkeypatch):
+    from src.agent import runtime_assembly
+
+    fake = SimpleNamespace(agent_data_tool_timeout_s=9)
+    monkeypatch.setattr(
+        "src.application_services.get_application_services",
+        lambda: SimpleNamespace(config=fake),
+    )
+    assert runtime_assembly._load_category_timeout_config() is fake
+
+
+def test_reload_runtime_singletons_injects_live_config(monkeypatch):
+    from src.services.system_config_service_parts.core import _SystemConfigCoreMethods
+
+    captured = {}
+    fake_config = SimpleNamespace(agent_data_tool_timeout_s=12)
+    fake_data_tools = SimpleNamespace(reset_fetcher_manager=lambda: None)
+    fake_search = SimpleNamespace(reset_search_service=lambda: None)
+
+    class _Service:
+        def __init__(self):
+            self._runtime_config_provider = lambda: fake_config
+
+    monkeypatch.setitem(sys.modules, "src.agent.tools.data_tools", fake_data_tools)
+    monkeypatch.setitem(sys.modules, "src.search_service", fake_search)
+    monkeypatch.setattr(
+        "src.agent.runtime_assembly.apply_tool_category_timeouts",
+        lambda registry=None, config=None: captured.update(config=config),
+    )
+    _SystemConfigCoreMethods._reload_runtime_singletons(_Service())
+
+    assert captured["config"] is fake_config
 
 
 @pytest.mark.parametrize("category,env_name,_attr", CATEGORY_KEYS)

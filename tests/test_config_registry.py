@@ -373,6 +373,7 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
             self.assertEqual(field["unit"], "s", key)
             self.assertNotEqual(field["display_order"], 9000, key)
             self.assertEqual(field["help_key"], "settings.agent.runtime_guards", key)
+            self.assertEqual(field["validation"], {"min": 0, "max": 3600}, key)
 
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
