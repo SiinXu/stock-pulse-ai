@@ -57,6 +57,18 @@ def test_docker_entrypoint_repairs_ownership_and_user_permissions() -> None:
     assert re.search(r"gosu\s+\"\$APP_USER:\$APP_GROUP\"\s+test\s+-w", entrypoint)
 
 
+def _compose_environment_map(environment) -> dict[str, str]:
+    if not environment:
+        return {}
+    if isinstance(environment, dict):
+        return {str(key): "" if value is None else str(value) for key, value in environment.items()}
+    mapped: dict[str, str] = {}
+    for item in environment:
+        key, separator, value = str(item).partition("=")
+        mapped[key] = value if separator else ""
+    return mapped
+
+
 def test_docker_compose_injects_env_without_single_file_env_mount() -> None:
     compose_text = (REPO_ROOT / "docker" / "docker-compose.yml").read_text(encoding="utf-8")
     compose = yaml.safe_load(compose_text)
@@ -66,6 +78,29 @@ def test_docker_compose_injects_env_without_single_file_env_mount() -> None:
     assert "../.env:/app/.env" not in common["volumes"]
     assert not any(str(volume).startswith("../.env:") for volume in common["volumes"])
     assert "../longbridge_tokens:/home/dsa/.longbridge" in common["volumes"]
+
+
+def test_docker_compose_default_topology_has_one_legacy_day_batch_owner() -> None:
+    compose = yaml.safe_load(
+        (REPO_ROOT / "docker" / "docker-compose.yml").read_text(encoding="utf-8")
+    )
+    analyzer = compose["services"]["analyzer"]
+    server = compose["services"]["server"]
+    common_env = _compose_environment_map(compose["x-common"].get("environment"))
+    analyzer_env = {**common_env, **_compose_environment_map(analyzer.get("environment"))}
+    server_env = {**common_env, **_compose_environment_map(server.get("environment"))}
+
+    assert analyzer["command"] == ["python", "main.py", "--schedule"]
+    assert server["command"][:3] == ["python", "main.py", "--serve-only"]
+    assert server_env.get("DSA_RUNTIME_SCHEDULER_SUPPRESS_START", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+    assert analyzer_env.get("DSA_RUNTIME_SCHEDULER_SUPPRESS_START") in {None, "", "false"}
+    assert "profiles" not in analyzer
+    assert "profiles" not in server
 
 
 def test_docker_compose_default_memory_recommendation_is_not_512m() -> None:

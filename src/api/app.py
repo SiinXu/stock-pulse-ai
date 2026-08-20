@@ -343,6 +343,8 @@ async def app_lifespan(app: FastAPI):
         personalized_schedule_enabled=(
             runtime_owns_schedule and scheduled_task_owner
         ),
+        # Compose `server` ships suppress-start so this process stays a
+        # CRUD/status non-owner even when shared `.env` has SCHEDULE_ENABLED.
         legacy_schedule_enabled=not runtime_suppress_start,
     )
     app.state.runtime_scheduler_service = runtime_scheduler_service

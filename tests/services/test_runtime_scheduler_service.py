@@ -13,6 +13,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import yaml
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
@@ -25,6 +26,31 @@ from src.services.runtime_scheduler import (
     SCHEDULED_TASK_OWNER_ENV,
     RuntimeSchedulerService,
 )
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _compose_environment_map(environment) -> dict[str, str]:
+    if not environment:
+        return {}
+    if isinstance(environment, dict):
+        return {str(key): "" if value is None else str(value) for key, value in environment.items()}
+    mapped: dict[str, str] = {}
+    for item in environment:
+        key, separator, value = str(item).partition("=")
+        mapped[key] = value if separator else ""
+    return mapped
+
+
+def _shipped_compose_server_environment() -> dict[str, str]:
+    compose = yaml.safe_load(
+        (_REPO_ROOT / "docker" / "docker-compose.yml").read_text(encoding="utf-8")
+    )
+    common_env = _compose_environment_map(compose["x-common"].get("environment"))
+    server_env = _compose_environment_map(
+        compose["services"]["server"].get("environment")
+    )
+    return {**common_env, **server_env}
 
 
 class _FakeJob:
@@ -903,6 +929,72 @@ class RuntimeSchedulerServiceTestCase(unittest.TestCase):
         self.assertFalse(kwargs["legacy_schedule_enabled"])
         runtime_scheduler.reconcile_scheduled_tasks.assert_called_once_with()
         runtime_scheduler.reconcile_from_config.assert_not_called()
+        self.assertIsNone(os.getenv(SCHEDULED_TASK_OWNER_ENV))
+
+    def test_lifespan_compose_server_env_does_not_attach_legacy_when_schedule_enabled(self) -> None:
+        from src.api.app import create_app
+
+        shipped = _shipped_compose_server_environment()
+        suppress_value = shipped.get(RUNTIME_SCHEDULER_SUPPRESS_START_ENV, "")
+        self.assertIn(suppress_value.strip().lower(), {"1", "true", "yes", "on"})
+
+        class ExplodingScheduler:
+            def __init__(self, *args, **kwargs):
+                raise AssertionError(
+                    "Compose server must not start the legacy day-batch scheduler"
+                )
+
+        captured: dict[str, object] = {}
+
+        def wrapping_runtime_scheduler(**kwargs):
+            captured["kwargs"] = kwargs
+            service = RuntimeSchedulerService(**kwargs)
+            captured["service"] = service
+            return service
+
+        process_env = {
+            RUNTIME_SCHEDULER_SUPPRESS_START_ENV: suppress_value,
+            SCHEDULED_TASK_OWNER_ENV: "false",
+        }
+
+        with tempfile.TemporaryDirectory() as temp_dir, patch.dict(
+            os.environ,
+            process_env,
+            clear=False,
+        ), patch(
+            "src.config.get_config",
+            return_value=SimpleNamespace(
+                schedule_enabled=True,
+                schedule_run_immediately=True,
+                schedule_time="18:00",
+                schedule_times=["18:00"],
+            ),
+        ), patch(
+            "src.services.runtime_scheduler.Scheduler",
+            ExplodingScheduler,
+        ), patch(
+            "src.api.app.RuntimeSchedulerService",
+            wrapping_runtime_scheduler,
+        ), patch(
+            "src.api.app.SystemConfigService",
+        ), patch("src.api.app._schedule_stock_index_background_refresh"):
+            os.environ.pop(CLI_SCHEDULER_OWNER_ENV, None)
+            os.environ.pop(RUNTIME_SCHEDULER_FORCE_ENABLED_ENV, None)
+            os.environ.pop(RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV, None)
+
+            app = create_app(static_dir=Path(temp_dir))
+            with TestClient(app):
+                service = captured["service"]
+                status = service.status()
+                self.assertFalse(status["attached"])
+                self.assertFalse(status["enabled"])
+                self.assertEqual(status["process_mode"], "not_attached")
+                self.assertEqual(service.run_now()["reason"], "scheduler_not_attached")
+
+        kwargs = captured["kwargs"]
+        self.assertFalse(kwargs["personalized_schedule_enabled"])
+        self.assertFalse(kwargs["legacy_schedule_enabled"])
+        self.assertIsNone(os.getenv(RUNTIME_SCHEDULER_SUPPRESS_START_ENV))
         self.assertIsNone(os.getenv(SCHEDULED_TASK_OWNER_ENV))
 
     def test_lifespan_health_does_not_eagerly_initialize_scheduled_task_database(self) -> None:

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Fixed] Restarting standalone WebUI/API/Desktop with `--serve-only` restores enabled schedules without running analysis at startup; default Compose keeps `analyzer` as the sole legacy day-batch owner (Refs #1221).
 - [Changed] SearXNG public instance discovery is now opt-in (default off): unset configuration skips searx.space polling, while explicit true keeps the previous fallback and error contracts (Refs #1221).
 - [Fixed] Isolate PortfolioSignalSummary from DecisionSignalDisplay so the Portfolio route no longer preloads the report-export download chunk (Refs #163).
 - [Added] Paper-trading decision process-quality scores (analysis support, risk-gate compliance, position discipline) with explainable reasons, trade-date equity sizing, and a portfolio API; process-only and not a PnL evaluation (Refs #1134, #1127, #987).
