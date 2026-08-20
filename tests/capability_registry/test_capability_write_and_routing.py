@@ -18,7 +18,11 @@ from fastapi.testclient import TestClient
 from src.api.v1.endpoints import capabilities as capabilities_endpoint
 from src.capability_registry.resolution import resolve_capability_dependencies, resolve_many
 from src.capability_registry.task_routing import resolve_task_model_route
-from src.capability_registry.write_audit import CapabilityWriteAuditor
+from src.capability_registry.write_audit import (
+    CapabilityWriteAuditor,
+    classify_capability_write,
+    peek_register_capability_id,
+)
 from src.capability_registry.write_models import WriteCapabilityEntry, WriteRegistrySnapshot
 from src.capability_registry.write_service import CapabilityWriteError, CapabilityWriteService
 from src.capability_registry.write_store import CapabilityWriteStore, WriteRegistryStoreError
@@ -491,3 +495,52 @@ def test_api_route_uses_live_config_pins(
     assert body["selected_model"] == "openai/gpt-pinned"
     assert body["pin_source"] == "LITELLM_MODEL"
     assert body["routing_enabled"] is True
+
+
+def test_classify_capability_write_only_matches_privileged_mutations() -> None:
+    register = classify_capability_write("POST", "/api/v1/capabilities/registry")
+    update = classify_capability_write("PUT", "/api/v1/capabilities/registry/llm:x")
+    retire = classify_capability_write(
+        "POST", "/api/v1/capabilities/registry/llm:x/retire",
+    )
+    assert register == ("register", "")
+    assert update == ("update", "llm:x")
+    assert retire == ("retire", "llm:x")
+    assert classify_capability_write("GET", "/api/v1/capabilities") is None
+    assert classify_capability_write("GET", "/api/v1/capabilities/registry") is None
+    assert classify_capability_write("POST", "/api/v1/capabilities/resolve") is None
+    assert classify_capability_write("POST", "/api/v1/capabilities/route") is None
+    assert classify_capability_write("POST", "/api/v1/capabilities/registry/llm:x") is None
+
+
+def test_peek_register_capability_id_is_bounded_and_ignores_secrets() -> None:
+    secret = "sk_live_must_not_audit"
+    body = (
+        '{"capability_id":"llm:deepseek-pro","api_key":"%s","token":"%s"}'
+        % (secret, secret)
+    ).encode("utf-8")
+    assert peek_register_capability_id(body) == "llm:deepseek-pro"
+    assert peek_register_capability_id(b"") == "unknown-capability"
+    assert peek_register_capability_id(b"{not-json") == "unknown-capability"
+    assert peek_register_capability_id(b"[]") == "unknown-capability"
+    assert peek_register_capability_id(b"x" * 5000) == "unknown-capability"
+
+
+def test_record_denied_persists_denied_completion(tmp_path: Path) -> None:
+    recorder = SecurityAuditRecorderStub()
+    auditor = CapabilityWriteAuditor(recorder=recorder)
+    auditor.record_denied(capability_id="llm:x", operation="register")
+    assert recorder.attempts
+    assert recorder.completions[0]["event_type"] == "capability.write"
+    assert recorder.completions[0]["outcome"] == "denied"
+    assert recorder.completions[0]["reason_code"] == "unauthorized"
+    assert recorder.completions[0]["actor_type"] == "unauthenticated"
+    assert recorder.completions[0]["actor_id"] == "unauthenticated"
+    assert recorder.completions[0]["target_type"] == "capability"
+    assert recorder.completions[0]["target_id"] == "llm:x"
+
+    recorder = SecurityAuditRecorderStub()
+    CapabilityWriteAuditor(recorder=recorder).record_denied(
+        capability_id="", operation="update",
+    )
+    assert recorder.completions[0]["target_id"] == "unknown-capability"
