@@ -1,1 +1,2 @@
 - [Changed] Schedule Home attention, Today's Focus, and setup-status loads through TanStack Query while preserving mount and manual-refresh presentation (Refs #789).
+- [Chore] Own browser timezone lookup in utils so Home Query scheduling does not import UI components (Refs #789).

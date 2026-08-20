@@ -183,9 +183,9 @@
     {
       "id": "HomePage",
       "match": "assets/HomePage-*.js",
-      "maxGzipBytes": 27199,
-      "measuredGzipBytes": 26799,
-      "note": "Same-toolchain proof vs authored base 2a493611 (node 22.13.0, vite 7.3.1, shared node_modules): base HomePage-family gzip 24827 B, head 26799 B (+1972 B). The Query hook family lives on the Home lazy chunk; TanStack Query itself stays in vendor. Cap = measured zlib-9 + 400 B. settings-route budget is unchanged (Refs #789)."
+      "maxGzipBytes": 27213,
+      "measuredGzipBytes": 26813,
+      "note": "Same-toolchain proof vs authored base 2a493611 (node 22.13.0, vite 7.3.1, shared node_modules): base HomePage-family gzip 24827 B, head 26813 B (+1986 B) after moving browser timezone to utils. The Query hook family lives on the Home lazy chunk; TanStack Query itself stays in vendor. Cap = measured zlib-9 + 400 B. settings-route budget is unchanged (Refs #789)."
     },
     {
       "id": "BacktestPage",
@@ -410,9 +410,9 @@
       "match": [
         "assets/HomePage-*.js"
       ],
-      "maxGzipBytes": 27199,
-      "measuredGzipBytes": 26799,
-      "note": "Same-pattern family for HomePage. Cap inherited from the per-asset rule so splitting the Home chunk cannot hide Query-scheduling growth. Same-toolchain delta vs 2a493611 is +1972 B gzip; settings-route is not raised (Refs #789)."
+      "maxGzipBytes": 27213,
+      "measuredGzipBytes": 26813,
+      "note": "Same-pattern family for HomePage. Cap inherited from the per-asset rule so splitting the Home chunk cannot hide Query-scheduling growth. Same-toolchain delta vs 2a493611 is +1986 B gzip; settings-route is not raised (Refs #789)."
     },
     {
       "id": "StockScreeningPage-family",

@@ -9,12 +9,12 @@ import { historyApi } from '../api/history';
 import { scheduledTasksApi } from '../api/scheduledTasks';
 import { systemConfigApi } from '../api/systemConfig';
 import { getTodaysFocus } from '../api/todaysFocus';
-import { getBrowserTimezone } from '../components/home/scheduledTaskPresentation';
 import type { HistoryItem, StockReportType } from '../types/analysis';
 import type { DecisionSignalItem } from '../types/decisionSignals';
 import type { ScheduledTaskTodayItem } from '../types/scheduledTasks';
 import type { SetupStatusResponse } from '../types/systemConfig';
 import type { TodaysFocusResponse } from '../types/todaysFocus';
+import { getBrowserTimezone } from '../utils/browserTimezone';
 
 /** Stable query key for the Home attention pack (mount + manual refresh). */
 export const HOME_ATTENTION_QUERY_KEY = ['home', 'attention'] as const;
