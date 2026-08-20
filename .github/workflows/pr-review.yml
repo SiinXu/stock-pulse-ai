@@ -8,6 +8,12 @@
 # Security model:
 # - workflow_dispatch fails closed unless pr_number is a positive integer that identifies
 #   an accessible pull request in this repository.
+# - security-check is checkout-free. It snapshots head/base via pulls.get, inventories files
+#   with SHA-pinned repos.compareCommits of those commits, re-gets, and fail-closes on
+#   head/base drift before emitting outputs. pulls.listFiles cannot pin a SHA; a re-get
+#   equality guard alone does not close B->A->B ABA. GitHub compare truncates at 300 files
+#   and that case fail-closes. Downstream ai-review checkouts use the emitted SHAs with no
+#   github.sha fallback.
 # - Fork PRs: read-only static checks only. Repository secrets and write jobs are skipped.
 # - Same-repo PRs targeting the default branch: static checks + AI review; write jobs stay
 #   gated on pull_request and therefore remain idle on this dispatch-only trigger.
@@ -43,16 +49,16 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
-      safe_to_run: ${{ steps.check_sensitive.outputs.safe_to_run }}
-      sensitive_files_changed: ${{ steps.check_sensitive.outputs.sensitive_files_changed }}
-      is_fork: ${{ steps.trust.outputs.is_fork }}
-      is_default_branch: ${{ steps.trust.outputs.is_default_branch }}
-      base_sha: ${{ steps.trust.outputs.base_sha }}
-      head_sha: ${{ steps.trust.outputs.head_sha }}
+      safe_to_run: ${{ steps.snapshot.outputs.safe_to_run }}
+      sensitive_files_changed: ${{ steps.snapshot.outputs.sensitive_files_changed }}
+      is_fork: ${{ steps.snapshot.outputs.is_fork }}
+      is_default_branch: ${{ steps.snapshot.outputs.is_default_branch }}
+      base_sha: ${{ steps.snapshot.outputs.base_sha }}
+      head_sha: ${{ steps.snapshot.outputs.head_sha }}
     
     steps:
-      - name: 🔐 Classify Pull Request Trust
-        id: trust
+      - name: 🔐 Snapshot Pull Request Trust And Inventory
+        id: snapshot
         env:
           PR_NUMBER: ${{ inputs.pr_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
@@ -73,46 +79,6 @@ jobs:
               core.setFailed('repository metadata is unavailable');
               return;
             }
-            let pull;
-            try {
-              const response = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: Number(prNumber),
-              });
-              pull = response.data;
-            } catch (error) {
-              const status = error.status || 'unknown';
-              core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);
-              return;
-            }
-            if (!pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha) {
-              core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);
-              return;
-            }
-            const isFork = String(pull.head.repo.id) !== String(context.payload.repository.id);
-            const isDefaultBranch = pull.base.ref === defaultBranch;
-            core.setOutput('is_fork', isFork ? 'true' : 'false');
-            core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');
-            core.setOutput('base_sha', pull.base.sha);
-            core.setOutput('head_sha', pull.head.sha);
-            if (isFork) {
-              core.summary.addRaw('## Fork Pull Request Policy\n\nThis run is limited to read-only static checks.\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\n');
-              await core.summary.write();
-            }
-
-      - name: 🔒 Check Sensitive File Changes
-        id: check_sensitive
-        env:
-          PR_NUMBER: ${{ inputs.pr_number }}
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const prNumber = process.env.PR_NUMBER || '';
-            if (!/^[1-9][0-9]*$/.test(prNumber)) {
-              core.setFailed('workflow_dispatch requires a positive integer pr_number');
-              return;
-            }
             const unsafeDynamicPattern = /[^\x00-\x7F]|&/gu;
             const escapeDynamicText = value => value.replace(unsafeDynamicPattern, character => {
               const codePoint = character.codePointAt(0);
@@ -121,33 +87,89 @@ jobs:
                 ? `\\u${hexadecimal.padStart(4, '0')}`
                 : `\\u{${hexadecimal}}`;
             });
-            let files;
+            const missingMetadata = pull => !pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || !pull.head.repo.owner || typeof pull.head.repo.owner.login !== 'string' || !pull.head.repo.owner.login || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha;
+            let firstPull;
             try {
-              files = await github.paginate(github.rest.pulls.listFiles, {
+              const firstResponse = await github.rest.pulls.get({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 pull_number: Number(prNumber),
-                per_page: 100,
               });
+              firstPull = firstResponse.data;
             } catch (error) {
               const status = error.status || 'unknown';
-              core.setFailed(`Unable to list files for pull request ${prNumber}: ${status}`);
+              core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);
+              return;
+            }
+            if (missingMetadata(firstPull)) {
+              core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);
+              return;
+            }
+            const comparisonHead = String(firstPull.head.repo.id) === String(context.payload.repository.id) ? firstPull.head.sha : `${firstPull.head.repo.owner.login}:${firstPull.head.sha}`;
+            let files;
+            try {
+              const comparison = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: firstPull.base.sha,
+                head: comparisonHead,
+              });
+              files = comparison.data && comparison.data.files;
+            } catch (error) {
+              const status = error.status || 'unknown';
+              core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: ${status}`);
               return;
             }
             if (!Array.isArray(files)) {
-              core.setFailed(`Unable to list files for pull request ${prNumber}: invalid response`);
+              core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: invalid response`);
+              return;
+            }
+            if (files.length >= 300) {
+              core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: file inventory is truncated`);
               return;
             }
             for (const file of files) {
               if (!file || typeof file.filename !== 'string' || !file.filename) {
-                core.setFailed(`Unable to list files for pull request ${prNumber}: a changed file is missing its filename`);
+                core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: a changed file is missing its filename`);
                 return;
               }
             }
+            let secondPull;
+            try {
+              const secondResponse = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: Number(prNumber),
+              });
+              secondPull = secondResponse.data;
+            } catch (error) {
+              const status = error.status || 'unknown';
+              core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);
+              return;
+            }
+            if (missingMetadata(secondPull)) {
+              core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);
+              return;
+            }
+            if (firstPull.head.sha !== secondPull.head.sha || firstPull.base.sha !== secondPull.base.sha || firstPull.base.ref !== secondPull.base.ref || String(firstPull.head.repo.id) !== String(secondPull.head.repo.id)) {
+              core.setFailed(`Pull request ${prNumber} changed during the API snapshot`);
+              return;
+            }
+            const pull = secondPull;
+            const isFork = String(pull.head.repo.id) !== String(context.payload.repository.id);
+            const isDefaultBranch = pull.base.ref === defaultBranch;
             const sensitivePattern = /^(\.github\/workflows\/.*\.yml|\.github\/scripts\/.*\.py)$/;
             const sensitiveFiles = files
               .map(file => file.filename)
               .filter(filename => sensitivePattern.test(filename));
+            core.setOutput('is_fork', isFork ? 'true' : 'false');
+            core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');
+            core.setOutput('base_sha', pull.base.sha);
+            core.setOutput('head_sha', pull.head.sha);
+            if (isFork) {
+              core.summary.addRaw('## Fork Pull Request Policy\n\nThis run is limited to read-only static checks.\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\n');
+              await core.summary.write();
+            }
             if (sensitiveFiles.length > 0) {
               const escaped = sensitiveFiles.map(escapeDynamicText).join('\n');
               core.summary.addRaw('⚠️ **Sensitive files changed; manual review is required.**\n\nChanged sensitive files:\n\n```\n');

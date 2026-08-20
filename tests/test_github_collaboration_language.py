@@ -74,7 +74,7 @@ def test_github_collaboration_assets_use_english() -> None:
 def test_pr_review_fetches_every_changed_file() -> None:
     workflow = (GITHUB_DIR / "workflows" / "pr-review.yml").read_text(encoding="utf-8")
 
-    assert workflow.count("github.paginate(github.rest.pulls.listFiles") == 3
+    assert workflow.count("github.paginate(github.rest.pulls.listFiles") == 2
     assert "const escapeDynamicText = value => value.replace(unsafeDynamicPattern" in workflow
     assert "const displayFilename = escapeDynamicText(file.filename);" in workflow
     assert "\\`${file.filename}\\`" not in workflow

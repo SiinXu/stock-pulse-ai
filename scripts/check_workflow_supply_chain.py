@@ -34,9 +34,8 @@ SECRET_EXPRESSION_RE = re.compile(
 )
 
 PR_REVIEW_WORKFLOW = ".github/workflows/pr-review.yml"
-TRUST_CLASSIFIER_ID = "trust"
-CHECK_SENSITIVE_ID = "check_sensitive"
-SECURITY_CHECK_STEP_IDS = (TRUST_CLASSIFIER_ID, CHECK_SENSITIVE_ID)
+SNAPSHOT_ID = "snapshot"
+SECURITY_CHECK_STEP_IDS = (SNAPSHOT_ID,)
 TRUSTED_REVIEW_CHECKOUT_ID = "trusted-review-inputs"
 PULL_REQUEST_REVIEW_CHECKOUT_ID = "pull-request-analysis-inputs"
 FETCH_REVIEW_BASE_ID = "fetch-analysis-base"
@@ -89,24 +88,21 @@ FETCH_REVIEW_BASE_COMMAND = (
     'git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"'
 )
 SECURITY_CHECK_OUTPUTS = {
-    "safe_to_run": "${{ steps.check_sensitive.outputs.safe_to_run }}",
-    "sensitive_files_changed": "${{ steps.check_sensitive.outputs.sensitive_files_changed }}",
-    "is_fork": "${{ steps.trust.outputs.is_fork }}",
-    "is_default_branch": "${{ steps.trust.outputs.is_default_branch }}",
-    "base_sha": "${{ steps.trust.outputs.base_sha }}",
-    "head_sha": "${{ steps.trust.outputs.head_sha }}",
+    "safe_to_run": "${{ steps.snapshot.outputs.safe_to_run }}",
+    "sensitive_files_changed": "${{ steps.snapshot.outputs.sensitive_files_changed }}",
+    "is_fork": "${{ steps.snapshot.outputs.is_fork }}",
+    "is_default_branch": "${{ steps.snapshot.outputs.is_default_branch }}",
+    "base_sha": "${{ steps.snapshot.outputs.base_sha }}",
+    "head_sha": "${{ steps.snapshot.outputs.head_sha }}",
 }
 PR_REVIEW_DISPATCH_INPUT = {
     "description": "Pull request number to review (required positive integer)",
     "required": "true",
     "type": "string",
 }
-TRUST_CLASSIFIER_ENV = {
+SNAPSHOT_ENV = {
     "PR_NUMBER": "${{ inputs.pr_number }}",
     "DEFAULT_BRANCH": "${{ github.event.repository.default_branch }}",
-}
-CHECK_SENSITIVE_ENV = {
-    "PR_NUMBER": "${{ inputs.pr_number }}",
 }
 SECURITY_CHECK_FORBIDDEN_SUBSTRINGS = (
     "actions/checkout@",
@@ -117,7 +113,7 @@ SECURITY_CHECK_FORBIDDEN_SUBSTRINGS = (
     "git pull",
     "git worktree",
 )
-TRUST_CLASSIFIER_SCRIPT_LINES = (
+SNAPSHOT_SCRIPT_LINES = (
     "const prNumber = process.env.PR_NUMBER || '';",
     "if (!/^[1-9][0-9]*$/.test(prNumber)) {",
     "core.setFailed('workflow_dispatch requires a positive integer pr_number');",
@@ -132,40 +128,6 @@ TRUST_CLASSIFIER_SCRIPT_LINES = (
     "core.setFailed('repository metadata is unavailable');",
     "return;",
     "}",
-    "let pull;",
-    "try {",
-    "const response = await github.rest.pulls.get({",
-    "owner: context.repo.owner,",
-    "repo: context.repo.repo,",
-    "pull_number: Number(prNumber),",
-    "});",
-    "pull = response.data;",
-    "} catch (error) {",
-    "const status = error.status || 'unknown';",
-    "core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);",
-    "return;",
-    "}",
-    "if (!pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha) {",
-    "core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);",
-    "return;",
-    "}",
-    "const isFork = String(pull.head.repo.id) !== String(context.payload.repository.id);",
-    "const isDefaultBranch = pull.base.ref === defaultBranch;",
-    "core.setOutput('is_fork', isFork ? 'true' : 'false');",
-    "core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');",
-    "core.setOutput('base_sha', pull.base.sha);",
-    "core.setOutput('head_sha', pull.head.sha);",
-    "if (isFork) {",
-    "core.summary.addRaw('## Fork Pull Request Policy\\n\\nThis run is limited to read-only static checks.\\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\\n');",
-    "await core.summary.write();",
-    "}",
-)
-CHECK_SENSITIVE_SCRIPT_LINES = (
-    "const prNumber = process.env.PR_NUMBER || '';",
-    "if (!/^[1-9][0-9]*$/.test(prNumber)) {",
-    "core.setFailed('workflow_dispatch requires a positive integer pr_number');",
-    "return;",
-    "}",
     "const unsafeDynamicPattern = /[^\\x00-\\x7F]|&/gu;",
     "const escapeDynamicText = value => value.replace(unsafeDynamicPattern, character => {",
     "const codePoint = character.codePointAt(0);",
@@ -174,33 +136,89 @@ CHECK_SENSITIVE_SCRIPT_LINES = (
     "? `\\\\u${hexadecimal.padStart(4, '0')}`",
     ": `\\\\u{${hexadecimal}}`;",
     "});",
-    "let files;",
+    "const missingMetadata = pull => !pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || !pull.head.repo.owner || typeof pull.head.repo.owner.login !== 'string' || !pull.head.repo.owner.login || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha;",
+    "let firstPull;",
     "try {",
-    "files = await github.paginate(github.rest.pulls.listFiles, {",
+    "const firstResponse = await github.rest.pulls.get({",
     "owner: context.repo.owner,",
     "repo: context.repo.repo,",
     "pull_number: Number(prNumber),",
-    "per_page: 100,",
     "});",
+    "firstPull = firstResponse.data;",
     "} catch (error) {",
     "const status = error.status || 'unknown';",
-    "core.setFailed(`Unable to list files for pull request ${prNumber}: ${status}`);",
+    "core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);",
+    "return;",
+    "}",
+    "if (missingMetadata(firstPull)) {",
+    "core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);",
+    "return;",
+    "}",
+    "const comparisonHead = String(firstPull.head.repo.id) === String(context.payload.repository.id) ? firstPull.head.sha : `${firstPull.head.repo.owner.login}:${firstPull.head.sha}`;",
+    "let files;",
+    "try {",
+    "const comparison = await github.rest.repos.compareCommits({",
+    "owner: context.repo.owner,",
+    "repo: context.repo.repo,",
+    "base: firstPull.base.sha,",
+    "head: comparisonHead,",
+    "});",
+    "files = comparison.data && comparison.data.files;",
+    "} catch (error) {",
+    "const status = error.status || 'unknown';",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: ${status}`);",
     "return;",
     "}",
     "if (!Array.isArray(files)) {",
-    "core.setFailed(`Unable to list files for pull request ${prNumber}: invalid response`);",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: invalid response`);",
+    "return;",
+    "}",
+    "if (files.length >= 300) {",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: file inventory is truncated`);",
     "return;",
     "}",
     "for (const file of files) {",
     "if (!file || typeof file.filename !== 'string' || !file.filename) {",
-    "core.setFailed(`Unable to list files for pull request ${prNumber}: a changed file is missing its filename`);",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: a changed file is missing its filename`);",
     "return;",
     "}",
     "}",
+    "let secondPull;",
+    "try {",
+    "const secondResponse = await github.rest.pulls.get({",
+    "owner: context.repo.owner,",
+    "repo: context.repo.repo,",
+    "pull_number: Number(prNumber),",
+    "});",
+    "secondPull = secondResponse.data;",
+    "} catch (error) {",
+    "const status = error.status || 'unknown';",
+    "core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);",
+    "return;",
+    "}",
+    "if (missingMetadata(secondPull)) {",
+    "core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);",
+    "return;",
+    "}",
+    "if (firstPull.head.sha !== secondPull.head.sha || firstPull.base.sha !== secondPull.base.sha || firstPull.base.ref !== secondPull.base.ref || String(firstPull.head.repo.id) !== String(secondPull.head.repo.id)) {",
+    "core.setFailed(`Pull request ${prNumber} changed during the API snapshot`);",
+    "return;",
+    "}",
+    "const pull = secondPull;",
+    "const isFork = String(pull.head.repo.id) !== String(context.payload.repository.id);",
+    "const isDefaultBranch = pull.base.ref === defaultBranch;",
     "const sensitivePattern = /^(\\.github\\/workflows\\/.*\\.yml|\\.github\\/scripts\\/.*\\.py)$/;",
     "const sensitiveFiles = files",
     ".map(file => file.filename)",
     ".filter(filename => sensitivePattern.test(filename));",
+    "core.setOutput('is_fork', isFork ? 'true' : 'false');",
+    "core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');",
+    "core.setOutput('base_sha', pull.base.sha);",
+    "core.setOutput('head_sha', pull.head.sha);",
+    "if (isFork) {",
+    "core.summary.addRaw('## Fork Pull Request Policy\\n\\nThis run is limited to read-only static checks.\\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\\n');",
+    "await core.summary.write();",
+    "}",
     "if (sensitiveFiles.length > 0) {",
     "const escaped = sensitiveFiles.map(escapeDynamicText).join('\\n');",
     "core.summary.addRaw('⚠️ **Sensitive files changed; manual review is required.**\\n\\nChanged sensitive files:\\n\\n```\\n');",
@@ -737,24 +755,14 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
                 for step_id, step in zip(step_ids, security_steps)
                 if step_id and step_ids.count(step_id) == 1
             }
-            trust_step = identified_security_steps.get(TRUST_CLASSIFIER_ID)
-            if trust_step is not None:
+            snapshot_step = identified_security_steps.get(SNAPSHOT_ID)
+            if snapshot_step is not None:
                 errors.extend(
                     _github_script_step_errors(
-                        trust_step,
-                        expected_env=TRUST_CLASSIFIER_ENV,
-                        expected_script_lines=TRUST_CLASSIFIER_SCRIPT_LINES,
-                        label=f"{relative_path}: trust classifier step",
-                    )
-                )
-            check_sensitive_step = identified_security_steps.get(CHECK_SENSITIVE_ID)
-            if check_sensitive_step is not None:
-                errors.extend(
-                    _github_script_step_errors(
-                        check_sensitive_step,
-                        expected_env=CHECK_SENSITIVE_ENV,
-                        expected_script_lines=CHECK_SENSITIVE_SCRIPT_LINES,
-                        label=f"{relative_path}: sensitive-file API inventory step",
+                        snapshot_step,
+                        expected_env=SNAPSHOT_ENV,
+                        expected_script_lines=SNAPSHOT_SCRIPT_LINES,
+                        label=f"{relative_path}: SHA-pinned snapshot step",
                     )
                 )
 
@@ -1153,17 +1161,11 @@ jobs:
     security_output_lines = "\n".join(
         f"      {key}: {value}" for key, value in SECURITY_CHECK_OUTPUTS.items()
     )
-    trust_classifier_env_lines = "\n".join(
-        f"          {key}: {value}" for key, value in TRUST_CLASSIFIER_ENV.items()
+    snapshot_env_lines = "\n".join(
+        f"          {key}: {value}" for key, value in SNAPSHOT_ENV.items()
     )
-    check_sensitive_env_lines = "\n".join(
-        f"          {key}: {value}" for key, value in CHECK_SENSITIVE_ENV.items()
-    )
-    trust_classifier_script_lines = "\n".join(
-        f"            {line}" for line in TRUST_CLASSIFIER_SCRIPT_LINES
-    )
-    check_sensitive_script_lines = "\n".join(
-        f"            {line}" for line in CHECK_SENSITIVE_SCRIPT_LINES
+    snapshot_script_lines = "\n".join(
+        f"            {line}" for line in SNAPSHOT_SCRIPT_LINES
     )
     dispatch_input_lines = "\n".join(
         f"        {key}: {value}" for key, value in PR_REVIEW_DISPATCH_INPUT.items()
@@ -1191,22 +1193,14 @@ jobs:
     outputs:
 {security_output_lines}
     steps:
-      - name: Classify pull request trust
-        id: {TRUST_CLASSIFIER_ID}
+      - name: Snapshot pull request trust and inventory
+        id: {SNAPSHOT_ID}
         env:
-{trust_classifier_env_lines}
+{snapshot_env_lines}
         uses: actions/github-script@{sha} # v9.0.0
         with:
           script: |
-{trust_classifier_script_lines}
-      - name: Check sensitive file changes
-        id: {CHECK_SENSITIVE_ID}
-        env:
-{check_sensitive_env_lines}
-        uses: actions/github-script@{sha} # v9.0.0
-        with:
-          script: |
-{check_sensitive_script_lines}
+{snapshot_script_lines}
   ai-review:
     name: AI review
     runs-on: ubuntu-latest
@@ -1335,10 +1329,10 @@ jobs:
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
-                "      - name: Classify pull request trust\n",
+                "      - name: Snapshot pull request trust and inventory\n",
                 "      - name: Checkout untrusted pull request\n"
                 f"        uses: actions/checkout@{sha} # v5.1.0\n"
-                "      - name: Classify pull request trust\n",
+                "      - name: Snapshot pull request trust and inventory\n",
                 1,
             )
         ),
@@ -1347,8 +1341,28 @@ jobs:
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
-                "files = await github.paginate(github.rest.pulls.listFiles, {",
-                "files = await github.paginate(github.rest.pulls.listCommits, {",
+                "const comparison = await github.rest.repos.compareCommits({",
+                "const comparison = await github.paginate(github.rest.pulls.listFiles, {",
+                1,
+            )
+        ),
+        "exact API-only contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "base: firstPull.base.sha,",
+                "base: firstPull.base.ref,",
+                1,
+            )
+        ),
+        "exact API-only contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "if (firstPull.head.sha !== secondPull.head.sha || firstPull.base.sha !== secondPull.base.sha || firstPull.base.ref !== secondPull.base.ref || String(firstPull.head.repo.id) !== String(secondPull.head.repo.id)) {",
+                "if (false) {",
                 1,
             )
         ),
@@ -1685,7 +1699,7 @@ jobs:
         trusted_errors(trusted_review.replace(f"id: {FETCH_REVIEW_BASE_ID}", f"id: {SETUP_REVIEW_PYTHON_ID}")),
         "exact reviewed step order",
     )
-    print("Workflow supply-chain self-tests passed (52 cases).")
+    print("Workflow supply-chain self-tests passed (54 cases).")
 
 
 def parse_args() -> argparse.Namespace:
