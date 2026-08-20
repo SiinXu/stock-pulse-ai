@@ -17,9 +17,41 @@ Authorable theme surface for Web (Issues #162 / #880):
 | 1 — Core semantic | Theme pack / `:root` / `.dark` | Bare HSL channels for Tailwind. Packs may recolor brand/surfaces only. |
 | Legacy aliases | `index.css` | `--home-price-up/down` → Layer 0 hues during migration. |
 
-Built-in packs: `classic` (default), `slate` (validation variant). Runtime attrs: `data-theme-pack`, `data-price-direction`. Guard: `themeContractGuard.test.ts` (baseline-only-decrease). Preference bridge: `MARKET_REVIEW_COLOR_SCHEME` ↔ `data-price-direction`.
+Built-in packs: `classic` (default), `slate` (validation variant). Runtime attrs: `data-theme-pack`, `data-price-direction`. Guard: `themeContractGuard.test.ts` (baseline-only-decrease) plus the Phase 0 token-freeze ratchet below. Preference bridge: `MARKET_REVIEW_COLOR_SCHEME` ↔ `data-price-direction`.
 
 Signed price / gain / loss paint on Portfolio, Backtest, Screening results, Market Structure, and Financial Calculators uses `changeSemantics` + `changeColorCssVar` (via `SignedChangeText`). Preference is the existing ThemeAppearance / `data-price-direction` bridge (`MARKET_REVIEW_COLOR_SCHEME`) — do not add a parallel preference hook. Do not map signed values onto `text-success` / `text-danger`. Zero, missing, non-finite, and unresolved-market values stay unpainted; never invent a `cn` market for an unknown code. Sign or wording remains the non-color cue. Backtest up/down movement badges use `trend-up` / `trend-down` so they follow `data-price-direction`.
+
+### Theme token freeze (Phase 0 / #1300)
+
+Phase 0 freezes the current Web custom-property contract. It does **not** delete page-scoped leftovers, unify value formats, or ship a second theme package. Those remain later T25/T40 work.
+
+| Surface | Owner | Freeze rule |
+| --- | --- | --- |
+| Web runtime tokens | `apps/dsa-web/src/index.css` (`:root`, `.dark`, pack selectors, `data-price-direction`, `data-density`) | Unique defined names must match `THEME_DEFINED_TOKEN_NAMES`. New names fail CI. |
+| Classification | `classifyThemeToken()` in `src/design/theme.ts` | Layer 0 / Layer 1 stay the public API. Page-scoped leftovers are `page-scoped-debt`, not Layer 1. Compat and `--home-price-*` aliases stay aliases. |
+| Page prefixes | `--home-*`, `--settings-*`, `--login-*`, `--chat-*`, `--backtest-*`, `--portfolio-*` | Frozen. Do not add names. Do not promote them to Layer 1 to green CI. |
+| Definitions outside `index.css` | production TS/TSX/CSS | Forbidden. Local `style` may override an inventoried token (see `Input` error ring); it may not invent a new name. |
+| Undefined `var(--*)` | `THEME_UNGOVERNED_REFERENCE_DEBT` in `themeTokenFreezeGuard.test.ts` | Shrink-only. Includes `--home-border`, chart `--info`, Tailwind `--color-purple`, and optional `.input-surface` slots. Do not add those names to the defined inventory. The list stays in the `.test.ts` file because `./themeTokenFreeze.ts` is not path-filtered as `__tests__` by the production source inventory. |
+| Desktop chrome | `apps/dsa-desktop/renderer/assistant.html` and `loading.html` | Isolated inventories in `DESKTOP_CHROME_DEFINED_TOKENS`. The embedded WebView still uses the Web contract. Do not copy desktop `--bg` / `--panel` into Web Layer 1. |
+
+**How to add a token.** Prefer an existing Layer 1 name plus use-site opacity (`hsl(var(--primary) / 0.12)`). If a new public token is required: add it to `THEME_LAYER1_CSS_VARS` (or Layer 0 only for market paint), define it on `:root` and `.dark`, append it to `THEME_DEFINED_TOKEN_NAMES`, and keep charts / price-direction / desktop chrome on the existing owners. Domain geometry may use `--nav-*` / `--report-*` / `--input-surface-*`. Never add a page-prefixed name.
+
+**How to read a failure**
+
+| Code | Meaning |
+| --- | --- |
+| `new-defined-token` / `ungoverned-defined-token` | `index.css` grew a name that is missing from the inventory or has no class. Follow the addition workflow; do not invent a page token. |
+| `stale-defined-token` | Inventory lists a name that left `index.css`. Remove it from the inventory in the same PR. |
+| `page-scoped-growth` | A new `--home-*` / `--settings-*` / … name. Delete it or reuse Layer 1. |
+| `outside-definition` | A custom property was defined outside `index.css`. |
+| `new-ungoverned-reference` | `var(--missing)` / `hsl(var(--missing))` is not defined and not on the shrink-only debt list. |
+| `stale-ungoverned-reference` | A recorded undefined reference is gone. Shrink `THEME_UNGOVERNED_REFERENCE_DEBT`. |
+| `blessed-page-token` | A page-prefixed name was classified as Layer 1. Keep it as `page-scoped-debt` or `legacy-alias`. |
+| `desktop-token-growth` / `stale-desktop-token` | Isolated desktop chrome tokens changed. Update `DESKTOP_CHROME_DEFINED_TOKENS` only for that surface. |
+
+Guards: `themeContractGuard.test.ts` (price-direction / pack / Layer 0) and `themeTokenFreezeGuard.test.ts` (name-set ratchet and counterexamples).
+
+**WAIT_FOR density integration.** Repeating the 18 structural spacing custom-property names as string literals in `themeTokenInventory.ts` is measured by `densityAdoptionRatchet` as `new-density-aware-file` (`../../design/themeTokenInventory.ts`, `densityTokenCount=18`, `fixedSpacingCount=0`). That is a catalog-string false positive, not theme-token consumer adoption. T24 does **not** change `densityAdoptionRatchet.ts` or weaken that scanner. The inventory composes those names from `DENSITY_STRUCTURAL_CSS_VARS` instead of repeating the literals. Density implementation/review should decide whether non-`density.ts` design catalogs belong in the consumer inventory; do not raise the density baseline or add a scanner bypass on this PR.
 
 
 - Foundation owns semantic tokens and shared control geometry.
@@ -67,6 +99,52 @@ Shared patterns compose these primitives:
 
 Every caller-visible string, including `aria-label` and tooltip content, must
 come from the existing i18n resources.
+
+### Shared-control adoption ratchet
+
+Product TS/TSX must use the shared button primitives above instead of growing
+new native `<button>` hosts or `role="button"` stand-ins. Native `input` /
+`select` / `textarea` remain on the existing form-control guard
+(`nativeFormControlAdoptionGuard.test.ts`). This task does **not** mass-migrate
+current product buttons.
+
+The scanner (`sharedControlAdoptionRatchet.ts`) walks the TypeScript AST — not a
+raw substring count — so aliases (`const Tag = 'button'`), multiline JSX,
+spread props, `createElement('button')`, and `document.createElement('button')`
+count, while comments, type-only `'button'` literals, and selector strings such
+as `'[role="button"]'` do not.
+
+**Required owners.** `Button`, `IconButton`, `Pressable`, and `SelectionChip`
+must keep a native button (`SHARED_CONTROL_REQUIRED_OWNERS`). Losing that
+element is a regression.
+
+**Compound owners.** DatePicker, Tabs, Select, DataTable sort headers, and the
+other files in `SHARED_CONTROL_COMPOUND_OWNERS` may render native buttons
+because they *are* the shared control. Count changes still require a baseline
+edit.
+
+**Measured baseline.** `apps/dsa-web/src/design/sharedControlAdoptionBaseline.json`
+is snapshotted from the current production tree. Per-file `nativeButtonCount` /
+`roleButtonCount` are shrink-only ceilings for business files. New unaudited
+files fail as `new-bypass`. File moves with the same basename and counts fail as
+`file-moved` until the JSON path is updated.
+
+**Approved accessibility exemptions.** `SHARED_CONTROL_A11Y_EXEMPTIONS` is the
+only production exception list. Current entries are the SVG scatter hit target
+on Decision Signals and the native `details`/`summary` disclosure on the run-flow
+timeline. Do **not** park leftover product-button debt here.
+
+**Inventory exclusions** (documented in `SHARED_CONTROL_SCAN_EXCLUSIONS`): tests,
+fixtures, generated files, vendor/`node_modules`, `src/dev/**`, playground, and
+stories. Those trees are not shipped product UI.
+
+| Code | Meaning |
+| --- | --- |
+| `missing-required-owner` / `lost-owner-file` | A shared control dropped its native button. Restore it. |
+| `new-bypass` / `bypass-regression` | New or extra native/`role="button"` usage outside owners. Use `Button` / `IconButton` / `Pressable`, or add a reviewed a11y exemption. |
+| `baseline-needs-tightening` / `lost-debt-file` | The tree improved. Update the JSON ceiling. |
+| `file-moved` | Same basename and counts at a new path. Update the JSON path; do not treat the move as a free new bypass. |
+| `stale-exemption` / `exemption-overflow` | Fix `SHARED_CONTROL_A11Y_EXEMPTIONS`. |
 
 ## Filter And Query Semantics
 
@@ -786,6 +864,7 @@ A PR that introduces or reworks a surface fails this contract when any apply:
 7. New mid-width layout keeps three dense full columns that clip core content.
 8. Any new glow, glass, or non-semantic shadow treatment (also a DESIGN_GUIDE failure).
 9. A density-aware shared component or page replaces `density-*` utilities with fixed `p-*` / `gap-*` / spacing `style` without a `DENSITY_FIXED_GEOMETRY_EXEMPTIONS` entry.
+10. A new production file (or extra occurrence in an existing file) introduces a native `<button>` or `role="button"` host outside the shared-control owners / a11y exemption list.
 
 ## State And Alert Semantics
 

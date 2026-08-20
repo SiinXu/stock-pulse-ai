@@ -1,0 +1,2 @@
+- [Tests] Add a shrink-only AST ratchet for native button and role-button shared-control bypasses so new product UI cannot grow unaudited native controls (Refs #878).
+- [Docs] Document the shared-control adoption ratchet, required owners, a11y exemptions, and inventory exclusions in the Web UI foundation contract (Refs #878).

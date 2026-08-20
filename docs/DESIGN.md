@@ -155,8 +155,8 @@ StockPulse follows Chinese-market movement semantics:
 
 | Meaning | Light | Dark | Existing token |
 |---|---:|---:|---|
-| Price up | `#F34949` | `#F45252` | `--home-price-up` |
-| Price down | `#00D668` | `#00E06C` | `--home-price-down` |
+| Price up | `#F34949` | `#F45252` | `--price-up` (default `data-price-direction=cn` → `--price-red`; legacy `--home-price-up` aliases the hue, not the direction) |
+| Price down | `#00D668` | `#00E06C` | `--price-down` (default CN → `--price-green`; legacy `--home-price-down` aliases the hue) |
 
 These colors are product semantics, not decorations. Never derive them from brand, success, or
 error tokens. Never reverse them to match the Web3 reference. Always pair color with a sign, arrow,
