@@ -1,0 +1,1 @@
+- [Changed] Extracted scheduled-task admission field builders into `src/services/scheduled_task_parts/admission_fields.py` behind the existing `src.services.scheduled_task_service` facade without changing claim, dispatch, tick, or reconcile contracts (Refs #1086).

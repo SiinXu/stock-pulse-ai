@@ -21,7 +21,7 @@
     "src/services/local_model_service.py": 1548,
     "src/services/reasoning_trace_export_service.py": 1730,
     "src/services/run_flow.py": 1759,
-    "src/services/scheduled_task_service.py": 2090
+    "src/services/scheduled_task_service.py": 2024
   },
   "cleanup_plan": [
     "Prefer extracting cohesive helpers/packages when a hot-path file exceeds 2000 lines (soft review budget is 1500).",
