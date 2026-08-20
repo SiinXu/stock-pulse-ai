@@ -14,7 +14,7 @@
   "module_count": 9,
   "modules": {
     "src/agent/orchestrator_parts/pipeline.py": 1564,
-    "src/data_provider/base.py": 4609,
+    "src/data_provider/base.py": 4564,
     "src/data_provider/data_validation.py": 1715,
     "src/market/analyzer.py": 2026,
     "src/services/history_service.py": 1581,
