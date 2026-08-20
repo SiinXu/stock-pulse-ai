@@ -3,6 +3,27 @@
 import { z } from 'zod';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import apiClient from './index';
+import type { components } from '../types/api.generated';
+
+type OpenApiCandidateDiscoveryResponse = components['schemas']['CandidateDiscoveryResponse'];
+type OpenApiCandidateDiscoveryCandidate = components['schemas']['CandidateDiscoveryCandidate'];
+type OpenApiCandidateDiscoveryTaskAccepted = components['schemas']['CandidateDiscoveryTaskAccepted'];
+type OpenApiCandidateDiscoveryTaskStatus = components['schemas']['CandidateDiscoveryTaskStatus'];
+
+// Compile-time anchor: hand-written camelCase types stay aligned with OpenAPI
+// field sets (rename detection is structural; extra optional UI fields are fine).
+type _AssertDiscoveryResponse = keyof OpenApiCandidateDiscoveryResponse;
+type _AssertDiscoveryCandidate = keyof OpenApiCandidateDiscoveryCandidate;
+type _AssertDiscoveryAccepted = keyof OpenApiCandidateDiscoveryTaskAccepted;
+type _AssertDiscoveryStatus = keyof OpenApiCandidateDiscoveryTaskStatus;
+const _discoveryResponseAnchor: _AssertDiscoveryResponse = 'pack_version';
+const _discoveryCandidateAnchor: _AssertDiscoveryCandidate = 'change_pct';
+const _discoveryAcceptedAnchor: _AssertDiscoveryAccepted = 'task_id';
+const _discoveryStatusAnchor: _AssertDiscoveryStatus = 'task_id';
+void _discoveryResponseAnchor;
+void _discoveryCandidateAnchor;
+void _discoveryAcceptedAnchor;
+void _discoveryStatusAnchor;
 
 const candidateSchema = z.object({
   rank: z.number(),
@@ -187,24 +208,8 @@ function mapResponse(payload: unknown): CandidateDiscoveryResponse {
     return mapCandidate(item);
   });
   return {
-    packVersion: parsed.packVersion,
-    runId: parsed.runId,
-    status: parsed.status,
-    query: parsed.query,
-    universe: parsed.universe,
-    market: parsed.market,
-    page: parsed.page,
-    pageSize: parsed.pageSize,
-    maxResults: parsed.maxResults,
-    candidateCount: parsed.candidateCount,
+    ...parsed,
     candidates,
-    criteria: parsed.criteria,
-    emptyReason: parsed.emptyReason,
-    emptyMessage: parsed.emptyMessage,
-    warnings: parsed.warnings,
-    researchDisclaimer: parsed.researchDisclaimer,
-    universeContract: parsed.universeContract,
-    costContract: parsed.costContract,
   };
 }
 
@@ -217,17 +222,7 @@ export const candidateDiscoveryApi = {
       'candidate discovery task accepted',
       'candidateDiscovery',
     );
-    return {
-      taskId: parsed.taskId,
-      traceId: parsed.traceId,
-      status: parsed.status,
-      message: parsed.message,
-      universe: parsed.universe,
-      page: parsed.page,
-      pageSize: parsed.pageSize,
-      maxResults: parsed.maxResults,
-      maxProviderCalls: parsed.maxProviderCalls,
-    };
+    return parsed;
   },
 
   getTask: async (taskId: string): Promise<CandidateDiscoveryTaskStatus> => {
@@ -239,12 +234,7 @@ export const candidateDiscoveryApi = {
       'candidateDiscovery',
     );
     return {
-      taskId: parsed.taskId,
-      traceId: parsed.traceId,
-      status: parsed.status,
-      progress: parsed.progress,
-      message: parsed.message,
-      error: parsed.error,
+      ...parsed,
       result: parsed.result ? mapResponse(parsed.result) : null,
     };
   },
@@ -258,12 +248,7 @@ export const candidateDiscoveryApi = {
       'candidateDiscovery',
     );
     return {
-      taskId: parsed.taskId,
-      traceId: parsed.traceId,
-      status: parsed.status,
-      progress: parsed.progress,
-      message: parsed.message,
-      error: parsed.error,
+      ...parsed,
       result: parsed.result ? mapResponse(parsed.result) : null,
     };
   },
