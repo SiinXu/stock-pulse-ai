@@ -1,0 +1,1 @@
+- [Changed] Fold ReportStructuredInsights skill, committee, and conflict lists behind a top-3 Show all / Show less disclosure while keeping Phase and Attribution fully open (Refs #1332).
