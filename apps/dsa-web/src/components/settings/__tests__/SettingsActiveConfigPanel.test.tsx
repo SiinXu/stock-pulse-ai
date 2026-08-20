@@ -194,7 +194,7 @@ describe('SettingsActiveConfigPanel group disclosure', () => {
           readOnlyDiagnosticForItem={() => undefined}
           activeCategory="data_source"
           configVersion="v1"
-          revealFieldKey="TAVILY_API_KEYS"
+          queryField="TAVILY_API_KEYS"
         />
       </UiLanguageProvider>,
     );

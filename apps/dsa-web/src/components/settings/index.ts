@@ -13,7 +13,6 @@ export * from './agentSetupPresets';
 export * from './notificationChannels';
 export * from './notificationFieldGroups';
 export * from './categoryFieldGroups';
-export * from './settingsFieldGroupDisclosure';
 export * from './settingsSubCategories';
 export * from './SettingsField';
 export * from './SettingsHelpButton';

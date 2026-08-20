@@ -76,12 +76,6 @@ import {
 } from '../components/settings/settingsGenerationDraftModel';
 import SettingsConflictPanel from '../components/settings/SettingsConflictPanel';
 import SettingsActiveConfigPanel from '../components/settings/SettingsActiveConfigPanel';
-import {
-  SETTINGS_FIELD_QUERY_KEY,
-  focusSettingsFieldWhenPresent,
-  resolveSettingsRevealFieldKey,
-  settingsRevealUrlFingerprint,
-} from '../components/settings/settingsFieldGroupDisclosure';
 import { SettingsOnboardingHosts } from '../components/onboarding/SettingsOnboardingHosts';
 import {
   SETTINGS_SECTIONS,
@@ -169,11 +163,7 @@ const SettingsPage: React.FC = () => {
   const [revealFieldRequest, setRevealFieldRequest] = useState<{
     requestId: number;
     key: string;
-    urlFingerprint: string;
   } | null>(null);
-  const [locationHash, setLocationHash] = useState(
-    () => (typeof window === 'undefined' ? '' : window.location.hash),
-  );
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
   const [schedulerRuntimeEnabled, setSchedulerRuntimeEnabled] = useState<boolean | null>(null);
@@ -305,23 +295,24 @@ const SettingsPage: React.FC = () => {
     }
     return SETTINGS_SECTIONS[0].id;
   }, [searchParams]);
-  useEffect(() => {
-    const syncHash = () => setLocationHash(window.location.hash);
-    window.addEventListener('hashchange', syncHash);
-    return () => window.removeEventListener('hashchange', syncHash);
-  }, []);
-  const queryField = searchParams.get(SETTINGS_FIELD_QUERY_KEY);
-  const revealFieldKey = resolveSettingsRevealFieldKey({
-    requestKey: revealFieldRequest?.key,
-    requestUrlFingerprint: revealFieldRequest?.urlFingerprint,
-    queryField,
-    hash: locationHash,
-  });
+  const queryField = searchParams.get('field');
   useEffect(() => {
     if (!revealFieldRequest || parseModelAccessFieldKey(revealFieldRequest.key)) {
       return undefined;
     }
-    return focusSettingsFieldWhenPresent(revealFieldRequest.key);
+    const fieldKey = revealFieldRequest.key;
+    let cancelled = false;
+    let stop = () => {};
+    void import('../components/settings/settingsFieldGroupDisclosure').then((module) => {
+      if (cancelled) {
+        return;
+      }
+      stop = module.focusSettingsFieldWhenPresent(fieldKey);
+    });
+    return () => {
+      cancelled = true;
+      stop();
+    };
   }, [revealFieldRequest]);
   useEffect(() => {
     document.title = t(activeSection === SETTINGS_SECTION_IDS.usage
@@ -841,12 +832,11 @@ const SettingsPage: React.FC = () => {
     setRevealFieldRequest((previous) => ({
       requestId: (previous?.requestId ?? 0) + 1,
       key: entry.key,
-      urlFingerprint: settingsRevealUrlFingerprint(queryField, locationHash),
     }));
     if (parseModelAccessFieldKey(entry.key)) {
       setLlmFocusFieldRequest((previous) => ({ requestId: (previous?.requestId ?? 0) + 1, key: entry.key }));
     }
-  }, [locationHash, queryField, selectSectionView]);
+  }, [selectSectionView]);
   // Some settings (e.g. WEBUI host/port, log dir) only take effect after a
   // restart. Surface a page-level notice when any *changed* field is one of
   // them so the user knows a save alone won't apply them.
@@ -1450,7 +1440,8 @@ const SettingsPage: React.FC = () => {
       activeCategory={activeCategory}
       maskToken={maskToken}
       configVersion={configVersion}
-      revealFieldKey={revealFieldKey}
+      queryField={queryField}
+      revealRequestKey={revealFieldRequest?.key}
       revealRequestId={revealFieldRequest?.requestId}
     />
   );

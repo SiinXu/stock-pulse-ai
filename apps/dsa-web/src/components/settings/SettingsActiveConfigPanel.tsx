@@ -30,7 +30,7 @@ import type { SettingsSaveStatus } from './autosaveMachine';
 
 export type { FieldGroupDescriptor };
 
-const SettingsFieldGroupPanel = lazy(() => import('./SettingsFieldGroupPanel'));
+const SettingsFieldGroups = lazy(() => import('./SettingsFieldGroupPanel'));
 
 export type SettingsActiveConfigPanelProps = {
   panelKey: string;
@@ -70,8 +70,10 @@ export type SettingsActiveConfigPanelProps = {
   /** Optional mask token so notification channel cards can run test-to-bind. */
   maskToken?: string;
   configVersion: string;
-  /** Search, deep-link, or error-jump target that must reveal its collapsed group. */
-  revealFieldKey?: string | null;
+  /** URL `?field=` value so collapsed groups can reveal without page-level helpers. */
+  queryField?: string | null;
+  /** Error-jump field key that must reveal its collapsed group. */
+  revealRequestKey?: string | null;
   /** Bumped on each jump so the same field can re-open a user-collapsed group. */
   revealRequestId?: number | null;
 };
@@ -116,7 +118,8 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   activeCategory,
   maskToken,
   configVersion,
-  revealFieldKey = null,
+  queryField = null,
+  revealRequestKey = null,
   revealRequestId = null,
 }) => {
   const { t } = useUiLanguage();
@@ -206,43 +209,34 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
           readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
         />
       ) : activeFieldGroupOrder ? (
-        <div className="space-y-4">
-          <Suspense fallback={null}>
-          {activeFieldGroupOrder.map((group) => {
-            const groupItems = subFilteredItems
-              .filter((item) => fieldGroupIdOf(item.key) === group.id)
-              .sort((a, b) => fieldGroupOrderOf(a.key) - fieldGroupOrderOf(b.key));
-            if (!groupItems.length) {
-              return null;
-            }
-            const showChannelRoutingEmptyBanner = hasConfiguredNotificationChannelStatus
+        <Suspense fallback={null}>
+          <SettingsFieldGroups
+            groups={activeFieldGroupOrder}
+            items={subFilteredItems}
+            fieldGroupIdOf={fieldGroupIdOf}
+            fieldGroupOrderOf={fieldGroupOrderOf}
+            queryField={queryField}
+            revealRequestKey={revealRequestKey}
+            revealRequestId={revealRequestId}
+            showChannelRoutingEmptyBannerFor={(groupItems) => (
+              hasConfiguredNotificationChannelStatus
               && configuredRoutingValues.size === 0
-              && groupItems.some((item) => channelRoutingFieldKeys.has(item.key));
-            return (
-              <SettingsFieldGroupPanel
-                key={group.id}
-                group={group}
-                groupItems={groupItems}
-                revealFieldKey={revealFieldKey}
-                revealRequestId={revealRequestId}
-                showChannelRoutingEmptyBanner={showChannelRoutingEmptyBanner}
-                channelRoutingEmptyBanner={channelRoutingEmptyBanner}
-                isSaving={isSaving}
-                setDraftValue={setDraftValue}
-                issueByKey={issueByKey}
-                allValuesByKey={allValuesByKey}
-                readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
-                activeCategory={activeCategory}
-                channelRoutingFieldKeys={channelRoutingFieldKeys}
-                hasConfiguredNotificationChannelStatus={hasConfiguredNotificationChannelStatus}
-                channelRoutingOptionFilter={channelRoutingOptionFilter}
-                channelRoutingEmptyState={channelRoutingEmptyState}
-                Field={SettingsField}
-              />
-            );
-          })}
-          </Suspense>
-        </div>
+              && groupItems.some((item) => channelRoutingFieldKeys.has(item.key))
+            )}
+            channelRoutingEmptyBanner={channelRoutingEmptyBanner}
+            isSaving={isSaving}
+            setDraftValue={setDraftValue}
+            issueByKey={issueByKey}
+            allValuesByKey={allValuesByKey}
+            readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
+            activeCategory={activeCategory}
+            channelRoutingFieldKeys={channelRoutingFieldKeys}
+            hasConfiguredNotificationChannelStatus={hasConfiguredNotificationChannelStatus}
+            channelRoutingOptionFilter={channelRoutingOptionFilter}
+            channelRoutingEmptyState={channelRoutingEmptyState}
+            Field={SettingsField}
+          />
+        </Suspense>
       ) : subFilteredItems.length ? (
         <form
           className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
