@@ -109,4 +109,66 @@ export function registerSettingsPageDisclosureTests(): void {
     fireEvent.click(screen.getByRole('button', { name: /前往修正: Tavily API Keys/ }));
     expect(await groupToggle('search')).toHaveAttribute('aria-expanded', 'true');
   });
+
+  it('opens Web & Logs groups on direct service entry so diagnostics controls are reachable', async () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'system',
+      activeSubCategory: 'web',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        system: [
+          {
+            key: 'WEBUI_PORT',
+            value: '8000',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'WEBUI_PORT',
+              title: 'Web UI Port',
+              category: 'system' as const,
+              dataType: 'integer' as const,
+              uiControl: 'number' as const,
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: { min: 1, max: 65535 },
+              displayOrder: 1,
+            },
+          },
+          {
+            key: 'LOG_LEVEL',
+            value: 'INFO',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'LOG_LEVEL',
+              title: '日志级别',
+              category: 'system' as const,
+              dataType: 'string' as const,
+              uiControl: 'select' as const,
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'],
+              validation: {},
+              displayOrder: 2,
+            },
+          },
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({
+      section: 'system_security',
+      view: 'service',
+    });
+    render(<SettingsPage />);
+
+    expect(await groupToggle('web')).toHaveAttribute('aria-expanded', 'true');
+    expect(await groupToggle('log')).toHaveAttribute('aria-expanded', 'true');
+    const logLevel = await screen.findByRole('combobox', { name: '日志级别' });
+    expect(logLevel.closest('[hidden]')).toBeNull();
+    expect(logLevel.closest('[inert]')).toBeNull();
+  });
 }

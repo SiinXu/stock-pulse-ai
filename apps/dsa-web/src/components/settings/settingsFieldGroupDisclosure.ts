@@ -21,6 +21,19 @@ export function isSettingsGroupDefaultOpen(groupId: string): boolean {
   return DEFAULT_OPEN_GROUP_ID_SET.has(groupId);
 }
 
+/**
+ * Destination views such as Web & Logs filter to groups that are never in the
+ * default-open set. Opening those rendered groups after the lazy chunk mounts
+ * keeps the view's controls reachable without changing quote/primary/schedule
+ * progressive disclosure on lists that still have a primary group.
+ */
+export function settingsRenderedGroupsNeedDestinationOpen(
+  renderedGroupIds: readonly string[],
+): boolean {
+  return renderedGroupIds.length > 0
+    && !renderedGroupIds.some((groupId) => isSettingsGroupDefaultOpen(groupId));
+}
+
 export function parseSettingsFieldHash(hash: string): string | null {
   if (!hash.startsWith('#setting-')) {
     return null;

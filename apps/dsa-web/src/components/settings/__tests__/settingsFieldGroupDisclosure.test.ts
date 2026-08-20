@@ -7,6 +7,7 @@ import {
   isSettingsGroupDefaultOpen,
   parseSettingsFieldHash,
   resolveSettingsRevealFieldKey,
+  settingsRenderedGroupsNeedDestinationOpen,
   settingsRevealUrlFingerprint,
 } from '../settingsFieldGroupDisclosure';
 
@@ -19,6 +20,10 @@ describe('settingsFieldGroupDisclosure', () => {
     for (const groupId of ['search', 'news', 'other', 'routing', 'report', 'behavior', 'web', 'log']) {
       expect(isSettingsGroupDefaultOpen(groupId), groupId).toBe(false);
     }
+    expect(settingsRenderedGroupsNeedDestinationOpen(['quote', 'search'])).toBe(false);
+    expect(settingsRenderedGroupsNeedDestinationOpen(['web', 'log'])).toBe(true);
+    expect(settingsRenderedGroupsNeedDestinationOpen(['routing'])).toBe(true);
+    expect(settingsRenderedGroupsNeedDestinationOpen([])).toBe(false);
   });
 
   it('parses a field hash and prefers an explicit reveal request', () => {

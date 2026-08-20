@@ -1,0 +1,1 @@
+- [Fixed] Reveal Settings destination groups after lazy load when a view has no default-open group, keep schema safety diagnostics visible on the field, and focus the targeted control from `?field=` / hash / error jumps (Refs #1395).
