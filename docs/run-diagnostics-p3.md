@@ -30,6 +30,7 @@ GET /api/v1/history/{record_id}/diagnostics
 - 批量入口为汇总报告建立独立 delivery trace，并把真实 `render` / `dispatch` 终态合并回每个结果的既有分析诊断；不会把批量延后执行误记为 skipped，也不会覆盖分析阶段记录。
 - 通知失败只把 `dispatch` 标为 failed/degraded，不会把已成功的 `AnalysisResult` 改为失败；部分渠道成功时为 degraded，全部失败时为 failed。部分渠道已经送达时，在 PIPE-02 提供幂等 fence 前 `retryable=false`，避免重试复制已成功通知。
 - 本地报告的 `render` 终态包含文件输出结果；报告内容生成成功但文件写入失败时仍记录为 failed。
+- 单股投递会在 `notifier.is_available()` 早退之前先把普通本地 Markdown 报告写入 `reports/report_YYYYMMDD_<code>.md`。渠道未配置时 `render` 仍为 success，`dispatch` 记为 skipped/`notification_not_configured`，并且不调用 send。该路径的本地写入失败 fail-open：记录告警，不把 `render` 改为 failed，也不阻断已配置渠道的发送。批量 `_save_local_report()` 的文件写入失败仍按上一条将 `render` 记为 failed。
 - `pipeline_stage_runs` 是 `context_snapshot.diagnostics` 的可选追加字段，不修改数据库 schema、API 必填字段、配置项或既有 Run Flow 事件。
 
 ### Pipeline 阶段 Result 与重试 fence
