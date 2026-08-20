@@ -8,8 +8,9 @@ import sys
 import threading
 import time
 import unittest
+from datetime import datetime
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -27,6 +28,7 @@ class _TrackingNotifier:
         self.thread_names = []
         self.email_stock_codes = []
         self.sent_reports = []
+        self.saved_reports = []
         self._lock = threading.Lock()
         self._inflight = 0
         self.max_inflight = 0
@@ -44,7 +46,12 @@ class _TrackingNotifier:
         self.generate_single_stock_report = MagicMock(
             side_effect=lambda result, report_type=None: f"single:{result.code}"
         )
+        self.save_report_to_file = MagicMock(side_effect=self._save_report_to_file)
         self.send = MagicMock(side_effect=self._send)
+
+    def _save_report_to_file(self, content, filename=None):
+        self.saved_reports.append((content, filename))
+        return f"/tmp/{filename or 'report.md'}"
 
     def _send(
         self,
@@ -81,6 +88,15 @@ def _make_result(code: str, success: bool = True) -> AnalysisResult:
         success=success,
         error_message=None if success else "JSON解析失败",
     )
+
+
+class _FrozenReportDateTime(datetime):
+    """Keep filename assertions stable without replacing the datetime type."""
+
+    @classmethod
+    def now(cls, tz=None):
+        frozen = cls(2030, 1, 2, 12, 0, 0)
+        return frozen if tz is None else frozen.replace(tzinfo=tz)
 
 
 class TestPipelineSingleStockNotify(unittest.TestCase):
@@ -153,19 +169,23 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         pipeline.notifier = _TrackingNotifier()
         pipeline.config = SimpleNamespace(notification_delta_first=False)
 
-        result = pipeline.process_single_stock(
-            code="600519",
-            skip_analysis=False,
-            single_stock_notify=True,
-            report_type=ReportType.BRIEF,
-            analysis_query_id="query-1",
-        )
+        with patch("src.core.pipeline.datetime", _FrozenReportDateTime):
+            result = pipeline.process_single_stock(
+                code="600519",
+                skip_analysis=False,
+                single_stock_notify=True,
+                report_type=ReportType.BRIEF,
+                analysis_query_id="query-1",
+            )
 
         self.assertIsNotNone(result)
         pipeline.notifier.generate_brief_report.assert_called_once_with(
             [result],
             report_type=ReportType.BRIEF,
         )
+        save_call = pipeline.notifier.save_report_to_file.call_args
+        self.assertEqual(save_call.args[0], "brief:600519")
+        self.assertEqual(save_call.kwargs["filename"], "report_20300102_600519.md")
         pipeline.notifier.send.assert_called_once_with(
             "brief:600519",
             email_stock_codes=["600519"],
@@ -194,6 +214,8 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         )
 
         pipeline._format_delta_first_notification.assert_called_once()
+        save_call = pipeline.notifier.save_report_to_file.call_args
+        self.assertEqual(save_call.args[0], "single:600519")
         pipeline.notifier.send.assert_called_once_with(
             "delta-first:600519",
             email_stock_codes=["600519"],
@@ -202,6 +224,85 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
             dedup_key="report:single:600519:simple",
             cooldown_key="report:single:600519:simple",
         )
+
+    def test_process_single_stock_saves_report_even_when_notifier_is_unavailable(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
+        pipeline.analyze_stock = MagicMock(return_value=_make_result("600519"))
+        pipeline.notifier = _TrackingNotifier()
+        pipeline.notifier.is_available.return_value = False
+        pipeline.config = SimpleNamespace(notification_delta_first=False)
+        pipeline._format_delta_first_notification = MagicMock(
+            return_value="delta-first:600519"
+        )
+
+        with patch("src.core.pipeline.datetime", _FrozenReportDateTime):
+            result = pipeline.process_single_stock(
+                code="600519",
+                skip_analysis=False,
+                single_stock_notify=True,
+                report_type=ReportType.SIMPLE,
+                analysis_query_id="query-1",
+            )
+
+        self.assertIsNotNone(result)
+        save_call = pipeline.notifier.save_report_to_file.call_args
+        self.assertEqual(save_call.args[0], "single:600519")
+        self.assertEqual(save_call.kwargs["filename"], "report_20300102_600519.md")
+        pipeline.notifier.send.assert_not_called()
+        pipeline._format_delta_first_notification.assert_not_called()
+
+    def test_process_single_stock_save_failure_does_not_block_enabled_send(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
+        pipeline.analyze_stock = MagicMock(return_value=_make_result("600519"))
+        pipeline.notifier = _TrackingNotifier()
+        pipeline.notifier.save_report_to_file = MagicMock(
+            side_effect=OSError("permission denied")
+        )
+        pipeline.config = SimpleNamespace(notification_delta_first=False)
+
+        result = pipeline.process_single_stock(
+            code="600519",
+            skip_analysis=False,
+            single_stock_notify=True,
+            report_type=ReportType.SIMPLE,
+            analysis_query_id="query-1",
+        )
+
+        self.assertIsNotNone(result)
+        pipeline.notifier.save_report_to_file.assert_called_once()
+        pipeline.notifier.send.assert_called_once_with(
+            "single:600519",
+            email_stock_codes=["600519"],
+            route_type="report",
+            severity="info",
+            dedup_key="report:single:600519:simple",
+            cooldown_key="report:single:600519:simple",
+        )
+
+    def test_process_single_stock_save_failure_still_skips_unconfigured_send(self):
+        pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+        pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
+        pipeline.analyze_stock = MagicMock(return_value=_make_result("600519"))
+        pipeline.notifier = _TrackingNotifier()
+        pipeline.notifier.is_available.return_value = False
+        pipeline.notifier.save_report_to_file = MagicMock(
+            side_effect=OSError("permission denied")
+        )
+        pipeline.config = SimpleNamespace(notification_delta_first=False)
+
+        result = pipeline.process_single_stock(
+            code="600519",
+            skip_analysis=False,
+            single_stock_notify=True,
+            report_type=ReportType.SIMPLE,
+            analysis_query_id="query-1",
+        )
+
+        self.assertIsNotNone(result)
+        pipeline.notifier.save_report_to_file.assert_called_once()
+        pipeline.notifier.send.assert_not_called()
 
     def test_process_single_stock_updates_saved_diagnostics_after_notification(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
@@ -269,6 +370,7 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertFalse(result.success)
         pipeline.notifier.generate_brief_report.assert_not_called()
+        pipeline.notifier.save_report_to_file.assert_not_called()
         pipeline.notifier.send.assert_not_called()
 
 

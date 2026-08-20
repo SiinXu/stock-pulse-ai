@@ -1,0 +1,1 @@
+- [Fixed] Single-stock delivery now saves the ordinary local Markdown report before skipping notification when no channel is configured (Refs #1221).

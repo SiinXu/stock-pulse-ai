@@ -4,6 +4,7 @@
 import logging
 import sys
 import threading
+from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.analyzer import AnalysisResult
@@ -180,50 +181,6 @@ class _DeliveryStageMixin:
         fallback_code: Optional[str] = None,
     ) -> None:
         """发送单股通知，供直接单股入口和批量串行推送共用。"""
-        if not self.notifier.is_available():
-            self._record_pipeline_stage_result(
-                PipelineStageResult.skipped(
-                    PipelineStageName.RENDER,
-                    reason="notification_not_configured",
-                ),
-                input_summary={
-                    "stock_code": getattr(result, "code", None) or fallback_code,
-                    "report_type": report_type.value,
-                    "result_count": 1,
-                },
-                output_summary={"reason": "notification_not_configured"},
-            )
-            self._record_pipeline_stage_result(
-                PipelineStageResult.skipped(
-                    PipelineStageName.DISPATCH,
-                    reason="notification_not_configured",
-                ),
-                input_summary={
-                    "stock_code": getattr(result, "code", None) or fallback_code,
-                    "route": "report",
-                    "result_count": 1,
-                },
-                output_summary={"reason": "notification_not_configured"},
-            )
-            notification_run = self._build_notification_run_snapshot(
-                channel="report",
-                status="not_configured",
-                success=False,
-                attempts=0,
-            )
-            record_notification_run(
-                channel="report",
-                status="not_configured",
-                success=False,
-                attempts=0,
-            )
-            self._refresh_saved_diagnostic_snapshot(
-                result=result,
-                fallback_code=fallback_code,
-                notification_run=notification_run,
-            )
-            return
-
         stock_code = getattr(result, "code", None) or fallback_code or "unknown"
         notify_lock = getattr(self, "_single_stock_notify_lock", None)
         if notify_lock is None:
@@ -266,6 +223,73 @@ class _DeliveryStageMixin:
                         report_type=report_type,
                     )
                     logger.info("[%s] Using simple report format", stock_code)
+
+                save_report = getattr(self.notifier, "save_report_to_file", None)
+                if callable(save_report):
+                    try:
+                        date_str = datetime.now().strftime("%Y%m%d")
+                        filename = f"report_{date_str}_{stock_code}.md"
+                        filepath = save_report(report_content, filename=filename)
+                        logger.info(
+                            "[%s] Single-stock report saved locally: %s",
+                            stock_code,
+                            filepath,
+                        )
+                    except Exception as exc:  # broad-exception: fallback_recorded - local I/O must not block analysis or skip enabled notification sending
+                        log_safe_exception(
+                            logger,
+                            "Single-stock local report persistence failed",
+                            exc,
+                            error_code="pipeline_single_stock_local_report_save_failed",
+                            context={"stock_code": stock_code},
+                            level=logging.WARNING,
+                        )
+
+                if not self.notifier.is_available():
+                    render_output = RenderStageOutput.from_content(
+                        report_content,
+                        route="single_stock",
+                    )
+                    render_result = PipelineStageResult.success(
+                        PipelineStageName.RENDER,
+                        render_output.as_legacy_value(),
+                    )
+                    self._finish_pipeline_stage(
+                        render_stage,
+                        render_result,
+                        output_summary=render_output.to_output_summary(),
+                    )
+                    self._record_pipeline_stage_result(
+                        PipelineStageResult.skipped(
+                            PipelineStageName.DISPATCH,
+                            reason="notification_not_configured",
+                        ),
+                        input_summary={
+                            "stock_code": stock_code,
+                            "route": "report",
+                            "result_count": 1,
+                        },
+                        output_summary={"reason": "notification_not_configured"},
+                    )
+                    notification_run = self._build_notification_run_snapshot(
+                        channel="report",
+                        status="not_configured",
+                        success=False,
+                        attempts=0,
+                    )
+                    record_notification_run(
+                        channel="report",
+                        status="not_configured",
+                        success=False,
+                        attempts=0,
+                    )
+                    self._refresh_saved_diagnostic_snapshot(
+                        result=result,
+                        fallback_code=fallback_code,
+                        notification_run=notification_run,
+                    )
+                    return
+
                 report_content = self._format_delta_first_notification(
                     report_content,
                     [result],

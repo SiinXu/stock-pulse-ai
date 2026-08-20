@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -303,6 +303,34 @@ def test_resolve_failure_is_timed_and_skips_downstream_stages() -> None:
     )
 
 
+class _UnavailableNotifier:
+    """Minimal notifier that can render and save but has no delivery channel."""
+
+    def __init__(self) -> None:
+        self.saved_reports = []
+        self.send_calls = 0
+
+    def is_available(self) -> bool:
+        """Report that no notification channel is configured."""
+        return False
+
+    def generate_single_stock_report(self, result, report_type=None) -> str:
+        """Return a deterministic rendered report."""
+        _ = (result, report_type)
+        return "rendered report"
+
+    def save_report_to_file(self, content, filename=None) -> str:
+        """Persist the rendered report without requiring a channel."""
+        self.saved_reports.append((content, filename))
+        return f"/tmp/{filename or 'report.md'}"
+
+    def send(self, content: str, **kwargs) -> bool:
+        """Fail the test if dispatch runs while unconfigured."""
+        _ = (content, kwargs)
+        self.send_calls += 1
+        raise AssertionError("send() must not run when notifier is unconfigured")
+
+
 class _FailedNotifier:
     """Minimal notifier that renders successfully but cannot dispatch."""
 
@@ -389,6 +417,48 @@ def test_notification_failure_is_dispatch_failure_not_analysis_failure() -> None
     assert stage_runs[-1]["output_summary"]["attempt_count"] == 1
     assert stage_runs[-1]["output_summary"]["failure_count"] == 1
     assert stage_runs[-1]["retryable"] is True
+
+
+def test_unconfigured_single_stock_render_succeeds_and_dispatch_is_skipped() -> None:
+    """Persist the local report before skipping dispatch when no channel exists."""
+    from src.core.pipeline import StockAnalysisPipeline
+    from src.enums import ReportType
+
+    notifier = _UnavailableNotifier()
+    pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
+    pipeline.notifier = notifier
+    pipeline.save_context_snapshot = False
+    result = SimpleNamespace(code="600519", query_id="query-stage", success=True)
+    token = activate_run_diagnostic_context(
+        trace_id="trace-unconfigured",
+        query_id="query-stage",
+        stock_code="600519",
+    )
+    try:
+        class _FrozenReportDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                frozen = cls(2030, 1, 2, 12, 0, 0)
+                return frozen if tz is None else frozen.replace(tzinfo=tz)
+
+        with patch("src.core.pipeline.datetime", _FrozenReportDateTime):
+            pipeline._send_single_stock_notification(result, ReportType.SIMPLE)
+        snapshot = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert result.success is True
+    assert notifier.saved_reports == [("rendered report", "report_20300102_600519.md")]
+    assert notifier.send_calls == 0
+    assert snapshot is not None
+    stage_runs = snapshot["pipeline_stage_runs"]
+    assert [(run["stage"], run["status"]) for run in stage_runs] == [
+        ("render", "success"),
+        ("dispatch", "skipped"),
+    ]
+    assert stage_runs[0]["output_summary"]["route"] == "single_stock"
+    assert stage_runs[-1]["output_summary"]["reason"] == "notification_not_configured"
+    assert snapshot["notification_runs"][-1]["status"] == "not_configured"
 
 
 def test_single_stock_partial_dispatch_is_degraded_and_not_retryable() -> None:

@@ -269,7 +269,7 @@ circuit, cache freshness, and stale-window rules are defined in
 | `context` | Assemble bounded historical, request, and prompt context with provenance and quality state. | analysis context services and schemas |
 | `analyze` | Execute normal LLM analysis or the approved Agent path, then normalize and guard the result. | `src/analyzer.py`, `src/analyzer_parts/`, `src/llm/`, `src/agent/` |
 | `persist` | Store analysis history and its eligible context snapshot. | `src/repositories/`, `src/storage.py` |
-| `render` | Generate the selected report representation and persist local report artifacts. | report schema, renderer, templates, delivery stage |
+| `render` | Generate the selected report representation and persist local report artifacts. Single-stock delivery writes the normal local Markdown report before the notifier-availability check, so a missing channel skips `dispatch` without dropping the file. | report schema, renderer, templates, delivery stage |
 | `dispatch` | Isolate notification and contextual-reply attempts across configured delivery channels. | delivery stage and notification modules |
 
 ## Product Skill And Strategy Execution
