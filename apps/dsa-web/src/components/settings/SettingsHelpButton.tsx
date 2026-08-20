@@ -17,6 +17,8 @@ interface SettingsHelpButtonProps {
   description?: string;
   /** Whether the saved config sets this key explicitly (vs. using the default). */
   rawValueExists?: boolean;
+  /** Non-blocking field status copy (optional, read-only, restart, dependency). */
+  statusNotes?: readonly string[];
 }
 
 export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
@@ -24,6 +26,7 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
   schema,
   helpKey,
   description,
+  statusNotes = [],
 }) => {
   const { language, t } = useUiLanguage();
   const help = getSettingsHelpContent(helpKey ?? schema?.helpKey, description, language)
@@ -31,8 +34,9 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
   const purpose = description ?? help?.summary ?? help?.usage ?? '';
   const recommendation = help?.notes?.[0] ?? help?.usage ?? help?.valueNotes?.[0] ?? '';
   const helpButtonLabel = formatUiText(SETTINGS_MISC_TEXT[language].helpLabel, { title });
+  const hasStatusNotes = statusNotes.length > 0;
 
-  if (!help || (!purpose && !recommendation)) {
+  if ((!help || (!purpose && !recommendation)) && !hasStatusNotes) {
     return null;
   }
 
@@ -49,10 +53,15 @@ export const SettingsHelpButton: React.FC<SettingsHelpButtonProps> = ({
               <span className="block text-secondary-text">{purpose}</span>
             </span>
           ) : null}
-          {recommendation && recommendation !== purpose ? (
-            <span className="block">
+          {(recommendation && recommendation !== purpose) || hasStatusNotes ? (
+            <span className="block" data-testid={hasStatusNotes ? 'settings-field-status-notes' : undefined}>
               <span className="block font-medium text-foreground">{t('settings.helpNotes')}</span>
-              <span className="block text-secondary-text">{recommendation}</span>
+              {recommendation && recommendation !== purpose ? (
+                <span className="block text-secondary-text">{recommendation}</span>
+              ) : null}
+              {statusNotes.map((note) => (
+                <span key={note} className="block text-secondary-text">{note}</span>
+              ))}
             </span>
           ) : null}
         </span>

@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { lazy, Suspense } from 'react';
 import type React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -9,7 +10,7 @@ import {
   resolveFieldRequirement,
 } from '../../utils/configConditions';
 import { EmptyState } from '../common';
-import type { UiTextKey } from '../../i18n/uiText';
+import type { FieldGroupDescriptor } from './settingsFieldGroupDisclosure';
 // Import via the settings barrel so SettingsPage.testHarness mocks apply.
 import {
   SettingsField,
@@ -27,10 +28,9 @@ import { AgentBehaviorPanel } from './AgentBehaviorPanel';
 import type { AgentModelSummary } from './AgentBehaviorPanel';
 import type { SettingsSaveStatus } from './autosaveMachine';
 
-export type FieldGroupDescriptor = {
-  id: string;
-  titleKey: UiTextKey;
-};
+export type { FieldGroupDescriptor };
+
+const SettingsFieldGroupPanel = lazy(() => import('./SettingsFieldGroupPanel'));
 
 export type SettingsActiveConfigPanelProps = {
   panelKey: string;
@@ -70,6 +70,10 @@ export type SettingsActiveConfigPanelProps = {
   /** Optional mask token so notification channel cards can run test-to-bind. */
   maskToken?: string;
   configVersion: string;
+  /** Search, deep-link, or error-jump target that must reveal its collapsed group. */
+  revealFieldKey?: string | null;
+  /** Bumped on each jump so the same field can re-open a user-collapsed group. */
+  revealRequestId?: number | null;
 };
 
 /**
@@ -112,6 +116,8 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   activeCategory,
   maskToken,
   configVersion,
+  revealFieldKey = null,
+  revealRequestId = null,
 }) => {
   const { t } = useUiLanguage();
 
@@ -201,6 +207,7 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
         />
       ) : activeFieldGroupOrder ? (
         <div className="space-y-4">
+          <Suspense fallback={null}>
           {activeFieldGroupOrder.map((group) => {
             const groupItems = subFilteredItems
               .filter((item) => fieldGroupIdOf(item.key) === group.id)
@@ -212,40 +219,29 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
               && configuredRoutingValues.size === 0
               && groupItems.some((item) => channelRoutingFieldKeys.has(item.key));
             return (
-              <div key={group.id} className="space-y-2">
-                <h3 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h3>
-                {showChannelRoutingEmptyBanner ? channelRoutingEmptyBanner : null}
-                <form
-                  className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
-                  onSubmit={(event) => event.preventDefault()}
-                >
-                  {groupItems.map((item) => (
-                    <SettingsField
-                      key={item.key}
-                      item={item}
-                      value={item.value}
-                      disabled={isSaving}
-                      onChange={setDraftValue}
-                      issues={issueByKey[item.key] || []}
-                      requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                      dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                      readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
-                      enumOptionFilter={
-                        channelRoutingFieldKeys.has(item.key) && hasConfiguredNotificationChannelStatus
-                          ? channelRoutingOptionFilter
-                          : undefined
-                      }
-                      enumEmptyState={
-                        channelRoutingFieldKeys.has(item.key) && hasConfiguredNotificationChannelStatus
-                          ? channelRoutingEmptyState
-                          : undefined
-                      }
-                    />
-                  ))}
-                </form>
-              </div>
+              <SettingsFieldGroupPanel
+                key={group.id}
+                group={group}
+                groupItems={groupItems}
+                revealFieldKey={revealFieldKey}
+                revealRequestId={revealRequestId}
+                showChannelRoutingEmptyBanner={showChannelRoutingEmptyBanner}
+                channelRoutingEmptyBanner={channelRoutingEmptyBanner}
+                isSaving={isSaving}
+                setDraftValue={setDraftValue}
+                issueByKey={issueByKey}
+                allValuesByKey={allValuesByKey}
+                readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
+                activeCategory={activeCategory}
+                channelRoutingFieldKeys={channelRoutingFieldKeys}
+                hasConfiguredNotificationChannelStatus={hasConfiguredNotificationChannelStatus}
+                channelRoutingOptionFilter={channelRoutingOptionFilter}
+                channelRoutingEmptyState={channelRoutingEmptyState}
+                Field={SettingsField}
+              />
             );
           })}
+          </Suspense>
         </div>
       ) : subFilteredItems.length ? (
         <form

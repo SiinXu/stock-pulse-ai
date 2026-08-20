@@ -76,6 +76,10 @@ import {
 } from '../components/settings/settingsGenerationDraftModel';
 import SettingsConflictPanel from '../components/settings/SettingsConflictPanel';
 import SettingsActiveConfigPanel from '../components/settings/SettingsActiveConfigPanel';
+import {
+  SETTINGS_FIELD_QUERY_KEY,
+  resolveSettingsRevealFieldKey,
+} from '../components/settings/settingsFieldGroupDisclosure';
 import { SettingsOnboardingHosts } from '../components/onboarding/SettingsOnboardingHosts';
 import {
   SETTINGS_SECTIONS,
@@ -160,6 +164,10 @@ const SettingsPage: React.FC = () => {
   });
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
+  const [revealFieldRequest, setRevealFieldRequest] = useState<{ requestId: number; key: string } | null>(null);
+  const [locationHash, setLocationHash] = useState(
+    () => (typeof window === 'undefined' ? '' : window.location.hash),
+  );
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
   const [schedulerRuntimeEnabled, setSchedulerRuntimeEnabled] = useState<boolean | null>(null);
@@ -291,6 +299,16 @@ const SettingsPage: React.FC = () => {
     }
     return SETTINGS_SECTIONS[0].id;
   }, [searchParams]);
+  useEffect(() => {
+    const syncHash = () => setLocationHash(window.location.hash);
+    window.addEventListener('hashchange', syncHash);
+    return () => window.removeEventListener('hashchange', syncHash);
+  }, []);
+  const revealFieldKey = resolveSettingsRevealFieldKey({
+    requestKey: revealFieldRequest?.key,
+    queryField: searchParams.get(SETTINGS_FIELD_QUERY_KEY),
+    hash: locationHash,
+  });
   useEffect(() => {
     document.title = t(activeSection === SETTINGS_SECTION_IDS.usage
       ? 'usage.documentTitle'
@@ -806,6 +824,10 @@ const SettingsPage: React.FC = () => {
     && dismissedErrorSummaryFingerprint !== errorSummaryFingerprint;
   const jumpToErrorField = useCallback((entry: ErrorSummaryEntry) => {
     selectSectionView(entry.section as SettingsSectionId, entry.view);
+    setRevealFieldRequest((previous) => ({
+      requestId: (previous?.requestId ?? 0) + 1,
+      key: entry.key,
+    }));
     if (parseModelAccessFieldKey(entry.key)) {
       setLlmFocusFieldRequest((previous) => ({ requestId: (previous?.requestId ?? 0) + 1, key: entry.key }));
       return;
@@ -1422,6 +1444,8 @@ const SettingsPage: React.FC = () => {
       activeCategory={activeCategory}
       maskToken={maskToken}
       configVersion={configVersion}
+      revealFieldKey={revealFieldKey}
+      revealRequestId={revealFieldRequest?.requestId}
     />
   );
   const activeSaveGroup = activeCategory;

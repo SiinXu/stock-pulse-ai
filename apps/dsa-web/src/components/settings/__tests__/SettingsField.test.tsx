@@ -151,9 +151,15 @@ describe('SettingsField', () => {
     );
 
     expect(screen.getByDisplayValue('saved-value')).toBeDisabled();
-    expect(screen.getByText('只读')).toBeInTheDocument();
-    expect(screen.getByTestId('settings-schema-diagnostic-UNSAFE_AI_FIELD')).toHaveTextContent(
+    expect(screen.queryByText('只读')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('settings-schema-diagnostic-UNSAFE_AI_FIELD')).not.toBeInTheDocument();
+    expect(openHelpTooltip(/配置说明/)).toHaveTextContent('只读');
+    expect(screen.getByTestId('settings-field-status-notes')).toHaveTextContent(
       'schema_condition_unknown',
+    );
+    expect(screen.getByTestId('settings-field-UNSAFE_AI_FIELD')).toHaveAttribute(
+      'aria-description',
+      expect.stringContaining('schema_condition_unknown'),
     );
   });
 
@@ -352,7 +358,8 @@ describe('SettingsField', () => {
         onChange={vi.fn()}
       />
     );
-    expect(screen.getByText('重启生效')).toBeInTheDocument();
+    expect(screen.queryByText('重启生效')).not.toBeInTheDocument();
+    expect(openHelpTooltip(/配置说明/)).toHaveTextContent('重启生效');
 
     // A field without the restart warning code shows no badge.
     rerender(
@@ -1369,6 +1376,88 @@ describe('SettingsField', () => {
     expect(tooltip).not.toHaveTextContent('当前取值来源');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /完整指南/ })).not.toBeInTheDocument();
+  });
+
+  it('keeps only required and validation errors on the label row', () => {
+    const onChange = vi.fn();
+    render(
+      <SettingsField
+        item={{
+          key: 'PROXY_HOST',
+          value: '127.0.0.1',
+          rawValueExists: true,
+          isMasked: false,
+          schema: {
+            key: 'PROXY_HOST',
+            title: 'Proxy host',
+            category: 'system',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: false,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+            warningCodes: ['restart_required'],
+          },
+        }}
+        value="127.0.0.1"
+        onChange={onChange}
+        requirement="optional"
+        dependencyLocked
+        issues={[
+          {
+            key: 'PROXY_HOST',
+            code: 'invalid',
+            message: '主机无效',
+            severity: 'error',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByText('选填')).not.toBeInTheDocument();
+    expect(screen.queryByText('依赖条件未满足')).not.toBeInTheDocument();
+    expect(screen.queryByText('重启生效')).not.toBeInTheDocument();
+    expect(screen.getByText('主机无效')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('127.0.0.1')).toBeDisabled();
+
+    const tooltip = openHelpTooltip(/配置说明/);
+    expect(tooltip).toHaveTextContent('选填');
+    expect(tooltip).toHaveTextContent('依赖条件未满足');
+    expect(tooltip).toHaveTextContent('重启生效');
+  });
+
+  it('keeps the required badge on the label and leaves inherited copy in help', () => {
+    render(
+      <SettingsField
+        item={{
+          key: 'REQUIRED_FIELD',
+          value: '',
+          rawValueExists: false,
+          isMasked: false,
+          schema: {
+            key: 'REQUIRED_FIELD',
+            title: 'Required field',
+            category: 'system',
+            dataType: 'string',
+            uiControl: 'text',
+            isSensitive: false,
+            isRequired: true,
+            isEditable: true,
+            options: [],
+            validation: {},
+            displayOrder: 1,
+          },
+        }}
+        value=""
+        onChange={vi.fn()}
+        requirement="required"
+      />,
+    );
+
+    expect(screen.getByText('必填')).toBeInTheDocument();
   });
 
   it('does not render inline external doc links or KEY=value examples on the field body', () => {

@@ -5,6 +5,9 @@ interface CollapsibleProps {
   title: string;
   children: React.ReactNode;
   defaultOpen?: boolean;
+  /** Controlled open state. When omitted, the panel is uncontrolled. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   icon?: React.ReactNode;
   className?: string;
 }
@@ -16,11 +19,22 @@ export const Collapsible: React.FC<CollapsibleProps> = ({
   title,
   children,
   defaultOpen = false,
+  open,
+  onOpenChange,
   icon,
   className = '',
 }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
+  const isControlled = open !== undefined;
+  const isOpen = isControlled ? open : uncontrolledOpen;
   const panelId = useId();
+
+  const setOpen = (next: boolean) => {
+    if (!isControlled) {
+      setUncontrolledOpen(next);
+    }
+    onOpenChange?.(next);
+  };
 
   return (
     <div
@@ -32,7 +46,7 @@ export const Collapsible: React.FC<CollapsibleProps> = ({
     >
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => setOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-controls={panelId}
         className="flex min-h-11 w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-hover"

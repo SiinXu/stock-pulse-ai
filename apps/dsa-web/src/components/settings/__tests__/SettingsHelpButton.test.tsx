@@ -45,4 +45,22 @@ describe('SettingsHelpButton tooltip contract', () => {
     fireEvent.keyDown(trigger.parentElement!, { key: 'Escape' });
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
   });
+
+  it('surfaces field status notes in the existing help tooltip', () => {
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <SettingsHelpButton
+          fieldKey="WEBUI_PORT"
+          title="Web UI Port"
+          statusNotes={['Read-only', 'Restart to apply']}
+        />
+      </UiLanguageProvider>,
+    );
+
+    const trigger = screen.getByRole('button', { name: /Web UI Port/ });
+    fireEvent.mouseEnter(trigger.parentElement!);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Read-only');
+    expect(tooltip).toHaveTextContent('Restart to apply');
+  });
 });

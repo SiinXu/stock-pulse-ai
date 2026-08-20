@@ -1,0 +1,1 @@
+- [Changed] Collapse Settings field groups behind the shared Collapsible (default-open quote, primary, and schedule only) and move optional, read-only, restart, and dependency status copy into field help (Refs #1332).
