@@ -209,7 +209,9 @@ describe('legacy surface migration guard', () => {
       .flatMap(([filename, source]) => findLegacySurfaceDebt(filename, source)));
 
     expect(actual).toEqual([]);
-    expect(productionSources['../../../index.html']).toContain('<div id="root"></div>');
+    expect(productionSources['../../../index.html']).toContain(
+      '<div id="root"><div data-locale-neutral-shell aria-busy="true" class="min-h-dvh bg-base"></div></div>',
+    );
     expect(productionSources['../../../vite.config.ts']).toContain('defineConfig');
     expect(Object.keys(productionSources).some((filename) => filename.endsWith('.css'))).toBe(true);
   });
