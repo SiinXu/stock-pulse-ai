@@ -180,12 +180,16 @@ font coverage are ready). Capability probing uses
 `GET /api/v1/history/export/capabilities`; unavailable optional formats stay
 visible but disabled with an explicit unavailable label.
 
+Decision Signal details reuse the same download controls and
+`reportExportApi.download` path when `sourceReportId` is a positive integer.
+Signals without a source report render no export controls and do not add a
+second exporter.
+
 ## Remaining Issue #163 scope
 
 - DOCX structured binary export (if product still needs native OOXML)
 - XLSX score/metric sheets
 - optional evidence/audit appendix toggle (#127)
-- DecisionSignal one-click export surface (report Markdown panel is covered)
 
 This path does not change templates, report generation, Desktop,
 `pdf_parsing_service.py`, share-image, or `md2img`.

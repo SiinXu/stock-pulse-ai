@@ -29,6 +29,7 @@ import {
   getDecisionSignalPlanQualityLabel,
 } from '../../utils/decisionSignalLabels';
 import { getReportLanguageForUi } from '../../utils/reportLanguage';
+import ReportExportDownloadButtons from '../report/ReportExportDownloadButtons';
 import { ReportRiskGateBanner } from '../report/ReportRiskGateBanner';
 import { buildRiskGatePresentation } from '../report/reportRiskGateUtils';
 
@@ -367,6 +368,11 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
   const qualityData = asJsonViewerData(item.dataQualitySummary);
   const metadataData = asJsonViewerData(item.metadata);
   const reportLanguage = getReportLanguageForUi(language);
+  const exportRecordId = typeof item.sourceReportId === 'number'
+    && Number.isInteger(item.sourceReportId)
+    && item.sourceReportId > 0
+    ? item.sourceReportId
+    : null;
 
   return (
     <div className="space-y-5">
@@ -380,7 +386,14 @@ export const DecisionSignalDetails: React.FC<DecisionSignalDetailsProps> = ({
           <h3 className="mt-3 text-xl font-semibold text-foreground">{item.stockName || item.stockCode}</h3>
           <p className="mt-1 font-mono text-sm text-secondary-text">{item.stockCode} · {getDecisionSignalMarketLabel(item.market, t)}</p>
         </div>
-        {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+        {exportRecordId !== null || actions ? (
+          <div className="flex flex-wrap items-start justify-end gap-2">
+            {exportRecordId !== null ? (
+              <ReportExportDownloadButtons recordId={exportRecordId} />
+            ) : null}
+            {actions ? <div className="flex flex-wrap gap-2">{actions}</div> : null}
+          </div>
+        ) : null}
       </div>
 
       <ReportRiskGateBanner

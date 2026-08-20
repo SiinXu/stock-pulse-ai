@@ -93,4 +93,25 @@ describe('ReportMarkdownPanel export controls', () => {
     });
     expect(htmlButton).toHaveAttribute('aria-label', 'HTML export is unavailable');
   });
+
+  it('surfaces the parsed export error without a second download path', async () => {
+    vi.mocked(reportExportApi.download).mockRejectedValue(new Error('export denied'));
+
+    render(
+      <UiLanguageProvider initialLanguage="en">
+        <ReportMarkdownPanel
+          recordId={7}
+          stockName="Demo"
+          stockCode="600519"
+          onRequestClose={() => undefined}
+        />
+      </UiLanguageProvider>,
+    );
+
+    fireEvent.click(await screen.findByTestId('report-export-md'));
+    expect(await screen.findByTestId('report-export-error')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(reportExportApi.download).toHaveBeenCalledWith(7, 'md');
+    });
+  });
 });

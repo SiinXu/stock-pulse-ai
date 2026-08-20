@@ -1,0 +1,1 @@
+- [Added] One-click Markdown, HTML, and PDF export on Decision Signal details when a source report ID is present, reusing the existing history report export path (Refs #163).
