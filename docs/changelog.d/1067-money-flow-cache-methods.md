@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager money-flow cache lookup, store, invalidate, and stats into `src/data_provider/manager_parts/money_flow_cache_methods.py` behind the existing `src.data_provider.base` facade without changing cache TTL, routing, circuit, or public imports (Refs #1067).

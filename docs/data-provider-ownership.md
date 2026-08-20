@@ -1,7 +1,7 @@
 # Data Provider Module Ownership
 
 - Status: `Living`
-- Last verified: 2026-08-12
+- Last verified: 2026-08-21
 - Related: [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md),
   [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md),
   Issue #622
@@ -17,7 +17,7 @@ priority, circuit, or fallback policy (ADR-005).
 
 | Public path | Role |
 | --- | --- |
-| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache descriptors. |
+| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache / realtime field-trust / money-flow cache descriptors. |
 | `src.data_provider` package (`__init__.py`) | Stable package exports for plugins and callers. |
 
 Production and test code import public names from `src.data_provider.base`.
@@ -30,7 +30,7 @@ orders converge on one current inventory and descriptor set. New
 **implementations** of extracted responsibilities belong in the owner module
 below, then re-exported from the facade when a public name must remain stable.
 
-## Ownership Map (after second extraction)
+## Ownership Map (after money-flow cache extraction)
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
@@ -42,13 +42,15 @@ below, then re-exported from the facade when a public name must remain stable.
 | `src/data_provider/daily_cache.py` | Layered daily cache keys and lookup helpers | Provider priority |
 | `src/data_provider/manager_parts/daily_cache_methods.py` | Manager-owned daily cache orchestration rebound onto `DataFetcherManager` (cache resolve, candidate validation, stock-name cache helpers) | Layered cache storage implementation (owned by `daily_cache.py`) |
 | `src/data_provider/manager_parts/daily_source_health.py` | Daily health/circuit/adaptive-priority methods rebound onto `DataFetcherManager` | Daily fetch execution loops |
+| `src/data_provider/manager_parts/realtime_field_trust_methods.py` | Manager-owned realtime quote attempt and field-trust bookkeeping rebound onto `DataFetcherManager` | Realtime routing policy, fallback order, and `get_realtime_quote` |
+| `src/data_provider/manager_parts/money_flow_cache_methods.py` | Manager-owned money-flow cache lookup, store, invalidate, and stats rebound onto `DataFetcherManager` | `get_money_flow` routing, circuit policy, TTL/size class attributes, cache/circuit instance state, and hit/miss increments |
 | `src/data_provider/plugin_registry.py` | Plugin provider registration and discovery seams | Built-in fetcher implementations |
 | `src/data_provider/_capability_catalog.py` | Built-in capability inventory and the mechanics that apply manager-owned ordering inputs, maintain indexes, synchronize plugin providers, filter by capability/market/availability, and look up fetchers | Priority values or policy, daily/realtime/fundamental execution, cache, health, circuit, fallback, or plugin routing policy |
 | `src/data_provider/*_fetcher.py` | One remote/source adapter each (history, quote, or specialty data) | Cross-provider orchestration |
 | `src/data_provider/akshare_fetcher.py` | Compatibility facade for the AkShare provider: public class, constants, re-exports, and ADR-006 method rebinding / timeout clone seams | New capability-domain bodies (add under `akshare_parts/`) |
 | `src/data_provider/akshare_parts/` | AkShare implementation ownership by capability domain: `symbols`, `timeout_client`, `parse_tencent`, `realtime_errors`, `history`, `realtime_quotes`, `market_boards`, `enhanced`, `realtime_cache`, plus `facade_bind` helpers | Cross-provider manager policy (ADR-005) |
 | `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
-| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/fallback/plugin policy and state, daily/realtime/fundamental workflows still co-located, facade bindings/re-exports | New pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache descriptors |
+| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/fallback/plugin policy and state, daily/realtime/fundamental workflows still co-located, facade bindings/re-exports | New pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/field-trust/money-flow-cache descriptors |
 
 The private catalog receives and mutates only manager-owned state through
 `DataFetcherManager` descriptors. It does not introduce an independent policy
@@ -108,6 +110,20 @@ Slice 5 rebinds daily-cache orchestration descriptors from
 - `_daily_cache_key`, `_record_daily_cache_result`, `_validate_daily_candidate`
 - `get_daily_cache_stats`, `invalidate_daily_cache`
 - `_get_cached_stock_name`, `_cache_stock_name`
+
+Slice 6 rebinds realtime field-trust descriptors from
+`manager_parts/realtime_field_trust_methods.py` (see that module's
+`EXPECTED_REALTIME_FIELD_TRUST_METHOD_NAMES`).
+
+Slice 7 rebinds money-flow cache descriptors from
+`manager_parts/money_flow_cache_methods.py` while preserving their
+`src.data_provider.base` module, qualname, signature, globals, and patch behavior:
+
+- `_money_flow_cache_lookup`, `_money_flow_cache_store`
+- `invalidate_money_flow_cache`, `get_money_flow_cache_stats`
+
+`get_money_flow`, `_money_flow_timestamp`, TTL/size class attributes,
+cache/circuit instance state, and hit/miss increments stay on the facade.
 
 ## How To Add The Next Extraction Slice
 
