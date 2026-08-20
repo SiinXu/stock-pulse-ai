@@ -133,30 +133,32 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
     (strata?.disclaimer && strata.disclaimer.trim())
     || text.defaultDisclaimer;
 
-  const rawFallbackBlobs = collectNonEmptyStrings([
-    ...(facts.length > 0 ? [] : [
-      rawResult?.technicalAnalysis ?? rawResult?.technical_analysis,
-      rawResult?.maAnalysis ?? rawResult?.ma_analysis,
-      rawResult?.volumeAnalysis ?? rawResult?.volume_analysis,
-    ]),
-    ...(gaps.length > 0 ? [] : [
-      rawResult?.fundamentalAnalysis ?? rawResult?.fundamental_analysis,
-      rawResult?.dataSources ?? rawResult?.data_sources,
-    ]),
-    ...(inference.length > 0 ? [] : [
-      rawResult?.analysisSummary ?? rawResult?.analysis_summary,
-      rawResult?.trendAnalysis ?? rawResult?.trend_analysis,
-      rawResult?.buyReason ?? rawResult?.buy_reason,
-    ]),
-  ]);
+  const rawFallbackBlobs = strata
+    ? collectNonEmptyStrings([
+      ...(facts.length > 0 ? [] : [
+        rawResult?.technicalAnalysis ?? rawResult?.technical_analysis,
+        rawResult?.maAnalysis ?? rawResult?.ma_analysis,
+        rawResult?.volumeAnalysis ?? rawResult?.volume_analysis,
+      ]),
+      ...(gaps.length > 0 ? [] : [
+        rawResult?.fundamentalAnalysis ?? rawResult?.fundamental_analysis,
+        rawResult?.dataSources ?? rawResult?.data_sources,
+      ]),
+      ...(inference.length > 0 ? [] : [
+        rawResult?.analysisSummary ?? rawResult?.analysis_summary,
+        rawResult?.trendAnalysis ?? rawResult?.trend_analysis,
+        rawResult?.buyReason ?? rawResult?.buy_reason,
+      ]),
+    ])
+    : [];
 
   const hasStructuredSecondary = Boolean(strata);
   const hasRawFallback = rawFallbackBlobs.length > 0;
-  const hasSecondary = hasStructuredSecondary || hasRawFallback;
-  const showRisks = Boolean(strata) || risks.length > 0;
+  const hasSecondary = hasStructuredSecondary;
+  const showRisks = Boolean(strata);
   const showSecondary = hasSecondary && isExpanded;
 
-  if (!strata && !alwaysShowDisclaimer && !showRisks && !hasRawFallback) {
+  if (!strata && !alwaysShowDisclaimer) {
     return null;
   }
 

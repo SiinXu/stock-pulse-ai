@@ -242,11 +242,24 @@ describe('ReportStrata', () => {
   });
 
   it('shows disclaimer for historical reports without strata', () => {
-    render(<ReportStrata details={{}} language="zh" alwaysShowDisclaimer />);
+    render(
+      <ReportStrata
+        details={{
+          rawResult: {
+            analysis_summary: 'Historical payload without report strata.',
+            risk_warning: '波动风险',
+            technical_analysis: '价格位于主要均线上方。',
+          },
+        }}
+        language="zh"
+        alwaysShowDisclaimer
+      />,
+    );
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('不构成投资建议');
     expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
     expect(screen.queryByTestId('report-strata-toggle')).not.toBeInTheDocument();
     expect(screen.queryByTestId('report-strata-raw-fallback')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-strata-risks')).not.toBeInTheDocument();
   });
 
   it('resolves strata from rawResult.dashboard when projection is absent', () => {
