@@ -1,0 +1,1 @@
+- [Changed] Extra-locale first paint uses a locale-neutral shell so de/fr catalogs no longer block createRoot; built-in zh/en still render immediately when they are the requested language, and extra-locale load failure still persists Simplified Chinese.

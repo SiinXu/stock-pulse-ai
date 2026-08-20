@@ -1,0 +1,1 @@
+- [Tests] Lock all-provider missing-column and all-open-circuit daily manager paths as typed DataFetchError (or eligible stale cache), and include the issue #1069 contract suite in data-provider selective CI (Refs #1069).

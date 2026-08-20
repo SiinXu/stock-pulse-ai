@@ -9,8 +9,10 @@ import {
   resolveFieldRequirement,
 } from '../../utils/configConditions';
 import {
+  focusSettingsFieldWhenPresent,
   isSettingsGroupDefaultOpen,
   resolveSettingsRevealFieldKey,
+  settingsRenderedGroupsNeedDestinationOpen,
   settingsRevealUrlFingerprint,
   type FieldGroupDescriptor,
 } from './settingsFieldGroupDisclosure';
@@ -19,6 +21,7 @@ import type { SettingsFieldProps } from './settingsFieldMemo';
 export type SettingsFieldGroupPanelProps = {
   group: FieldGroupDescriptor;
   groupItems: SystemConfigItem[];
+  destinationOpen?: boolean;
   revealFieldKey?: string | null;
   revealRequestId?: number | null;
   showChannelRoutingEmptyBanner: boolean;
@@ -39,6 +42,7 @@ export type SettingsFieldGroupPanelProps = {
 export function SettingsFieldGroupPanel({
   group,
   groupItems,
+  destinationOpen = false,
   revealFieldKey,
   revealRequestId = null,
   showChannelRoutingEmptyBanner,
@@ -56,7 +60,7 @@ export function SettingsFieldGroupPanel({
   Field,
 }: SettingsFieldGroupPanelProps) {
   const { t } = useUiLanguage();
-  const defaultOpen = isSettingsGroupDefaultOpen(group.id);
+  const defaultOpen = destinationOpen || isSettingsGroupDefaultOpen(group.id);
   const shouldReveal = Boolean(revealFieldKey)
     && groupItems.some((item) => item.key === revealFieldKey);
 
@@ -174,20 +178,32 @@ export default function SettingsFieldGroups({
     hash,
   });
 
+  useEffect(() => {
+    if (!revealFieldKey) {
+      return undefined;
+    }
+    return focusSettingsFieldWhenPresent(revealFieldKey);
+  }, [revealFieldKey, revealRequestId]);
+
+  const renderedGroups = groups.map((group) => ({
+    group,
+    groupItems: items
+      .filter((item) => fieldGroupIdOf(item.key) === group.id)
+      .sort((a, b) => fieldGroupOrderOf(a.key) - fieldGroupOrderOf(b.key)),
+  })).filter((entry) => entry.groupItems.length);
+  const destinationOpen = settingsRenderedGroupsNeedDestinationOpen(
+    renderedGroups.map((entry) => entry.group.id),
+  );
+
   return (
     <div className="space-y-4">
-      {groups.map((group) => {
-        const groupItems = items
-          .filter((item) => fieldGroupIdOf(item.key) === group.id)
-          .sort((a, b) => fieldGroupOrderOf(a.key) - fieldGroupOrderOf(b.key));
-        if (!groupItems.length) {
-          return null;
-        }
+      {renderedGroups.map(({ group, groupItems }) => {
         return (
           <SettingsFieldGroupPanel
             key={group.id}
             group={group}
             groupItems={groupItems}
+            destinationOpen={destinationOpen}
             revealFieldKey={revealFieldKey}
             revealRequestId={revealRequestId}
             showChannelRoutingEmptyBanner={showChannelRoutingEmptyBannerFor(groupItems)}

@@ -11,11 +11,6 @@
       "nativeButtonCount": 1,
       "roleButtonCount": 0
     },
-    "../../pages/HomePage.tsx": {
-      "file": "../../pages/HomePage.tsx",
-      "nativeButtonCount": 3,
-      "roleButtonCount": 0
-    },
     "../../pages/ResearchAnalysisWorkbenchPage.tsx": {
       "file": "../../pages/ResearchAnalysisWorkbenchPage.tsx",
       "nativeButtonCount": 1,
@@ -176,9 +171,14 @@
       "nativeButtonCount": 1,
       "roleButtonCount": 0
     },
+    "../decision-signals/DecisionSignalDetails.tsx": {
+      "file": "../decision-signals/DecisionSignalDetails.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
     "../decision-signals/DecisionSignalDisplay.tsx": {
       "file": "../decision-signals/DecisionSignalDisplay.tsx",
-      "nativeButtonCount": 3,
+      "nativeButtonCount": 1,
       "roleButtonCount": 0
     },
     "../decision-signals/DecisionSignalProfileCalibration.tsx": {

@@ -484,6 +484,15 @@ function SettingsFieldComponent({
           enumEmptyState,
         )}
 
+        {readOnlyDiagnostic ? (
+          <p
+            data-testid={`settings-schema-diagnostic-${item.key}`}
+            className="mt-2 text-xs text-warning"
+          >
+            {readOnlyDiagnostic}
+          </p>
+        ) : null}
+
         {issues.length ? (
           <div className="mt-2 space-y-1">
             {issues.map((issue, index) => (

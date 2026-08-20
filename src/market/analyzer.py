@@ -43,6 +43,11 @@ from src.utils.sanitize import (
     sanitize_diagnostic_text,
 )
 from src.data_provider.base import DataFetcherManager
+from src.market import metrics as _market_metrics
+
+build_market_light_scores = _market_metrics.build_market_light_scores
+build_market_temperature = _market_metrics.build_market_temperature
+market_light_status_from_score = _market_metrics.market_light_status_from_score
 
 logger = logging.getLogger(__name__)
 
@@ -1139,12 +1144,7 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
         scores = self._build_market_light_scores(overview)
         score = int(scores["score"])
         temperature_label = str(scores["temperature_label"])
-        if score >= 60:
-            status = "green"
-        elif score >= 40:
-            status = "yellow"
-        else:
-            status = "red"
+        status = market_light_status_from_score(score)
 
         if self._get_review_language() == "en":
             label_map = {
@@ -1396,64 +1396,11 @@ Focus on index trend, liquidity, and sector rotation to shape the next-session t
 
     def _build_market_light_scores(self, overview: MarketOverview) -> Dict[str, Any]:
         """Build the canonical Market Light scores used by reports and alerts."""
-
-        participants = overview.up_count + overview.down_count
-        breadth_available = bool(self.profile.has_market_stats and participants > 0)
-        breadth_score = 50
-        if breadth_available:
-            breadth_score = int(overview.up_count / participants * 100)
-
-        index_changes = [idx.change_pct for idx in overview.indices if idx.change_pct is not None]
-        index_available = bool(overview.indices and index_changes)
-        index_score = 50
-        if index_available:
-            avg_change = sum(index_changes) / len(index_changes)
-            index_score = int(max(0, min(100, 50 + avg_change * 12)))
-
-        limit_total = overview.limit_up_count + overview.limit_down_count
-        limit_available = bool(self.profile.has_market_stats and limit_total > 0)
-        limit_score = 50
-        if limit_available:
-            limit_score = int(overview.limit_up_count / limit_total * 100)
-
-        dimensions = {
-            "breadth": {"score": breadth_score, "available": breadth_available},
-            "index": {"score": index_score, "available": index_available},
-            "limit": {"score": limit_score, "available": limit_available},
-        }
-
-        if not index_available:
-            data_quality = "unavailable"
-        elif all(dimension["available"] for dimension in dimensions.values()):
-            data_quality = "ok"
-        else:
-            data_quality = "partial"
-
-        score = int(round(breadth_score * 0.45 + index_score * 0.35 + limit_score * 0.20))
-        if self._get_review_language() == "en":
-            if score >= 70:
-                label = "risk-on"
-            elif score >= 55:
-                label = "constructive"
-            elif score >= 40:
-                label = "mixed"
-            else:
-                label = "defensive"
-        else:
-            if score >= 70:
-                label = "强势"
-            elif score >= 55:
-                label = "偏暖"
-            elif score >= 40:
-                label = "震荡"
-            else:
-                label = "偏弱"
-        return {
-            "score": score,
-            "temperature_label": label,
-            "dimensions": dimensions,
-            "data_quality": data_quality,
-        }
+        return build_market_light_scores(
+            overview,
+            has_market_stats=self.profile.has_market_stats,
+            review_language=self._get_review_language(),
+        )
 
     def _build_market_temperature(self, overview: MarketOverview) -> tuple[int, str]:
         scores = self._build_market_light_scores(overview)

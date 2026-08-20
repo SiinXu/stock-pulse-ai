@@ -3034,7 +3034,7 @@ export interface paths {
         };
         /**
          * Compare two analysis report versions
-         * @description Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, and the typed T17 AnalysisDelta. engine_pending and no_baseline are never presented as 'no change'.
+         * @description Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, optional-section honesty, and the typed T17 AnalysisDelta. engine_pending, no_baseline, and a missing optional multi-agent/risk/catalyst section are never presented as 'no change'.
          */
         get: operations["compareReportVersions"];
         put?: never;
@@ -11405,6 +11405,50 @@ export interface components {
             /** Title */
             title: string;
         };
+        /**
+         * OptionalSectionPresence
+         * @description Honesty projection for one optional report section (issue #188).
+         *
+         *     Absence is explicit. Two missing sections are ``both_missing``, never an
+         *     invented identical empty comparison. Complements T17 list diffs and does
+         *     not replace them.
+         */
+        OptionalSectionPresence: {
+            /**
+             * Base Item Count
+             * @default 0
+             */
+            base_item_count: number;
+            /**
+             * Base Present
+             * @default false
+             */
+            base_present: boolean;
+            /** Base Preview */
+            base_preview?: string[];
+            /**
+             * Comparison Status
+             * @enum {string}
+             */
+            comparison_status: "both_missing" | "base_missing" | "target_missing" | "present_identical" | "present_different";
+            /**
+             * Section
+             * @enum {string}
+             */
+            section: "catalysts" | "structured_risk" | "multi_agent";
+            /**
+             * Target Item Count
+             * @default 0
+             */
+            target_item_count: number;
+            /**
+             * Target Present
+             * @default false
+             */
+            target_present: boolean;
+            /** Target Preview */
+            target_preview?: string[];
+        };
         /** OutboundActivityItem */
         OutboundActivityItem: {
             /** Allowlisted */
@@ -14893,6 +14937,11 @@ export interface components {
             engine_status: "ok" | "engine_pending";
             /** Field Diffs */
             field_diffs?: components["schemas"]["ReportFieldDiff"][];
+            /**
+             * Optional Sections
+             * @description Always-complete honesty rows for optional multi-agent, structured-risk, and catalyst sections. Missing sections are labeled as missing and are never collapsed into matching empty content.
+             */
+            optional_sections?: components["schemas"]["OptionalSectionPresence"][];
             /**
              * Status
              * @description ok: T17 delta available with baseline; engine_pending: T17 compare_analyses not wired yet; no_baseline: T17 returned has_baseline=false (distinct from no changes); incomparable: runs cannot be compared

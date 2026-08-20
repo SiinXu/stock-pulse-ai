@@ -36,12 +36,30 @@
         if (themeColor) {
           themeColor.setAttribute('content', theme === 'light' ? '#F7F8F7' : '#151514');
         }
+        // Canonical stored UI language only. Full browser-locale normalization
+        // happens in main.tsx before createRoot; do not persist from this script.
+        const htmlLangByLanguage = {
+          zh: 'zh-CN',
+          'zh-TW': 'zh-TW',
+          en: 'en',
+          ja: 'ja',
+          ko: 'ko',
+          de: 'de',
+          es: 'es',
+          ms: 'ms',
+          fr: 'fr',
+          id: 'id',
+        };
+        const storedLanguage = localStorage.getItem('dsa.uiLanguage');
+        if (storedLanguage && Object.prototype.hasOwnProperty.call(htmlLangByLanguage, storedLanguage)) {
+          root.lang = htmlLangByLanguage[storedLanguage];
+        }
       })();
     </script>
     <title>StockPulse</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><div data-locale-neutral-shell aria-busy="true" class="min-h-dvh bg-base"></div></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

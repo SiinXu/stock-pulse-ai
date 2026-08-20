@@ -27,6 +27,7 @@ import {
   IconButton,
   InlineAlert,
   PageHeader,
+  Pressable,
   Section,
   StatePanel,
   WorkspacePage,
@@ -578,7 +579,7 @@ const HomePage: React.FC = () => {
             />
           ) : (data.dueReassessmentTotal ?? 0) > 0 ? (
             <div className="space-y-3">
-              <button
+              <Pressable
                 type="button"
                 className="flex min-h-14 w-full items-center justify-between gap-3 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2 text-left"
                 onClick={() => navigate(reviewHref)}
@@ -592,7 +593,7 @@ const HomePage: React.FC = () => {
                   </span>
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-              </button>
+              </Pressable>
             </div>
           ) : (
             <EmptyState
@@ -629,7 +630,7 @@ const HomePage: React.FC = () => {
       </div>
 
       <section className="rounded-xl border border-border p-4" aria-labelledby="home-configurable-heading">
-        <button
+        <Pressable
           type="button"
           className="flex min-h-11 w-full items-center justify-between gap-4 text-left"
           aria-expanded={configurableExpanded}
@@ -648,7 +649,7 @@ const HomePage: React.FC = () => {
             className={`h-5 w-5 shrink-0 transition-transform ${configurableExpanded ? 'rotate-180' : ''}`}
             aria-hidden="true"
           />
-        </button>
+        </Pressable>
 
         <div id="home-configurable-content" className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-3" hidden={!configurableExpanded}>
           <Section
@@ -669,7 +670,7 @@ const HomePage: React.FC = () => {
                 titleAs="p"
               />
             ) : latestMarketReview ? (
-              <button
+              <Pressable
                 type="button"
                 className="flex min-h-14 w-full items-center justify-between gap-3 text-left"
                 onClick={() => navigate(buildDeepLink({
@@ -686,7 +687,7 @@ const HomePage: React.FC = () => {
                   </span>
                 </span>
                 <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-              </button>
+              </Pressable>
             ) : (
               <EmptyState
                 compact

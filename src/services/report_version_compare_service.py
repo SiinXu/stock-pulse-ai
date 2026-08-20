@@ -20,6 +20,9 @@ from src.services.report_version_compare_adapter import (
     CompareAnalysesFn,
     invoke_compare_analyses,
 )
+from src.services.report_version_compare_optional_sections import (
+    build_optional_sections,
+)
 from src.storage import DatabaseManager
 from src.utils.data_processing import normalize_model_used, parse_json_field
 
@@ -173,6 +176,10 @@ class ReportVersionCompareService:
             target_missing_keys=target_run.get("config_missing_keys") or [],
         )
         field_diffs = self._build_field_diffs(base_run, target_run)
+        optional_sections = build_optional_sections(
+            parse_json_field(getattr(base_record, "raw_result", None)),
+            parse_json_field(getattr(target_record, "raw_result", None)),
+        )
 
         engine_status, delta = invoke_compare_analyses(
             base_code,
@@ -197,6 +204,7 @@ class ReportVersionCompareService:
             "target_run": target_run,
             "config_diff": config_diff,
             "field_diffs": field_diffs,
+            "optional_sections": optional_sections,
             "delta": delta,
             "engine_status": engine_status,
         }

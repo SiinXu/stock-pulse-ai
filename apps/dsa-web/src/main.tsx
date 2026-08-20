@@ -6,14 +6,18 @@ import App from './App.tsx'
 import { ThemeProvider } from './components/theme/ThemeProvider'
 import { ThemeAppearanceProvider } from './components/theme/ThemeAppearanceProvider'
 import { PriceDirectionSync } from './components/theme/PriceDirectionSync'
-import { prepareInitialUiLanguage } from './i18n/prepareUiLanguage'
+import { InitialUiLanguageGate } from './i18n/InitialUiLanguageGate'
+import { beginInitialUiLanguage } from './i18n/prepareUiLanguage'
 import { QueryProvider } from './query/QueryProvider'
 import { applyUiLanguageToDocument, getRuntimeInitialLanguage } from './utils/uiLanguage'
 import { installApiMockIfEnabled } from './dev/apiMock/apiMockSwitch'
 import { registerServiceWorker } from './pwa/registerServiceWorker'
 
-const initialUiLanguage = await prepareInitialUiLanguage(getRuntimeInitialLanguage())
-applyUiLanguageToDocument(initialUiLanguage)
+const requestedUiLanguage = getRuntimeInitialLanguage()
+const { shell, catalog } = beginInitialUiLanguage(requestedUiLanguage)
+applyUiLanguageToDocument(
+  shell.status === 'app-ready' ? shell.language : shell.requested,
+)
 
 if (import.meta.env.DEV) {
   // Temporary dev API mock switch; no-op unless enabled via ?mock / VITE_MOCK_API.
@@ -47,7 +51,13 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <ThemeAppearanceProvider>
           <PriceDirectionSync />
-          <App initialUiLanguage={initialUiLanguage} />
+          <InitialUiLanguageGate
+            shell={shell}
+            catalog={catalog}
+            onLanguage={applyUiLanguageToDocument}
+          >
+            {(language) => <App initialUiLanguage={language} />}
+          </InitialUiLanguageGate>
         </ThemeAppearanceProvider>
       </ThemeProvider>
     </QueryProvider>

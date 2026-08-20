@@ -100,6 +100,12 @@ const getVendorChunkName = (id: string): string | undefined => {
   if (extraLocaleMatch) {
     return `extra-locale-${extraLocaleMatch[1]}`
   }
+  // Optional-section honesty copy is split out of core locale-{locale} packs
+  // so locale-ja-family can stay at the merged #1375 cap (Refs #188).
+  const optionalSectionsMatch = normalizedId.match(/\/src\/i18n\/translations\/optionalSections\/([^/]+)\.ts$/)
+  if (optionalSectionsMatch) {
+    return `optional-sections-${optionalSectionsMatch[1]}`
+  }
   if (
     normalizedId.endsWith('/src/i18n/evidenceExportErrorTranslations.ts')
     || normalizedId.endsWith('/src/api/error/evidenceExportErrors.ts')

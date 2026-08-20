@@ -120,7 +120,8 @@ This is the entry point for project documentation. The README covers the project
 | Document | Contents |
 | --- | --- |
 | [Business Architecture](business-architecture.md) | Stakeholders, business capabilities, outcomes, and the value flow from evidence acquisition to notification |
-| [Technical Architecture](architecture-overview.md) | Current components, entrypoints, ownership boundaries, process modes, cache/fallback branches, and the eight-stage analysis data flow |
+| [Technical Architecture](architecture-overview.md) | Current components, entrypoints, ownership boundaries, process modes, cache/fallback branches, the eight-stage analysis data flow, and the run-diagnostics schema boundary |
+| [Run diagnostics Phase 1](run-diagnostics-p1.md) | `trace_id`, ProviderRun, frozen schema contract, and facade/collect/export layout (#1076; Chinese topic doc, English contract is in the architecture overview) |
 | [Foundation Pipeline And Product Layer](foundation-product-architecture.md) | Responsibility tracks, interaction boundaries, contribution placement, upstream porting, and license provenance |
 | [Upstream Parity Checker](upstream-parity.md) | Weekly drift report, path-presence inventory, deliberately diverged path whitelist, `Ported-from` trailers, triage flow, and governance cadence (#1002 / #1061) |
 | [ADR Registry And Process](adr/README.md) | Decision numbering, statuses, template, significant-PR consideration, and historical records |

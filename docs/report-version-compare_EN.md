@@ -2,7 +2,7 @@
 
 [中文](report-version-compare.md) | [English](report-version-compare_EN.md)
 
-Issue #188 / T18: users can select two runs for the same symbol from analysis history, or enter from Stock Details, and review typed report and configuration differences side by side. Issue #188 remains open for structured risk/catalyst diffing and explicit behavior when optional multi-agent sections are absent.
+Issue #188 / T18: users can select two runs for the same symbol from analysis history, or enter from Stock Details, and review typed report and configuration differences side by side. Optional multi-agent, structured-risk, and catalyst sections now have an explicit honesty panel: missing sections are labeled as missing and are not treated as matching empty content. Issue #188 remains open for deeper structured risk/catalyst item-level presentation beyond the T17 list diffs that already complement this page.
 
 ## Scope
 
@@ -21,6 +21,20 @@ Issue #188 / T18: users can select two runs for the same symbol from analysis hi
 | `engine_pending` | The merged engine is unavailable at runtime; side-by-side fields and config provenance still render. **Not “no change”** |
 | `no_baseline` | T17 returned `has_baseline=false`. **Not “no change”** |
 | `incomparable` | Runs cannot be compared (for example, different symbols) |
+
+## Optional section honesty
+
+`optional_sections` is always a complete three-row projection (`catalysts`, `structured_risk`, `multi_agent`). Presence means the persisted run produced the section (the key exists), including an empty list. Absence means the section was never produced. For `multi_agent`, only the additive `dashboard.bull_bear_debate` and `dashboard.committee_deliberation` keys count; the mandatory `dashboard.risk_manager` risk-gate payload does not.
+
+| comparison_status | Meaning |
+| --- | --- |
+| `both_missing` | Neither run produced the section. This is **not** identical empty content |
+| `base_missing` | Baseline did not produce the section; the candidate did |
+| `target_missing` | Candidate did not produce the section; the baseline did |
+| `present_identical` | Both runs produced the section with the same comparable content |
+| `present_different` | Both runs produced the section, and the contents differ |
+
+This panel complements the T17 AnalysisDelta list diffs. It does not replace delta reports or invent item-level added/removed rows for a section that one side never produced.
 
 ## Severity grading (presentation layer)
 
@@ -59,6 +73,7 @@ Tests may inject fixtures with `ReportVersionCompareService(compare_fn=...)`.
 ## Related files
 
 - `src/services/report_version_compare_service.py`
+- `src/services/report_version_compare_optional_sections.py`
 - `src/services/report_version_compare_adapter.py`
 - `src/api/v1/endpoints/report_version_compare.py`
 - `apps/dsa-web/src/pages/ReportVersionComparePage.tsx`

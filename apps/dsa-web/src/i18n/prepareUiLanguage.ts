@@ -6,6 +6,29 @@ import type { UiLanguage } from './uiLanguages';
 
 type TranslationLoader = (language: UiLanguage) => Promise<void>;
 
+export type BuiltinUiLanguage = Extract<UiLanguage, 'zh' | 'en'>;
+export type ExtraUiLanguage = Exclude<UiLanguage, BuiltinUiLanguage>;
+
+export function isBuiltinUiLanguage(language: UiLanguage): language is BuiltinUiLanguage {
+  return language === 'zh' || language === 'en';
+}
+
+export type InitialUiLanguageShell =
+  | { status: 'app-ready'; language: BuiltinUiLanguage }
+  | { status: 'locale-neutral'; requested: ExtraUiLanguage };
+
+export type InitialUiLanguageBootstrap = {
+  shell: InitialUiLanguageShell;
+  catalog: Promise<UiLanguage>;
+};
+
+export function resolveInitialUiLanguageShell(requestedLanguage: UiLanguage): InitialUiLanguageShell {
+  if (isBuiltinUiLanguage(requestedLanguage)) {
+    return { status: 'app-ready', language: requestedLanguage };
+  }
+  return { status: 'locale-neutral', requested: requestedLanguage };
+}
+
 export async function prepareInitialUiLanguage(
   requestedLanguage: UiLanguage,
   loadTranslations: TranslationLoader = loadUiLanguageTranslations,
@@ -21,4 +44,15 @@ export async function prepareInitialUiLanguage(
     persistUiLanguage(storage, fallbackLanguage);
     return fallbackLanguage;
   }
+}
+
+export function beginInitialUiLanguage(
+  requestedLanguage: UiLanguage,
+  loadTranslations: TranslationLoader = loadUiLanguageTranslations,
+  storage: Storage | null = getUiLanguageStorage(),
+): InitialUiLanguageBootstrap {
+  return {
+    shell: resolveInitialUiLanguageShell(requestedLanguage),
+    catalog: prepareInitialUiLanguage(requestedLanguage, loadTranslations, storage),
+  };
 }

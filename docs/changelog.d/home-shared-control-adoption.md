@@ -1,0 +1,2 @@
+- [Changed] Adopt the shared Pressable primitive for the three Home-owned interactive rows while preserving focus, disabled, styling, and configurable aria-expanded semantics (Refs #878, #1332).
+- [Tests] Add Home shared-control a11y and behavior coverage and drop the HomePage native-button inventory entry after the debt is gone (Refs #878, #1332).

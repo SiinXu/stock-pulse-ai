@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { lazy, Suspense } from 'react';
 import { Bell, FileText } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { ParsedApiError } from '../../api/error';
@@ -24,7 +25,9 @@ import {
   buildAnalysisWorkbenchHref,
   buildSignalCenterHref,
 } from '../../routing/routes';
-import { DecisionSignalDetails } from './DecisionSignalDisplay';
+const DecisionSignalDetails = lazy(() => import('./DecisionSignalDetails').then((module) => ({
+  default: module.DecisionSignalDetails,
+})));
 import { DecisionSignalMemoryControls } from './DecisionSignalMemoryControls';
 import {
   STATUS_ACTION_CONFIRM_KEYS,
@@ -100,67 +103,69 @@ const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProps> = ({
             key={selected.item.id}
             signalId={selected.item.id}
           />
-          <DecisionSignalDetails
-            item={selected.item}
-            outcomes={outcomes}
-            outcomesLoading={outcomesLoading}
-            outcomesError={outcomesError?.message ?? null}
-            feedback={feedback}
-            feedbackLoading={feedbackLoading}
-            feedbackSaving={feedbackSaving}
-            feedbackError={feedbackError?.message ?? null}
-            onFeedbackSubmit={onFeedbackSubmit}
-            actions={(
-              <>
-                {selected.item.sourceReportId ? (
-                  <Link
-                    to={buildAnalysisWorkbenchHref({
-                      segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
-                      recordId: selected.item.sourceReportId,
-                      runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
-                      runFlowRecordId: selected.item.sourceReportId,
-                      stock: selected.item.stockCode,
-                    })}
-                    data-control="navigation-link"
-                    className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                  >
-                    <FileText className="h-3.5 w-3.5" />
-                    {t('decisionSignals.reassessSource', { id: selected.item.sourceReportId })}
-                  </Link>
-                ) : null}
-                {createRuleHref ? (
-                  <Link
-                    to={createRuleHref}
-                    data-control="navigation-link"
-                    data-testid="decision-signal-create-rule"
-                    className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
-                  >
-                    <Bell className="h-3.5 w-3.5" aria-hidden="true" />
-                    {t('decisionSignals.createRuleFromSignal')}
-                  </Link>
-                ) : null}
-                {STATUS_ACTIONS.map((status) => (
-                  <Button
-                    key={status}
-                    type="button"
-                    variant="secondary"
-                    size="comfortable"
-                    className="text-xs"
-                    onClick={() => {
-                      onRequestStatusChange(
-                        selected.item,
-                        status,
-                        t(STATUS_ACTION_CONFIRM_KEYS[status]),
-                      );
-                    }}
-                    disabled={statusUpdating || selected.item.status === status}
-                  >
-                    {t(STATUS_ACTION_LABEL_KEYS[status])}
-                  </Button>
-                ))}
-              </>
-            )}
-          />
+          <Suspense fallback={null}>
+            <DecisionSignalDetails
+              item={selected.item}
+              outcomes={outcomes}
+              outcomesLoading={outcomesLoading}
+              outcomesError={outcomesError?.message ?? null}
+              feedback={feedback}
+              feedbackLoading={feedbackLoading}
+              feedbackSaving={feedbackSaving}
+              feedbackError={feedbackError?.message ?? null}
+              onFeedbackSubmit={onFeedbackSubmit}
+              actions={(
+                <>
+                  {selected.item.sourceReportId ? (
+                    <Link
+                      to={buildAnalysisWorkbenchHref({
+                        segment: ANALYSIS_WORKBENCH_SEGMENT_VALUES.history,
+                        recordId: selected.item.sourceReportId,
+                        runFlow: RUN_FLOW_ROUTE_QUERY_VALUES.history,
+                        runFlowRecordId: selected.item.sourceReportId,
+                        stock: selected.item.stockCode,
+                      })}
+                      data-control="navigation-link"
+                      className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      {t('decisionSignals.reassessSource', { id: selected.item.sourceReportId })}
+                    </Link>
+                  ) : null}
+                  {createRuleHref ? (
+                    <Link
+                      to={createRuleHref}
+                      data-control="navigation-link"
+                      data-testid="decision-signal-create-rule"
+                      className="control-hit-target inline-flex min-h-7 min-w-0 max-w-full items-center gap-1.5 px-1.5 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/25"
+                    >
+                      <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                      {t('decisionSignals.createRuleFromSignal')}
+                    </Link>
+                  ) : null}
+                  {STATUS_ACTIONS.map((status) => (
+                    <Button
+                      key={status}
+                      type="button"
+                      variant="secondary"
+                      size="comfortable"
+                      className="text-xs"
+                      onClick={() => {
+                        onRequestStatusChange(
+                          selected.item,
+                          status,
+                          t(STATUS_ACTION_CONFIRM_KEYS[status]),
+                        );
+                      }}
+                      disabled={statusUpdating || selected.item.status === status}
+                    >
+                      {t(STATUS_ACTION_LABEL_KEYS[status])}
+                    </Button>
+                  ))}
+                </>
+              )}
+            />
+          </Suspense>
         </div>
       ) : null}
     </Drawer>

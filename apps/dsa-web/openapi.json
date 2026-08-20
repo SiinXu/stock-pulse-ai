@@ -18382,6 +18382,73 @@
         "title": "OnboardingWeekStep",
         "type": "object"
       },
+      "OptionalSectionPresence": {
+        "description": "Honesty projection for one optional report section (issue #188).\n\nAbsence is explicit. Two missing sections are ``both_missing``, never an\ninvented identical empty comparison. Complements T17 list diffs and does\nnot replace them.",
+        "properties": {
+          "base_item_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Base Item Count",
+            "type": "integer"
+          },
+          "base_present": {
+            "default": false,
+            "title": "Base Present",
+            "type": "boolean"
+          },
+          "base_preview": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Base Preview",
+            "type": "array"
+          },
+          "comparison_status": {
+            "enum": [
+              "both_missing",
+              "base_missing",
+              "target_missing",
+              "present_identical",
+              "present_different"
+            ],
+            "title": "Comparison Status",
+            "type": "string"
+          },
+          "section": {
+            "enum": [
+              "catalysts",
+              "structured_risk",
+              "multi_agent"
+            ],
+            "title": "Section",
+            "type": "string"
+          },
+          "target_item_count": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Target Item Count",
+            "type": "integer"
+          },
+          "target_present": {
+            "default": false,
+            "title": "Target Present",
+            "type": "boolean"
+          },
+          "target_preview": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Target Preview",
+            "type": "array"
+          }
+        },
+        "required": [
+          "section",
+          "comparison_status"
+        ],
+        "title": "OptionalSectionPresence",
+        "type": "object"
+      },
       "OutboundActivityItem": {
         "additionalProperties": false,
         "properties": {
@@ -28129,6 +28196,14 @@
               "$ref": "#/components/schemas/ReportFieldDiff"
             },
             "title": "Field Diffs",
+            "type": "array"
+          },
+          "optional_sections": {
+            "description": "Always-complete honesty rows for optional multi-agent, structured-risk, and catalyst sections. Missing sections are labeled as missing and are never collapsed into matching empty content.",
+            "items": {
+              "$ref": "#/components/schemas/OptionalSectionPresence"
+            },
+            "title": "Optional Sections",
             "type": "array"
           },
           "status": {
@@ -53675,7 +53750,7 @@
     },
     "/api/v1/report-version-compare/compare": {
       "get": {
-        "description": "Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, and the typed T17 AnalysisDelta. engine_pending and no_baseline are never presented as 'no change'.",
+        "description": "Compare two selected analysis runs: side-by-side field snapshots, configuration provenance differences, optional-section honesty, and the typed T17 AnalysisDelta. engine_pending, no_baseline, and a missing optional multi-agent/risk/catalyst section are never presented as 'no change'.",
         "operationId": "compareReportVersions",
         "parameters": [
           {

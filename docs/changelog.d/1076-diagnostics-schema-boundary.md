@@ -1,0 +1,2 @@
+- [Changed] Freeze the run-diagnostics schema boundary in `src/services/diagnostics/schema.py` with snapshot/summary key contracts and copy-safe `to_dict()` serialization, without changing public imports or collect/export behavior (Refs #1076).
+- [Fixed] Recursively snapshot nested diagnostic `to_dict()` and `snapshot()` payloads so mutating nested dict, list, set, tuple, dataclass, or extra/context values cannot rewrite in-memory diagnostic state (Refs #1076).

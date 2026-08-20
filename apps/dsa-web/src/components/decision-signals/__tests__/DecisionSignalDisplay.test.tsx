@@ -1,8 +1,23 @@
 import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { reportExportApi } from '../../../api/reportExport';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { DecisionSignalItem } from '../../../types/decisionSignals';
-import { DecisionSignalCard, DecisionSignalDetails, PortfolioSignalSummary } from '../DecisionSignalDisplay';
+import { DecisionSignalCard } from '../DecisionSignalDisplay';
+import { DecisionSignalDetails } from '../DecisionSignalDetails';
+import { PortfolioSignalSummary } from '../PortfolioSignalSummary';
+
+vi.mock('../../../api/reportExport', () => ({
+  reportExportApi: {
+    getCapabilities: vi.fn(),
+    download: vi.fn(),
+  },
+}));
+
+beforeEach(() => {
+  vi.mocked(reportExportApi.getCapabilities).mockImplementation(() => new Promise(() => {}));
+  vi.mocked(reportExportApi.download).mockResolvedValue({ filename: 'stockpulse-report-3001.md' });
+});
 
 const signal: DecisionSignalItem = {
   id: 7,

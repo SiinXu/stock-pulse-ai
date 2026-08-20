@@ -77,7 +77,7 @@ compact projection when committee mode produced a section.
 ## Web UI
 
 - **Settings / mode toggle**: still config / API context first (no new settings IA in this pass).
-- **Report / History**: `ReportStructuredInsights` renders committee conclusion, member stances, reserved opinions, and divergence when the payload is present.
+- **Report / History**: `ReportStructuredInsights` renders committee conclusion, member stances, reserved opinions, and divergence when the payload is present. Member stances, reserved opinions, and divergence lists show the first 3 items by default, with Show all / Show less for the rest; the committee conclusion stays open.
 - **Signal Center**: signal detail reuses the same card from `evidence.committee_deliberation`.
 
 ## Rollback
