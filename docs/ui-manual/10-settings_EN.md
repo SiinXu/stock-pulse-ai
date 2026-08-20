@@ -97,9 +97,9 @@ News / search keys improve events and themes; technical-only runs may still work
 
 Use **Data providers** to search for a provider and edit its credentials, priority, and provider-specific options. Efinance, AkShare, TickFlow, AlphaSift, Pytdx, Baostock, YFinance, Finnhub, Alpha Vantage, Longbridge, and social sentiment settings stay in that directory instead of the generic field list. Cross-provider prefetch, circuit-breaker, adaptive-ordering, and daily-cache controls remain grouped under **Market & intelligence → Provider reliability**; the runtime projection on the provider page is read-only.
 
-Generic field groups (quote, search, news, primary model, schedule, notification routing, and so on) use the shared collapsible. Only **Quote sources**, **Primary model & routing**, and **Scheduling & run** start expanded; every other non-empty group, including **Other**, starts collapsed. Search, `?field=KEY`, `#setting-KEY`, and validation-summary jumps open the group that owns the targeted field.
+Generic field groups (quote, search, news, primary model, schedule, notification routing, and so on) use the shared collapsible. Only **Quote sources**, **Primary model & routing**, and **Scheduling & run** start expanded; every other non-empty group, including **Other**, starts collapsed. If the current view filters to groups with no default-open member (for example **Web & Logs** only has the web and log groups), those destination groups expand after the lazy chunk mounts so controls such as log level stay reachable. Search, `?field=KEY`, `#setting-KEY`, and validation-summary jumps open the group that owns the targeted field and focus that control.
 
-On each field, only **Required** and the validation message stay on the label row. Optional, read-only, restart-required, and dependency-locked explanations live in the field help tooltip. Disabled controls stay disabled.
+On each field, only **Required** and the validation message stay on the label row. Optional, read-only, restart-required, and dependency-locked explanations live in the field help tooltip. Schema safety diagnostics such as `schema_ui_placement_missing` stay visible under the field control. Disabled controls stay disabled.
 
 ## Notifications & alerts
 

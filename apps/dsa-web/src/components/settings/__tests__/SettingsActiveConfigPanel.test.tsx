@@ -204,7 +204,29 @@ describe('SettingsActiveConfigPanel group disclosure', () => {
     expect(screen.getByTestId('settings-field-TAVILY_API_KEYS')).toBeInTheDocument();
   });
 
-  it('wraps notification groups and keeps them collapsed by default', async () => {
+  it('opens destination groups when a view has no default-open group', async () => {
+    const serviceItems = [
+      configItem('WEBUI_PORT', 'system', 'Web port'),
+      configItem('LOG_LEVEL', 'system', '日志级别'),
+    ];
+    const service = renderPanel({
+      panelKey: 'system_security:service',
+      activeCategory: 'system',
+      subFilteredItems: serviceItems,
+      visibleActiveItems: serviceItems,
+      activeFieldGroupOrder: getCategoryFieldGroupOrder('system'),
+      fieldGroupIdOf: (key) => getCategoryFieldGroupId('system', key),
+      fieldGroupOrderOf: (key) => getCategoryFieldOrder('system', key),
+      allValuesByKey: Object.fromEntries(serviceItems.map((item) => [item.key, item.value])),
+      persistedValuesByKey: Object.fromEntries(serviceItems.map((item) => [item.key, item.value])),
+    });
+    expect(await groupToggle('web')).toHaveAttribute('aria-expanded', 'true');
+    expect(await groupToggle('log')).toHaveAttribute('aria-expanded', 'true');
+    const logField = screen.getByTestId('settings-field-LOG_LEVEL');
+    expect(logField.closest('[hidden]')).toBeNull();
+    expect(logField.closest('[inert]')).toBeNull();
+    service.unmount();
+
     const items = [
       configItem('NOTIFICATION_REPORT_CHANNELS', 'notification', 'Report channels'),
       configItem('REPORT_TYPE', 'notification', 'Report type'),
@@ -222,9 +244,9 @@ describe('SettingsActiveConfigPanel group disclosure', () => {
       persistedValuesByKey: Object.fromEntries(items.map((item) => [item.key, item.value])),
     });
 
-    expect(await groupToggle('routing')).toHaveAttribute('aria-expanded', 'false');
-    expect(await groupToggle('report')).toHaveAttribute('aria-expanded', 'false');
-    expect(await groupToggle('other')).toHaveAttribute('aria-expanded', 'false');
+    expect(await groupToggle('routing')).toHaveAttribute('aria-expanded', 'true');
+    expect(await groupToggle('report')).toHaveAttribute('aria-expanded', 'true');
+    expect(await groupToggle('other')).toHaveAttribute('aria-expanded', 'true');
   });
 
   it('exposes aria-expanded and aria-controls on each group toggle', async () => {

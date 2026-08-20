@@ -152,7 +152,9 @@ describe('SettingsField', () => {
 
     expect(screen.getByDisplayValue('saved-value')).toBeDisabled();
     expect(screen.queryByText('只读')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('settings-schema-diagnostic-UNSAFE_AI_FIELD')).not.toBeInTheDocument();
+    expect(screen.getByTestId('settings-schema-diagnostic-UNSAFE_AI_FIELD')).toHaveTextContent(
+      'schema_condition_unknown',
+    );
     expect(openHelpTooltip(/配置说明/)).toHaveTextContent('只读');
     expect(screen.getByTestId('settings-field-status-notes')).toHaveTextContent(
       'schema_condition_unknown',
