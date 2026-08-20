@@ -1,0 +1,1 @@
+- [Tests] Prove diagnostics collect helpers do not mutate analysis outcomes, nested caller-owned summaries, or the original analysis object after an internal collect failure (Refs #1076).
