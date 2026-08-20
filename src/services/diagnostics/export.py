@@ -12,6 +12,8 @@ from typing import Any, Dict, List, Optional
 from src.services.diagnostics.schema import (
     RunDiagnosticComponent,
     RunDiagnosticSummary,
+    _copy_diagnostic_value,
+    _redact_diagnostic_payload,
     sanitize_diagnostic_text,
 )
 
@@ -533,7 +535,7 @@ def build_run_diagnostic_summary(
         or raw.get("stock_code")
     )
 
-    return RunDiagnosticSummary(
+    payload = RunDiagnosticSummary(
         trace_id=trace_id,
         task_id=diagnostics.get("task_id"),
         query_id=resolved_query_id,
@@ -543,7 +545,10 @@ def build_run_diagnostic_summary(
         status_label=_SUMMARY_STATUS_LABELS[status],
         reason=reason,
         components=components,
-    ).to_dict()
+    )._schema_payload()
+    # Public copy_text is an export projection, not a schema field.
+    payload["copy_text"] = format_copyable_diagnostics(payload)
+    return _redact_diagnostic_payload(_copy_diagnostic_value(payload))
 
 
 def format_copyable_diagnostics(summary: Dict[str, Any]) -> str:

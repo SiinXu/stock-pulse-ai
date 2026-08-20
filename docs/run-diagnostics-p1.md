@@ -48,14 +48,15 @@
 - `DIAGNOSTIC_SNAPSHOT_KEYS`：`RunDiagnosticContext.snapshot()` 始终包含的键。`prompt_artifact_versions` / `prompt_version` / `skill_versions` 仅在绑定 prompt 产物时附加。
 - `ProviderRun.to_dict()`：必有 `trace_id` / `data_type` / `provider` / `operation` / `success` / `created_at`；`None` 的可选字段不序列化。
 - `DataQualityEvidenceRecord.to_dict()`：`symbol` / `provider` 即使为 `None` 也会写出；空 `provenance` 省略。
-- `RunDiagnosticSummary.to_dict()`：总体状态为 `normal` / `degraded` / `failed` / `unknown`；组件键为 `realtime_quote` / `daily_data` / `news` / `data_quality` / `llm` / `notification` / `history`；组件状态为 `ok` / `degraded` / `failed` / `unknown` / `not_configured` / `skipped`。`copy_text` 始终存在。
+- `RunDiagnosticSummary.to_dict()`：总体状态为 `normal` / `degraded` / `failed` / `unknown`；组件键为 `realtime_quote` / `daily_data` / `news` / `data_quality` / `llm` / `notification` / `history`；组件状态为 `ok` / `degraded` / `failed` / `unknown` / `not_configured` / `skipped`。schema `to_dict()` 不导入 export，也不输出 `copy_text`。
+- 导出摘要 `build_run_diagnostic_summary`：在 schema 载荷上附加 `copy_text`，该字段始终存在。`DIAGNOSTIC_SUMMARY_KEYS` 仍包含 `copy_text` 作为公开 API 契约。
 
 ### 变异风险
 
 - `sanitize_diagnostic_*` 必须返回新容器，不得改写调用方 mapping / list / 嵌套对象。
 - `to_dict()` 与 `snapshot()` 必须经过同一套递归拷贝边界，隔离嵌套 `dict` / `list` / `set` / `tuple` / dataclass 以及 extra/context 载荷，避免 snapshot、摘要、`copy_text` 或导出字典回写诊断对象。
 - 采集 / 导出可以写入诊断上下文，但不得改分析输入、分析 outcome 或其嵌套 `window` / `notes` 对象。
-- 本切片不拆 collect / export 业务逻辑；后续切片再收敛只读采集 API 与导出投影。
+- 本切片将 `copy_text` 从 schema `to_dict()` 移到 `export.build_run_diagnostic_summary`。collect 业务逻辑与 facade 所有权不在本切片。
 
 ## 稳定性边界
 

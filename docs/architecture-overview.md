@@ -146,17 +146,20 @@ Serialization rules: `ProviderRun` / `LLMRun` / `NotificationRun` /
 keeps `symbol` / `provider` even when `None` and omits empty `provenance`.
 Summary overall status is `normal | degraded | failed | unknown`; component
 keys are `realtime_quote`, `daily_data`, `news`, `data_quality`, `llm`,
-`notification`, `history`. `copy_text` is always present.
+`notification`, `history`. Exported summaries from
+`build_run_diagnostic_summary` always include `copy_text`.
+`RunDiagnosticSummary.to_dict()` is the schema serialization boundary: it
+does not import export and does not emit `copy_text`.
+`DIAGNOSTIC_SUMMARY_KEYS` still lists `copy_text` as the public API contract.
 
 Mutation boundary: sanitizers return new containers. `to_dict()` and
 `RunDiagnosticContext.snapshot()` pass outgoing payloads through one
 recursive copy boundary, so mutating nested dict/list/set/tuple/dataclass
 or extra context values cannot rewrite in-memory diagnostic objects.
 Collection may append to the diagnostic context only. It must not change
-analysis inputs, outcomes, or nested caller objects. Collect/export remain
-later slices of issue #1076; see [run diagnostics Phase 1](run-diagnostics-p1.md)
-for the Chinese field history. `RunDiagnosticSummary.to_dict()` still
-lazy-imports export to attach `copy_text`.
+analysis inputs, outcomes, or nested caller objects. Collect remains a
+later slice of issue #1076; see [run diagnostics Phase 1](run-diagnostics-p1.md)
+for the Chinese field history.
 
 ## Analysis Execution Paths
 
