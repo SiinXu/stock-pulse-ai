@@ -159,6 +159,17 @@ describe('playground production boundary', () => {
       expect(rule?.maxGzipBytes).toBe((rule?.measuredGzipBytes ?? 0) + ROUTE_HEADROOM_BYTES);
     }
 
+    const preservedCaps: Array<[string, number]> = [
+      ['locale-ja-family', 171148],
+      ['locale-extra-family', 22628],
+      ['portfolio-route', 94224],
+    ];
+    for (const [id, maxGzipBytes] of preservedCaps) {
+      const rule = budget.aggregateRules?.find((entry) => entry.id === id);
+      expect(rule, id).toBeDefined();
+      expect(rule?.maxGzipBytes).toBe(maxGzipBytes);
+    }
+
     const ruleIds = (budget.rules ?? []).map((rule) => rule.id);
     const aggregateIds = (budget.aggregateRules ?? []).map((rule) => rule.id);
     expect(ruleIds).not.toContain('PlaygroundRenderPage');

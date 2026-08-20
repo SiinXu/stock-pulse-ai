@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-20",
-  "baselineNote": "T18 omitted the playground production graph (Refs #883). Named splits that existed only because playground was a second async importer were removed; remaining route chunks were remeasured with zlib-9 + 400 B headroom.",
+  "baselineNote": "T18 omitted the playground production graph (Refs #883) after #1385. Named splits that existed only because playground was a second async importer were removed; remaining T18 route chunks stay at their remasured zlib-9 + 400 B caps. Merged #1375 caps stay exact (locale-ja-family 171148, locale-extra-family 22628, portfolio-route 94224) because this production build stayed inside them.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -223,7 +223,7 @@
       ],
       "maxGzipBytes": 171148,
       "measuredGzipBytes": 170748,
-      "note": "Already-split same-pattern family for locale-ja. Measured zlib-9 sum 170748 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-ja cap is unchanged."
+      "note": "Already-split same-pattern family for locale-ja. Keep the merged #1375 cap (measured 170748 B + 400 B). Fresh post-#1385 T18 zlib-9 sum 170913 B stays inside 171148 B. Per-asset locale-ja cap is unchanged."
     },
     {
       "id": "locale-de-family",
@@ -479,7 +479,7 @@
       ],
       "maxGzipBytes": 94224,
       "measuredGzipBytes": 93824,
-      "note": "Portfolio route family after Insights/PP catalog modules (#1375). Keep the merged cap; T18 playground omission must not preemptively raise this family. Per-asset PortfolioPage / PortfolioRiskMetricsPanel caps are unchanged."
+      "note": "Portfolio route family after Insights/PP catalog modules (#1375). Keep the merged cap (measured 93824 B + 400 B). Fresh post-#1385 T18 zlib-9 sum 93811 B stays inside 94224 B; do not raise. Per-asset PortfolioPage / PortfolioRiskMetricsPanel caps are unchanged."
     },
     {
       "id": "screening-route",
