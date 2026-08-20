@@ -9,11 +9,13 @@
 # - workflow_dispatch fails closed unless pr_number is a positive integer that identifies
 #   an accessible pull request in this repository.
 # - security-check is checkout-free. It snapshots head/base via pulls.get, inventories files
-#   with SHA-pinned repos.compareCommits of those commits, re-gets, and fail-closes on
-#   head/base drift before emitting outputs. pulls.listFiles cannot pin a SHA; a re-get
-#   equality guard alone does not close B->A->B ABA. GitHub compare truncates at 300 files
-#   and that case fail-closes. Downstream ai-review checkouts use the emitted SHAs with no
-#   github.sha fallback.
+#   with SHA-pinned repos.compareCommits of those exact commit SHAs (same-repo and fork),
+#   re-gets, and fail-closes on head/base drift before emitting outputs. pulls.listFiles
+#   cannot pin a SHA; a re-get equality guard alone does not close B->A->B ABA. GitHub
+#   documents cross-repo compare as USERNAME:BRANCH (mutable) and allows commit SHAs in the
+#   same repository network; owner:SHA is not that documented fork qualifier. Compare 404s
+#   and the 300-file truncation cap fail-close. Downstream ai-review checkouts use the
+#   emitted SHAs with no github.sha fallback.
 # - Fork PRs: read-only static checks only. Repository secrets and write jobs are skipped.
 # - Same-repo PRs targeting the default branch: static checks + AI review; write jobs stay
 #   gated on pull_request and therefore remain idle on this dispatch-only trigger.
@@ -105,14 +107,13 @@ jobs:
               core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);
               return;
             }
-            const comparisonHead = String(firstPull.head.repo.id) === String(context.payload.repository.id) ? firstPull.head.sha : `${firstPull.head.repo.owner.login}:${firstPull.head.sha}`;
             let files;
             try {
               const comparison = await github.rest.repos.compareCommits({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 base: firstPull.base.sha,
-                head: comparisonHead,
+                head: firstPull.head.sha,
               });
               files = comparison.data && comparison.data.files;
             } catch (error) {

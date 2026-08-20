@@ -154,14 +154,13 @@ SNAPSHOT_SCRIPT_LINES = (
     "core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);",
     "return;",
     "}",
-    "const comparisonHead = String(firstPull.head.repo.id) === String(context.payload.repository.id) ? firstPull.head.sha : `${firstPull.head.repo.owner.login}:${firstPull.head.sha}`;",
     "let files;",
     "try {",
     "const comparison = await github.rest.repos.compareCommits({",
     "owner: context.repo.owner,",
     "repo: context.repo.repo,",
     "base: firstPull.base.sha,",
-    "head: comparisonHead,",
+    "head: firstPull.head.sha,",
     "});",
     "files = comparison.data && comparison.data.files;",
     "} catch (error) {",
@@ -1361,6 +1360,16 @@ jobs:
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
+                "head: firstPull.head.sha,",
+                "head: `${firstPull.head.repo.owner.login}:${firstPull.head.sha}`,",
+                1,
+            )
+        ),
+        "exact API-only contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
                 "if (firstPull.head.sha !== secondPull.head.sha || firstPull.base.sha !== secondPull.base.sha || firstPull.base.ref !== secondPull.base.ref || String(firstPull.head.repo.id) !== String(secondPull.head.repo.id)) {",
                 "if (false) {",
                 1,
@@ -1699,7 +1708,7 @@ jobs:
         trusted_errors(trusted_review.replace(f"id: {FETCH_REVIEW_BASE_ID}", f"id: {SETUP_REVIEW_PYTHON_ID}")),
         "exact reviewed step order",
     )
-    print("Workflow supply-chain self-tests passed (54 cases).")
+    print("Workflow supply-chain self-tests passed (55 cases).")
 
 
 def parse_args() -> argparse.Namespace:

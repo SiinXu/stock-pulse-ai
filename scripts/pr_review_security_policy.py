@@ -31,6 +31,7 @@ JS_PR_NUMBER_TEST = "/^[1-9][0-9]*$/.test(prNumber)"
 JS_PULLS_GET = "github.rest.pulls.get("
 JS_COMPARE_COMMITS = "github.rest.repos.compareCommits("
 JS_COMPARE_BASE = "base: firstPull.base.sha"
+JS_COMPARE_HEAD = "head: firstPull.head.sha"
 JS_LIST_FILES = "github.paginate(github.rest.pulls.listFiles"
 JS_SENSITIVE_PATTERN = (
     r"/^(\.github\/workflows\/.*\.yml|\.github\/scripts\/.*\.py)$/"
@@ -119,11 +120,15 @@ def require_pull_metadata(pull: PullRecord | None) -> PullRecord:
     return pull
 
 
-def compare_head_spec(pull: PullRecord, repository_id: object) -> str:
-    """Return the compare ``head`` pin: SHA for same-repo, owner:SHA for forks."""
-    if str(pull.head_repo_id) == str(repository_id):
-        return pull.head_sha
-    return f"{pull.head_owner_login}:{pull.head_sha}"
+def compare_head_spec(pull: PullRecord, _repository_id: object) -> str:
+    """Return the compare head pin: the captured commit SHA.
+
+    GitHub's compare ``basehead`` fork qualifier is documented as
+    ``USERNAME:BRANCH``, which is mutable. The same endpoint description
+    allows commit SHAs in the same repository network, so this oracle pins
+    ``pulls.get`` ``head.sha`` with no owner-colon prefix.
+    """
+    return pull.head_sha
 
 
 @dataclass

@@ -107,9 +107,11 @@ Threat model for this opt-in `workflow_dispatch` design:
 
 - `workflow_dispatch` has no pull-request event SHA. `security-check` therefore
   snapshots head/base through `pulls.get`, inventories files with SHA-pinned
-  `repos.compareCommits` of those commits, re-gets, and fail-closes on drift
-  before emitting checkout SHAs. `pulls.listFiles` cannot pin a SHA; a re-get
-  equality guard alone does not close B→A→B ABA.
+  `repos.compareCommits` of those exact commit SHAs, re-gets, and fail-closes
+  on drift before emitting checkout SHAs. GitHub documents cross-repo compare
+  as `USERNAME:BRANCH` (mutable) and allows commit SHAs in the same repository
+  network; `owner:SHA` is not used. `pulls.listFiles` cannot pin a SHA; a
+  re-get equality guard alone does not close B→A→B ABA.
 - Fork workflows never receive repository secrets from GitHub, and the API
   classifier still skips AI review, labels, and comments for forks.
 - Same-repository collaborators can dispatch review against a pull request.

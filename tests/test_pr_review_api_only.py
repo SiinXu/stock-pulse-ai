@@ -16,6 +16,7 @@ from scripts.pr_review_security_policy import (
     COMPARE_FILE_LIMIT,
     JS_COMPARE_BASE,
     JS_COMPARE_COMMITS,
+    JS_COMPARE_HEAD,
     JS_DEFAULT_BRANCH_COMPARE,
     JS_FORK_COMPARE,
     JS_LIST_FILES,
@@ -135,6 +136,8 @@ def test_security_check_is_checkout_free_sha_pinned_snapshot() -> None:
     assert snapshot.count(JS_PULLS_GET) == 2
     assert JS_COMPARE_COMMITS in snapshot
     assert JS_COMPARE_BASE in snapshot
+    assert JS_COMPARE_HEAD in snapshot
+    assert "${firstPull.head.repo.owner.login}:${firstPull.head.sha}" not in snapshot
     assert JS_LIST_FILES not in snapshot
     assert JS_SNAPSHOT_EQUALITY in snapshot
     assert JS_FORK_COMPARE in snapshot
@@ -354,16 +357,23 @@ def test_truncated_compare_fails_closed() -> None:
         _snapshot(api)
 
 
-def test_fork_compare_pins_owner_and_sha() -> None:
+def test_fork_compare_pins_captured_head_sha_not_owner_colon_ref() -> None:
+    """Fork inventory uses the same immutable SHA...SHA compare as same-repo.
+
+    GitHub documents cross-repo ``basehead`` as ``USERNAME:BRANCH`` (mutable)
+    and allows commit SHAs in the same repository network. Owner-colon-SHA is
+    not that documented fork qualifier, so a missing SHA fail-closes instead.
+    """
     fork = _pull(HEAD_B, repo_id=99)
     api = MutatingPullsApi(
         get_timeline=[fork, fork],
-        compare_files={(BASE_SHA, f"SiinXu:{HEAD_B}"): (SENSITIVE_PATH,)},
+        compare_files={(BASE_SHA, HEAD_B): (SENSITIVE_PATH,)},
         list_files_timeline=[(SAFE_PATH,)],
     )
     result = _snapshot(api, repository_id=1)
     assert result.is_fork is True
     assert result.head_sha == HEAD_B
     assert result.sensitive_files == (SENSITIVE_PATH,)
-    assert api.compare_calls == [(BASE_SHA, f"SiinXu:{HEAD_B}")]
+    assert api.compare_calls == [(BASE_SHA, HEAD_B)]
     assert api.list_files_calls == 0
+    assert (BASE_SHA, f"SiinXu:{HEAD_B}") not in api.compare_calls
