@@ -141,7 +141,7 @@ This is the entry point for project documentation. The README covers the project
 | [Data Provider Plugin Authoring Guide](data-provider-plugin-authoring.md) | Loadable example, manifest, `PLUGINS_DIR`, lifecycle diagnostics, compatibility, trust, and routing boundaries |
 | [Analysis Strategy Plugin Authoring Guide](analysis-strategy-plugin-authoring.md) | Declarative-first boundary, `Skill` registration fields, catalog precedence, lifecycle, diagnostics, tests, and trust |
 | [Supply-Chain Maintenance](supply-chain-maintenance.md) | Dependency and GitHub Actions pinning, permissions, updates, exceptions, validation, and rollback policy |
-| [Web UI Foundation Contract](web-ui-foundation.md) | Semantic controls, visible sizes, coarse-pointer targets, surface-role/density D5 ratchet (#877), native-button adoption ratchet (#878), guardrails, and migration ownership |
+| [Web UI Foundation Contract](web-ui-foundation.md) | Semantic controls, visible sizes, coarse-pointer targets, surface-role/density D5 ratchet (#877), native-button adoption ratchet (#878), Theme token freeze Phase 0 (#1300), guardrails, and migration ownership |
 | [Web PWA (shell-only)](web-pwa.md) | Installable PWA, conservative shell cache boundary, no analysis/market data caching (#234) |
 | [Web responsive breakpoints](web-responsive-breakpoints.md) | Supported 320/768/1024 matrix, page audit gaps, and batch plan (#146 / #234) |
 | [Web Runtime Performance Budgets](web-runtime-performance.md) | Issue #883 ten surfaces plus T16 DataTable virtualization, per-scenario blocking/observe/skip gates, and aggregate gzip families; [中文](web-runtime-performance_CN.md) |
