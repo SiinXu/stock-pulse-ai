@@ -1,7 +1,7 @@
 # Upstream Parity Checker
 
 - Status: `Living`
-- Last verified: 2026-08-20
+- Last verified: 2026-08-21
 - Scope: drift reporting for `ZhuLinsen/daily_stock_analysis`, whitelist semantics, trailer-safe vs do-not-trailer SHAs, triage, and maintainer cadence
 
 StockPulse ports upstream foundation fixes **manually**. There is no automatic
@@ -51,6 +51,8 @@ Ported-from: ZhuLinsen/daily_stock_analysis@<sha>
 - Multiple trailers are allowed when one StockPulse change combines several upstream commits.
 - The checker matches trailer SHAs as prefixes against full upstream SHAs.
 - The line must be `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`. A bare `Ported-from: <sha>` (missing `repo@`) is malformed and does **not** count as already ported.
+- Each absorbed upstream SHA must appear in exactly one well-formed local trailer. After a squash lands, that trailer often lives on an ancestor squash commit, not on `HEAD`. Do not duplicate the trailer on a later commit.
+- Matching walks `git log` from the local ref. A shallow clone (GitHub Actions default `fetch-depth: 1`) only contains `HEAD`, so ancestor trailers are invisible. The checker fails closed on shallow history. Use `git fetch --unshallow` locally, or `fetch-depth: 0` in Actions.
 
 ## Trailer-safe vs do-not-trailer SHAs
 
@@ -152,6 +154,7 @@ python scripts/inventory_upstream_drift.py --fetch \
 - Actions are SHA-pinned (enforced by `scripts/check_workflow_supply_chain.py`).
 - Permissions: `contents: read`, `issues: write` only on the parity job.
 - The workflow never pushes code, opens PRs, or merges upstream.
+- `upstream-parity.yml` and the offline pytest jobs that run trailer tests (`backend-gate`, `backend-tests`, `python-minimum-tests`) check out with `fetch-depth: 0`. Default depth 1 is not enough: after a squash merge, `HEAD` does not repeat ancestor `Ported-from` trailers. A bounded `fetch-depth: N` is also not enough, because trailers can sit thousands of commits back. Full history does not change job permissions (`contents: read`) and adds a small clone cost relative to the 30–45 minute shards.
 
 ## Keeping This Current
 

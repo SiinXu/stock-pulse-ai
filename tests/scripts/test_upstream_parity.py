@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import tempfile
 from pathlib import Path
 
 import pytest
@@ -13,8 +15,10 @@ from scripts.check_upstream_parity import (
     STATUS_ATTENTION,
     STATUS_INFORMATIONAL,
     STATUS_PORTED,
+    ParityError,
     build_ported_index,
     classify_paths,
+    git_repository_is_shallow,
     list_local_commit_messages,
     load_whitelist,
     main,
@@ -248,9 +252,11 @@ def test_date_freeze_sha_absorbed_on_main_is_not_denied_or_duplicated() -> None:
     index = build_ported_index(
         messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
     )
-    assert match_ported_by(DATE_FREEZE_SHA, index), (
+    matched = match_ported_by(DATE_FREEZE_SHA, index)
+    assert matched, (
         "5c964bf23 must stay already ported via the #1413 well-formed trailer"
     )
+    assert len(matched) == 1
 
 
 def test_schedule_restore_sha_absorbed_on_main_is_not_denied_or_duplicated() -> None:
@@ -262,6 +268,128 @@ def test_schedule_restore_sha_absorbed_on_main_is_not_denied_or_duplicated() -> 
     index = build_ported_index(
         messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
     )
-    assert match_ported_by(SCHEDULE_RESTORE_SHA, index), (
+    matched = match_ported_by(SCHEDULE_RESTORE_SHA, index)
+    assert matched, (
         "96bc532df must stay already ported via the #1409 well-formed trailer"
     )
+    assert len(matched) == 1
+
+
+def _git(args: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:
+    completed = subprocess.run(
+        ["git", *args],
+        cwd=str(cwd),
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if check and completed.returncode != 0:
+        raise AssertionError(
+            f"git {' '.join(args)} failed ({completed.returncode}): "
+            f"{(completed.stderr or completed.stdout).strip()}"
+        )
+    return completed
+
+
+def _init_fixture_repo(path: Path) -> None:
+    path.mkdir(parents=True, exist_ok=True)
+    init = _git(["init", "-b", "main"], path, check=False)
+    if init.returncode != 0:
+        _git(["init"], path)
+        _git(["branch", "-M", "main"], path)
+    _git(["config", "user.email", "parity-self-test@example.com"], path)
+    _git(["config", "user.name", "Parity Self Test"], path)
+
+
+def _commit(path: Path, filename: str, content: str, message: str) -> str:
+    (path / filename).write_text(content, encoding="utf-8")
+    _git(["add", "-A"], path)
+    _git(["commit", "-m", message], path)
+    return _git(["rev-parse", "HEAD"], path).stdout.strip()
+
+
+def _build_squash_main_fixture(root: Path) -> Path:
+    """Linear squash-main shape: trailers on ancestors, not duplicated on HEAD."""
+    repo = root / "full"
+    _init_fixture_repo(repo)
+    _commit(
+        repo,
+        "date-freeze.txt",
+        "absorbed date freeze\n",
+        "fix: save single-stock reports when notify is unconfigured\n\n"
+        f"Ported-from: ZhuLinsen/daily_stock_analysis@{DATE_FREEZE_SHA[:9]}\n",
+    )
+    _commit(
+        repo,
+        "schedule-restore.txt",
+        "absorbed schedule restore\n",
+        "fix: restore enabled schedules under --serve-only\n\n"
+        f"Ported-from: ZhuLinsen/daily_stock_analysis@{SCHEDULE_RESTORE_SHA[:9]}\n",
+    )
+    _commit(
+        repo,
+        "later-squash.txt",
+        "later absorbed attention SHAs\n",
+        "chore: record Ported-from trailers for absorbed Attention SHAs\n\n"
+        "Ported-from: ZhuLinsen/daily_stock_analysis@487e49e56\n",
+    )
+    return repo
+
+
+def test_squash_main_shape_recognizes_absorbed_shas_once() -> None:
+    """Post-squash main: ancestor trailers still match, HEAD does not duplicate."""
+    with tempfile.TemporaryDirectory(prefix="parity-squash-") as tmp:
+        repo = _build_squash_main_fixture(Path(tmp))
+        assert not git_repository_is_shallow(repo)
+        messages = list_local_commit_messages(repo, "HEAD")
+        index = build_ported_index(
+            messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+        )
+        freeze = match_ported_by(DATE_FREEZE_SHA, index)
+        restore = match_ported_by(SCHEDULE_RESTORE_SHA, index)
+        assert freeze == [
+            "fix: save single-stock reports when notify is unconfigured"
+        ]
+        assert restore == [
+            "fix: restore enabled schedules under --serve-only"
+        ]
+        head_subject = messages[0].splitlines()[0]
+        assert head_subject == (
+            "chore: record Ported-from trailers for absorbed Attention SHAs"
+        )
+        assert head_subject not in freeze
+        assert head_subject not in restore
+        assert "487e49e56" in index
+        assert DATE_FREEZE_SHA[:9] in index
+        assert SCHEDULE_RESTORE_SHA[:9] in index
+
+
+def test_shallow_clone_hides_ancestor_trailers_and_fails_closed() -> None:
+    """CI depth 1 only sees HEAD; production matching must not silently miss."""
+    with tempfile.TemporaryDirectory(prefix="parity-shallow-") as tmp:
+        tmp_path = Path(tmp)
+        full = _build_squash_main_fixture(tmp_path)
+        shallow = tmp_path / "shallow"
+        _git(
+            [
+                "clone",
+                "--depth=1",
+                "--no-local",
+                f"file://{full}",
+                str(shallow),
+            ],
+            tmp_path,
+        )
+        assert git_repository_is_shallow(shallow)
+        with pytest.raises(ParityError, match="shallow clone"):
+            list_local_commit_messages(shallow, "HEAD")
+        silent = list_local_commit_messages(
+            shallow, "HEAD", allow_shallow=True
+        )
+        assert len(silent) == 1
+        index = build_ported_index(
+            silent, upstream_repo="ZhuLinsen/daily_stock_analysis"
+        )
+        assert match_ported_by(DATE_FREEZE_SHA, index) == []
+        assert match_ported_by(SCHEDULE_RESTORE_SHA, index) == []
+        assert "487e49e56" in index

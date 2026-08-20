@@ -1,7 +1,7 @@
 # 上游一致性检查（Upstream Parity）
 
 - 状态：`Living`
-- 最近核对：2026-08-20
+- 最近核对：2026-08-21
 - 范围：`ZhuLinsen/daily_stock_analysis` 漂移报告、白名单语义、trailer-safe / do-not-trailer SHA 契约、分诊流程与维护节奏
 
 StockPulse **手动**移植上游 foundation 修复，不会自动 merge 或同步上游。本文说明每周运行的一致性检查如何报告漂移，以便维护者有计划地分诊移植。
@@ -45,6 +45,8 @@ Ported-from: ZhuLinsen/daily_stock_analysis@<sha>
 - 一次 StockPulse 变更合并多个上游提交时，可写多条 trailer。
 - 检查器将 trailer 中的 SHA 作为前缀与完整上游 SHA 匹配。
 - 必须写成 `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`。缺少 `repo@` 的 `Ported-from: <sha>` 为畸形 trailer，**不算** already ported。
+- 每个已吸收的上游 SHA 只能有一条格式正确的本地 trailer。squash 合入后，该 trailer 通常在祖先 squash 提交上，而不在 `HEAD`。不要在后续提交中重复同一条 trailer。
+- 匹配会从本地 ref 走 `git log`。浅克隆（GitHub Actions 默认 `fetch-depth: 1`）只包含 `HEAD`，祖先 trailer 会消失。检查器在浅历史上失败关闭。本地使用 `git fetch --unshallow`，Actions 使用 `fetch-depth: 0`。
 
 ## Trailer-safe 与 do-not-trailer SHA
 
@@ -146,6 +148,7 @@ python scripts/inventory_upstream_drift.py --fetch \
 - Actions 使用 SHA 固定（由 `scripts/check_workflow_supply_chain.py` 强制）。
 - 权限：parity 作业仅 `contents: read`、`issues: write`。
 - 工作流不会推送代码、打开 PR，也不会 merge 上游。
+- `upstream-parity.yml` 以及运行 trailer 测试的离线 pytest 作业（`backend-gate`、`backend-tests`、`python-minimum-tests`）使用 `fetch-depth: 0`。默认 depth 1 不够：squash 合入后 `HEAD` 不会重复祖先 `Ported-from` trailer。有界的 `fetch-depth: N` 也不够，因为 trailer 可能在数千个提交之前。完整历史不改变作业权限（仍是 `contents: read`），相对 30–45 分钟分片只增加很小的 clone 成本。
 
 ## 文档维护
 

@@ -1,0 +1,2 @@
+- [Fixed] Fetch full git history in the offline pytest shards so already-absorbed Ported-from trailers on ancestor squash commits stay visible (Refs #1221).
+- [Tests] Prove squash-main ancestor trailers match `5c964bf23` and `96bc532df` exactly once and that a depth-1 clone cannot see them (Refs #1221).
