@@ -6,6 +6,9 @@ import {
   type AnalysisListChange,
   type AnalysisValueChange,
   type ConfigComponentDiff,
+  type OptionalSectionComparisonStatus,
+  type OptionalSectionId,
+  type OptionalSectionPresence,
   type ReportFieldDiff,
   type ReportVersionCompareResponse,
   type ReportVersionSeverity,
@@ -139,6 +142,84 @@ function renderValueChanges(
           </li>
         );
       })}
+    </ul>
+  );
+}
+
+function optionalSectionLabel(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  section: OptionalSectionId | string,
+): string {
+  switch (section) {
+    case 'catalysts':
+      return text.optionalSectionCatalysts;
+    case 'structured_risk':
+      return text.optionalSectionStructuredRisk;
+    case 'multi_agent':
+      return text.optionalSectionMultiAgent;
+    default:
+      return section;
+  }
+}
+
+function optionalStatusLabel(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  status: OptionalSectionComparisonStatus | string,
+): string {
+  switch (status) {
+    case 'both_missing':
+      return text.optionalStatusBothMissing;
+    case 'base_missing':
+      return text.optionalStatusBaseMissing;
+    case 'target_missing':
+      return text.optionalStatusTargetMissing;
+    case 'present_identical':
+      return text.optionalStatusPresentIdentical;
+    case 'present_different':
+      return text.optionalStatusPresentDifferent;
+    default:
+      return status;
+  }
+}
+
+function optionalStatusBadgeVariant(
+  status: OptionalSectionComparisonStatus | string,
+): 'warning' | 'info' | 'history' {
+  switch (status) {
+    case 'present_identical':
+      return 'history';
+    case 'present_different':
+      return 'info';
+    default:
+      return 'warning';
+  }
+}
+
+function optionalPresenceLabel(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  present: boolean,
+  count: number,
+): string {
+  if (!present) return text.optionalSectionAbsent;
+  return text.optionalSectionPresent.replace('{count}', String(count));
+}
+
+function renderOptionalPreview(
+  text: (typeof REPORT_VERSION_COMPARE_TEXT)['en'],
+  present: boolean,
+  items: string[] | undefined,
+): React.ReactNode {
+  if (!present) {
+    return null;
+  }
+  if (!items || items.length === 0) {
+    return <p className="text-sm text-secondary-text">{text.optionalPreviewEmpty}</p>;
+  }
+  return (
+    <ul className="list-disc space-y-1 pl-5 text-sm text-foreground">
+      {items.map((item) => (
+        <li key={item} className="break-words">{item}</li>
+      ))}
     </ul>
   );
 }
@@ -364,6 +445,46 @@ export const ReportVersionCompareView: React.FC<ReportVersionCompareViewProps> =
                 <div>
                   <div className="text-xs text-secondary-text">{text.targetValue}</div>
                   <div className="text-foreground">{formatCell(diff.targetValue, emptyValue)}</div>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Surface>
+
+      <Surface className="space-y-3 p-4" data-testid="report-version-optional-sections">
+        <h3 className="text-sm font-semibold text-foreground">{text.optionalSectionsTitle}</h3>
+        <p className="text-sm text-secondary-text">{text.optionalSectionsDescription}</p>
+        <ul className="space-y-2">
+          {(result.optionalSections ?? []).map((row: OptionalSectionPresence) => (
+            <li
+              key={row.section}
+              data-testid={`report-version-optional-section-${row.section}`}
+              data-comparison-status={row.comparisonStatus}
+              className="space-y-2 rounded-lg border border-border/50 bg-elevated/50 px-3 py-2"
+            >
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-medium text-foreground">
+                  {optionalSectionLabel(text, row.section)}
+                </span>
+                <Badge variant={optionalStatusBadgeVariant(row.comparisonStatus)} size="sm">
+                  {optionalStatusLabel(text, row.comparisonStatus)}
+                </Badge>
+              </div>
+              <div className="grid gap-2 text-sm sm:grid-cols-2">
+                <div>
+                  <div className="text-xs text-secondary-text">{text.baseLabel}</div>
+                  <div className={row.basePresent ? 'text-foreground' : 'text-warning'}>
+                    {optionalPresenceLabel(text, row.basePresent, row.baseItemCount)}
+                  </div>
+                  {renderOptionalPreview(text, row.basePresent, row.basePreview)}
+                </div>
+                <div>
+                  <div className="text-xs text-secondary-text">{text.targetLabel}</div>
+                  <div className={row.targetPresent ? 'text-foreground' : 'text-warning'}>
+                    {optionalPresenceLabel(text, row.targetPresent, row.targetItemCount)}
+                  </div>
+                  {renderOptionalPreview(text, row.targetPresent, row.targetPreview)}
                 </div>
               </div>
             </li>

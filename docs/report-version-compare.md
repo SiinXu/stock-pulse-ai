@@ -2,7 +2,7 @@
 
 [中文](report-version-compare.md) | [English](report-version-compare_EN.md)
 
-Issue #188 / T18：用户可从分析历史选择同一标的的两次运行，或从个股详情进入版本对比，并排查看类型化的报告与配置差异。Issue #188 仍保留结构化 risk/catalyst 差异与可选多智能体区块缺失时的显式行为等后续范围。
+Issue #188 / T18：用户可从分析历史选择同一标的的两次运行，或从个股详情进入版本对比，并排查看类型化的报告与配置差异。可选的多智能体、结构化风险与催化区块现在有明确的诚实对照：缺失会标成缺失，而不会被当成“两边都为空所以相同”。Issue #188 仍保留比 T17 列表差异更深层的结构化 risk/catalyst 条目展示等后续范围。
 
 ## 能力范围
 
@@ -21,6 +21,20 @@ Issue #188 / T18：用户可从分析历史选择同一标的的两次运行，�
 | `engine_pending` | 合并后的引擎在运行时不可用；仍展示并排字段与配置来源。**不等于无变化** |
 | `no_baseline` | T17 返回 `has_baseline=false`。**不等于无变化** |
 | `incomparable` | 运行不可比（例如标的不一致） |
+
+## 可选区块诚实对照
+
+`optional_sections` 始终返回完整的三行投影（`catalysts`、`structured_risk`、`multi_agent`）。“已产出”表示持久化运行里存在该区块键（即使列表为空）；“未产出”表示该区块从未生成。`multi_agent` 仅统计可选的 `dashboard.bull_bear_debate` 与 `dashboard.committee_deliberation`；编排器必写的 `dashboard.risk_manager` 风控门禁不计入。
+
+| comparison_status | 含义 |
+| --- | --- |
+| `both_missing` | 两次运行都未产出该区块。**不等于**两边都是空内容所以相同 |
+| `base_missing` | 基线未产出，对比版本产出了 |
+| `target_missing` | 对比版本未产出，基线产出了 |
+| `present_identical` | 两边都产出，且可比内容相同 |
+| `present_different` | 两边都产出，且内容不同 |
+
+该面板补充 T17 AnalysisDelta 的列表差异，不替代自动 delta 报告，也不会给“一侧从未产出的区块”编造条目级 added/removed。
 
 ## 变化分级（展示层）
 
@@ -59,6 +73,7 @@ HTTP API 为兼容保留 `base_run_id` / `target_run_id` 参数名，但参数�
 ## 相关文件
 
 - `src/services/report_version_compare_service.py`
+- `src/services/report_version_compare_optional_sections.py`
 - `src/services/report_version_compare_adapter.py`
 - `src/api/v1/endpoints/report_version_compare.py`
 - `apps/dsa-web/src/pages/ReportVersionComparePage.tsx`

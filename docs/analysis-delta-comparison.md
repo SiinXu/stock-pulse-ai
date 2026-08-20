@@ -81,6 +81,8 @@ Persisted on `analysis_history` or inside `raw_result` / `dashboard`:
 - Evidence: `key_points`, `dashboard.intelligence.positive_catalysts`, `report_strata.verified_facts`, `data_sources`
 - Risks: `dashboard.intelligence.risk_alerts`, `risk_warning`, `report_strata.risks_counter_evidence`
 
+T17 list diffs still treat a missing optional list key as an empty list. That is intentional for the automatic delta report (#148) and must not be confused with “both sides produced the same empty section.” Manual version compare (T18 / #188) adds a complementary `optional_sections` honesty projection so missing multi-agent, structured-risk, and catalyst sections stay visible. See [Report version comparison](report-version-compare_EN.md).
+
 **Not comparable without schema work (out of T17 scope)**
 
 - Free-form narrative sections (`trend_analysis`, full markdown body)

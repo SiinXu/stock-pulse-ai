@@ -12,25 +12,63 @@ type UiTranslationModule = { translations: UiTranslationBundle };
 async function loadExtraLocaleBundle(
   loadCore: () => Promise<{ translations: Record<string, string> }>,
   loadExtra: () => Promise<{ EXTRA_UI_TRANSLATIONS: Record<string, string> }>,
+  loadOptionalSections: () => Promise<{ OPTIONAL_SECTION_HONESTY_TRANSLATIONS: Record<string, string> }>,
 ): Promise<UiTranslationModule> {
-  const [core, extra] = await Promise.all([loadCore(), loadExtra()]);
+  const [core, extra, optionalSections] = await Promise.all([
+    loadCore(),
+    loadExtra(),
+    loadOptionalSections(),
+  ]);
   return {
     translations: {
       ...core.translations,
       ...extra.EXTRA_UI_TRANSLATIONS,
+      ...optionalSections.OPTIONAL_SECTION_HONESTY_TRANSLATIONS,
     } as UiTranslationBundle,
   };
 }
 
 const TRANSLATION_LOADERS: Record<AdditionalUiLanguage, () => Promise<UiTranslationModule>> = {
-  "zh-TW": () => loadExtraLocaleBundle(() => import('./zh-TW'), () => import('./extra/zh-TW')),
-  "ja": () => loadExtraLocaleBundle(() => import('./ja'), () => import('./extra/ja')),
-  "ko": () => loadExtraLocaleBundle(() => import('./ko'), () => import('./extra/ko')),
-  "de": () => loadExtraLocaleBundle(() => import('./de'), () => import('./extra/de')),
-  "es": () => loadExtraLocaleBundle(() => import('./es'), () => import('./extra/es')),
-  "ms": () => loadExtraLocaleBundle(() => import('./ms'), () => import('./extra/ms')),
-  "fr": () => loadExtraLocaleBundle(() => import('./fr'), () => import('./extra/fr')),
-  "id": () => loadExtraLocaleBundle(() => import('./id'), () => import('./extra/id')),
+  "zh-TW": () => loadExtraLocaleBundle(
+    () => import('./zh-TW'),
+    () => import('./extra/zh-TW'),
+    () => import('./optionalSections/zh-TW'),
+  ),
+  "ja": () => loadExtraLocaleBundle(
+    () => import('./ja'),
+    () => import('./extra/ja'),
+    () => import('./optionalSections/ja'),
+  ),
+  "ko": () => loadExtraLocaleBundle(
+    () => import('./ko'),
+    () => import('./extra/ko'),
+    () => import('./optionalSections/ko'),
+  ),
+  "de": () => loadExtraLocaleBundle(
+    () => import('./de'),
+    () => import('./extra/de'),
+    () => import('./optionalSections/de'),
+  ),
+  "es": () => loadExtraLocaleBundle(
+    () => import('./es'),
+    () => import('./extra/es'),
+    () => import('./optionalSections/es'),
+  ),
+  "ms": () => loadExtraLocaleBundle(
+    () => import('./ms'),
+    () => import('./extra/ms'),
+    () => import('./optionalSections/ms'),
+  ),
+  "fr": () => loadExtraLocaleBundle(
+    () => import('./fr'),
+    () => import('./extra/fr'),
+    () => import('./optionalSections/fr'),
+  ),
+  "id": () => loadExtraLocaleBundle(
+    () => import('./id'),
+    () => import('./extra/id'),
+    () => import('./optionalSections/id'),
+  ),
 };
 
 const loadedTranslations = new Map<AdditionalUiLanguage, UiTranslationBundle>();

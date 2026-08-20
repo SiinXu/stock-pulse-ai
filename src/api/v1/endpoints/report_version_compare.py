@@ -15,6 +15,7 @@ from src.api.v1.schemas.report_version_compare import (
     AnalysisDeltaPayload,
     ConfigComponentDiff,
     ConfigFingerprintDiff,
+    OptionalSectionPresence,
     ReportFieldDiff,
     ReportVersionCompareResponse,
     ReportVersionRunItem,
@@ -135,9 +136,10 @@ def list_report_version_runs(
     summary="Compare two analysis report versions",
     description=(
         "Compare two selected analysis runs: side-by-side field snapshots, "
-        "configuration provenance differences, and the typed T17 AnalysisDelta. "
-        "engine_pending and no_baseline are "
-        "never presented as 'no change'."
+        "configuration provenance differences, optional-section honesty, and "
+        "the typed T17 AnalysisDelta. engine_pending, no_baseline, and a "
+        "missing optional multi-agent/risk/catalyst section are never "
+        "presented as 'no change'."
     ),
     operation_id="compareReportVersions",
 )
@@ -194,6 +196,10 @@ def compare_report_versions(
     field_diffs = [
         ReportFieldDiff(**item) for item in result.get("field_diffs") or []
     ]
+    optional_sections = [
+        OptionalSectionPresence(**item)
+        for item in result.get("optional_sections") or []
+    ]
 
     return ReportVersionCompareResponse(
         status=result["status"],
@@ -202,6 +208,7 @@ def compare_report_versions(
         target_run=_run_item(result["target_run"]),
         config_diff=config_diff,
         field_diffs=field_diffs,
+        optional_sections=optional_sections,
         delta=delta,
         engine_status=result["engine_status"],
     )

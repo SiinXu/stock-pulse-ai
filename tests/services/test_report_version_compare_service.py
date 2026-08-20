@@ -320,6 +320,87 @@ class ReportVersionCompareServiceTests(unittest.TestCase):
         self.assertEqual(result["config_diff"]["comparison_status"], "unknown")
         self.assertFalse(result["config_diff"]["identical"])
 
+    def test_optional_sections_honesty_left_right_both_and_different(self) -> None:
+        base_missing = _insert_history(self.db, query_id="base-missing")
+        target_with_sections = _insert_history(
+            self.db,
+            query_id="target-present",
+            extra_raw={
+                "dashboard": {
+                    "intelligence": {
+                        "positive_catalysts": ["Export recovery"],
+                        "risk_alerts": ["Liquidity risk"],
+                    },
+                    "report_strata": {"risks_counter_evidence": ["Currency headwind"]},
+                    "bull_bear_debate": {"status": "complete", "winner": "bull"},
+                }
+            },
+        )
+        left = ReportVersionCompareService(self.db).compare_runs(
+            "600519", str(base_missing), str(target_with_sections)
+        )
+        left_by_section = {row["section"]: row for row in left["optional_sections"]}
+        self.assertEqual(
+            set(left_by_section),
+            {"catalysts", "structured_risk", "multi_agent"},
+        )
+        self.assertEqual(left_by_section["catalysts"]["comparison_status"], "base_missing")
+        self.assertEqual(left_by_section["structured_risk"]["comparison_status"], "base_missing")
+        self.assertEqual(left_by_section["multi_agent"]["comparison_status"], "base_missing")
+        self.assertFalse(left_by_section["catalysts"]["base_present"])
+        self.assertTrue(left_by_section["catalysts"]["target_present"])
+
+        right_missing = _insert_history(self.db, query_id="right-missing")
+        right = ReportVersionCompareService(self.db).compare_runs(
+            "600519", str(target_with_sections), str(right_missing)
+        )
+        right_by_section = {row["section"]: row for row in right["optional_sections"]}
+        self.assertEqual(right_by_section["catalysts"]["comparison_status"], "target_missing")
+        self.assertEqual(right_by_section["multi_agent"]["comparison_status"], "target_missing")
+
+        both_missing_a = _insert_history(self.db, query_id="both-a")
+        both_missing_b = _insert_history(self.db, query_id="both-b")
+        both = ReportVersionCompareService(self.db).compare_runs(
+            "600519", str(both_missing_a), str(both_missing_b)
+        )
+        for row in both["optional_sections"]:
+            self.assertEqual(row["comparison_status"], "both_missing")
+            self.assertFalse(row["base_present"])
+            self.assertFalse(row["target_present"])
+
+        different_target = _insert_history(
+            self.db,
+            query_id="target-different",
+            extra_raw={
+                "dashboard": {
+                    "intelligence": {
+                        "positive_catalysts": ["Export recovery", "Buyback"],
+                        "risk_alerts": ["Liquidity risk", "Margin pressure"],
+                    },
+                    "report_strata": {"risks_counter_evidence": ["Currency headwind"]},
+                    "bull_bear_debate": {"status": "complete", "winner": "bear"},
+                    "committee_deliberation": {"status": "resolved"},
+                }
+            },
+        )
+        different = ReportVersionCompareService(self.db).compare_runs(
+            "600519", str(target_with_sections), str(different_target)
+        )
+        different_by_section = {row["section"]: row for row in different["optional_sections"]}
+        self.assertEqual(
+            different_by_section["catalysts"]["comparison_status"],
+            "present_different",
+        )
+        self.assertEqual(
+            different_by_section["structured_risk"]["comparison_status"],
+            "present_different",
+        )
+        self.assertEqual(
+            different_by_section["multi_agent"]["comparison_status"],
+            "present_different",
+        )
+        json.dumps(different, allow_nan=False)
+
     def test_missing_invalid_or_non_string_language_keeps_config_unknown(self) -> None:
         service = ReportVersionCompareService(self.db)
 

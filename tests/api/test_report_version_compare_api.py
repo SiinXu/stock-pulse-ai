@@ -49,6 +49,7 @@ def _insert_history(
     model_used: str = "model-a",
     report_language: Any = "zh",
     created_at: Optional[datetime] = None,
+    extra_raw: Optional[Dict[str, Any]] = None,
 ) -> int:
     raw = {
         "model_used": model_used,
@@ -59,6 +60,8 @@ def _insert_history(
     }
     if report_language is not None:
         raw["report_language"] = report_language
+    if extra_raw:
+        raw.update(extra_raw)
 
     def _write(session):
         row = AnalysisHistory(
@@ -237,6 +240,35 @@ class ReportVersionCompareApiTests(unittest.TestCase):
         )
         self.assertEqual(resp.status_code, 400, resp.text)
         self.assertEqual(resp.json()["error"], "same_run_ids")
+
+    def test_compare_optional_sections_honesty_is_in_the_public_payload(self) -> None:
+        base_id = _insert_history(self.db, query_id="base")
+        target_id = _insert_history(
+            self.db,
+            query_id="target",
+            extra_raw={
+                "dashboard": {
+                    "intelligence": {"positive_catalysts": ["Export recovery"]},
+                    "bull_bear_debate": {"status": "complete"},
+                }
+            },
+        )
+        resp = self.client.get(
+            "/api/v1/report-version-compare/compare",
+            params={
+                "stock_code": "600519",
+                "base_run_id": str(base_id),
+                "target_run_id": str(target_id),
+            },
+        )
+        self.assertEqual(resp.status_code, 200, resp.text)
+        payload = resp.json()
+        by_section = {row["section"]: row for row in payload["optional_sections"]}
+        self.assertEqual(by_section["catalysts"]["comparison_status"], "base_missing")
+        self.assertEqual(by_section["multi_agent"]["comparison_status"], "base_missing")
+        self.assertEqual(by_section["structured_risk"]["comparison_status"], "both_missing")
+        self.assertEqual(by_section["catalysts"]["target_preview"], ["Export recovery"])
+        json.dumps(payload, allow_nan=False)
 
     def test_list_runs_normalizes_corrupt_scores_before_response_serialization(self) -> None:
         run_ids = [
