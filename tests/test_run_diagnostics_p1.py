@@ -17,6 +17,7 @@ import pandas as pd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.data_provider.base import BaseFetcher, DataFetcherManager
+from src.services.diagnostics.schema import DIAGNOSTIC_SNAPSHOT_KEYS
 from src.services.run_diagnostics import (
     RunDiagnosticContext,
     activate_run_diagnostic_context,
@@ -390,22 +391,7 @@ class RunDiagnosticsSplitCharacterizationTestCase(unittest.TestCase):
         "sanitize_finite_diagnostic_metadata",
     )
 
-    SNAPSHOT_KEYS = (
-        "trace_id",
-        "task_id",
-        "query_id",
-        "stock_code",
-        "trigger_source",
-        "scope",
-        "provider_runs",
-        "data_quality_evidence",
-        "llm_runs",
-        "notification_runs",
-        "history_runs",
-        "pipeline_stage_runs",
-        "agent_events",
-        "agent_events_capture",
-    )
+    SNAPSHOT_KEYS = DIAGNOSTIC_SNAPSHOT_KEYS
 
     FACADE_BOUND_CALLABLES = (
         "activate_run_diagnostic_context",

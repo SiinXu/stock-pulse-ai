@@ -1,8 +1,21 @@
 # -*- coding: utf-8 -*-
 """Stable run-diagnostic schema, sanitization, and serialization helpers.
 
+This module owns the persisted/API diagnostic *shape*: dataclasses, status
+vocabularies, snapshot keys, and redaction/normalization helpers.
+
 Collection and export consume these types. Callers should keep importing the
-public names from ``src.services.run_diagnostics``.
+public names from ``src.services.run_diagnostics``. Do not import
+``src.services.diagnostics.schema`` from new production code.
+
+Mutation risks
+--------------
+Normalization helpers return new containers. They must not mutate caller
+mappings, lists, or nested objects. Dataclass ``to_dict()`` methods copy
+payloads and omit empty optional fields; they must not rewrite dataclass
+fields in place. Collection/export may append to the diagnostic context, but
+must not alias or mutate business inputs, analysis outcomes, or nested
+window/notes objects passed in by callers.
 """
 
 from __future__ import annotations
@@ -32,6 +45,79 @@ PIPELINE_STAGE_NAMES = (
     "dispatch",
 )
 PIPELINE_STAGE_STATUSES = frozenset({"success", "degraded", "failed", "skipped"})
+
+# Keys always present on ``RunDiagnosticContext.snapshot()``. Optional identity
+# keys in DIAGNOSTIC_SNAPSHOT_OPTIONAL_KEYS appear only when prompt artifacts
+# were attached for the active run.
+DIAGNOSTIC_SNAPSHOT_KEYS = (
+    "trace_id",
+    "task_id",
+    "query_id",
+    "stock_code",
+    "trigger_source",
+    "scope",
+    "provider_runs",
+    "data_quality_evidence",
+    "llm_runs",
+    "notification_runs",
+    "history_runs",
+    "pipeline_stage_runs",
+    "agent_events",
+    "agent_events_capture",
+)
+DIAGNOSTIC_SNAPSHOT_OPTIONAL_KEYS = (
+    "prompt_artifact_versions",
+    "prompt_version",
+    "skill_versions",
+)
+
+# User-facing summary payload after ``RunDiagnosticSummary.to_dict()``.
+# Optional identity fields are omitted when None; ``copy_text`` is always set.
+DIAGNOSTIC_SUMMARY_KEYS = (
+    "trace_id",
+    "task_id",
+    "query_id",
+    "stock_code",
+    "trigger_source",
+    "status",
+    "status_label",
+    "reason",
+    "components",
+    "copy_text",
+)
+DIAGNOSTIC_SUMMARY_COMPONENT_KEYS = (
+    "realtime_quote",
+    "daily_data",
+    "news",
+    "data_quality",
+    "llm",
+    "notification",
+    "history",
+)
+DIAGNOSTIC_SUMMARY_STATUSES = frozenset({"normal", "degraded", "failed", "unknown"})
+DIAGNOSTIC_COMPONENT_STATUSES = frozenset(
+    {"ok", "degraded", "failed", "unknown", "not_configured", "skipped"}
+)
+
+# ProviderRun.to_dict() omits None optionals. created_at is always serialized.
+PROVIDER_RUN_REQUIRED_KEYS = (
+    "trace_id",
+    "data_type",
+    "provider",
+    "operation",
+    "success",
+    "created_at",
+)
+PROVIDER_RUN_OPTIONAL_KEYS = (
+    "latency_ms",
+    "error_type",
+    "error_message_sanitized",
+    "fallback_from",
+    "fallback_to",
+    "cache_hit",
+    "stale_seconds",
+    "record_count",
+)
 
 _EXISTING_REDACTION_SENTINEL = '"__STOCKPULSE_EXISTING_REDACTION__"'
 _LOCAL_ABSOLUTE_PATH_RE = re.compile(
@@ -401,8 +487,8 @@ class PipelineStageRun:
             "trace_id": self.trace_id,
             "stage": self.stage,
             "status": self.status,
-            "input_summary": self.input_summary,
-            "output_summary": self.output_summary,
+            "input_summary": dict(self.input_summary),
+            "output_summary": dict(self.output_summary),
             "duration_ms": self.duration_ms,
             "degraded": self.degraded,
             "degradation_reason": self.degradation_reason,
@@ -431,7 +517,7 @@ class RunDiagnosticComponent:
             "label": self.label,
             "status": self.status,
             "message": self.message,
-            "details": self.details,
+            "details": dict(self.details),
         }
         return {key: value for key, value in payload.items() if value not in (None, {}, [])}
 

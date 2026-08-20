@@ -115,7 +115,8 @@
 | 文档 | 内容 |
 | --- | --- |
 | [业务架构](business-architecture.md) | 利益相关者、业务能力、结果与从证据获取到通知的价值流 |
-| [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流 |
+| [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流；含运行诊断 schema 边界 |
+| [运行诊断 Phase 1](run-diagnostics-p1.md) | `trace_id`、ProviderRun、冻结 schema 契约、facade / collect / export 布局（#1076；中文专题，无独立英文副本） |
 | [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md) | 双轨职责、交互边界、贡献归属、上游移植与许可证来源规则 |
 | [上游一致性检查](upstream-parity_CN.md) | 每周漂移报告、路径存在性盘点、有意分叉路径白名单、`Ported-from` trailer、分诊流程与治理节奏（#1002 / #1061；[English](upstream-parity.md)） |
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |

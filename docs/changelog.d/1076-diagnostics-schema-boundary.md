@@ -1,0 +1,1 @@
+- [Changed] Freeze the run-diagnostics schema boundary in `src/services/diagnostics/schema.py` with snapshot/summary key contracts and copy-safe `to_dict()` serialization, without changing public imports or collect/export behavior (Refs #1076).

@@ -1,7 +1,7 @@
 # StockPulse Architecture Overview
 
 - Status: `Living`
-- Last verified: 2026-07-24
+- Last verified: 2026-08-20
 - Scope: current technical component boundaries, process entrypoints, and analysis data flow
 
 This document is the technical view of the current implementation. For
@@ -95,6 +95,7 @@ roots; see the [legacy facade import policy](legacy-facade-import-policy.md).
 | --- | --- | --- |
 | `src/application_services.py` | Lazy access to Config, DatabaseManager, SearchService, and AnalysisTaskQueue; process plugin lifecycle and root-owned extension adapters/catalogs; explicit injection. New/touched code should prefer constructor injection or `get_application_services().config` over bare `get_config()`; growth is ratcheted by [config-access ratchet](config-access-ratchet.md) / [ADR-011](adr/ADR-011-config-access-ratchet.md). | Full dependency injection for every caller; adoption is currently incremental. |
 | `src/services/` | Application use cases, task queue adapter, scheduling, analysis, history, portfolio, alerts, intelligence, and rendering services | HTTP transport schemas or provider-specific normalization. |
+| `src/services/run_diagnostics.py` and `src/services/diagnostics/` | In-memory, fail-open run diagnostics. The facade is the only public import. `schema.py` owns snapshot/summary types, status vocabularies, omit-`None` serialization, and redaction helpers. `collect.py` / `export.py` stay behind the facade. | Business analysis outcomes, provider fallback policy, or HTTP DTOs (`src/api/v1/schemas/history.py` mirrors the summary shape). |
 | `src/core/pipeline.py`, `src/core/stages/`, and `src/core/contracts/` | Analysis orchestration facade, stage implementations, typed stage outcomes, and formal stage IO contracts (`RunContext`, fetch/analyze/render IO, stage errors). `pipeline.py` is orchestration-only; business rules stay in stages/services. | Transport lifecycle or persistent query APIs. |
 | `src/data_provider/` | Market/provider adapters, capability routing, normalization, layered daily caching, priority fallback, health, and circuit control. | Product task lifecycle or report presentation. |
 | `src/search_service.py` and intelligence/context services | News and intelligence retrieval, context assembly, and source diagnostics | Market-price provider ownership or HTTP presentation. |
@@ -127,6 +128,31 @@ models with explicit `model_config`. LLM report boundaries stay on Pydantic
 Internal domain contracts can remain Pydantic models, dataclasses, or
 `TypedDict`s according to their boundary needs. This convention does not change
 the Native Agent production runtime or adopt PydanticAI as its orchestrator.
+
+### Run diagnostics schema
+
+The public import remains `src.services.run_diagnostics`. `schema.py` is the
+frozen shape boundary for persisted snapshots, history/API summaries, and
+redaction. Production callers must not import the internal package.
+
+Always-present snapshot keys: `trace_id`, `task_id`, `query_id`, `stock_code`,
+`trigger_source`, `scope`, `provider_runs`, `data_quality_evidence`,
+`llm_runs`, `notification_runs`, `history_runs`, `pipeline_stage_runs`,
+`agent_events`, `agent_events_capture`. Prompt identity keys are omitted until
+artifacts are attached.
+
+Serialization rules: `ProviderRun` / `LLMRun` / `NotificationRun` /
+`HistoryRun` / `PipelineStageRun` omit `None`. `DataQualityEvidenceRecord`
+keeps `symbol` / `provider` even when `None` and omits empty `provenance`.
+Summary overall status is `normal | degraded | failed | unknown`; component
+keys are `realtime_quote`, `daily_data`, `news`, `data_quality`, `llm`,
+`notification`, `history`. `copy_text` is always present.
+
+Mutation boundary: sanitizers and `to_dict()` copy containers. Collection may
+append to the diagnostic context only. It must not change analysis inputs,
+outcomes, or nested caller objects. Collect/export remain later slices of
+issue #1076; see [run diagnostics Phase 1](run-diagnostics-p1.md) for the
+Chinese field history.
 
 ## Analysis Execution Paths
 
