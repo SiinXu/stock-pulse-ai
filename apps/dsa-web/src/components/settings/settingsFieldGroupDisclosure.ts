@@ -29,13 +29,27 @@ export function parseSettingsFieldHash(hash: string): string | null {
   return key.length > 0 ? key : null;
 }
 
+export function settingsRevealUrlFingerprint(
+  queryField?: string | null,
+  hash?: string | null,
+): string {
+  return `${queryField?.trim() ?? ''}|${hash ?? ''}`;
+}
+
 export function resolveSettingsRevealFieldKey(options: {
   requestKey?: string | null;
+  requestUrlFingerprint?: string | null;
   queryField?: string | null;
   hash?: string | null;
 }): string | undefined {
   const fromRequest = options.requestKey?.trim();
-  if (fromRequest) {
+  const currentFingerprint = settingsRevealUrlFingerprint(options.queryField, options.hash);
+  const requestStillApplies = Boolean(fromRequest)
+    && (
+      options.requestUrlFingerprint == null
+      || options.requestUrlFingerprint === currentFingerprint
+    );
+  if (requestStillApplies) {
     return fromRequest;
   }
   const fromQuery = options.queryField?.trim();
@@ -43,4 +57,40 @@ export function resolveSettingsRevealFieldKey(options: {
     return fromQuery;
   }
   return options.hash ? parseSettingsFieldHash(options.hash) ?? undefined : undefined;
+}
+
+export function focusSettingsFieldWhenPresent(
+  fieldKey: string,
+  options?: { maxFrames?: number; root?: Document },
+): () => void {
+  const root = options?.root ?? (typeof document === 'undefined' ? null : document);
+  const maxFrames = options?.maxFrames ?? 60;
+  let cancelled = false;
+  let frames = 0;
+  let rafId = 0;
+
+  const attempt = () => {
+    if (cancelled || !root) {
+      return;
+    }
+    const el = root.getElementById(`setting-${fieldKey}`);
+    const blocked = el?.closest('[inert], [hidden]');
+    if (el && !blocked) {
+      el.focus();
+      if (typeof el.scrollIntoView === 'function') {
+        el.scrollIntoView({ block: 'center' });
+      }
+      return;
+    }
+    if (frames < maxFrames) {
+      frames += 1;
+      rafId = requestAnimationFrame(attempt);
+    }
+  };
+
+  rafId = requestAnimationFrame(attempt);
+  return () => {
+    cancelled = true;
+    cancelAnimationFrame(rafId);
+  };
 }

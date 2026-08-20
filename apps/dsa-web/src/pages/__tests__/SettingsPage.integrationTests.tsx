@@ -34,6 +34,14 @@ const {
   withTestConnectionCoreFields,
 } = SettingsPageTestHarness;
 
+async function expandSettingsFieldGroup(groupId: string): Promise<void> {
+  const group = await screen.findByTestId(`settings-field-group-${groupId}`);
+  const toggle = group.querySelector('button[aria-expanded]') as HTMLButtonElement | null;
+  if (toggle?.getAttribute('aria-expanded') === 'false') {
+    fireEvent.click(toggle);
+  }
+}
+
 export function registerSettingsPageIntegrationTests(): void {
   it('wires confirmed Agent presets through one Settings-host draft batch', async () => {
     const standard = AGENT_SETUP_PRESETS.find((preset) => preset.id === 'standard_research')!;
@@ -141,7 +149,7 @@ export function registerSettingsPageIntegrationTests(): void {
     ]));
   });
 
-  it('splits notification fields so Reports and Alerts render independent field sets', () => {
+  it('splits notification fields so Reports and Alerts render independent field sets', async () => {
     const notifyField = (key: string, uiControl = 'text') => ({
       key,
       value: '',
@@ -191,6 +199,7 @@ export function registerSettingsPageIntegrationTests(): void {
     const { rerender } = render(<SettingsPage />);
     expect(screen.getByTestId('settings-field-REPORT_TYPE')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-REPORT_LANGUAGE')).toBeInTheDocument();
+    await expandSettingsFieldGroup('report');
     expect(screen.getByRole('combobox', { name: 'Research Presentation Profile' })).toHaveValue('balanced');
     expect(screen.queryByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).not.toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-WECHAT_WEBHOOK_URL')).not.toBeInTheDocument();
@@ -211,7 +220,7 @@ export function registerSettingsPageIntegrationTests(): void {
     expect(screen.queryByTestId('settings-field-NOTIFICATION_ALERT_CHANNELS')).not.toBeInTheDocument();
   });
 
-  it('limits channel routing options to configured channels and guides setup when none exist', () => {
+  it('limits channel routing options to configured channels and guides setup when none exist', async () => {
     const routingItem = (options: string[]) => ({
       key: 'NOTIFICATION_ALERT_CHANNELS',
       value: '',
@@ -290,6 +299,7 @@ export function registerSettingsPageIntegrationTests(): void {
     expect(within(emptyField).getByText('—')).toBeInTheDocument();
     const emptyBanner = screen.getByTestId('channel-routing-empty-banner');
     expect(within(emptyBanner).getByText('尚未配置任何通知渠道，配置成功后才能在这里选择接收渠道。')).toBeInTheDocument();
+    await expandSettingsFieldGroup('routing');
     fireEvent.click(within(emptyBanner).getByRole('button', { name: '去配置通知渠道' }));
     const [nextParams] = routerSearchParamsMock.setParams.mock.calls.at(-1) ?? [];
     expect(nextParams?.get('section')).toBe('notifications');

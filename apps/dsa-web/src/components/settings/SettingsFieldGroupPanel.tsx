@@ -34,7 +34,7 @@ export type SettingsFieldGroupPanelProps = {
   Field: ComponentType<SettingsFieldProps>;
 };
 
-export default function SettingsFieldGroupPanel({
+export function SettingsFieldGroupPanel({
   group,
   groupItems,
   revealFieldKey,
@@ -98,3 +98,5 @@ export default function SettingsFieldGroupPanel({
     </div>
   );
 }
+
+export default SettingsFieldGroupPanel;

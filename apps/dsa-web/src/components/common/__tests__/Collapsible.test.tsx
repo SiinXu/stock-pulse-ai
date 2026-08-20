@@ -25,5 +25,24 @@ describe('Collapsible', () => {
       </Collapsible>,
     );
     expect(screen.getByRole('button', { name: 'Search sources' })).toHaveAttribute('aria-expanded', 'true');
+    const openPanel = document.getElementById(
+      screen.getByRole('button', { name: 'Search sources' }).getAttribute('aria-controls')!,
+    );
+    expect(openPanel).not.toHaveAttribute('inert');
+    expect(openPanel).not.toHaveAttribute('hidden');
+  });
+
+  it('marks collapsed content hidden and inert so fields are not keyboard or find-in-page reachable', () => {
+    render(
+      <Collapsible title="Search sources" defaultOpen={false}>
+        <input aria-label="Hidden field" />
+      </Collapsible>,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Search sources' });
+    const panel = document.getElementById(toggle.getAttribute('aria-controls')!);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(panel).toHaveAttribute('inert');
+    expect(panel).toHaveAttribute('hidden');
   });
 });

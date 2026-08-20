@@ -33,6 +33,7 @@ import { SettingsAlert } from '../../components/settings/SettingsAlert';
 import { SettingsConfigurationSummary, SystemConfigSummary } from '../../components/settings/SettingsConfigurationSummary';
 import { SettingsErrorSummary } from '../../components/settings/SettingsErrorSummary';
 import { SettingsField } from '../../components/settings/SettingsField';
+import { SettingsFieldGroupPanel } from '../../components/settings/SettingsFieldGroupPanel';
 import { SettingsHelpButton } from '../../components/settings/SettingsHelpButton';
 import { SettingsLoading } from '../../components/settings/SettingsLoading';
 import { SettingsSectionNav, SettingsViewTabs } from '../../components/settings/SettingsNavigation';
@@ -408,6 +409,33 @@ const SettingsErrorSummaryStory = () => {
   );
 };
 
+const SettingsFieldGroupPanelStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  const item = fixtureSystemConfigItems[1];
+  const [value, setValue] = useState(item.value);
+  const groupItem = { ...item, value };
+  return (
+    <SettingsFieldGroupPanel
+      group={{ id: 'search', titleKey: 'settings.dataGroupSearch' }}
+      groupItems={[groupItem]}
+      revealFieldKey={scenario === 'default' ? item.key : null}
+      showChannelRoutingEmptyBanner={false}
+      channelRoutingEmptyBanner={null}
+      isSaving={false}
+      setDraftValue={(_, next) => setValue(next)}
+      issueByKey={{}}
+      allValuesByKey={{ [item.key]: value }}
+      readOnlyDiagnosticForItem={() => undefined}
+      activeCategory="data_source"
+      channelRoutingFieldKeys={new Set()}
+      hasConfiguredNotificationChannelStatus={false}
+      channelRoutingOptionFilter={() => true}
+      channelRoutingEmptyState={null}
+      Field={SettingsField}
+    />
+  );
+};
+
 const SettingsFieldStory = () => {
   const { scenario } = usePlaygroundScenario();
   const item = fixtureSystemConfigItems[2];
@@ -623,6 +651,7 @@ export const SETTINGS_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'settings-configuration-summary': SettingsConfigurationSummaryStory,
   'settings-error-summary': SettingsErrorSummaryStory,
   'settings-field': SettingsFieldStory,
+  'settings-field-group-panel': SettingsFieldGroupPanelStory,
   'settings-help-button': SettingsHelpButtonStory,
   'settings-loading': SettingsLoading,
   'settings-section-nav': SettingsSectionNavStory,

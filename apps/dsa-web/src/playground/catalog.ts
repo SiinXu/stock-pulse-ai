@@ -251,6 +251,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('settings', 'settings-view-tabs', 'SettingsViewTabs', 'components/settings/SettingsNavigation.tsx', ['interactive']),
   entry('settings', 'settings-panel-error-boundary', 'SettingsPanelErrorBoundary', 'components/settings/SettingsPanelErrorBoundary.tsx', ['default', 'error']),
   entry('settings', 'settings-section-card', 'SettingsSectionCard', 'components/settings/SettingsSectionCard.tsx'),
+  entry('settings', 'settings-field-group-panel', 'SettingsFieldGroupPanel', 'components/settings/SettingsFieldGroupPanel.tsx', ['default', 'states']),
 
   entry('reports', 'dcf-sensitivity-panel', 'DcfSensitivityPanel', 'components/valuation/DcfSensitivityPanel.tsx', ['default', 'empty', 'interactive']),
   entry('reports', 'peer-valuation-canvas', 'PeerValuationCanvas', 'components/valuation/PeerValuationCanvas.tsx', ['default', 'empty', 'interactive']),

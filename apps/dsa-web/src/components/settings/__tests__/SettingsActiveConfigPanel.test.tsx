@@ -234,8 +234,13 @@ describe('SettingsActiveConfigPanel group disclosure', () => {
     expect(searchToggle).toHaveAttribute('aria-expanded', 'false');
     const panelId = searchToggle.getAttribute('aria-controls');
     expect(panelId).toBeTruthy();
-    expect(document.getElementById(panelId!)).toBeInstanceOf(HTMLElement);
+    const panel = document.getElementById(panelId!);
+    expect(panel).toBeInstanceOf(HTMLElement);
+    expect(panel).toHaveAttribute('hidden');
+    expect(panel).toHaveAttribute('inert');
     fireEvent.click(searchToggle);
     expect(searchToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).not.toHaveAttribute('hidden');
+    expect(panel).not.toHaveAttribute('inert');
   });
 });
