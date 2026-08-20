@@ -1,1 +1,0 @@
-- [Fixed] Isolate PortfolioSignalSummary from DecisionSignalDisplay so the Portfolio route no longer preloads the report-export download chunk (Refs #163).
