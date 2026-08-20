@@ -229,3 +229,24 @@ def test_do_not_trailer_shas_are_not_ported_on_head() -> None:
         if match_ported_by(entry.sha, index)
     ]
     assert leaked == [], f"do_not_trailer SHAs unexpectedly marked ported: {leaked}"
+
+
+DATE_FREEZE_SHA = "5c964bf23bade6571d09a085fc42199882b77f8f"
+
+
+def _triage_contains(entries, sha: str) -> bool:
+    return any(sha.startswith(entry.sha) or entry.sha.startswith(sha[:9]) for entry in entries)
+
+
+def test_date_freeze_sha_absorbed_on_main_is_not_denied_or_duplicated() -> None:
+    """#1413 already trailered 5c964bf23; do not false-exclude or re-trailer it here."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    assert not _triage_contains(triage.do_not_trailer, DATE_FREEZE_SHA)
+    assert not _triage_contains(triage.trailer_safe, DATE_FREEZE_SHA)
+    messages = list_local_commit_messages(ROOT, "HEAD")
+    index = build_ported_index(
+        messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    assert match_ported_by(DATE_FREEZE_SHA, index), (
+        "5c964bf23 must stay already ported via the #1413 well-formed trailer"
+    )

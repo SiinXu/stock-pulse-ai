@@ -76,11 +76,6 @@
       "reason": "Intentional product/docs skip tracked by #1222; StockPulse still documents AIHubMix rather than InferEra referral links."
     },
     {
-      "sha": "5c964bf23bade6571d09a085fc42199882b77f8f",
-      "subject": "test: stabilize single-stock report date assertions",
-      "reason": "Local tests/test_pipeline_single_stock_notify.py does not freeze report timestamps; a trailer would hide a real test-stability gap."
-    },
-    {
       "sha": "cfd6b0a5fb9c57685dc2b02ca059fa88d8eff8ec",
       "subject": "feat(agent): per-category tool timeouts with graceful degradation",
       "reason": "AGENT_{DATA,SEARCH,ANALYSIS,ACTION}_TOOL_TIMEOUT_S keys are absent; StockPulse still has global/stage timeouts only."

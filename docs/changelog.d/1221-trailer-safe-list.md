@@ -1,1 +1,2 @@
 - [Chore] Record well-formed Ported-from trailers for semantically absorbed upstream Attention SHAs and keep a do-not-trailer list so high path presence cannot hide residual or governance gaps (Refs #1221).
+- [Chore] Drop the stale `5c964bf23` do-not-trailer row after #1413 absorbed the single-stock report date-freeze on main; do not duplicate that trailer on this PR (Refs #1221).
