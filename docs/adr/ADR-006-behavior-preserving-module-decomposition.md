@@ -4,7 +4,7 @@
 - Decision date: 2026-07-21
 - Recorded: 2026-07-21
 - Decision owners: StockPulse maintainers
-- References: [PR #291](https://github.com/SiinXu/stock-pulse-ai/pull/291), [PR #293](https://github.com/SiinXu/stock-pulse-ai/pull/293), [PR #296](https://github.com/SiinXu/stock-pulse-ai/pull/296), [PR #297](https://github.com/SiinXu/stock-pulse-ai/pull/297)
+- References: [PR #291](https://github.com/SiinXu/stock-pulse-ai/pull/291), [PR #293](https://github.com/SiinXu/stock-pulse-ai/pull/293), [PR #296](https://github.com/SiinXu/stock-pulse-ai/pull/296), [PR #297](https://github.com/SiinXu/stock-pulse-ai/pull/297), living operational checklist [service-split template](../service-split-template.md)
 
 ## Context
 
@@ -53,3 +53,6 @@ unobserved low-level source metadata such as a moved callable's `co_filename`.
   of the observed contract.
 - Future cleanup can remove compatibility machinery only through an explicit,
   separately verified contract change.
+- New service, provider, market, and plugin gravity-module splits follow the
+  living [service-split template](../service-split-template.md) (facade, tests,
+  ratchets, and shim-removal criteria). That document does not amend this ADR.

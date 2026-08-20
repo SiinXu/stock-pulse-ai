@@ -56,7 +56,7 @@ Post a draft pull request or progress update within 3 days of claiming. Maintain
 
 ### Architecture Decisions
 
-If a PR changes component boundaries, a cross-module source of truth, the runtime/persistence/deployment model, security or failure policy, or a reusable large-migration method, its description must record ADR consideration: link a new or existing ADR, or explain why the change stays within accepted decisions and needs no new record. See the [ADR registry](adr/README.md) for numbering, statuses, process, and the template.
+If a PR changes component boundaries, a cross-module source of truth, the runtime/persistence/deployment model, security or failure policy, or a reusable large-migration method, its description must record ADR consideration: link a new or existing ADR, or explain why the change stays within accepted decisions and needs no new record. See the [ADR registry](adr/README.md) for numbering, statuses, process, and the template. Behavior-preserving gravity-module splits (facade, re-exports, tests, ratchets) follow the [service-split template](service-split-template.md); ADR-006 remains the architectural decision.
 
 Accepted ADRs remain as history. Record a material reversal in a new ADR with reciprocal links instead of rewriting the earlier decision.
 
