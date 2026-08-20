@@ -359,6 +359,21 @@ class TestGenerationBackendFieldsRegistered(unittest.TestCase):
     def test_agent_timeout_declares_display_unit(self):
         self.assertEqual(get_field_definition("AGENT_ORCHESTRATOR_TIMEOUT_S")["unit"], "s")
 
+    def test_category_tool_timeouts_are_registered_not_inferred(self):
+        keys = (
+            "AGENT_DATA_TOOL_TIMEOUT_S",
+            "AGENT_SEARCH_TOOL_TIMEOUT_S",
+            "AGENT_ANALYSIS_TOOL_TIMEOUT_S",
+            "AGENT_ACTION_TOOL_TIMEOUT_S",
+        )
+        for key in keys:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "agent", key)
+            self.assertEqual(field["default_value"], "0", key)
+            self.assertEqual(field["unit"], "s", key)
+            self.assertNotEqual(field["display_order"], 9000, key)
+            self.assertEqual(field["help_key"], "settings.agent.runtime_guards", key)
+
     def test_schema_response_groups_generation_backend_fields(self):
         schema = build_schema_response()
         self.assertEqual(schema["schema_version"], SCHEMA_VERSION)

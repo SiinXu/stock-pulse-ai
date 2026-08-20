@@ -10,9 +10,10 @@ import json
 import logging
 import math
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any
+from types import MappingProxyType
+from typing import Any, Mapping, Optional
 
 from src.utils.sanitize import sanitize_diagnostic_text
 
@@ -20,6 +21,17 @@ from src.utils.sanitize import sanitize_diagnostic_text
 DEFAULT_TOOL_TIMEOUT_SECONDS = 120.0
 DEFAULT_MAX_IDENTICAL_TOOL_CALLS = 3
 DEFAULT_MAX_STAGE_ENTRIES = 1
+TOOL_TIMEOUT_CATEGORIES = ("data", "search", "analysis", "action")
+CATEGORY_TOOL_TIMEOUT_SOURCES = {
+    "data": ("agent_data_tool_timeout_s", "AGENT_DATA_TOOL_TIMEOUT_S"),
+    "search": ("agent_search_tool_timeout_s", "AGENT_SEARCH_TOOL_TIMEOUT_S"),
+    "analysis": ("agent_analysis_tool_timeout_s", "AGENT_ANALYSIS_TOOL_TIMEOUT_S"),
+    "action": ("agent_action_tool_timeout_s", "AGENT_ACTION_TOOL_TIMEOUT_S"),
+}
+
+
+def _default_category_tool_timeouts() -> Mapping[str, float]:
+    return MappingProxyType({category: 0.0 for category in TOOL_TIMEOUT_CATEGORIES})
 
 
 class StageFailurePolicy(str, Enum):
@@ -37,6 +49,9 @@ class RuntimeGuardPolicy:
     max_identical_tool_calls: int = DEFAULT_MAX_IDENTICAL_TOOL_CALLS
     max_stage_entries: int = DEFAULT_MAX_STAGE_ENTRIES
     stage_failure_policy: StageFailurePolicy = StageFailurePolicy.ISOLATE
+    category_timeouts: Mapping[str, float] = field(
+        default_factory=_default_category_tool_timeouts
+    )
 
     @classmethod
     def from_sources(cls, config: Any = None) -> "RuntimeGuardPolicy":
@@ -65,7 +80,39 @@ class RuntimeGuardPolicy:
             max_identical_tool_calls=identical_limit,
             max_stage_entries=stage_entry_limit,
             stage_failure_policy=failure_policy,
+            category_timeouts=resolve_category_tool_timeouts(config),
         )
+
+
+def resolve_category_tool_timeouts(config: Any = None) -> Mapping[str, float]:
+    """Resolve optional per-category tool caps; ``0`` means no category cap."""
+    timeouts = {
+        category: _read_non_negative_float(
+            config,
+            attr_name=attr_name,
+            env_name=env_name,
+            default=0.0,
+        )
+        for category, (attr_name, env_name) in CATEGORY_TOOL_TIMEOUT_SOURCES.items()
+    }
+    return MappingProxyType(timeouts)
+
+
+def shortest_positive_timeout(*values: Optional[float]) -> Optional[float]:
+    """Return the shortest positive finite timeout, or ``None`` when none apply."""
+    positives: list[float] = []
+    for value in values:
+        if value is None:
+            continue
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            continue
+        if math.isfinite(number) and number > 0:
+            positives.append(number)
+    if not positives:
+        return None
+    return min(positives)
 
 
 def runtime_guard_fingerprint(value: str) -> str:
@@ -188,11 +235,15 @@ def _safe_log_value(value: Any) -> Any:
 
 
 __all__ = [
+    "CATEGORY_TOOL_TIMEOUT_SOURCES",
     "DEFAULT_MAX_IDENTICAL_TOOL_CALLS",
     "DEFAULT_MAX_STAGE_ENTRIES",
     "DEFAULT_TOOL_TIMEOUT_SECONDS",
     "RuntimeGuardPolicy",
     "StageFailurePolicy",
+    "TOOL_TIMEOUT_CATEGORIES",
     "log_runtime_guard_event",
+    "resolve_category_tool_timeouts",
     "runtime_guard_fingerprint",
+    "shortest_positive_timeout",
 ]

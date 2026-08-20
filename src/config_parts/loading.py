@@ -33,6 +33,7 @@ from src.config_parts.parsers import (
     parse_env_finite_float as _parse_env_finite_float,
     parse_env_float,
     parse_env_int,
+    parse_optional_category_tool_timeout,
     resolve_news_window_days,
     resolve_unified_llm_temperature,
 )
@@ -1095,6 +1096,22 @@ class _ConfigLoadingMethods:
             prediction_extract_enabled=parse_env_bool(
                 os.getenv('PREDICTION_EXTRACT_ENABLED'),
                 False,
+            ),
+            agent_data_tool_timeout_s=parse_optional_category_tool_timeout(
+                os.getenv('AGENT_DATA_TOOL_TIMEOUT_S'),
+                field_name='AGENT_DATA_TOOL_TIMEOUT_S',
+            ),
+            agent_search_tool_timeout_s=parse_optional_category_tool_timeout(
+                os.getenv('AGENT_SEARCH_TOOL_TIMEOUT_S'),
+                field_name='AGENT_SEARCH_TOOL_TIMEOUT_S',
+            ),
+            agent_analysis_tool_timeout_s=parse_optional_category_tool_timeout(
+                os.getenv('AGENT_ANALYSIS_TOOL_TIMEOUT_S'),
+                field_name='AGENT_ANALYSIS_TOOL_TIMEOUT_S',
+            ),
+            agent_action_tool_timeout_s=parse_optional_category_tool_timeout(
+                os.getenv('AGENT_ACTION_TOOL_TIMEOUT_S'),
+                field_name='AGENT_ACTION_TOOL_TIMEOUT_S',
             ),
             agent_technical_agent_timeout_s=parse_env_float(
                 os.getenv('AGENT_TECHNICAL_AGENT_TIMEOUT_S'), 0,

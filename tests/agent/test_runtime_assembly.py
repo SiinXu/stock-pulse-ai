@@ -68,6 +68,7 @@ def test_factory_reexports_runtime_assembly_entrypoints():
 
     assert factory.get_tool_registry is runtime_assembly.get_tool_registry
     assert factory.build_agent_executor is runtime_assembly.build_agent_executor
+    assert factory.apply_tool_category_timeouts is runtime_assembly.apply_tool_category_timeouts
 
 
 @pytest.mark.parametrize(

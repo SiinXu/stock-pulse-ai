@@ -3361,6 +3361,122 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_DATA_TOOL_TIMEOUT_S": {
+        "title": "Agent Data Tool Timeout",
+        "description": (
+            "Optional timeout in seconds for tools in the data category, including "
+            "market-style network data tools. Default 0 means no category cap and "
+            "defers to AGENT_TOOL_TIMEOUT_S / remaining orchestrator budget. "
+            "Invalid, non-finite, or negative values warn and degrade to no category cap."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 709,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": ["AGENT_DATA_TOOL_TIMEOUT_S=0", "AGENT_DATA_TOOL_TIMEOUT_S=30"],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_SEARCH_TOOL_TIMEOUT_S": {
+        "title": "Agent Search Tool Timeout",
+        "description": (
+            "Optional timeout in seconds for tools in the search category. "
+            "Default 0 means no category cap and defers to AGENT_TOOL_TIMEOUT_S / "
+            "remaining orchestrator budget. Invalid, non-finite, or negative values "
+            "warn and degrade to no category cap."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 709,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": ["AGENT_SEARCH_TOOL_TIMEOUT_S=0", "AGENT_SEARCH_TOOL_TIMEOUT_S=20"],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_ANALYSIS_TOOL_TIMEOUT_S": {
+        "title": "Agent Analysis Tool Timeout",
+        "description": (
+            "Optional timeout in seconds for tools in the analysis category. "
+            "Default 0 means no category cap and defers to AGENT_TOOL_TIMEOUT_S / "
+            "remaining orchestrator budget. Invalid, non-finite, or negative values "
+            "warn and degrade to no category cap."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 709,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": ["AGENT_ANALYSIS_TOOL_TIMEOUT_S=0", "AGENT_ANALYSIS_TOOL_TIMEOUT_S=45"],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_ACTION_TOOL_TIMEOUT_S": {
+        "title": "Agent Action Tool Timeout",
+        "description": (
+            "Optional timeout in seconds for tools in the action category. "
+            "Default 0 means no category cap and defers to AGENT_TOOL_TIMEOUT_S / "
+            "remaining orchestrator budget. Invalid, non-finite, or negative values "
+            "warn and degrade to no category cap."
+        ),
+        "category": "agent",
+        "data_type": "number",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "unit": "s",
+        "options": [],
+        "validation": {"min": 0, "max": 3600},
+        "display_order": 709,
+        "help_key": "settings.agent.runtime_guards",
+        "examples": ["AGENT_ACTION_TOOL_TIMEOUT_S=0", "AGENT_ACTION_TOOL_TIMEOUT_S=15"],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MAX_IDENTICAL_TOOL_CALLS": {
         "title": "Max Identical Tool Calls",
         "description": (

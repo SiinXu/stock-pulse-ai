@@ -1710,9 +1710,9 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
   'settings.agent.runtime_guards': {
     title: 'Agent 运行时护栏',
     summary: '低敏的工具循环与 Stage 失败护栏，用于约束 Agent 执行。',
-    usage: 'AGENT_TOOL_TIMEOUT_S 限制单次工具调用；AGENT_MAX_IDENTICAL_TOOL_CALLS 与 AGENT_MAX_STAGE_ENTRIES 阻止失控循环；AGENT_STAGE_FAILURE_POLICY 在 isolate 与 fail_fast 之间选择。',
+    usage: 'AGENT_TOOL_TIMEOUT_S 限制单次工具调用；AGENT_DATA_TOOL_TIMEOUT_S、AGENT_SEARCH_TOOL_TIMEOUT_S、AGENT_ANALYSIS_TOOL_TIMEOUT_S 和 AGENT_ACTION_TOOL_TIMEOUT_S 可按工具类别设置可选上限（0 表示继续使用全局上限）；AGENT_MAX_IDENTICAL_TOOL_CALLS 与 AGENT_MAX_STAGE_ENTRIES 阻止失控循环；AGENT_STAGE_FAILURE_POLICY 在 isolate 与 fail_fast 之间选择。',
     valueNotes: [
-      '工具超时默认 120 秒；相同调用次数或 Stage 进入次数设为 0 可单独关闭对应护栏。',
+      '工具超时默认 120 秒；类别上限默认 0。相同调用次数或 Stage 进入次数设为 0 可单独关闭对应护栏。',
       'isolate 对非关键 Stage 降级继续；fail_fast 在普通 Stage 失败时停止 Pipeline。',
       '有界 Critic 白名单重试使用独立一次性预算，失败时始终 fail-soft 进入 Decision。',
     ],

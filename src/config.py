@@ -142,6 +142,7 @@ from src.config_parts.parsers import (
     parse_env_finite_float as _parse_env_finite_float,
     parse_env_float,
     parse_env_int,
+    parse_optional_category_tool_timeout,
     resolve_litellm_thinking_enabled,
     resolve_litellm_wire_model,
     resolve_llm_channel_protocol,

@@ -1,0 +1,1 @@
+- [Added] Optional per-category Agent tool timeouts (`AGENT_DATA_TOOL_TIMEOUT_S`, `AGENT_SEARCH_TOOL_TIMEOUT_S`, `AGENT_ANALYSIS_TOOL_TIMEOUT_S`, `AGENT_ACTION_TOOL_TIMEOUT_S`; default 0) that cap matching tool classes without changing the global `AGENT_TOOL_TIMEOUT_S` default (Refs #1423).

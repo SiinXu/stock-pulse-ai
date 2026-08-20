@@ -1667,9 +1667,9 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   'settings.agent.runtime_guards': {
     title: 'Agent Runtime Guards',
     summary: 'Low-sensitivity tool-loop and stage-failure guards for Agent execution.',
-    usage: 'AGENT_TOOL_TIMEOUT_S limits one tool call; AGENT_MAX_IDENTICAL_TOOL_CALLS and AGENT_MAX_STAGE_ENTRIES stop runaway loops; AGENT_STAGE_FAILURE_POLICY chooses isolate vs fail_fast for ordinary stages.',
+    usage: 'AGENT_TOOL_TIMEOUT_S limits one tool call. AGENT_DATA_TOOL_TIMEOUT_S, AGENT_SEARCH_TOOL_TIMEOUT_S, AGENT_ANALYSIS_TOOL_TIMEOUT_S, and AGENT_ACTION_TOOL_TIMEOUT_S optionally cap matching tool categories (0 keeps the global cap). AGENT_MAX_IDENTICAL_TOOL_CALLS and AGENT_MAX_STAGE_ENTRIES stop runaway loops; AGENT_STAGE_FAILURE_POLICY chooses isolate vs fail_fast for ordinary stages.',
     valueNotes: [
-      'Default tool timeout is 120 seconds; set identical-call or stage-entry guards to 0 to disable that guard.',
+      'Default tool timeout is 120 seconds; category caps default to 0. Set identical-call or stage-entry guards to 0 to disable that guard.',
       'isolate degrades non-critical stages; fail_fast stops the ordinary pipeline on stage failure.',
       'Bounded Critic whitelist retry uses a separate one-shot budget and always fail-softs into Decision.',
     ],

@@ -28,6 +28,7 @@ import math
 import threading
 import time
 import uuid
+from types import MappingProxyType
 from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Tuple
 
 from src.agent.tool_surface import ToolSurface, build_tool_error_result
@@ -128,6 +129,9 @@ class BoundToolSession:
                 continue
             frozen_registry.register(binding.snapshot)
             self._tool_bindings[tool_name] = binding
+        category_timeouts = dict(registry.category_timeouts())
+        frozen_registry.set_category_timeouts(category_timeouts)
+        self._category_timeouts = MappingProxyType(category_timeouts)
         self._surface = ToolSurface(frozen_registry)
         provided_permissions = frozenset(granted_permissions)
         if derive_granted_permissions:
@@ -268,6 +272,25 @@ class BoundToolSession:
     def canonical_tool_name(self, value: Any) -> str:
         """Return a trace-safe name bound to this session or ``unrecognized``."""
         return self._audit_tool_identity(value)
+
+    def category_timeout_seconds(self, name: Any) -> float:
+        """Return the frozen category cap for one bound tool, else ``0``."""
+        tool_name = name if isinstance(name, str) else ""
+        binding = self._tool_bindings.get(tool_name)
+        if binding is None:
+            return 0.0
+        from src.agent.tools.registry import normalize_tool_timeout_category
+
+        key = normalize_tool_timeout_category(getattr(binding.snapshot, "category", None))
+        if key is None:
+            return 0.0
+        try:
+            value = float(self._category_timeouts.get(key, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+        if not math.isfinite(value) or value < 0:
+            return 0.0
+        return value
 
     # ----- Execution -----
 

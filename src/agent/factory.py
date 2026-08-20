@@ -47,6 +47,7 @@ _FORWARDED_ASSEMBLY_NAMES = frozenset(
         "_resolve_selected_skill_ids",
         "normalize_requested_skill_ids",
         "_should_use_legacy_default_prompt",
+        "apply_tool_category_timeouts",
         "build_agent_executor",
         "build_declarative_skill_manager",
         "build_executor",
