@@ -2,7 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { ReportVersionCompareResponse } from '../../../api/reportVersionCompare';
+import type {
+  OptionalSectionPresence,
+  ReportVersionCompareResponse,
+} from '../../../api/reportVersionCompare';
 import { ReportVersionCompareView } from '../ReportVersionCompareView';
 
 const baseRun = {
@@ -84,6 +87,38 @@ function buildResult(
         },
       ],
     },
+    optionalSections: [
+      {
+        section: 'catalysts',
+        basePresent: false,
+        targetPresent: false,
+        comparisonStatus: 'both_missing',
+        baseItemCount: 0,
+        targetItemCount: 0,
+        basePreview: [],
+        targetPreview: [],
+      },
+      {
+        section: 'structured_risk',
+        basePresent: false,
+        targetPresent: false,
+        comparisonStatus: 'both_missing',
+        baseItemCount: 0,
+        targetItemCount: 0,
+        basePreview: [],
+        targetPreview: [],
+      },
+      {
+        section: 'multi_agent',
+        basePresent: false,
+        targetPresent: false,
+        comparisonStatus: 'both_missing',
+        baseItemCount: 0,
+        targetItemCount: 0,
+        basePreview: [],
+        targetPreview: [],
+      },
+    ],
     fieldDiffs: [
       {
         field: 'action',
@@ -234,5 +269,125 @@ describe('ReportVersionCompareView', () => {
     );
     expect(screen.getByText(/provenance is incomplete/i)).toBeInTheDocument();
     expect(screen.queryByText(/fingerprints match/i)).not.toBeInTheDocument();
+  });
+
+  function optionalRow(
+    section: OptionalSectionPresence['section'],
+    status: OptionalSectionPresence['comparisonStatus'],
+    extra: Partial<OptionalSectionPresence> = {},
+  ): OptionalSectionPresence {
+    return {
+      section,
+      basePresent: status === 'present_identical' || status === 'present_different' || status === 'target_missing',
+      targetPresent: status === 'present_identical' || status === 'present_different' || status === 'base_missing',
+      comparisonStatus: status,
+      baseItemCount: 0,
+      targetItemCount: 0,
+      basePreview: [],
+      targetPreview: [],
+      ...extra,
+    };
+  }
+
+  it('labels both-missing optional sections instead of inventing empty parity', () => {
+    render(<ReportVersionCompareView language="en" result={buildResult()} />);
+    const panel = screen.getByTestId('report-version-optional-sections');
+    expect(within(panel).getByText(/Absence is labeled explicitly/i)).toBeInTheDocument();
+    expect(screen.getByTestId('report-version-optional-section-catalysts')).toHaveAttribute(
+      'data-comparison-status',
+      'both_missing',
+    );
+    expect(within(screen.getByTestId('report-version-optional-section-catalysts')).getAllByText(
+      /Section not produced/i,
+    )).toHaveLength(2);
+    expect(within(screen.getByTestId('report-version-optional-section-structured_risk')).getByText(
+      /Neither run produced this section/i,
+    )).toBeInTheDocument();
+  });
+
+  it('surfaces left-missing catalysts without treating them as empty content', () => {
+    render(
+      <ReportVersionCompareView
+        language="en"
+        result={buildResult({
+          optionalSections: [
+            optionalRow('catalysts', 'base_missing', {
+              targetItemCount: 1,
+              targetPreview: ['Export recovery'],
+            }),
+            optionalRow('structured_risk', 'both_missing'),
+            optionalRow('multi_agent', 'both_missing'),
+          ],
+        })}
+      />,
+    );
+    const row = screen.getByTestId('report-version-optional-section-catalysts');
+    expect(row).toHaveAttribute('data-comparison-status', 'base_missing');
+    expect(within(row).getByText(/Baseline did not produce this section/i)).toBeInTheDocument();
+    expect(within(row).getByText('Export recovery')).toBeInTheDocument();
+    expect(within(row).queryByText(/^n\/a$/i)).not.toBeInTheDocument();
+  });
+
+  it('surfaces right-missing structured risk', () => {
+    render(
+      <ReportVersionCompareView
+        language="en"
+        result={buildResult({
+          optionalSections: [
+            optionalRow('catalysts', 'both_missing'),
+            optionalRow('structured_risk', 'target_missing', {
+              baseItemCount: 1,
+              basePreview: ['Elevated PE'],
+            }),
+            optionalRow('multi_agent', 'both_missing'),
+          ],
+        })}
+      />,
+    );
+    const row = screen.getByTestId('report-version-optional-section-structured_risk');
+    expect(row).toHaveAttribute('data-comparison-status', 'target_missing');
+    expect(within(row).getByText(/Candidate did not produce this section/i)).toBeInTheDocument();
+    expect(within(row).getByText('Elevated PE')).toBeInTheDocument();
+  });
+
+  it('shows present-but-different multi-agent contents beside the T17 delta', () => {
+    render(
+      <ReportVersionCompareView
+        language="en"
+        result={buildResult({
+          optionalSections: [
+            optionalRow('catalysts', 'present_different', {
+              baseItemCount: 1,
+              targetItemCount: 2,
+              basePreview: ['Quarterly update clean'],
+              targetPreview: ['Quarterly update clean', 'Export recovery'],
+            }),
+            optionalRow('structured_risk', 'present_identical', {
+              baseItemCount: 1,
+              targetItemCount: 1,
+              basePreview: ['Elevated PE'],
+              targetPreview: ['Elevated PE'],
+            }),
+            optionalRow('multi_agent', 'present_different', {
+              baseItemCount: 1,
+              targetItemCount: 2,
+              basePreview: ['bull_bear_debate'],
+              targetPreview: ['bull_bear_debate', 'committee_deliberation'],
+            }),
+          ],
+        })}
+      />,
+    );
+    expect(screen.getByTestId('report-version-optional-section-catalysts')).toHaveAttribute(
+      'data-comparison-status',
+      'present_different',
+    );
+    expect(within(screen.getByTestId('report-version-optional-section-structured_risk')).getByText(
+      /same content/i,
+    )).toBeInTheDocument();
+    expect(within(screen.getByTestId('report-version-optional-section-multi_agent')).getByText(
+      'committee_deliberation',
+    )).toBeInTheDocument();
+    expect(screen.getByTestId('report-version-engine-delta')).toBeInTheDocument();
   });
 });

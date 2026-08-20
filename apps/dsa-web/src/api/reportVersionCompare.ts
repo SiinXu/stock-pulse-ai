@@ -19,9 +19,11 @@ type _AssertCompare = keyof OpenApiCompare;
 const _runItemAnchor: _AssertRunItem = 'run_id';
 const _runListAnchor: _AssertRunList = 'stock_code';
 const _compareAnchor: _AssertCompare = 'engine_status';
+const _compareHonestyAnchor: _AssertCompare = 'optional_sections';
 void _runItemAnchor;
 void _runListAnchor;
 void _compareAnchor;
+void _compareHonestyAnchor;
 
 export type ReportVersionSeverity = 'major' | 'moderate' | 'minor' | 'none' | 'unknown';
 
@@ -112,6 +114,26 @@ export type AnalysisListChange = {
   outputTruncated: boolean;
 };
 
+export type OptionalSectionId = 'catalysts' | 'structured_risk' | 'multi_agent';
+
+export type OptionalSectionComparisonStatus =
+  | 'both_missing'
+  | 'base_missing'
+  | 'target_missing'
+  | 'present_identical'
+  | 'present_different';
+
+export type OptionalSectionPresence = {
+  section: OptionalSectionId;
+  basePresent: boolean;
+  targetPresent: boolean;
+  comparisonStatus: OptionalSectionComparisonStatus;
+  baseItemCount: number;
+  targetItemCount: number;
+  basePreview: string[];
+  targetPreview: string[];
+};
+
 export type AnalysisDeltaPayload = {
   hasBaseline: boolean;
   baselineStatus:
@@ -141,6 +163,7 @@ export type ReportVersionCompareResponse = {
   targetRun: ReportVersionRunItem;
   configDiff: ConfigFingerprintDiff;
   fieldDiffs: ReportFieldDiff[];
+  optionalSections: OptionalSectionPresence[];
   delta?: AnalysisDeltaPayload | null;
   engineStatus: 'ok' | 'engine_pending';
 };
@@ -264,6 +287,19 @@ const analysisListChangeSchema = z
   })
   .passthrough();
 
+const optionalSectionPresenceSchema = z
+  .object({
+    section: z.string(),
+    basePresent: z.boolean().optional(),
+    targetPresent: z.boolean().optional(),
+    comparisonStatus: z.string(),
+    baseItemCount: z.number().int().optional(),
+    targetItemCount: z.number().int().optional(),
+    basePreview: z.array(z.string()).optional(),
+    targetPreview: z.array(z.string()).optional(),
+  })
+  .passthrough();
+
 const analysisDeltaPayloadSchema = z
   .object({
     hasBaseline: z.boolean().optional(),
@@ -291,6 +327,7 @@ const reportVersionCompareResponseSchema = z
     targetRun: reportVersionRunItemSchema,
     configDiff: configFingerprintDiffSchema,
     fieldDiffs: z.array(reportFieldDiffSchema).optional(),
+    optionalSections: z.array(optionalSectionPresenceSchema).optional(),
     delta: analysisDeltaPayloadSchema.nullable().optional(),
     engineStatus: z.string(),
   })
@@ -366,6 +403,18 @@ export const reportVersionCompareApi = {
         targetComplete: data.configDiff?.targetComplete ?? false,
       },
       fieldDiffs: (data.fieldDiffs ?? []).map((item) => toCamelCase<ReportFieldDiff>(item)),
+      optionalSections: (data.optionalSections ?? []).map((item) => {
+        const row = toCamelCase<OptionalSectionPresence>(item);
+        return {
+          ...row,
+          basePresent: row.basePresent ?? false,
+          targetPresent: row.targetPresent ?? false,
+          baseItemCount: row.baseItemCount ?? 0,
+          targetItemCount: row.targetItemCount ?? 0,
+          basePreview: row.basePreview ?? [],
+          targetPreview: row.targetPreview ?? [],
+        };
+      }),
       delta: data.delta ? toCamelCase<AnalysisDeltaPayload>(data.delta) : data.delta,
     };
     return assertCamelCasePayload<ReportVersionCompareResponse>(

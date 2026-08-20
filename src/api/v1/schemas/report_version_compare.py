@@ -143,6 +143,30 @@ class AnalysisDeltaPayload(BaseModel):
     risk_changes: List[AnalysisListChangePayload] = Field(default_factory=list)
 
 
+class OptionalSectionPresence(BaseModel):
+    """Honesty projection for one optional report section (issue #188).
+
+    Absence is explicit. Two missing sections are ``both_missing``, never an
+    invented identical empty comparison. Complements T17 list diffs and does
+    not replace them.
+    """
+
+    section: Literal["catalysts", "structured_risk", "multi_agent"]
+    base_present: bool = False
+    target_present: bool = False
+    comparison_status: Literal[
+        "both_missing",
+        "base_missing",
+        "target_missing",
+        "present_identical",
+        "present_different",
+    ]
+    base_item_count: int = Field(0, ge=0)
+    target_item_count: int = Field(0, ge=0)
+    base_preview: List[str] = Field(default_factory=list)
+    target_preview: List[str] = Field(default_factory=list)
+
+
 class ReportVersionCompareResponse(BaseModel):
     """Compare two selected analysis runs for one symbol."""
 
@@ -162,6 +186,14 @@ class ReportVersionCompareResponse(BaseModel):
     target_run: ReportVersionRunItem
     config_diff: ConfigFingerprintDiff
     field_diffs: List[ReportFieldDiff] = Field(default_factory=list)
+    optional_sections: List[OptionalSectionPresence] = Field(
+        default_factory=list,
+        description=(
+            "Always-complete honesty rows for optional multi-agent, structured-risk, "
+            "and catalyst sections. Missing sections are labeled as missing and are "
+            "never collapsed into matching empty content."
+        ),
+    )
     delta: Optional[AnalysisDeltaPayload] = Field(
         None,
         description="T17 AnalysisDelta projection when the comparison engine is available",
