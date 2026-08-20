@@ -505,7 +505,7 @@ jobs:
               echo "  SearXNG Public Instances: ❌ disabled"
               ;;
             "")
-              echo "  SearXNG Public Instances: ✅ enabled by default"
+              echo "  SearXNG Public Instances: ⚪ disabled by default (public instances are commonly rate-limited; set true to enable)"
               ;;
             *)
               echo "  SearXNG Public Instances: ✅ enabled"

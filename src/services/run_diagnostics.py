@@ -28,6 +28,7 @@ from src.services.diagnostics.schema import (
     ProviderRun,
     RunDiagnosticComponent,
     RunDiagnosticSummary,
+    _copy_diagnostic_value,
     _redact_diagnostic_payload,
     build_trace_id,
     safe_diagnostic_key,
@@ -318,9 +319,11 @@ class RunDiagnosticContext:
                 "truncated": self.agent_events_dropped_count > 0,
             },
         }
-        redacted = _redact_diagnostic_payload(payload)
+        redacted = _redact_diagnostic_payload(_copy_diagnostic_value(payload))
         if isinstance(self.prompt_artifact_versions, dict):
-            public = _public_prompt_artifact_versions(self.prompt_artifact_versions)
+            public = _copy_diagnostic_value(
+                _public_prompt_artifact_versions(self.prompt_artifact_versions)
+            )
             redacted["prompt_artifact_versions"] = public
             if public.get("prompt_version") is not None:
                 redacted["prompt_version"] = public["prompt_version"]

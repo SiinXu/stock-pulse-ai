@@ -1,0 +1,1 @@
+- [Fixed] Unauthenticated capability-registry writes now persist a denied `capability.write` audit at AuthMiddleware without route exemptions (Refs #1325).

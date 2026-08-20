@@ -1,12 +1,27 @@
 # -*- coding: utf-8 -*-
 """Stable run-diagnostic schema, sanitization, and serialization helpers.
 
+This module owns the persisted/API diagnostic *shape*: dataclasses, status
+vocabularies, snapshot keys, and redaction/normalization helpers.
+
 Collection and export consume these types. Callers should keep importing the
-public names from ``src.services.run_diagnostics``.
+public names from ``src.services.run_diagnostics``. Do not import
+``src.services.diagnostics.schema`` from new production code.
+
+Mutation risks
+--------------
+Normalization helpers return new containers. They must not mutate caller
+mappings, lists, or nested objects. Dataclass ``to_dict()`` methods and
+context snapshots pass outgoing payloads through one recursive copy boundary
+and omit empty optional fields; they must not rewrite dataclass fields in
+place. Collection/export may append to the diagnostic context, but must not
+alias or mutate business inputs, analysis outcomes, or nested window/notes
+objects passed in by callers.
 """
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 import uuid
@@ -32,6 +47,81 @@ PIPELINE_STAGE_NAMES = (
     "dispatch",
 )
 PIPELINE_STAGE_STATUSES = frozenset({"success", "degraded", "failed", "skipped"})
+
+# Keys always present on ``RunDiagnosticContext.snapshot()``. Optional identity
+# keys in DIAGNOSTIC_SNAPSHOT_OPTIONAL_KEYS appear only when prompt artifacts
+# were attached for the active run.
+DIAGNOSTIC_SNAPSHOT_KEYS = (
+    "trace_id",
+    "task_id",
+    "query_id",
+    "stock_code",
+    "trigger_source",
+    "scope",
+    "provider_runs",
+    "data_quality_evidence",
+    "llm_runs",
+    "notification_runs",
+    "history_runs",
+    "pipeline_stage_runs",
+    "agent_events",
+    "agent_events_capture",
+)
+DIAGNOSTIC_SNAPSHOT_OPTIONAL_KEYS = (
+    "prompt_artifact_versions",
+    "prompt_version",
+    "skill_versions",
+)
+
+# User-facing exported summary payload from ``build_run_diagnostic_summary``.
+# Optional identity fields are omitted when None; ``copy_text`` is always set
+# by export. ``RunDiagnosticSummary.to_dict()`` emits the same keys except
+# ``copy_text`` and must not import export.
+DIAGNOSTIC_SUMMARY_KEYS = (
+    "trace_id",
+    "task_id",
+    "query_id",
+    "stock_code",
+    "trigger_source",
+    "status",
+    "status_label",
+    "reason",
+    "components",
+    "copy_text",
+)
+DIAGNOSTIC_SUMMARY_COMPONENT_KEYS = (
+    "realtime_quote",
+    "daily_data",
+    "news",
+    "data_quality",
+    "llm",
+    "notification",
+    "history",
+)
+DIAGNOSTIC_SUMMARY_STATUSES = frozenset({"normal", "degraded", "failed", "unknown"})
+DIAGNOSTIC_COMPONENT_STATUSES = frozenset(
+    {"ok", "degraded", "failed", "unknown", "not_configured", "skipped"}
+)
+
+# ProviderRun.to_dict() omits None optionals. created_at is always serialized.
+PROVIDER_RUN_REQUIRED_KEYS = (
+    "trace_id",
+    "data_type",
+    "provider",
+    "operation",
+    "success",
+    "created_at",
+)
+PROVIDER_RUN_OPTIONAL_KEYS = (
+    "latency_ms",
+    "error_type",
+    "error_message_sanitized",
+    "fallback_from",
+    "fallback_to",
+    "cache_hit",
+    "stale_seconds",
+    "record_count",
+)
 
 _EXISTING_REDACTION_SENTINEL = '"__STOCKPULSE_EXISTING_REDACTION__"'
 _LOCAL_ABSOLUTE_PATH_RE = re.compile(
@@ -116,6 +206,18 @@ def _redact_diagnostic_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
         if isinstance(restored, dict)
         else {"redaction_error": "<redacted>"}
     )
+
+
+def _copy_diagnostic_value(value: Any) -> Any:
+    """Return a recursive snapshot of a diagnostic payload value.
+
+    This is the single copy boundary for public diagnostic payloads.
+    Mutating nested dict, list, set, tuple, dataclass, or other supported
+    values on the result must not rewrite in-memory diagnostic state.
+    Container families stay the same so JSON shape is unchanged.
+    """
+
+    return copy.deepcopy(value)
 
 
 def sanitize_diagnostic_text(value: Any, *, max_length: int = 300) -> Optional[str]:
@@ -255,7 +357,9 @@ class ProviderRun:
             "record_count": self.record_count,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass(frozen=True)
@@ -293,7 +397,7 @@ class DataQualityEvidenceRecord:
         }
         if self.provenance:
             payload["provenance"] = dict(self.provenance)
-        return payload
+        return _copy_diagnostic_value(payload)
 
 
 @dataclass
@@ -326,7 +430,9 @@ class LLMRun:
             "error_message_sanitized": self.error_message_sanitized,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -351,7 +457,9 @@ class NotificationRun:
             "error_message_sanitized": self.error_message_sanitized,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -374,7 +482,9 @@ class HistoryRun:
             "error_message_sanitized": self.error_message_sanitized,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -401,8 +511,8 @@ class PipelineStageRun:
             "trace_id": self.trace_id,
             "stage": self.stage,
             "status": self.status,
-            "input_summary": self.input_summary,
-            "output_summary": self.output_summary,
+            "input_summary": dict(self.input_summary),
+            "output_summary": dict(self.output_summary),
             "duration_ms": self.duration_ms,
             "degraded": self.degraded,
             "degradation_reason": self.degradation_reason,
@@ -412,7 +522,9 @@ class PipelineStageRun:
             "started_at": self.started_at,
             "ended_at": self.ended_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -431,9 +543,15 @@ class RunDiagnosticComponent:
             "label": self.label,
             "status": self.status,
             "message": self.message,
-            "details": self.details,
+            "details": dict(self.details),
         }
-        return {key: value for key, value in payload.items() if value not in (None, {}, [])}
+        return _copy_diagnostic_value(
+            {
+                key: value
+                for key, value in payload.items()
+                if value not in (None, {}, [])
+            }
+        )
 
 
 @dataclass
@@ -450,7 +568,8 @@ class RunDiagnosticSummary:
     trigger_source: Optional[str] = None
     components: Dict[str, RunDiagnosticComponent] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def _schema_payload(self) -> Dict[str, Any]:
+        """Return the typed summary fields without export ``copy_text``."""
         payload = {
             "trace_id": self.trace_id,
             "task_id": self.task_id,
@@ -465,8 +584,13 @@ class RunDiagnosticSummary:
                 for key, component in self.components.items()
             },
         }
-        from src.services.diagnostics.export import format_copyable_diagnostics
+        return {key: value for key, value in payload.items() if value is not None}
 
-        payload["copy_text"] = format_copyable_diagnostics(payload)
-        compact = {key: value for key, value in payload.items() if value is not None}
-        return _redact_diagnostic_payload(compact)
+    def to_dict(self) -> Dict[str, Any]:
+        """Serialize schema fields with redaction and copy isolation.
+
+        This boundary does not import export and does not emit ``copy_text``.
+        The public diagnostics JSON attaches ``copy_text`` in
+        ``build_run_diagnostic_summary``.
+        """
+        return _redact_diagnostic_payload(_copy_diagnostic_value(self._schema_payload()))

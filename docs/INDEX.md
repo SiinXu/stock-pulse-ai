@@ -115,7 +115,8 @@
 | 文档 | 内容 |
 | --- | --- |
 | [业务架构](business-architecture.md) | 利益相关者、业务能力、结果与从证据获取到通知的价值流 |
-| [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流 |
+| [技术架构总览](architecture-overview.md) | 当前组件、入口、所有权边界、进程模式、缓存/fallback 旁路与八阶段分析数据流；含运行诊断 schema 边界 |
+| [运行诊断 Phase 1](run-diagnostics-p1.md) | `trace_id`、ProviderRun、冻结 schema 契约、facade / collect / export 布局（#1076；中文专题，无独立英文副本） |
 | [Foundation Pipeline 与 Product Layer](foundation-product-architecture.md) | 双轨职责、交互边界、贡献归属、上游移植与许可证来源规则 |
 | [上游一致性检查](upstream-parity_CN.md) | 每周漂移报告、路径存在性盘点、有意分叉路径白名单、`Ported-from` trailer、分诊流程与治理节奏（#1002 / #1061；[English](upstream-parity.md)） |
 | [ADR 注册表与流程](adr/README.md) | 架构决策编号、状态、模板、重大 PR 考量规则与历史决策入口 |
@@ -126,6 +127,7 @@
 | [工程效率操作手册](engineering-efficiency-playbook.md) | 并行修复/合并火车的操作指南：批次合并、冲突图、配置注册守卫、squash 误关防线、自迭代验收、单机资源与工作区保护（[EN](engineering-efficiency-playbook_EN.md)；合同仍以 `AGENTS.md` 为准） |
 | [离线测试门禁（超时、覆盖率下限、marker）](testing-ci-gate.md) | 单测超时、faulthandler、实测覆盖率下限、严格 marker，以及手动 benchmark 说明（英文专题；中英流程一致） |
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
+| [Service-split template（英文）](service-split-template.md) | 行为保持的 facade / re-export 拆分清单、棘轮验证与兼容 shim 删除条件；含 merged PR #1352 偏差审计（Refs #1088） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
 | [分析质量门](analysis-quality-gate.md) | 管线内禁止无中生有事实的质量门，复用 agent-eval 维度；annotate/intercept（#887） |

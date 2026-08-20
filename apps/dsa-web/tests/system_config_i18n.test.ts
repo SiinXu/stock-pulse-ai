@@ -110,6 +110,14 @@ describe('systemConfigI18n required key coverage', () => {
     expect(title).not.toBe('SearXNG Base URLs');
   });
 
+  it('describes public SearXNG discovery as opt-in in Chinese', () => {
+    const description = getFieldDescriptionZh('SEARXNG_PUBLIC_INSTANCES_ENABLED');
+
+    expect(description).toContain('默认关闭');
+    expect(description).toContain('设为 true');
+    expect(description).not.toContain('设为 false 可禁用该默认行为');
+  });
+
   it('documents LLM usage HMAC privacy boundaries', () => {
     const zh = getSettingsHelpContent('settings.ai_model.LLM_USAGE_HMAC_SECRET', undefined, 'zh-CN');
     const en = getSettingsHelpContent('settings.ai_model.LLM_USAGE_HMAC_SECRET', undefined, 'en');
