@@ -1,0 +1,1 @@
+- [Chore] Record well-formed Ported-from trailers for semantically absorbed upstream Attention SHAs and keep a do-not-trailer list so high path presence cannot hide residual or governance gaps (Refs #1221).

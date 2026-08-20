@@ -15,6 +15,7 @@ from scripts.check_upstream_parity import (
     STATUS_PORTED,
     build_ported_index,
     classify_paths,
+    list_local_commit_messages,
     load_whitelist,
     main,
     match_ported_by,
@@ -25,6 +26,10 @@ from scripts.check_upstream_parity import (
     ParityReport,
     UpstreamCommit,
     WhitelistConfig,
+)
+from scripts.inventory_upstream_drift import (
+    DEFAULT_TRAILER_TRIAGE,
+    load_trailer_triage,
 )
 
 
@@ -91,6 +96,30 @@ def test_parse_ported_from_trailers_filters_repo_and_length() -> None:
         message, upstream_repo="ZhuLinsen/daily_stock_analysis"
     )
     assert found == ["91988da1", "ee3d3da1deadbeef"]
+
+
+def test_malformed_ported_from_without_repo_does_not_match() -> None:
+    """Missing repo@ trailers must not mark upstream SHAs already ported."""
+    message = "\n".join(
+        [
+            "refactor: split the chat page and persist session skill selection",
+            "",
+            "Ported-from: ed848da6",
+            "Ported-from: ae19329d",
+            "Ported-from: e430fcfe48016a33399c37efcd2ffb20d79b9a43",
+            "Ported-from: 4dda5d71",
+        ]
+    )
+    found = parse_ported_from_trailers(
+        message, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    assert found == []
+    index = build_ported_index(
+        [message], upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    assert match_ported_by("ed848da6f0fc1080e1a61a1799b9c7d510a3eaca", index) == []
+    assert match_ported_by("ae19329d6684c4ec4ad0b51e627c0c5204ccd594", index) == []
+    assert match_ported_by("e430fcfe48016a33399c37efcd2ffb20d79b9a43", index) == []
 
 
 def test_match_ported_by_prefix() -> None:
@@ -170,3 +199,33 @@ def test_load_whitelist_rejects_invalid(tmp_path: Path) -> None:
 
 def test_self_test_exit_zero() -> None:
     assert main(["--self-test"]) == 0
+
+
+def test_trailer_safe_shas_have_well_formed_trailers_on_head() -> None:
+    """Real risk layer: trailer_safe SHAs must match git Ported-from trailers."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    messages = list_local_commit_messages(ROOT, "HEAD")
+    index = build_ported_index(
+        messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    missing = [
+        entry.sha
+        for entry in triage.trailer_safe
+        if not match_ported_by(entry.sha, index)
+    ]
+    assert missing == [], f"trailer_safe SHAs missing well-formed trailers: {missing}"
+
+
+def test_do_not_trailer_shas_are_not_ported_on_head() -> None:
+    """Real risk layer: do_not_trailer SHAs must stay unported on this head."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    messages = list_local_commit_messages(ROOT, "HEAD")
+    index = build_ported_index(
+        messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    leaked = [
+        (entry.sha, match_ported_by(entry.sha, index))
+        for entry in triage.do_not_trailer
+        if match_ported_by(entry.sha, index)
+    ]
+    assert leaked == [], f"do_not_trailer SHAs unexpectedly marked ported: {leaked}"

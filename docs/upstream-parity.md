@@ -1,8 +1,8 @@
 # Upstream Parity Checker
 
 - Status: `Living`
-- Last verified: 2026-08-12
-- Scope: drift reporting for `ZhuLinsen/daily_stock_analysis`, whitelist semantics, triage, and maintainer cadence
+- Last verified: 2026-08-20
+- Scope: drift reporting for `ZhuLinsen/daily_stock_analysis`, whitelist semantics, trailer-safe vs do-not-trailer SHAs, triage, and maintainer cadence
 
 StockPulse ports upstream foundation fixes **manually**. There is no automatic
 merge or sync from upstream. This document describes the weekly parity checker
@@ -19,6 +19,7 @@ Machine tracking issue: [#1002](https://github.com/SiinXu/stock-pulse-ai/issues/
 Script: `scripts/check_upstream_parity.py`  
 Inventory (path presence + suggested actions): `scripts/inventory_upstream_drift.py`
 Whitelist: `scripts/upstream_parity_whitelist.json`  
+Trailer SHA contract: `scripts/upstream_trailer_triage.json`  
 Workflow: `.github/workflows/upstream-parity.yml`
 
 On each weekly (or manual) run the workflow:
@@ -49,6 +50,18 @@ Ported-from: ZhuLinsen/daily_stock_analysis@<sha>
 - Use the upstream commit SHA (7-40 hex characters).
 - Multiple trailers are allowed when one StockPulse change combines several upstream commits.
 - The checker matches trailer SHAs as prefixes against full upstream SHAs.
+- The line must be `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`. A bare `Ported-from: <sha>` (missing `repo@`) is malformed and does **not** count as already ported.
+
+## Trailer-safe vs do-not-trailer SHAs
+
+Path presence of ≥75% is only a heuristic (`record_trailer`). It is not authorization to add a `Ported-from` trailer. `scripts/upstream_trailer_triage.json` is the SHA-level contract (#1221):
+
+- **trailer_safe** — a semantic spot-check confirmed the intent is already absorbed under a fork-native layout. Record a well-formed trailer (empty/no-op commit or the next related PR). Do not copy upstream files a second time.
+- **do_not_trailer** — high path presence still hides a residual gap, a partial port, or a deliberate governance/security divergence. Do not add or reformat a trailer to silence Attention. Open or keep a port/design issue instead.
+- Reformatting a malformed trailer for a `do_not_trailer` SHA would hide leftovers.
+- Do **not** expand the path whitelist to hide these SHAs.
+
+In-flight product ports may later absorb a heuristic `record_trailer` row; those SHAs are owned by the product PR, not by a trailer-only commit.
 
 ## Whitelist Semantics
 
@@ -84,7 +97,8 @@ python scripts/inventory_upstream_drift.py \
 3. Work **Attention** commits first. For each candidate, classify per #1061:
    - **Port now** — foundation fix; small, test-backed PR with `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`
    - **DESIGN-NEEDED** — entangled with local Agent/strategy/report contracts; one design issue before code (example: #805 multi-strategy cluster)
-   - **Record trailer** — fork already absorbed the intent under a different layout; spot-check, then add `Ported-from` so #1002 stops listing it as Attention
+   - **Record trailer** — fork already absorbed the intent under a different layout; spot-check, then add `Ported-from` so #1002 stops listing it as Attention. Only `trailer_safe` SHAs in `scripts/upstream_trailer_triage.json` are authorized without a further product port.
+   - **Do not trailer** — SHA is in `do_not_trailer`; high path presence is not absorb. Keep Attention until a real port or an intentional skip issue exists.
    - **Skip / whitelist** — product-only, docs/changelog-only, or governance paths StockPulse will not mirror; expand whitelist only deliberately
 4. **Never half-port** entangled clusters across orchestrator/pipeline/report schema without a design note.
 5. Open or update **child issues** for concrete residual gaps. Do not leave actionable gaps only inside the weekly report body.

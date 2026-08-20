@@ -26,6 +26,7 @@
     "scripts/import_layer_baseline.json",
     "scripts/legacy_facade_import_baseline.json",
     "scripts/upstream_parity_whitelist.json",
+    "scripts/upstream_trailer_triage.json",
     "scripts/workflow_supply_chain_exceptions.json"
   ]
 }

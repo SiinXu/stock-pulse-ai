@@ -1,8 +1,8 @@
 # 上游一致性检查（Upstream Parity）
 
 - 状态：`Living`
-- 最近核对：2026-08-12
-- 范围：`ZhuLinsen/daily_stock_analysis` 漂移报告、白名单语义、分诊流程与维护节奏
+- 最近核对：2026-08-20
+- 范围：`ZhuLinsen/daily_stock_analysis` 漂移报告、白名单语义、trailer-safe / do-not-trailer SHA 契约、分诊流程与维护节奏
 
 StockPulse **手动**移植上游 foundation 修复，不会自动 merge 或同步上游。本文说明每周运行的一致性检查如何报告漂移，以便维护者有计划地分诊移植。
 
@@ -17,6 +17,7 @@ StockPulse **手动**移植上游 foundation 修复，不会自动 merge 或同�
 脚本：`scripts/check_upstream_parity.py`  
 盘点脚本（路径存在性 + 建议动作）：`scripts/inventory_upstream_drift.py`
 白名单：`scripts/upstream_parity_whitelist.json`  
+Trailer SHA 契约：`scripts/upstream_trailer_triage.json`  
 工作流：`.github/workflows/upstream-parity.yml`
 
 每次每周（或手动）运行时，工作流会：
@@ -43,6 +44,18 @@ Ported-from: ZhuLinsen/daily_stock_analysis@<sha>
 - 使用上游提交 SHA（7–40 位十六进制）。
 - 一次 StockPulse 变更合并多个上游提交时，可写多条 trailer。
 - 检查器将 trailer 中的 SHA 作为前缀与完整上游 SHA 匹配。
+- 必须写成 `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`。缺少 `repo@` 的 `Ported-from: <sha>` 为畸形 trailer，**不算** already ported。
+
+## Trailer-safe 与 do-not-trailer SHA
+
+路径存在性 ≥75% 只是启发式（`record_trailer`），不能单独授权补 `Ported-from` trailer。`scripts/upstream_trailer_triage.json` 是 SHA 级契约（#1221）：
+
+- **trailer_safe** — 语义 spot-check 已确认意图被 fork-native 布局吸收。可补格式正确的 trailer（空提交或下一张相关 PR）。不要二次拷贝上游文件。
+- **do_not_trailer** — 高路径存在性仍掩盖残留缺口、部分移植或有意的治理/安全分叉。不要靠补 trailer 或改写畸形 trailer 消音 Attention。应开/保留 port 或 design Issue。
+- 把 `do_not_trailer` SHA 的畸形 trailer 改成合法格式会掩盖残留差距。
+- **不要**靠扩大路径白名单来隐藏这些 SHA。
+
+进行中的产品 port PR 可能随后吸收某条启发式 `record_trailer`；那些 SHA 归产品 PR 所有，不属于 trailer-only 提交。
 
 ## 白名单语义
 
@@ -78,7 +91,8 @@ python scripts/inventory_upstream_drift.py \
 3. 优先处理 **Attention** 提交。对每个候选，按 #1061 分类：
    - **Port now** — foundation 修复；小而可测的 PR，提交含 `Ported-from: ZhuLinsen/daily_stock_analysis@<sha>`
    - **DESIGN-NEEDED** — 与本地 Agent/策略/报告契约纠缠；先开设计 Issue 再写代码（示例：#805 multi-strategy 集群）
-   - **Record trailer** — 本仓已以 fork-native 布局吸收意图；语义 spot-check 后补 `Ported-from`，使 #1002 不再标为 Attention
+   - **Record trailer** — 本仓已以 fork-native 布局吸收意图；语义 spot-check 后补 `Ported-from`，使 #1002 不再标为 Attention。无后续产品 port 时，仅 `scripts/upstream_trailer_triage.json` 中的 `trailer_safe` SHA 可补 trailer。
+   - **Do not trailer** — SHA 在 `do_not_trailer` 中；高路径存在性不等于已吸收。在真实 port 或有意 skip Issue 落地前保持 Attention。
    - **Skip / whitelist** — 仅产品面、docs/changelog 或治理路径，StockPulse 明确不镜像；扩展白名单须审慎
 4. **禁止半移植** 跨 orchestrator/pipeline/报告 schema 的纠缠集群（无设计说明不得拆文件拷贝）。
 5. 对真实残留差距**开子 Issue 或更新既有 Issue**；不要只把差距留在周报正文里。
