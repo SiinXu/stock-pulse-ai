@@ -1,0 +1,1 @@
+- [Changed] Extracted market-review prompt builders from `src/market/analyzer.py` into `src/market/prompts.py` without changing prompt text or public analyzer signatures (Refs #1085).
