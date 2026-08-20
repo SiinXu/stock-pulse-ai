@@ -2474,74 +2474,6 @@ class DataFetcherManager:
     def _money_flow_timestamp() -> str:
         return datetime.now(timezone.utc).isoformat()
 
-    def _money_flow_cache_lookup(self, key, *, allow_stale: bool = False):
-        now = time.time()
-        with self._money_flow_cache_lock:
-            entry = self._money_flow_cache.get(key)
-            if entry is None and allow_stale:
-                identity = (key[0], key[1], key[3], key[4])
-                candidates = [
-                    value
-                    for cache_key, value in self._money_flow_cache.items()
-                    if (
-                        cache_key[0],
-                        cache_key[1],
-                        cache_key[3],
-                        cache_key[4],
-                    ) == identity
-                ]
-                entry = max(candidates, key=lambda item: item["stored_at"], default=None)
-            if entry is None:
-                return None
-            age = now - entry["stored_at"]
-            ttl = (
-                self._MONEY_FLOW_STALE_TTL_SECONDS
-                if allow_stale
-                else self._MONEY_FLOW_CACHE_TTL_SECONDS
-            )
-            return entry["outcome"] if age <= ttl else None
-
-    def _money_flow_cache_store(self, key, outcome) -> None:
-        snapshot = getattr(outcome, "snapshot", None)
-        with self._money_flow_cache_lock:
-            self._money_flow_cache[key] = {
-                "stored_at": time.time(),
-                "outcome": outcome,
-                "calibration_identity": (
-                    getattr(snapshot, "source", None),
-                    getattr(snapshot, "bucket_definition", None),
-                    getattr(snapshot, "unit", None),
-                    getattr(snapshot, "amount_scale", None),
-                ),
-            }
-            while len(self._money_flow_cache) > self._MONEY_FLOW_CACHE_MAX_ENTRIES:
-                oldest_key = min(
-                    self._money_flow_cache,
-                    key=lambda item: self._money_flow_cache[item]["stored_at"],
-                )
-                self._money_flow_cache.pop(oldest_key, None)
-
-    def invalidate_money_flow_cache(self, stock_code: Optional[str] = None) -> int:
-        """Invalidate all entries, or only entries for one normalized symbol."""
-        normalized = normalize_stock_code(stock_code) if stock_code else None
-        with self._money_flow_cache_lock:
-            keys = [
-                key for key in self._money_flow_cache
-                if normalized is None or key[0] == normalized
-            ]
-            for key in keys:
-                self._money_flow_cache.pop(key, None)
-            return len(keys)
-
-    def get_money_flow_cache_stats(self) -> Dict[str, Any]:
-        with self._money_flow_cache_lock:
-            return {
-                "entries": len(self._money_flow_cache),
-                "hits": self._money_flow_cache_hits,
-                "misses": self._money_flow_cache_misses,
-                "circuit": self._money_flow_circuit.get_snapshot(),
-            }
-
     def get_money_flow(self, stock_code: str, days: int = 5):
         """Return an explicit, provenance-bearing money-flow provider outcome.
 
@@ -4465,13 +4397,15 @@ class DataFetcherManager:
 
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006
 # compatibility facade while focused parts own inventory/selection, daily
-# health/circuit, daily-cache orchestration, and realtime field-trust
-# bookkeeping. Rebinding preserves method globals so existing patches against
-# this module continue to intercept moved implementations.
+# health/circuit, daily-cache orchestration, realtime field-trust
+# bookkeeping, and money-flow cache lookup/store. Rebinding preserves method
+# globals so existing patches against this module continue to intercept moved
+# implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
 from .manager_parts import (  # noqa: E402
+    money_flow_cache_methods as _money_flow_cache_methods_module,
     realtime_field_trust_methods as _realtime_field_trust_methods_module,
 )
 
@@ -4567,11 +4501,26 @@ def _assemble_realtime_field_trust_methods_facade(
         )
 
 
+def _assemble_money_flow_cache_methods_facade(
+    cache_module=_money_flow_cache_methods_module,
+) -> None:
+    bound_method_names = cache_module.bind_money_flow_cache_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != cache_module.EXPECTED_MONEY_FLOW_CACHE_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager money-flow cache methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_data_fetcher_manager_facades(
     assemble_capability=_assemble_capability_catalog_facade,
     assemble_health=_assemble_daily_source_health_facade,
     assemble_daily_cache=_assemble_daily_cache_methods_facade,
     assemble_realtime=_assemble_realtime_field_trust_methods_facade,
+    assemble_money_flow=_assemble_money_flow_cache_methods_facade,
 ) -> None:
     # Default args capture the assembler callables so reload hooks keep working
     # after the facade module deletes the temporary assembly names.
@@ -4579,6 +4528,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_health()
     assemble_daily_cache()
     assemble_realtime()
+    assemble_money_flow()
 
 
 _assemble_data_fetcher_manager_facades()
@@ -4594,6 +4544,9 @@ _daily_cache_methods_module._install_facade_reload_hook(
 _realtime_field_trust_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_money_flow_cache_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 
 del (
     _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
@@ -4601,9 +4554,11 @@ del (
     _assemble_daily_source_health_facade,
     _assemble_daily_cache_methods_facade,
     _assemble_realtime_field_trust_methods_facade,
+    _assemble_money_flow_cache_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
     _daily_source_health_module,
     _daily_cache_methods_module,
     _realtime_field_trust_methods_module,
+    _money_flow_cache_methods_module,
 )
