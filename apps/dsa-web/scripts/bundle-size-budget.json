@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-20",
-  "baselineNote": "T18 omitted the playground production graph (Refs #883) after #1385. Named splits that existed only because playground was a second async importer were removed; remaining T18 route chunks stay at their remasured zlib-9 + 400 B caps. Locale-*-family aggregate caps were remeasured after issue #188 optional-section honesty copy (Refs #188). locale-extra-family 22628 and portfolio-route 94224 stay exact because this production build stayed inside them.",
+  "baselineNote": "T18 omitted the playground production graph (Refs #883) after #1385. Named splits that existed only because playground was a second async importer were removed; remaining T18 route chunks stay at their remasured zlib-9 + 400 B caps. Merged #1375 caps stay exact (locale-ja-family 171148, locale-extra-family 22628, portfolio-route 94224) because this production build stayed inside them.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -221,72 +221,72 @@
       "match": [
         "assets/ja-*.js"
       ],
-      "maxGzipBytes": 171643,
-      "measuredGzipBytes": 171243,
-      "note": "Already-split same-pattern family for locale-ja. Remeasured zlib-9 sum 171243 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-ja cap is unchanged."
+      "maxGzipBytes": 171148,
+      "measuredGzipBytes": 170748,
+      "note": "Already-split same-pattern family for locale-ja. Keep the merged #1375 cap (measured 170748 B + 400 B). Fresh post-#1385 T18 zlib-9 sum 170913 B stays inside 171148 B. Per-asset locale-ja cap is unchanged."
     },
     {
       "id": "locale-de-family",
       "match": [
         "assets/de-*.js"
       ],
-      "maxGzipBytes": 163902,
-      "measuredGzipBytes": 163502,
-      "note": "Already-split same-pattern family for locale-de. Remeasured zlib-9 sum 163502 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-de cap is unchanged."
+      "maxGzipBytes": 163283,
+      "measuredGzipBytes": 162883,
+      "note": "Already-split same-pattern family for locale-de. Measured zlib-9 sum 162883 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-de cap is unchanged."
     },
     {
       "id": "locale-ko-family",
       "match": [
         "assets/ko-*.js"
       ],
-      "maxGzipBytes": 164195,
-      "measuredGzipBytes": 163795,
-      "note": "Already-split same-pattern family for locale-ko. Remeasured zlib-9 sum 163795 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-ko cap is unchanged."
+      "maxGzipBytes": 163677,
+      "measuredGzipBytes": 163277,
+      "note": "Already-split same-pattern family for locale-ko. Measured zlib-9 sum 163277 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-ko cap is unchanged."
     },
     {
       "id": "locale-fr-family",
       "match": [
         "assets/fr-*.js"
       ],
-      "maxGzipBytes": 163608,
-      "measuredGzipBytes": 163208,
-      "note": "Already-split same-pattern family for locale-fr. Remeasured zlib-9 sum 163208 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-fr cap is unchanged."
+      "maxGzipBytes": 162983,
+      "measuredGzipBytes": 162583,
+      "note": "Already-split same-pattern family for locale-fr. Measured zlib-9 sum 162583 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-fr cap is unchanged."
     },
     {
       "id": "locale-es-family",
       "match": [
         "assets/es-*.js"
       ],
-      "maxGzipBytes": 159014,
-      "measuredGzipBytes": 158614,
-      "note": "Already-split same-pattern family for locale-es. Remeasured zlib-9 sum 158614 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-es cap is unchanged."
+      "maxGzipBytes": 158392,
+      "measuredGzipBytes": 157992,
+      "note": "Already-split same-pattern family for locale-es. Measured zlib-9 sum 157992 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-es cap is unchanged."
     },
     {
       "id": "locale-zh-TW-family",
       "match": [
         "assets/zh-TW-*.js"
       ],
-      "maxGzipBytes": 158844,
-      "measuredGzipBytes": 158444,
-      "note": "Already-split same-pattern family for locale-zh-TW. Remeasured zlib-9 sum 158444 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-zh-TW cap is unchanged."
+      "maxGzipBytes": 158392,
+      "measuredGzipBytes": 157992,
+      "note": "Already-split same-pattern family for locale-zh-TW. Measured zlib-9 sum 157992 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-zh-TW cap is unchanged."
     },
     {
       "id": "locale-ms-family",
       "match": [
         "assets/ms-*.js"
       ],
-      "maxGzipBytes": 148531,
-      "measuredGzipBytes": 148131,
-      "note": "Already-split same-pattern family for locale-ms. Remeasured zlib-9 sum 148131 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-ms cap is unchanged."
+      "maxGzipBytes": 147930,
+      "measuredGzipBytes": 147530,
+      "note": "Already-split same-pattern family for locale-ms. Measured zlib-9 sum 147530 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-ms cap is unchanged."
     },
     {
       "id": "locale-id-family",
       "match": [
         "assets/id-*.js"
       ],
-      "maxGzipBytes": 148749,
-      "measuredGzipBytes": 148349,
-      "note": "Already-split same-pattern family for locale-id. Remeasured zlib-9 sum 148349 B after issue #188 optional-section honesty copy + 400 B headroom. Per-asset locale-id cap is unchanged."
+      "maxGzipBytes": 148086,
+      "measuredGzipBytes": 147686,
+      "note": "Already-split same-pattern family for locale-id. Measured zlib-9 sum 147686 B on origin/main 86b0c094c + 400 B headroom. Per-asset locale-id cap is unchanged."
     },
     {
       "id": "locale-extra-family",

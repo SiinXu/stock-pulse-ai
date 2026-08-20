@@ -24,7 +24,7 @@ Issue #188 / T18：用户可从分析历史选择同一标的的两次运行，�
 
 ## 可选区块诚实对照
 
-`optional_sections` 始终返回完整的三行投影（`catalysts`、`structured_risk`、`multi_agent`）。“已产出”表示持久化运行里存在该区块键（即使列表为空）；“未产出”表示该区块从未生成。
+`optional_sections` 始终返回完整的三行投影（`catalysts`、`structured_risk`、`multi_agent`）。“已产出”表示持久化运行里存在该区块键（即使列表为空）；“未产出”表示该区块从未生成。`multi_agent` 仅统计可选的 `dashboard.bull_bear_debate` 与 `dashboard.committee_deliberation`；编排器必写的 `dashboard.risk_manager` 风控门禁不计入。
 
 | comparison_status | 含义 |
 | --- | --- |

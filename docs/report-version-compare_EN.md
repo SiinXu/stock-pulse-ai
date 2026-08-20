@@ -24,7 +24,7 @@ Issue #188 / T18: users can select two runs for the same symbol from analysis hi
 
 ## Optional section honesty
 
-`optional_sections` is always a complete three-row projection (`catalysts`, `structured_risk`, `multi_agent`). Presence means the persisted run produced the section (the key exists), including an empty list. Absence means the section was never produced.
+`optional_sections` is always a complete three-row projection (`catalysts`, `structured_risk`, `multi_agent`). Presence means the persisted run produced the section (the key exists), including an empty list. Absence means the section was never produced. For `multi_agent`, only the additive `dashboard.bull_bear_debate` and `dashboard.committee_deliberation` keys count; the mandatory `dashboard.risk_manager` risk-gate payload does not.
 
 | comparison_status | Meaning |
 | --- | --- |

@@ -1,2 +1,1 @@
 - [Added] Report version compare labels missing optional multi-agent, structured-risk, and catalyst sections instead of treating absence as matching empty content (Refs #188).
-- [Chore] Rebaseline Web locale-family gzip budgets after optional-section honesty copy (Refs #188).

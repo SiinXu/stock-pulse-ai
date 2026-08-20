@@ -199,6 +199,59 @@ def test_multi_agent_left_missing_and_present_different() -> None:
     assert row["target_preview"] == ["bull_bear_debate", "committee_deliberation"]
 
 
+def test_mandatory_risk_manager_gate_does_not_mark_multi_agent_present() -> None:
+    """Ordinary orchestrator runs persist dashboard.risk_manager without debate."""
+    base = {
+        "dashboard": {
+            "risk_manager": {
+                "schema_version": "risk-manager-result/v1",
+                "final_action": "hold",
+                "evaluation_id": "a" * 32,
+            }
+        }
+    }
+    target = {
+        "dashboard": {
+            "risk_manager": {
+                "schema_version": "risk-manager-result/v1",
+                "final_action": "buy",
+                "evaluation_id": "b" * 32,
+            }
+        }
+    }
+    rows = _by_section(build_optional_sections(base, target))
+    row = rows[SECTION_MULTI_AGENT]
+    assert row["comparison_status"] == STATUS_BOTH_MISSING
+    assert row["base_present"] is False
+    assert row["target_present"] is False
+    assert row["base_preview"] == []
+    assert row["target_preview"] == []
+
+
+def test_risk_manager_trace_does_not_change_multi_agent_fingerprint() -> None:
+    debate = {"status": "complete", "winner": "bull"}
+    rows = _by_section(
+        build_optional_sections(
+            {
+                "dashboard": {
+                    "bull_bear_debate": debate,
+                    "risk_manager": {"final_action": "hold"},
+                }
+            },
+            {
+                "dashboard": {
+                    "bull_bear_debate": debate,
+                    "risk_manager": {"final_action": "buy"},
+                }
+            },
+        )
+    )
+    row = rows[SECTION_MULTI_AGENT]
+    assert row["comparison_status"] == STATUS_PRESENT_IDENTICAL
+    assert row["base_preview"] == ["bull_bear_debate"]
+    assert row["target_preview"] == ["bull_bear_debate"]
+
+
 def test_key_presence_none_is_still_produced() -> None:
     rows = _by_section(
         build_optional_sections(

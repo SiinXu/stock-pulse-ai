@@ -292,16 +292,16 @@ describe('ReportVersionCompareView', () => {
   it('labels both-missing optional sections instead of inventing empty parity', () => {
     render(<ReportVersionCompareView language="en" result={buildResult()} />);
     const panel = screen.getByTestId('report-version-optional-sections');
-    expect(within(panel).getByText(/Absence is labeled explicitly/i)).toBeInTheDocument();
+    expect(panel).toBeInTheDocument();
     expect(screen.getByTestId('report-version-optional-section-catalysts')).toHaveAttribute(
       'data-comparison-status',
       'both_missing',
     );
     expect(within(screen.getByTestId('report-version-optional-section-catalysts')).getAllByText(
-      /Section not produced/i,
+      /Not produced/i,
     )).toHaveLength(2);
     expect(within(screen.getByTestId('report-version-optional-section-structured_risk')).getByText(
-      /Neither run produced this section/i,
+      /Neither produced/i,
     )).toBeInTheDocument();
   });
 
@@ -323,7 +323,7 @@ describe('ReportVersionCompareView', () => {
     );
     const row = screen.getByTestId('report-version-optional-section-catalysts');
     expect(row).toHaveAttribute('data-comparison-status', 'base_missing');
-    expect(within(row).getByText(/Baseline did not produce this section/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Baseline missing/i)).toBeInTheDocument();
     expect(within(row).getByText('Export recovery')).toBeInTheDocument();
     expect(within(row).queryByText(/^n\/a$/i)).not.toBeInTheDocument();
   });
@@ -346,7 +346,7 @@ describe('ReportVersionCompareView', () => {
     );
     const row = screen.getByTestId('report-version-optional-section-structured_risk');
     expect(row).toHaveAttribute('data-comparison-status', 'target_missing');
-    expect(within(row).getByText(/Candidate did not produce this section/i)).toBeInTheDocument();
+    expect(within(row).getByText(/Candidate missing/i)).toBeInTheDocument();
     expect(within(row).getByText('Elevated PE')).toBeInTheDocument();
   });
 

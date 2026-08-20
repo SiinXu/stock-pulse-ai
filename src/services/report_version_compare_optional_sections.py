@@ -34,10 +34,12 @@ STATUS_PRESENT_DIFFERENT = "present_different"
 MAX_OPTIONAL_SECTION_PREVIEW_ITEMS = 8
 MAX_OPTIONAL_SECTION_ITEM_LENGTH = 512
 
+# Additive optional product surfaces only. Orchestrator analysis always writes
+# dashboard.risk_manager on the mandatory risk-gate path, so that key must not
+# mark multi_agent as produced.
 _MULTI_AGENT_KEYS: Tuple[str, ...] = (
     "bull_bear_debate",
     "committee_deliberation",
-    "risk_manager",
 )
 
 
