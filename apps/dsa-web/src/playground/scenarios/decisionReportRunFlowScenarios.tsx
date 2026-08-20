@@ -18,10 +18,10 @@ import type { Message, ProgressStep } from '../../stores/agentChatStore';
 import { DecisionSignalCreateDrawer } from '../../components/decision-signals/DecisionSignalCreateDrawer';
 import {
   DecisionSignalCard,
-  DecisionSignalDetails,
   DecisionSignalOutcomeBadge,
-  PortfolioSignalSummary,
 } from '../../components/decision-signals/DecisionSignalDisplay';
+import { DecisionSignalDetails } from '../../components/decision-signals/DecisionSignalDetails';
+import { PortfolioSignalSummary } from '../../components/decision-signals/PortfolioSignalSummary';
 import { DecisionSignalMemoryControls } from '../../components/decision-signals/DecisionSignalMemoryControls';
 import { DecisionSignalOutcomeExplorer } from '../../components/decision-signals/DecisionSignalOutcomeExplorer';
 import { DecisionSignalOutcomeRunPanel } from '../../components/decision-signals/DecisionSignalOutcomeRunPanel';

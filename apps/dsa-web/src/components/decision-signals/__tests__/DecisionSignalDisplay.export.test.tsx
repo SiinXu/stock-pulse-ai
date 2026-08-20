@@ -7,7 +7,7 @@ import { reportExportApi, type ReportExportCapabilities } from '../../../api/rep
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { createDeferred } from '../../../test-utils';
 import type { DecisionSignalItem } from '../../../types/decisionSignals';
-import { DecisionSignalDetails } from '../DecisionSignalDisplay';
+import { DecisionSignalDetails } from '../DecisionSignalDetails';
 
 vi.mock('../../../api/reportExport', () => ({
   reportExportApi: {

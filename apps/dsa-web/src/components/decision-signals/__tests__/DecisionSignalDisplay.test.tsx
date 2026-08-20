@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { reportExportApi } from '../../../api/reportExport';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { DecisionSignalItem } from '../../../types/decisionSignals';
-import { DecisionSignalCard, DecisionSignalDetails, PortfolioSignalSummary } from '../DecisionSignalDisplay';
+import { DecisionSignalCard } from '../DecisionSignalDisplay';
+import { DecisionSignalDetails } from '../DecisionSignalDetails';
+import { PortfolioSignalSummary } from '../PortfolioSignalSummary';
 
 vi.mock('../../../api/reportExport', () => ({
   reportExportApi: {

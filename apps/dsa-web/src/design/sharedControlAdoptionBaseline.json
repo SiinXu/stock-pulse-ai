@@ -171,9 +171,14 @@
       "nativeButtonCount": 1,
       "roleButtonCount": 0
     },
+    "../decision-signals/DecisionSignalDetails.tsx": {
+      "file": "../decision-signals/DecisionSignalDetails.tsx",
+      "nativeButtonCount": 2,
+      "roleButtonCount": 0
+    },
     "../decision-signals/DecisionSignalDisplay.tsx": {
       "file": "../decision-signals/DecisionSignalDisplay.tsx",
-      "nativeButtonCount": 3,
+      "nativeButtonCount": 1,
       "roleButtonCount": 0
     },
     "../decision-signals/DecisionSignalProfileCalibration.tsx": {
