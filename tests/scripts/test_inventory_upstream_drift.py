@@ -15,13 +15,19 @@ from scripts.check_upstream_parity import (
 )
 from scripts.inventory_upstream_drift import (
     ACTION_DESIGN_NEEDED,
+    ACTION_DO_NOT_TRAILER,
     ACTION_MANUAL_TRIAGE,
     ACTION_PORT_NOW,
     ACTION_RECORD_TRAILER,
     ACTION_SKIP_DOCS,
+    DEFAULT_TRAILER_TRIAGE,
     DriftInventory,
+    KIND_DO_NOT_TRAILER,
+    KIND_TRAILER_SAFE,
+    apply_trailer_triage,
     build_inventory,
     inventory_attention_commit,
+    load_trailer_triage,
     main,
     render_inventory_markdown,
     suggest_action,
@@ -36,6 +42,9 @@ def test_inventory_script_does_not_expand_upstream_path_whitelist() -> None:
     whitelist = load_whitelist(DEFAULT_WHITELIST)
 
     assert "scripts/inventory_upstream_drift.py" not in (
+        whitelist.deliberately_diverged_prefixes
+    )
+    assert "scripts/upstream_trailer_triage.json" in (
         whitelist.deliberately_diverged_prefixes
     )
 
@@ -164,3 +173,113 @@ def test_build_inventory_from_empty_attention() -> None:
 
 def test_self_test_cli_exit_zero() -> None:
     assert main(["--self-test"]) == 0
+
+
+def test_trailer_triage_contract_loads_without_overlap() -> None:
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    assert triage.version == 1
+    assert triage.upstream_repo == "ZhuLinsen/daily_stock_analysis"
+    assert triage.trailer_safe
+    assert triage.do_not_trailer
+    safe_shas = {entry.sha for entry in triage.trailer_safe}
+    deny_shas = {entry.sha for entry in triage.do_not_trailer}
+    assert safe_shas.isdisjoint(deny_shas)
+    for entry in (*triage.trailer_safe, *triage.do_not_trailer):
+        assert len(entry.sha) >= 7
+        assert entry.reason
+        assert entry.kind in {KIND_TRAILER_SAFE, KIND_DO_NOT_TRAILER}
+
+
+def test_do_not_trailer_overrides_high_presence_heuristic() -> None:
+    """100% path presence must not authorize a trailer for deny-list SHAs."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    deny = next(entry for entry in triage.do_not_trailer if entry.sha.startswith("a54f46e1e"))
+    action, rationale, _cluster = suggest_action(
+        subject=deny.subject or "ci: temporarily disable automatic PR review",
+        paths=(
+            ".github/workflows/pr-review.yml",
+            "docs/CHANGELOG.md",
+            "docs/CONTRIBUTING.md",
+            "docs/CONTRIBUTING_EN.md",
+        ),
+        missing_paths=(),
+        presence_ratio=1.0,
+    )
+    assert action == ACTION_RECORD_TRAILER
+    action, rationale, _cluster = apply_trailer_triage(
+        sha=deny.sha,
+        action=action,
+        rationale=rationale,
+        cluster="likely-absorbed",
+        triage=triage,
+    )
+    assert action == ACTION_DO_NOT_TRAILER
+    assert "pull_request_target" in rationale.lower() or "checkout" in rationale.lower()
+
+    commit = UpstreamCommit(
+        sha=deny.sha,
+        short_sha=deny.sha[:9],
+        subject=deny.subject,
+        author_date="2026-07-22T00:00:00+00:00",
+        paths=(".github/workflows/pr-review.yml", "docs/CHANGELOG.md"),
+        status=STATUS_ATTENTION,
+        shared_paths=(".github/workflows/pr-review.yml", "docs/CHANGELOG.md"),
+    )
+    row = inventory_attention_commit(commit, repo=ROOT, trailer_triage=triage)
+    assert row.suggested_action == ACTION_DO_NOT_TRAILER
+
+
+def test_trailer_safe_overrides_missing_renamed_path_heuristic() -> None:
+    """Fork-native evaluator rename must not stay port_now after spot-check."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    safe = next(entry for entry in triage.trailer_safe if entry.sha.startswith("85ded1d70"))
+    action, rationale, cluster = suggest_action(
+        subject="feat: add skill opinion outcome evaluation core",
+        paths=(
+            "src/core/skill_opinion_outcome_evaluator.py",
+            "src/services/skill_opinion_outcome_service.py",
+            "docs/CHANGELOG.md",
+        ),
+        missing_paths=("src/core/skill_opinion_outcome_evaluator.py",),
+        presence_ratio=0.6,
+    )
+    assert action == ACTION_PORT_NOW
+    action, rationale, cluster = apply_trailer_triage(
+        sha=safe.sha,
+        action=action,
+        rationale=rationale,
+        cluster=cluster,
+        triage=triage,
+    )
+    assert action == ACTION_RECORD_TRAILER
+    assert "skill_opinion_outcome_evaluator.py" in rationale
+
+
+def test_render_inventory_includes_do_not_trailer_histogram() -> None:
+    inventory = DriftInventory(
+        generated_at="2026-08-20T00:00:00Z",
+        local_ref="origin/main",
+        upstream_ref="upstream/main",
+        upstream_repo="ZhuLinsen/daily_stock_analysis",
+        fork_point="abc123",
+        totals={
+            "upstream_only_commits": 1,
+            "attention": 1,
+            "already_ported": 0,
+            "informational": 0,
+        },
+        action_counts={ACTION_DO_NOT_TRAILER: 1},
+        attention_rows=[],
+        already_ported_count=0,
+        informational_count=0,
+        cadence={
+            "machine_report": "weekly",
+            "human_triage": "after refresh",
+            "re_run_local": "after ports",
+        },
+        consumers=["Maintainers triaging #1002"],
+        notes=["Path presence is a heuristic."],
+    )
+    markdown = render_inventory_markdown(inventory)
+    assert ACTION_DO_NOT_TRAILER in markdown
+    assert "do not trailer" in markdown.lower()

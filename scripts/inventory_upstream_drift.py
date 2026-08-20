@@ -42,6 +42,7 @@ from scripts.check_upstream_parity import (  # noqa: E402
     DEFAULT_UPSTREAM_REMOTE,
     DEFAULT_UPSTREAM_URL,
     DEFAULT_WHITELIST,
+    MIN_PORTED_SHA_LEN,
     STATUS_ATTENTION,
     ParityError,
     ParityReport,
@@ -56,6 +57,13 @@ ACTION_DESIGN_NEEDED = "design_needed"
 ACTION_RECORD_TRAILER = "record_trailer"
 ACTION_SKIP_DOCS = "skip_docs"
 ACTION_MANUAL_TRIAGE = "manual_triage"
+ACTION_DO_NOT_TRAILER = "do_not_trailer"
+
+KIND_TRAILER_SAFE = "trailer_safe"
+KIND_DO_NOT_TRAILER = "do_not_trailer"
+
+DEFAULT_TRAILER_TRIAGE = ROOT / "scripts" / "upstream_trailer_triage.json"
+_SHA_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
 _DOCS_ONLY_NAMES = frozenset(
     {
@@ -110,6 +118,47 @@ class AttentionInventoryRow:
     suggested_action: str
     rationale: str
     cluster: str = ""
+
+
+@dataclass(frozen=True)
+class TrailerTriageEntry:
+    """One SHA in the trailer-safe or do-not-trailer contract."""
+
+    sha: str
+    kind: str
+    subject: str
+    reason: str
+
+
+@dataclass(frozen=True)
+class TrailerTriage:
+    """SHA-level trailer contract loaded from JSON."""
+
+    version: int
+    upstream_repo: str
+    trailer_safe: tuple[TrailerTriageEntry, ...]
+    do_not_trailer: tuple[TrailerTriageEntry, ...]
+
+    def lookup(self, full_sha: str) -> TrailerTriageEntry | None:
+        """Return the matching triage entry for *full_sha*, if any."""
+        needle = (full_sha or "").strip().lower()
+        if len(needle) < MIN_PORTED_SHA_LEN:
+            return None
+        hits: list[TrailerTriageEntry] = []
+        for entry in (*self.trailer_safe, *self.do_not_trailer):
+            prefix = entry.sha.lower()
+            if len(prefix) < MIN_PORTED_SHA_LEN:
+                continue
+            if needle.startswith(prefix) or prefix.startswith(needle):
+                hits.append(entry)
+        if len(hits) > 1:
+            kinds = {hit.kind for hit in hits}
+            if len(kinds) > 1:
+                raise ParityError(
+                    f"SHA {full_sha!r} matches both trailer_safe and do_not_trailer"
+                )
+            return hits[0]
+        return hits[0] if hits else None
 
 
 @dataclass
@@ -179,6 +228,117 @@ def _match_fork_native_cluster(subject: str, paths: Sequence[str]) -> str:
         if any(marker.lower() in blob for marker in markers):
             return name
     return ""
+
+
+def _parse_triage_entries(
+    raw_entries: object,
+    *,
+    kind: str,
+    path: Path,
+) -> tuple[TrailerTriageEntry, ...]:
+    """Validate one SHA list from the trailer-triage JSON."""
+    if not isinstance(raw_entries, list) or not raw_entries:
+        raise ParityError(f"{path}: {kind} must be a non-empty list")
+    entries: list[TrailerTriageEntry] = []
+    seen: set[str] = set()
+    for item in raw_entries:
+        if not isinstance(item, dict):
+            raise ParityError(f"{path}: {kind} entries must be objects")
+        sha = item.get("sha")
+        subject = item.get("subject", "")
+        reason = item.get("reason")
+        if not isinstance(sha, str) or not _SHA_RE.fullmatch(sha.strip()):
+            raise ParityError(
+                f"{path}: {kind} sha must be 7-40 hex characters, got {sha!r}"
+            )
+        cleaned_sha = sha.strip().lower()
+        if cleaned_sha in seen:
+            raise ParityError(f"{path}: duplicate {kind} sha {cleaned_sha}")
+        seen.add(cleaned_sha)
+        if not isinstance(reason, str) or not reason.strip():
+            raise ParityError(f"{path}: {kind} reason must be a non-empty string")
+        if subject is not None and not isinstance(subject, str):
+            raise ParityError(f"{path}: {kind} subject must be a string when present")
+        entries.append(
+            TrailerTriageEntry(
+                sha=cleaned_sha,
+                kind=kind,
+                subject=(subject or "").strip(),
+                reason=reason.strip(),
+            )
+        )
+    return tuple(entries)
+
+
+def load_trailer_triage(path: Path) -> TrailerTriage:
+    """Load the SHA-level trailer-safe / do-not-trailer contract."""
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ParityError(f"trailer triage file not found: {path}") from exc
+    except json.JSONDecodeError as exc:
+        raise ParityError(f"invalid trailer triage JSON: {path}: {exc}") from exc
+
+    if not isinstance(raw, dict):
+        raise ParityError(f"{path}: trailer triage root must be an object")
+    if raw.get("version") != 1:
+        raise ParityError(f"{path}: unsupported trailer triage version: {raw.get('version')!r}")
+
+    upstream_repo = raw.get("upstream_repo")
+    if not isinstance(upstream_repo, str) or not upstream_repo.strip():
+        raise ParityError(f"{path}: upstream_repo must be a non-empty string")
+
+    trailer_safe = _parse_triage_entries(
+        raw.get("trailer_safe"), kind=KIND_TRAILER_SAFE, path=path
+    )
+    do_not_trailer = _parse_triage_entries(
+        raw.get("do_not_trailer"), kind=KIND_DO_NOT_TRAILER, path=path
+    )
+
+    safe_prefixes = {entry.sha for entry in trailer_safe}
+    deny_prefixes = {entry.sha for entry in do_not_trailer}
+    for safe in safe_prefixes:
+        for deny in deny_prefixes:
+            if safe.startswith(deny) or deny.startswith(safe):
+                raise ParityError(
+                    f"{path}: sha {safe} overlaps do_not_trailer {deny}"
+                )
+
+    return TrailerTriage(
+        version=1,
+        upstream_repo=upstream_repo.strip(),
+        trailer_safe=trailer_safe,
+        do_not_trailer=do_not_trailer,
+    )
+
+
+def apply_trailer_triage(
+    *,
+    sha: str,
+    action: str,
+    rationale: str,
+    cluster: str,
+    triage: TrailerTriage | None,
+) -> tuple[str, str, str]:
+    """Override heuristic actions using the SHA-level trailer contract."""
+    if triage is None:
+        return action, rationale, cluster
+    entry = triage.lookup(sha)
+    if entry is None:
+        return action, rationale, cluster
+    if entry.kind == KIND_DO_NOT_TRAILER:
+        return (
+            ACTION_DO_NOT_TRAILER,
+            entry.reason,
+            cluster or "do-not-trailer",
+        )
+    if entry.kind == KIND_TRAILER_SAFE:
+        return (
+            ACTION_RECORD_TRAILER,
+            entry.reason,
+            cluster or "trailer-safe",
+        )
+    return action, rationale, cluster
 
 
 def suggest_action(
@@ -276,8 +436,11 @@ def inventory_attention_commit(
     commit: UpstreamCommit,
     *,
     repo: Path,
+    trailer_triage: TrailerTriage | None = None,
 ) -> AttentionInventoryRow:
     """Enrich one Attention commit with local path presence and triage."""
+    if trailer_triage is None:
+        trailer_triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
     shared = commit.shared_paths or commit.paths
     presence: list[PathPresence] = []
     for path in shared:
@@ -299,6 +462,13 @@ def inventory_attention_commit(
         paths=shared,
         missing_paths=missing,
         presence_ratio=ratio,
+    )
+    action, rationale, cluster = apply_trailer_triage(
+        sha=commit.sha,
+        action=action,
+        rationale=rationale,
+        cluster=cluster,
+        triage=trailer_triage,
     )
 
     return AttentionInventoryRow(
@@ -324,10 +494,17 @@ def build_inventory(
     report: ParityReport,
     *,
     repo: Path,
+    trailer_triage: TrailerTriage | None = None,
 ) -> DriftInventory:
     """Build the drift inventory from a parity report."""
+    triage = (
+        trailer_triage
+        if trailer_triage is not None
+        else load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    )
     rows = [
-        inventory_attention_commit(commit, repo=repo) for commit in report.attention
+        inventory_attention_commit(commit, repo=repo, trailer_triage=triage)
+        for commit in report.attention
     ]
     action_counts = Counter(row.suggested_action for row in rows)
     return DriftInventory(
@@ -374,6 +551,10 @@ def build_inventory(
             "Suggested actions never replace maintainer judgment for foundation ports.",
             "Record Ported-from: ZhuLinsen/daily_stock_analysis@<sha> only after a "
             "semantic spot-check confirms the intent is covered.",
+            "SHA-level contract: scripts/upstream_trailer_triage.json. "
+            "trailer_safe SHAs may receive a well-formed Ported-from trailer; "
+            "do_not_trailer SHAs must remain Attention even at 100% path presence. "
+            "Malformed trailers (missing repo@) do not count.",
         ],
     )
 
@@ -439,6 +620,10 @@ def render_inventory_markdown(inventory: DriftInventory) -> str:
         (
             f"| `{ACTION_RECORD_TRAILER}` | {inventory.action_counts.get(ACTION_RECORD_TRAILER, 0)} | "
             "Likely already absorbed; spot-check then record trailers |"
+        ),
+        (
+            f"| `{ACTION_DO_NOT_TRAILER}` | {inventory.action_counts.get(ACTION_DO_NOT_TRAILER, 0)} | "
+            "High path presence still hides a residual or governance gap; do not trailer |"
         ),
         (
             f"| `{ACTION_SKIP_DOCS}` | {inventory.action_counts.get(ACTION_SKIP_DOCS, 0)} | "
@@ -647,6 +832,40 @@ def run_self_tests() -> None:
     row = inventory_attention_commit(commit, repo=ROOT)
     assert row.suggested_action == ACTION_SKIP_DOCS
     assert row.paths_present == 1
+    cases += 1
+
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    assert triage.trailer_safe and triage.do_not_trailer
+    deny = triage.do_not_trailer[0]
+    deny_commit = UpstreamCommit(
+        sha=deny.sha,
+        short_sha=deny.sha[:9],
+        subject=deny.subject or "ci: high-presence residual",
+        author_date="2026-08-01T00:00:00+00:00",
+        paths=(".github/workflows/pr-review.yml", "docs/CHANGELOG.md"),
+        status=STATUS_ATTENTION,
+        shared_paths=(".github/workflows/pr-review.yml", "docs/CHANGELOG.md"),
+    )
+    deny_row = inventory_attention_commit(
+        deny_commit, repo=ROOT, trailer_triage=triage
+    )
+    assert deny_row.suggested_action == ACTION_DO_NOT_TRAILER, deny_row.suggested_action
+    cases += 1
+
+    safe = triage.trailer_safe[0]
+    safe_commit = UpstreamCommit(
+        sha=safe.sha,
+        short_sha=safe.sha[:9],
+        subject=safe.subject or "feat: absorbed under fork-native layout",
+        author_date="2026-08-01T00:00:00+00:00",
+        paths=("src/core/missing_upstream_name.py", "docs/CHANGELOG.md"),
+        status=STATUS_ATTENTION,
+        shared_paths=("src/core/missing_upstream_name.py", "docs/CHANGELOG.md"),
+    )
+    safe_row = inventory_attention_commit(
+        safe_commit, repo=ROOT, trailer_triage=triage
+    )
+    assert safe_row.suggested_action == ACTION_RECORD_TRAILER, safe_row.suggested_action
     cases += 1
 
     print(f"Upstream drift inventory self-tests passed ({cases} cases).")
