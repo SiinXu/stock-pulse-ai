@@ -4,6 +4,7 @@
 - Last verified: 2026-08-13
 - Related: [architecture overview](architecture-overview.md),
   [layer-direction ratchet](layer-direction-ratchet.md),
+  [service-split template](service-split-template.md),
   `scripts/check_hot_path_module_size.py`,
   `scripts/hot_path_module_size_baseline.json`,
   issue [#1087](https://github.com/SiinXu/stock-pulse-ai/issues/1087)
