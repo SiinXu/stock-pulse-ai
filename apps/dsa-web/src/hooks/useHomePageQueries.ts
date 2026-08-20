@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect } from 'react';
+import { useEffect } from 'react';
 import { alertsApi } from '../api/alerts';
 import { decisionSignalsApi } from '../api/decisionSignals';
 import { parseApiError, type ParsedApiError } from '../api/error';
@@ -9,6 +9,7 @@ import { historyApi } from '../api/history';
 import { scheduledTasksApi } from '../api/scheduledTasks';
 import { systemConfigApi } from '../api/systemConfig';
 import { getTodaysFocus } from '../api/todaysFocus';
+import { getBrowserTimezone } from '../components/home/scheduledTaskPresentation';
 import type { HistoryItem, StockReportType } from '../types/analysis';
 import type { DecisionSignalItem } from '../types/decisionSignals';
 import type { ScheduledTaskTodayItem } from '../types/scheduledTasks';
@@ -130,12 +131,13 @@ const EMPTY_ATTENTION_QUERY_RESULT: HomeAttentionQueryResult = {
   signalStale: EMPTY_SIGNAL_STALE,
 };
 
-function getBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
+function useExactQueryCleanup(queryKey: readonly unknown[]): void {
+  const queryClient = useQueryClient();
+  useEffect(() => {
+    return () => {
+      queryClient.removeQueries({ queryKey, exact: true });
+    };
+  }, [queryClient, queryKey]);
 }
 
 /**
@@ -260,8 +262,8 @@ export function mergeHomeAttentionQueryResult(
  *   row (same remount miss as the previous effect, without `gcTime: 0` loops).
  */
 export function useHomeAttentionQuery() {
-  const queryClient = useQueryClient();
-  const { data, isFetching, refetch: refetchQuery } = useQuery({
+  useExactQueryCleanup(HOME_ATTENTION_QUERY_KEY);
+  const { data, isFetching, refetch } = useQuery({
     queryKey: HOME_ATTENTION_QUERY_KEY,
     queryFn: async ({ client }): Promise<HomeAttentionQueryResult> => {
       const previous = client.getQueryData<HomeAttentionQueryResult>(HOME_ATTENTION_QUERY_KEY);
@@ -271,17 +273,7 @@ export function useHomeAttentionQuery() {
     ...HOME_PAGE_QUERY_SCHEDULE,
   });
 
-  useEffect(() => {
-    return () => {
-      queryClient.removeQueries({ queryKey: HOME_ATTENTION_QUERY_KEY, exact: true });
-    };
-  }, [queryClient]);
-
   const result = data ?? EMPTY_ATTENTION_QUERY_RESULT;
-  const refetch = useCallback(() => {
-    void refetchQuery();
-  }, [refetchQuery]);
-
   return {
     data: result.data,
     availability: result.availability,
@@ -299,10 +291,10 @@ export function useHomeAttentionQuery() {
  * Transport stays in getTodaysFocus (no AbortSignal on that client).
  */
 export function useTodaysFocusQuery(language: string) {
-  const queryClient = useQueryClient();
   const focusLanguage = resolveFocusLanguage(language);
   const queryKey = buildTodaysFocusQueryKey(focusLanguage);
-  const { data, isFetching, refetch: refetchQuery } = useQuery({
+  useExactQueryCleanup(queryKey);
+  const { data, isFetching, refetch } = useQuery({
     queryKey,
     queryFn: async (): Promise<HomeTodaysFocusQueryResult> => {
       try {
@@ -314,16 +306,6 @@ export function useTodaysFocusQuery(language: string) {
     },
     ...HOME_PAGE_QUERY_SCHEDULE,
   });
-
-  useEffect(() => {
-    return () => {
-      queryClient.removeQueries({ queryKey, exact: true });
-    };
-  }, [queryClient, queryKey]);
-
-  const refetch = useCallback(() => {
-    void refetchQuery();
-  }, [refetchQuery]);
 
   return {
     data: data?.data ?? null,
@@ -342,7 +324,8 @@ export function useTodaysFocusQuery(language: string) {
  */
 export function useHomeSetupStatusQuery() {
   const queryClient = useQueryClient();
-  const { data, isFetching, refetch: refetchQuery } = useQuery({
+  useExactQueryCleanup(HOME_SETUP_STATUS_QUERY_KEY);
+  const { data, isFetching, refetch } = useQuery({
     queryKey: HOME_SETUP_STATUS_QUERY_KEY,
     queryFn: async (): Promise<HomeSetupStatusQueryResult> => {
       try {
@@ -355,17 +338,7 @@ export function useHomeSetupStatusQuery() {
     ...HOME_PAGE_QUERY_SCHEDULE,
   });
 
-  useEffect(() => {
-    return () => {
-      queryClient.removeQueries({ queryKey: HOME_SETUP_STATUS_QUERY_KEY, exact: true });
-    };
-  }, [queryClient]);
-
-  const refetch = useCallback(() => {
-    void refetchQuery();
-  }, [refetchQuery]);
-
-  const refreshSilent = useCallback(() => {
+  const refreshSilent = () => {
     void systemConfigApi.getSetupStatus()
       .then((status) => {
         queryClient.setQueryData<HomeSetupStatusQueryResult>(
@@ -382,7 +355,7 @@ export function useHomeSetupStatusQuery() {
           }),
         );
       });
-  }, [queryClient]);
+  };
 
   return {
     status: data?.status ?? null,
