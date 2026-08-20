@@ -66,7 +66,12 @@ def _audit_unavailable_response() -> JSONResponse:
 
 
 async def _bounded_request_body(request: Request, max_bytes: int) -> bytes:
-    """Read a cached, size-capped body without copying it into audit metadata."""
+    """Read a size-capped body without copying it into audit metadata.
+
+    Declared Content-Length above the cap is rejected without reading.
+    Missing or chunked bodies are streamed and stopped at ``max_bytes``
+    so the process never joins an unbounded payload.
+    """
     header = request.headers.get("content-length")
     if header is not None:
         try:
@@ -75,13 +80,21 @@ async def _bounded_request_body(request: Request, max_bytes: int) -> bytes:
             return b""
         if declared < 0 or declared > max_bytes:
             return b""
+    chunks: list[bytes] = []
+    total = 0
     try:
-        body = await request.body()
+        async for chunk in request.stream():
+            if type(chunk) is not bytes:
+                return b""
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > max_bytes:
+                return b""
+            chunks.append(chunk)
     except ClientDisconnect:
         return b""
-    if type(body) is not bytes or len(body) > max_bytes:
-        return b""
-    return body
+    return b"".join(chunks)
 
 
 async def _denied_capability_write_response(request: Request) -> JSONResponse:

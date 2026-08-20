@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -11,10 +12,11 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+from starlette.requests import Request
 
 import src.auth as auth
 from src.api.app import create_app
-from src.api.middlewares.auth import EXEMPT_PATHS
+from src.api.middlewares.auth import EXEMPT_PATHS, _bounded_request_body
 from src.api.v1.endpoints import capabilities as capabilities_endpoint
 from src.capability_registry import CapabilityRecord, CapabilitySnapshot, SourceStatus
 from src.capability_registry.write_service import get_capability_write_service
@@ -402,3 +404,73 @@ def test_denied_write_audit_does_not_copy_secrets_from_body(tmp_path: Path) -> N
         rendered = repr([event.model_dump() for event in _capability_write_events()])
         assert _DENIED_SECRET not in rendered
         assert denied[0].target.id == "llm:deepseek-pro"
+
+
+def _asgi_request(headers: list[tuple[bytes, bytes]], receive):
+    return Request(
+        {
+            "type": "http",
+            "asgi": {"version": "3.0"},
+            "http_version": "1.1",
+            "method": "POST",
+            "scheme": "http",
+            "path": "/api/v1/capabilities/registry",
+            "raw_path": b"/api/v1/capabilities/registry",
+            "query_string": b"",
+            "headers": headers,
+            "client": ("127.0.0.1", 1234),
+            "server": ("testserver", 80),
+        },
+        receive,
+    )
+
+
+def test_bounded_request_body_stops_chunked_read_at_cap() -> None:
+    pulled: list[int] = []
+    messages = iter(
+        (
+            {"type": "http.request", "body": b"{" + b"x" * 4096, "more_body": True},
+            {"type": "http.request", "body": b"y" * 1_000_000, "more_body": False},
+        )
+    )
+
+    async def receive():
+        pulled.append(1)
+        return next(messages)
+
+    result = asyncio.run(
+        _bounded_request_body(
+            _asgi_request([(b"transfer-encoding", b"chunked")], receive),
+            4096,
+        )
+    )
+
+    assert result == b""
+    assert pulled == [1]
+
+
+def test_bounded_request_body_reads_undeclared_body_within_cap() -> None:
+    payload = b'{"capability_id":"llm:deepseek-pro"}'
+
+    async def receive():
+        return {"type": "http.request", "body": payload, "more_body": False}
+
+    result = asyncio.run(
+        _bounded_request_body(_asgi_request([], receive), 4096)
+    )
+
+    assert result == payload
+
+
+def test_bounded_request_body_skips_read_when_content_length_exceeds_cap() -> None:
+    async def receive():
+        raise AssertionError("must not read an oversized declared body")
+
+    result = asyncio.run(
+        _bounded_request_body(
+            _asgi_request([(b"content-length", b"8192")], receive),
+            4096,
+        )
+    )
+
+    assert result == b""
