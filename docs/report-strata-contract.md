@@ -31,7 +31,7 @@ Issue #616 要求分析报告以**固定证据分层**呈现内容，避免把�
 | 表面 | 行为 |
 | --- | --- |
 | Markdown / brief / WeChat | 有 strata 时输出 1–5 层；免责声明统一在报告级页脚一次输出 |
-| Web 完整报告 | 同样 1–5 顺序 + 免责声明面板；无 strata 时仅免责声明 |
+| Web 完整报告 | 决策卡仍是结论。默认只展开风险/反证与免责声明；已核实事实、缺失/冲突、模型推断、框架对齐放在默认折叠的补充证据披露中（共享 Button，`aria-expanded` / `aria-controls`）。`source` / `asOf` 不默认内联，走已有 details 注释。空结构化列表不会把原始技术/成交量/基本面 blob 提升为事实或缺口，这些 blob 只出现在二次/原始 Collapsible 中。无 strata 时仍显示免责声明 |
 | API `ReportDetails.report_strata` | 从 `raw_result`/dashboard 解析后投影（analysis / history / status） |
 
 ## Fixtures
