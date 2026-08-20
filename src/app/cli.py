@@ -404,7 +404,7 @@ Examples / 示例:
     parser.add_argument(
         '--webui-only',
         action='store_true',
-        help='Start Web service only (no auto analysis) / 仅启动 Web 服务，不执行自动分析'
+        help='Start Web service only (no startup analysis; restore enabled schedules) / 仅启动 Web 服务，启动时不执行分析，但会恢复已启用的定时任务'
     )
 
     parser.add_argument(
@@ -416,7 +416,7 @@ Examples / 示例:
     parser.add_argument(
         '--serve-only',
         action='store_true',
-        help='Start FastAPI backend only (no auto analysis) / 仅启动 FastAPI 后端服务，不自动执行分析'
+        help='Start FastAPI backend only (no startup analysis; restore enabled schedules) / 仅启动 FastAPI 后端服务，启动时不执行分析，但会恢复已启用的定时任务'
     )
 
     parser.add_argument(

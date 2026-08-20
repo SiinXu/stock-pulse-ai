@@ -62,7 +62,7 @@ def resolve_scheduler_process_mode(
     - ``desktop``: Desktop process with the legacy day-batch attached
     - ``cli-schedule``: this process does not own the schedule (CLI ownership handoff)
     - ``not_attached``: this process could own the schedule but the legacy day-batch is not attached
-      (for example ``--serve-only`` suppress-start)
+      (for example when ``DSA_RUNTIME_SCHEDULER_SUPPRESS_START`` is set)
 
     Values are derived only from ownership, attachment, and Desktop env — never guessed.
     """

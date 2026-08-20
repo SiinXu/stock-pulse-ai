@@ -72,7 +72,7 @@ Authoritative legacy `process_mode` values on the status API / Settings card
 | `serve+schedule` | This long-lived Web/API process owns and has attached the legacy day-batch |
 | `desktop` | Desktop process with the legacy day-batch attached |
 | `cli-schedule` | This process does **not** own the schedule (`DSA_CLI_SCHEDULER_OWNS_SCHEDULE`) |
-| `not_attached` | This process could own the schedule but the legacy day-batch is not attached (e.g. `--serve-only`) |
+| `not_attached` | This process could own the schedule but the legacy day-batch is not attached (for example when `DSA_RUNTIME_SCHEDULER_SUPPRESS_START` is set) |
 
 Apply semantics on the card: **hot-reload on save** badges appear only when
 `attached=true` for `SCHEDULE_ENABLED` / times. `SCHEDULE_RUN_IMMEDIATELY` stays
@@ -391,14 +391,17 @@ No new scheduler loop is introduced:
   provided Docker Compose topology, the `analyzer` service executes persisted
   tasks and the `server` service provides CRUD/status APIs. Starting only
   `server` stores definitions but does not execute them; start `analyzer` for
-  scheduled execution.
+  scheduled execution. The same `--serve-only` process still restores the
+  legacy `SCHEDULE_*` day-batch when `SCHEDULE_ENABLED` or `--schedule` is on,
+  without running an immediate analysis at startup.
 - Desktop starts the same `--serve-only` entrypoint with
-  `DSA_DESKTOP_MODE=true`; that backend owns persisted tasks while continuing
-  to suppress the legacy environment-driven daily job at startup. Saving the
-  existing `SCHEDULE_ENABLED` settings may still start or rebuild that legacy
-  job later, preserving the prior Web/Desktop configuration contract. The
-  internal `DSA_SCHEDULED_TASK_OWNER` handoff keeps these deployment roles
-  explicit; it is not a second operator-facing scheduling switch.
+  `DSA_DESKTOP_MODE=true`; that backend owns persisted tasks and restores
+  enabled legacy daily jobs at startup without immediately running analysis.
+  Saving the existing `SCHEDULE_ENABLED` settings may still start or rebuild
+  that legacy job later, preserving the prior Web/Desktop configuration
+  contract. The internal `DSA_SCHEDULED_TASK_OWNER` handoff keeps these
+  deployment roles explicit; it is not a second operator-facing scheduling
+  switch.
 
 Do not run multiple analyzer processes against the same task database. SQLite
 claiming prevents duplicate due-slot rows, but canonical execution state and
