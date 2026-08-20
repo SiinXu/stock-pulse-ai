@@ -193,4 +193,3 @@ or #1088 is closed.
 
 Keep [#1088](https://github.com/SiinXu/stock-pulse-ai/issues/1088) **open**. PRs
 that only add or refine this template use `Refs #1088`, never `Fixes`/`Closes`.
-)
