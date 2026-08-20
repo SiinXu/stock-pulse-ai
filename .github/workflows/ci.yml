@@ -290,6 +290,12 @@ jobs:
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Trailer tests walk git log. Default depth 1 only sees the squash
+          # HEAD message, so ancestor Ported-from trailers vanish after landing
+          # (push run 32414632111). Full history is required; it does not
+          # fetch origin/main with --depth=1.
+          fetch-depth: 0
       - name: 🐍 Setup Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -442,6 +448,10 @@ jobs:
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Same trailer-history contract as backend-tests: depth 1 drops
+          # ancestor squash Ported-from trailers (push run 32414632111).
+          fetch-depth: 0
       - name: 🐍 Setup minimum Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

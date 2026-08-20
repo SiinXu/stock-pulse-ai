@@ -101,6 +101,12 @@ def test_backend_tests_are_sharded_for_full_prs_and_push_to_main() -> None:
     assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert sum("offline-tests-shard" in command for command in runs) == 1
+    checkout = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/checkout@")
+    )
+    assert checkout["with"]["fetch-depth"] == 0
     upload = next(
         step
         for step in job["steps"]
@@ -109,6 +115,20 @@ def test_backend_tests_are_sharded_for_full_prs_and_push_to_main() -> None:
     assert upload["with"]["include-hidden-files"] is True
     assert upload["with"]["if-no-files-found"] == "error"
     _assert_job_fail_closed(job)
+
+
+def test_offline_pytest_jobs_fetch_full_git_history() -> None:
+    """Ported-from tests walk git log; depth 1 drops ancestor squash trailers."""
+
+    workflow = _workflow()
+    for job_id in ("backend-gate", "backend-tests", "python-minimum-tests"):
+        job = workflow["jobs"][job_id]
+        checkout = next(
+            step
+            for step in job["steps"]
+            if step.get("uses", "").startswith("actions/checkout@")
+        )
+        assert checkout.get("with", {}).get("fetch-depth") == 0, job_id
 
 
 def test_backend_tests_shards_cover_every_offline_test_module_once() -> None:
@@ -313,6 +333,13 @@ def test_python_minimum_push_covers_sharded_python_310_suite() -> None:
     ]
     assert len(setup_steps) == 1
     assert setup_steps[0]["with"]["python-version"] == "3.10"
+
+    checkout = next(
+        step
+        for step in job["steps"]
+        if step.get("uses", "").startswith("actions/checkout@")
+    )
+    assert checkout["with"]["fetch-depth"] == 0
 
     shard_steps = [
         step

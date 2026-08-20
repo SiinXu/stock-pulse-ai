@@ -8,7 +8,10 @@ Upstream is treated as a read-only reference repository. This checker:
 3. Classifies each commit by changed paths against a maintained whitelist of
    deliberately diverged prefixes (informational) vs shared paths (attention).
 4. Cross-references local ``Ported-from: <upstream_repo>@<sha>`` trailers so
-   already-ported upstream commits are marked separately.
+   already-ported upstream commits are marked separately. Matching walks
+   ``git log`` from the local ref, so a shallow clone (GitHub Actions default
+   ``fetch-depth: 1``) cannot see trailers recorded on ancestor squash
+   commits. The checker fails closed on shallow history.
 5. Emits a Markdown drift report for humans and the weekly workflow.
 
 Network fetch is optional and intended for the scheduled workflow, not the
@@ -313,8 +316,40 @@ def commit_paths(repo: Path, sha: str) -> tuple[str, ...]:
     return tuple(paths)
 
 
-def list_local_commit_messages(repo: Path, local_ref: str) -> list[str]:
-    """Return full messages for commits reachable from *local_ref*."""
+def git_repository_is_shallow(repo: Path) -> bool:
+    """Return True when *repo* is a shallow clone."""
+    completed = _run_git(
+        ["rev-parse", "--is-shallow-repository"],
+        cwd=repo,
+        check=False,
+    )
+    if completed.returncode != 0:
+        stderr = (completed.stderr or "").strip()
+        raise ParityError(
+            "git rev-parse --is-shallow-repository failed: "
+            f"{stderr or completed.stdout.strip()}"
+        )
+    return completed.stdout.strip().lower() == "true"
+
+
+def list_local_commit_messages(
+    repo: Path,
+    local_ref: str,
+    *,
+    allow_shallow: bool = False,
+) -> list[str]:
+    """Return full messages for commits reachable from *local_ref*.
+
+    Ported-from matching uses this history. A shallow clone only contains HEAD,
+    so trailers on earlier squash commits disappear. Fail closed unless
+    *allow_shallow* is True (tests that reproduce the silent-miss shape).
+    """
+    if not allow_shallow and git_repository_is_shallow(repo):
+        raise ParityError(
+            "Ported-from matching requires full git history; this repository is "
+            "a shallow clone. Use checkout fetch-depth: 0 or "
+            "`git fetch --unshallow`."
+        )
     completed = _run_git(
         ["log", "--pretty=format:%B%x1e", local_ref],
         cwd=repo,
