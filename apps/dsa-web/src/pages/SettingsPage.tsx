@@ -160,6 +160,10 @@ const SettingsPage: React.FC = () => {
   });
   const settingsText = SETTINGS_PAGE_TEXT[uiLanguage];
   const [llmFocusFieldRequest, setLlmFocusFieldRequest] = useState<ModelAccessFieldFocusRequest | null>(null);
+  const [revealFieldRequest, setRevealFieldRequest] = useState<{
+    requestId: number;
+    key: string;
+  } | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [schedulerStatusRefreshToken, setSchedulerStatusRefreshToken] = useState(0);
   const [schedulerRuntimeEnabled, setSchedulerRuntimeEnabled] = useState<boolean | null>(null);
@@ -291,6 +295,25 @@ const SettingsPage: React.FC = () => {
     }
     return SETTINGS_SECTIONS[0].id;
   }, [searchParams]);
+  const queryField = searchParams.get('field');
+  useEffect(() => {
+    if (!revealFieldRequest || parseModelAccessFieldKey(revealFieldRequest.key)) {
+      return undefined;
+    }
+    const fieldKey = revealFieldRequest.key;
+    let cancelled = false;
+    let stop = () => {};
+    void import('../components/settings/settingsFieldGroupDisclosure').then((module) => {
+      if (cancelled) {
+        return;
+      }
+      stop = module.focusSettingsFieldWhenPresent(fieldKey);
+    });
+    return () => {
+      cancelled = true;
+      stop();
+    };
+  }, [revealFieldRequest]);
   useEffect(() => {
     document.title = t(activeSection === SETTINGS_SECTION_IDS.usage
       ? 'usage.documentTitle'
@@ -806,18 +829,13 @@ const SettingsPage: React.FC = () => {
     && dismissedErrorSummaryFingerprint !== errorSummaryFingerprint;
   const jumpToErrorField = useCallback((entry: ErrorSummaryEntry) => {
     selectSectionView(entry.section as SettingsSectionId, entry.view);
+    setRevealFieldRequest((previous) => ({
+      requestId: (previous?.requestId ?? 0) + 1,
+      key: entry.key,
+    }));
     if (parseModelAccessFieldKey(entry.key)) {
       setLlmFocusFieldRequest((previous) => ({ requestId: (previous?.requestId ?? 0) + 1, key: entry.key }));
-      return;
     }
-    // Focus + reveal the field once the target section commits (two frames).
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      const el = document.getElementById(`setting-${entry.key}`);
-      if (el) {
-        el.focus();
-        el.scrollIntoView({ block: 'center' });
-      }
-    }));
   }, [selectSectionView]);
   // Some settings (e.g. WEBUI host/port, log dir) only take effect after a
   // restart. Surface a page-level notice when any *changed* field is one of
@@ -1422,6 +1440,9 @@ const SettingsPage: React.FC = () => {
       activeCategory={activeCategory}
       maskToken={maskToken}
       configVersion={configVersion}
+      queryField={queryField}
+      revealRequestKey={revealFieldRequest?.key}
+      revealRequestId={revealFieldRequest?.requestId}
     />
   );
   const activeSaveGroup = activeCategory;

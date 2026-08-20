@@ -412,11 +412,31 @@ function SettingsFieldComponent({
   const displayValue = resolveDisplayValue(item, value, resolvedControl);
   const savedSecretIsMasked = resolvedControl === 'password'
     && isPersistedMaskedSecret(item, displayValue, isMultiValueField(item));
+  const isReadOnly = !schema?.isEditable || Boolean(readOnlyDiagnostic);
+  const statusNotes: string[] = [];
+  if (isReadOnly) {
+    statusNotes.push(t('common.readOnly'));
+  }
+  if (readOnlyDiagnostic) {
+    statusNotes.push(readOnlyDiagnostic);
+  }
+  if (requirement === 'optional') {
+    statusNotes.push(t('settings.fieldOptional'));
+  } else if (requirement === 'inherited') {
+    statusNotes.push(t('settings.fieldInherited'));
+  }
+  if (dependencyLocked && requirement !== 'inherited' && !readOnlyDiagnostic) {
+    statusNotes.push(t('settings.fieldDependencyLocked'));
+  }
+  if (schema?.warningCodes?.includes('restart_required')) {
+    statusNotes.push(t('settings.fieldRestartRequired'));
+  }
 
   return (
     <div
       data-settings-field-row="true"
       data-testid={`settings-field-${item.key}`}
+      aria-description={statusNotes.length ? statusNotes.join('. ') : undefined}
       className={cn(
         'grid gap-2 px-2 py-1.5 transition-colors duration-200',
         isTextarea ? 'md:gap-2' : 'md:grid-cols-[minmax(0,1fr)_240px] md:items-center md:gap-4',
@@ -434,32 +454,12 @@ function SettingsFieldComponent({
             schema={schema}
             description={description}
             rawValueExists={item.rawValueExists}
+            statusNotes={statusNotes}
           />
-          {!schema?.isEditable || readOnlyDiagnostic ? (
-            <Badge variant="default" size="sm">
-              {t('common.readOnly')}
-            </Badge>
-          ) : null}
           {requirement === 'required' ? (
             <Badge variant="warning" size="sm">{t('settings.fieldRequired')}</Badge>
-          ) : requirement === 'inherited' ? (
-            <Badge variant="default" size="sm">{t('settings.fieldInherited')}</Badge>
-          ) : requirement === 'optional' ? (
-            <Badge variant="default" size="sm">{t('settings.fieldOptional')}</Badge>
-          ) : null}
-          {dependencyLocked && requirement !== 'inherited' && !readOnlyDiagnostic ? (
-            <Badge variant="default" size="sm">{t('settings.fieldDependencyLocked')}</Badge>
-          ) : null}
-          {schema?.warningCodes?.includes('restart_required') ? (
-            <Badge variant="default" size="sm">{t('settings.fieldRestartRequired')}</Badge>
           ) : null}
         </div>
-        {/* External docs links and raw KEY=value examples stay out of everyday fields. */}
-        {readOnlyDiagnostic ? (
-          <p className="text-xs text-warning" data-testid={`settings-schema-diagnostic-${item.key}`}>
-            {readOnlyDiagnostic}
-          </p>
-        ) : null}
       </div>
 
       <div data-settings-control-column="true" className={cn('min-w-0', !isTextarea && 'md:w-full md:justify-self-end')}>

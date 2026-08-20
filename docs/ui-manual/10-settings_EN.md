@@ -97,6 +97,10 @@ News / search keys improve events and themes; technical-only runs may still work
 
 Use **Data providers** to search for a provider and edit its credentials, priority, and provider-specific options. Efinance, AkShare, TickFlow, AlphaSift, Pytdx, Baostock, YFinance, Finnhub, Alpha Vantage, Longbridge, and social sentiment settings stay in that directory instead of the generic field list. Cross-provider prefetch, circuit-breaker, adaptive-ordering, and daily-cache controls remain grouped under **Market & intelligence → Provider reliability**; the runtime projection on the provider page is read-only.
 
+Generic field groups (quote, search, news, primary model, schedule, notification routing, and so on) use the shared collapsible. Only **Quote sources**, **Primary model & routing**, and **Scheduling & run** start expanded; every other non-empty group, including **Other**, starts collapsed. Search, `?field=KEY`, `#setting-KEY`, and validation-summary jumps open the group that owns the targeted field.
+
+On each field, only **Required** and the validation message stay on the label row. Optional, read-only, restart-required, and dependency-locked explanations live in the field help tooltip. Disabled controls stay disabled.
+
 ## Notifications & alerts
 
 1. Pick **one** channel you actually read.  

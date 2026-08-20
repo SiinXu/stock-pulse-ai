@@ -615,7 +615,7 @@ export function registerSettingsPageOverviewTests(): void {
     expect(screen.queryByText('AGENT_ORCHESTRATOR_TIMEOUT_S')).not.toBeInTheDocument();
   });
 
-  it('renders context compression profile labels and blank preset guidance in the Conversation section', () => {
+  it('renders context compression profile labels and blank preset guidance in the Conversation section', async () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'agent',
@@ -693,7 +693,7 @@ export function registerSettingsPageOverviewTests(): void {
 
     render(<SettingsPage />);
 
-    expect(screen.getByText('AGENT_CONTEXT_COMPRESSION_PROFILE')).toBeInTheDocument();
+    expect(await screen.findByText('AGENT_CONTEXT_COMPRESSION_PROFILE')).toBeInTheDocument();
     expect(screen.getByText('成本优先')).toBeInTheDocument();
     expect(screen.getByText('均衡推荐')).toBeInTheDocument();
     expect(screen.getByText('长上下文原文优先')).toBeInTheDocument();
@@ -701,7 +701,7 @@ export function registerSettingsPageOverviewTests(): void {
     expect(screen.getByText(/压缩时最近 N 个用户轮次及其后的回复保持原文/)).toHaveTextContent('留空则跟随当前上下文压缩策略 profile 默认值');
   });
 
-  it('keeps Agent and Conversation fields inline in their own PR #35 groups', () => {
+  it('keeps Agent and Conversation fields inline in their own PR #35 groups', async () => {
     const configState = buildSystemConfigState();
     useSystemConfigMock.mockReturnValue(buildSystemConfigState({
       activeCategory: 'agent',
@@ -759,7 +759,7 @@ export function registerSettingsPageOverviewTests(): void {
     routerSearchParamsMock.params = new URLSearchParams({ section: 'conversation', view: 'context' });
     rerender(<SettingsPage />);
 
-    expect(screen.getByText('记忆与上下文')).toBeInTheDocument();
+    expect(await screen.findByText('记忆与上下文')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-AGENT_ORCHESTRATOR_TIMEOUT_S')).not.toBeInTheDocument();
     expect(screen.getByTestId('settings-field-AGENT_CONTEXT_COMPRESSION_PROFILE')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /配置.*对话/ })).not.toBeInTheDocument();

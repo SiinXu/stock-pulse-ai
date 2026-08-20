@@ -2,6 +2,8 @@
 
 This document mirrors repository rules for the Web settings help inventory. Configuration semantics, defaults, runtime priority, and troubleshooting still follow `.env.example`, `docs/full-guide.md` / topic docs, and the live config registry.
 
+Optional, read-only, restart-required, and dependency-locked field status copy is shown in the existing Settings help tooltip rather than as always-visible label badges. Required badges and validation errors stay on the field.
+
 For the full Chinese maintenance guide (including historical PR coverage of field help), see `docs/settings-help.md`.
 
 ## Non-settings education help (Issue #201)

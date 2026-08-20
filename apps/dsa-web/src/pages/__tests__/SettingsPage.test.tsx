@@ -1,5 +1,6 @@
 import { describe } from 'vitest';
 import { registerSettingsPageAdvancedTests } from './SettingsPage.advancedTests';
+import { registerSettingsPageDisclosureTests } from './SettingsPage.disclosureTests';
 import { registerSettingsPageIntegrationTests } from './SettingsPage.integrationTests';
 import { registerSettingsPageLlmTests } from './SettingsPage.llmTests';
 import { registerSettingsPageOverviewTests } from './SettingsPage.overviewTests';
@@ -15,4 +16,5 @@ describe('SettingsPage', () => {
   registerSettingsPageIntegrationTests();
   registerSettingsPageSchedulerTests();
   registerSettingsPageAdvancedTests();
+  registerSettingsPageDisclosureTests();
 });
