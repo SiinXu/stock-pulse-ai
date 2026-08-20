@@ -68,6 +68,52 @@ Shared patterns compose these primitives:
 Every caller-visible string, including `aria-label` and tooltip content, must
 come from the existing i18n resources.
 
+### Shared-control adoption ratchet
+
+Product TS/TSX must use the shared button primitives above instead of growing
+new native `<button>` hosts or `role="button"` stand-ins. Native `input` /
+`select` / `textarea` remain on the existing form-control guard
+(`nativeFormControlAdoptionGuard.test.ts`). This task does **not** mass-migrate
+current product buttons.
+
+The scanner (`sharedControlAdoptionRatchet.ts`) walks the TypeScript AST — not a
+raw substring count — so aliases (`const Tag = 'button'`), multiline JSX,
+spread props, `createElement('button')`, and `document.createElement('button')`
+count, while comments, type-only `'button'` literals, and selector strings such
+as `'[role="button"]'` do not.
+
+**Required owners.** `Button`, `IconButton`, `Pressable`, and `SelectionChip`
+must keep a native button (`SHARED_CONTROL_REQUIRED_OWNERS`). Losing that
+element is a regression.
+
+**Compound owners.** DatePicker, Tabs, Select, DataTable sort headers, and the
+other files in `SHARED_CONTROL_COMPOUND_OWNERS` may render native buttons
+because they *are* the shared control. Count changes still require a baseline
+edit.
+
+**Measured baseline.** `apps/dsa-web/src/design/sharedControlAdoptionBaseline.json`
+is snapshotted from the current production tree. Per-file `nativeButtonCount` /
+`roleButtonCount` are shrink-only ceilings for business files. New unaudited
+files fail as `new-bypass`. File moves with the same basename and counts fail as
+`file-moved` until the JSON path is updated.
+
+**Approved accessibility exemptions.** `SHARED_CONTROL_A11Y_EXEMPTIONS` is the
+only production exception list. Current entries are the SVG scatter hit target
+on Decision Signals and the native `details`/`summary` disclosure on the run-flow
+timeline. Do **not** park leftover product-button debt here.
+
+**Inventory exclusions** (documented in `SHARED_CONTROL_SCAN_EXCLUSIONS`): tests,
+fixtures, generated files, vendor/`node_modules`, `src/dev/**`, playground, and
+stories. Those trees are not shipped product UI.
+
+| Code | Meaning |
+| --- | --- |
+| `missing-required-owner` / `lost-owner-file` | A shared control dropped its native button. Restore it. |
+| `new-bypass` / `bypass-regression` | New or extra native/`role="button"` usage outside owners. Use `Button` / `IconButton` / `Pressable`, or add a reviewed a11y exemption. |
+| `baseline-needs-tightening` / `lost-debt-file` | The tree improved. Update the JSON ceiling. |
+| `file-moved` | Same basename and counts at a new path. Update the JSON path; do not treat the move as a free new bypass. |
+| `stale-exemption` / `exemption-overflow` | Fix `SHARED_CONTROL_A11Y_EXEMPTIONS`. |
+
 ## Filter And Query Semantics
 
 Applied filters are navigation state. A page supplies a typed
@@ -786,6 +832,7 @@ A PR that introduces or reworks a surface fails this contract when any apply:
 7. New mid-width layout keeps three dense full columns that clip core content.
 8. Any new glow, glass, or non-semantic shadow treatment (also a DESIGN_GUIDE failure).
 9. A density-aware shared component or page replaces `density-*` utilities with fixed `p-*` / `gap-*` / spacing `style` without a `DENSITY_FIXED_GEOMETRY_EXEMPTIONS` entry.
+10. A new production file (or extra occurrence in an existing file) introduces a native `<button>` or `role="button"` host outside the shared-control owners / a11y exemption list.
 
 ## State And Alert Semantics
 

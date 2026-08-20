@@ -38,6 +38,11 @@
      `data-density="compact"`。可执行棘轮与固定几何豁免见
      [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md) 的 D5 与
      `src/design/density.ts`。
+   - 产品页不要新增原生 `<button>` 或 `role="button"` 宿主；使用共享 `Button` /
+     `IconButton` / `Pressable`（或已登记的复合控件）。可执行棘轮与无障碍豁免见
+     [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md) 的 Shared-control
+     adoption ratchet 与 `src/design/sharedControlAdoptionBaseline.json`。本规则不要求
+     一次性改完现有页面。
    - 不写死密钥、账号、路径、模型名、端口或环境差异逻辑（仓库硬规则）。
 
 ## 1. 设计基调
