@@ -53,7 +53,7 @@
 ### 变异风险
 
 - `sanitize_diagnostic_*` 必须返回新容器，不得改写调用方 mapping / list / 嵌套对象。
-- `to_dict()` 必须拷贝嵌套 `dict` / `list`，避免 snapshot 或摘要字典回写诊断对象。
+- `to_dict()` 与 `snapshot()` 必须经过同一套递归拷贝边界，隔离嵌套 `dict` / `list` / `set` / `tuple` / dataclass 以及 extra/context 载荷，避免 snapshot、摘要、`copy_text` 或导出字典回写诊断对象。
 - 采集 / 导出可以写入诊断上下文，但不得改分析输入、分析 outcome 或其嵌套 `window` / `notes` 对象。
 - 本切片不拆 collect / export 业务逻辑；后续切片再收敛只读采集 API 与导出投影。
 

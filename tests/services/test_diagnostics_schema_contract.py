@@ -3,8 +3,13 @@
 
 from __future__ import annotations
 
+import ast
 import copy
 import json
+import os
+import subprocess
+import sys
+from dataclasses import dataclass
 from pathlib import Path
 
 from src.services.diagnostics.schema import (
@@ -31,8 +36,10 @@ from src.services.diagnostics.schema import (
 )
 from src.services.run_diagnostics import (
     activate_run_diagnostic_context,
+    attach_prompt_artifact_versions,
     build_run_diagnostic_summary,
     current_diagnostic_snapshot,
+    get_current_diagnostic_context,
     observe_pipeline_stage,
     record_history_run,
     record_llm_run,
@@ -48,6 +55,67 @@ def test_schema_module_does_not_import_collect() -> None:
     source = Path("src/services/diagnostics/schema.py").read_text(encoding="utf-8")
     assert "diagnostics.collect" not in source
     assert "from src.services.diagnostics.collect" not in source
+
+
+def test_schema_keeps_export_import_lazy() -> None:
+    source = Path("src/services/diagnostics/schema.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    module_level_modules = []
+    for node in tree.body:
+        if isinstance(node, ast.ImportFrom) and node.module:
+            module_level_modules.append(node.module)
+        elif isinstance(node, ast.Import):
+            module_level_modules.extend(alias.name for alias in node.names)
+    assert all("diagnostics.export" not in name for name in module_level_modules)
+    assert all("diagnostics.collect" not in name for name in module_level_modules)
+
+    lazy_export_imports = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom)
+        and node.module == "src.services.diagnostics.export"
+        and node.col_offset > 0
+    ]
+    assert lazy_export_imports
+
+    script = (
+        "import sys\n"
+        "banned = ("
+        "'src.services.diagnostics.export',"
+        "'src.services.diagnostics.collect',"
+        "'src.services.run_diagnostics',"
+        ")\n"
+        "for name in list(sys.modules):\n"
+        "    if name == 'src' or name.startswith('src.'):\n"
+        "        del sys.modules[name]\n"
+        "import src.services.diagnostics.schema as schema\n"
+        "loaded = [name for name in banned if name in sys.modules]\n"
+        "assert not loaded, loaded\n"
+        "assert schema._copy_diagnostic_value({'k': {'n': 1}}) is not None\n"
+    )
+    repo_root = str(Path(__file__).resolve().parents[2])
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [repo_root, env["PYTHONPATH"]] if env.get("PYTHONPATH") else [repo_root]
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=False,
+        capture_output=True,
+        cwd=repo_root,
+        env=env,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_copy_helper_is_not_added_to_public_facade() -> None:
+    import src.services.run_diagnostics as run_diagnostics
+
+    assert "_copy_diagnostic_value" not in run_diagnostics.__all__
+    from tests.test_run_diagnostics_p1 import RunDiagnosticsSplitCharacterizationTestCase
+
+    assert "_copy_diagnostic_value" not in RunDiagnosticsSplitCharacterizationTestCase.PUBLIC_NAMES
 
 
 def test_empty_snapshot_keys_and_list_shapes() -> None:
@@ -318,6 +386,7 @@ def test_to_dict_does_not_alias_or_mutate_dataclass_fields() -> None:
     )
     payload = evidence.to_dict()
     payload["issues"].append({"code": "mutated"})
+    payload["issues"][0]["code"] = "mutated"
     payload["provenance"]["source"] = "mutated"
     payload["symbol"] = "000001"
     assert evidence.issues == [{"code": "gap", "message": "missing bar"}]
@@ -359,6 +428,7 @@ def test_to_dict_does_not_alias_or_mutate_dataclass_fields() -> None:
     )
     stage_payload = stage.to_dict()
     stage_payload["input_summary"]["stock_code"] = "000001"
+    stage_payload["input_summary"]["window"]["days"] = 99
     stage_payload["output_summary"]["record_count"] = 99
     assert stage.input_summary == {"stock_code": "600519", "window": {"days": 30}}
     assert stage.output_summary == {"record_count": 1}
@@ -416,3 +486,184 @@ def test_diagnostics_calls_do_not_mutate_business_inputs_or_outcomes() -> None:
     assert rerecorded is not None
     assert {"mutated": True} not in rerecorded["provider_runs"]
     assert {"mutated": True} not in rerecorded["agent_events"]
+
+
+@dataclass
+class _NestedNote:
+    code: str
+    window: dict
+
+
+class _CustomNote:
+    def __init__(self, label: str) -> None:
+        self.label = label
+
+
+def test_to_dict_isolates_nested_dict_list_set_tuple_and_custom_values() -> None:
+    flags = {"ok", "live"}
+    tags = ("keep", ["inner"])
+    extra = _NestedNote(code="gap", window={"days": 30})
+    custom = _CustomNote("keep")
+    details = {
+        "window": {"days": 30, "notes": ["keep"]},
+        "flags": flags,
+        "tags": tags,
+        "extra": extra,
+        "custom": custom,
+        "context": {"payload": {"source": "caller"}},
+    }
+    component = RunDiagnosticComponent(
+        key="llm",
+        label="LLM",
+        status="ok",
+        message="ok",
+        details=details,
+    )
+    payload = component.to_dict()
+    payload["details"]["window"]["days"] = 99
+    payload["details"]["window"]["notes"].append("mutated")
+    payload["details"]["flags"].add("mutated")
+    payload["details"]["tags"][1].append("mutated")
+    payload["details"]["extra"].code = "mutated"
+    payload["details"]["extra"].window["days"] = 99
+    payload["details"]["custom"].label = "mutated"
+    payload["details"]["context"]["payload"]["source"] = "mutated"
+
+    assert details["window"] == {"days": 30, "notes": ["keep"]}
+    assert flags == {"ok", "live"}
+    assert tags == ("keep", ["inner"])
+    assert extra.code == "gap"
+    assert extra.window == {"days": 30}
+    assert custom.label == "keep"
+    assert details["context"] == {"payload": {"source": "caller"}}
+    json.dumps(
+        {key: value for key, value in payload["details"].items() if key not in {"flags", "extra", "custom"}},
+        ensure_ascii=False,
+    )
+
+
+def test_repeated_to_dict_and_snapshot_serialization_stay_isolated() -> None:
+    issues = [{"code": "gap", "message": "missing bar", "context": {"n": 1}}]
+    evidence = DataQualityEvidenceRecord(
+        schema_version="dq_v1",
+        data_type="daily_data",
+        severity="warn",
+        symbol="600519",
+        provider="UnitFetcher",
+        market="CN",
+        instrument_type="stock",
+        rejected=False,
+        issues=issues,
+        issue_count=1,
+        truncated=False,
+        provenance={"source": "validator", "nested": {"k": "v"}},
+        created_at=_CREATED_AT,
+    )
+    first = evidence.to_dict()
+    second = evidence.to_dict()
+    first["issues"][0]["code"] = "mutated"
+    first["issues"][0]["context"]["n"] = 99
+    first["provenance"]["nested"]["k"] = "mutated"
+    assert second["issues"][0] == {"code": "gap", "message": "missing bar", "context": {"n": 1}}
+    assert second["provenance"] == {"source": "validator", "nested": {"k": "v"}}
+    assert evidence.issues[0]["code"] == "gap"
+    assert evidence.provenance["nested"]["k"] == "v"
+
+    token = activate_run_diagnostic_context(trace_id="trace-repeat")
+    try:
+        context = get_current_diagnostic_context()
+        assert context is not None
+        context.record_agent_event(
+            {"kind": "tool", "payload": {"nested": {"k": "v"}, "notes": ["keep"]}}
+        )
+        attach_prompt_artifact_versions(
+            {
+                "schema_version": "1",
+                "prompt_version": "p1",
+                "skills": [
+                    {
+                        "kind": "skill",
+                        "artifact_id": "skill-1",
+                        "version": "v1",
+                        "content_hash": "abc",
+                    }
+                ],
+                "skill_versions": {"skill-1": "v1"},
+            }
+        )
+        record_llm_run(success=True, model="deepseek-chat")
+        first_snapshot = current_diagnostic_snapshot()
+        first_snapshot["agent_events"][0]["payload"]["nested"]["k"] = "mutated"
+        first_snapshot["agent_events"][0]["payload"]["notes"].append("mutated")
+        first_snapshot["prompt_artifact_versions"]["skills"][0]["version"] = "mutated"
+        first_snapshot["skill_versions"]["skill-1"] = "mutated"
+        rerecorded = current_diagnostic_snapshot()
+    finally:
+        reset_run_diagnostic_context(token)
+
+    assert rerecorded is not None
+    assert rerecorded["agent_events"][0]["payload"]["nested"]["k"] == "v"
+    assert rerecorded["agent_events"][0]["payload"]["notes"] == ["keep"]
+    assert rerecorded["prompt_artifact_versions"]["skills"][0]["version"] == "v1"
+    assert rerecorded["skill_versions"]["skill-1"] == "v1"
+
+
+def test_export_redaction_and_copy_text_use_isolated_payloads() -> None:
+    original_snapshot = {
+        "diagnostics": {
+            "trace_id": "trace-export",
+            "stock_code": "600519",
+            "provider_runs": [
+                {
+                    "data_type": "realtime_quote",
+                    "success": False,
+                    "error_message_sanitized": "token=<redacted>",
+                    "context": {"window": {"days": 30}},
+                }
+            ],
+            "llm_runs": [{"success": True, "model": "deepseek-chat"}],
+            "notification_runs": [],
+            "history_runs": [],
+            "data_quality_evidence": [
+                {
+                    "issues": [{"code": "gap", "context": {"n": 1}}],
+                }
+            ],
+        }
+    }
+    frozen_snapshot = copy.deepcopy(original_snapshot)
+    raw_result = {
+        "success": True,
+        "model_used": "deepseek-chat",
+        "secret_token": "sk-live-secret",
+    }
+    frozen_raw = copy.deepcopy(raw_result)
+
+    summary = build_run_diagnostic_summary(
+        context_snapshot=original_snapshot,
+        raw_result=raw_result,
+        report_saved=True,
+    )
+    encoded = json.dumps(summary, ensure_ascii=False)
+    assert original_snapshot == frozen_snapshot
+    assert raw_result == frozen_raw
+    assert "sk-live-secret" not in encoded
+    assert "copy_text" in summary
+    assert "realtime_quote" in encoded
+
+    summary["components"]["realtime_quote"]["details"]["window"] = {"days": 99}
+    summary["reason"] = "mutated"
+    summary["copy_text"] = "mutated"
+    original_snapshot["diagnostics"]["provider_runs"][0]["context"]["window"]["days"] = 99
+    original_snapshot["diagnostics"]["data_quality_evidence"][0]["issues"][0]["code"] = "mutated"
+
+    reread = build_run_diagnostic_summary(
+        context_snapshot=frozen_snapshot,
+        raw_result=frozen_raw,
+        report_saved=True,
+    )
+    assert frozen_snapshot["diagnostics"]["provider_runs"][0]["context"]["window"]["days"] == 30
+    assert reread["reason"] != "mutated"
+    assert reread["copy_text"] != "mutated"
+    assert "sk-live-secret" not in json.dumps(reread, ensure_ascii=False)
+    assert raw_result == frozen_raw

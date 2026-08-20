@@ -11,15 +11,17 @@ public names from ``src.services.run_diagnostics``. Do not import
 Mutation risks
 --------------
 Normalization helpers return new containers. They must not mutate caller
-mappings, lists, or nested objects. Dataclass ``to_dict()`` methods copy
-payloads and omit empty optional fields; they must not rewrite dataclass
-fields in place. Collection/export may append to the diagnostic context, but
-must not alias or mutate business inputs, analysis outcomes, or nested
-window/notes objects passed in by callers.
+mappings, lists, or nested objects. Dataclass ``to_dict()`` methods and
+context snapshots pass outgoing payloads through one recursive copy boundary
+and omit empty optional fields; they must not rewrite dataclass fields in
+place. Collection/export may append to the diagnostic context, but must not
+alias or mutate business inputs, analysis outcomes, or nested window/notes
+objects passed in by callers.
 """
 
 from __future__ import annotations
 
+import copy
 import math
 import re
 import uuid
@@ -204,6 +206,18 @@ def _redact_diagnostic_payload(payload: Dict[str, Any]) -> Dict[str, Any]:
     )
 
 
+def _copy_diagnostic_value(value: Any) -> Any:
+    """Return a recursive snapshot of a diagnostic payload value.
+
+    This is the single copy boundary for public diagnostic payloads.
+    Mutating nested dict, list, set, tuple, dataclass, or other supported
+    values on the result must not rewrite in-memory diagnostic state.
+    Container families stay the same so JSON shape is unchanged.
+    """
+
+    return copy.deepcopy(value)
+
+
 def sanitize_diagnostic_text(value: Any, *, max_length: int = 300) -> Optional[str]:
     """Return a short diagnostic string with sensitive details redacted."""
     if value is None:
@@ -341,7 +355,9 @@ class ProviderRun:
             "record_count": self.record_count,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass(frozen=True)
@@ -379,7 +395,7 @@ class DataQualityEvidenceRecord:
         }
         if self.provenance:
             payload["provenance"] = dict(self.provenance)
-        return payload
+        return _copy_diagnostic_value(payload)
 
 
 @dataclass
@@ -412,7 +428,9 @@ class LLMRun:
             "error_message_sanitized": self.error_message_sanitized,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -437,7 +455,9 @@ class NotificationRun:
             "error_message_sanitized": self.error_message_sanitized,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -460,7 +480,9 @@ class HistoryRun:
             "error_message_sanitized": self.error_message_sanitized,
             "created_at": self.created_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -498,7 +520,9 @@ class PipelineStageRun:
             "started_at": self.started_at,
             "ended_at": self.ended_at,
         }
-        return {key: value for key, value in payload.items() if value is not None}
+        return _copy_diagnostic_value(
+            {key: value for key, value in payload.items() if value is not None}
+        )
 
 
 @dataclass
@@ -519,7 +543,13 @@ class RunDiagnosticComponent:
             "message": self.message,
             "details": dict(self.details),
         }
-        return {key: value for key, value in payload.items() if value not in (None, {}, [])}
+        return _copy_diagnostic_value(
+            {
+                key: value
+                for key, value in payload.items()
+                if value not in (None, {}, [])
+            }
+        )
 
 
 @dataclass
@@ -555,4 +585,4 @@ class RunDiagnosticSummary:
 
         payload["copy_text"] = format_copyable_diagnostics(payload)
         compact = {key: value for key, value in payload.items() if value is not None}
-        return _redact_diagnostic_payload(compact)
+        return _redact_diagnostic_payload(_copy_diagnostic_value(compact))

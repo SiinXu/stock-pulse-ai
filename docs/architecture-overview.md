@@ -148,11 +148,15 @@ Summary overall status is `normal | degraded | failed | unknown`; component
 keys are `realtime_quote`, `daily_data`, `news`, `data_quality`, `llm`,
 `notification`, `history`. `copy_text` is always present.
 
-Mutation boundary: sanitizers and `to_dict()` copy containers. Collection may
-append to the diagnostic context only. It must not change analysis inputs,
-outcomes, or nested caller objects. Collect/export remain later slices of
-issue #1076; see [run diagnostics Phase 1](run-diagnostics-p1.md) for the
-Chinese field history.
+Mutation boundary: sanitizers return new containers. `to_dict()` and
+`RunDiagnosticContext.snapshot()` pass outgoing payloads through one
+recursive copy boundary, so mutating nested dict/list/set/tuple/dataclass
+or extra context values cannot rewrite in-memory diagnostic objects.
+Collection may append to the diagnostic context only. It must not change
+analysis inputs, outcomes, or nested caller objects. Collect/export remain
+later slices of issue #1076; see [run diagnostics Phase 1](run-diagnostics-p1.md)
+for the Chinese field history. `RunDiagnosticSummary.to_dict()` still
+lazy-imports export to attach `copy_text`.
 
 ## Analysis Execution Paths
 
