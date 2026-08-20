@@ -157,6 +157,7 @@ than a line-count-driven file split.
 | `ApprovalsPage` workspace | `hooks/useApprovalsWorkspaceQuery.ts` | First run full load; later ticks poll proposals at **5s**; interval off when auth-blocked; no focus refetch; countdown timer stays local | Wave 1 |
 | `StockDetailsPage` quote + history | `hooks/useStockDetailsQueries.ts` | Code/days key; no poll/focus; `retry: false` | Wave 1 |
 | Analysis Workbench dashboard data refresh | `hooks/useDashboardDataRefreshQuery.ts` (via `useDashboardLifecycle`) | First run **per mount** (mount-scoped query key + cache miss) non-silent history + stock-bar + active tasks; initial-loader identity change re-runs non-silent path; later ticks silent at **30s**; explicit `visibilitychange` refetch (`refetchOnWindowFocus: false`); unmount removes schedule cache entry; SSE + 2s disconnected task poll stay custom; `retry: false` | Wave 2 (#789) |
+| `HomePage` attention / Today's Focus / setup-status | `hooks/useHomePageQueries.ts` | Mount + manual refresh only; no poll; no window-focus refetch; Today's Focus key includes language; attention pack uses allSettled so one failed source does not wipe the pack; last-known signal totals stay marked stale; setup silent refresh stays onboarding-owned; unmount removes cache rows; `retry: false`; `staleTime: 0` | Wave 2 (#789) |
 
 ### Rollout rules for the next pages
 
@@ -170,10 +171,7 @@ than a line-count-driven file split.
    until a later dedicated slice.
 6. Tests that render a Query consumer must wrap with a test `QueryClientProvider` (`retry: false`).
 
-Suggested remaining migration order (issue #789): HomePage attention/setup/today's-focus →
-Portfolio projection session → Notification Center + unread 60s poll → Settings system-config loads
-→ Screening → Chat/agent status → Backtest / calculators / report compare / event calendar / token
-usage. Defer surfaces owned by concurrent open PRs.
+Suggested remaining migration order (issue #789): Portfolio projection session → Notification Center + unread 60s poll → Settings system-config loads → Screening → Chat/agent status → Backtest / calculators / report compare / event calendar / token usage. Defer surfaces owned by concurrent open PRs.
 
 ## Change Checklist
 

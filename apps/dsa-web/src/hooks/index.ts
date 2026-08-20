@@ -14,6 +14,27 @@ export {
 export type { DashboardDataRefreshQueryResult } from './useDashboardDataRefreshQuery';
 export { useAnalysisWorkbenchState } from './useAnalysisWorkbenchState';
 export { useHomeUrlState } from './useHomeUrlState';
+export {
+  HOME_ATTENTION_QUERY_KEY,
+  HOME_SETUP_STATUS_QUERY_KEY,
+  TODAYS_FOCUS_QUERY_KEY_ROOT,
+  buildTodaysFocusQueryKey,
+  fetchHomeAttentionData,
+  mergeHomeAttentionQueryResult,
+  resolveFocusLanguage,
+  useHomeAttentionQuery,
+  useHomeSetupStatusQuery,
+  useTodaysFocusQuery,
+} from './useHomePageQueries';
+export type {
+  HomeAttentionAvailability,
+  HomeAttentionData,
+  HomeAttentionLoadResult,
+  HomeAttentionQueryResult,
+  HomeSetupStatusQueryResult,
+  HomeSignalStaleFields,
+  HomeTodaysFocusQueryResult,
+} from './useHomePageQueries';
 export { useMarketReviewRunner } from './useMarketReviewRunner';
 export {
   MARKET_REVIEW_HISTORY_QUERY_KEY,

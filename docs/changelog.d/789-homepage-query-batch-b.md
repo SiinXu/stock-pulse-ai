@@ -1,0 +1,1 @@
+- [Changed] Schedule Home attention, Today's Focus, and setup-status loads through TanStack Query while preserving mount and manual-refresh presentation (Refs #789).
