@@ -9,10 +9,7 @@ import type {
   ReportStrategySynthesisSkill,
   ReportStructuredInsights as ReportStructuredInsightsType,
 } from '../../../types/analysis';
-import {
-  REPORT_INSIGHT_LIST_PREVIEW_LIMIT,
-  ReportStructuredInsights,
-} from '../ReportStructuredInsights';
+import { ReportStructuredInsights } from '../ReportStructuredInsights';
 import { normalizeReportStructuredInsights } from '../reportStructuredInsightsUtils';
 
 const completeInsights: ReportStructuredInsightsType = {
@@ -518,7 +515,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
     ({ testId, fixture, preview, full }) => {
       render(<ReportStructuredInsights insights={insightsWithLists(fixture)} language="en" />);
 
-      expect(preview).toHaveLength(REPORT_INSIGHT_LIST_PREVIEW_LIMIT);
+      expect(preview).toHaveLength(3);
       expect(visibleInsightNames(testId)).toEqual([...preview]);
       expect(allInsightNames(testId)).toEqual([...full]);
       const toggle = screen.getByTestId(`${testId}-disclosure`);

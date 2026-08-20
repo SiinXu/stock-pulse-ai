@@ -21,7 +21,7 @@ import { REPORT_STRUCTURED_INSIGHTS_TEXT } from '../../locales/reportStructuredI
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
 import { normalizeReportStructuredInsights } from './reportStructuredInsightsUtils';
 
-export const REPORT_INSIGHT_LIST_PREVIEW_LIMIT = 3;
+const REPORT_INSIGHT_LIST_PREVIEW_LIMIT = 3;
 
 const formatInsightCountLabel = (template: string, count: number): string => (
   template.replaceAll('{count}', String(count))
