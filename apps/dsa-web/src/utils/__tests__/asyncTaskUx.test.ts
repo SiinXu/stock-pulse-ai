@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
-import { createParsedApiError } from '../../api/error';
+import { createParsedApiError, getParsedApiError } from '../../api/error';
 import {
   extractExistingTaskId,
   isActiveTaskStatus,
@@ -151,6 +151,44 @@ describe('asyncTaskUx', () => {
         code: 'rollback_unavailable',
         status: 409,
       }))).toBe('none');
+    });
+
+    it('returns none for an HTTP 409 with a missing code', () => {
+      const unlabeled = getParsedApiError({
+        isAxiosError: true,
+        message: 'Conflict',
+        response: {
+          status: 409,
+          data: { message: 'Conflict' },
+        },
+      });
+      expect(unlabeled.status).toBe(409);
+      expect(unlabeled.code).toBeUndefined();
+      expect(resolveBusyRecoveryKind(unlabeled)).toBe('none');
+      expect(resolveBusyRecoveryDecision(unlabeled)).toEqual({
+        kind: 'none',
+        existingTaskId: null,
+        blocksLaunch: false,
+      });
+    });
+
+    it('returns none for an HTTP 409 with an unknown future code', () => {
+      const unknown = getParsedApiError({
+        isAxiosError: true,
+        message: 'Conflict',
+        response: {
+          status: 409,
+          data: { error: 'future_unmapped_conflict_v2', message: 'Conflict' },
+        },
+      });
+      expect(unknown.status).toBe(409);
+      expect(unknown.code).toBe('future_unmapped_conflict_v2');
+      expect(resolveBusyRecoveryKind(unknown)).toBe('none');
+      expect(resolveBusyRecoveryDecision(unknown)).toEqual({
+        kind: 'none',
+        existingTaskId: null,
+        blocksLaunch: false,
+      });
     });
 
     it('exposes a production decision with attachable task identity', () => {

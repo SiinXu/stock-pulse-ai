@@ -1,0 +1,1 @@
+- [Tests] Assert unlabeled and unknown HTTP 409 recoveries stay fail-closed without silent reload (Refs #885).
