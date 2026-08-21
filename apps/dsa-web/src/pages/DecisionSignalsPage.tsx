@@ -1062,7 +1062,11 @@ const DecisionSignalsPage: React.FC = () => {
     void loadTimelineForContext(activeStockContext, timelineFilters);
   }, [activeStockContext, loadTimelineForContext, timelineFilters]);
 
-  const { runStatusUpdate, isUpdating: statusUpdating } = useDecisionSignalStatusMutation({
+  const {
+    runStatusUpdate,
+    releaseStatusUpdate,
+    isUpdating: statusUpdating,
+  } = useDecisionSignalStatusMutation({
     isMounted: () => mountedRef.current,
   });
 
@@ -1078,38 +1082,42 @@ const DecisionSignalsPage: React.FC = () => {
       setStatusError(result.error);
       return;
     }
-    const updated = result.item;
-    setPendingStatus(null);
-    setStatusError(null);
-    setLatestItems((current) => current.flatMap((item) => {
-      if (item.id !== updated.id) return [item];
-      return updated.status === 'active' ? [updated] : [];
-    }));
-    setTimelineItems((current) => current.flatMap((item) => {
-      if (item.id !== updated.id) return [item];
-      return appliedTimelineContext?.status === 'active' && updated.status !== 'active' ? [] : [updated];
-    }));
-    setSelected((current) => {
-      if (!current || current.item.id !== updated.id) return current;
-      if (current.source === 'latest') {
-        return updated.status === 'active' ? { source: 'latest', item: updated } : null;
-      }
-      if (current.source === 'timeline') {
-        return appliedTimelineContext?.status === 'active' && updated.status !== 'active'
-          ? null
-          : { source: 'timeline', item: updated };
-      }
-      if (current.source === 'persisted') {
-        return { source: 'persisted', item: updated };
-      }
-      if (current.source === 'outcome') {
-        return { source: 'outcome', item: updated };
-      }
-      if (!parseSourceReportId(appliedFilters.sourceReportId) && appliedFilters.status && updated.status !== appliedFilters.status) return null;
-      return { source: 'list', item: updated };
-    });
-    await loadSignalsForPage(page);
-    await loadOutcomeStats();
+    try {
+      const updated = result.item;
+      setPendingStatus(null);
+      setStatusError(null);
+      setLatestItems((current) => current.flatMap((item) => {
+        if (item.id !== updated.id) return [item];
+        return updated.status === 'active' ? [updated] : [];
+      }));
+      setTimelineItems((current) => current.flatMap((item) => {
+        if (item.id !== updated.id) return [item];
+        return appliedTimelineContext?.status === 'active' && updated.status !== 'active' ? [] : [updated];
+      }));
+      setSelected((current) => {
+        if (!current || current.item.id !== updated.id) return current;
+        if (current.source === 'latest') {
+          return updated.status === 'active' ? { source: 'latest', item: updated } : null;
+        }
+        if (current.source === 'timeline') {
+          return appliedTimelineContext?.status === 'active' && updated.status !== 'active'
+            ? null
+            : { source: 'timeline', item: updated };
+        }
+        if (current.source === 'persisted') {
+          return { source: 'persisted', item: updated };
+        }
+        if (current.source === 'outcome') {
+          return { source: 'outcome', item: updated };
+        }
+        if (!parseSourceReportId(appliedFilters.sourceReportId) && appliedFilters.status && updated.status !== appliedFilters.status) return null;
+        return { source: 'list', item: updated };
+      });
+      await loadSignalsForPage(page);
+      await loadOutcomeStats();
+    } finally {
+      releaseStatusUpdate();
+    }
   };
 
   const handleFeedbackSubmit = useCallback(async (feedbackValue: DecisionSignalFeedbackValue) => {

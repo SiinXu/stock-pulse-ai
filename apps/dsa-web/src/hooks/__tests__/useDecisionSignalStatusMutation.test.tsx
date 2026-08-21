@@ -75,6 +75,18 @@ describe('useDecisionSignalStatusMutation', () => {
       item: { ...signal, status: 'invalidated' },
     });
     await expect(second).resolves.toEqual({ kind: 'ignored' });
+    expect(result.current.isUpdating).toBe(true);
+
+    let third: Promise<unknown> | undefined;
+    await act(async () => {
+      third = result.current.runStatusUpdate({ signalId: 7, status: 'archived' });
+    });
+    await expect(third).resolves.toEqual({ kind: 'ignored' });
+    expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      result.current.releaseStatusUpdate();
+    });
     await waitFor(() => expect(result.current.isUpdating).toBe(false));
   });
 
@@ -91,11 +103,15 @@ describe('useDecisionSignalStatusMutation', () => {
     });
 
     expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1);
-    expect(outcome).toMatchObject({
+    expect(outcome).toEqual({
       kind: 'error',
-      error: expect.objectContaining({ message: expect.any(String) }),
+      error: expect.objectContaining({
+        title: '请求失败',
+        message: '请求未能完成，请稍后重试。',
+      }),
     });
     expect((outcome as { error: { message: string } }).error.message).not.toBe('status update failed');
+    expect(result.current.isUpdating).toBe(false);
   });
 
   it('does not apply success after unmount', async () => {

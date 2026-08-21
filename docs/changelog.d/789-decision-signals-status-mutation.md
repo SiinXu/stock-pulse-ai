@@ -1,1 +1,1 @@
-- [Changed] Schedule Decision Signals status updates through TanStack Query while preserving the in-flight confirmation guard (Refs #789).
+- [Changed] Schedule Decision Signals status updates through TanStack Query while keeping the in-flight confirmation guard through the page-owned list and stats reload (Refs #789).

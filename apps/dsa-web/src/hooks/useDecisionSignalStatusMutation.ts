@@ -35,6 +35,9 @@ type UseDecisionSignalStatusMutationOptions = {
  * - `retry: false`; errors stay on the existing confirm-dialog / ApiErrorAlert
  *   surfaces via the returned result (no parallel error channel).
  * - List/stats reload and latest/timeline/selection updates remain page-owned.
+ * - On success the in-flight ref and `isUpdating` stay true until the page
+ *   finishes `loadSignalsForPage` + `loadOutcomeStats` and calls
+ *   `releaseStatusUpdate`. Error and unmount paths release immediately.
  */
 export function useDecisionSignalStatusMutation({
   isMounted,
@@ -50,6 +53,13 @@ export function useDecisionSignalStatusMutation({
   });
   const { mutateAsync } = mutation;
 
+  const releaseStatusUpdate = useCallback(() => {
+    inFlightRef.current = false;
+    if (isMounted()) {
+      setGuardBusy(false);
+    }
+  }, [isMounted]);
+
   const runStatusUpdate = useCallback(async (
     input: DecisionSignalStatusMutationInput,
   ): Promise<DecisionSignalStatusMutationResult> => {
@@ -61,24 +71,23 @@ export function useDecisionSignalStatusMutation({
     try {
       const item = await mutateAsync(input);
       if (!isMounted()) {
+        inFlightRef.current = false;
         return { kind: 'unmounted' };
       }
       return { kind: 'ok', item };
     } catch (err) {
+      inFlightRef.current = false;
       if (!isMounted()) {
         return { kind: 'unmounted' };
       }
+      setGuardBusy(false);
       return { kind: 'error', error: getParsedApiError(err) };
-    } finally {
-      inFlightRef.current = false;
-      if (isMounted()) {
-        setGuardBusy(false);
-      }
     }
   }, [isMounted, mutateAsync]);
 
   return {
     runStatusUpdate,
+    releaseStatusUpdate,
     isUpdating: guardBusy || mutation.isPending,
   };
 }
