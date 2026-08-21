@@ -318,7 +318,7 @@ manager 实例；常规应用运行期使用单例 manager。
 
 `DataFetcherManager` 的实时行情与筹码分布单源 attempt 另外共享一个**进程内**短 TTL
 （5 秒）与 in-flight coalesce 辅助层，key 为 `provider + 规范化代码 + as_of +
-capability`。同一 key 的并发请求只打一次真实 provider 调用。只缓存成功结果；失败、空结果、
+capability`（wait timeout 属于单个 caller，不是 key 的一部分）。同一 key 的并发请求只打一次真实 provider 调用。只缓存成功结果；失败、空结果、
 占位筹码、超时和 waiter 取消都不会当成成功写入，也不会绕过 fallback、熔断准入、校验或各
 fetcher 自己的限流。它不替代日线 L1/L2、AkShare/TickFlow/Longbridge 快照缓存，也不改变
 `REALTIME_CACHE_TTL`（该值仍是陈旧度标注，不是这次进程 TTL）。没有新增环境变量。

@@ -451,6 +451,63 @@ def test_waiter_timeout_does_not_poison_shared_work() -> None:
     assert cache.stats()["stores"] == 1
 
 
+def test_chip_wait_timeout_is_not_part_of_coalesce_key() -> None:
+    """Different wait_timeouts still share one chip load; isolation is per waiter.
+
+    Agent-layer category timeouts are not a cache-key axis. Putting timeout
+    identity in the key would split concurrent same-symbol chip pulls.
+    """
+    started = threading.Event()
+    release = threading.Event()
+    loader = _RecordingLoader(
+        result="chip-shared",
+        delay_event=started,
+        release_event=release,
+    )
+    cache = ProviderPullCoalesce(ttl_seconds=5.0)
+    owner_result: List[Any] = []
+    waiter_error: List[BaseException] = []
+    key_kwargs = {
+        "provider": "TushareFetcher",
+        "symbol": "600519",
+        "as_of": "2026-08-21T12:00:00Z",
+        "capability": CHIP_DISTRIBUTION_CAPABILITY,
+    }
+    assert len(cache.build_key(**key_kwargs)) == 4
+
+    def _owner() -> None:
+        owner_result.append(
+            cache.get_or_load(
+                **key_kwargs,
+                loader=loader,
+                wait_timeout=2.0,
+            )
+        )
+
+    owner = threading.Thread(target=_owner)
+    owner.start()
+    assert started.wait(timeout=2.0)
+
+    try:
+        cache.get_or_load(
+            **key_kwargs,
+            loader=loader,
+            wait_timeout=0.05,
+        )
+    except TimeoutError as exc:
+        waiter_error.append(exc)
+
+    release.set()
+    owner.join(timeout=5.0)
+
+    assert waiter_error and isinstance(waiter_error[0], TimeoutError)
+    assert owner_result == ["chip-shared"]
+    assert loader.calls == 1
+    assert cache.stats()["coalesced"] == 1
+    assert cache.stats()["loads"] == 1
+    assert cache.stats()["stores"] == 1
+
+
 @patch("src.config.get_config")
 def test_wired_realtime_path_coalesces_and_keeps_fallback(mock_get_config) -> None:
     mock_get_config.return_value = SimpleNamespace(

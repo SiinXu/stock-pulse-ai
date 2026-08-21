@@ -5,6 +5,7 @@
 Issue #1292: reuse the ActualsFetcher lock + shared-slot + TTL pattern without
 forking that class or wrapping daily L2 persistence, circuit breakers, or
 fallback order. Keys are ``(provider, normalized symbol, as_of, capability)``.
+Wait timeout is per-caller and is not part of the key.
 
 Manager paths currently wired: realtime quotes and chip-distribution pulls.
 
