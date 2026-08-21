@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import builtins
+import dis
 import logging
 import math
 import sys
@@ -119,6 +121,36 @@ def test_shortest_positive_timeout_ignores_zero_and_nonfinite():
 @pytest.mark.parametrize("raw", ["", None, "0", "0.0"])
 def test_optional_category_timeout_zero_or_unset(raw):
     assert parse_optional_category_tool_timeout(raw, field_name="AGENT_DATA_TOOL_TIMEOUT_S") == 0.0
+
+
+def _function_global_names(function) -> set[str]:
+    return {
+        instruction.argval
+        for instruction in dis.get_instructions(function.__code__)
+        if instruction.opname in {"LOAD_GLOBAL", "LOAD_NAME"}
+    }
+
+
+def test_category_timeout_parser_globals_are_clone_safe():
+    import src.config as config_module
+    from src.config_parts import parsers as parsers_module
+
+    owners = {
+        "parsers": parsers_module.parse_optional_category_tool_timeout,
+        "config": config_module.parse_optional_category_tool_timeout,
+        "load_from_env": config_module.Config._load_from_env.__func__.__globals__[
+            "parse_optional_category_tool_timeout"
+        ],
+    }
+    for owner, function in owners.items():
+        missing = [
+            name
+            for name in _function_global_names(function)
+            if name not in function.__globals__ and not hasattr(builtins, name)
+        ]
+        assert missing == [], (owner, missing)
+        assert function.__kwdefaults__["maximum"] == CATEGORY_TOOL_TIMEOUT_MAX_S, owner
+        assert "CATEGORY_TOOL_TIMEOUT_MAX_S" not in _function_global_names(function), owner
 
 
 @pytest.mark.parametrize("raw", ["abc", "nan", "inf", "-1", "-0.5"])
