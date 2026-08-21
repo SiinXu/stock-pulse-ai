@@ -235,11 +235,11 @@ def test_cli_list_includes_settings_help_and_existing_derived_files(capsys):
     assert listed == list(SUPPORTED_DISPLAY)
 
 
-def test_cli_refuses_empty_batch(capsys):
-    assert main([]) == 2
-    err = capsys.readouterr().err
-    assert "REFUSE" in err
-    assert "no conflict files were provided" in err
+def test_cli_clean_tree_is_noop(capsys):
+    assert main([]) == 0
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    assert "nothing to do" in captured.out
 
 
 def test_cli_refuses_unsupported_path(capsys):
@@ -265,6 +265,37 @@ def test_plan_resolutions_dispatches_settings_help(monkeypatch, tmp_path):
     assert "settings.ours" in text
     assert "settings.theirs" in text
     assert "<<<<<<<" not in text
+
+
+def test_cli_writes_nothing_when_any_file_is_refused(monkeypatch, capsys):
+    wrote: list[object] = []
+    monkeypatch.setattr(
+        "scripts.merge_resolvers.resolve.atomic_write_and_stage",
+        lambda *_args, **_kwargs: wrote.append(True),
+    )
+
+    good = _context(
+        _conflict(
+            _help_block("settings.ours", "Ours"),
+            _help_block("settings.theirs", "Theirs"),
+        )
+    )
+    bad = _context(_help_file([_help_block("settings.a", "A")]))
+    zh_path = Path("apps/dsa-web/src/locales/settingsHelp.zh.ts")
+
+    def load(_root, path):
+        return good if path == HELP_PATH else bad
+
+    monkeypatch.setattr(
+        "scripts.merge_resolvers.resolve.load_conflict_context",
+        load,
+    )
+
+    assert main([HELP_PATH.as_posix(), zh_path.as_posix()]) == 2
+    err = capsys.readouterr().err
+    assert "REFUSE" in err
+    assert "no conflict hunks" in err
+    assert wrote == []
 
 
 def test_plan_resolutions_refuses_empty_path_list(tmp_path):

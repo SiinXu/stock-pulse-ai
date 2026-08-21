@@ -1,0 +1,1 @@
+- [Added] Landed the derived-file merge resolver suite (Refs #167).
