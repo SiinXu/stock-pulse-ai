@@ -37,12 +37,12 @@ const WRONG_LANGUAGE_CHROME = [
 ] as const;
 
 describe('InitialUiLanguageGate', () => {
-  it('paints built-in English immediately when English is requested', () => {
-    const { shell, catalog } = beginInitialUiLanguage(
-      'en',
-      vi.fn(async () => undefined),
-      createMemoryStorage(),
-    );
+  it('does not paint English chrome until the English catalog settles', async () => {
+    let settle!: () => void;
+    const loadTranslations = vi.fn(() => new Promise<void>((resolve) => {
+      settle = resolve;
+    }));
+    const { shell, catalog } = beginInitialUiLanguage('en', loadTranslations, createMemoryStorage());
 
     const { container } = render(
       <InitialUiLanguageGate shell={shell} catalog={catalog}>
@@ -54,7 +54,13 @@ describe('InitialUiLanguageGate', () => {
       </InitialUiLanguageGate>,
     );
 
-    expect(screen.getByTestId('app-language')).toHaveTextContent('en:Today');
+    expect(container.querySelector('[data-locale-neutral-shell]')).not.toBeNull();
+    expect(screen.queryByTestId('app-language')).toBeNull();
+    expect(container.textContent ?? '').not.toContain(UI_TEXT.en['layout.nav.home']);
+    expect(container.textContent ?? '').not.toContain(UI_TEXT.zh['layout.nav.home']);
+
+    settle();
+    await waitFor(() => expect(screen.getByTestId('app-language')).toHaveTextContent('en:Today'));
     expect(container.querySelector('[data-locale-neutral-shell]')).toBeNull();
   });
 

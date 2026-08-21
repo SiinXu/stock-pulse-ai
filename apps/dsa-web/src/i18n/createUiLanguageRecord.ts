@@ -186,7 +186,25 @@ export function createUiLanguageRecord<const B extends BaseUiLanguageRecord>(
     }
     validateSourceValue(base.en, namespace);
   }
-  const record: Record<PropertyKey, unknown> = { ...base };
+  // Copy zh and extra own keys without evaluating a lazy `en` accessor. English
+  // UI_TEXT is loaded through loadUiLanguageTranslations so it can stay off the
+  // production entry chunk; spreading `base` would throw before that catalog
+  // settles.
+  const record: Record<PropertyKey, unknown> = { zh: base.zh };
+  Object.defineProperty(record, 'en', {
+    enumerable: true,
+    configurable: true,
+    get() {
+      return base.en;
+    },
+  });
+  for (const key of Reflect.ownKeys(base)) {
+    if (key === 'zh' || key === 'en') continue;
+    const descriptor = Object.getOwnPropertyDescriptor(base, key);
+    if (descriptor) {
+      Object.defineProperty(record, key, descriptor);
+    }
+  }
   const localizedCache = new Map<AdditionalUiLanguage, LocalizedValue<B>>();
 
   for (const language of ADDITIONAL_UI_LANGUAGES) {

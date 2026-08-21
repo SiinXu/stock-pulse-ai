@@ -13,9 +13,16 @@
     {
       "id": "js-entry",
       "match": "assets/index-*.js",
-      "maxGzipBytes": 186196,
-      "measuredGzipBytes": 177329,
-      "note": "Rebaselined after removing the components/common barrel from App.tsx (Refs #883). Local gzip-9 measurement 177329 B; cap = ceil(measured * 1.05)."
+      "maxGzipBytes": 155555,
+      "measuredGzipBytes": 148147,
+      "note": "Lowered after splitting English UI_TEXT out of the entry chunk via loadUiLanguageTranslations (Refs #883). Local gzip-9 measurement 148147 B; cap = ceil(measured * 1.05). Same-machine origin/main measurement before the split was 183283 B."
+    },
+    {
+      "id": "ui-text-en",
+      "match": "assets/uiTextEn-*.js",
+      "maxGzipBytes": 38383,
+      "measuredGzipBytes": 34893,
+      "note": "English UI_TEXT payload loaded through the existing loadUiLanguageTranslations path (Refs #883). Initial per-asset baseline: local gzip-9 measurement 34893 B; cap = ceil(measured * 1.10)."
     },
     {
       "id": "locale-ja",
@@ -212,9 +219,18 @@
       "match": [
         "assets/index-*.js"
       ],
-      "maxGzipBytes": 186196,
-      "measuredGzipBytes": 177019,
-      "note": "Same-pattern family for js-entry. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 177019 B on origin/main 86b0c094c; inherited cap, no extra family headroom."
+      "maxGzipBytes": 155555,
+      "measuredGzipBytes": 148147,
+      "note": "Same-pattern family for js-entry. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 148147 B after the English UI_TEXT split (Refs #883)."
+    },
+    {
+      "id": "ui-text-en-family",
+      "match": [
+        "assets/uiTextEn-*.js"
+      ],
+      "maxGzipBytes": 38383,
+      "measuredGzipBytes": 34893,
+      "note": "Same-pattern family for ui-text-en. Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
       "id": "locale-ja-family",
