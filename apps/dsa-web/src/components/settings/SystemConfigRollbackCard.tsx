@@ -6,6 +6,7 @@ import { RotateCcw } from 'lucide-react';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../../api/error';
 import { SystemConfigConflictError, systemConfigApi } from '../../api/systemConfig';
 import type { UpdateSystemConfigResponse } from '../../types/systemConfig';
+import { resolveBusyRecoveryDecision } from '../../utils/asyncTaskUx';
 import { ApiErrorAlert, Button, ConfirmDialog, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { SettingsAlert } from './SettingsAlert';
@@ -41,6 +42,8 @@ const SystemConfigRollbackCard: React.FC<SystemConfigRollbackCardProps> = ({
       setIsReloading(false);
     }
   };
+
+  const conflictRecovery = resolveBusyRecoveryDecision(error);
 
   const rollback = async () => {
     if (!configVersion || isRollingBack) {
@@ -103,8 +106,8 @@ const SystemConfigRollbackCard: React.FC<SystemConfigRollbackCardProps> = ({
       {error ? (
         <ApiErrorAlert
           error={error}
-          actionLabel={error.code === 'config_version_conflict' ? t('settings.rollbackReloadLatest') : undefined}
-          onAction={error.code === 'config_version_conflict' ? () => void reloadLatest() : undefined}
+          actionLabel={conflictRecovery.kind === 'reload' ? t('settings.rollbackReloadLatest') : undefined}
+          onAction={conflictRecovery.kind === 'reload' ? () => void reloadLatest() : undefined}
         />
       ) : null}
       {!error && success ? (

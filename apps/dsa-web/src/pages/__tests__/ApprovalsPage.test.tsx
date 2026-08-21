@@ -408,6 +408,8 @@ describe('ApprovalsPage', () => {
     expect(approvalsApi.getRule).toHaveBeenCalledTimes(1);
     expect(ruleSwitch).toHaveAttribute('aria-checked', 'true');
     await waitForApprovalsConfirmLockReleased();
+    expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save rule' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save rule' }));
     await waitFor(() => expect(approvalsApi.updateRule).toHaveBeenCalledWith(
@@ -417,6 +419,26 @@ describe('ApprovalsPage', () => {
       }),
     ));
     expect(await screen.findByText('Approval rule saved.')).toBeInTheDocument();
+  });
+
+  it('reloads after a rule-save 409 through the shared recovery contract', async () => {
+    vi.mocked(approvalsApi.updateRule).mockRejectedValueOnce({
+      isAxiosError: true,
+      message: 'Conflict',
+      response: {
+        status: 409,
+        data: { error: 'approval_version_conflict', message: 'Conflict' },
+      },
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Enable human approval' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save rule' }));
+
+    expect(await screen.findByText('Approval state changed; the page was refreshed.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save rule' })).toBeEnabled();
+    expect(approvalsApi.getRule).toHaveBeenCalledTimes(2);
+    expect(approvalsApi.list).toHaveBeenCalledTimes(2);
   });
 
   it('does not hide a rule-save error after successful background polling', async () => {

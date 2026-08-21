@@ -40,6 +40,7 @@ import {
   formatApprovalStatus,
   formatApprovalTarget,
 } from '../utils/approvalFormat';
+import { resolveBusyRecoveryDecision } from '../utils/asyncTaskUx';
 import { buildDecisionActionLabelMap } from '../utils/decisionAction';
 
 const RULE_MIN_SECONDS = 30;
@@ -275,7 +276,7 @@ const ApprovalsPage: React.FC = () => {
       setNotice(text.ruleSaved);
     } catch (cause) {
       const parsed = getParsedApiError(cause, language);
-      if (parsed.status === 409) {
+      if (resolveBusyRecoveryDecision(parsed).kind === 'reload') {
         await load(true);
         setNotice(text.conflictRefresh);
       } else {
@@ -309,7 +310,7 @@ const ApprovalsPage: React.FC = () => {
       closeDecisionConfirm();
     } catch (cause) {
       const parsed = getParsedApiError(cause, language);
-      if (parsed.status === 409) {
+      if (resolveBusyRecoveryDecision(parsed).kind === 'reload') {
         await pollProposals();
         if (!mountedRef.current) return;
         closeDecisionConfirm();

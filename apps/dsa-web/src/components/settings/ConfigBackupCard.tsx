@@ -8,6 +8,7 @@ import { systemConfigApi } from '../../api/systemConfig';
 import { useAuth } from '../../hooks';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { UpdateSystemConfigResponse } from '../../types/systemConfig';
+import { resolveBusyRecoveryDecision } from '../../utils/asyncTaskUx';
 import { ApiErrorAlert, Button, ConfirmDialog, FileInput, Surface } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
@@ -54,6 +55,7 @@ const ConfigBackupCard: React.FC<ConfigBackupCardProps> = ({
   const [showImportConfirm, setShowImportConfirm] = useState(false);
 
   const envBackupActionDisabled = disabled || isExportingEnv || isImportingEnv || !isEnvBackupAllowed;
+  const envBackupRecovery = resolveBusyRecoveryDecision(envBackupActionError);
 
   const downloadEnvBackup = async () => {
     setEnvBackupActionError(null);
@@ -179,8 +181,8 @@ const ConfigBackupCard: React.FC<ConfigBackupCardProps> = ({
           {envBackupActionError ? (
             <ApiErrorAlert
               error={envBackupActionError}
-              actionLabel={envBackupActionError.status === 409 ? t('settings.reload') : undefined}
-              onAction={envBackupActionError.status === 409 ? () => void load() : undefined}
+              actionLabel={envBackupRecovery.kind === 'reload' ? t('settings.reload') : undefined}
+              onAction={envBackupRecovery.kind === 'reload' ? () => void load() : undefined}
             />
           ) : null}
           {!envBackupActionError && envBackupActionSuccess ? (
