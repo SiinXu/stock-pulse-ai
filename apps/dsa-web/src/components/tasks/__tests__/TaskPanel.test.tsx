@@ -112,6 +112,42 @@ describe('TaskPanel', () => {
     expect(screen.getByRole('button', { name: '查看 长飞光纤 运行流' })).toBeInTheDocument();
   });
 
+  it('does not render a cancel control for a running analysis task', () => {
+    const onDismiss = vi.fn();
+    render(
+      <TaskPanel
+        tasks={[baseTask]}
+        onOpenRunFlow={vi.fn()}
+        onDismiss={onDismiss}
+      />,
+    );
+
+    expect(screen.getByLabelText('任务状态：分析中')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '查看 贵州茅台 运行流' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /取消|停止/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '关闭 贵州茅台 任务' })).not.toBeInTheDocument();
+    expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('does not treat cancel-requested status as a clickable cancel action', () => {
+    render(
+      <TaskPanel
+        tasks={[
+          {
+            ...baseTask,
+            status: 'cancel_requested',
+            message: '正在请求取消',
+          },
+        ]}
+        onDismiss={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByLabelText('任务状态：请求取消')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /取消|停止/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '关闭 贵州茅台 任务' })).not.toBeInTheDocument();
+  });
+
   it('opens the run-flow view from an active task icon button', () => {
     const onOpenRunFlow = vi.fn();
     render(

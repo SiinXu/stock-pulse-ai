@@ -1,0 +1,1 @@
+- [Fixed] Made the analysis cancel affordance honest (Refs #1058).
