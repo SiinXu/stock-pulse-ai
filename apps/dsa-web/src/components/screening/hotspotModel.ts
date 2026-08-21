@@ -24,6 +24,8 @@ import type { ScreeningText } from './screeningText';
 export const ALPHASIFT_HOTSPOT_NO_CACHE_HINT = 'No cached AlphaSift hotspot snapshot. Click refresh to fetch live hotspots.';
 export const ALPHASIFT_HOTSPOT_UNAVAILABLE_CODE = 'eastmoney_hotspot_unavailable';
 
+export type HotspotPanelKind = 'healthy' | 'empty' | 'degraded' | 'cached';
+
 export const formatHotspotEmptyMessage = (result: AlphaSiftHotspotsResponse, text: ScreeningText) => {
   const message = String(result.message || '').trim();
   const sourceErrors = result.sourceErrors || [];
@@ -39,6 +41,15 @@ export const formatHotspotEmptyMessage = (result: AlphaSiftHotspotsResponse, tex
   }
   return text.hotspotUnavailable;
 };
+
+export const getHotspotPanelKind = (
+  count: number,
+  error: string,
+  empty: string,
+  unavailable: string,
+): HotspotPanelKind => (
+  count > 0 ? (error ? 'cached' : 'healthy') : (!error || error === empty || error === unavailable ? 'empty' : 'degraded')
+);
 
 export const getRouteTimeLabel = (item: AlphaSiftHotspotDetail['route'][number], language: UiLanguage, text: ScreeningText) => {
   const rawTime = item.publishedAt || item.date || item.time || '';

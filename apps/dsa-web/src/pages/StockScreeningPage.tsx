@@ -15,7 +15,7 @@ import {
   getParsedApiError,
   toApiErrorMessage,
 } from '../api/error';
-import { AppPage, Button } from '../components/common';
+import { AppPage } from '../components/common';
 import { ScreeningConfigurationModal } from '../components/screening/ScreeningConfigurationModal';
 import { ScreeningHotspotsSection } from '../components/screening/ScreeningHotspotsSection';
 import ScreeningPageAlerts from '../components/screening/ScreeningPageAlerts';
@@ -612,9 +612,7 @@ const StockScreeningPage: React.FC = () => {
         onRefresh={() => void loadHotspots(true)}
         onSelectHotspot={handleHotspotSelect}
         onAnalyzeStock={handleAnalyzeHotspotStock}
-        dataSourcesAction={(hotspotError || hotspotDetailError || (hotspotDetail?.sourceErrors || []).length > 0 || (hotspotDetail?.missingFields || []).length > 0) ? (
-          <Button size="default" variant="secondary" aria-label={`${text.openDataSources} · ${text.hotspots}`} onClick={handleOpenDataSources}>{text.openDataSources}</Button>
-        ) : undefined}
+        onOpenDataSources={handleOpenDataSources}
       />
 
       <ScreeningStrategyBar
