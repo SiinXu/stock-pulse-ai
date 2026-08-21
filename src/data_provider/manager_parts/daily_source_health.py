@@ -161,29 +161,52 @@ class _DailySourceHealthMethods:
             return lock
 
     def _call_fetcher_method(self, fetcher: BaseFetcher, method_name: str, *args, **kwargs):
-        """Serialize shared fetcher state access through manager-owned per-instance locks."""
+        """Serialize shared fetcher state; realtime quotes coalesce before the lock."""
         validation_instrument_type = kwargs.pop("_validation_instrument_type", None)
         method = getattr(fetcher, method_name)
         result_validator = kwargs.pop("_manager_result_validator", None)
-        with self._get_fetcher_call_lock(fetcher):
-            if method_name == "get_realtime_quote":
-                result = method(*args, **kwargs)
-                if result is not None:
-                    from src.data_provider.data_validation import validate_and_annotate
+        if method_name == "get_realtime_quote":
+            from src.data_provider.pull_coalesce import (
+                REALTIME_QUOTE_CAPABILITY,
+                coalesce_provider_pull,
+                realtime_quote_is_success,
+            )
 
-                    stock_code = kwargs.get("stock_code") or (args[0] if args else "")
-                    validate_and_annotate(
-                        result,
-                        data_type="realtime_quote",
-                        market=_market_tag(normalize_stock_code(str(stock_code))),
-                        stock_code=str(stock_code),
-                        provider=fetcher.name,
-                        instrument_type=(
-                            validation_instrument_type
-                            or getattr(result, "instrument_type", None)
-                        ),
-                    )
-                return result
+            stock_code = kwargs.get("stock_code") or (args[0] if args else "")
+            source = kwargs.get("source")
+            provider_key = str(fetcher.name)
+            if source not in (None, ""):
+                provider_key = f"{fetcher.name}:{source}"
+
+            def _load_realtime_quote():
+                with self._get_fetcher_call_lock(fetcher):
+                    result = method(*args, **kwargs)
+                    if result is not None:
+                        from src.data_provider.data_validation import (
+                            validate_and_annotate,
+                        )
+
+                        validate_and_annotate(
+                            result,
+                            data_type="realtime_quote",
+                            market=_market_tag(normalize_stock_code(str(stock_code))),
+                            stock_code=str(stock_code),
+                            provider=fetcher.name,
+                            instrument_type=(
+                                validation_instrument_type
+                                or getattr(result, "instrument_type", None)
+                            ),
+                        )
+                    return result
+
+            return coalesce_provider_pull(
+                provider=provider_key,
+                symbol=str(stock_code),
+                capability=REALTIME_QUOTE_CAPABILITY,
+                loader=_load_realtime_quote,
+                is_success=realtime_quote_is_success,
+            )
+        with self._get_fetcher_call_lock(fetcher):
             if method_name != "get_daily_data":
                 if result_validator is not None:
                     raise ValueError(

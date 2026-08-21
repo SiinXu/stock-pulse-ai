@@ -57,6 +57,16 @@ def _disable_adaptive_provider_priority_by_default(monkeypatch):
     monkeypatch.setenv("PROVIDER_ADAPTIVE_PRIORITY_ENABLED", "false")
 
 
+@pytest.fixture(autouse=True)
+def _reset_provider_pull_coalesce():
+    """Keep the process-local realtime pull cache from coupling unrelated tests."""
+    from src.data_provider.pull_coalesce import reset_provider_pull_coalesce_for_tests
+
+    reset_provider_pull_coalesce_for_tests()
+    yield
+    reset_provider_pull_coalesce_for_tests()
+
+
 if _USE_THREADLESS_TEST_CLIENT:
     _original_call_soon_threadsafe = asyncio.BaseEventLoop.call_soon_threadsafe
 

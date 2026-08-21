@@ -1,0 +1,1 @@
+- [Added] Add a process-local short-TTL in-flight coalesce helper for provider pulls and wire it on realtime quote fetches (Refs #1292).

@@ -316,6 +316,13 @@ PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES=256
 `hits`、`misses`、`stale_hits`、`writes` 和 `invalidations`，不记录缓存内容。计数作用域为当前
 manager 实例；常规应用运行期使用单例 manager。
 
+`DataFetcherManager` 的实时行情单源 attempt 另外共享一个**进程内**短 TTL（5 秒）与
+in-flight coalesce 辅助层，key 为 `provider + 规范化代码 + as_of + capability`。同一 key
+的并发请求只打一次真实 provider 调用。只缓存成功行情；失败、空结果、超时和 waiter 取消
+都不会当成成功写入，也不会绕过 fallback、熔断准入、校验或各 fetcher 自己的限流。它不替代
+日线 L1/L2、AkShare/TickFlow/Longbridge 快照缓存，也不改变 `REALTIME_CACHE_TTL`（该值仍是
+陈旧度标注，不是这次进程 TTL）。没有新增环境变量。
+
 运维或测试代码可以显式查询和失效：
 
 ```python
