@@ -10,6 +10,7 @@
 - 非结构化散文不得变成假的可验证声明。
 - Provider / 真值取数失败记为 `data_unavailable`（可重试），永不伪造命中。
 - LLM 预算耗尽必须显式记录 `budget_skipped` / `terminate_reason=budget`，语义对齐 Critic 的 `record_critic_budget_skip`，禁止静默降级。
+- 若运行上下文带有 `ctx.meta["mode_budget_account"]`，反思 / 后验 LLM 调用会计入该 run 账户；跳过仍使用 `budget_skipped`，不得越过 `max_llm_turns`。这些调用走 `llm_complete`，不经过 `run_agent_loop`，因此不会重复计次。
 
 ## 入口
 

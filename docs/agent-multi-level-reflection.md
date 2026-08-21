@@ -9,6 +9,7 @@
 - **不得**在运行时改写 ToolSurface 拒绝/放行边界。
 - 不可解析散文 **不会**变成可核验假声明或新的 lesson kind。
 - 可选 LLM 均有预算；耗尽时显式 `budget_skipped`，禁止静默当成功。
+- 轨迹层 / 可选即时层 LLM 在运行带有 `ctx.meta["mode_budget_account"]` 时计入同一账户；它们不经过 `run_agent_loop`，因此只计一次。跨运行 meta-review 为离线任务，没有 run 账户。
 
 ## 三层结构
 

@@ -381,8 +381,11 @@ def _maybe_attach_end_of_run_reflection(
 
     Default-off via ``agent_reflection_enabled``. Fail-soft: a reflection
     provider/validation failure is explicit in metadata but never changes the
-    already-computed Agent result. Episode persistence remains owned by #1210's
-    single end-of-run finalizer so this hook cannot create duplicate episodes.
+    already-computed Agent result. When the executor or planning context holds
+    a ``mode_budget_account``, that same object is copied onto the reflection
+    ctx so the optional LLM call charges the run account. Episode persistence
+    remains owned by #1210's single end-of-run finalizer so this hook cannot
+    create duplicate episodes.
     """
     if getattr(config, "agent_reflection_enabled", False) is not True:
         return
@@ -451,6 +454,7 @@ def _maybe_attach_end_of_run_reflection(
     ctx.meta["trajectory_summary"] = _reflection_trajectory_summary(
         tool_calls_log
     )
+    _attach_mode_budget_account(ctx, executor=executor, context=context)
 
     try:
         multi = run_trajectory_layer(
@@ -485,6 +489,44 @@ def _maybe_attach_end_of_run_reflection(
         planning_metadata.setdefault(
             "replan_reason_kinds", list(multi.replan_reason_kinds)
         )
+
+def _attach_mode_budget_account(
+    ctx: Any,
+    *,
+    executor: Any,
+    context: Optional[Dict[str, Any]],
+) -> None:
+    """Copy the live run account onto the reflection ctx when one exists."""
+    account = None
+    if isinstance(context, dict):
+        account = context.get("mode_budget_account")
+        if account is None:
+            nested = context.get("meta")
+            if isinstance(nested, dict):
+                account = nested.get("mode_budget_account")
+    if account is None and executor is not None:
+        account = getattr(executor, "mode_budget_account", None)
+        if account is None:
+            account = getattr(executor, "_mode_budget_account", None)
+    if account is None:
+        return
+    meta = getattr(ctx, "meta", None)
+    if not isinstance(meta, dict):
+        return
+    meta["mode_budget_account"] = account
+    snapshot = getattr(account, "snapshot", None)
+    if callable(snapshot):
+        try:
+            meta["mode_budget"] = snapshot()
+        except Exception as exc:  # broad-exception: fallback_recorded - snapshot is diagnostic
+            log_safe_exception(
+                logger,
+                "End-of-run reflection could not snapshot mode budget",
+                exc,
+                error_code="agent_reflection_mode_budget_snapshot_failed",
+                level=logging.INFO,
+            )
+
 
 def _reflection_error_payload(reason: str) -> Dict[str, Any]:
     """Expose optional reflection failure without changing the run outcome."""

@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import inspect
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 from src.agent.evolution.budget import (
+    BUDGET_SKIPPED,
     MAX_REFLECTION_LLM_CALL_BUDGET,
     LlmCallBudget,
 )
@@ -34,6 +36,8 @@ from src.agent.evolution.step_critique import (
     map_replan_reason_kind,
     should_trigger_step_critique,
 )
+from src.agent.evolution.guards import snapshot_soul_identity
+from src.agent.runtime.mode_budget import ModeBudgetAccount, ModeBudgetLimits
 from src.agent.soul import AGENT_SOUL_HASH, AGENT_SOUL_VERSION
 
 
@@ -43,6 +47,40 @@ class _Ctx:
         self.opinions = []
         self.risk_flags = []
         self.stock_code = "AAPL"
+
+
+def _run_account(*, max_llm_turns: int, llm_turns: int = 0) -> ModeBudgetAccount:
+    return ModeBudgetAccount(
+        limits=ModeBudgetLimits(
+            mode="standard",
+            enabled=True,
+            max_llm_turns=max_llm_turns,
+            max_tool_calls=0,
+            max_cost_usd=0.0,
+            max_tokens=0,
+        ),
+        llm_turns=llm_turns,
+    )
+
+
+def _failed_quote_observations():
+    return [
+        {
+            "step_id": 1,
+            "status": "failed",
+            "tool_calls": [
+                {
+                    "tool_name": "get_realtime_quote",
+                    "ok": False,
+                    "error_code": "tool_failed",
+                }
+            ],
+        }
+    ]
+
+
+def _boom_llm(_system: str, _user: str) -> str:
+    raise AssertionError("LLM must not run when the run account forbids the call")
 
 
 def test_map_replan_reason_kind_uses_shared_taxonomy():
@@ -647,3 +685,159 @@ def test_meta_review_cli_force_is_not_always_true(tmp_path):
         stream.seek(mod.MAX_EPISODE_FILE_BYTES)
         stream.write(b"x")
     assert mod.main(["--episodes", str(oversized), "--force"]) == 2
+
+
+def test_step_critique_skips_llm_when_run_account_at_max_llm_turns() -> None:
+    account = _run_account(max_llm_turns=1, llm_turns=1)
+    ctx = _Ctx(run_id="run-step-cap", mode_budget_account=account)
+    soul_before = snapshot_soul_identity()
+
+    result = critique_step_observations(
+        _failed_quote_observations(),
+        config=SimpleNamespace(agent_step_critique_enabled=True),
+        ctx=ctx,
+        budget=LlmCallBudget(total=1),
+        llm_complete=_boom_llm,
+        force=True,
+    )
+
+    assert result.validation_status == BUDGET_SKIPPED
+    assert result.skip_reason
+    assert result.lessons  # deterministic floor remains
+    assert account.llm_turns == 1
+    assert snapshot_soul_identity() == soul_before
+    assert AGENT_SOUL_HASH == soul_before.content_hash
+
+
+def test_trajectory_layer_skips_when_run_account_already_breached() -> None:
+    account = _run_account(max_llm_turns=2, llm_turns=2)
+    breach = account.record_llm_turn()
+    assert breach is not None
+    assert breach.reason == "budget_turns"
+    turns_after_breach = account.llm_turns
+    ctx = _Ctx(
+        run_id="run-traj-breach",
+        episode_id="ep-traj-breach",
+        mode_budget_account=account,
+    )
+    soul_before = snapshot_soul_identity()
+
+    traj = run_trajectory_layer(
+        ctx,
+        config=SimpleNamespace(
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+        ),
+        llm_complete=_boom_llm,
+        budget=LlmCallBudget(total=1),
+    )
+
+    assert traj.trajectory is not None
+    assert traj.trajectory["status"] == "budget_skipped"
+    assert traj.trajectory["terminate_reason"] == "budget"
+    assert traj.trajectory["validation_status"] == BUDGET_SKIPPED
+    assert traj.trajectory["skip_reason"]
+    assert account.llm_turns == turns_after_breach
+    assert account.snapshot()["breach"]["reason"] == "budget_turns"
+    assert snapshot_soul_identity() == soul_before
+    assert AGENT_SOUL_HASH == soul_before.content_hash
+
+
+def test_end_of_run_reflection_attaches_context_mode_budget_account() -> None:
+    from src.agent.planning.product import _maybe_attach_end_of_run_reflection
+
+    account = _run_account(max_llm_turns=2, llm_turns=2)
+    soul_before = snapshot_soul_identity()
+    planning_metadata: dict = {}
+    executor = SimpleNamespace(
+        llm_adapter=SimpleNamespace(call_completion=_boom_llm),
+    )
+    _maybe_attach_end_of_run_reflection(
+        planning_metadata,
+        executor=executor,
+        config=SimpleNamespace(
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+            agent_planning_proposal_timeout_seconds=5.0,
+        ),
+        context={
+            "stock_code": "600519",
+            "run_id": "run-attach",
+            "episode_id": "ep-attach",
+            "mode_budget_account": account,
+        },
+        success=True,
+        tool_calls_log=[],
+    )
+    reflection = planning_metadata["reflection_result"]
+    assert reflection["status"] == "budget_skipped"
+    assert reflection["terminate_reason"] == "budget"
+    assert reflection["validation_status"] == BUDGET_SKIPPED
+    assert reflection["skip_reason"]
+    assert account.llm_turns == 2
+    assert snapshot_soul_identity() == soul_before
+    assert AGENT_SOUL_HASH == soul_before.content_hash
+
+
+def test_end_of_run_reflection_attaches_executor_mode_budget_account() -> None:
+    from src.agent.planning.product import _maybe_attach_end_of_run_reflection
+
+    account = _run_account(max_llm_turns=1, llm_turns=1)
+    planning_metadata: dict = {}
+    executor = SimpleNamespace(
+        mode_budget_account=account,
+        llm_adapter=SimpleNamespace(
+            call_completion=lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                AssertionError("LLM must not run when the run account is at cap")
+            )
+        ),
+    )
+    _maybe_attach_end_of_run_reflection(
+        planning_metadata,
+        executor=executor,
+        config=SimpleNamespace(
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+            agent_planning_proposal_timeout_seconds=5.0,
+        ),
+        context={"stock_code": "AAPL", "run_id": "run-exec-attach"},
+        success=True,
+        tool_calls_log=[],
+    )
+    reflection = planning_metadata["reflection_result"]
+    assert reflection["status"] == "budget_skipped"
+    assert reflection["skip_reason"]
+    assert account.llm_turns == 1
+
+
+def test_reflection_llm_paths_do_not_double_count_via_run_agent_loop() -> None:
+    from src.agent.evolution import postmortem, reflection, step_critique
+    from src.agent.planning import product as planning_product
+    from src.agent.runner_parts import loop as runner_loop
+
+    assert "run_agent_loop" not in inspect.getsource(reflection.run_reflection_loop)
+    assert "run_agent_loop" not in inspect.getsource(postmortem.reflect_resolved_forecast)
+    assert "run_agent_loop" not in inspect.getsource(step_critique.critique_step_observations)
+    assert "run_agent_loop" not in inspect.getsource(planning_product._reflection_llm_complete)
+    assert "call_completion" in inspect.getsource(planning_product._reflection_llm_complete)
+    loop_source = inspect.getsource(runner_loop.run_agent_loop)
+    assert "run_reflection_loop" not in loop_source
+    assert "reflect_resolved_forecast" not in loop_source
+    assert "critique_step_observations" not in loop_source
+
+    account = _run_account(max_llm_turns=5, llm_turns=1)
+    ctx = _Ctx(run_id="run-once", mode_budget_account=account)
+    result = run_reflection_loop(
+        ctx,
+        config=SimpleNamespace(agent_reflection_enabled=True),
+        llm_complete=lambda _system, _user: json.dumps(
+            {"lessons": [], "revised": False}
+        ),
+        budget=LlmCallBudget(total=1),
+    )
+    assert result.status == "completed"
+    assert account.llm_turns == 2
+    assert account.breach is None
