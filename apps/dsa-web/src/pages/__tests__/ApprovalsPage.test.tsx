@@ -404,12 +404,12 @@ describe('ApprovalsPage', () => {
     });
     expect(await screen.findByText('Approval state changed; the page was refreshed.')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Approve original signal' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Save rule' })).toBeEnabled();
     expect(approvalsApi.list).toHaveBeenCalledTimes(2);
     expect(approvalsApi.getRule).toHaveBeenCalledTimes(1);
     expect(ruleSwitch).toHaveAttribute('aria-checked', 'true');
     await waitForApprovalsConfirmLockReleased();
+    expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save rule' })).toBeEnabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save rule' }));
     await waitFor(() => expect(approvalsApi.updateRule).toHaveBeenCalledWith(
