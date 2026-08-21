@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
+  classifyThemeToken,
   THEME_CORE_CSS_VARS,
   THEME_LAYER0_CSS_VARS,
   THEME_LEGACY_PRICE_ALIASES,
@@ -258,6 +259,312 @@ function findDarkThemeDirectionOverrides(indexCss: string): Finding[] {
   return findings;
 }
 
+/**
+ * Frozen value-shape contract for every `index.css` custom property (issue #1300
+ * Phase 0 format freeze). Names were frozen in #1385; this ratchet freezes the
+ * *format* of each assignment without rewriting non-conforming values.
+ *
+ * Canonical shapes:
+ * - hsl-triplet: `H S% L%` (Layer 1 / Tailwind-interop channels)
+ * - hsl-function: `hsl(var(--token))` or `hsl(var(--token) / alpha)`
+ * - var-ref: `var(--token)`
+ * - length / shadow / gradient / hex: geometry, elevation, masks
+ *
+ * Raw `hsl(H S% L%)` stored in a variable is `hsl-literal` debt, not a
+ * canonical format. Do not convert those values here — shrink the ledger later.
+ */
+const TOKEN_FORMATS = [
+  'hsl-triplet',
+  'hsl-function',
+  'var-ref',
+  'length',
+  'shadow',
+  'gradient',
+  'hex',
+] as const;
+
+type TokenFormat = (typeof TOKEN_FORMATS)[number];
+type TokenValueShape = TokenFormat | 'hsl-literal' | 'unknown';
+
+type TokenAssignment = { token: string; value: string; line: number };
+
+type TokenFormatFinding = TokenAssignment & {
+  declared: TokenFormat;
+  observed: TokenValueShape;
+};
+
+type MeasuredFormatDebt = { token: string; shapes: TokenValueShape[] };
+
+type TokenFormatDebt = {
+  token: string;
+  allowedDebtShapes: readonly TokenValueShape[];
+  reason: string;
+  removeWhen: string;
+};
+
+type TokenFormatDiff = {
+  code: 'new-format-debt' | 'stale-format-debt' | 'shape-drift';
+  token: string;
+  detail: string;
+};
+
+const TOKEN_FORMAT_OVERRIDES = {
+  '--bg-subtle-raw': 'var-ref',
+  '--border-default': 'var-ref',
+  '--border-dim-raw': 'var-ref',
+  '--border-subtle-raw': 'var-ref',
+  '--chat-prose-border': 'var-ref',
+  '--chat-prose-border-strong': 'var-ref',
+  '--color-danger-alert-bg': 'hsl-triplet',
+  '--color-danger-alert-border': 'hsl-triplet',
+  '--color-danger-alert-text': 'hsl-triplet',
+  '--gradient-primary': 'gradient',
+  '--home-cool-surface': 'hsl-triplet',
+  '--home-cool-surface-strong': 'hsl-triplet',
+  '--home-hero-shadow': 'shadow',
+  '--home-history-item-selected-bg': 'gradient',
+  '--home-mobile-overlay-bg': 'var-ref',
+  '--home-panel-selected-shadow': 'shadow',
+  '--home-panel-shadow': 'shadow',
+  '--home-panel-shadow-hover': 'shadow',
+  '--home-rail-bg': 'gradient',
+  '--home-rail-shadow': 'shadow',
+  '--home-shadow-deep': 'hsl-triplet',
+  '--home-shadow-neutral': 'hsl-triplet',
+  '--input-surface-bg': 'var-ref',
+  '--input-surface-focus-ring': 'shadow',
+  '--mask-opaque': 'hex',
+  '--nav-indicator-width': 'length',
+  '--nav-item-height': 'length',
+  '--nav-item-padding-x': 'length',
+  '--neutral-black': 'hsl-triplet',
+  '--neutral-white': 'hsl-triplet',
+  '--overlay-sheet-footer-toast-offset': 'length',
+  '--portfolio-control-border': 'hsl-triplet',
+  '--radius-dot': 'length',
+} as const satisfies Record<string, TokenFormat>;
+
+function rawHslLiteralDebt(token: string, reason: string): TokenFormatDebt {
+  return {
+    token,
+    allowedDebtShapes: ['hsl-literal'],
+    reason,
+    removeWhen:
+      'Rewrite remaining raw hsl() literals to hsl(var(--token)) during T25/T40 format unification.',
+  };
+}
+
+const LIGHT_MODE_RAW_HSL_REASON =
+  'At least one assignment stores a raw hsl() literal instead of hsl(var(--token)).';
+const LOGIN_RAW_HSL_REASON =
+  'Login tokens store raw hsl() literals instead of hsl(var(--Layer-1)).';
+const REPORT_STRATEGY_RAW_HSL_REASON =
+  'Strategy hue is stored as a raw hsl() literal instead of hsl(var(--price-*)) or Layer 1.';
+
+/** Shrink-only. Never add an entry to absorb new format drift. */
+const TOKEN_FORMAT_DEBT: readonly TokenFormatDebt[] = [
+  rawHslLiteralDebt('--home-history-item-hover-bg', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--home-panel-subtle-bg', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--home-panel-subtle-bg-hover', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--home-surface-button-bg', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--home-surface-button-bg-hover', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--input-surface-border', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--input-surface-border-hover', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--login-bg-card', LOGIN_RAW_HSL_REASON),
+  rawHslLiteralDebt('--login-bg-main', LOGIN_RAW_HSL_REASON),
+  rawHslLiteralDebt('--login-border-card', LOGIN_RAW_HSL_REASON),
+  rawHslLiteralDebt('--login-text-muted', LOGIN_RAW_HSL_REASON),
+  rawHslLiteralDebt('--login-text-primary', LOGIN_RAW_HSL_REASON),
+  rawHslLiteralDebt('--login-text-secondary', LOGIN_RAW_HSL_REASON),
+  rawHslLiteralDebt('--nav-active-bg', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--nav-active-border', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--report-strategy-buy', REPORT_STRATEGY_RAW_HSL_REASON),
+  rawHslLiteralDebt('--report-strategy-stop', REPORT_STRATEGY_RAW_HSL_REASON),
+  rawHslLiteralDebt('--report-strategy-take', REPORT_STRATEGY_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-border', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-border-overlay', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-border-soft', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-border-strong', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-input-rest-border', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-secondary-bg', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-secondary-border', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-skeleton-soft', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-skeleton-strong', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-surface-hover', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-surface-overlay', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-surface-overlay-muted', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-surface-overlay-soft', LIGHT_MODE_RAW_HSL_REASON),
+  rawHslLiteralDebt('--settings-surface-panel', LIGHT_MODE_RAW_HSL_REASON),
+];
+
+const MAX_TOKEN_FORMAT_DEBT = 32;
+
+function collapseCssValue(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function isShadowValue(value: string): boolean {
+  if (/^(?:linear|radial|conic)-gradient\(/i.test(value)) return false;
+  if (/^(?:hsl|hsla|rgb|rgba|var)\(/i.test(value)) return false;
+  const hasLength = /-?[\d.]+(?:px|rem|em)\b/.test(value);
+  const hasColor = /\b(?:hsl|hsla|rgb|rgba|var)\(/i.test(value)
+    || /#[0-9a-fA-F]{3,8}\b/.test(value);
+  return hasLength && hasColor;
+}
+
+function observedTokenFormat(value: string): TokenValueShape {
+  const collapsed = collapseCssValue(value);
+  if (/^var\(--[a-zA-Z][\w-]*\)$/.test(collapsed)) return 'var-ref';
+  if (/^hsl\(\s*var\(--[a-zA-Z][\w-]*\)\s*(?:\/\s*[\d.]+\s*)?\)$/.test(collapsed)) {
+    return 'hsl-function';
+  }
+  if (/^hsl\(\s*-?[\d.]+(?:deg)?\s+[\d.]+%\s+[\d.]+%\s*(?:\/\s*[\d.]+\s*)?\)$/.test(collapsed)) {
+    return 'hsl-literal';
+  }
+  if (/^-?[\d.]+(?:deg)?\s+[\d.]+%\s+[\d.]+%$/.test(collapsed)) return 'hsl-triplet';
+  if (/^#(?:[0-9a-fA-F]{3,8})$/.test(collapsed)) return 'hex';
+  if (/^-?[\d.]+(?:px|rem|em|%)$/.test(collapsed)) return 'length';
+  if (/^(?:linear|radial|conic)-gradient\(/i.test(collapsed)) return 'gradient';
+  if (isShadowValue(collapsed)) return 'shadow';
+  return 'unknown';
+}
+
+function declaredTokenFormat(token: string): TokenFormat {
+  if (Object.prototype.hasOwnProperty.call(TOKEN_FORMAT_OVERRIDES, token)) {
+    return TOKEN_FORMAT_OVERRIDES[token as keyof typeof TOKEN_FORMAT_OVERRIDES];
+  }
+  const tokenClass = classifyThemeToken(token);
+  switch (tokenClass) {
+    case 'layer0':
+      if (token.endsWith('-hsl')) return 'hsl-triplet';
+      if (token === '--price-up' || token === '--price-down') return 'var-ref';
+      return 'hsl-function';
+    case 'layer1':
+      return token === '--radius' ? 'length' : 'hsl-triplet';
+    case 'layer1-derived':
+      return 'hsl-function';
+    case 'density':
+      return token.startsWith('--density-space-') ? 'length' : 'var-ref';
+    case 'elevation':
+      return token.startsWith('--shadow-elevation-') ? 'var-ref' : 'shadow';
+    case 'compat-alias':
+      return token === '--success' || token === '--warning' || token === '--danger'
+        ? 'var-ref'
+        : 'hsl-triplet';
+    case 'legacy-alias':
+      return 'var-ref';
+    case 'domain':
+    case 'page-scoped-debt':
+    case 'ungoverned':
+      return 'hsl-function';
+    default: {
+      const exhaustive: never = tokenClass;
+      return exhaustive;
+    }
+  }
+}
+
+function collectDefinedTokenAssignments(indexCss: string): TokenAssignment[] {
+  const source = maskComments(indexCss);
+  const assignments: TokenAssignment[] = [];
+  const pattern = /(--[a-zA-Z][\w-]*)\s*:\s*([^;]+);/g;
+  for (const match of source.matchAll(pattern)) {
+    assignments.push({
+      token: match[1] ?? '',
+      value: collapseCssValue(match[2] ?? ''),
+      line: lineOf(source, match.index ?? 0),
+    });
+  }
+  return assignments;
+}
+
+function uniqueDefinedTokenNames(assignments: readonly TokenAssignment[]): string[] {
+  return [...new Set(assignments.map((assignment) => assignment.token))].sort();
+}
+
+function measureTokenFormatDebt(
+  assignments: readonly TokenAssignment[],
+): MeasuredFormatDebt[] {
+  const byToken = new Map<string, TokenAssignment[]>();
+  for (const assignment of assignments) {
+    const list = byToken.get(assignment.token) ?? [];
+    list.push(assignment);
+    byToken.set(assignment.token, list);
+  }
+  const debt: MeasuredFormatDebt[] = [];
+  for (const token of [...byToken.keys()].sort()) {
+    const declared = declaredTokenFormat(token);
+    const shapes = [...new Set(
+      (byToken.get(token) ?? [])
+        .map((assignment) => observedTokenFormat(assignment.value))
+        .filter((shape) => shape !== declared),
+    )].sort();
+    if (shapes.length === 0) continue;
+    debt.push({ token, shapes });
+  }
+  return debt;
+}
+
+function diffTokenFormatDebt(
+  measured: readonly MeasuredFormatDebt[],
+  ledger: readonly TokenFormatDebt[],
+): TokenFormatDiff[] {
+  const diffs: TokenFormatDiff[] = [];
+  const measuredMap = new Map(measured.map((entry) => [entry.token, entry]));
+  const ledgerMap = new Map(ledger.map((entry) => [entry.token, entry]));
+  for (const entry of measured) {
+    const allowed = ledgerMap.get(entry.token);
+    if (!allowed) {
+      diffs.push({
+        code: 'new-format-debt',
+        token: entry.token,
+        detail: entry.shapes.join(','),
+      });
+      continue;
+    }
+    const allowedShapes = [...allowed.allowedDebtShapes].sort();
+    if (allowedShapes.join('\0') !== entry.shapes.join('\0')) {
+      diffs.push({
+        code: 'shape-drift',
+        token: entry.token,
+        detail: `measured=${entry.shapes.join(',')} allowed=${allowedShapes.join(',')}`,
+      });
+    }
+  }
+  for (const entry of ledger) {
+    if (measuredMap.has(entry.token)) continue;
+    diffs.push({
+      code: 'stale-format-debt',
+      token: entry.token,
+      detail: 'ledger entry no longer measured',
+    });
+  }
+  return diffs;
+}
+
+function collectTokenFormatAssignmentFindings(indexCss: string): TokenFormatFinding[] {
+  const ledgerShapes = new Map(
+    TOKEN_FORMAT_DEBT.map((entry) => [entry.token, new Set(entry.allowedDebtShapes)]),
+  );
+  const findings: TokenFormatFinding[] = [];
+  for (const assignment of collectDefinedTokenAssignments(indexCss)) {
+    const declared = declaredTokenFormat(assignment.token);
+    const observed = observedTokenFormat(assignment.value);
+    if (observed === declared) continue;
+    if (ledgerShapes.get(assignment.token)?.has(observed)) continue;
+    findings.push({ ...assignment, declared, observed });
+  }
+  return findings;
+}
+
+function formatTokenFormatFindings(findings: readonly TokenFormatFinding[]): string {
+  return findings
+    .map((finding) => (
+      `${finding.token}: declared ${finding.declared}, observed ${finding.observed} (${finding.value})`
+    ))
+    .join('\n');
+}
+
 describe('theme contract guard', () => {
   assertNonEmptyProductionInventory(productionTypeScriptSources, 'productionTypeScriptSources');
   assertNonEmptyProductionInventory(productionCssSources, 'productionCssSources');
@@ -417,5 +724,116 @@ export function changeColorToCss(color: ChangeColor): string {
     expect(findings.length).toBeLessThanOrEqual(MAX_PRICE_DIRECTION_BYPASS_DEBT);
     expect(findings.length).toBe(MAX_PRICE_DIRECTION_BYPASS_DEBT);
     expect(files).toEqual([...PRICE_DIRECTION_BYPASS_DEBT].sort());
+  });
+
+  describe('theme token format freeze', () => {
+    const assignments = collectDefinedTokenAssignments(indexCss);
+    const uniqueNames = uniqueDefinedTokenNames(assignments);
+    const measuredDebt = measureTokenFormatDebt(assignments);
+    const frozenCount = uniqueNames.length - measuredDebt.length;
+
+    it('declares a format for every defined custom property', () => {
+      expect(uniqueNames.length).toBeGreaterThan(200);
+      for (const token of uniqueNames) {
+        expect(TOKEN_FORMATS, token).toContain(declaredTokenFormat(token));
+      }
+      for (const token of Object.keys(TOKEN_FORMAT_OVERRIDES)) {
+        expect(uniqueNames, token).toContain(token);
+        const declared = declaredTokenFormat(token);
+        const shapes = [...new Set(
+          assignments
+            .filter((assignment) => assignment.token === token)
+            .map((assignment) => observedTokenFormat(assignment.value)),
+        )];
+        expect(shapes, token).toEqual([declared]);
+      }
+    });
+
+    it('keeps current index.css green against the seeded format ledger', () => {
+      const counts = {
+        unique: uniqueNames.length,
+        frozen: frozenCount,
+        allowlisted: measuredDebt.length,
+      };
+      expect(
+        counts,
+        `frozen=${counts.frozen} allowlisted=${counts.allowlisted} unique=${counts.unique}`,
+      ).toEqual({
+        unique: uniqueNames.length,
+        frozen: uniqueNames.length - MAX_TOKEN_FORMAT_DEBT,
+        allowlisted: MAX_TOKEN_FORMAT_DEBT,
+      });
+      expect(measuredDebt.length).toBeLessThanOrEqual(MAX_TOKEN_FORMAT_DEBT);
+      expect(measuredDebt.length).toBe(MAX_TOKEN_FORMAT_DEBT);
+      expect(TOKEN_FORMAT_DEBT.length).toBe(MAX_TOKEN_FORMAT_DEBT);
+      expect(TOKEN_FORMAT_DEBT.map((entry) => entry.token)).toEqual(
+        [...TOKEN_FORMAT_DEBT.map((entry) => entry.token)].sort(),
+      );
+      expect(diffTokenFormatDebt(measuredDebt, TOKEN_FORMAT_DEBT)).toEqual([]);
+      expect(collectTokenFormatAssignmentFindings(indexCss)).toEqual([]);
+      for (const entry of TOKEN_FORMAT_DEBT) {
+        expect(entry.reason.trim().length, entry.token).toBeGreaterThan(0);
+        expect(entry.removeWhen.trim().length, entry.token).toBeGreaterThan(0);
+        expect(entry.allowedDebtShapes.length, entry.token).toBeGreaterThan(0);
+        expect(entry.allowedDebtShapes).not.toContain(declaredTokenFormat(entry.token));
+      }
+    });
+
+    it('fails when a frozen token is assigned a wrong-shaped value', () => {
+      const findings = collectTokenFormatAssignmentFindings(`
+        :root {
+          --primary: #ff00aa;
+          --radius: hsl(var(--primary));
+        }
+      `);
+      const formatted = formatTokenFormatFindings(findings);
+      expect(formatted).toContain('--primary: declared hsl-triplet, observed hex (#ff00aa)');
+      expect(formatted).toContain('--radius: declared length, observed hsl-function (hsl(var(--primary)))');
+    });
+
+    it('rejects raising the format-debt ceiling without matching measured debt', () => {
+      const raisedCeiling = MAX_TOKEN_FORMAT_DEBT + 1;
+      expect(measuredDebt.length).toBeLessThan(raisedCeiling);
+      expect(measuredDebt.length).toBe(MAX_TOKEN_FORMAT_DEBT);
+      const staleLedger = [
+        ...TOKEN_FORMAT_DEBT,
+        rawHslLiteralDebt('--primary', 'synthetic extra ceiling slot'),
+      ];
+      expect(staleLedger.length).toBe(raisedCeiling);
+      const stale = diffTokenFormatDebt(measuredDebt, staleLedger);
+      expect(stale.some((item) => (
+        item.code === 'stale-format-debt' && item.token === '--primary'
+      ))).toBe(true);
+    });
+
+    it('rejects unlisted format drift and stale ledger entries', () => {
+      const hexBackground = collectDefinedTokenAssignments(`
+        ${indexCss}
+        :root { --background: #ffffff; }
+      `);
+      const hexDebt = measureTokenFormatDebt(hexBackground);
+      expect(hexDebt.some((entry) => (
+        entry.token === '--background' && entry.shapes.includes('hex')
+      ))).toBe(true);
+      expect(diffTokenFormatDebt(hexDebt, TOKEN_FORMAT_DEBT).some((diff) => (
+        diff.code === 'new-format-debt' && diff.token === '--background'
+      ))).toBe(true);
+
+      const convertedNav = assignments.filter((assignment) => (
+        assignment.token !== '--nav-active-bg'
+        || observedTokenFormat(assignment.value) === 'hsl-function'
+      ));
+      const stale = diffTokenFormatDebt(measureTokenFormatDebt(convertedNav), TOKEN_FORMAT_DEBT);
+      expect(stale.some((diff) => (
+        diff.code === 'stale-format-debt' && diff.token === '--nav-active-bg'
+      ))).toBe(true);
+
+      const hexNav = collectDefinedTokenAssignments(`
+        :root { --nav-active-bg: #00ffaa; }
+      `);
+      expect(diffTokenFormatDebt(measureTokenFormatDebt(hexNav), TOKEN_FORMAT_DEBT).some((diff) => (
+        diff.code === 'shape-drift' && diff.token === '--nav-active-bg'
+      ))).toBe(true);
+    });
   });
 });
