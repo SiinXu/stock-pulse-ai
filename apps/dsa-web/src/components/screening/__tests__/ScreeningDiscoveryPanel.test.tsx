@@ -3,7 +3,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { candidateDiscoveryApi } from '../../../api/candidateDiscovery';
+import {
+  candidateDiscoveryApi,
+  type CandidateDiscoveryResponse,
+} from '../../../api/candidateDiscovery';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { SOURCE_CANDIDATE_DISCOVERY_TEXT } from '../../../locales/candidateDiscoveryText';
 import { SCREENING_TEXT } from '../../../locales/screening';
@@ -55,7 +58,9 @@ function discoveryResult(count: number) {
   };
 }
 
-function emptyDiscoveryResult(overrides: Record<string, unknown> = {}) {
+function emptyDiscoveryResult(
+  overrides: Partial<CandidateDiscoveryResponse> = {},
+): CandidateDiscoveryResponse {
   return {
     packVersion: '1',
     runId: 'run-empty',
@@ -69,7 +74,7 @@ function emptyDiscoveryResult(overrides: Record<string, unknown> = {}) {
   };
 }
 
-async function renderCompletedDiscovery(result: Record<string, unknown>) {
+async function renderCompletedDiscovery(result: CandidateDiscoveryResponse) {
   vi.mocked(candidateDiscoveryApi.startTask).mockResolvedValue({
     taskId: 'task-empty',
     traceId: 'trace-empty',
