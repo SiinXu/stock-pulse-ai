@@ -64,6 +64,11 @@ export {
   useDecisionSignalDetailQueries,
 } from './useDecisionSignalDetailQueries';
 export type { DecisionSignalDetailQueryView } from './useDecisionSignalDetailQueries';
+export { useDecisionSignalStatusMutation } from './useDecisionSignalStatusMutation';
+export type {
+  DecisionSignalStatusMutationInput,
+  DecisionSignalStatusMutationResult,
+} from './useDecisionSignalStatusMutation';
 export {
   buildSkillOutcomesQueryKey,
   SKILL_OUTCOMES_QUERY_KEY_ROOT,

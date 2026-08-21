@@ -1,0 +1,1 @@
+- [Tests] Prove the Approvals confirm a11y/busy lock stays held through deferred 409 recovery until Save rule is reachable again.
