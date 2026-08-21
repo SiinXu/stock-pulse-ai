@@ -42,18 +42,34 @@ sys.modules.update(_build_optional_module_stubs())
 import src.core.market_review as market_review_module
 from src.config import Config
 from src.llm.generation_backend import GenerationError, GenerationErrorCode
+from src.notification import ChannelAttemptResult, NotificationDispatchResult
 from src.services.run_diagnostics import activate_run_diagnostic_context, reset_run_diagnostic_context
 from src.storage import AnalysisHistory, DatabaseManager
+
+_NOTIFIER_SPEC = (
+    "is_available",
+    "save_report_to_file",
+    "send_with_results",
+)
+
+
+def _successful_dispatch() -> NotificationDispatchResult:
+    return NotificationDispatchResult(
+        dispatched=True,
+        success=True,
+        status="sent",
+        channel_results=[ChannelAttemptResult(channel="report", success=True)],
+    )
 
 run_market_review = market_review_module.run_market_review
 
 
 class MarketReviewLocalizationTestCase(unittest.TestCase):
     def _make_notifier(self) -> MagicMock:
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=_NOTIFIER_SPEC)
         notifier.save_report_to_file.return_value = "/tmp/market_review.md"
         notifier.is_available.return_value = True
-        notifier.send.return_value = True
+        notifier.send_with_results.return_value = _successful_dispatch()
         return notifier
 
     def test_resolve_market_review_regions_returns_ordered_non_empty_list(self) -> None:
@@ -101,10 +117,10 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
         self.assertEqual(result, "## 2026-04-10 A-share Market Recap\n\nBody")
         saved_content = notifier.save_report_to_file.call_args.args[0]
         self.assertTrue(saved_content.startswith("# 🎯 Market Review\n\n"))
-        sent_content = notifier.send.call_args.args[0]
+        sent_content = notifier.send_with_results.call_args.args[0]
         self.assertTrue(sent_content.startswith("🎯 Market Review\n\n"))
-        self.assertTrue(notifier.send.call_args.kwargs["email_send_to_all"])
-        self.assertEqual(notifier.send.call_args.kwargs["route_type"], "report")
+        self.assertTrue(notifier.send_with_results.call_args.kwargs["email_send_to_all"])
+        self.assertEqual(notifier.send_with_results.call_args.kwargs["route_type"], "report")
         persist_history.assert_called_once()
         self.assertTrue(persist_history.call_args.kwargs["query_id"].startswith("market_review_"))
 
@@ -213,7 +229,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
         self.assertIn("### 板块主线", result)
         self.assertIn("| 1 | AI算力 | +3.25% |", result)
         self.assertIn("| 1 | 煤炭 | -1.12% |", result)
-        notifier.send.assert_not_called()
+        notifier.send_with_results.assert_not_called()
 
     def test_run_market_review_reraises_generation_backend_config_error(self) -> None:
         notifier = self._make_notifier()
@@ -247,7 +263,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
 
         self.assertIs(exc_info.exception, backend_error)
         notifier.save_report_to_file.assert_not_called()
-        notifier.send.assert_not_called()
+        notifier.send_with_results.assert_not_called()
 
     def test_run_market_review_merges_both_regions_with_english_wrappers(self) -> None:
         notifier = self._make_notifier()
@@ -310,7 +326,7 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
             set(persist_history.call_args.kwargs["market_light_snapshots"]),
             {"cn", "hk", "us", "jp", "kr"},
         )
-        sent_content = notifier.send.call_args.args[0]
+        sent_content = notifier.send_with_results.call_args.args[0]
         self.assertTrue(sent_content.startswith("🎯 Market Review\n\n"))
         self.assertIn("# US Market Recap\n\nUS body", sent_content)
         self.assertIn("# Japan Market Recap\n\nJP body", sent_content)
@@ -894,6 +910,80 @@ class MarketReviewLocalizationTestCase(unittest.TestCase):
                     notification_runs = context_snapshot["diagnostics"]["notification_runs"]
                     self.assertEqual(notification_runs[-1]["status"], "success")
                     self.assertTrue(notification_runs[-1]["success"])
+            finally:
+                reset_run_diagnostic_context(token)
+                DatabaseManager.reset_instance()
+                Config._instance = None
+                if old_db_path is None:
+                    os.environ.pop("DATABASE_PATH", None)
+                else:
+                    os.environ["DATABASE_PATH"] = old_db_path
+
+    def test_run_market_review_records_mixed_channel_dispatch_results(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            old_db_path = os.environ.get("DATABASE_PATH")
+            os.environ["DATABASE_PATH"] = os.path.join(
+                temp_dir, "market_review_mixed_notification.db"
+            )
+            Config._instance = None
+            DatabaseManager.reset_instance()
+            query_id = "market-task-mixed-notification"
+            notifier = self._make_notifier()
+            notifier.send_with_results.return_value = NotificationDispatchResult(
+                dispatched=True,
+                success=True,
+                status="partial_failed",
+                channel_results=[
+                    ChannelAttemptResult(
+                        channel="wechat",
+                        success=False,
+                        error_code="exception",
+                    ),
+                    ChannelAttemptResult(channel="custom", success=True),
+                ],
+            )
+            market_analyzer = MagicMock()
+            market_analyzer.run_daily_review_with_snapshot.return_value = SimpleNamespace(
+                report="## 今日大盘\n\n复盘正文",
+                market_light_snapshot={"region": "cn", "trade_date": "2026-03-06", "score": 60},
+            )
+            token = activate_run_diagnostic_context(
+                trace_id="trace-market-mixed",
+                task_id=query_id,
+                query_id=query_id,
+                stock_code=market_review_module.MARKET_REVIEW_HISTORY_CODE,
+                trigger_source="api",
+            )
+            try:
+                with patch.object(market_review_module, "MarketAnalyzer", return_value=market_analyzer):
+                    result = run_market_review(
+                        notifier,
+                        config=SimpleNamespace(report_language="zh", market_review_region="cn"),
+                        send_notification=True,
+                        query_id=query_id,
+                        trigger_source="api",
+                    )
+
+                self.assertEqual(result, "## 今日大盘\n\n复盘正文")
+                notifier.send_with_results.assert_called_once()
+                self.assertEqual(
+                    notifier.send_with_results.call_args.kwargs["route_type"],
+                    "report",
+                )
+                self.assertTrue(
+                    notifier.send_with_results.call_args.kwargs["email_send_to_all"]
+                )
+                db = DatabaseManager.get_instance()
+                with db.get_session() as session:
+                    row = session.query(AnalysisHistory).filter(
+                        AnalysisHistory.query_id == query_id
+                    ).first()
+                    self.assertIsNotNone(row)
+                    context_snapshot = json.loads(row.context_snapshot)
+                    notification_runs = context_snapshot["diagnostics"]["notification_runs"]
+                    by_channel = {run["channel"]: run for run in notification_runs}
+                    self.assertFalse(by_channel["wechat"]["success"])
+                    self.assertTrue(by_channel["custom"]["success"])
             finally:
                 reset_run_diagnostic_context(token)
                 DatabaseManager.reset_instance()

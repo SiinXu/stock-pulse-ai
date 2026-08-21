@@ -76,6 +76,7 @@ EXPECTED_PRIVATE_NAMES = (
     "_build_schedule_times_provider",
     "_can_reuse_market_context_for_review",
     "_compute_trading_day_filter",
+    "_dispatch_and_log_notification",
     "_enforce_webui_bind_security",
     "_env_bootstrapped",
     "_exports",

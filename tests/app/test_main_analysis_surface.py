@@ -31,6 +31,7 @@ MOVED_ANALYSIS_FUNCTIONS = (
     "_resolve_daily_market_context_target_date",
     "_market_review_report_text",
     "_save_reused_market_review_report",
+    "_dispatch_and_log_notification",
     "run_full_analysis",
 )
 

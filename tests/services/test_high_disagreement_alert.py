@@ -294,10 +294,46 @@ class EmitAlertTests(unittest.TestCase):
         self.assertIn("recordId=99", calls[0]["content"])
         self.assertIn("directional_opposition", calls[0]["content"])
 
+    def test_mixed_channel_results_stay_success_with_partial_signal(self) -> None:
+        from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+        class _Notifier:
+            def send_with_results(self, content: str, **kwargs: Any) -> Any:
+                return NotificationDispatchResult(
+                    dispatched=True,
+                    success=True,
+                    status="partial_failed",
+                    channel_results=[
+                        ChannelAttemptResult(
+                            channel="wechat",
+                            success=False,
+                            error_code="exception",
+                        ),
+                        ChannelAttemptResult(channel="custom", success=True),
+                    ],
+                )
+
+        config = SimpleNamespace(
+            high_disagreement_alerts_enabled=True,
+            high_disagreement_threshold=0.6,
+            report_language="en",
+        )
+        with self.assertLogs("src.services.high_disagreement_alert", level="WARNING") as captured:
+            ok = maybe_send_high_disagreement_alert(
+                self._result(_sample_record(score=0.8)),
+                history_id=99,
+                config=config,
+                notifier=_Notifier(),
+            )
+        self.assertTrue(ok)
+        self.assertTrue(
+            any("partial_failed" in line and "wechat" in line for line in captured.output)
+        )
+
     def test_real_composed_config_properties_are_consumed(self) -> None:
         from src.config import Config
 
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         notifier.send_with_results.return_value = SimpleNamespace(
             success=True,
             status="sent",
@@ -317,7 +353,7 @@ class EmitAlertTests(unittest.TestCase):
         notifier.send_with_results.assert_called_once()
 
     def test_skips_when_alerts_disabled(self) -> None:
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         config = SimpleNamespace(
             high_disagreement_alerts_enabled=False,
             high_disagreement_threshold=0.6,
@@ -333,7 +369,7 @@ class EmitAlertTests(unittest.TestCase):
         notifier.send.assert_not_called()
 
     def test_non_boolean_config_and_delivery_values_fail_closed(self) -> None:
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         config = SimpleNamespace(
             high_disagreement_alerts_enabled="true",
             high_disagreement_threshold=0.6,
@@ -359,7 +395,7 @@ class EmitAlertTests(unittest.TestCase):
         notifier.send_with_results.assert_not_called()
 
     def test_skips_when_no_disagreement_record(self) -> None:
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         config = SimpleNamespace(
             high_disagreement_alerts_enabled=True,
             high_disagreement_threshold=0.6,
@@ -374,7 +410,7 @@ class EmitAlertTests(unittest.TestCase):
         notifier.send_with_results.assert_not_called()
 
     def test_skips_when_injected_config_is_missing(self) -> None:
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         ok = maybe_send_high_disagreement_alert(
             self._result(_sample_record()),
             history_id=1,
@@ -403,7 +439,7 @@ class EmitAlertTests(unittest.TestCase):
         self.assertFalse(ok)
 
     def test_score_below_threshold_without_high_flag_skips(self) -> None:
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         config = SimpleNamespace(
             high_disagreement_alerts_enabled=True,
             high_disagreement_threshold=0.6,
@@ -419,7 +455,7 @@ class EmitAlertTests(unittest.TestCase):
 
     def test_score_below_threshold_with_high_flag_skips(self) -> None:
         """Counterexample from PR review: threshold must remain effective."""
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         config = SimpleNamespace(
             high_disagreement_alerts_enabled=True,
             high_disagreement_threshold=0.6,
@@ -435,7 +471,7 @@ class EmitAlertTests(unittest.TestCase):
 
     def test_skips_when_outbound_notifications_disabled(self) -> None:
         """Counterexample: --no-notify / send_notification=false must not push."""
-        notifier = MagicMock()
+        notifier = MagicMock(spec_set=["send_with_results", "send"])
         config = SimpleNamespace(
             high_disagreement_alerts_enabled=True,
             high_disagreement_threshold=0.6,

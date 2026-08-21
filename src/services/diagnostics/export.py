@@ -320,13 +320,27 @@ def _notification_component(diagnostics: Dict[str, Any]) -> RunDiagnosticCompone
     successes = [run for run in runs if run.get("success") is True]
     failures = [run for run in runs if run.get("success") is False and run not in skipped]
     channels = [run.get("channel") for run in runs if run.get("channel")]
+    results = []
+    for run in runs:
+        channel = str(run.get("channel") or "").strip()
+        if not channel:
+            continue
+        ok = run.get("success") is True
+        error = None
+        if not ok:
+            error = run.get("error_message_sanitized") or run.get("status") or "send_failed"
+        results.append({"channel": channel, "ok": ok, "error": error})
     if successes and failures:
         return _component(
             "notification",
             label,
             "degraded",
             "部分通知渠道失败，其余渠道已发送",
-            {"channels": channels, "failed": [run.get("channel") for run in failures]},
+            {
+                "channels": channels,
+                "failed": [run.get("channel") for run in failures],
+                "results": results,
+            },
         )
     if successes:
         return _component(
@@ -334,7 +348,7 @@ def _notification_component(diagnostics: Dict[str, Any]) -> RunDiagnosticCompone
             label,
             "ok",
             "通知发送成功",
-            {"channels": channels},
+            {"channels": channels, "results": results},
         )
     if skipped and not failures:
         status = "not_configured" if any(run.get("status") == "not_configured" for run in skipped) else "skipped"
@@ -343,7 +357,7 @@ def _notification_component(diagnostics: Dict[str, Any]) -> RunDiagnosticCompone
             label,
             status,
             "通知未配置或本次跳过",
-            {"channels": channels},
+            {"channels": channels, "results": results},
         )
     last_failure = failures[-1] if failures else runs[-1]
     return _component(
@@ -351,7 +365,7 @@ def _notification_component(diagnostics: Dict[str, Any]) -> RunDiagnosticCompone
         label,
         "failed",
         f"通知失败：{last_failure.get('error_message_sanitized') or last_failure.get('status') or '未知错误'}",
-        {"channels": channels},
+        {"channels": channels, "results": results},
     )
 
 

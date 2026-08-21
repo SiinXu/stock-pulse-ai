@@ -642,17 +642,25 @@ def maybe_send_failure_notification(
             from src.notification import NotificationService
 
             sender = NotificationService()
-        ok = bool(
-            sender.send(
-                content,
-                route_type="system_error",
-                severity="error",
-            )
+        from src.notification_parts.dispatch import (
+            dispatch_channel_summaries,
+            invoke_notifier_dispatch,
         )
+
+        dispatch = invoke_notifier_dispatch(
+            sender,
+            content,
+            route_type="system_error",
+            severity="error",
+        )
+        ok = bool(getattr(dispatch, "success", False))
+        status = str(getattr(dispatch, "status", "") or "")
         return {
             "attempted": True,
             "sent": ok,
             "reason": "sent" if ok else "dispatch_failed",
+            "status": status or ("sent" if ok else "all_failed"),
+            "channels": dispatch_channel_summaries(dispatch),
         }
     except Exception as exc:  # broad-exception: fallback_recorded - notify must never fail the run
         log_safe_exception(

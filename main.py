@@ -439,6 +439,12 @@ _save_reused_market_review_report = __cli_source.clone_facade_function(
     module_name=__name__,
     qualname="_save_reused_market_review_report",
 )
+_dispatch_and_log_notification = __cli_source.clone_facade_function(
+    __analysis_source._dispatch_and_log_notification,
+    globals(),
+    module_name=__name__,
+    qualname="_dispatch_and_log_notification",
+)
 run_full_analysis = __cli_source.clone_facade_function(
     __analysis_source.run_full_analysis,
     globals(),

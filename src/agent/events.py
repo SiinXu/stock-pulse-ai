@@ -615,9 +615,31 @@ def build_event_monitor_from_config(
         title = f"Event Alert | {triggered.rule.stock_code}"
         content = triggered.message or triggered.rule.description or "Alert triggered"
         alert_text = NotificationBuilder.build_simple_alert(title=title, content=content, alert_type="warning")
-        sent = notification_service.send(alert_text, route_type="alert")
-        if not sent:
-            logger.info("[EventMonitor] No notification channel available for alert: %s", title)
+        from src.notification_parts.dispatch import (
+            dispatch_channel_summaries,
+            invoke_notifier_dispatch,
+        )
+
+        dispatch = invoke_notifier_dispatch(
+            notification_service,
+            alert_text,
+            route_type="alert",
+        )
+        status = str(getattr(dispatch, "status", "") or "")
+        channels = dispatch_channel_summaries(dispatch)
+        if status == "partial_failed":
+            logger.warning(
+                "[EventMonitor] Alert dispatch partial_failed title=%s channels=%s",
+                title,
+                channels,
+            )
+        elif not bool(getattr(dispatch, "success", False)):
+            logger.info(
+                "[EventMonitor] No notification channel available for alert: %s status=%s channels=%s",
+                title,
+                status or "failed",
+                channels,
+            )
 
     monitor.on_trigger(_notify)
     logger.info("[EventMonitor] Loaded %d configured alert rule(s)", len(monitor.rules))

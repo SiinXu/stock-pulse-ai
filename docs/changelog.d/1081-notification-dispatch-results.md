@@ -1,0 +1,1 @@
+- [Changed] Surface structured per-channel notification dispatch results (`channel`/`ok`/`error`) to remaining API, diagnostics, market-review, and CLI/service callers so mixed channel failure stays distinct from analysis success (Refs #1081).

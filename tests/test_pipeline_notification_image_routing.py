@@ -1020,6 +1020,13 @@ class TestPipelineReportRouteFiltering(unittest.TestCase):
             "telegram",
             summary["components"]["notification"]["details"]["failed"],
         )
+        self.assertEqual(
+            summary["components"]["notification"]["details"]["results"],
+            [
+                {"channel": "wechat", "ok": True, "error": None},
+                {"channel": "telegram", "ok": False, "error": "send_failed"},
+            ],
+        )
 
 
 if __name__ == "__main__":

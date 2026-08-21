@@ -455,10 +455,17 @@ class EventResearchBriefService:
             )
             status = str(getattr(dispatch, "status", "all_failed") or "all_failed")
             success = bool(getattr(dispatch, "success", False))
+            from src.notification_parts.dispatch import dispatch_channel_summaries
+
+            channels = dispatch_channel_summaries(dispatch)
+            if status == "partial_failed" and success:
+                logger.warning(
+                    "event research brief notification partial_failed channels=%s",
+                    channels,
+                )
+                return "degraded", True
             if status == "sent" and success:
                 return "ok", True
-            if status == "partial_failed" and success:
-                return "degraded", True
             if status == "no_channel":
                 return "not_configured", False
             return "degraded", False
