@@ -3,12 +3,12 @@
 import { z } from 'zod';
 import apiClient from './index';
 import { getParsedApiError } from './error';
-import { toCamelCase } from './utils';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type {
   DemoAnalysisPayload,
   FirstRunReadiness,
   OnboardingApplyResult,
+  OnboardingFeaturePath,
   OnboardingPlan,
   OnboardingState,
   UserOnboardingProfile,
@@ -20,18 +20,26 @@ type OpenApiOnboardingState = components['schemas']['OnboardingStateResponse'];
 type OpenApiOnboardingPlan = components['schemas']['OnboardingPlanResponse'];
 type OpenApiOnboardingApply = components['schemas']['OnboardingApplyResponse'];
 type OpenApiOnboardingReset = components['schemas']['OnboardingResetResponse'];
+type OpenApiFirstRun = components['schemas']['FirstRunReadinessResponse'];
+type OpenApiDemo = components['schemas']['DemoAnalysisResponse'];
 type _AssertState = keyof OpenApiOnboardingState;
 type _AssertPlan = keyof OpenApiOnboardingPlan;
 type _AssertApply = keyof OpenApiOnboardingApply;
 type _AssertReset = keyof OpenApiOnboardingReset;
+type _AssertFirstRun = keyof OpenApiFirstRun;
+type _AssertDemo = keyof OpenApiDemo;
 const _stateAnchor: _AssertState = 'exists';
 const _planAnchor: _AssertPlan = 'week_plan';
 const _applyAnchor: _AssertApply = 'applied_keys';
 const _resetAnchor: _AssertReset = 'reset';
+const _firstRunAnchor: _AssertFirstRun = 'primary_path';
+const _demoAnchor: _AssertDemo = 'is_sample';
 void _stateAnchor;
 void _planAnchor;
 void _applyAnchor;
 void _resetAnchor;
+void _firstRunAnchor;
+void _demoAnchor;
 
 
 const reportLanguageSchema = z.enum(['zh', 'en', 'ko']);
@@ -114,6 +122,141 @@ const demoAnalysisSchema = z.object({
   }),
 });
 
+const finiteNumber = z.number().finite();
+const stringListSchema = z.array(z.string());
+const objectRecordSchema = z.record(z.string(), z.unknown());
+
+const onboardingFeaturePathSchema = z.object({
+  stage: z.string(),
+  label: z.string(),
+  primaryPath: stringListSchema.optional(),
+  emphasize: stringListSchema.optional(),
+  defer: stringListSchema.optional(),
+}).passthrough();
+
+const onboardingConfigItemSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+}).passthrough();
+
+const onboardingTodoItemSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  description: z.string(),
+  priority: finiteNumber.optional(),
+  href: z.string().nullable().optional(),
+  kind: z.string().optional(),
+}).passthrough();
+
+const onboardingPlanStepSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  detail: z.string(),
+}).passthrough();
+
+const onboardingWeekStepSchema = z.object({
+  day: z.string(),
+  title: z.string(),
+  detail: z.string(),
+}).passthrough();
+
+const onboardingPlanSchema = z.object({
+  schemaVersion: finiteNumber,
+  engine: z.string(),
+  llmNote: z.string(),
+  profile: objectRecordSchema,
+  featureStage: z.string(),
+  featurePath: onboardingFeaturePathSchema,
+  recommendedPresetId: z.string(),
+  recommendedPresetName: z.string(),
+  disclaimer: z.string(),
+  generatedAt: z.string(),
+  modelAvailable: z.boolean().optional(),
+  preferLlm: z.boolean().optional(),
+  beginnerModeRecommended: z.boolean().optional(),
+  configChanges: z.array(objectRecordSchema).optional(),
+  configItems: z.array(onboardingConfigItemSchema).optional(),
+  todos: z.array(onboardingTodoItemSchema).optional(),
+  todayPlan: z.array(onboardingPlanStepSchema).optional(),
+  weekPlan: z.array(onboardingWeekStepSchema).optional(),
+}).passthrough();
+
+const onboardingApplySchema = z.object({
+  success: z.boolean(),
+  configVersion: z.string(),
+  plan: onboardingPlanSchema,
+  profile: objectRecordSchema,
+  message: z.string(),
+  appliedKeys: stringListSchema.optional(),
+  appliedCount: finiteNumber.optional(),
+  update: objectRecordSchema.optional(),
+}).passthrough();
+
+const onboardingStateSchema = z.object({
+  exists: z.boolean(),
+  status: z.string().nullable().optional(),
+  profile: objectRecordSchema.nullable().optional(),
+  plan: onboardingPlanSchema.nullable().optional(),
+  appliedAt: z.string().nullable().optional(),
+  appliedKeys: stringListSchema.optional(),
+  configVersion: z.string().nullable().optional(),
+}).passthrough();
+
+const onboardingResetSchema = z.object({
+  success: z.boolean(),
+  reset: z.boolean(),
+  message: z.string(),
+}).passthrough();
+
+function defaultPlanCollections(plan: OnboardingPlan): OnboardingPlan {
+  if (!Array.isArray(plan.configChanges)) plan.configChanges = [];
+  if (!Array.isArray(plan.configItems)) plan.configItems = [];
+  if (!Array.isArray(plan.todos)) plan.todos = [];
+  if (!Array.isArray(plan.todayPlan)) plan.todayPlan = [];
+  if (!Array.isArray(plan.weekPlan)) plan.weekPlan = [];
+  const featurePath = plan.featurePath as OnboardingFeaturePath | undefined;
+  if (featurePath) {
+    if (!Array.isArray(featurePath.primaryPath)) featurePath.primaryPath = [];
+    if (!Array.isArray(featurePath.emphasize)) featurePath.emphasize = [];
+    if (!Array.isArray(featurePath.defer)) featurePath.defer = [];
+  }
+  return plan;
+}
+
+function parseOnboardingPlan(data: unknown): OnboardingPlan {
+  const parsed = parseCamelCasePayload<OnboardingPlan>(
+    data,
+    onboardingPlanSchema,
+    'OnboardingPlanResponse',
+    'onboarding',
+  );
+  return defaultPlanCollections(parsed);
+}
+
+function parseOnboardingApply(data: unknown): OnboardingApplyResult {
+  const parsed = parseCamelCasePayload<OnboardingApplyResult>(
+    data,
+    onboardingApplySchema,
+    'OnboardingApplyResponse',
+    'onboarding',
+  );
+  if (!Array.isArray(parsed.appliedKeys)) parsed.appliedKeys = [];
+  defaultPlanCollections(parsed.plan);
+  return parsed;
+}
+
+function parseOnboardingState(data: unknown): OnboardingState {
+  const parsed = parseCamelCasePayload<OnboardingState>(
+    data,
+    onboardingStateSchema,
+    'OnboardingStateResponse',
+    'onboarding',
+  );
+  if (!Array.isArray(parsed.appliedKeys)) parsed.appliedKeys = [];
+  if (parsed.plan) defaultPlanCollections(parsed.plan);
+  return parsed;
+}
+
 function toSnakeProfile(profile: UserOnboardingProfile): Record<string, unknown> {
   return {
     schema_version: profile.schemaVersion,
@@ -140,7 +283,7 @@ export const onboardingApi = {
         model_available: Boolean(input.modelAvailable),
         prefer_llm: Boolean(input.preferLlm),
       });
-      return toCamelCase<OnboardingPlan>(response.data);
+      return parseOnboardingPlan(response.data);
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -161,7 +304,7 @@ export const onboardingApi = {
         model_available: Boolean(input.modelAvailable),
         prefer_llm: Boolean(input.preferLlm),
       });
-      return toCamelCase<OnboardingApplyResult>(response.data);
+      return parseOnboardingApply(response.data);
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -170,7 +313,7 @@ export const onboardingApi = {
   async getState(): Promise<OnboardingState> {
     try {
       const response = await apiClient.get(`${BASE_PATH}/state`);
-      return toCamelCase<OnboardingState>(response.data);
+      return parseOnboardingState(response.data);
     } catch (error) {
       throw getParsedApiError(error);
     }
@@ -179,7 +322,12 @@ export const onboardingApi = {
   async resetState(): Promise<{ success: boolean; reset: boolean; message: string }> {
     try {
       const response = await apiClient.delete(`${BASE_PATH}/state`);
-      return toCamelCase(response.data);
+      return parseCamelCasePayload<{ success: boolean; reset: boolean; message: string }>(
+        response.data,
+        onboardingResetSchema,
+        'OnboardingResetResponse',
+        'onboarding',
+      );
     } catch (error) {
       throw getParsedApiError(error);
     }
