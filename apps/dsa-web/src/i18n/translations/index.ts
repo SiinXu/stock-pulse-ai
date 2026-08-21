@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { getLoadedEnglishUiText, loadEnglishUiTextPayload } from '../englishUiTextState';
 import { ADDITIONAL_UI_LANGUAGES, type UiLanguage } from '../uiLanguages';
 import type { UiTranslationKey } from './en';
 
@@ -79,7 +80,12 @@ function isAdditionalUiLanguage(language: UiLanguage): language is AdditionalUiL
 }
 
 export async function loadUiLanguageTranslations(language: UiLanguage): Promise<void> {
-  if (!isAdditionalUiLanguage(language) || loadedTranslations.has(language)) return;
+  if (language === 'zh') return;
+  // Extra locales project from the English UI_TEXT tree, so the same loader
+  // that resolves ja/de/… also fetches the English payload before the catalog
+  // is readable. zh stays synchronous in the entry chunk as the fallback.
+  await loadEnglishUiTextPayload();
+  if (language === 'en' || !isAdditionalUiLanguage(language) || loadedTranslations.has(language)) return;
   let pending = pendingTranslations.get(language);
   if (!pending) {
     pending = TRANSLATION_LOADERS[language]().then(({ translations }) => {
@@ -93,11 +99,16 @@ export async function loadUiLanguageTranslations(language: UiLanguage): Promise<
 }
 
 export async function loadAllUiLanguageTranslations(): Promise<void> {
-  await Promise.all(ADDITIONAL_UI_LANGUAGES.map(loadUiLanguageTranslations));
+  await Promise.all([
+    loadEnglishUiTextPayload(),
+    ...ADDITIONAL_UI_LANGUAGES.map(loadUiLanguageTranslations),
+  ]);
 }
 
 export function isUiLanguageTranslationsLoaded(language: UiLanguage): boolean {
-  return !isAdditionalUiLanguage(language) || loadedTranslations.has(language);
+  if (language === 'zh') return true;
+  if (!getLoadedEnglishUiText()) return false;
+  return language === 'en' || loadedTranslations.has(language);
 }
 
 export function getLoadedUiLanguageTranslations(language: AdditionalUiLanguage): UiTranslationBundle | null {

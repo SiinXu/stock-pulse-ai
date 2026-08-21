@@ -6,11 +6,14 @@ import type { UiLanguage } from './uiLanguages';
 
 type TranslationLoader = (language: UiLanguage) => Promise<void>;
 
-export type BuiltinUiLanguage = Extract<UiLanguage, 'zh' | 'en'>;
+// Only Simplified Chinese stays in the render-blocking entry chunk. English
+// uses the same loadUiLanguageTranslations path as extra locales so the unused
+// language payload is not downloaded on first paint.
+export type BuiltinUiLanguage = Extract<UiLanguage, 'zh'>;
 export type ExtraUiLanguage = Exclude<UiLanguage, BuiltinUiLanguage>;
 
 export function isBuiltinUiLanguage(language: UiLanguage): language is BuiltinUiLanguage {
-  return language === 'zh' || language === 'en';
+  return language === 'zh';
 }
 
 export type InitialUiLanguageShell =

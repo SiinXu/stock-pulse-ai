@@ -43,19 +43,39 @@ describe('prepareInitialUiLanguage', () => {
 });
 
 describe('beginInitialUiLanguage', () => {
-  it('is app-ready immediately for requested zh and en', () => {
+  it('is app-ready immediately only for requested zh', () => {
     const loadTranslations = vi.fn(() => new Promise<void>(() => undefined));
 
     expect(beginInitialUiLanguage('zh', loadTranslations, createMemoryStorage()).shell).toEqual({
       status: 'app-ready',
       language: 'zh',
     });
-    expect(beginInitialUiLanguage('en', loadTranslations, createMemoryStorage()).shell).toEqual({
-      status: 'app-ready',
-      language: 'en',
-    });
     expect(resolveInitialUiLanguageShell('zh')).toEqual({ status: 'app-ready', language: 'zh' });
-    expect(resolveInitialUiLanguageShell('en')).toEqual({ status: 'app-ready', language: 'en' });
+    expect(resolveInitialUiLanguageShell('en')).toEqual({ status: 'locale-neutral', requested: 'en' });
+  });
+
+  it('reports locale-neutral shell before a deferred en catalog settles', async () => {
+    let settle!: () => void;
+    const loadTranslations = vi.fn(() => new Promise<void>((resolve) => {
+      settle = resolve;
+    }));
+    const storageLike = createMemoryStorage([[UI_LANGUAGE_STORAGE_KEY, 'en']]);
+
+    const { shell, catalog } = beginInitialUiLanguage('en', loadTranslations, storageLike);
+    expect(shell).toEqual({ status: 'locale-neutral', requested: 'en' });
+    expect(loadTranslations).toHaveBeenCalledWith('en');
+
+    let catalogLanguage: string | undefined;
+    void catalog.then((language) => {
+      catalogLanguage = language;
+    });
+    await Promise.resolve();
+    expect(catalogLanguage).toBeUndefined();
+    expect(storageLike.getItem(UI_LANGUAGE_STORAGE_KEY)).toBe('en');
+
+    settle();
+    await expect(catalog).resolves.toBe('en');
+    expect(storageLike.getItem(UI_LANGUAGE_STORAGE_KEY)).toBe('en');
   });
 
   it('reports locale-neutral shell before a deferred de catalog settles', async () => {
@@ -103,6 +123,22 @@ describe('beginInitialUiLanguage', () => {
     settle();
     await expect(catalog).resolves.toBe('fr');
     expect(storageLike.getItem(UI_LANGUAGE_STORAGE_KEY)).toBeNull();
+  });
+
+  it('still persists zh honestly when a deferred en catalog fails', async () => {
+    let rejectLoad!: (reason?: unknown) => void;
+    const loadTranslations = vi.fn(() => new Promise<void>((_resolve, reject) => {
+      rejectLoad = reject;
+    }));
+    const storageLike = createMemoryStorage([[UI_LANGUAGE_STORAGE_KEY, 'en']]);
+
+    const { shell, catalog } = beginInitialUiLanguage('en', loadTranslations, storageLike);
+    expect(shell).toEqual({ status: 'locale-neutral', requested: 'en' });
+    expect(storageLike.getItem(UI_LANGUAGE_STORAGE_KEY)).toBe('en');
+
+    rejectLoad(new TypeError('Failed to fetch dynamically imported module'));
+    await expect(catalog).resolves.toBe('zh');
+    expect(storageLike.getItem(UI_LANGUAGE_STORAGE_KEY)).toBe('zh');
   });
 
   it('still persists zh honestly when a deferred fr catalog fails', async () => {
