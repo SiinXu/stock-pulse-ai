@@ -62,6 +62,15 @@ async function openDecisionConfirm(name: 'Approve original signal' | 'Reject and
   return screen.findByRole('dialog', { name });
 }
 
+async function waitForApprovalsConfirmLockReleased() {
+  await waitFor(() => {
+    const page = screen.getByTestId('approvals-page');
+    expect(page.closest('[inert]')).toBeNull();
+    expect(page.closest('[aria-hidden="true"]')).toBeNull();
+    expect(document.body.style.overflow).not.toBe('hidden');
+  });
+}
+
 const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   void target;
   return () => {};
@@ -351,6 +360,7 @@ describe('ApprovalsPage', () => {
     expect(approvalsApi.list).toHaveBeenCalledTimes(2);
     expect(approvalsApi.getRule).toHaveBeenCalledTimes(1);
     expect(ruleSwitch).toHaveAttribute('aria-checked', 'true');
+    await waitForApprovalsConfirmLockReleased();
 
     fireEvent.click(screen.getByRole('button', { name: 'Save rule' }));
     await waitFor(() => expect(approvalsApi.updateRule).toHaveBeenCalledWith(
