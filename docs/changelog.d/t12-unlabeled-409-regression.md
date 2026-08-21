@@ -1,2 +1,1 @@
 - [Tests] Assert unlabeled and unknown HTTP 409 recoveries stay fail-closed without silent reload (Refs #885).
-- [Docs] Record Approvals, Investment Framework, and Settings backup/rollback 409 adoption in the async-task UX map (Refs #885).
