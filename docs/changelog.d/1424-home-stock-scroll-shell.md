@@ -1,0 +1,1 @@
+- [Fixed] Apply an unlayered home-stock-scroll-shell so the mobile stock-bar stays out of the page scroll chain while desktop clipping and pinch-to-zoom remain unchanged (Refs #1424).

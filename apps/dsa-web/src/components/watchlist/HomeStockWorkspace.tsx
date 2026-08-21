@@ -390,13 +390,16 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
 
   // Both branches share one skeleton so the controls keep an identical position.
   const workspaceShell = (content: React.ReactNode) => (
-    <div className={`flex min-h-0 flex-1 flex-col gap-2 ${className}`}>
+    <div
+      className={`home-stock-scroll-shell flex min-h-0 flex-1 flex-col gap-2 ${className}`.trim()}
+      data-testid="home-stock-workspace"
+    >
       {renderTabs}
       <div
         role="region"
         id={panelId}
         aria-label={activeTabLabel}
-        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+        className="flex min-h-0 flex-1 flex-col"
       >
         {content}
       </div>
@@ -413,13 +416,13 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         onItemClick={onHistoryItemClick}
         onDeleteStock={onDeleteStock}
         isDeleting={isDeleting}
-        className="min-h-0 flex-1 overflow-hidden"
+        className="min-h-0 flex-1"
       />,
     );
   }
 
   return workspaceShell(
-    <Surface as="aside" level="interactive" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+    <Surface as="aside" level="interactive" className="home-stock-scroll-shell flex min-h-0 flex-1 flex-col">
       <div className="space-y-3 border-b border-subtle px-4 py-4">
         {activeTab === HOME_WORKSPACE_VALUES.watchlist ? (
           <>
@@ -533,7 +536,7 @@ export const HomeStockWorkspace: React.FC<HomeStockWorkspaceProps> = ({
         )}
       </div>
 
-      <ScrollArea viewportClassName="p-4" className="min-h-0 flex-1">
+      <ScrollArea viewportClassName="p-4" className="min-h-0 flex-1" testId="home-stock-workspace-scroll">
         {activeTab === HOME_WORKSPACE_VALUES.watchlist ? (
           watchlistLoading ? (
             <DashboardStateBlock loading compact title={t('watchlist.loading')} />

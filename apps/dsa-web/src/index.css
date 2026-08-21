@@ -1986,6 +1986,23 @@ a {
   touch-action: pan-x pan-y;
 }
 
+/*
+ * Home stock-bar / workspace shell (#1424).
+ * Unlayered so Tailwind overflow utilities cannot restore mobile clipping.
+ * Nested ScrollArea viewport remains the only pan surface.
+ */
+.home-stock-scroll-shell,
+[data-surface-level].home-stock-scroll-shell {
+  overflow: visible;
+}
+
+@media (min-width: 48rem) {
+  .home-stock-scroll-shell,
+  [data-surface-level].home-stock-scroll-shell {
+    overflow: hidden;
+  }
+}
+
 .shell-page-frame::before {
   content: "";
   position: absolute;

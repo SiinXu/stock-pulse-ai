@@ -308,4 +308,66 @@ describe('HomeStockWorkspace', () => {
     expect(screen.getByText('AI 64')).toBeInTheDocument();
     expect(screen.queryByText('AI 评分暂时不可用；刷新成功前不会显示评分或按评分排序。')).not.toBeInTheDocument();
   });
+
+  it.each<[HomeWorkspaceTab, string]>([
+    ['history', 'home-stock-bar-scroll'],
+    ['watchlist', 'home-stock-workspace-scroll'],
+    ['today', 'home-stock-workspace-scroll'],
+  ])(
+    'applies the home-stock-scroll-shell contract on the %s view',
+    (activeTab, viewportTestId) => {
+      render(
+        <HomeStockWorkspace
+          {...buildProps(activeTab)}
+          historyItems={activeTab === 'history' ? [{
+            id: 1,
+            stockCode: '600519',
+            stockName: '贵州茅台',
+            sentimentScore: 62,
+            operationAdvice: '观望',
+            analysisCount: 1,
+            lastAnalysisTime: '2026-07-15T08:00:00Z',
+          }] : []}
+          todayItems={activeTab === 'today' ? [{
+            id: 2,
+            stockCode: 'AAPL',
+            stockName: 'Apple',
+            sentimentScore: 70,
+            operationAdvice: '买入',
+            analysisCount: 1,
+            lastAnalysisTime: '2026-07-15T08:00:00Z',
+          }] : []}
+          watchlistRows={activeTab === 'watchlist' ? [{ code: '600519', analyzedToday: false }] : []}
+        />,
+      );
+
+      const workspace = screen.getByTestId('home-stock-workspace');
+      expect(workspace).toHaveClass('home-stock-scroll-shell');
+      expect(workspace).not.toHaveClass('overflow-hidden');
+
+      const panel = screen.getByRole('region');
+      expect(panel).not.toHaveClass('overflow-hidden');
+      expect(workspace.contains(panel)).toBe(true);
+
+      const viewport = screen.getByTestId(viewportTestId);
+      expect(viewport).toHaveClass('min-h-0', 'overflow-y-auto');
+      expect(viewport.parentElement).toHaveClass('overflow-hidden');
+      expect(viewport.className.split(/\s+/)).not.toContain('touch-pan-y');
+
+      if (activeTab === 'history') {
+        const stockBar = screen.getByTestId('home-stock-bar');
+        expect(stockBar.tagName).toBe('ASIDE');
+        expect(stockBar).toHaveClass('home-stock-scroll-shell');
+        expect(stockBar).not.toHaveClass('overflow-hidden');
+        expect(stockBar.contains(viewport)).toBe(true);
+        expect(screen.queryByTestId('home-stock-workspace-scroll')).not.toBeInTheDocument();
+      } else {
+        const surface = viewport.parentElement?.parentElement;
+        expect(surface?.tagName).toBe('ASIDE');
+        expect(surface).toHaveClass('home-stock-scroll-shell');
+        expect(surface).not.toHaveClass('overflow-hidden');
+        expect(screen.queryByTestId('home-stock-bar')).not.toBeInTheDocument();
+      }
+    },
+  );
 });
