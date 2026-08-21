@@ -1,0 +1,2 @@
+- [Added] Coalesce same-key chip-distribution provider pulls through the existing process-local short-TTL helper (Refs #1292).
+- [Tests] Keep provider-pull coalesce wait timeout waiter-local so different timeout callers still share one same-key load.

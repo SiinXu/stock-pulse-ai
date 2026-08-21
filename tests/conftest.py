@@ -59,7 +59,7 @@ def _disable_adaptive_provider_priority_by_default(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def _reset_provider_pull_coalesce():
-    """Keep the process-local realtime pull cache from coupling unrelated tests."""
+    """Keep the process-local provider pull cache from coupling unrelated tests."""
     from src.data_provider.pull_coalesce import reset_provider_pull_coalesce_for_tests
 
     reset_provider_pull_coalesce_for_tests()
