@@ -1,0 +1,1 @@
+- [Fixed] Distinguished empty and degraded screening states with an actionable next step (Refs #871).

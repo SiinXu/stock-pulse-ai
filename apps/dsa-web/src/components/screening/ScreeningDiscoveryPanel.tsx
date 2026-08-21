@@ -13,10 +13,15 @@ import { toApiErrorMessage } from '../../api/error';
 import { systemConfigApi } from '../../api/systemConfig';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatUiText } from '../../i18n/uiText';
+import { buildSettingsHref } from '../../routing/routes';
 import { buildDeepLink } from '../../utils/deepLink';
 import { formatSignedChangePercent } from '../../utils/marketFormat';
 import { Button, DataTable, Input, Select, Surface, Textarea, type DataTableColumn } from '../common';
 import { SignedChangeText } from '../theme/SignedChangeText';
+import {
+  createDiscoveryResultsEmptyState,
+  getDiscoveryResultsEmptyKind,
+} from './discoveryEmptyState';
 import type { DiscoveryScreeningText } from './screeningText';
 
 const POLL_MS = 1500;
@@ -164,6 +169,10 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
       }
     }
   };
+
+  const handleOpenDataSources = useCallback(() => {
+    navigate(buildSettingsHref({ section: 'data_sources', view: 'providers' }));
+  }, [navigate]);
 
   const handleAnalyze = (candidate: DiscoveryCandidate) => {
     try {
@@ -356,23 +365,23 @@ const ScreeningDiscoveryPanel: React.FC<ScreeningDiscoveryPanelProps> = ({ text 
               ))}
             </ul>
           ) : null}
-          {candidates.length === 0 ? (
-            <p className="text-sm text-secondary-text">
-              {result.emptyMessage || text.discoveryNoHits}
-            </p>
-          ) : (
-            <DataTable
-              caption={text.discoveryTitle}
-              columns={candidateColumns}
-              rows={candidates}
-              getRowKey={(item) => `${item.rank}-${item.code}`}
-              emptyState={{ title: text.discoveryNoHits }}
-              density="compact"
-              frame="embedded"
-              minWidth="wide"
-              virtualization={false}
-            />
-          )}
+          <DataTable
+            caption={text.discoveryTitle}
+            columns={candidateColumns}
+            rows={candidates}
+            getRowKey={(item) => `${item.rank}-${item.code}`}
+            emptyState={createDiscoveryResultsEmptyState({
+              text,
+              kind: getDiscoveryResultsEmptyKind(result),
+              loading,
+              onOpenDataSources: handleOpenDataSources,
+              onRetry: () => { void handleRun(); },
+            })}
+            density="compact"
+            frame="embedded"
+            minWidth="wide"
+            virtualization={false}
+          />
           <p className="text-xs text-secondary-text">{result.researchDisclaimer || text.discoveryDisclaimer}</p>
         </div>
       ) : null}
