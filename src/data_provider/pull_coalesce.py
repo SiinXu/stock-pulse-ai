@@ -6,6 +6,8 @@ Issue #1292: reuse the ActualsFetcher lock + shared-slot + TTL pattern without
 forking that class or wrapping daily L2 persistence, circuit breakers, or
 fallback order. Keys are ``(provider, normalized symbol, as_of, capability)``.
 
+Manager paths currently wired: realtime quotes and chip-distribution pulls.
+
 Only successful results are stored. Failures, empty results, cancellations, and
 timeouts never become a cached success. A waiter that times out or is abandoned
 does not cancel shared in-flight work.
@@ -25,6 +27,7 @@ from src.data_provider.symbol_normalization import normalize_stock_code
 DEFAULT_TTL_SECONDS = 5.0
 DEFAULT_MAX_ENTRIES = 512
 REALTIME_QUOTE_CAPABILITY = "realtime_quote"
+CHIP_DISTRIBUTION_CAPABILITY = "chip_distribution"
 
 CacheKey = Tuple[str, str, str, str]
 Loader = Callable[[], Any]

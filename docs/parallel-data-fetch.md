@@ -31,9 +31,10 @@ relative to the fetch stage.
 Hard rule: parallelism **must not** open a side-channel around provider
 governance. Every branch still uses the manager (fallback chain, process
 cache, circuit breaker, validation, and each fetcher’s own rate limiter).
-Realtime quote attempts additionally share the process-local short-TTL
-in-flight helper in `src/data_provider/pull_coalesce.py`; that helper does
-not change fallback order or skip an open circuit.
+Realtime quote and chip-distribution attempts additionally share the
+process-local short-TTL in-flight helper in
+`src/data_provider/pull_coalesce.py`; that helper does not change fallback
+order or skip an open circuit.
 
 ## Deterministic merge order
 

@@ -1,0 +1,1 @@
+- [Added] Coalesce same-key chip-distribution provider pulls through the existing process-local short-TTL helper (Refs #1292).

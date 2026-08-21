@@ -161,7 +161,7 @@ class _DailySourceHealthMethods:
             return lock
 
     def _call_fetcher_method(self, fetcher: BaseFetcher, method_name: str, *args, **kwargs):
-        """Serialize shared fetcher state; realtime quotes coalesce before the lock."""
+        """Serialize shared fetcher state; realtime quote and chip-distribution pulls coalesce."""
         validation_instrument_type = kwargs.pop("_validation_instrument_type", None)
         method = getattr(fetcher, method_name)
         result_validator = kwargs.pop("_manager_result_validator", None)
@@ -205,6 +205,26 @@ class _DailySourceHealthMethods:
                 capability=REALTIME_QUOTE_CAPABILITY,
                 loader=_load_realtime_quote,
                 is_success=realtime_quote_is_success,
+            )
+        if method_name == "get_chip_distribution":
+            from src.data_provider.chip_helpers import _is_meaningful_chip_distribution
+            from src.data_provider.pull_coalesce import (
+                CHIP_DISTRIBUTION_CAPABILITY,
+                coalesce_provider_pull,
+            )
+
+            stock_code = kwargs.get("stock_code") or (args[0] if args else "")
+
+            def _load_chip_distribution():
+                with self._get_fetcher_call_lock(fetcher):
+                    return method(*args, **kwargs)
+
+            return coalesce_provider_pull(
+                provider=str(fetcher.name),
+                symbol=str(stock_code),
+                capability=CHIP_DISTRIBUTION_CAPABILITY,
+                loader=_load_chip_distribution,
+                is_success=_is_meaningful_chip_distribution,
             )
         with self._get_fetcher_call_lock(fetcher):
             if method_name != "get_daily_data":
