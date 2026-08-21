@@ -1,0 +1,1 @@
+- [Fixed] Fail-closed report-version-compare API payloads so malformed nested compare JSON cannot pass as camelCase success (Refs #721).
