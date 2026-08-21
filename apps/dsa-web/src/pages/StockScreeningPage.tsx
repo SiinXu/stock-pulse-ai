@@ -24,7 +24,7 @@ import { useRouteFocusTarget } from '../components/routing';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
-import { formatHotspotEmptyMessage } from '../components/screening/hotspotModel';
+import { formatHotspotEmptyMessage, isLastGoodHotspotResponse } from '../components/screening/hotspotModel';
 import { getScreeningDegradationReasons } from '../components/screening/screeningDegradation';
 import createScreeningResultsEmptyState from '../components/screening/screeningResultsEmptyState';
 import {
@@ -276,7 +276,7 @@ const StockScreeningPage: React.FC = () => {
         setHotspotDetail(null);
       }
       setHotspotDetailError('');
-      if (nextHotspots.length === 0) {
+      if (nextHotspots.length === 0 || isLastGoodHotspotResponse(result)) {
         setHotspotError(formatHotspotEmptyMessage(result, text));
       }
     } catch (err) {

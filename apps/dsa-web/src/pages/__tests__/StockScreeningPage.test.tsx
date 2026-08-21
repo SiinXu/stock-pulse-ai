@@ -588,6 +588,49 @@ describe('StockScreeningPage', () => {
     expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
   });
 
+  it('labels a 200 last-good hotspot payload as cached, keeps the cards, and keeps Retry plus Data Sources', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getHotspots.mockResolvedValueOnce({
+      enabled: true,
+      provider: 'akshare',
+      providerUsed: 'akshare',
+      cacheUsed: true,
+      fallbackUsed: true,
+      cachedAt: '2026-06-07T12:00:00Z',
+      hotspots: [{ topic: 'MLCC', name: 'MLCC', heatScore: 91, stage: 'warming' }],
+      hotspotCount: 1,
+      sourceErrors: ['alphasift_hotspot_source_error'],
+    });
+
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    const section = hotspotSection as HTMLElement;
+    const alert = within(section).getByRole('status');
+    expect(within(alert).getByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(within(alert).queryByText('无法获取行情快照')).not.toBeInTheDocument();
+    expect(screen.queryByText('alphasift_hotspot_source_error')).not.toBeInTheDocument();
+    fireEvent.click(within(section).getByRole('button', { name: /展开热点题材/ }));
+    expect(within(section).getByText('MLCC')).toBeInTheDocument();
+    const retry = within(section).getByRole('button', { name: /刷新热点题材/ });
+    const dataSources = within(section).getByRole('button', { name: '打开数据源设置 · 热点题材' });
+    expect(retry).toHaveAttribute('data-control', 'button');
+    expect(dataSources).toHaveAttribute('data-control', 'button');
+    fireEvent.click(dataSources);
+    expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
+  });
+
   it('prefers merged hotspot route summaries over raw timeline items', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({
       enabled: true,

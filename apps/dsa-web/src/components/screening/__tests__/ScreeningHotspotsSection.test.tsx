@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AlphaSiftHotspot, AlphaSiftHotspotDetail } from '../../../api/alphasift';
 import { SCREENING_TEXT } from '../../../locales/screening';
 import { ScreeningHotspotsSection, type ScreeningHotspotsSectionProps } from '../ScreeningHotspotsSection';
-import { getHotspotPanelKind } from '../hotspotModel';
+import { getHotspotPanelKind, isLastGoodHotspotResponse } from '../hotspotModel';
 
 const text = SCREENING_TEXT.en;
 const dataSourcesName = `${text.openDataSources} · ${text.hotspots}`;
@@ -85,6 +85,27 @@ describe('getHotspotPanelKind', () => {
     expect(getHotspotPanelKind(0, text.hotspotLoadFailed, empty, unavailable)).toBe('degraded');
     expect(getHotspotPanelKind(1, text.hotspotLoadFailed, empty, unavailable)).toBe('cached');
     expect(getHotspotPanelKind(1, '', empty, unavailable)).toBe('healthy');
+  });
+
+  it('treats a 200 payload with cacheUsed/fallbackUsed and sourceErrors as last-good, not a healthy cache read', () => {
+    expect(isLastGoodHotspotResponse({
+      enabled: true,
+      provider: 'akshare',
+      hotspotCount: 1,
+      hotspots: [hotspot],
+      cacheUsed: true,
+      fallbackUsed: true,
+      sourceErrors: ['alphasift_hotspot_source_error'],
+    })).toBe(true);
+    expect(isLastGoodHotspotResponse({
+      enabled: true,
+      provider: 'akshare',
+      hotspotCount: 1,
+      hotspots: [hotspot],
+      cacheUsed: true,
+      fallbackUsed: false,
+      sourceErrors: [],
+    })).toBe(false);
   });
 });
 
