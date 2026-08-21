@@ -1,0 +1,1 @@
+- [Fixed] Added dark counterparts for light-only surface tokens (Refs #1300).

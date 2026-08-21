@@ -399,6 +399,59 @@ const TOKEN_FORMAT_DEBT: readonly TokenFormatDebt[] = [
 
 const MAX_TOKEN_FORMAT_DEBT = 32;
 
+/**
+ * Tokens that are allowed to exist only on `:root` because they are not
+ * theme-mode paint: density/geometry, absolute mix inks, and price-direction
+ * aliases owned by `[data-price-direction]` (must not be reassigned in `.dark`).
+ * Shrink-only. Do not add a color/surface token here to dodge pairing.
+ */
+const THEME_INDEPENDENT_LIGHT_ONLY_TOKENS = [
+  '--mask-opaque',
+  '--neutral-black',
+  '--neutral-white',
+  '--overlay-sheet-footer-toast-offset',
+  '--price-down',
+  '--price-up',
+  '--radius',
+  '--radius-dot',
+] as const;
+
+/** Remaining `:root` color/surface tokens with no `.dark` assignment. Shrink only. */
+const MAX_LIGHT_ONLY_SURFACE_TOKENS = 0;
+
+function extractThemeBlock(source: string, selector: string): string {
+  const pattern = new RegExp(`^${selector}\\s*\\{([\\s\\S]*?)^\\}`, 'm');
+  const match = source.match(pattern);
+  return match?.[1] ?? '';
+}
+
+function tokenNamesInBlock(body: string): Set<string> {
+  const names = new Set<string>();
+  const pattern = /(--[a-zA-Z][\w-]*)\s*:\s*([^;]+);/g;
+  for (const match of body.matchAll(pattern)) {
+    const token = match[1] ?? '';
+    if (token) names.add(token);
+  }
+  return names;
+}
+
+function isThemeIndependentLightOnlyToken(token: string): boolean {
+  if (token.startsWith('--density-')) return true;
+  return (THEME_INDEPENDENT_LIGHT_ONLY_TOKENS as readonly string[]).includes(token);
+}
+
+function collectLightOnlyRootTokens(indexCss: string): string[] {
+  const source = maskComments(indexCss);
+  const rootTokens = tokenNamesInBlock(extractThemeBlock(source, ':root'));
+  const darkTokens = tokenNamesInBlock(extractThemeBlock(source, '\\.dark'));
+  return [...rootTokens].filter((token) => !darkTokens.has(token)).sort();
+}
+
+function collectLightOnlySurfaceTokens(indexCss: string): string[] {
+  return collectLightOnlyRootTokens(indexCss)
+    .filter((token) => !isThemeIndependentLightOnlyToken(token));
+}
+
 function collapseCssValue(value: string): string {
   return value.replace(/\s+/g, ' ').trim();
 }
@@ -834,6 +887,58 @@ export function changeColorToCss(color: ChangeColor): string {
       expect(diffTokenFormatDebt(measureTokenFormatDebt(hexNav), TOKEN_FORMAT_DEBT).some((diff) => (
         diff.code === 'shape-drift' && diff.token === '--nav-active-bg'
       ))).toBe(true);
+    });
+  });
+
+  describe('light/dark surface pairing', () => {
+    const lightOnlyRoot = collectLightOnlyRootTokens(indexCss);
+    const lightOnlySurface = collectLightOnlySurfaceTokens(indexCss);
+    const independentLightOnly = lightOnlyRoot.filter(isThemeIndependentLightOnlyToken);
+
+    it('keeps every :root color/surface token paired in .dark', () => {
+      expect(lightOnlySurface.length).toBeLessThanOrEqual(MAX_LIGHT_ONLY_SURFACE_TOKENS);
+      expect(lightOnlySurface.length).toBe(MAX_LIGHT_ONLY_SURFACE_TOKENS);
+      expect(lightOnlySurface).toEqual([]);
+      expect(lightOnlyRoot).toEqual(independentLightOnly);
+      expect(THEME_INDEPENDENT_LIGHT_ONLY_TOKENS).toEqual(
+        [...THEME_INDEPENDENT_LIGHT_ONLY_TOKENS].sort(),
+      );
+      expect(
+        independentLightOnly.filter((token) => !token.startsWith('--density-')),
+      ).toEqual([...THEME_INDEPENDENT_LIGHT_ONLY_TOKENS]);
+      expect(
+        independentLightOnly.filter((token) => token.startsWith('--density-')).length,
+      ).toBeGreaterThan(0);
+    });
+
+    it('fails when a new color/surface token is defined only on :root', () => {
+      const unpaired = collectLightOnlySurfaceTokens(`
+:root {
+  --radius: 0.75rem;
+  --mask-opaque: #000;
+  --audit-surface: 80 7% 97%;
+}
+.dark {
+}
+`);
+      expect(unpaired).toEqual(['--audit-surface']);
+      expect(unpaired).not.toContain('--radius');
+      expect(unpaired).not.toContain('--mask-opaque');
+    });
+
+    it('does not treat density or price-direction tokens as unpaired surface paint', () => {
+      const unpaired = collectLightOnlySurfaceTokens(`
+:root {
+  --density-space-1: 0.25rem;
+  --price-up: var(--price-red);
+  --price-down: var(--price-green);
+  --card: 0 0% 100%;
+}
+.dark {
+  --card: 70 4% 11%;
+}
+`);
+      expect(unpaired).toEqual([]);
     });
   });
 });
