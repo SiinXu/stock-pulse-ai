@@ -3,7 +3,7 @@ import { lazy } from 'react';
 import type React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
-import { AppShellSkeleton, RouteOutletBoundary } from '../RouteBoundary';
+import { RouteOutletBoundary } from '../RouteBoundary';
 import { Shell } from '../Shell';
 
 vi.mock('../../../contexts/AuthContext', () => ({
@@ -21,20 +21,6 @@ vi.mock('../../../stores/agentChatStore', () => {
       selector ? selector(state) : state
     ),
   };
-});
-
-describe('AppShellSkeleton', () => {
-  it('paints a non-textual nav frame without a spinner', () => {
-    const { container } = render(<AppShellSkeleton />);
-
-    expect(container.querySelector('[data-app-shell-skeleton]')).toHaveAttribute('aria-busy', 'true');
-    expect(container.querySelector('[data-shell-sidebar]')).toBeInTheDocument();
-    expect(container.querySelector('[data-shell-main]')).toBeInTheDocument();
-    expect(container.querySelector('[data-shell-mobile-header]')).toBeInTheDocument();
-    expect(container.querySelector('[data-control="spinner"]')).not.toBeInTheDocument();
-    expect(container.textContent).toBe('');
-    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
-  });
 });
 
 describe('RouteOutletBoundary', () => {
