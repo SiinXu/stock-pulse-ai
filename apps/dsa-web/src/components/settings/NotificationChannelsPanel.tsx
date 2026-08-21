@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Bell, Puzzle, Send } from 'lucide-react';
@@ -37,6 +37,7 @@ import {
   computeNotificationConfigurationFingerprint,
   getNotificationChannelTestRecord,
   getNotificationChannelTestStatusVersion,
+  resolveNotificationChannelHealth,
   setNotificationChannelTestRecord,
   subscribeNotificationChannelTestStatus,
   type NotificationChannelTestOutcome,
@@ -120,6 +121,8 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
   const testStatusVersion = useChannelTestStatusVersion();
   const [statusNow, setStatusNow] = useState(() => Date.now());
   const [openChannelId, setOpenChannelId] = useState<string | null>(null);
+  const openChannelIdRef = useRef<string | null>(openChannelId);
+  openChannelIdRef.current = openChannelId;
   const [isTesting, setIsTesting] = useState(false);
   const [configurationFingerprints, setConfigurationFingerprints] = useState<ReadonlyMap<string, string>>(new Map());
   const [selectedBindEvents, setSelectedBindEvents] = useState<NotificationEventKind[]>([]);
@@ -280,9 +283,11 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
 
   const runChannelTest = async () => {
     if (!openChannel || !maskToken) return;
+    const selectedChannelId = openChannel.id;
     const testChannel = toTestChannel(openChannel.id, openChannel.routingValue);
     if (!testChannel) return;
     const testItems = openChannelItems.map((item) => ({ key: item.key, value: String(item.value ?? '') }));
+    const isSelectedChannel = () => openChannelIdRef.current === selectedChannelId;
     setIsTesting(true);
     setModalFeedback(null);
     let configFingerprint: string | null = null;
@@ -311,6 +316,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         configFingerprint,
         at: Date.now(),
       });
+      if (!isSelectedChannel()) return;
       if (outcome === 'verified') {
         setModalFeedback({
           outcome,
@@ -349,6 +355,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
           at: Date.now(),
         });
       }
+      if (!isSelectedChannel()) return;
       setModalFeedback({
         outcome: 'failed',
         title: t('settings.notificationTestFailure'),
@@ -356,7 +363,9 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         technical: [parsed.code, mapped.technicalReason].filter(Boolean).join(' · ') || undefined,
       });
     } finally {
-      setIsTesting(false);
+      if (isSelectedChannel()) {
+        setIsTesting(false);
+      }
     }
   };
 
@@ -451,23 +460,28 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
             }, statusNow)
             : undefined;
           const boundEvents = eventsForRoutingChannel(eventRoutes, routingValue);
-          const statusLabel = !configured
+          const channelHealth = resolveNotificationChannelHealth({
+            configured,
+            hasPendingConfiguration,
+            lastTestOutcome: lastTest?.outcome,
+          });
+          const statusLabel = channelHealth === 'unconfigured'
             ? text.bindUnconfigured
-            : hasPendingConfiguration && lastTest
-              ? text.testDraftOnly
-            : lastTest?.outcome === 'verified'
-              ? text.bindVerified
-              : lastTest?.outcome === 'degraded'
+            : channelHealth === 'failed'
+              ? text.lastTestFailed
+              : channelHealth === 'degraded'
                 ? text.bindDegraded
-              : text.bindNeedsTest;
-          const statusVariant = !configured
+                : channelHealth === 'draft'
+                  ? text.testDraftOnly
+                  : channelHealth === 'verified'
+                    ? text.bindVerified
+                    : text.bindNeedsTest;
+          const statusVariant = channelHealth === 'unconfigured'
             ? 'default'
-            : hasPendingConfiguration && lastTest
-              ? 'warning'
-            : lastTest?.outcome === 'verified'
-              ? 'success'
-              : lastTest?.outcome === 'failed'
-                ? 'danger'
+            : channelHealth === 'failed'
+              ? 'danger'
+              : channelHealth === 'verified'
+                ? 'success'
                 : 'warning';
           const testBadge = lastTest
             ? (lastTest.outcome === 'verified'
@@ -482,6 +496,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
               type="button"
               aria-haspopup="dialog"
               data-testid={`notification-channel-card-${channel.id}`}
+              data-channel-health={channelHealth}
               onClick={() => setOpenChannelId(channel.id)}
               className={cn(
                 'flex flex-col gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
