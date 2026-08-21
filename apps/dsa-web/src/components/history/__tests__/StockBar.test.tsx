@@ -37,14 +37,20 @@ describe('StockBar', () => {
         items={[item]}
         isLoading={false}
         onItemClick={vi.fn()}
-        className="min-h-0 flex-1 overflow-hidden"
+        className="min-h-0 flex-1"
       />,
     );
 
     const root = container.firstElementChild;
     expect(root).toHaveClass('min-h-0');
+    expect(root).not.toHaveClass('overflow-hidden');
+    const shell = screen.getByTestId('home-stock-bar');
+    expect(shell.tagName).toBe('ASIDE');
+    expect(shell).toHaveClass('home-stock-scroll-shell');
+    expect(shell).not.toHaveClass('overflow-hidden');
     const viewport = screen.getByTestId('home-stock-bar-scroll');
     expect(viewport).toHaveClass('min-h-0', 'overflow-y-auto');
-    expect(viewport.parentElement).toHaveClass('min-h-0', 'flex-1');
+    expect(viewport.parentElement).toHaveClass('min-h-0', 'flex-1', 'overflow-hidden');
+    expect(viewport.className.split(/\s+/)).not.toContain('touch-pan-y');
   });
 });

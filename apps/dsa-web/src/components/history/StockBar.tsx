@@ -111,7 +111,8 @@ export const StockBar: React.FC<StockBarProps> = ({
       <Surface
         as="aside"
         level="interactive"
-        className="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
+        data-testid="home-stock-bar"
+        className="home-stock-scroll-shell flex h-full min-h-0 min-w-0 flex-1 flex-col"
       >
         <ScrollArea
           className="min-h-0 flex-1"
