@@ -1,0 +1,1 @@
+- [Chore] Removed unreferenced global CSS classes (Refs #1300).
