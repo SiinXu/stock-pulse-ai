@@ -140,6 +140,12 @@ const getVendorChunkName = (id: string): string | undefined => {
   if (normalizedId.endsWith('/src/components/common/DataTable.tsx')) {
     return 'DataTable'
   }
+  // Shared foundation paint helper used by multiple lazy routes. Keep it off
+  // the BacktestPage/backtest-support family so SignedChangeText adoption does
+  // not inflate the backtest-route aggregate (Refs #881 / PR #1440).
+  if (normalizedId.endsWith('/src/components/theme/SignedChangeText.tsx')) {
+    return 'SignedChangeText'
+  }
   if (
     normalizedId.endsWith('/src/utils/backtestPageUtils.ts')
     || normalizedId.endsWith('/src/hooks/useBacktestRunPhase.ts')

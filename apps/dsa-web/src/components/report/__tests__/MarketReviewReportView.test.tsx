@@ -1,10 +1,11 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   AnalysisReport,
   MarketReviewPayload,
   MarketStructureContext,
 } from '../../../types/analysis';
+import { applyPriceDirection } from '../../theme/themeRuntime';
 import { MarketReviewReportView } from '../MarketReviewReportView';
 
 vi.mock('../../../api/history', () => ({
@@ -168,6 +169,12 @@ const marketReviewReportWithStructure: AnalysisReport = {
 };
 
 describe('MarketReviewReportView', () => {
+  afterEach(() => {
+    cleanup();
+    applyPriceDirection('cn', { persist: false });
+    document.documentElement.classList.remove('dark');
+  });
+
   it('uses the report locale for the fallback title', () => {
     render(
       <MarketReviewReportView
@@ -425,5 +432,187 @@ describe('MarketReviewReportView', () => {
     fireEvent.click(runFlowButton);
 
     expect(onOpenRunFlow).toHaveBeenCalledWith(7);
+  });
+
+  it('paints index and ranking percents with document price-direction hue tokens', () => {
+    applyPriceDirection('cn', { persist: false });
+    render(
+      <MarketReviewReportView
+        payload={combinedMarketReviewPayload}
+        content="# 大盘复盘"
+        reportLanguage="zh"
+      />,
+    );
+
+    const cnTable = screen.getByRole('table', { name: 'A股市场: 指数' });
+    const indexGain = within(cnTable).getByText('1.20%');
+    const rankingGain = screen.getByText('+2.35%');
+    const rankingLoss = screen.getByText('-1.10%');
+    expect(indexGain).toHaveStyle({ color: 'var(--price-red)' });
+    expect(rankingGain).toHaveStyle({ color: 'var(--price-red)' });
+    expect(rankingLoss).toHaveStyle({ color: 'var(--price-green)' });
+    expect(indexGain).not.toHaveClass('text-success');
+    expect(indexGain).not.toHaveClass('text-danger');
+    expect(rankingGain).not.toHaveClass('text-success');
+    expect(rankingLoss).not.toHaveClass('text-danger');
+  });
+
+  it('paints the same Market Review cells from US preference even when the payload region is CN', () => {
+    applyPriceDirection('us', { persist: false });
+    document.documentElement.classList.add('dark');
+    render(
+      <MarketReviewReportView
+        payload={combinedMarketReviewPayload}
+        content="# 大盘复盘"
+        reportLanguage="zh"
+      />,
+    );
+
+    const cnTable = screen.getByRole('table', { name: 'A股市场: 指数' });
+    expect(within(cnTable).getByText('1.20%')).toHaveStyle({ color: 'var(--price-green)' });
+    expect(screen.getByText('+2.35%')).toHaveStyle({ color: 'var(--price-green)' });
+    expect(screen.getByText('-1.10%')).toHaveStyle({ color: 'var(--price-red)' });
+  });
+
+  it('paints a US-region payload from document CN preference rather than the US convention', () => {
+    applyPriceDirection('cn', { persist: false });
+    render(
+      <MarketReviewReportView
+        payload={noBreadthMarketReviewPayload}
+        content="# Market Review"
+        reportLanguage="en"
+      />,
+    );
+
+    expect(screen.getByText('0.68%')).toHaveStyle({ color: 'var(--price-red)' });
+    expect(screen.getByText('+1.90%')).toHaveStyle({ color: 'var(--price-red)' });
+  });
+
+  it('omits unresolved region ids and still paints from document preference', () => {
+    applyPriceDirection('us', { persist: false });
+    const jpPayload: MarketReviewPayload = {
+      version: 1,
+      kind: 'market_review',
+      region: 'jp',
+      language: 'en',
+      title: 'Market Review',
+      rootTitle: 'Market Review',
+      indices: [{
+        code: 'N225',
+        name: 'Nikkei',
+        current: 38000,
+        changePct: 0.68,
+        high: 38100,
+        low: 37900,
+      }],
+    };
+    render(
+      <MarketReviewReportView
+        payload={jpPayload}
+        content="# Market Review"
+        reportLanguage="en"
+      />,
+    );
+    expect(screen.getByText('0.68%')).toHaveStyle({ color: 'var(--price-green)' });
+
+    cleanup();
+    applyPriceDirection('cn', { persist: false });
+    const combinedRegionPayload: MarketReviewPayload = {
+      version: 1,
+      kind: 'market_review',
+      region: 'cn,hk',
+      language: 'en',
+      title: 'Market Review',
+      rootTitle: 'Market Review',
+      indices: [{
+        code: '000300',
+        name: 'CSI 300',
+        current: 3920.2,
+        changePct: -1.1,
+        high: 3940.5,
+        low: 3860.1,
+      }],
+    };
+    render(
+      <MarketReviewReportView
+        payload={combinedRegionPayload}
+        content="# Market Review"
+        reportLanguage="en"
+      />,
+    );
+    expect(screen.getByText('-1.10%')).toHaveStyle({ color: 'var(--price-green)' });
+  });
+
+  it('leaves zero and non-finite Market Review percents unpainted', () => {
+    applyPriceDirection('cn', { persist: false });
+    const payload: MarketReviewPayload = {
+      version: 1,
+      kind: 'market_review',
+      region: 'cn',
+      language: 'en',
+      title: 'Market Review',
+      rootTitle: 'Market Review',
+      indices: [
+        {
+          code: 'ZERO',
+          name: 'Zero Index',
+          current: 100,
+          changePct: 0,
+          high: 101,
+          low: 99,
+        },
+        {
+          code: 'NAN',
+          name: 'NaN Index',
+          current: 100,
+          changePct: Number.NaN,
+          high: 101,
+          low: 99,
+        },
+        {
+          code: 'INF',
+          name: 'Inf Index',
+          current: 100,
+          changePct: Number.POSITIVE_INFINITY,
+          high: 101,
+          low: 99,
+        },
+      ],
+      sectors: {
+        top: [{ name: 'Zero Rank', changePct: 0 }],
+        bottom: [{ name: 'Missing Rank', changePct: Number.NaN }],
+      },
+    };
+
+    render(
+      <MarketReviewReportView
+        payload={payload}
+        content="# Market Review"
+        reportLanguage="en"
+      />,
+    );
+
+    const indexTable = screen.getByRole('table', { name: 'Market Review: Index' });
+    const zeroIndex = within(indexTable).getByText('0.00%');
+    expect(zeroIndex).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(zeroIndex).not.toHaveStyle({ color: 'var(--price-green)' });
+    expect(zeroIndex).not.toHaveClass('text-success');
+    expect(zeroIndex).not.toHaveClass('text-danger');
+
+    const zeroRank = screen.getByText('0.00%', { selector: '.text-secondary-text' });
+    expect(zeroRank).toHaveClass('text-secondary-text');
+    expect(zeroRank).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(zeroRank).not.toHaveStyle({ color: 'var(--price-green)' });
+
+    const missingCells = screen.getAllByText('-');
+    expect(missingCells.length).toBeGreaterThan(0);
+    for (const node of missingCells) {
+      expect(node).not.toHaveStyle({ color: 'var(--price-red)' });
+      expect(node).not.toHaveStyle({ color: 'var(--price-green)' });
+      expect(node).not.toHaveClass('text-success');
+      expect(node).not.toHaveClass('text-danger');
+    }
+    expect(screen.queryByText('Infinity%')).not.toBeInTheDocument();
+    expect(screen.queryByText('NaN%')).not.toBeInTheDocument();
   });
 });

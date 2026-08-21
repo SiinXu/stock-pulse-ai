@@ -249,16 +249,25 @@ describe('BacktestPage', () => {
     expect(resultRow).not.toBeNull();
     const gain = within(resultRow as HTMLElement).getByText('3.8%');
     expect(gain).toHaveClass('price-up');
+    expect(gain.getAttribute('style')).toContain('var(--price-red)');
     expect(gain).not.toHaveClass('text-success');
     expect(gain).not.toHaveClass('text-danger');
     expect(within(resultRow as HTMLElement).getByText('上涨')).toHaveClass('badge-trend-up');
+    expect(screen.getByText('1.2%').getAttribute('style')).toContain('var(--price-red)');
+    expect(screen.getByText('2.4%').getAttribute('style')).toContain('var(--price-red)');
 
     applyPriceDirection('us', { persist: false });
+    document.documentElement.classList.add('dark');
     cleanup();
     renderPage();
     const flippedRow = (await screen.findByText('600519')).closest('tr');
-    expect(within(flippedRow as HTMLElement).getByText('3.8%')).toHaveClass('price-up');
-    expect(within(flippedRow as HTMLElement).getByText('3.8%')).not.toHaveClass('text-success');
+    const flippedGain = within(flippedRow as HTMLElement).getByText('3.8%');
+    expect(flippedGain).toHaveClass('price-up');
+    expect(flippedGain.getAttribute('style')).toContain('var(--price-green)');
+    expect(flippedGain).not.toHaveClass('text-success');
+    expect(screen.getByText('1.2%').getAttribute('style')).toContain('var(--price-green)');
+    expect(screen.getByText('2.4%').getAttribute('style')).toContain('var(--price-green)');
+    document.documentElement.classList.remove('dark');
 
     mockGetResults.mockResolvedValueOnce({
       total: 2,
@@ -274,11 +283,20 @@ describe('BacktestPage', () => {
     renderPage();
     const zeroRow = (await screen.findByText('600519')).closest('tr');
     const unknownRow = (await screen.findByText('000001')).closest('tr');
-    expect(within(zeroRow as HTMLElement).getByText('0.0%')).not.toHaveStyle({ color: 'var(--price-red)' });
-    expect(within(zeroRow as HTMLElement).getByText('0.0%')).not.toHaveStyle({ color: 'var(--price-green)' });
+    const zeroReturn = within(zeroRow as HTMLElement).getByText('0.0%');
+    expect(zeroReturn).not.toHaveClass('price-up');
+    expect(zeroReturn).not.toHaveClass('price-down');
+    expect(zeroReturn.getAttribute('style') ?? '').not.toContain('--price-red');
+    expect(zeroReturn.getAttribute('style') ?? '').not.toContain('--price-green');
+    expect(zeroReturn).not.toHaveStyle({ color: 'var(--price-red)' });
+    expect(zeroReturn).not.toHaveStyle({ color: 'var(--price-green)' });
     const unknownReturns = within(unknownRow as HTMLElement).getAllByText('--', { selector: '.text-muted-text' });
     expect(unknownReturns.length).toBeGreaterThan(0);
     for (const node of unknownReturns) {
+      expect(node).not.toHaveClass('price-up');
+      expect(node).not.toHaveClass('price-down');
+      expect(node.getAttribute('style') ?? '').not.toContain('--price-red');
+      expect(node.getAttribute('style') ?? '').not.toContain('--price-green');
       expect(node).not.toHaveStyle({ color: 'var(--price-red)' });
       expect(node).not.toHaveStyle({ color: 'var(--price-green)' });
     }

@@ -9,6 +9,7 @@ import { getParsedApiError } from '../api/error';
 import { useBacktestRunPhase } from '../hooks/useBacktestRunPhase';
 import { ApiErrorAlert, AppPage, Badge, Button, Card, ConfirmDialog, DataTable, type DataTableColumn, DateRangePicker, EmptyState, Input, Loading, PageHeader, Pagination, SegmentedControl, Select, StatePanel, StatusDot, Switch, Toolbar, Tooltip } from '../components/common';
 import { Progress } from '../components/common/Progress';
+import { SignedChangeText } from '../components/theme/SignedChangeText';
 import { StockAutocomplete } from '../components/StockAutocomplete';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
 import { formatUiText, type UiLanguage } from '../i18n/uiText';
@@ -116,11 +117,33 @@ function boolIcon(value: boolean | null | undefined, text: BacktestText) {
 
 // ============ Metric Row ============
 
-const MetricRow: React.FC<{ label: string; value: string; accent?: boolean }> = ({ label, value, accent }) => (
+const MetricRow: React.FC<{ label: string; value: React.ReactNode; accent?: boolean }> = ({ label, value, accent }) => (
   <div className="backtest-metric-row">
     <span className="label">{label}</span>
     <span className={`value ${accent ? 'accent' : ''}`}>{value}</span>
   </div>
+);
+
+function signedReturnClass(value: number | null | undefined): string | undefined {
+  if (value == null || !Number.isFinite(value) || value === 0) return undefined;
+  return value > 0 ? 'price-up' : 'price-down';
+}
+
+function signedReturnFallbackClass(value: number | null | undefined): string {
+  return value == null || !Number.isFinite(value) ? 'text-muted-text' : 'text-secondary-text';
+}
+
+const SignedReturnText: React.FC<{ value: number | null | undefined; children: React.ReactNode }> = ({
+  value,
+  children,
+}) => (
+  <SignedChangeText
+    value={value}
+    className={signedReturnClass(value)}
+    fallbackClassName={signedReturnFallbackClass(value)}
+  >
+    {children}
+  </SignedChangeText>
 );
 
 function phaseBreakdownText(metrics: PerformanceMetrics, language: UiLanguage): string | null {
@@ -172,8 +195,14 @@ const PerformanceCard: React.FC<{ metrics: PerformanceMetrics; title: string; la
       </div>
       <MetricRow label={text.directionAccuracy} value={pct(metrics.directionAccuracyPct)} accent />
       <MetricRow label={text.winRate} value={pct(metrics.winRatePct)} accent />
-      <MetricRow label={text.avgSimulatedReturn} value={pct(metrics.avgSimulatedReturnPct)} />
-      <MetricRow label={text.avgStockReturn} value={pct(metrics.avgStockReturnPct)} />
+      <MetricRow
+        label={text.avgSimulatedReturn}
+        value={<SignedReturnText value={metrics.avgSimulatedReturnPct}>{pct(metrics.avgSimulatedReturnPct)}</SignedReturnText>}
+      />
+      <MetricRow
+        label={text.avgStockReturn}
+        value={<SignedReturnText value={metrics.avgStockReturnPct}>{pct(metrics.avgStockReturnPct)}</SignedReturnText>}
+      />
       <MetricRow label={text.stopLossTriggerRate} value={pct(metrics.stopLossTriggerRate)} />
       <MetricRow label={text.takeProfitTriggerRate} value={pct(metrics.takeProfitTriggerRate)} />
       <MetricRow label={text.avgDaysToFirstHit} value={metrics.avgDaysToFirstHit != null ? metrics.avgDaysToFirstHit.toFixed(1) : '--'} />
@@ -742,13 +771,9 @@ const BacktestPage: React.FC = () => {
       cell: (row) => (
         <div className="flex items-center gap-2">
           {actualMovementBadge(row.actualMovement, language)}
-          <span className={
-            row.actualReturnPct != null
-              ? row.actualReturnPct > 0 ? 'price-up' : row.actualReturnPct < 0 ? 'price-down' : 'text-secondary-text'
-              : 'text-muted-text'
-          }>
+          <SignedReturnText value={row.actualReturnPct}>
             {pct(row.actualReturnPct)}
-          </span>
+          </SignedReturnText>
         </div>
       ),
     },
