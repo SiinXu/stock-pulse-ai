@@ -1,0 +1,1 @@
+- [Fixed] Rendered data-quality levels through the existing formatters (Refs #887).

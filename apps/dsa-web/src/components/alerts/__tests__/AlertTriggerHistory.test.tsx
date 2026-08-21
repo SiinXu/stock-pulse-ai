@@ -83,6 +83,47 @@ describe('AlertTriggerHistory', () => {
     expect(screen.queryByText('fundamentals: fetch_failed')).not.toBeInTheDocument();
   });
 
+  it('renders zh known quality and limitation labels instead of raw codes', () => {
+    render(
+      <UiLanguageProvider initialLanguage="zh">
+        <AlertTriggerHistory
+          triggers={[makeTrigger({
+            status: 'degraded',
+            analysisContextPackOverview: {
+              packVersion: '1.0',
+              subject: { code: 'AAPL', stockName: 'Apple', market: 'us' },
+              blocks: [],
+              counts: {
+                available: 0,
+                missing: 0,
+                notSupported: 0,
+                fallback: 0,
+                stale: 0,
+                estimated: 0,
+                partial: 0,
+                fetchFailed: 0,
+              },
+              dataQuality: {
+                level: 'usable',
+                limitations: ['fundamentals: fetch_failed'],
+                blockScores: {},
+              },
+              warnings: [],
+              metadata: {},
+            },
+          })]}
+        />
+      </UiLanguageProvider>,
+    );
+
+    expect(screen.getByText('降级')).toBeInTheDocument();
+    expect(screen.getByText('质量：可用')).toBeInTheDocument();
+    expect(screen.getByText('基本面：抓取失败')).toBeInTheDocument();
+    expect(screen.queryByText('degraded')).not.toBeInTheDocument();
+    expect(screen.queryByText('usable')).not.toBeInTheDocument();
+    expect(screen.queryByText('fundamentals: fetch_failed')).not.toBeInTheDocument();
+  });
+
   it('keeps unknown status and quality codes visible', () => {
     render(
       <UiLanguageProvider initialLanguage="zh">
