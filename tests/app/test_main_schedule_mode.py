@@ -1550,10 +1550,12 @@ class MainScheduleModeTestCase(unittest.TestCase):
         pipeline.notifier.generate_aggregate_report.return_value = "stock report"
         pipeline._format_delta_first_notification.return_value = "delta stock report"
         pipeline.notifier.is_available.return_value = True
-        pipeline.notifier.send_with_results.return_value = SimpleNamespace(
+        from src.notification import NotificationDispatchResult
+
+        pipeline.notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
             success=True,
             status="sent",
-            channel_summaries=lambda: [],
         )
         send_with_results = pipeline.notifier.send_with_results
 
@@ -1965,10 +1967,12 @@ class MainScheduleModeTestCase(unittest.TestCase):
             ],
         )
         pipeline.notifier.is_available.return_value = True
-        pipeline.notifier.send_with_results.return_value = SimpleNamespace(
+        from src.notification import NotificationDispatchResult
+
+        pipeline.notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
             success=True,
             status="sent",
-            channel_summaries=lambda: [],
         )
         send_with_results = pipeline.notifier.send_with_results
         pipeline_kwargs = {}
@@ -2244,10 +2248,12 @@ class MainScheduleModeTestCase(unittest.TestCase):
         )
         pipeline.notifier.is_available.return_value = True
         pipeline.notifier.generate_aggregate_report.return_value = ""
-        pipeline.notifier.send_with_results.return_value = SimpleNamespace(
+        from src.notification import NotificationDispatchResult
+
+        pipeline.notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
             success=True,
             status="sent",
-            channel_summaries=lambda: [],
         )
         send_with_results = pipeline.notifier.send_with_results
         pipeline_kwargs = {}

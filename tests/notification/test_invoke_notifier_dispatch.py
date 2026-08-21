@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 
 from src.notification import ChannelAttemptResult, NotificationDispatchResult
 from src.notification_parts.dispatch import (
+    coerce_notification_dispatch_result,
     dispatch_channel_summaries,
     invoke_notifier_dispatch,
 )
@@ -115,6 +116,78 @@ def test_invoke_unrecognized_send_with_results_is_not_silent_success() -> None:
     assert result.success is False
     assert result.status == "all_failed"
     assert dispatch_channel_summaries(result) == []
+
+
+def test_coerce_keeps_canonical_dispatch_result() -> None:
+    canonical = NotificationDispatchResult(
+        dispatched=True,
+        success=True,
+        status="sent",
+        channel_results=[ChannelAttemptResult(channel="custom", success=True)],
+    )
+    assert coerce_notification_dispatch_result(canonical) is canonical
+
+
+def test_coerce_legacy_bool_true_is_explicit_sent_boundary() -> None:
+    result = coerce_notification_dispatch_result(True)
+    assert isinstance(result, NotificationDispatchResult)
+    assert result.success is True
+    assert result.status == "sent"
+    assert result.channel_results == []
+
+
+def test_coerce_legacy_bool_false_is_all_failed_boundary() -> None:
+    result = coerce_notification_dispatch_result(False)
+    assert isinstance(result, NotificationDispatchResult)
+    assert result.success is False
+    assert result.status == "all_failed"
+
+
+def _assert_duck_typed_result_fails_closed(value: object) -> None:
+    result = coerce_notification_dispatch_result(value)
+    assert isinstance(result, NotificationDispatchResult)
+    assert result.success is False
+    assert result.status == "all_failed"
+    assert result is not value
+    assert dispatch_channel_summaries(result) == []
+
+
+def test_coerce_rejects_duck_typed_sent_success() -> None:
+    _assert_duck_typed_result_fails_closed(
+        SimpleNamespace(status="sent", success=True, dispatched=True)
+    )
+
+
+def test_coerce_rejects_duck_typed_partial_failed_success() -> None:
+    _assert_duck_typed_result_fails_closed(
+        SimpleNamespace(status="partial_failed", success=True)
+    )
+
+
+def test_coerce_rejects_duck_typed_all_failed_marked_success() -> None:
+    _assert_duck_typed_result_fails_closed(
+        SimpleNamespace(status="all_failed", success=True)
+    )
+
+
+def test_coerce_rejects_unknown_status_with_success_true() -> None:
+    _assert_duck_typed_result_fails_closed(
+        SimpleNamespace(status="ok", success=True)
+    )
+
+
+def test_invoke_duck_typed_send_with_results_is_not_success() -> None:
+    class _Notifier:
+        def send_with_results(self, content: str, **kwargs):
+            return SimpleNamespace(status="sent", success=True, dispatched=True)
+
+        def send(self, content: str, **kwargs):
+            raise AssertionError("legacy send() must not run when results exist")
+
+    result = invoke_notifier_dispatch(_Notifier(), "body")
+    assert isinstance(result, NotificationDispatchResult)
+    assert result.success is False
+    assert result.status == "all_failed"
 
 
 def test_dispatch_channel_summaries_accepts_plain_namespace_attempts() -> None:

@@ -269,12 +269,18 @@ class EmitAlertTests(unittest.TestCase):
         )
 
     def test_sends_via_alert_route_when_threshold_exceeded(self) -> None:
+        from src.notification import NotificationDispatchResult
+
         calls: List[Dict[str, Any]] = []
 
         class _Notifier:
             def send_with_results(self, content: str, **kwargs: Any) -> Any:
                 calls.append({"content": content, **kwargs})
-                return SimpleNamespace(success=True, status="sent", dispatched=True)
+                return NotificationDispatchResult(
+                    dispatched=True,
+                    success=True,
+                    status="sent",
+                )
 
         config = SimpleNamespace(
             high_disagreement_alerts_enabled=True,
@@ -293,6 +299,24 @@ class EmitAlertTests(unittest.TestCase):
         self.assertEqual(calls[0]["severity"], "warning")
         self.assertIn("recordId=99", calls[0]["content"])
         self.assertIn("directional_opposition", calls[0]["content"])
+
+    def test_duck_typed_sent_success_is_not_treated_as_alert_success(self) -> None:
+        class _Notifier:
+            def send_with_results(self, content: str, **kwargs: Any) -> Any:
+                return SimpleNamespace(status="sent", success=True, dispatched=True)
+
+        config = SimpleNamespace(
+            high_disagreement_alerts_enabled=True,
+            high_disagreement_threshold=0.6,
+            report_language="en",
+        )
+        ok = maybe_send_high_disagreement_alert(
+            self._result(_sample_record(score=0.8)),
+            history_id=99,
+            config=config,
+            notifier=_Notifier(),
+        )
+        self.assertFalse(ok)
 
     def test_mixed_channel_results_stay_success_with_partial_signal(self) -> None:
         from src.notification import ChannelAttemptResult, NotificationDispatchResult
@@ -333,8 +357,11 @@ class EmitAlertTests(unittest.TestCase):
     def test_real_composed_config_properties_are_consumed(self) -> None:
         from src.config import Config
 
+        from src.notification import NotificationDispatchResult
+
         notifier = MagicMock(spec_set=["send_with_results", "send"])
-        notifier.send_with_results.return_value = SimpleNamespace(
+        notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
             success=True,
             status="sent",
         )

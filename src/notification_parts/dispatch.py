@@ -179,10 +179,11 @@ def _legacy_bool_dispatch_result(success: bool) -> Any:
 def coerce_notification_dispatch_result(result: Any) -> Any:
     """Normalize a notifier return value onto the structured dispatch contract.
 
-    ``NotificationDispatchResult`` is kept as-is. A bool is the historical
-    ``send()`` shape. A duck-typed object with a string ``status`` is a
-    supported fake/result and is passed through. Other values are not treated
-    as success: unknown ``send_with_results()`` returns stay ``all_failed``.
+    Only a canonical ``NotificationDispatchResult`` or the historical bool
+    ``send()`` boundary may produce success. Duck-typed objects that merely
+    carry string ``status`` / bool ``success`` attributes are not treated as
+    structured results, including misleading ``status="sent"`` combinations
+    and unknown status strings.
     """
 
     from src.notification_parts.contracts import NotificationDispatchResult
@@ -191,9 +192,6 @@ def coerce_notification_dispatch_result(result: Any) -> Any:
         return result
     if isinstance(result, bool):
         return _legacy_bool_dispatch_result(result)
-    status = getattr(result, "status", None)
-    if isinstance(status, str):
-        return result
     return NotificationDispatchResult(
         dispatched=True,
         success=False,
@@ -267,7 +265,8 @@ def invoke_notifier_dispatch(
     Legacy compatibility: wrap bool ``send()`` only when the notifier has no
     callable ``send_with_results``. This is for real bool-only notifiers, not
     mock auto-attributes. Tests must use ``spec_set`` / autospec or concrete
-    fakes that model this interface.
+    fakes that return ``NotificationDispatchResult``. Duck-typed status
+    objects fail closed as ``all_failed``.
     """
 
     send_with_results = getattr(notifier, "send_with_results", None)
