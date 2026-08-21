@@ -32,6 +32,8 @@ type Listener = () => void;
 
 const records = new Map<string, NotificationChannelTestRecord>();
 const listeners = new Set<Listener>();
+/** Per-channel probe generation so a superseded in-flight attempt cannot commit. */
+const attemptIds = new Map<string, number>();
 /** Monotonic version so React useSyncExternalStore can detect updates. */
 let version = 0;
 
@@ -139,14 +141,36 @@ export function getAllNotificationChannelTestRecords(): ReadonlyMap<
   return records;
 }
 
+/**
+ * Start a probe for `channel` and return its attempt id. A later begin for
+ * the same channel supersedes older in-flight attempts.
+ */
+export function beginNotificationChannelTest(channel: string): number {
+  const next = (attemptIds.get(channel) ?? 0) + 1;
+  attemptIds.set(channel, next);
+  return next;
+}
+
+export function isCurrentNotificationChannelTest(channel: string, attemptId: number): boolean {
+  return attemptIds.get(channel) === attemptId;
+}
+
 export function setNotificationChannelTestRecord(
   record: Omit<NotificationChannelTestRecord, 'expiresAt'> & { expiresAt?: number },
-): void {
+  attemptId?: number,
+): boolean {
+  const current = attemptIds.get(record.channel) ?? 0;
+  if (attemptId !== undefined) {
+    if (current !== attemptId) return false;
+  } else {
+    attemptIds.set(record.channel, current + 1);
+  }
   records.set(record.channel, {
     ...record,
     expiresAt: record.expiresAt ?? record.at + NOTIFICATION_TEST_EVIDENCE_TTL_MS,
   });
   emit();
+  return true;
 }
 
 export function clearNotificationChannelTestRecord(channel: string): void {
@@ -169,5 +193,6 @@ export function subscribeNotificationChannelTestStatus(listener: Listener): () =
 /** Test-only reset so specs do not leak status across cases. */
 export function resetNotificationChannelTestStatusForTests(): void {
   records.clear();
+  attemptIds.clear();
   emit();
 }

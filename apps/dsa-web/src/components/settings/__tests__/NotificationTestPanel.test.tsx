@@ -4,9 +4,12 @@ import type { ReactNode } from 'react';
 import { useUiLanguage, UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../../utils/uiLanguage';
 import { NotificationTestPanel } from '../NotificationTestPanel';
-import { chooseOption, openListbox } from '../../../test-utils';
+import { chooseOption, createDeferred, openListbox } from '../../../test-utils';
+import type { TestNotificationChannelResponse } from '../../../types/systemConfig';
 import {
+  beginNotificationChannelTest,
   getNotificationChannelTestRecord,
+  isCurrentNotificationChannelTest,
   resetNotificationChannelTestStatusForTests,
 } from '../notificationChannelTestStatus';
 
@@ -85,6 +88,38 @@ describe('NotificationTestPanel', () => {
     expect(screen.getByText('HTTP 200')).toBeInTheDocument();
     expect(screen.getByText('https://example.com/hook?token=***')).toBeInTheDocument();
     expect(getNotificationChannelTestRecord('custom')?.outcome).toBe('verified');
+  });
+
+  it('does not commit a superseded panel probe into shared channel evidence', async () => {
+    const deferred = createDeferred<TestNotificationChannelResponse>();
+    testNotificationChannel.mockImplementationOnce(() => deferred.promise);
+
+    render(
+      <NotificationTestPanel
+        items={[{ key: 'CUSTOM_WEBHOOK_URLS', value: 'https://example.com/hook?token=secret' }]}
+        maskToken="******"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '配置' }));
+    chooseOption(screen.getByLabelText('渠道'), 'custom');
+    fireEvent.click(screen.getByRole('button', { name: /发送测试/ }));
+    await waitFor(() => expect(testNotificationChannel).toHaveBeenCalled());
+
+    const newerAttempt = beginNotificationChannelTest('custom');
+    deferred.resolve({
+      success: true,
+      message: 'stale panel success',
+      errorCode: null,
+      stage: 'notification_send',
+      retryable: false,
+      latencyMs: 12,
+      attempts: [],
+    });
+
+    expect(await screen.findByText('测试成功')).toBeInTheDocument();
+    expect(getNotificationChannelTestRecord('custom')).toBeUndefined();
+    expect(isCurrentNotificationChannelTest('custom', newerAttempt)).toBe(true);
   });
 
   it('tests a DingTalk draft while preserving masked group robot secrets', async () => {

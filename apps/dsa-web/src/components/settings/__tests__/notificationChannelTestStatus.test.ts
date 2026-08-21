@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
+  beginNotificationChannelTest,
   classifyNotificationTestOutcome,
   computeNotificationConfigurationFingerprint,
   getNotificationChannelTestRecord,
+  isCurrentNotificationChannelTest,
   resetNotificationChannelTestStatusForTests,
   resolveNotificationChannelHealth,
   setNotificationChannelTestRecord,
@@ -86,6 +88,76 @@ describe('notificationChannelTestStatus', () => {
         { channel: 'feishu', success: false, message: 'missing webhook', stage: 'send', retryable: false },
       ],
     })).toBe('failed');
+  });
+
+  it('ignores a superseded same-channel probe commit so the newer attempt wins', () => {
+    const first = beginNotificationChannelTest('feishu');
+    const second = beginNotificationChannelTest('feishu');
+    expect(isCurrentNotificationChannelTest('feishu', first)).toBe(false);
+    expect(isCurrentNotificationChannelTest('feishu', second)).toBe(true);
+
+    expect(setNotificationChannelTestRecord({
+      channel: 'feishu',
+      outcome: 'verified',
+      message: 'stale success',
+      attempts: [],
+      configVersion: 'v1',
+      configFingerprint: 'sha256:one',
+      at: Date.now(),
+    }, first)).toBe(false);
+    expect(getNotificationChannelTestRecord('feishu')).toBeUndefined();
+
+    expect(setNotificationChannelTestRecord({
+      channel: 'feishu',
+      outcome: 'failed',
+      message: 'newer failure',
+      attempts: [],
+      configVersion: 'v1',
+      configFingerprint: 'sha256:one',
+      at: Date.now(),
+    }, second)).toBe(true);
+    expect(getNotificationChannelTestRecord('feishu')?.outcome).toBe('failed');
+
+    expect(setNotificationChannelTestRecord({
+      channel: 'feishu',
+      outcome: 'verified',
+      message: 'stale success arrived last',
+      attempts: [],
+      configVersion: 'v1',
+      configFingerprint: 'sha256:one',
+      at: Date.now(),
+    }, first)).toBe(false);
+    expect(getNotificationChannelTestRecord('feishu')?.outcome).toBe('failed');
+    expect(getNotificationChannelTestRecord('feishu')?.message).toBe('newer failure');
+  });
+
+  it('keeps per-channel attempt identity isolated so another channel cannot supersede this one', () => {
+    const feishuAttempt = beginNotificationChannelTest('feishu');
+    const emailAttempt = beginNotificationChannelTest('email');
+    expect(isCurrentNotificationChannelTest('feishu', feishuAttempt)).toBe(true);
+    expect(isCurrentNotificationChannelTest('email', emailAttempt)).toBe(true);
+
+    expect(setNotificationChannelTestRecord({
+      channel: 'feishu',
+      outcome: 'failed',
+      message: 'feishu failed',
+      attempts: [],
+      configVersion: 'v1',
+      configFingerprint: 'sha256:feishu',
+      at: Date.now(),
+    }, feishuAttempt)).toBe(true);
+    expect(setNotificationChannelTestRecord({
+      channel: 'email',
+      outcome: 'verified',
+      message: 'email ok',
+      attempts: [],
+      configVersion: 'v1',
+      configFingerprint: 'sha256:email',
+      at: Date.now(),
+    }, emailAttempt)).toBe(true);
+
+    expect(getNotificationChannelTestRecord('feishu')?.outcome).toBe('failed');
+    expect(getNotificationChannelTestRecord('email')?.outcome).toBe('verified');
   });
 
   it('keeps failed and degraded ahead of draft so a probe failure is never hidden', () => {

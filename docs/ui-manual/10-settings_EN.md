@@ -109,7 +109,7 @@ On each field, only **Required** and the validation message stay on the label ro
 4. After every target passes, select events the channel does not yet receive and choose **Bind selected events** in the same dialog.
 5. Wait for the routing draft to save and appear in the effective Event routing summary; only then add a second channel.
 
-“Verified” is session evidence bound to the current config version and a one-way fingerprint of that channel's exact tested values; it expires after 30 minutes. Channel edits, failed/conflicted saves, server refreshes, and config-version changes invalidate old evidence. For multiple custom-webhook targets, only all-success is verified. Partial delivery lists the failed targets and cannot be bound.
+“Verified” is session evidence bound to the current config version and a one-way fingerprint of that channel's exact tested values; it expires after 30 minutes. Channel edits, failed/conflicted saves, server refreshes, and config-version changes invalidate old evidence. A later Send test for the same channel supersedes any still-in-flight earlier probe, so a slower stale result cannot replace the latest verified, degraded, or failed evidence. For multiple custom-webhook targets, only all-success is verified. Partial delivery lists the failed targets and cannot be bound.
 
 Event routing always describes the **effective path resolved from saved configuration**, never an unsaved draft. Empty routing keeps the backend's all-configured fan-out behavior. Case and duplicates follow backend normalization, while invalid or currently unconfigured targets are reported separately.
 
