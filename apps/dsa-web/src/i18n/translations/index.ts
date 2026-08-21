@@ -1,8 +1,20 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { ADDITIONAL_UI_LANGUAGES, type UiLanguage } from '../uiLanguages';
+import {
+  getLoadedEnglishUiText,
+  loadEnglishUiTextPayload,
+} from '../loadEnglishUiText';
 import type { UiTranslationKey } from './en';
-import type { UiTextKey } from '../uiTextZh';
+
+// The English import() lives in loadEnglishUiText.ts (isolated by vite
+// manualChunks) so this module can stay on extra-locale import()s without
+// emitting that factory from the backtest-support family.
+export {
+  getLoadedEnglishUiText,
+  loadEnglishUiTextPayload,
+  unloadEnglishUiTextForTests,
+} from '../loadEnglishUiText';
 
 export { SOURCE_UI_TRANSLATIONS, UI_TRANSLATION_KEYS, type UiTranslationKey } from './en';
 
@@ -75,30 +87,6 @@ const TRANSLATION_LOADERS: Record<AdditionalUiLanguage, () => Promise<UiTranslat
 const loadedTranslations = new Map<AdditionalUiLanguage, UiTranslationBundle>();
 const pendingTranslations = new Map<AdditionalUiLanguage, Promise<void>>();
 
-type EnglishUiText = Record<UiTextKey, string>;
-let loadedEnglishUiText: EnglishUiText | null = null;
-let pendingEnglishUiText: Promise<void> | null = null;
-
-// Keep this factory next to TRANSLATION_LOADERS so Rollup places the English
-// split with the extra-locale import()s on the entry chunk, not a route family.
-const ENGLISH_UI_TEXT_LOADER = () => import('../uiTextEn');
-
-export function getLoadedEnglishUiText(): EnglishUiText | null {
-  return loadedEnglishUiText;
-}
-
-export async function loadEnglishUiTextPayload(): Promise<void> {
-  if (loadedEnglishUiText) return;
-  if (!pendingEnglishUiText) {
-    pendingEnglishUiText = ENGLISH_UI_TEXT_LOADER().then(({ en }) => {
-      loadedEnglishUiText = en;
-    }).finally(() => {
-      pendingEnglishUiText = null;
-    });
-  }
-  await pendingEnglishUiText;
-}
-
 function isAdditionalUiLanguage(language: UiLanguage): language is AdditionalUiLanguage {
   return language !== 'zh' && language !== 'en';
 }
@@ -168,14 +156,6 @@ export function unloadUiLanguageTranslationsForTests(language?: AdditionalUiLang
   }
   loadedTranslations.clear();
   pendingTranslations.clear();
-}
-
-export function unloadEnglishUiTextForTests(): void {
-  if (import.meta.env.MODE !== 'test') {
-    throw new Error('unloadEnglishUiTextForTests is test-only');
-  }
-  loadedEnglishUiText = null;
-  pendingEnglishUiText = null;
 }
 
 // Dev, tests, and the i18n resource checker need synchronous English source

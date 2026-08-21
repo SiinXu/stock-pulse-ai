@@ -29,13 +29,18 @@ describe('English UI_TEXT entry split (Refs #883)', () => {
 
   it('does not statically import the English payload from the entry uiText module', () => {
     const uiTextSource = fs.readFileSync(path.join(i18nRoot, 'uiText.ts'), 'utf8');
-    const loaderSource = fs.readFileSync(path.join(i18nRoot, 'translations/index.ts'), 'utf8');
+    const extraLocaleLoaderSource = fs.readFileSync(path.join(i18nRoot, 'translations/index.ts'), 'utf8');
+    const englishLoaderSource = fs.readFileSync(path.join(i18nRoot, 'loadEnglishUiText.ts'), 'utf8');
+    const viteConfigSource = fs.readFileSync(path.resolve(i18nRoot, '../../vite.config.ts'), 'utf8');
 
     expect(uiTextSource).not.toMatch(/from ['"]\.\/uiTextEn['"]/);
     expect(uiTextSource).not.toMatch(/import\(\s*['"]\.\/uiTextEn['"]\s*\)/);
-    expect(loaderSource).toContain("import('../uiTextEn')");
-    expect(loaderSource).toContain('ENGLISH_UI_TEXT_LOADER');
-    expect(loaderSource).toContain('loadEnglishUiTextPayload');
+    expect(extraLocaleLoaderSource).not.toMatch(/import\(\s*['"]\.\.\/uiTextEn['"]\s*\)/);
+    expect(englishLoaderSource).toContain("import('./uiTextEn')");
+    expect(englishLoaderSource).toContain('ENGLISH_UI_TEXT_LOADER');
+    expect(englishLoaderSource).toContain('loadEnglishUiTextPayload');
+    expect(viteConfigSource).toContain("endsWith('/src/i18n/loadEnglishUiText.ts')");
+    expect(viteConfigSource).toContain("return 'englishUiTextLoader'");
   });
 
   it('keeps Simplified Chinese readable without the English catalog', () => {

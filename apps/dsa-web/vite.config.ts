@@ -146,6 +146,13 @@ const getVendorChunkName = (id: string): string | undefined => {
   if (normalizedId.endsWith('/src/components/theme/SignedChangeText.tsx')) {
     return 'SignedChangeText'
   }
+  // English UI_TEXT import() factory. translations/index.ts is imported by
+  // createUiLanguageRecord (used by locales/backtest → backtestPageUtils), so
+  // an import() there is emitted from already-preloaded backtest-support.
+  // Isolate the factory so the stub does not inflate backtest-route (Refs #883).
+  if (normalizedId.endsWith('/src/i18n/loadEnglishUiText.ts')) {
+    return 'englishUiTextLoader'
+  }
   if (
     normalizedId.endsWith('/src/utils/backtestPageUtils.ts')
     || normalizedId.endsWith('/src/hooks/useBacktestRunPhase.ts')

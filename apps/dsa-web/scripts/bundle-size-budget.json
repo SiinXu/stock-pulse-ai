@@ -526,9 +526,9 @@
         "assets/Backtest*-*.js",
         "assets/backtest*-*.js"
       ],
-      "maxGzipBytes": 22109,
-      "measuredGzipBytes": 21709,
-      "note": "BacktestPage aggregate family for sibling splits. Counts BacktestPage plus the T09 backtest-support chunk (and any later Backtest*/backtest* prefixes) that would not match the same-pattern BacktestPage-family glob. Re-measured zlib-9 sum 21709 B after the English UI_TEXT split (Refs #883): Rollup emits the shared loadUiLanguageTranslations English import() from backtest-support, which origin/main already modulepreloads. Same-machine origin/main sum was 21498 B. Cap = measured + 400 B. Per-asset BacktestPage cap and same-pattern BacktestPage-family inherited cap are unchanged."
+      "maxGzipBytes": 21603,
+      "measuredGzipBytes": 21203,
+      "note": "BacktestPage aggregate family for sibling splits. Counts BacktestPage plus the T09 backtest-support chunk (and any later Backtest*/backtest* prefixes) that would not match the same-pattern BacktestPage-family glob. Measured zlib-9 sum 21203 B on origin/main 87c876ff5 + T09 + 400 B headroom. Per-asset BacktestPage cap and same-pattern BacktestPage-family inherited cap are unchanged."
     }
   ]
 }
