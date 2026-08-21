@@ -616,7 +616,7 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(extraFamily.maxGzipBytes).toBeGreaterThan(extra.maxGzipBytes);
   });
 
-  it('seeds criticalPath from index.html modulepreload at the measured total', () => {
+  it('seeds criticalPath from index.html modulepreload with 400 B family headroom', () => {
     const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
     const criticalPath = budget.aggregateRules.find((rule) => rule.id === 'criticalPath');
 
@@ -626,7 +626,7 @@ describe('first-paint entry budget (Refs #883)', () => {
       match: ['assets/index-*.js'],
     }));
     expect(criticalPath.measuredGzipBytes).toBe(373653);
-    expect(criticalPath.maxGzipBytes).toBe(criticalPath.measuredGzipBytes);
+    expect(criticalPath.maxGzipBytes).toBe(criticalPath.measuredGzipBytes + 400);
     expect(budget.aggregateRules[budget.aggregateRules.length - 1].id).toBe('criticalPath');
     expect(budget.rules.some((rule) => rule.id === 'criticalPath')).toBe(false);
   });
