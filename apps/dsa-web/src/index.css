@@ -372,6 +372,11 @@
   --hover: 75 4% 16%;
   --secondary-text: 75 5% 72%;
   --muted-text: 75 4% 55%;
+  --home-shadow-neutral: 0 0% 0%;
+  --home-shadow-deep: 220 18% 8%;
+  --home-cool-surface: 72 4% 13%;
+  --home-cool-surface-strong: 60 3% 8%;
+  --portfolio-control-border: 75 4% 20%;
   --color-success: 118 50% 72%;
   --color-warning: 50 88% 72%;
   --color-danger: 350 89% 72%;
@@ -434,6 +439,7 @@
   --nav-indicator-shadow: hsl(var(--primary) / 0.8);
   --nav-badge-bg: hsl(var(--primary));
   --nav-brand-shadow: hsl(var(--primary) / 0.24);
+  --shell-sidebar-border: hsl(var(--border));
 
   /* Home page related (Dark theme) */
   --home-loading-ring-track: hsl(var(--primary) / 0.2);
@@ -491,6 +497,16 @@
   --home-prose-border-strong: hsl(var(--foreground) / 0.18);
   --home-prose-blockquote-border: hsl(var(--primary) / 0.3);
   --home-prose-blockquote-bg: hsl(var(--primary) / 0.08);
+  --home-panel-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.25);
+  --home-panel-shadow-hover: 0 2px 6px hsl(var(--neutral-black) / 0.35);
+  --home-hero-border: hsl(var(--primary) / 0.34);
+  --home-hero-gradient-start: hsl(var(--primary) / 0.24);
+  --home-hero-gradient-mid: hsl(var(--foreground) / 0.1);
+  --home-hero-gradient-end: hsl(var(--foreground) / 0.06);
+  --home-hero-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.25);
+  --home-rail-border: hsl(var(--foreground) / 0.1);
+  --home-rail-bg: linear-gradient(180deg, hsl(var(--card) / 0.94), hsl(var(--background) / 0.92));
+  --home-rail-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.25);
 
   /* Shadows (Dark theme) */
   --shadow-soft-card: 0 1px 2px hsl(var(--neutral-black) / 0.25);
@@ -1125,7 +1141,7 @@ a {
 }
 
 .dark .home-rail-card {
-  background: linear-gradient(180deg, hsl(var(--card) / 0.94), hsl(var(--background) / 0.92));
+  background: var(--home-rail-bg);
 }
 
 .dark .home-insight-card {
@@ -1147,6 +1163,20 @@ a {
   box-shadow:
     inset 0 1px 0 hsl(var(--neutral-white) / 0.04),
     0 10px 18px hsl(var(--home-shadow-deep) / 0.2);
+}
+
+.dark .home-surface-button {
+  box-shadow: inset 0 1px 0 hsl(var(--neutral-white) / 0.03);
+}
+
+.dark .home-surface-button:hover {
+  box-shadow:
+    inset 0 1px 0 hsl(var(--neutral-white) / 0.04),
+    0 10px 18px hsl(var(--home-shadow-deep) / 0.2);
+}
+
+.dark .home-accent-chip {
+  box-shadow: inset 0 1px 0 hsl(var(--neutral-white) / 0.05);
 }
 
 .dark .report-strategy-item {
