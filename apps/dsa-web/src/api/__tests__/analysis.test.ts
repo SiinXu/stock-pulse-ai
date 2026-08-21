@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { analysisApi, DuplicateTaskError } from '../analysis';
+import { ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE, analysisApi, DuplicateTaskError } from '../analysis';
 import { getParsedApiError, isApiRequestError } from '../error';
 
 const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
@@ -357,6 +357,12 @@ describe('analysisApi response validation', () => {
 
     const list = await analysisApi.getTasks();
     expect(list.tasks[0].stockCode).toBe('AAPL');
+  });
+
+  it('does not expose an analysis-task cancel helper while HTTP cancel is absent', () => {
+    expect(ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE).toBe(false);
+    expect(analysisApi).not.toHaveProperty('cancelTask');
+    expect(analysisApi).not.toHaveProperty('cancel');
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
