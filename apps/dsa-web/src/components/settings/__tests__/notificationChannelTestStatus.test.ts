@@ -6,6 +6,7 @@ import {
   computeNotificationConfigurationFingerprint,
   getNotificationChannelTestRecord,
   resetNotificationChannelTestStatusForTests,
+  resolveNotificationChannelHealth,
   setNotificationChannelTestRecord,
 } from '../notificationChannelTestStatus';
 
@@ -85,5 +86,42 @@ describe('notificationChannelTestStatus', () => {
         { channel: 'feishu', success: false, message: 'missing webhook', stage: 'send', retryable: false },
       ],
     })).toBe('failed');
+  });
+
+  it('keeps failed and degraded ahead of draft so a probe failure is never hidden', () => {
+    expect(resolveNotificationChannelHealth({
+      configured: true,
+      hasPendingConfiguration: true,
+      lastTestOutcome: 'failed',
+    })).toBe('failed');
+    expect(resolveNotificationChannelHealth({
+      configured: true,
+      hasPendingConfiguration: true,
+      lastTestOutcome: 'degraded',
+    })).toBe('degraded');
+    expect(resolveNotificationChannelHealth({
+      configured: true,
+      hasPendingConfiguration: true,
+      lastTestOutcome: 'verified',
+    })).toBe('draft');
+    expect(resolveNotificationChannelHealth({
+      configured: true,
+      hasPendingConfiguration: false,
+      lastTestOutcome: 'verified',
+    })).toBe('verified');
+    expect(resolveNotificationChannelHealth({
+      configured: true,
+      hasPendingConfiguration: false,
+      lastTestOutcome: 'failed',
+    })).toBe('failed');
+    expect(resolveNotificationChannelHealth({
+      configured: true,
+      hasPendingConfiguration: true,
+    })).toBe('needs_test');
+    expect(resolveNotificationChannelHealth({
+      configured: false,
+      hasPendingConfiguration: true,
+      lastTestOutcome: 'failed',
+    })).toBe('unconfigured');
   });
 });

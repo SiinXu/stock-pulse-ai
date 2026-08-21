@@ -83,6 +83,32 @@ export function classifyNotificationTestOutcome(
   return 'failed';
 }
 
+export type NotificationChannelHealth =
+  | 'unconfigured'
+  | 'draft'
+  | 'verified'
+  | 'degraded'
+  | 'failed'
+  | 'needs_test';
+
+/**
+ * Hub card health. Failed and degraded always win over draft so a probe
+ * failure is never hidden behind "Draft tested". Draft applies only to a
+ * verified probe of unsaved values (save-and-retest before bind).
+ */
+export function resolveNotificationChannelHealth(input: {
+  configured: boolean;
+  hasPendingConfiguration: boolean;
+  lastTestOutcome?: NotificationChannelTestOutcome;
+}): NotificationChannelHealth {
+  if (!input.configured) return 'unconfigured';
+  if (input.lastTestOutcome === 'failed') return 'failed';
+  if (input.lastTestOutcome === 'degraded') return 'degraded';
+  if (input.lastTestOutcome === 'verified' && input.hasPendingConfiguration) return 'draft';
+  if (input.lastTestOutcome === 'verified') return 'verified';
+  return 'needs_test';
+}
+
 export function getNotificationChannelTestStatusVersion(): number {
   return version;
 }

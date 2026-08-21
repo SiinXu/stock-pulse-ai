@@ -1,1 +1,1 @@
-- [Added] Added notification channel cards with test-to-bind (Refs #866).
+- [Fixed] Failed notification channel test-to-bind stays distinct from Needs test and Draft tested, and in-flight probe results stay on the tested channel (Refs #866).
