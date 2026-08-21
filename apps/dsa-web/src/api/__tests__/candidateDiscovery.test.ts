@@ -90,4 +90,68 @@ describe('candidateDiscoveryApi', () => {
       },
     );
   });
+
+  it('preserves extra keys on valid discovery envelopes (toCamelCase pass-through)', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        task_id: 'discovery-1',
+        trace_id: 'trace-1',
+        status: 'completed',
+        progress: 100,
+        unexpected_task_field: 'keep-task',
+        result: {
+          pack_version: 'candidate_discovery/1.0',
+          run_id: 'run-1',
+          status: 'completed',
+          universe: 'watchlist',
+          candidate_count: 1,
+          unexpected_server_field: 'keep-me',
+          candidates: [{
+            rank: 1,
+            code: '600519',
+            name: 'Kweichow Moutai',
+            reason: 'Matched bounded criteria',
+            extra_candidate_flag: true,
+          }],
+        },
+      },
+    });
+
+    const task = await candidateDiscoveryApi.getTask('discovery-1');
+    expect(task).toEqual(expect.objectContaining({
+      taskId: 'discovery-1',
+      unexpectedTaskField: 'keep-task',
+    }));
+    expect(task.result).toEqual(expect.objectContaining({
+      packVersion: 'candidate_discovery/1.0',
+      unexpectedServerField: 'keep-me',
+    }));
+    expect(task.result?.candidates[0].raw).toEqual(expect.objectContaining({
+      extraCandidateFlag: true,
+    }));
+  });
+
+  it('surfaces generated CandidateDiscoveryResponse mismatch through ParsedApiError', async () => {
+    get.mockResolvedValueOnce({
+      data: {
+        task_id: 'discovery-1',
+        status: 'completed',
+        result: {
+          run_id: 'run-1',
+          status: 'completed',
+          universe: 'watchlist',
+          candidate_count: 0,
+        },
+      },
+    });
+
+    await expect(candidateDiscoveryApi.getTask('discovery-1')).rejects.toSatisfy(
+      (error: unknown) => {
+        const parsed = getParsedApiError(error);
+        expect(parsed.code).toBe('api_response_validation_failed');
+        expect(parsed.params).toMatchObject({ label: 'candidate discovery response' });
+        return true;
+      },
+    );
+  });
 });

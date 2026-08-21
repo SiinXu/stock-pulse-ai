@@ -4,6 +4,19 @@ import { z } from 'zod';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
+
+type OpenApiMoneyFlowViewResponse = components['schemas']['MoneyFlowViewResponse'];
+type OpenApiMoneyFlowSnapshotResponse = components['schemas']['MoneyFlowSnapshotResponse'];
+
+// Compile-time anchor: hand-written camelCase types stay aligned with OpenAPI
+// field sets (rename detection is structural; extra optional UI fields are fine).
+type _AssertMoneyFlowView = keyof OpenApiMoneyFlowViewResponse;
+type _AssertMoneyFlowSnapshot = keyof OpenApiMoneyFlowSnapshotResponse;
+const _moneyFlowViewAnchor: _AssertMoneyFlowView = 'schema_version';
+const _moneyFlowSnapshotAnchor: _AssertMoneyFlowSnapshot = 'amount_scale';
+void _moneyFlowViewAnchor;
+void _moneyFlowSnapshotAnchor;
 
 const moneyFlowSnapshotSchema = z
   .object({

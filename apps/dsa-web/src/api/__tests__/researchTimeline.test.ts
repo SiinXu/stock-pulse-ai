@@ -50,4 +50,53 @@ describe('researchTimelineApi', () => {
       return true;
     });
   });
+
+  it('preserves extra keys on valid payloads (byte-identical toCamelCase pass-through)', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        stock_code: '600519',
+        items: [{
+          id: 'analysis_run:1',
+          kind: 'analysis_run',
+          occurred_at: '2026-08-01T10:00:00Z',
+          title: 'Hold',
+          link: { type: 'analysis_history', record_id: 1 },
+          unexpected_item_field: 'also',
+        }],
+        next_cursor: null,
+        has_more: false,
+        limit: 20,
+        sources: { analysis_run: 'ok', chat: 'empty', signal: 'empty', hypothesis: 'unavailable' },
+        unexpected_server_field: 'keep-me',
+      },
+    });
+
+    const result = await researchTimelineApi.list('600519');
+    expect(result).toEqual(expect.objectContaining({
+      stockCode: '600519',
+      unexpectedServerField: 'keep-me',
+    }));
+    expect(result.items[0]).toEqual(expect.objectContaining({
+      occurredAt: '2026-08-01T10:00:00Z',
+      unexpectedItemField: 'also',
+    }));
+  });
+
+  it('surfaces generated ResearchTimelineResponse mismatch through ParsedApiError', async () => {
+    getMock.mockResolvedValue({
+      data: {
+        items: [],
+        has_more: false,
+        limit: 20,
+        sources: { analysis_run: 'ok', chat: 'empty', signal: 'empty', hypothesis: 'unavailable' },
+      },
+    });
+
+    await expect(researchTimelineApi.list('600519')).rejects.toSatisfy((error: unknown) => {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params?.label).toBe('ResearchTimelineResponse');
+      return true;
+    });
+  });
 });

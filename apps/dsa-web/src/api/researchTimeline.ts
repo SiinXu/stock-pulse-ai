@@ -4,6 +4,19 @@
 import { z } from 'zod';
 import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
+import type { components } from '../types/api.generated';
+
+type OpenApiResearchTimelineResponse = components['schemas']['ResearchTimelineResponse'];
+type OpenApiResearchTimelineNode = components['schemas']['ResearchTimelineNode'];
+
+// Compile-time anchor: hand-written camelCase types stay aligned with OpenAPI
+// field sets (rename detection is structural; extra optional UI fields are fine).
+type _AssertTimelineResponse = keyof OpenApiResearchTimelineResponse;
+type _AssertTimelineNode = keyof OpenApiResearchTimelineNode;
+const _timelineResponseAnchor: _AssertTimelineResponse = 'stock_code';
+const _timelineNodeAnchor: _AssertTimelineNode = 'occurred_at';
+void _timelineResponseAnchor;
+void _timelineNodeAnchor;
 
 const researchTimelineLinkSchema = z.object({
   type: z.string(),

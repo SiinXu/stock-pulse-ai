@@ -1,0 +1,1 @@
+- [Changed] Anchor remaining JSON Web clients (`candidateDiscovery`, `moneyFlow`, `researchTimeline`) on generated OpenAPI response types while keeping existing Zod/ParsedApiError fail-closed validation (Refs #721).

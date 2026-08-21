@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { describe, expect, it } from 'vitest';
+import { getParsedApiError } from '../error';
 import { parseMoneyFlowView } from '../moneyFlow';
 
 const partialPayload = () => ({
@@ -66,5 +67,35 @@ describe('moneyFlow contract', () => {
     expect(() =>
       parseMoneyFlowView({ ...partialPayload(), status: 'partial', snapshot: null }),
     ).toThrow();
+  });
+
+  it('returns the camelCase success object (pass-through, not stripped Zod output)', () => {
+    const parsed = parseMoneyFlowView(partialPayload());
+    expect(parsed).toEqual(expect.objectContaining({
+      schemaVersion: 'money_flow_view/1.0',
+      stockCode: '600519',
+      cacheState: 'miss',
+      fallbackFrom: null,
+      errorCode: null,
+      warnings: ['money_flow_amount_scale_is_not_authoritatively_calibrated'],
+    }));
+    expect(parsed.sourceChain?.[0]).toEqual(expect.objectContaining({
+      provider: 'akshare',
+      status: 'success',
+      latencyMs: 12,
+    }));
+  });
+
+  it('surfaces generated MoneyFlowViewResponse mismatch through ParsedApiError', () => {
+    const payload = partialPayload() as { disclaimer?: string };
+    delete payload.disclaimer;
+    expect(() => parseMoneyFlowView(payload)).toThrow();
+    try {
+      parseMoneyFlowView(payload);
+    } catch (error) {
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.params).toMatchObject({ label: 'MoneyFlowView' });
+    }
   });
 });
