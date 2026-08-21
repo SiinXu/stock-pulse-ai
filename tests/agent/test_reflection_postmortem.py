@@ -735,6 +735,29 @@ def test_reflection_skips_when_run_account_already_breached() -> None:
     assert AGENT_SOUL_HASH == soul_before.content_hash
 
 
+def test_reflection_records_last_remaining_run_account_turn() -> None:
+    """End-of-run reflection does not reserve a Decision turn."""
+    account = _run_account(max_llm_turns=2, llm_turns=1)
+    ctx = _ctx(episode_id="ep-run-last", mode_budget_account=account)
+    calls: List[str] = []
+
+    def _llm(system: str, user: str) -> str:
+        calls.append(system)
+        return json.dumps({"lessons": [], "revised": False})
+
+    result = run_reflection_loop(
+        ctx,
+        config=_config(),
+        llm_complete=_llm,
+        budget=LlmCallBudget(total=1),
+    )
+
+    assert result.status == "completed"
+    assert len(calls) == 1
+    assert account.llm_turns == 2
+    assert account.breach is None
+
+
 def test_reflection_records_one_run_account_turn_when_room_remains() -> None:
     account = _run_account(max_llm_turns=4, llm_turns=1)
     ctx = _ctx(episode_id="ep-run-room", mode_budget_account=account)

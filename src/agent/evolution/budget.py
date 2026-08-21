@@ -23,6 +23,7 @@ DEFAULT_STEP_CRITIQUE_LLM_BUDGET = 0
 DEFAULT_REFLECTION_LLM_BUDGET = 1
 DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET = 8
 DEFAULT_META_REVIEW_LLM_BUDGET = 0
+DECISION_LLM_TURN_RESERVE = 1
 MAX_REFLECTION_LLM_CALL_BUDGET = 64
 MAX_BUDGET_SKIP_REASONS = 32
 
@@ -142,11 +143,19 @@ def _refresh_mode_budget_snapshot(ctx: Any, account: Any) -> None:
         )
 
 
-def mode_budget_turn_block_reason(ctx: Any) -> Optional[str]:
+def mode_budget_turn_block_reason(
+    ctx: Any,
+    *,
+    required_llm_turns: int = 1,
+    reserve_llm_turns: int = 0,
+) -> Optional[str]:
     """Return a run-account reason that forbids another LLM call.
 
     Does not increment counters. ``None`` means there is no run account, the
-    account is disabled, or one more turn still fits under the cap.
+    account is disabled, or the requested turns plus reserve still fit.
+    In-loop optional work must pass ``reserve_llm_turns`` so required
+    downstream stages (Decision) keep a turn. End-of-run reflection keeps the
+    default reserve of 0.
     """
     account = _mode_budget_account_from_ctx(ctx)
     if account is None:
@@ -180,9 +189,11 @@ def mode_budget_turn_block_reason(ctx: Any) -> Optional[str]:
     try:
         max_turns = max(0, int(limits.get("max_llm_turns") or 0))
         used_turns = max(0, int(used.get("llm_turns") or 0))
+        required = max(1, int(required_llm_turns))
+        reserve = max(0, int(reserve_llm_turns))
     except (TypeError, ValueError):
         return "budget_turns"
-    if max_turns > 0 and used_turns >= max_turns:
+    if max_turns > 0 and used_turns + required + reserve > max_turns:
         return "budget_turns"
     return None
 
@@ -221,14 +232,22 @@ def try_consume_with_run_account(
     ctx: Any,
     *,
     reason: str,
+    required_llm_turns: int = 1,
+    reserve_llm_turns: int = 0,
 ) -> bool:
     """Consume one nested slot and one run-account turn when both allow it.
 
     Callers must record ``budget_skipped`` when this returns False. The nested
     ``LlmCallBudget`` is unchanged in meaning; the run account is charged only
-    for calls that do not already go through ``run_agent_loop``.
+    for calls that do not already go through ``run_agent_loop``. In-loop
+    optional work must pass ``reserve_llm_turns`` so later required stages
+    keep capacity.
     """
-    block = mode_budget_turn_block_reason(ctx)
+    block = mode_budget_turn_block_reason(
+        ctx,
+        required_llm_turns=required_llm_turns,
+        reserve_llm_turns=reserve_llm_turns,
+    )
     if block is not None:
         call_budget.record_skip(reason=f"budget_exhausted:{reason}")
         return False
@@ -242,6 +261,7 @@ def try_consume_with_run_account(
 
 __all__ = [
     "BUDGET_SKIPPED",
+    "DECISION_LLM_TURN_RESERVE",
     "DEFAULT_META_REVIEW_LLM_BUDGET",
     "DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET",
     "DEFAULT_REFLECTION_LLM_BUDGET",

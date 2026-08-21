@@ -687,6 +687,52 @@ def test_meta_review_cli_force_is_not_always_true(tmp_path):
     assert mod.main(["--episodes", str(oversized), "--force"]) == 2
 
 
+def test_step_critique_skips_llm_when_only_decision_reserve_remains() -> None:
+    account = _run_account(max_llm_turns=2, llm_turns=1)
+    ctx = _Ctx(run_id="run-step-reserve", mode_budget_account=account)
+    soul_before = snapshot_soul_identity()
+
+    result = critique_step_observations(
+        _failed_quote_observations(),
+        config=SimpleNamespace(agent_step_critique_enabled=True),
+        ctx=ctx,
+        budget=LlmCallBudget(total=1),
+        llm_complete=_boom_llm,
+        force=True,
+    )
+
+    assert result.validation_status == BUDGET_SKIPPED
+    assert result.skip_reason
+    assert result.lessons  # deterministic floor remains
+    assert account.llm_turns == 1
+    assert snapshot_soul_identity() == soul_before
+    assert AGENT_SOUL_HASH == soul_before.content_hash
+
+
+def test_step_critique_records_run_account_turn_when_decision_reserve_fits() -> None:
+    account = _run_account(max_llm_turns=3, llm_turns=1)
+    ctx = _Ctx(run_id="run-step-room", mode_budget_account=account)
+    calls: list[str] = []
+
+    def _llm(_system: str, _user: str) -> str:
+        calls.append(_system)
+        return '{"lessons": []}'
+
+    result = critique_step_observations(
+        _failed_quote_observations(),
+        config=SimpleNamespace(agent_step_critique_enabled=True),
+        ctx=ctx,
+        budget=LlmCallBudget(total=1),
+        llm_complete=_llm,
+        force=True,
+    )
+
+    assert result.validation_status == "valid"
+    assert len(calls) == 1
+    assert account.llm_turns == 2
+    assert account.breach is None
+
+
 def test_step_critique_skips_llm_when_run_account_at_max_llm_turns() -> None:
     account = _run_account(max_llm_turns=1, llm_turns=1)
     ctx = _Ctx(run_id="run-step-cap", mode_budget_account=account)
@@ -779,6 +825,105 @@ def test_end_of_run_reflection_attaches_context_mode_budget_account() -> None:
     assert account.llm_turns == 2
     assert snapshot_soul_identity() == soul_before
     assert AGENT_SOUL_HASH == soul_before.content_hash
+
+
+def test_end_of_run_reflection_uses_account_persisted_by_run_loop() -> None:
+    from src.agent.executor import AgentExecutor
+    from src.agent.llm_adapter import ToolCall
+    from src.agent.planning.product import _maybe_attach_end_of_run_reflection
+    from src.agent.tools.registry import (
+        ToolDefinition,
+        ToolParameter,
+        ToolPolicy,
+        ToolRegistry,
+    )
+    from unittest.mock import MagicMock
+
+    class _FakeResponse:
+        def __init__(self, *, content: str = "", tool_calls=None):
+            self.content = content
+            self.tool_calls = tool_calls or []
+            self.usage = {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+            }
+            self.provider = "fake"
+            self.model = "fake-model"
+            self.reasoning_content = None
+            self.provider_blocks = None
+
+    registry = ToolRegistry()
+    registry.register(
+        ToolDefinition(
+            name="echo",
+            description="Echo a message.",
+            parameters=[
+                ToolParameter(name="message", type="string", description="Message"),
+            ],
+            handler=lambda message="": {"message": message},
+            category="data",
+            policy=ToolPolicy.declared(
+                read_only=True,
+                side_effects=[],
+                permissions=["analysis_context:read"],
+            ),
+        )
+    )
+    adapter = MagicMock()
+    adapter.model = "fake-model"
+    adapter.call_with_tools.side_effect = [
+        _FakeResponse(
+            tool_calls=[ToolCall(id="c1", name="echo", arguments={"message": "x"})],
+            content="need tool",
+        ),
+        _FakeResponse(content="done"),
+    ]
+    adapter.call_completion.side_effect = _boom_llm
+    executor = AgentExecutor(
+        tool_registry=registry,
+        llm_adapter=adapter,
+        max_steps=5,
+        config=SimpleNamespace(
+            agent_mode_budget_enabled=True,
+            agent_mode_budget_chat_max_llm_turns=2,
+            agent_mode_budget_max_llm_turns=0,
+            agent_mode_budget_max_tool_calls=0,
+            agent_mode_budget_max_cost_usd=0.0,
+            agent_mode_budget_max_tokens=0,
+        ),
+    )
+    assert getattr(executor, "mode_budget_account", None) is None
+    result = executor._run_loop(
+        messages=[{"role": "user", "content": "hi"}],
+        tool_decls=[],
+        parse_dashboard=False,
+    )
+    account = executor.mode_budget_account
+    assert account is not None
+    assert account.llm_turns == 2
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["used"]["llm_turns"] == 2
+
+    planning_metadata: dict = {}
+    _maybe_attach_end_of_run_reflection(
+        planning_metadata,
+        executor=executor,
+        config=SimpleNamespace(
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+            agent_planning_proposal_timeout_seconds=5.0,
+        ),
+        context={"stock_code": "AAPL", "run_id": "run-loop-persist"},
+        success=True,
+        tool_calls_log=[],
+    )
+    reflection = planning_metadata["reflection_result"]
+    assert reflection["status"] == "budget_skipped"
+    assert reflection["skip_reason"]
+    assert account.llm_turns == 2
+    adapter.call_completion.assert_not_called()
 
 
 def test_end_of_run_reflection_attaches_executor_mode_budget_account() -> None:

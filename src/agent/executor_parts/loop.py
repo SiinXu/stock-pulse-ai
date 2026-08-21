@@ -42,6 +42,8 @@ class _LoopMethods:
             mode="chat",
             chat=True,
         )
+        # Persist the live run account so end-of-run reflection can charge it.
+        self.mode_budget_account = budget_account
         effective_max_steps = budget_account.limits.effective_max_steps(self.max_steps)
         loop_result = run_agent_loop(
             messages=messages,

@@ -1,1 +1,3 @@
 - [Changed] Optional reflection and post-mortem LLM calls now charge the run mode-budget account and skip with `budget_skipped` when that account is already at `max_llm_turns` (Refs #1121).
+- [Fixed] Persist the Chat/single-agent mode-budget account on the executor so end-of-run reflection charges the same run account (Refs #1121).
+- [Fixed] Optional in-loop step-critique LLM enrichment reserves one Decision turn on the run account (Refs #1121).
