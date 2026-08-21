@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { UiTextKey, UiTextParams } from '../../i18n/uiText';
 import type { ScheduledTaskOccurrenceStatus } from '../../types/scheduledTasks';
+import { getBrowserTimezone } from '../../utils/browserTimezone';
+
+export { getBrowserTimezone };
 
 type UiTranslator = (key: UiTextKey, params?: UiTextParams) => string;
 
@@ -11,14 +14,6 @@ export type ScheduledTaskBadgeVariant =
   | 'success'
   | 'warning'
   | 'danger';
-
-export function getBrowserTimezone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
-  } catch {
-    return 'UTC';
-  }
-}
 
 export function getScheduledTaskTypeLabel(
   taskType: string | undefined,

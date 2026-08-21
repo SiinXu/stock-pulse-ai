@@ -12,14 +12,11 @@ import {
   ShieldAlert,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { alertsApi } from '../api/alerts';
-import { decisionSignalsApi } from '../api/decisionSignals';
-import { historyApi } from '../api/history';
-import { scheduledTasksApi } from '../api/scheduledTasks';
-import { systemConfigApi } from '../api/systemConfig';
-import { getTodaysFocus } from '../api/todaysFocus';
-import type { ParsedApiError } from '../api/error';
-import { parseApiError } from '../api/error';
+import {
+  useHomeAttentionQuery,
+  useHomeSetupStatusQuery,
+  useTodaysFocusQuery,
+} from '../hooks/useHomePageQueries';
 import {
   Badge,
   Button,
@@ -36,7 +33,6 @@ import {
   HomeReadinessCard,
   HomeSignalSummary,
   TodaysFocusPanel,
-  getBrowserTimezone,
   getScheduledTaskStatusPresentation,
   getScheduledTaskTypeLabel,
   resolveSetupCheckLabel,
@@ -60,13 +56,6 @@ import {
   buildSettingsHref,
   buildSignalCenterHref,
 } from '../routing/routes';
-import type { HistoryItem, StockReportType } from '../types/analysis';
-import type { DecisionSignalItem } from '../types/decisionSignals';
-import type {
-  ScheduledTaskTodayItem,
-} from '../types/scheduledTasks';
-import type { SetupStatusResponse } from '../types/systemConfig';
-import type { TodaysFocusResponse } from '../types/todaysFocus';
 import { buildDeepLink } from '../utils/deepLink';
 import { formatDateTime } from '../utils/format';
 import {
@@ -95,288 +84,45 @@ function writeHomeConfigurableExpanded(expanded: boolean): void {
   }
 }
 
-
-
-
-const SIGNAL_PAGE_SIZE = 12;
-const RECENT_ANALYSIS_LIMIT = 4;
-const REASSESSMENT_WINDOW_MS = 24 * 60 * 60 * 1000;
-const STOCK_REPORT_TYPES: readonly StockReportType[] = ['simple', 'detailed', 'full', 'brief'];
-
-type HomeAttentionAvailability = {
-  activeSignals: boolean;
-  reassessments: boolean;
-  alerts: boolean;
-  marketReview: boolean;
-  recentAnalyses: boolean;
-  scheduledTasks: boolean;
-};
-
-type HomeAttentionData = {
-  activeSignals: DecisionSignalItem[];
-  activeSignalTotal: number | null;
-  dueReassessmentTotal: number | null;
-  triggeredAlertTotal: number | null;
-  latestMarketReview: HistoryItem | null;
-  recentAnalyses: HistoryItem[];
-  scheduledTasks: ScheduledTaskTodayItem[];
-};
-
-type HomeAttentionLoadResult = {
-  data: HomeAttentionData;
-  availability: HomeAttentionAvailability;
-  failedSourceCount: number;
-};
-
-type HomeSignalStaleFields = {
-  activeSignals: boolean;
-  reassessments: boolean;
-  alerts: boolean;
-};
-
-const EMPTY_SIGNAL_STALE: HomeSignalStaleFields = {
-  activeSignals: false,
-  reassessments: false,
-  alerts: false,
-};
-
-const EMPTY_ATTENTION_DATA: HomeAttentionData = {
-  activeSignals: [],
-  activeSignalTotal: null,
-  dueReassessmentTotal: null,
-  triggeredAlertTotal: null,
-  latestMarketReview: null,
-  recentAnalyses: [],
-  scheduledTasks: [],
-};
-
-const EMPTY_ATTENTION_AVAILABILITY: HomeAttentionAvailability = {
-  activeSignals: false,
-  reassessments: false,
-  alerts: false,
-  marketReview: false,
-  recentAnalyses: false,
-  scheduledTasks: false,
-};
-
-
-async function fetchHomeAttentionData(): Promise<HomeAttentionLoadResult> {
-  const reassessmentCutoff = new Date(Date.now() + REASSESSMENT_WINDOW_MS).toISOString();
-  const [coreResults, recentAnalysisResults] = await Promise.all([
-    Promise.allSettled([
-      decisionSignalsApi.list({ status: 'active', page: 1, pageSize: SIGNAL_PAGE_SIZE }),
-      decisionSignalsApi.list({
-        status: 'active',
-        expiresTo: reassessmentCutoff,
-        page: 1,
-        pageSize: 1,
-      }),
-      alertsApi.listTriggers({ status: 'triggered', page: 1, pageSize: 1 }),
-      historyApi.getList({ reportType: 'market_review', page: 1, limit: 1 }),
-      scheduledTasksApi.getToday({ timezone: getBrowserTimezone() }),
-    ]),
-    Promise.allSettled(STOCK_REPORT_TYPES.map((reportType) => (
-      historyApi.getList({ reportType, page: 1, limit: RECENT_ANALYSIS_LIMIT })
-    ))),
-  ]);
-  const [
-    signalsResult,
-    reassessmentsResult,
-    alertsResult,
-    marketReviewResult,
-    scheduledTasksResult,
-  ] = coreResults;
-  const availability: HomeAttentionAvailability = {
-    activeSignals: signalsResult.status === 'fulfilled',
-    reassessments: reassessmentsResult.status === 'fulfilled',
-    alerts: alertsResult.status === 'fulfilled',
-    marketReview: marketReviewResult.status === 'fulfilled',
-    recentAnalyses: recentAnalysisResults.every((result) => result.status === 'fulfilled'),
-    scheduledTasks: scheduledTasksResult.status === 'fulfilled',
-  };
-  const recentAnalyses = recentAnalysisResults
-    .flatMap((result) => (result.status === 'fulfilled' ? result.value.items : []))
-    .filter((item) => item.reportType !== 'market_review' && item.stockCode !== 'MARKET')
-    .sort((left, right) => {
-      const timeDifference = Date.parse(right.createdAt) - Date.parse(left.createdAt);
-      return Number.isFinite(timeDifference) && timeDifference !== 0
-        ? timeDifference
-        : right.id - left.id;
-    })
-    .slice(0, RECENT_ANALYSIS_LIMIT);
-  return {
-    data: {
-      activeSignals: signalsResult.status === 'fulfilled' ? signalsResult.value.items : [],
-      activeSignalTotal: signalsResult.status === 'fulfilled' ? signalsResult.value.total : null,
-      dueReassessmentTotal: reassessmentsResult.status === 'fulfilled'
-        ? reassessmentsResult.value.total
-        : null,
-      triggeredAlertTotal: alertsResult.status === 'fulfilled' ? alertsResult.value.total : null,
-      latestMarketReview: marketReviewResult.status === 'fulfilled'
-        ? marketReviewResult.value.items[0] ?? null
-        : null,
-      recentAnalyses,
-      scheduledTasks: scheduledTasksResult.status === 'fulfilled'
-        ? scheduledTasksResult.value.items
-        : [],
-    },
-    availability,
-    failedSourceCount: Object.values(availability).filter((available) => !available).length,
-  };
-}
-
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
   const { language, t } = useUiLanguage();
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
-  const requestIdRef = useRef(0);
-  const [data, setData] = useState<HomeAttentionData>(EMPTY_ATTENTION_DATA);
-  const [availability, setAvailability] = useState<HomeAttentionAvailability>(
-    EMPTY_ATTENTION_AVAILABILITY,
-  );
-  const [isLoading, setIsLoading] = useState(true);
   const [scoreRefreshGeneration, setScoreRefreshGeneration] = useState(0);
-  const [failedSourceCount, setFailedSourceCount] = useState(0);
-  const [signalStale, setSignalStale] = useState<HomeSignalStaleFields>(EMPTY_SIGNAL_STALE);
-  const dataRef = useRef(data);
-  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
-  const [setupStatusLoading, setSetupStatusLoading] = useState(true);
-  const [setupStatusError, setSetupStatusError] = useState<ParsedApiError | null>(null);
   const [onboardingDismissed, setOnboardingDismissed] = useState(readOnboardingDismissed);
   const [configurableExpanded, setConfigurableExpanded] = useState(
     readHomeConfigurableExpanded,
   );
-  const todaysFocusRequestIdRef = useRef(0);
-  const [todaysFocusData, setTodaysFocusData] = useState<TodaysFocusResponse | null>(null);
-  const [todaysFocusLoading, setTodaysFocusLoading] = useState(true);
-  const [todaysFocusError, setTodaysFocusError] = useState<ParsedApiError | null>(null);
+  const {
+    data,
+    availability,
+    failedSourceCount,
+    signalStale,
+    isLoading,
+    refetch: refetchAttention,
+  } = useHomeAttentionQuery();
+  const {
+    data: todaysFocusData,
+    isLoading: todaysFocusLoading,
+    error: todaysFocusError,
+    refetch: refetchTodaysFocus,
+  } = useTodaysFocusQuery(language);
+  const {
+    status: setupStatus,
+    isLoading: setupStatusLoading,
+    error: setupStatusError,
+    refetch: refetchSetupStatus,
+    refreshSilent: refreshSetupStatus,
+  } = useHomeSetupStatusQuery();
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.home,
     headingRef: pageHeadingRef,
     ready: true,
   });
 
-  dataRef.current = data;
-
-  const applyAttentionData = useCallback((result: HomeAttentionLoadResult) => {
-    const previous = dataRef.current;
-    const nextActiveTotal = result.availability.activeSignals
-      ? result.data.activeSignalTotal
-      : previous.activeSignalTotal;
-    const nextDueTotal = result.availability.reassessments
-      ? result.data.dueReassessmentTotal
-      : previous.dueReassessmentTotal;
-    const nextAlertTotal = result.availability.alerts
-      ? result.data.triggeredAlertTotal
-      : previous.triggeredAlertTotal;
-    const nextData: HomeAttentionData = {
-      ...result.data,
-      activeSignals: result.availability.activeSignals
-        ? result.data.activeSignals
-        : previous.activeSignals,
-      activeSignalTotal: nextActiveTotal,
-      dueReassessmentTotal: nextDueTotal,
-      triggeredAlertTotal: nextAlertTotal,
-    };
-    dataRef.current = nextData;
-    setData(nextData);
-    setSignalStale({
-      activeSignals: !result.availability.activeSignals && previous.activeSignalTotal !== null,
-      reassessments: !result.availability.reassessments && previous.dueReassessmentTotal !== null,
-      alerts: !result.availability.alerts && previous.triggeredAlertTotal !== null,
-    });
-    setAvailability(result.availability);
-    setFailedSourceCount(result.failedSourceCount);
-    setIsLoading(false);
-  }, []);
-
-  const loadAttentionData = useCallback(async () => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    const result = await fetchHomeAttentionData();
-    if (requestIdRef.current !== requestId) return;
-    applyAttentionData(result);
-  }, [applyAttentionData]);
-
-  const loadTodaysFocus = useCallback(async () => {
-    const requestId = todaysFocusRequestIdRef.current + 1;
-    todaysFocusRequestIdRef.current = requestId;
-    setTodaysFocusLoading(true);
-    setTodaysFocusError(null);
-    try {
-      const response = await getTodaysFocus({
-        language: language === 'zh' ? 'zh' : 'en',
-      });
-      if (todaysFocusRequestIdRef.current !== requestId) return;
-      setTodaysFocusData(response);
-    } catch (error) {
-      if (todaysFocusRequestIdRef.current !== requestId) return;
-      setTodaysFocusData(null);
-      setTodaysFocusError(parseApiError(error));
-    } finally {
-      if (todaysFocusRequestIdRef.current === requestId) {
-        setTodaysFocusLoading(false);
-      }
-    }
-  }, [language]);
-
   useEffect(() => {
     document.title = t('home.pageTitle');
   }, [t]);
-
-  useEffect(() => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    void fetchHomeAttentionData().then((result) => {
-      if (requestIdRef.current === requestId) applyAttentionData(result);
-    });
-    return () => {
-      requestIdRef.current += 1;
-    };
-  }, [applyAttentionData]);
-
-  useEffect(() => {
-    void loadTodaysFocus();
-    return () => {
-      todaysFocusRequestIdRef.current += 1;
-    };
-  }, [loadTodaysFocus]);
-
-  const loadSetupStatus = useCallback(async () => {
-    setSetupStatusLoading(true);
-    setSetupStatusError(null);
-    try {
-      const status = await systemConfigApi.getSetupStatus();
-      setSetupStatus(status);
-    } catch (error) {
-      setSetupStatus(null);
-      setSetupStatusError(parseApiError(error));
-    } finally {
-      setSetupStatusLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-    setSetupStatusLoading(true);
-    systemConfigApi.getSetupStatus()
-      .then((status) => {
-        if (!active) return;
-        setSetupStatus(status);
-        setSetupStatusError(null);
-      })
-      .catch((error) => {
-        if (!active) return;
-        setSetupStatus(null);
-        setSetupStatusError(parseApiError(error));
-      })
-      .finally(() => {
-        if (active) setSetupStatusLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   const latestMarketReview = data.latestMarketReview;
   const lastSuccessSignal = useMemo(() => {
@@ -414,24 +160,12 @@ const HomePage: React.FC = () => {
     dismissOnboarding();
     setOnboardingDismissed(true);
   }, []);
-  const refreshSetupStatus = useCallback(() => {
-    void systemConfigApi.getSetupStatus()
-      .then((status) => setSetupStatus(status))
-      .catch(() => setSetupStatus(null));
-  }, []);
   const handleRefresh = useCallback(() => {
-    const previous = dataRef.current;
-    setIsLoading(true);
-    setSignalStale({
-      activeSignals: previous.activeSignalTotal !== null,
-      reassessments: previous.dueReassessmentTotal !== null,
-      alerts: previous.triggeredAlertTotal !== null,
-    });
     setScoreRefreshGeneration((generation) => generation + 1);
-    void loadAttentionData();
-    void loadSetupStatus();
-    void loadTodaysFocus();
-  }, [loadAttentionData, loadSetupStatus, loadTodaysFocus]);
+    refetchAttention();
+    refetchSetupStatus();
+    refetchTodaysFocus();
+  }, [refetchAttention, refetchSetupStatus, refetchTodaysFocus]);
 
   const watchlistScoreRefreshKey = useMemo(() => JSON.stringify({
     refreshGeneration: scoreRefreshGeneration,
@@ -486,7 +220,7 @@ const HomePage: React.FC = () => {
           isLoading={setupStatusLoading}
           error={setupStatusError}
           lastSuccess={lastSuccessSignal}
-          onRefresh={() => { void loadSetupStatus(); }}
+          onRefresh={() => { refetchSetupStatus(); }}
           // Incomplete-setup dismiss lives only on HomeOnboardingSection so Home
           // does not render two identical "Close" controls at once (#879 B6 spirit).
           dismissible={false}
@@ -553,7 +287,7 @@ const HomePage: React.FC = () => {
           data={todaysFocusData}
           isLoading={todaysFocusLoading}
           error={todaysFocusError}
-          onRefresh={() => { void loadTodaysFocus(); }}
+          onRefresh={() => { refetchTodaysFocus(); }}
           onSelectSymbol={(code) => navigate(`/stocks/${encodeURIComponent(code)}`)}
           t={t}
         />

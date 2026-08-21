@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { alertsApi } from '../../api/alerts';
@@ -281,8 +283,18 @@ function LocationProbe() {
   return <output data-testid="location">{`${location.pathname}${location.search}${location.hash}`}</output>;
 }
 
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
 function renderHome() {
-  return render(
+  return render(wrapWithQueryClient(
     <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
       <UiLanguageProvider initialLanguage="en">
         <MemoryRouter initialEntries={[APP_ROUTE_PATHS.home]}>
@@ -291,7 +303,7 @@ function renderHome() {
         </MemoryRouter>
       </UiLanguageProvider>
     </RouteFocusRegistrationContext.Provider>,
-  );
+  ));
 }
 
 describe('HomePage attention hub', () => {
@@ -368,7 +380,7 @@ describe('HomePage attention hub', () => {
     expect(within(dashboard).getByRole('button', { name: 'Hide Triggered alerts' }))
       .toBeInTheDocument();
     await waitFor(() => {
-      expect(getTodaysFocus).toHaveBeenCalled();
+      expect(getTodaysFocus).toHaveBeenCalledWith({ language: 'en' });
     });
     expect(await within(core).findByTestId('todays-focus-empty')).toBeInTheDocument();
     const todos = within(core).getByRole('region', { name: 'To-dos' });
@@ -503,8 +515,8 @@ describe('HomePage attention hub', () => {
     renderHome();
 
     const scheduled = await screen.findByRole('region', { name: 'Versioned scheduled tasks today' });
-    const emptyState = within(scheduled)
-      .getByText('No versioned scheduled tasks today')
+    const emptyState = (await within(scheduled)
+      .findByText('No versioned scheduled tasks today'))
       .closest('[data-state-panel="empty"]');
     expect(emptyState?.parentElement).toHaveClass('rounded-lg', 'border', 'border-border');
     expect(emptyState).toContainElement(
@@ -521,7 +533,7 @@ describe('HomePage attention hub', () => {
     renderHome();
 
     const scheduled = await screen.findByRole('region', { name: 'Versioned scheduled tasks today' });
-    expect(within(scheduled).getByText('Home data is incomplete')).toBeInTheDocument();
+    expect(await within(scheduled).findByText('Home data is incomplete')).toBeInTheDocument();
     expect(screen.getAllByText('Apple')).not.toHaveLength(0);
     expect(screen.queryByText('No versioned scheduled tasks today')).not.toBeInTheDocument();
   });
@@ -628,7 +640,7 @@ describe('HomePage attention hub', () => {
     renderHome();
 
     const alerts = await screen.findByRole('region', { name: 'Triggered alerts' });
-    expect(within(alerts).getByText('Home data is incomplete')).toBeInTheDocument();
+    expect(await within(alerts).findByText('Home data is incomplete')).toBeInTheDocument();
     expect(screen.getAllByText('Apple')).not.toHaveLength(0);
     fireEvent.click(within(alerts).getByRole('button', { name: 'Retry' }));
     await waitFor(() => expect(alertsApi.listTriggers).toHaveBeenCalledTimes(2));
@@ -850,7 +862,7 @@ describe('HomePage attention hub', () => {
 
     expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
     // Goal-language labels, not backend Chinese titles.
-    expect(screen.getByText('Model is not connected yet')).toBeInTheDocument();
+    expect(await screen.findByText('Model is not connected yet')).toBeInTheDocument();
     expect(screen.getByText('Watchlist is empty')).toBeInTheDocument();
     expect(screen.queryByText(/主要模型/)).not.toBeInTheDocument();
   });
@@ -874,7 +886,7 @@ describe('HomePage attention hub', () => {
     renderHome();
 
     expect(await screen.findByTestId('home-readiness-card')).toBeInTheDocument();
-    expect(screen.getByText('Future readiness item')).toBeInTheDocument();
+    expect(await screen.findByText('Future readiness item')).toBeInTheDocument();
   });
 
   it('hosts the three Home-owned interactive rows on the shared Pressable primitive', async () => {
