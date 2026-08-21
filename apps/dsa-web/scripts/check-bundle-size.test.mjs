@@ -615,4 +615,19 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(extraFamily.maxGzipBytes).toBe(extraFamily.measuredGzipBytes + 400);
     expect(extraFamily.maxGzipBytes).toBeGreaterThan(extra.maxGzipBytes);
   });
+
+  it('seeds criticalPath from index.html modulepreload at the measured total', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const criticalPath = budget.aggregateRules.find((rule) => rule.id === 'criticalPath');
+
+    expect(criticalPath).toEqual(expect.objectContaining({
+      id: 'criticalPath',
+      source: 'indexHtmlModulepreload',
+      match: ['assets/index-*.js'],
+    }));
+    expect(criticalPath.measuredGzipBytes).toBe(373653);
+    expect(criticalPath.maxGzipBytes).toBe(criticalPath.measuredGzipBytes);
+    expect(budget.aggregateRules[budget.aggregateRules.length - 1].id).toBe('criticalPath');
+    expect(budget.rules.some((rule) => rule.id === 'criticalPath')).toBe(false);
+  });
 });
