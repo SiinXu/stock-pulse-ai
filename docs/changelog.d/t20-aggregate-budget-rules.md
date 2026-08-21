@@ -1,0 +1,1 @@
+- [Tests] Added a criticalPath aggregate family that sums the entry script and every modulepreload link in the built index.html (Refs #883).
