@@ -419,13 +419,9 @@ async def send_chat_to_notification(request: SendChatRequest):
     """
     Send chat session content to configured notification channels.
     Uses run_in_executor to avoid blocking the event loop.
-
-    Returns the shared dispatch contract (Issue #1081): overall ``success``
-    stays true when any channel succeeds, while ``status`` and ``channels``
-    expose mixed ``channel`` / ``ok`` / ``error`` results. Chat analysis is
-    not performed here; a partial notify failure is not rewritten as
-    ``no_channels``.
     """
+    # Response body stays OpenAPI-unknown. Issue #1081 adds status/channels
+    # without changing the historical success bool or no_channels error.
     from src.notification import NotificationService
     from src.notification_parts.dispatch import dispatch_channel_summaries
 
