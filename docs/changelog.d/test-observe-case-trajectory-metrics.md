@@ -1,0 +1,1 @@
+- [Tests] Blocking offline pytest now evaluates a real observe_case tool log so trajectory sample_size and tool_selection_precision cannot go missing unnoticed.

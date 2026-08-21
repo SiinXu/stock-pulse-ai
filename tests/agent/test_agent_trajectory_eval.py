@@ -13,6 +13,7 @@ from src.schemas.agent_trajectory import (
     FAILURE_CLASS_GUARDED,
     MAX_REPORTED_REJECTED_CALLS,
     PATH_ORCHESTRATOR,
+    TrajectoryToolCallInput,
 )
 from src.services.agent_trajectory_eval_service import (
     MAX_EVALUATED_CALLS,
@@ -23,6 +24,8 @@ from src.services.agent_trajectory_eval_service import (
     normalize_tool_arguments,
     strict_json_dumps,
 )
+from tests.agent.benchmark.loader import iter_scenarios, load_source_case
+from tests.agent_runtime_replay import observe_case
 
 
 def _call(
@@ -293,6 +296,54 @@ def test_extra_redacted_runner_fields_do_not_reject_valid_calls() -> None:
     assert result.metrics.retry_rate == 0.0
     assert result.metrics.cache_hit_rate == 0.0
     assert "result_preview" not in result.steps[0].model_dump()
+
+
+def test_observe_case_tool_log_keeps_selection_metrics_available() -> None:
+    """Blocking-suite join: real observe_case logs must still yield selection rates.
+
+    ``tests/agent/benchmark/test_offline_benchmark.py`` carries the
+    ``benchmark`` marker, so the offline gate
+    (``pytest -m "not network and not benchmark"``) never runs that module.
+    This test is unmarked and feeds a live ``observe_case`` tool log — which
+    includes extra redacted keys such as ``result_preview`` — into
+    ``evaluate_agent_trajectory``.
+    """
+    scenario = next(item for item in iter_scenarios() if item["id"] == "bench-a-happy-path")
+    source_case = load_source_case(str(scenario["source_case"]))
+    observed = observe_case(source_case)
+    tool_calls = observed["tool_calls"]
+    assert isinstance(tool_calls, list) and tool_calls
+
+    documented = TrajectoryToolCallInput.model_fields
+    extra_keys: set[str] = set()
+    for call in tool_calls:
+        assert isinstance(call, dict)
+        extra_keys.update(key for key in call if key not in documented)
+    assert "result_preview" in extra_keys
+
+    tool_rubric = scenario["evaluation"]["tool_usage_discipline"]
+    source_context = source_case["input"]["context"]
+    result = evaluate_agent_trajectory(
+        [
+            {
+                "run_id": str(source_case["id"]),
+                "execution_id": f"offline-replay:{source_case['id']}",
+                "task_id": str(scenario["id"]),
+                "agent_id": "offline-single-agent",
+                "stock_code": source_context["stock_code"],
+                "market": scenario["market"],
+                "completed": observed["success"],
+                "tool_calls": tool_calls,
+            }
+        ],
+        rubric={
+            "required_tools": list(tool_rubric["required_tools"]),
+            "forbidden_tools": list(tool_rubric["forbidden_tools"]),
+        },
+    )
+
+    assert result.metrics.sample_size > 0
+    assert result.metrics.tool_selection_precision is not None
 
 
 def test_extra_runner_fields_do_not_bypass_strict_boolean_validation() -> None:
