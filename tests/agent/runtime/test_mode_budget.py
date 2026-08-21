@@ -3,9 +3,10 @@
 
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
 from typing import List
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -18,6 +19,7 @@ from src.agent.runtime.mode_budget import (
     budget_breach_from_max_steps,
     create_mode_budget_account,
     estimate_usage_cost_usd,
+    get_or_create_context_budget_account,
     resolve_mode_budget_limits,
 )
 from src.config import Config
@@ -356,18 +358,139 @@ def test_classic_analyzer_does_not_import_mode_budget():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_config_has_no_undocumented_per_mode_budget_override_fields():
-    """Per-mode AGENT_MODE_BUDGET_<MODE>_* env keys are not a Config side channel."""
-    documented = {
-        "agent_mode_budget_enabled",
-        "agent_mode_budget_max_llm_turns",
-        "agent_mode_budget_max_tool_calls",
-        "agent_mode_budget_max_cost_usd",
-        "agent_mode_budget_max_tokens",
-    }
-    leftover = [
+_PER_MODE_BUDGET_FIELDS = (
+    "agent_mode_budget_quick_max_llm_turns",
+    "agent_mode_budget_quick_max_tool_calls",
+    "agent_mode_budget_quick_max_cost_usd",
+    "agent_mode_budget_standard_max_llm_turns",
+    "agent_mode_budget_standard_max_tool_calls",
+    "agent_mode_budget_standard_max_cost_usd",
+    "agent_mode_budget_full_max_llm_turns",
+    "agent_mode_budget_full_max_tool_calls",
+    "agent_mode_budget_full_max_cost_usd",
+    "agent_mode_budget_specialist_max_llm_turns",
+    "agent_mode_budget_specialist_max_tool_calls",
+    "agent_mode_budget_specialist_max_cost_usd",
+    "agent_mode_budget_chat_max_llm_turns",
+    "agent_mode_budget_chat_max_tool_calls",
+    "agent_mode_budget_chat_max_cost_usd",
+)
+
+
+def test_config_keeps_documented_per_mode_budget_override_fields():
+    """Per-mode overrides stay Config attributes (not a silent deletion)."""
+    missing = [
         name
-        for name in Config.__dataclass_fields__
-        if name.startswith("agent_mode_budget_") and name not in documented
+        for name in _PER_MODE_BUDGET_FIELDS
+        if name not in Config.__dataclass_fields__
     ]
-    assert leftover == []
+    assert missing == []
+
+
+def test_per_mode_override_takes_effect_for_multi():
+    """A documented per-mode Config override still binds Multi's context account."""
+    cfg = SimpleNamespace(
+        agent_mode_budget_enabled=True,
+        agent_mode_budget_max_llm_turns=0,
+        agent_mode_budget_max_tool_calls=0,
+        agent_mode_budget_max_cost_usd=0.0,
+        agent_mode_budget_max_tokens=0,
+        agent_mode_budget_quick_max_tool_calls=4,
+        agent_mode_budget_quick_max_llm_turns=0,
+        agent_mode_budget_quick_max_cost_usd=0.0,
+        agent_mode_budget_full_max_tool_calls=0,
+    )
+    quick_ctx = SimpleNamespace(meta={"orchestrator_mode": "quick"})
+    quick_account = get_or_create_context_budget_account(
+        quick_ctx, cfg, mode="quick"
+    )
+    assert quick_account.limits.mode == "quick"
+    assert quick_account.limits.max_tool_calls == 4
+    assert quick_account.limits.max_llm_turns == 6
+    assert quick_account.limits.max_cost_usd == pytest.approx(0.15)
+
+    full_ctx = SimpleNamespace(meta={"orchestrator_mode": "full"})
+    full_account = get_or_create_context_budget_account(full_ctx, cfg, mode="full")
+    assert full_account.limits.mode == "full"
+    assert full_account.limits.max_tool_calls == 48
+
+
+def test_per_mode_override_zero_keeps_mode_default():
+    """0 on a per-mode override still means 'keep mode default', not unlimited."""
+    cfg = SimpleNamespace(
+        agent_mode_budget_enabled=True,
+        agent_mode_budget_quick_max_tool_calls=0,
+        agent_mode_budget_quick_max_llm_turns=0,
+        agent_mode_budget_quick_max_cost_usd=0.0,
+    )
+    limits = resolve_mode_budget_limits(cfg, mode="quick")
+    assert limits.max_tool_calls == 16
+    assert limits.max_llm_turns == 6
+    assert limits.max_cost_usd == pytest.approx(0.15)
+
+
+def test_global_tightener_mins_with_per_mode_override():
+    """A positive global tightener still takes min() after a per-mode override."""
+    cfg = SimpleNamespace(
+        agent_mode_budget_enabled=True,
+        agent_mode_budget_max_tool_calls=3,
+        agent_mode_budget_max_llm_turns=0,
+        agent_mode_budget_max_cost_usd=0.0,
+        agent_mode_budget_max_tokens=0,
+        agent_mode_budget_quick_max_tool_calls=8,
+    )
+    limits = resolve_mode_budget_limits(cfg, mode="quick")
+    assert limits.max_tool_calls == 3
+
+
+def test_chat_factory_honors_per_mode_chat_override():
+    """Passing Config into Chat means agent_mode_budget_chat_max_* now applies."""
+    cfg = SimpleNamespace(
+        agent_mode_budget_enabled=True,
+        agent_mode_budget_max_tool_calls=0,
+        agent_mode_budget_max_llm_turns=0,
+        agent_mode_budget_max_cost_usd=0.0,
+        agent_mode_budget_max_tokens=0,
+        agent_mode_budget_chat_max_tool_calls=1,
+        agent_mode_budget_chat_max_llm_turns=0,
+        agent_mode_budget_chat_max_cost_usd=0.0,
+    )
+    t1 = ToolCall(id="c1", name="echo", arguments={"message": "a"})
+    t2 = ToolCall(id="c2", name="echo", arguments={"message": "b"})
+    adapter = _adapter([
+        _FakeResponse(tool_calls=[t1], content="t1"),
+        _FakeResponse(tool_calls=[t2], content="t2"),
+    ])
+    executor = _chat_executor(adapter=adapter, max_steps=5, config=cfg)
+    result = _run_chat_loop(executor)
+    assert result.success is False
+    assert result.failure_reason == StageFailureReason.BUDGET_TOOLS
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["limits"]["max_tool_calls"] == 1
+    assert result.budget_snapshot["breach"]["reason"] == "budget_tools"
+
+
+def test_per_mode_override_env_maps_onto_config_attributes():
+    """The loader still maps optional AGENT_MODE_BUDGET_<MODE>_MAX_* env vars."""
+    with patch("src.config.setup_env"), patch.object(
+        Config, "_parse_litellm_yaml", return_value=[]
+    ), patch.object(Config, "_parse_stock_email_groups", return_value=[]), patch.dict(
+        os.environ,
+        {
+            "STOCK_LIST": "600519",
+            "AGENT_MODE_BUDGET_QUICK_MAX_TOOL_CALLS": "4",
+            "AGENT_MODE_BUDGET_CHAT_MAX_LLM_TURNS": "7",
+        },
+        clear=True,
+    ):
+        loaded = Config._load_from_env()
+    try:
+        assert loaded.agent_mode_budget_quick_max_tool_calls == 4
+        assert loaded.agent_mode_budget_chat_max_llm_turns == 7
+        quick = resolve_mode_budget_limits(loaded, mode="quick")
+        assert quick.max_tool_calls == 4
+        chat = resolve_mode_budget_limits(loaded, mode="chat", chat=True)
+        assert chat.max_llm_turns == 7
+        assert chat.max_tool_calls == 24
+    finally:
+        Config.reset_instance()

@@ -906,6 +906,66 @@ class _ConfigLoadingMethods:
                 field_name='AGENT_MODE_BUDGET_MAX_TOKENS',
                 minimum=0,
             ),
+            agent_mode_budget_quick_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_quick_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_quick_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_QUICK_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_QUICK_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_standard_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_standard_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_standard_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_STANDARD_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_STANDARD_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_full_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_full_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_full_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_FULL_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_FULL_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_specialist_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_specialist_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_specialist_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_SPECIALIST_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_SPECIALIST_MAX_COST_USD', minimum=0.0,
+            ),
+            agent_mode_budget_chat_max_llm_turns=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_LLM_TURNS'), 0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_LLM_TURNS', minimum=0,
+            ),
+            agent_mode_budget_chat_max_tool_calls=parse_env_int(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_TOOL_CALLS'), 0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_TOOL_CALLS', minimum=0,
+            ),
+            agent_mode_budget_chat_max_cost_usd=parse_env_float(
+                os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_COST_USD'), 0.0,
+                field_name='AGENT_MODE_BUDGET_CHAT_MAX_COST_USD', minimum=0.0,
+            ),
             agent_critic_enabled=parse_env_bool(
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,

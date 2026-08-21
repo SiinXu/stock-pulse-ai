@@ -1,1 +1,3 @@
-- [Fixed] Honor AGENT_MODE_BUDGET_ENABLED on the Chat/single-agent loop so disabling mode budgets no longer leaves Chat clipped to the default caps (Refs #1121).
+- [Fixed] Honor AGENT_MODE_BUDGET_ENABLED and the global AGENT_MODE_BUDGET_MAX_* tighteners on the Chat/single-agent loop so disabling mode budgets no longer leaves Chat clipped to the default caps (Refs #1121).
+- [Changed] Chat/single-agent now also honors existing per-mode Config overrides (`agent_mode_budget_chat_max_*`), which previously applied only to Multi.
+- [Docs] Keep the documented per-mode Config overrides (`agent_mode_budget_<mode>_max_*` for quick|standard|full|specialist|chat). They remain Config attributes with optional unregistered env mapping; they are not Web Settings keys.
