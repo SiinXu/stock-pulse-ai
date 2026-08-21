@@ -337,6 +337,8 @@ describe('InvestmentFrameworkSettingsCard', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
     expect(await screen.findByText('配置已被其他操作更新。')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '载入服务器最新版本' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '保存新版本' })).toBeEnabled();
     expect(getFramework).toHaveBeenCalledTimes(1);
     const conflictDraftDialog = await openFrameworkBasics();
     expect(within(conflictDraftDialog).getByLabelText('自由规则')).toHaveValue(

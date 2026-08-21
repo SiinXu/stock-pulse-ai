@@ -156,15 +156,31 @@ export type BusyRecoveryKind =
   | 'reload'
   | 'none';
 
+/**
+ * Revision-conflict codes whose mapper class is still `generic` because they
+ * are not in `CONFIG_CONFLICT_CODES`. The async-task contract still assigns
+ * them `reload` (see `docs/async-task-ux-contract.md`).
+ */
+const REVISION_CONFLICT_RECOVERY_CODES = new Set([
+  'approval_version_conflict',
+  'approval_invalid_transition',
+  'investment_framework_revision_conflict',
+]);
+
 export function resolveBusyRecoveryKind(
   error: ParsedApiError | null | undefined,
 ): BusyRecoveryKind {
   if (!error) return 'none';
   const mapping = mapApiErrorToActionable(error);
-  if (mapping.class === 'config_conflict') return 'reload';
+  const code = (error.code || mapping.technicalCode || '').trim();
+  if (
+    mapping.class === 'config_conflict'
+    || REVISION_CONFLICT_RECOVERY_CODES.has(code)
+  ) {
+    return 'reload';
+  }
   if (mapping.class !== 'busy') return 'none';
 
-  const code = (error.code || mapping.technicalCode || '').trim();
   if (
     code === 'duplicate_task'
     || code === 'duplicate_market_review'

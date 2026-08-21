@@ -7,6 +7,7 @@ import { investmentFrameworkApi } from '../../api/investmentFramework';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatDateTime } from '../../utils/format';
+import { resolveBusyRecoveryDecision } from '../../utils/asyncTaskUx';
 import type {
   InvestmentFrameworkContent,
   InvestmentFrameworkHistoryItem,
@@ -68,7 +69,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [isConflict, setIsConflict] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [serverValidationIssues, setServerValidationIssues] = useState<
     InvestmentFrameworkValidationIssue[]
@@ -94,7 +94,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setChangeSummary('');
         setShowValidation(false);
       }
-      setIsConflict(false);
       return true;
     } catch (err) {
       const parsed = getParsedApiError(err);
@@ -106,7 +105,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
           setChangeSummary('');
           setShowValidation(false);
         }
-        setIsConflict(false);
         return true;
       }
       setLoadError(parsed);
@@ -265,7 +263,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setSuccessMessage(t('settings.frameworkSaved'));
       }
       setShowValidation(false);
-      setIsConflict(false);
       await loadHistory(!exists);
     } catch (err) {
       const parsed = getParsedApiError(err);
@@ -276,10 +273,6 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         setShowValidation(true);
       }
       setError(parsed);
-      setIsConflict(
-        parsed.status === 409
-        || parsed.code === 'investment_framework_revision_conflict',
-      );
     } finally {
       setIsSubmitting(false);
     }
@@ -301,12 +294,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         await loadHistory();
       }
     } catch (err) {
-      const parsed = getParsedApiError(err);
-      setError(parsed);
-      setIsConflict(
-        parsed.status === 409
-        || parsed.code === 'investment_framework_revision_conflict',
-      );
+      setError(getParsedApiError(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -336,6 +324,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
     }
   };
 
+  const isConflict = resolveBusyRecoveryDecision(error).kind === 'reload';
   const selectedHistory = history?.items.find(
     (item) => item.version === selectedHistoryVersion,
   ) ?? null;

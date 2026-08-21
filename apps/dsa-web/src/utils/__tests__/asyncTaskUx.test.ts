@@ -127,6 +127,30 @@ describe('asyncTaskUx', () => {
         code: 'config_version_conflict',
         status: 409,
       }))).toBe('reload');
+      expect(resolveBusyRecoveryKind(createParsedApiError({
+        title: 'conflict',
+        message: 'conflict',
+        code: 'approval_version_conflict',
+        status: 409,
+      }))).toBe('reload');
+      expect(resolveBusyRecoveryKind(createParsedApiError({
+        title: 'conflict',
+        message: 'conflict',
+        code: 'approval_invalid_transition',
+        status: 409,
+      }))).toBe('reload');
+      expect(resolveBusyRecoveryKind(createParsedApiError({
+        title: 'conflict',
+        message: 'conflict',
+        code: 'investment_framework_revision_conflict',
+        status: 409,
+      }))).toBe('reload');
+      expect(resolveBusyRecoveryKind(createParsedApiError({
+        title: 'unavailable',
+        message: 'unavailable',
+        code: 'rollback_unavailable',
+        status: 409,
+      }))).toBe('none');
     });
 
     it('exposes a production decision with attachable task identity', () => {
