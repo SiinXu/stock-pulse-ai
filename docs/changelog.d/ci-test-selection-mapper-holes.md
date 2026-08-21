@@ -1,1 +1,2 @@
 - [Fixed] PR-tier backend test selection maps `src/market`, `src/schemas`, `src/agent`, and `src/migrations` to their existing tests and fails closed to the full suite when a mapping evaporates.
+- [Fixed] PR-tier test selection fails closed to the full suite for non-collectable `tests/` paths (including `tests/fixtures/**`) and empty-tuple mappings outside the `docs/` and `apps/dsa-web/` NONE allowlist.

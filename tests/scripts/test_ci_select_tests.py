@@ -40,6 +40,7 @@ def test_config_forces_full_suite() -> None:
 def test_non_collectable_test_support_forces_full_suite() -> None:
     assert select_targets(["tests/system_config_service_test_support.py"]) == "FULL"
     assert select_targets(["tests/services/conftest.py"]) == "FULL"
+    assert select_targets(["tests/analysis_quality/assertions.py"]) == "FULL"
 
 
 def test_data_provider_roots_map_to_provider_tests() -> None:
@@ -114,6 +115,27 @@ def test_docs_only_is_none() -> None:
     assert select_targets(["docs/CHANGELOG.md", "docs/FAQ.md"]) == []
 
 
+def test_web_only_is_none() -> None:
+    assert select_targets(["apps/dsa-web/src/main.tsx"]) == []
+
+
+def test_tests_fixtures_fail_closed_to_full_suite() -> None:
+    """Fixture-only PRs must not select NONE (collection smoke, then green)."""
+
+    assert select_targets(["tests/fixtures/schema_migrations/v3_4_0.sql"]) == "FULL"
+    assert select_targets(["tests/fixtures/provider_contracts/manifest.json"]) == "FULL"
+    assert select_targets(["tests/fixtures/ocr/sample_chart_annotation.png"]) == "FULL"
+    assert select_targets([
+        "docs/CHANGELOG.md",
+        "tests/fixtures/schema_migrations/v3_4_0.sql",
+    ]) == "FULL"
+
+
+def test_collectable_test_module_maps_to_itself() -> None:
+    assert select_targets(["tests/test_storage.py"]) == ["tests/test_storage.py"]
+    assert select_targets(["tests/api/test_api_health.py"]) == ["tests/api/test_api_health.py"]
+
+
 def test_empty_paths_full() -> None:
     assert select_targets([]) == "FULL"
 
@@ -144,17 +166,32 @@ def test_empty_glob_mapping_fails_closed_to_full_suite(monkeypatch) -> None:
     assert select_targets(["stale_src/mod.py"]) == "FULL"
 
 
+def test_empty_tuple_mapping_outside_allowlist_fails_closed_to_full_suite(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        ci_select_tests,
+        "PATH_TO_TARGETS",
+        (("src/market/", ()),) + ci_select_tests.PATH_TO_TARGETS,
+    )
+    assert select_targets(["src/market/analyzer.py"]) == "FULL"
+
+
 def test_declared_mapping_targets_exist() -> None:
     root = Path(ci_select_tests.REPO_ROOT)
+    empty_prefixes = []
     for prefix, targets in ci_select_tests.PATH_TO_TARGETS:
+        if not targets:
+            empty_prefixes.append(prefix)
+            continue
         for target in targets:
-            if not target:
-                continue
+            assert target, f"{prefix} includes an empty-string target"
             if any(char in target for char in "*?["):
                 matches = list(root.glob(target))
                 assert matches, f"{prefix} glob {target!r} matched nothing"
                 continue
             assert (root / target).exists(), f"{prefix} maps to missing {target}"
+    assert set(empty_prefixes) == set(ci_select_tests.NONE_PREFIXES)
 
 
 def test_cli_paths_file_prints_full_for_unmapped(tmp_path, capsys) -> None:
@@ -162,6 +199,23 @@ def test_cli_paths_file_prints_full_for_unmapped(tmp_path, capsys) -> None:
     paths_file.write_text("unknown_tree/x.py\n", encoding="utf-8")
     assert ci_select_tests.main(["--paths-file", str(paths_file)]) == 0
     assert capsys.readouterr().out == "FULL\n"
+
+
+def test_cli_paths_file_prints_full_for_tests_fixtures(tmp_path, capsys) -> None:
+    paths_file = tmp_path / "paths.txt"
+    paths_file.write_text(
+        "tests/fixtures/schema_migrations/v3_4_0.sql\n",
+        encoding="utf-8",
+    )
+    assert ci_select_tests.main(["--paths-file", str(paths_file)]) == 0
+    assert capsys.readouterr().out == "FULL\n"
+
+
+def test_cli_paths_file_prints_none_only_for_allowlist(tmp_path, capsys) -> None:
+    paths_file = tmp_path / "paths.txt"
+    paths_file.write_text("docs/CHANGELOG.md\napps/dsa-web/src/main.tsx\n", encoding="utf-8")
+    assert ci_select_tests.main(["--paths-file", str(paths_file)]) == 0
+    assert capsys.readouterr().out == "NONE\n"
 
 
 def test_missing_merge_base_fails_closed_to_full_suite(

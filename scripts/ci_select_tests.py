@@ -9,11 +9,14 @@ avoid a full-suite run. The mapper fails closed to ``FULL`` when:
 - mapping is uncertain (shared infrastructure, config, conftest)
 - the merge-base cannot be proven
 - a changed path matches no mapping
+- a ``tests/`` path is not a collectable ``test_*.py`` module
+- a mapping is an empty tuple outside ``NONE_PREFIXES``
 - a mapping's targets are all missing or its globs match nothing
 
 Hosted CI must schedule the four ``backend-tests`` shards for ``FULL``;
 ``offline-tests-selective`` refuses to run the unsharded suite. ``NONE`` is
-reserved for paths that map to an empty target list by design (docs, web).
+allowed only for the explicit ``NONE_PREFIXES`` allowlist (``docs/`` and
+``apps/dsa-web/``). Any other empty selection is ``FULL``.
 
 Usage:
   python scripts/ci_select_tests.py --base origin/main
@@ -50,6 +53,13 @@ FULL_SUITE_PREFIXES: tuple[str, ...] = (
     "src/config_parts/",
     "src/core/config_registry",
     ".github/workflows/ci.yml",
+)
+
+# CLI ``NONE`` (empty pytest target list) is allowed only for these prefixes.
+# Empty-tuple mappings outside this allowlist fail closed to ``FULL``.
+NONE_PREFIXES: tuple[str, ...] = (
+    "apps/dsa-web/",
+    "docs/",
 )
 
 # First-match path map: longer prefixes must be listed before shorter ones
@@ -92,7 +102,6 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("src/storage", ("tests/test_storage.py", "tests/storage")),
     ("src/", ("tests/",)),
     ("scripts/", ("tests/scripts", "tests/test_ci_workflow.py")),
-    ("tests/", ()),  # filled from the changed path itself
     ("apps/dsa-web/", ()),  # web-only; backend selective returns empty → smoke only
     ("docs/", ()),
     (".github/", ("tests/test_ci_workflow.py",)),
@@ -122,12 +131,23 @@ def _git_diff_names(base: str) -> list[str] | None:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def _matches_prefix(path: str, prefix: str) -> bool:
+    return path == prefix.rstrip("/") or path.startswith(prefix)
+
+
 def _forces_full(path: str) -> bool:
     normalized = path.replace("\\", "/")
-    for prefix in FULL_SUITE_PREFIXES:
-        if normalized == prefix or normalized.startswith(prefix):
-            return True
-    return False
+    return any(_matches_prefix(normalized, prefix) for prefix in FULL_SUITE_PREFIXES)
+
+
+def _is_none_allowlisted(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return any(_matches_prefix(normalized, prefix) for prefix in NONE_PREFIXES)
+
+
+def _is_collectable_pytest_module(path: str) -> bool:
+    filename = path.rsplit("/", 1)[-1]
+    return path.endswith(".py") and filename.startswith("test_")
 
 
 def _is_glob(target: str) -> bool:
@@ -152,18 +172,26 @@ def _expand_target(target: str) -> set[str]:
 
 def _targets_for_path(path: str) -> set[str]:
     normalized = path.replace("\\", "/")
-    if normalized.startswith("tests/") and normalized.endswith(".py"):
-        # Pytest only collects ``test_*.py`` in this repository.  Helper,
-        # fixture, and nested conftest modules can affect many consumers, but
-        # passing one of them as the sole explicit target collects zero tests
-        # and makes pytest exit 5.  Their dependency surface is not encoded in
+    if normalized.startswith("tests/"):
+        # Pytest only collects ``test_*.py`` in this repository. Helper
+        # modules, nested conftest, fixtures, SQL/JSON/images, and other
+        # support files can affect many consumers. Passing one of them as
+        # the sole explicit target collects zero tests (pytest exit 5) or
+        # skips the consumers. Their dependency surface is not encoded in
         # this lightweight mapper, so fail closed to the full suite.
-        if not normalized.rsplit("/", 1)[-1].startswith("test_"):
-            return {"FULL"}
-        return {normalized}
+        if _is_collectable_pytest_module(normalized):
+            return {normalized}
+        return {"FULL"}
     for prefix, targets in PATH_TO_TARGETS:
-        if normalized == prefix.rstrip("/") or normalized.startswith(prefix):
-            return {target for target in targets if target}
+        if not _matches_prefix(normalized, prefix):
+            continue
+        selected = {target for target in targets if target}
+        if selected:
+            return selected
+        # Empty mapping is NONE only on the explicit allowlist.
+        if _is_none_allowlisted(normalized):
+            return set()
+        return {"FULL"}
     # Unknown top-level paths → full suite for safety.
     return {"FULL"}
 
@@ -196,8 +224,10 @@ def select_targets(paths: Sequence[str]) -> list[str] | str:
     if not existing:
         if mapped_any:
             return "FULL"
-        # Docs/web-only changes: empty mapping by design.
-        return []
+        # Empty selection is NONE only when every path is on the allowlist.
+        if paths and all(_is_none_allowlisted(path) for path in paths):
+            return []
+        return "FULL"
     return existing
 
 
