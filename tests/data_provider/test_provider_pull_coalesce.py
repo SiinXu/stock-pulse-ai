@@ -158,6 +158,63 @@ def test_concurrent_same_key_coalesces_to_one_load() -> None:
     assert cache.stats()["stores"] == 1
 
 
+def test_delayed_claim_after_owner_stores_reuses_warm_cache() -> None:
+    started = threading.Event()
+    release = threading.Event()
+    loader = _RecordingLoader(
+        result="ok",
+        delay_event=started,
+        release_event=release,
+    )
+    cache = ProviderPullCoalesce(ttl_seconds=5.0)
+    enter_claim = threading.Event()
+    allow_claim = threading.Event()
+    begin_calls = {"n": 0}
+    original_begin = cache._begin_inflight
+
+    def gated_begin(key):
+        begin_calls["n"] += 1
+        if begin_calls["n"] > 1:
+            enter_claim.set()
+            assert allow_claim.wait(timeout=5.0)
+        return original_begin(key)
+
+    setattr(cache, "_begin_inflight", gated_begin)
+
+    results: List[Any] = [None, None]
+    errors: List[BaseException] = []
+
+    def _worker(index: int) -> None:
+        try:
+            results[index] = cache.get_or_load(
+                provider="EfinanceFetcher",
+                symbol="600519",
+                as_of="2026-08-21T12:00:00Z",
+                capability=REALTIME_QUOTE_CAPABILITY,
+                loader=loader,
+            )
+        except BaseException as exc:
+            errors.append(exc)
+
+    owner = threading.Thread(target=_worker, args=(0,))
+    late = threading.Thread(target=_worker, args=(1,))
+    owner.start()
+    assert started.wait(timeout=2.0)
+    late.start()
+    assert enter_claim.wait(timeout=2.0)
+    release.set()
+    owner.join(timeout=5.0)
+    allow_claim.set()
+    late.join(timeout=5.0)
+
+    assert errors == []
+    assert results == ["ok", "ok"]
+    assert loader.calls == 1
+    assert cache.stats()["loads"] == 1
+    assert cache.stats()["stores"] == 1
+    assert cache.stats()["hits"] == 1
+
+
 def test_cached_quote_is_isolated_from_caller_mutation() -> None:
     quote = _quote()
     cache = ProviderPullCoalesce(ttl_seconds=5.0)

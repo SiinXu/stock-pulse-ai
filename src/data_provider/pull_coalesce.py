@@ -227,6 +227,14 @@ class ProviderPullCoalesce:
 
     def _begin_inflight(self, key: CacheKey) -> Tuple[_InflightSlot, bool]:
         with self._lock:
+            # Re-check under the same lock as the claim so a caller that
+            # missed cache, then paused while another owner stored and
+            # cleared the slot, cannot become a new owner of a warm entry.
+            cached = self._cache_get(key)
+            if cached is not None:
+                ready = _InflightSlot()
+                ready.set_result(cached)
+                return ready, False
             existing = self._inflight.get(key)
             if existing is not None:
                 self._coalesced += 1
