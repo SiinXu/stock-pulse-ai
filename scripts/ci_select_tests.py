@@ -16,7 +16,10 @@ avoid a full-suite run. The mapper fails closed to ``FULL`` when:
 Hosted CI must schedule the four ``backend-tests`` shards for ``FULL``;
 ``offline-tests-selective`` refuses to run the unsharded suite. ``NONE`` is
 allowed only for the explicit ``NONE_PREFIXES`` allowlist (``docs/`` and
-``apps/dsa-web/``). Any other empty selection is ``FULL``.
+``apps/dsa-web/``) excluding ``BACKEND_WEB_CONTRACT_PREFIXES`` (the
+``backend_web_contract`` paths in ``.github/workflows/ci.yml``). Those
+shared web/runtime files map to the backend tests that cover the contract.
+Any other empty selection is ``FULL``.
 
 Usage:
   python scripts/ci_select_tests.py --base origin/main
@@ -57,9 +60,23 @@ FULL_SUITE_PREFIXES: tuple[str, ...] = (
 
 # CLI ``NONE`` (empty pytest target list) is allowed only for these prefixes.
 # Empty-tuple mappings outside this allowlist fail closed to ``FULL``.
+# ``BACKEND_WEB_CONTRACT_PREFIXES`` live under ``apps/dsa-web/`` but are not
+# NONE: they are the ``backend_web_contract`` filter in ci.yml.
 NONE_PREFIXES: tuple[str, ...] = (
     "apps/dsa-web/",
     "docs/",
+)
+
+# Same path set as ci.yml ``backend_web_contract``. Longer prefixes listed
+# before ``apps/dsa-web/`` in ``PATH_TO_TARGETS`` so first-match cannot yield
+# NONE. Keep this tuple in lockstep with that YAML filter.
+BACKEND_WEB_CONTRACT_PREFIXES: tuple[str, ...] = (
+    "apps/dsa-web/public/",
+    "apps/dsa-web/src/components/settings/llmProviderTemplates.ts",
+    "apps/dsa-web/src/locales/settingsHelp.ts",
+    "apps/dsa-web/src/locales/settingsHelp.en.ts",
+    "apps/dsa-web/src/locales/settingsHelp.zh.ts",
+    "apps/dsa-web/src/utils/systemConfigI18n.ts",
 )
 
 # First-match path map: longer prefixes must be listed before shorter ones
@@ -102,7 +119,46 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("src/storage", ("tests/test_storage.py", "tests/storage")),
     ("src/", ("tests/",)),
     ("scripts/", ("tests/scripts", "tests/test_ci_workflow.py")),
-    ("apps/dsa-web/", ()),  # web-only; backend selective returns empty → smoke only
+    (
+        "apps/dsa-web/public/",
+        (
+            "tests/data/test_stock_index_loader.py",
+            "tests/test_generate_index_from_csv.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/components/settings/llmProviderTemplates.ts",
+        (
+            "tests/test_daily_analysis_workflow_llm_env.py",
+            "tests/test_provider_catalog.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/locales/settingsHelp.ts",
+        (
+            "tests/scripts/test_merge_resolvers.py",
+            "tests/test_config_registry.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/locales/settingsHelp.en.ts",
+        (
+            "tests/scripts/test_merge_resolvers.py",
+            "tests/test_config_registry.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/locales/settingsHelp.zh.ts",
+        (
+            "tests/scripts/test_merge_resolvers.py",
+            "tests/test_config_registry.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/utils/systemConfigI18n.ts",
+        ("tests/test_config_registry.py",),
+    ),
+    ("apps/dsa-web/", ()),  # remaining web-only; backend selective returns empty → smoke only
     ("docs/", ()),
     (".github/", ("tests/test_ci_workflow.py",)),
 )
@@ -140,8 +196,18 @@ def _forces_full(path: str) -> bool:
     return any(_matches_prefix(normalized, prefix) for prefix in FULL_SUITE_PREFIXES)
 
 
+def _is_backend_web_contract(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return any(
+        _matches_prefix(normalized, prefix) for prefix in BACKEND_WEB_CONTRACT_PREFIXES
+    )
+
+
 def _is_none_allowlisted(path: str) -> bool:
     normalized = path.replace("\\", "/")
+    # Shared web/runtime contracts must not use the apps/dsa-web/ NONE map.
+    if _is_backend_web_contract(normalized):
+        return False
     return any(_matches_prefix(normalized, prefix) for prefix in NONE_PREFIXES)
 
 
