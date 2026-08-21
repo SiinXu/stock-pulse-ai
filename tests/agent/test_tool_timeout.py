@@ -598,22 +598,94 @@ def test_mixed_deadlines_reversed_completion_order_still_fences_late_short():
     assert '"late": true' not in str(result.messages).lower()
 
 
+def _in_flight_freeze_session(registry, *, execution_id, security_audit):
+    from src.agent.runtime.tool_session import BoundToolSession
+
+    return BoundToolSession(
+        registry,
+        execution_id=execution_id,
+        allowed_tools=["slow"],
+        derive_granted_permissions=True,
+        security_audit=security_audit,
+    )
+
+
+def _assert_in_flight_session_ignores_live_registry_refresh(session, registry):
+    registry.set_category_timeouts({"data": 0, "search": 0, "analysis": 0, "action": 0})
+    assert session.category_timeout_seconds("slow") == 0.05
+    assert registry.category_timeout_seconds("data") == 0.0
+    logs = []
+    _execute_tools(
+        [ToolCall(id="call-slow", name="slow", arguments={"message": "slow"})],
+        session,
+        step=1,
+        progress_callback=None,
+        tool_calls_log=logs,
+        tool_wait_timeout_seconds=2.0,
+    )
+    assert logs[0]["timeout"] is True
+    assert logs[0]["success"] is False
+    assert session.category_timeout_seconds("slow") == 0.05
+    assert registry.category_timeout_seconds("data") == 0.0
+
+
 def test_in_flight_session_ignores_live_registry_timeout_refresh():
-    started = threading.Event()
+    """Live registry zeros after BoundToolSession construction must not extend this call.
+
+    Mutate on the test thread after the frozen snapshot exists. Do not gate the
+    proof on the handler starting inside the 0.05s fence: pre-handler audit and
+    thread start can consume that budget, which is the intended dispatch fence.
+    """
     registry = ToolRegistry()
     registry.set_category_timeouts({"data": 0.05})
+    _register_echo(
+        registry,
+        name="slow",
+        category="data",
+        handler=lambda message: time.sleep(0.2) or {"echo": message},
+    )
+    session = _in_flight_freeze_session(
+        registry,
+        execution_id="in-flight-freeze",
+        security_audit=SecurityAuditRecorderStub(),
+    )
+    _assert_in_flight_session_ignores_live_registry_refresh(session, registry)
+
+
+def test_in_flight_session_timeout_snapshot_survives_pre_handler_audit_hold():
+    """CI counterexample: 0.05s fence expires during record_attempt; freeze still holds.
+
+    Hosted backend-tests 3/4 failed when ``started.is_set()`` raced the same
+    50ms cap used as the product timeout. Hold attempt-audit past the fence so
+    the handler never runs, then prove the live-registry refresh still cannot
+    extend the in-flight wait.
+    """
+    release_attempt = threading.Event()
+
+    class HoldingAudit(SecurityAuditRecorderStub):
+        def record_attempt(self, **fields):
+            release_attempt.wait(timeout=1.0)
+            super().record_attempt(**fields)
+
+    registry = ToolRegistry()
+    registry.set_category_timeouts({"data": 0.05})
+    started = threading.Event()
 
     def handler(message):
         started.set()
-        registry.set_category_timeouts({"data": 0, "search": 0, "analysis": 0, "action": 0})
-        time.sleep(0.2)
-        return {"echo": message}
+        return time.sleep(0.2) or {"echo": message}
 
     _register_echo(registry, name="slow", category="data", handler=handler)
-    result = _run_named_tools(registry, [{"name": "slow"}], global_timeout=2.0)
-    assert started.is_set()
-    assert result.tool_calls_log[0]["timeout"] is True
-    assert result.tool_calls_log[0]["success"] is False
+    session = _in_flight_freeze_session(
+        registry,
+        execution_id="in-flight-freeze-audit-hold",
+        security_audit=HoldingAudit(),
+    )
+    try:
+        _assert_in_flight_session_ignores_live_registry_refresh(session, registry)
+        assert not started.is_set()
+    finally:
+        release_attempt.set()
 
 
 def test_new_session_uses_refreshed_registry_timeouts():

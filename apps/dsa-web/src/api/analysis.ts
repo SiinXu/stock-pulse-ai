@@ -22,7 +22,24 @@ import type { RunFlowSnapshot } from '../types/runFlow';
 import { serializeMarketReviewRegions } from '../utils/marketReviewRegion';
 // Generated OpenAPI components document the backend snake_case contract for
 // analysis task/status/list/market-review/run-flow responses.
-import type { components } from '../types/api.generated';
+import type { components, paths } from '../types/api.generated';
+
+/**
+ * OpenAPI path a future analysis-task cancel route would occupy.
+ * Discovery cancel (`/api/v1/discover/screen/tasks/{task_id}/cancel`) is
+ * kind-scoped to candidate discovery and must not be reused here.
+ */
+type AnalysisTaskCancelPath = '/api/v1/analysis/tasks/{task_id}/cancel';
+
+/**
+ * Whether the generated OpenAPI document exposes analysis-task cancel.
+ * The process-local queue can cancel (`TaskExecutionPort.cancel`), but the
+ * analysis HTTP surface currently has list/status/stream/flow only.
+ * Keep this `false` (and do not render a cancel control) until the path exists.
+ */
+export const ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE: (
+  AnalysisTaskCancelPath extends keyof paths ? true : false
+) = false;
 
 type OpenApiAnalysisResultResponse = components['schemas']['AnalysisResultResponse'];
 type OpenApiTaskAccepted = components['schemas']['TaskAccepted'];

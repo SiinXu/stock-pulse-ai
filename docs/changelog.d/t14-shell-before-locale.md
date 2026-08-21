@@ -1,0 +1,1 @@
+- [Changed] Rendered the app shell before the locale bundle resolves (Refs #883).

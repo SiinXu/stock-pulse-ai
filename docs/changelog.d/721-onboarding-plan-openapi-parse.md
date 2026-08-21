@@ -1,0 +1,1 @@
+- [Changed] Fail-closed Web onboarding plan/apply/state/reset JSON responses with generated OpenAPI anchors and Zod (Refs #721).

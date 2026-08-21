@@ -153,13 +153,23 @@ Additional modules completed in the remaining-module batch:
 
 - Full migrate: `configProfiles`, `skillOutcomes`, `reportVersionCompare`,
   `valuation`, `reportExport` (capabilities JSON; blob download remains a skip)
-- Anchors on already-validated clients: `auth` (request-only until status schema
-  exists), `notificationInbox`, `outboundActivity`, `onboarding`, `todaysFocus`,
-  `watchlistGroups`, `watchlistScores`, `portfolioRiskMetrics`, `eventCalendar`
-  (alert-trigger list composition)
+- Onboarding JSON: `plan` / `apply` / `state` / `reset` now use the same
+  generated-anchor + `parseCamelCasePayload` fail-closed path as first-run and
+  demo-analysis. Omitted collection fields default to `[]` after a successful
+  parse so wizard `.map` / `.length` call sites stay defined. Extra server keys
+  remain via `.passthrough()`.
+- Anchors on already-validated clients: `auth` (runtime validation present;
+  generated `AuthStatusResponse` now exists on camelCase wire, but the client
+  still anchors the request model), `notificationInbox`, `outboundActivity`,
+  `todaysFocus`, `watchlistGroups`, `watchlistScores`, `portfolioRiskMetrics`,
+  `eventCalendar` (alert-trigger list composition)
 
-Keep issue #721 open until any residual intentional skips are documented and
-owners accept residual risk; use `Refs #721` / `Refs #226` on incremental PRs.
+Keep issue #721 open until residual intentional skips are documented and
+owners accept residual risk: SSE/streaming, binary blob downloads, checker
+`[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
+and whether `--fail-on-pending` becomes a CI gate. Use `Refs #721` /
+`Refs #226` on incremental PRs. Do not close #721 from an onboarding-only
+slice.
 
 ## CI drift gate
 

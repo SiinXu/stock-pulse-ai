@@ -56,6 +56,64 @@
         }
       })();
     </script>
+    <style>
+      /* Non-textual nav frame for first paint. Uses the same chrome colors as
+         the FOUC theme-color script so the shell is visible before JS/CSS. */
+      [data-locale-neutral-shell] {
+        display: flex;
+        min-height: 100dvh;
+        box-sizing: border-box;
+        background: #151514;
+      }
+      html.light [data-locale-neutral-shell] {
+        background: #F7F8F7;
+      }
+      [data-locale-neutral-shell]::before,
+      [data-locale-neutral-shell]::after {
+        content: "";
+        display: block;
+        box-sizing: border-box;
+      }
+      [data-locale-neutral-shell]::before {
+        flex-shrink: 0;
+        width: 2.5rem;
+        height: 2.5rem;
+        margin: max(0.75rem, env(safe-area-inset-top, 0px)) 0.75rem 0;
+        border-radius: 0.5rem;
+        background: rgba(255, 255, 255, 0.08);
+      }
+      [data-locale-neutral-shell]::after {
+        flex: 1;
+        min-width: 0;
+        margin: 0.75rem;
+        border-radius: 0.75rem;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+      }
+      html.light [data-locale-neutral-shell]::before {
+        background: rgba(0, 0, 0, 0.08);
+      }
+      html.light [data-locale-neutral-shell]::after {
+        background: rgb(255, 255, 255);
+        border-color: rgba(0, 0, 0, 0.08);
+      }
+      @media (min-width: 1024px) {
+        [data-locale-neutral-shell]::before {
+          width: 5rem;
+          height: auto;
+          align-self: stretch;
+          margin: 1rem 0.5rem;
+          border-radius: 0.75rem;
+          background: rgba(255, 255, 255, 0.04);
+        }
+        html.light [data-locale-neutral-shell]::before {
+          background: rgba(0, 0, 0, 0.04);
+        }
+        [data-locale-neutral-shell]::after {
+          margin: 1rem 1rem 1rem 0.25rem;
+        }
+      }
+    </style>
     <title>StockPulse</title>
   </head>
   <body>
