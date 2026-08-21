@@ -88,10 +88,13 @@ def _execute_tools(
     def _resolve_tool_wait_timeout(tc_item) -> Optional[float]:
         """Shortest of the batch/global remaining budget and the category cap."""
         from src.agent.runtime.guards import shortest_positive_timeout
+        from src.agent.runtime.tool_session import (
+            resolve_session_category_timeout_seconds,
+        )
 
         return shortest_positive_timeout(
             tool_wait_timeout_seconds,
-            tool_session.category_timeout_seconds(tc_item.name),
+            resolve_session_category_timeout_seconds(tool_session, tc_item.name),
         )
 
     def _build_timeout_execution_result(tc_item, timeout_seconds=None):

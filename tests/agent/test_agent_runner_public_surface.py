@@ -85,7 +85,7 @@ EXPECTED_GROUPS = (
         "_runner_tools",
         "_TOOL_FUNCTION_NAMES",
         ("_execute_tools",),
-        "d0174ff13d87a616293cb57c132373405f5caae917181cd8b469d0e8974f892c",
+        "152ff8cea24e2deee721a11793211d8df54525e1edcd9dc484649f2565c9fff4",
     ),
 )
 

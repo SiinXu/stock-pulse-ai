@@ -83,6 +83,25 @@ class ExecutionFenceRejected(Exception):
         self.details = details
 
 
+def resolve_session_category_timeout_seconds(session: Any, name: Any) -> float:
+    """Return a session-like object's category cap in seconds, else ``0``.
+
+    Established minimal session doubles may omit ``category_timeout_seconds``;
+    that absence means no category cap. Real ``BoundToolSession`` objects keep
+    the construction-time snapshot.
+    """
+    resolver = getattr(session, "category_timeout_seconds", None)
+    if not callable(resolver):
+        return 0.0
+    try:
+        value = float(resolver(name) or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+    if not math.isfinite(value) or value < 0:
+        return 0.0
+    return value
+
+
 class BoundToolSession:
     """Frozen per-execution tool session with fail-closed gates."""
 

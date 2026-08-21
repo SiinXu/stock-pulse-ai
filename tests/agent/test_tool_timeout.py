@@ -5,6 +5,8 @@ from __future__ import annotations
 
 import builtins
 import dis
+import inspect
+import json
 import logging
 import math
 import sys
@@ -21,7 +23,7 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 from src.agent.llm_adapter import LLMResponse, ToolCall
-from src.agent.runner import run_agent_loop
+from src.agent.runner import _execute_tools, run_agent_loop
 from src.agent.runtime.guards import (
     RuntimeGuardPolicy,
     StageFailurePolicy,
@@ -331,6 +333,7 @@ def test_load_category_timeout_config_uses_application_services(monkeypatch):
 
 
 def test_reload_runtime_singletons_injects_live_config(monkeypatch):
+    from src.services.system_config_service import SystemConfigService
     from src.services.system_config_service_parts.core import _SystemConfigCoreMethods
 
     captured = {}
@@ -338,18 +341,26 @@ def test_reload_runtime_singletons_injects_live_config(monkeypatch):
     fake_data_tools = SimpleNamespace(reset_fetcher_manager=lambda: None)
     fake_search = SimpleNamespace(reset_search_service=lambda: None)
 
-    class _Service:
-        def __init__(self):
-            self._runtime_config_provider = lambda: fake_config
-
     monkeypatch.setitem(sys.modules, "src.agent.tools.data_tools", fake_data_tools)
     monkeypatch.setitem(sys.modules, "src.search_service", fake_search)
+    monkeypatch.setattr("src.config.get_config", lambda: fake_config)
     monkeypatch.setattr(
         "src.agent.runtime_assembly.apply_tool_category_timeouts",
         lambda registry=None, config=None: captured.update(config=config),
     )
-    _SystemConfigCoreMethods._reload_runtime_singletons(_Service())
 
+    assert isinstance(
+        inspect.getattr_static(SystemConfigService, "_reload_runtime_singletons"),
+        staticmethod,
+    )
+    assert str(
+        inspect.signature(SystemConfigService._reload_runtime_singletons)
+    ) == "() -> 'None'"
+    SystemConfigService._reload_runtime_singletons()
+    assert captured["config"] is fake_config
+
+    captured.clear()
+    _SystemConfigCoreMethods._reload_runtime_singletons()
     assert captured["config"] is fake_config
 
 
@@ -644,6 +655,120 @@ def test_bound_session_freezes_category_timeout_snapshot():
     assert session.category_timeout_seconds("echo") == 9.0
     with pytest.raises(TypeError):
         session._category_timeouts["data"] = 0  # type: ignore[index]
+
+
+def test_resolve_session_category_timeout_accepts_minimal_and_invalid_doubles():
+    from src.agent.runtime.tool_session import (
+        BoundToolSession,
+        resolve_session_category_timeout_seconds,
+    )
+
+    class MinimalSession:
+        execution_id = "minimal"
+
+    class InvalidSession:
+        @staticmethod
+        def category_timeout_seconds(_name):
+            return "not-a-timeout"
+
+    class NegativeSession:
+        @staticmethod
+        def category_timeout_seconds(_name):
+            return -3
+
+    assert resolve_session_category_timeout_seconds(MinimalSession(), "echo") == 0.0
+    assert resolve_session_category_timeout_seconds(InvalidSession(), "echo") == 0.0
+    assert resolve_session_category_timeout_seconds(NegativeSession(), "echo") == 0.0
+
+    registry = ToolRegistry()
+    registry.set_category_timeouts({"data": 9})
+    _register_echo(
+        registry,
+        name="echo",
+        category="data",
+        handler=lambda message: {"echo": message},
+    )
+    session = BoundToolSession(
+        registry,
+        execution_id="helper-freeze",
+        allowed_tools=["echo"],
+        derive_granted_permissions=True,
+        security_audit=SecurityAuditRecorderStub(),
+    )
+    registry.set_category_timeouts({"data": 1})
+    assert resolve_session_category_timeout_seconds(session, "echo") == 9.0
+    assert resolve_session_category_timeout_seconds(session, "missing") == 0.0
+
+
+def test_execute_tools_minimal_session_omitting_category_timeout_still_dispatches():
+    dispatched = []
+
+    class RecordingSession:
+        execution_id = "minimal-category-timeout"
+        deadline_monotonic = None
+
+        @staticmethod
+        def is_non_retriable_cached(_cache_key: str) -> bool:
+            return False
+
+        @staticmethod
+        def execute(name: str, arguments: dict, **_kwargs) -> dict:
+            dispatched.append(name)
+            return {
+                "result_text": json.dumps({"echo": arguments.get("message")}),
+                "ok": True,
+            }
+
+    tool_calls_log = []
+    results = _execute_tools(
+        [ToolCall(id="call-1", name="echo", arguments={"message": "public"})],
+        RecordingSession(),
+        step=1,
+        progress_callback=None,
+        tool_calls_log=tool_calls_log,
+    )
+
+    assert dispatched == ["echo"]
+    assert results[0]["tc"].name == "echo"
+    assert "timeout" not in tool_calls_log[0]
+    assert tool_calls_log[0]["success"] is True
+
+
+def test_execute_tools_honors_duck_typed_category_timeout():
+    class CappedSession:
+        execution_id = "duck-typed-category-timeout"
+        deadline_monotonic = None
+
+        @staticmethod
+        def is_non_retriable_cached(_cache_key: str) -> bool:
+            return False
+
+        @staticmethod
+        def category_timeout_seconds(_name: str) -> float:
+            return 0.05
+
+        @staticmethod
+        def execute(name: str, arguments: dict, **_kwargs) -> dict:
+            del name
+            time.sleep(0.2)
+            return {
+                "result_text": json.dumps({"echo": arguments.get("message")}),
+                "ok": True,
+            }
+
+    tool_calls_log = []
+    results = _execute_tools(
+        [ToolCall(id="call-slow", name="echo", arguments={"message": "slow"})],
+        CappedSession(),
+        step=1,
+        progress_callback=None,
+        tool_calls_log=tool_calls_log,
+        tool_wait_timeout_seconds=2.0,
+    )
+
+    assert tool_calls_log[0]["timeout"] is True
+    assert tool_calls_log[0]["success"] is False
+    assert json.loads(results[0]["result_str"])["timeout"] is True
 
 
 def test_runtime_guard_policy_reads_category_timeouts(monkeypatch):
