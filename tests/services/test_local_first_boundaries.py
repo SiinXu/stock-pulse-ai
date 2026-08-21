@@ -331,7 +331,10 @@ def test_standalone_cli_scheduler_uses_raising_analysis_entrypoint() -> None:
 
 def test_cli_analysis_emits_structured_failure_without_notification() -> None:
     pipeline = MagicMock()
-    pipeline.notifier = MagicMock()
+    pipeline.notifier = MagicMock(
+        spec_set=["send_with_results", "send", "is_available", "save_report_to_file"],
+    )
+    send_with_results = pipeline.notifier.send_with_results
     pipeline.run.side_effect = _missing_error()
     config = SimpleNamespace(
         market_review_enabled=False,
@@ -361,4 +364,4 @@ def test_cli_analysis_emits_structured_failure_without_notification() -> None:
     status = write_status.call_args.args[0]
     assert status.primary_code == "local_market_data_missing"
     assert status.extra["local_data_missing"]["reason"] == "missing_fields_and_ranges"
-    pipeline.notifier.send.assert_not_called()
+    send_with_results.assert_not_called()

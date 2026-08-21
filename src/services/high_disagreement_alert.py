@@ -21,7 +21,7 @@ import math
 import re
 from typing import Any, Dict, List, Mapping, Optional
 
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 
@@ -269,16 +269,31 @@ def maybe_send_high_disagreement_alert(
             "cooldown_key": f"high_disagreement:{stock_code}",
         }
 
-        send_with_results = getattr(notification_service, "send_with_results", None)
-        if callable(send_with_results):
-            dispatch_result = send_with_results(alert_text, **send_kwargs)
-            success = bool(getattr(dispatch_result, "success", False))
-            logger.info("High-disagreement alert dispatch finished")
-            return success
+        from src.notification_parts.dispatch import (
+            dispatch_channel_summaries,
+            invoke_notifier_dispatch,
+        )
 
-        sent = bool(notification_service.send(alert_text, **send_kwargs))
-        logger.info("High-disagreement alert send finished")
-        return sent
+        dispatch_result = invoke_notifier_dispatch(
+            notification_service,
+            alert_text,
+            **send_kwargs,
+        )
+        success = bool(getattr(dispatch_result, "success", False))
+        status = str(getattr(dispatch_result, "status", "") or "")
+        if status == "partial_failed":
+            logger.warning(
+                "High-disagreement alert dispatch finished status=%s channels=%s",
+                sanitize_diagnostic_text(
+                    getattr(dispatch_result, "status", None)
+                ),
+                sanitize_diagnostic_text(
+                    dispatch_channel_summaries(dispatch_result)
+                ),
+            )
+        else:
+            logger.info("High-disagreement alert dispatch finished")
+        return success
     except Exception as exc:  # broad-exception: fallback_recorded - alert must not interrupt analysis
         log_safe_exception(
             logger,

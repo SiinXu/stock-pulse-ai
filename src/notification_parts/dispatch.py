@@ -159,6 +159,134 @@ def get_dispatch_ports() -> DispatchPorts:
     return _PORTS
 
 
+def _legacy_bool_dispatch_result(success: bool) -> Any:
+    """Wrap historical bool ``send()`` into the shared dispatch contract."""
+
+    from src.notification_parts.contracts import NotificationDispatchResult
+
+    return NotificationDispatchResult(
+        dispatched=True,
+        success=bool(success),
+        status="sent" if success else "all_failed",
+        message=(
+            None
+            if success
+            else "legacy bool send() result; per-channel details unavailable"
+        ),
+    )
+
+
+def coerce_notification_dispatch_result(result: Any) -> Any:
+    """Normalize a notifier return value onto the structured dispatch contract.
+
+    Only a canonical ``NotificationDispatchResult`` or the historical bool
+    ``send()`` boundary may produce success. Duck-typed objects that merely
+    carry string ``status`` / bool ``success`` attributes are not treated as
+    structured results, including misleading ``status="sent"`` combinations
+    and unknown status strings.
+    """
+
+    from src.notification_parts.contracts import NotificationDispatchResult
+
+    if isinstance(result, NotificationDispatchResult):
+        return result
+    if isinstance(result, bool):
+        return _legacy_bool_dispatch_result(result)
+    return NotificationDispatchResult(
+        dispatched=True,
+        success=False,
+        status="all_failed",
+        message="unrecognized send_with_results() return value; per-channel details unavailable",
+    )
+
+
+def dispatch_channel_summaries(result: Any) -> List[dict]:
+    """Return ``[{channel, ok, error}, ...]`` from a structured dispatch result."""
+
+    summaries_fn = getattr(result, "channel_summaries", None)
+    if callable(summaries_fn):
+        try:
+            summaries = summaries_fn()
+        except Exception:  # broad-exception: optional_metadata - callers keep status when summary projection fails
+            summaries = None
+        if isinstance(summaries, list):
+            return [item for item in summaries if isinstance(item, dict)]
+    channel_results = getattr(result, "channel_results", None) or []
+    projected: List[dict] = []
+    for attempt in channel_results:
+        as_summary = getattr(attempt, "as_summary", None)
+        if callable(as_summary):
+            try:
+                item = as_summary()
+            except Exception:  # broad-exception: optional_metadata - skip malformed attempts
+                item = None
+            if isinstance(item, dict):
+                projected.append(item)
+                continue
+        if isinstance(attempt, dict):
+            channel = str(attempt.get("channel") or "").strip()
+            if channel:
+                projected.append(
+                    {
+                        "channel": channel,
+                        "ok": bool(attempt.get("ok", attempt.get("success"))),
+                        "error": attempt.get("error", attempt.get("error_code")),
+                    }
+                )
+            continue
+        channel = str(getattr(attempt, "channel", "") or "").strip()
+        if not channel:
+            continue
+        ok = bool(getattr(attempt, "success", False))
+        projected.append(
+            {
+                "channel": channel,
+                "ok": ok,
+                "error": None if ok else getattr(attempt, "error_code", None),
+            }
+        )
+    return projected
+
+
+def invoke_notifier_dispatch(
+    notifier: Any,
+    content: str,
+    **kwargs: Any,
+) -> Any:
+    """Dispatch through the canonical NotificationService result contract.
+
+    Canonical interface:
+    ``send_with_results(content, **kwargs) -> NotificationDispatchResult``
+    with ``status`` in ``sent`` / ``partial_failed`` / ``all_failed`` /
+    ``no_channel`` / ``noise_suppressed`` and ``channel_summaries()`` of
+    ``{channel, ok, error}``. ``success`` is true when any channel succeeds.
+    One channel failure does not halt later channels or analysis success.
+
+    Legacy compatibility: wrap bool ``send()`` only when the notifier has no
+    callable ``send_with_results``. This is for real bool-only notifiers, not
+    mock auto-attributes. Tests must use ``spec_set`` / autospec or concrete
+    fakes that return ``NotificationDispatchResult``. Duck-typed status
+    objects fail closed as ``all_failed``.
+    """
+
+    send_with_results = getattr(notifier, "send_with_results", None)
+    if callable(send_with_results):
+        return coerce_notification_dispatch_result(
+            send_with_results(content, **kwargs)
+        )
+    send = getattr(notifier, "send", None)
+    if callable(send):
+        return _legacy_bool_dispatch_result(bool(send(content, **kwargs)))
+    from src.notification_parts.contracts import NotificationDispatchResult
+
+    return NotificationDispatchResult(
+        dispatched=False,
+        success=False,
+        status="no_channel",
+        message="notification service unavailable",
+    )
+
+
 @dataclass
 class _DispatchAttemptRecord:
     """Retain one canonical attempt plus Pipeline-only bookkeeping."""

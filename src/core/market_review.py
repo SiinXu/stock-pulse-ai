@@ -35,7 +35,7 @@ from src.schemas.market_light import (
     resolve_market_light_sentiment_score,
 )
 from src.plugins.event_hooks import dispatch_market_review_event
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 
 logger = logging.getLogger(__name__)
@@ -381,17 +381,56 @@ def run_market_review(
                     wrapper_title=review_text["push_title"],
                 )
 
-                success = notifier.send(report_content, email_send_to_all=True, route_type="report")
-                _record_market_review_notification_run(
-                    query_id=history_query_id,
-                    channel="report",
-                    status="success" if success else "failed",
-                    success=success,
+                from src.notification_parts.dispatch import (
+                    dispatch_channel_summaries,
+                    invoke_notifier_dispatch,
                 )
-                if success:
+
+                dispatch = invoke_notifier_dispatch(
+                    notifier,
+                    report_content,
+                    email_send_to_all=True,
+                    route_type="report",
+                )
+                channel_summaries = [
+                    item
+                    for item in dispatch_channel_summaries(dispatch)
+                    if str(item.get("channel") or "").strip()
+                    and str(item.get("channel") or "").strip() != "__context__"
+                ]
+                if channel_summaries:
+                    for item in channel_summaries:
+                        ok = bool(item.get("ok"))
+                        _record_market_review_notification_run(
+                            query_id=history_query_id,
+                            channel=str(item.get("channel")),
+                            status="success" if ok else "failed",
+                            success=ok,
+                            error_message=item.get("error"),
+                        )
+                else:
+                    _record_market_review_notification_run(
+                        query_id=history_query_id,
+                        channel="report",
+                        status="success" if dispatch.success else "failed",
+                        success=bool(dispatch.success),
+                        error_message=dispatch.message,
+                    )
+                if dispatch.status == "partial_failed":
+                    logger.warning(
+                        "[MarketReview] component=market_review action=send_notification "
+                        "status=partial_failed trigger_source=%s query_id=%s region=%s "
+                        "channels=%s",
+                        trigger_source,
+                        history_query_id,
+                        persist_region,
+                        sanitize_diagnostic_text(channel_summaries),
+                    )
+                elif dispatch.success:
                     logger.info(
                         "[MarketReview] component=market_review action=send_notification "
-                        "status=success trigger_source=%s query_id=%s region=%s",
+                        "status=%s trigger_source=%s query_id=%s region=%s",
+                        sanitize_diagnostic_text(dispatch.status or "success"),
                         trigger_source,
                         history_query_id,
                         persist_region,
@@ -399,10 +438,12 @@ def run_market_review(
                 else:
                     logger.warning(
                         "[MarketReview] component=market_review action=send_notification "
-                        "status=failed trigger_source=%s query_id=%s region=%s",
+                        "status=%s trigger_source=%s query_id=%s region=%s channels=%s",
+                        sanitize_diagnostic_text(dispatch.status or "failed"),
                         trigger_source,
                         history_query_id,
                         persist_region,
+                        sanitize_diagnostic_text(channel_summaries),
                     )
             elif not send_notification:
                 logger.info(

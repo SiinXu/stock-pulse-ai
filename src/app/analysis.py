@@ -20,6 +20,41 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _dispatch_and_log_notification(
+    notifier: Any,
+    content: str,
+    *,
+    success_message: str,
+    failure_message: str,
+    **kwargs: Any,
+) -> Any:
+    """Send through the structured dispatcher and keep analysis success separate."""
+
+    from src.notification_parts.dispatch import (
+        dispatch_channel_summaries,
+        invoke_notifier_dispatch,
+    )
+    from src.utils.sanitize import sanitize_diagnostic_text
+
+    dispatch = invoke_notifier_dispatch(notifier, content, **kwargs)
+    status = str(getattr(dispatch, "status", "") or "")
+    if status == "partial_failed":
+        logger.warning(
+            "Notification dispatch finished status=partial_failed channels=%s",
+            sanitize_diagnostic_text(dispatch_channel_summaries(dispatch)),
+        )
+    elif getattr(dispatch, "success", False):
+        logger.info(success_message)
+    else:
+        logger.warning(
+            "%s status=%s channels=%s",
+            failure_message,
+            sanitize_diagnostic_text(getattr(dispatch, "status", None) or "failed"),
+            sanitize_diagnostic_text(dispatch_channel_summaries(dispatch)),
+        )
+    return dispatch
+
+
 def _compute_trading_day_filter(
     config: Config,
     args: argparse.Namespace,
@@ -504,14 +539,18 @@ def run_full_analysis(
                     and not args.no_notify
                     and pipeline.notifier.is_available()
                 ):
-                    if pipeline.notifier.send(
+                    _dispatch_and_log_notification(
+                        pipeline.notifier,
                         f"# 📈 大盘复盘\n\n{market_report}",
+                        success_message=(
+                            "Delivered the market review from this run's reusable context"
+                        ),
+                        failure_message=(
+                            "Failed to deliver the market review from reusable context"
+                        ),
                         email_send_to_all=True,
                         route_type="report",
-                    ):
-                        logger.info("Delivered the market review from this run's reusable context")
-                    else:
-                        logger.warning("Failed to deliver the market review from reusable context")
+                    )
 
             review_result = None
             if not can_skip_market_review:
@@ -581,10 +620,16 @@ def run_full_analysis(
             if parts:
                 combined_content = "\n\n---\n\n".join(parts)
                 if pipeline.notifier.is_available():
-                    if pipeline.notifier.send(combined_content, email_send_to_all=True, route_type="report"):
-                        logger.info("Delivered the combined stock-analysis and market-review report")
-                    else:
-                        logger.warning("Failed to deliver the combined analysis report")
+                    _dispatch_and_log_notification(
+                        pipeline.notifier,
+                        combined_content,
+                        success_message=(
+                            "Delivered the combined stock-analysis and market-review report"
+                        ),
+                        failure_message="Failed to deliver the combined analysis report",
+                        email_send_to_all=True,
+                        route_type="report",
+                    )
 
         # Output summary
         if results:
@@ -632,8 +677,11 @@ def run_full_analysis(
                     logger.info("Feishu document created: %s", doc_url)
                     # Optional: Also push the document link to the group
                     if not args.no_notify:
-                        pipeline.notifier.send(
+                        _dispatch_and_log_notification(
+                            pipeline.notifier,
                             f"[{now.strftime('%Y-%m-%d %H:%M')}] 复盘文档创建成功: {doc_url}",
+                            success_message="Delivered the Feishu document link",
+                            failure_message="Failed to deliver the Feishu document link",
                             route_type="report",
                         )
 

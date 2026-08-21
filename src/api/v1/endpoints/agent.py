@@ -420,20 +420,42 @@ async def send_chat_to_notification(request: SendChatRequest):
     Send chat session content to configured notification channels.
     Uses run_in_executor to avoid blocking the event loop.
     """
+    # Response body stays OpenAPI-unknown. Issue #1081 adds status/channels
+    # without changing the historical success bool or no_channels error.
     from src.notification import NotificationService
+    from src.notification_parts.dispatch import dispatch_channel_summaries
 
     loop = asyncio.get_running_loop()
-    success = await loop.run_in_executor(
+    dispatch = await loop.run_in_executor(
         None,
-        lambda: NotificationService().send(request.content),
+        lambda: NotificationService().send_with_results(request.content),
     )
-    if not success:
+    status = str(getattr(dispatch, "status", "") or "").strip() or (
+        "sent" if bool(getattr(dispatch, "success", False)) else "all_failed"
+    )
+    channels = dispatch_channel_summaries(dispatch)
+    success = bool(getattr(dispatch, "success", False))
+    if success:
+        return {
+            "success": True,
+            "status": status,
+            "channels": channels,
+        }
+    if status == "no_channel":
         return {
             "success": False,
+            "status": status,
+            "channels": channels,
             "error": "no_channels",
             "message": "未配置通知渠道，请先在设置中配置",
         }
-    return {"success": True}
+    return {
+        "success": False,
+        "status": status,
+        "channels": channels,
+        "error": "send_failed",
+        "message": getattr(dispatch, "message", None) or "通知发送失败",
+    }
 
 
 def _build_executor(config, skills: Optional[List[str]] = None):

@@ -9,7 +9,7 @@ import sys
 import textwrap
 from types import CodeType
 import typing
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from tests.litellm_stub import ensure_litellm_stub
 
@@ -31,6 +31,7 @@ MOVED_ANALYSIS_FUNCTIONS = (
     "_resolve_daily_market_context_target_date",
     "_market_review_report_text",
     "_save_reused_market_review_report",
+    "_dispatch_and_log_notification",
     "run_full_analysis",
 )
 
@@ -226,3 +227,37 @@ def test_application_services_remains_the_only_entrypoint_composition_root() -> 
         and node.module == "src.application_services"
         for node in analysis_tree.body
     )
+
+
+def test_dispatch_and_log_notification_partial_failed_is_not_full_fail(
+    caplog,
+) -> None:
+    """Mixed-channel delivery must not reuse the full-failure log prefix."""
+
+    import logging
+
+    from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+    notifier = MagicMock(spec_set=["send_with_results"])
+    notifier.send_with_results.return_value = NotificationDispatchResult(
+        dispatched=True,
+        success=True,
+        status="partial_failed",
+        channel_results=[
+            ChannelAttemptResult(channel="wechat", success=False, error_code="exception"),
+            ChannelAttemptResult(channel="custom", success=True),
+        ],
+    )
+
+    with caplog.at_level(logging.WARNING, logger="src.app.analysis"):
+        dispatch = analysis_source._dispatch_and_log_notification(
+            notifier,
+            "payload",
+            success_message="Delivered the combined analysis report",
+            failure_message="Failed to deliver the combined analysis report",
+        )
+
+    assert dispatch.success is True
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("partial_failed" in message and "wechat" in message for message in messages)
+    assert not any("Failed to deliver" in message for message in messages)

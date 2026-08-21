@@ -1540,10 +1540,24 @@ class MainScheduleModeTestCase(unittest.TestCase):
         )
         pipeline = MagicMock()
         pipeline.run.return_value = [result]
+        pipeline.notifier = MagicMock(
+            spec_set=[
+                "is_available",
+                "generate_aggregate_report",
+                "send_with_results",
+            ],
+        )
         pipeline.notifier.generate_aggregate_report.return_value = "stock report"
         pipeline._format_delta_first_notification.return_value = "delta stock report"
         pipeline.notifier.is_available.return_value = True
-        pipeline.notifier.send.return_value = True
+        from src.notification import NotificationDispatchResult
+
+        pipeline.notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
+            success=True,
+            status="sent",
+        )
+        send_with_results = pipeline.notifier.send_with_results
 
         with (
             patch.object(main, "_refresh_stock_index_cache_for_analysis"),
@@ -1558,7 +1572,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             [result],
             "simple",
         )
-        sent_content = pipeline.notifier.send.call_args.args[0]
+        sent_content = send_with_results.call_args.args[0]
         self.assertIn("delta stock report", sent_content)
         self.assertNotIn("\n\nstock report", sent_content)
 
@@ -1946,9 +1960,21 @@ class MainScheduleModeTestCase(unittest.TestCase):
         pipeline = MagicMock()
         pipeline.run.return_value = []
         pipeline.notifier = MagicMock(
-            is_available=MagicMock(return_value=True),
-            send=MagicMock(return_value=True),
+            spec_set=[
+                "is_available",
+                "send_with_results",
+                "save_report_to_file",
+            ],
         )
+        pipeline.notifier.is_available.return_value = True
+        from src.notification import NotificationDispatchResult
+
+        pipeline.notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
+            success=True,
+            status="sent",
+        )
+        send_with_results = pipeline.notifier.send_with_results
         pipeline_kwargs = {}
 
         def build_pipeline(*args, **kwargs):
@@ -1971,9 +1997,9 @@ class MainScheduleModeTestCase(unittest.TestCase):
         self.assertTrue(pipeline_kwargs["daily_market_context_allow_generate"])
         run_with_lock.assert_not_called()
         run_market_review.assert_not_called()
-        pipeline.notifier.send.assert_called_once()
-        self.assertIn("## 本轮运行时完整复盘", pipeline.notifier.send.call_args.args[0])
-        self.assertEqual(pipeline.notifier.send.call_args.kwargs["route_type"], "report")
+        send_with_results.assert_called_once()
+        self.assertIn("## 本轮运行时完整复盘", send_with_results.call_args.args[0])
+        self.assertEqual(send_with_results.call_args.kwargs["route_type"], "report")
         query_scoped_read = unittest.mock.call(
             config,
             pipeline=pipeline,
@@ -2017,8 +2043,11 @@ class MainScheduleModeTestCase(unittest.TestCase):
         )
         pipeline = MagicMock()
         pipeline.run.return_value = []
-        pipeline.notifier = MagicMock()
+        pipeline.notifier = MagicMock(
+            spec_set=["save_report_to_file", "send_with_results", "is_available"],
+        )
         pipeline.notifier.save_report_to_file.return_value = "/tmp/market_review.md"
+        send_with_results = pipeline.notifier.send_with_results
 
         def build_pipeline(*args, **kwargs):
             return pipeline
@@ -2040,7 +2069,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
 
         run_with_lock.assert_not_called()
         run_market_review.assert_not_called()
-        pipeline.notifier.send.assert_not_called()
+        send_with_results.assert_not_called()
         pipeline.notifier.save_report_to_file.assert_called_once()
         saved_content, saved_filename = pipeline.notifier.save_report_to_file.call_args.args
         self.assertTrue(saved_content.startswith("# 🎯 大盘复盘\n\n"))
@@ -2210,10 +2239,23 @@ class MainScheduleModeTestCase(unittest.TestCase):
         pipeline = MagicMock()
         pipeline.run.return_value = []
         pipeline.notifier = MagicMock(
-            is_available=MagicMock(return_value=True),
-            generate_aggregate_report=MagicMock(return_value=""),
-            send=MagicMock(return_value=True),
+            spec_set=[
+                "is_available",
+                "generate_aggregate_report",
+                "send_with_results",
+                "save_report_to_file",
+            ],
         )
+        pipeline.notifier.is_available.return_value = True
+        pipeline.notifier.generate_aggregate_report.return_value = ""
+        from src.notification import NotificationDispatchResult
+
+        pipeline.notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
+            success=True,
+            status="sent",
+        )
+        send_with_results = pipeline.notifier.send_with_results
         pipeline_kwargs = {}
 
         def build_pipeline(*args, **kwargs):
@@ -2269,7 +2311,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
             merge_notification=True,
             current_time=unittest.mock.ANY,
         )
-        notifier_message = pipeline.notifier.send.call_args.args[0]
+        notifier_message = send_with_results.call_args.args[0]
         self.assertIn("## 完整大盘复盘", notifier_message)
         self.assertNotIn("大盘退潮，高风险，建议观望。", notifier_message)
 

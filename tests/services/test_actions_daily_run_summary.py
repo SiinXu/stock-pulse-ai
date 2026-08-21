@@ -181,8 +181,65 @@ def test_failure_notify_sends_short_text() -> None:
         sender=sender,
     )
     assert result["attempted"] is True and result["sent"] is True
+    assert result["status"] == "sent"
+    assert result["channels"] == []
     assert sender.calls[0]["route_type"] == "system_error"
     assert "sk-" not in sender.calls[0]["content"]
+
+
+def test_failure_notify_surfaces_mixed_channel_results() -> None:
+    summary = DailyRunSummary(
+        outcome=OUTCOME_FAILED,
+        primary_code=CODE_MISSING_LLM,
+        ok_count=0,
+        failed_count=1,
+        skipped_count=0,
+        headline_zh="未检测到可用模型 Key",
+        headline_en="No usable model API key",
+        action_zh="添加 GEMINI_API_KEY",
+        action_en="Add GEMINI_API_KEY",
+        notify=True,
+        source="test",
+    )
+
+    class _StructuredSender:
+        def __init__(self) -> None:
+            self.calls: List[Dict[str, Any]] = []
+
+        def send_with_results(self, content: str, **kwargs: Any) -> Any:
+            from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+            self.calls.append({"content": content, **kwargs})
+            return NotificationDispatchResult(
+                dispatched=True,
+                success=True,
+                status="partial_failed",
+                channel_results=[
+                    ChannelAttemptResult(
+                        channel="custom",
+                        success=True,
+                    ),
+                    ChannelAttemptResult(
+                        channel="email",
+                        success=False,
+                        error_code="send_failed",
+                    ),
+                ],
+            )
+
+    sender = _StructuredSender()
+    result = maybe_send_failure_notification(
+        summary,
+        environ={"FAILURE_NOTIFY_ENABLED": "true", "NOTIFICATION_SYSTEM_ERROR_CHANNELS": "custom"},
+        sender=sender,
+    )
+    assert result["attempted"] is True
+    assert result["sent"] is True
+    assert result["status"] == "partial_failed"
+    assert result["channels"] == [
+        {"channel": "custom", "ok": True, "error": None},
+        {"channel": "email", "ok": False, "error": "send_failed"},
+    ]
 
 
 def test_failure_notify_exception_is_fail_open() -> None:

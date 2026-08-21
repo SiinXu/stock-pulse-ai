@@ -1063,6 +1063,140 @@ def test_agent_chat_all_invalid_skills_inherit_without_clearing_state(tmp_path: 
     ]
 
 
+def test_chat_send_returns_structured_mixed_channel_results(tmp_path: Path) -> None:
+    from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+    notifier = MagicMock(spec_set=["send_with_results"])
+    notifier.send_with_results.return_value = NotificationDispatchResult(
+        dispatched=True,
+        success=True,
+        status="partial_failed",
+        channel_results=[
+            ChannelAttemptResult(
+                channel="wechat",
+                success=False,
+                error_code="exception",
+            ),
+            ChannelAttemptResult(channel="custom", success=True),
+        ],
+    )
+
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False), patch(
+        "src.notification.NotificationService",
+        return_value=notifier,
+    ):
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat/send",
+            json={"content": "hello"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is True
+    assert payload["status"] == "partial_failed"
+    assert payload["channels"] == [
+        {"channel": "wechat", "ok": False, "error": "exception"},
+        {"channel": "custom", "ok": True, "error": None},
+    ]
+    notifier.send_with_results.assert_called_once()
+
+
+def test_chat_send_all_success_keeps_historical_success_flag(tmp_path: Path) -> None:
+    from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+    notifier = MagicMock(spec_set=["send_with_results"])
+    notifier.send_with_results.return_value = NotificationDispatchResult(
+        dispatched=True,
+        success=True,
+        status="sent",
+        channel_results=[
+            ChannelAttemptResult(channel="custom", success=True),
+        ],
+    )
+
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False), patch(
+        "src.notification.NotificationService",
+        return_value=notifier,
+    ):
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat/send",
+            json={"content": "hello"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload == {
+        "success": True,
+        "status": "sent",
+        "channels": [{"channel": "custom", "ok": True, "error": None}],
+    }
+
+
+def test_chat_send_all_failed_is_not_reported_as_no_channels(tmp_path: Path) -> None:
+    from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+    notifier = MagicMock(spec_set=["send_with_results"])
+    notifier.send_with_results.return_value = NotificationDispatchResult(
+        dispatched=True,
+        success=False,
+        status="all_failed",
+        message="all channels failed",
+        channel_results=[
+            ChannelAttemptResult(
+                channel="custom",
+                success=False,
+                error_code="send_failed",
+            ),
+        ],
+    )
+
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False), patch(
+        "src.notification.NotificationService",
+        return_value=notifier,
+    ):
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat/send",
+            json={"content": "hello"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["status"] == "all_failed"
+    assert payload["error"] == "send_failed"
+    assert payload["channels"] == [
+        {"channel": "custom", "ok": False, "error": "send_failed"},
+    ]
+
+
+def test_chat_send_no_channel_keeps_legacy_error_code(tmp_path: Path) -> None:
+    from src.notification import NotificationDispatchResult
+
+    notifier = MagicMock(spec_set=["send_with_results"])
+    notifier.send_with_results.return_value = NotificationDispatchResult(
+        dispatched=False,
+        success=False,
+        status="no_channel",
+        message="notification service unavailable",
+    )
+
+    with patch("src.api.middlewares.auth.is_auth_enabled", return_value=False), patch(
+        "src.notification.NotificationService",
+        return_value=notifier,
+    ):
+        response = TestClient(create_app(static_dir=tmp_path / "static")).post(
+            "/api/v1/agent/chat/send",
+            json={"content": "hello"},
+        )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["success"] is False
+    assert payload["status"] == "no_channel"
+    assert payload["error"] == "no_channels"
+    assert payload["channels"] == []
+
+
 def test_requested_skill_normalization_reuses_agent_factory_catalog_rules() -> None:
     from src.agent.factory import normalize_requested_skill_ids
 

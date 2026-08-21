@@ -288,6 +288,30 @@ class TestNotificationServiceSendToMethods(unittest.TestCase):
             self.assertTrue(service.send("content-again"))
 
     @mock.patch("src.notification.get_config")
+    def test_send_with_results_reports_all_success_channels(self, mock_get_config: mock.MagicMock):
+        cfg = _make_config(
+            wechat_webhook_url="https://wechat.example/hook",
+            custom_webhook_urls=["https://example.com/webhook"],
+        )
+        mock_get_config.return_value = cfg
+
+        service = NotificationService()
+
+        with mock.patch.object(service, "send_to_wechat", return_value=True), \
+             mock.patch.object(service, "send_to_custom", return_value=True):
+            result = service.send_with_results("content")
+            self.assertTrue(service.send("content-again"))
+
+        self.assertTrue(result.dispatched)
+        self.assertTrue(result.success)
+        self.assertEqual(result.status, "sent")
+        summaries = {item["channel"]: item for item in result.channel_summaries()}
+        self.assertTrue(summaries["wechat"]["ok"])
+        self.assertIsNone(summaries["wechat"]["error"])
+        self.assertTrue(summaries["custom"]["ok"])
+        self.assertIsNone(summaries["custom"]["error"])
+
+    @mock.patch("src.notification.get_config")
     def test_send_with_results_reports_route_no_channel(self, mock_get_config: mock.MagicMock):
         cfg = _make_config(
             custom_webhook_urls=["https://example.com/webhook"],
