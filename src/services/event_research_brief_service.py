@@ -16,7 +16,7 @@ from src.services.alert_event_context import (
     parse_diagnostics_object,
 )
 from src.services.event_alerts import CORPORATE_EVENT_DATA_SOURCE
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 
@@ -461,7 +461,7 @@ class EventResearchBriefService:
             if status == "partial_failed" and success:
                 logger.warning(
                     "event research brief notification partial_failed channels=%s",
-                    channels,
+                    sanitize_diagnostic_text(channels),
                 )
                 return "degraded", True
             if status == "sent" and success:

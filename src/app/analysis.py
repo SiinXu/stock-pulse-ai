@@ -34,14 +34,14 @@ def _dispatch_and_log_notification(
         dispatch_channel_summaries,
         invoke_notifier_dispatch,
     )
+    from src.utils.sanitize import sanitize_diagnostic_text
 
     dispatch = invoke_notifier_dispatch(notifier, content, **kwargs)
-    channels = dispatch_channel_summaries(dispatch)
     status = str(getattr(dispatch, "status", "") or "")
     if status == "partial_failed":
         logger.warning(
             "Notification dispatch finished status=partial_failed channels=%s",
-            channels,
+            sanitize_diagnostic_text(dispatch_channel_summaries(dispatch)),
         )
     elif getattr(dispatch, "success", False):
         logger.info(success_message)
@@ -49,8 +49,8 @@ def _dispatch_and_log_notification(
         logger.warning(
             "%s status=%s channels=%s",
             failure_message,
-            status or "failed",
-            channels,
+            sanitize_diagnostic_text(getattr(dispatch, "status", None) or "failed"),
+            sanitize_diagnostic_text(dispatch_channel_summaries(dispatch)),
         )
     return dispatch
 

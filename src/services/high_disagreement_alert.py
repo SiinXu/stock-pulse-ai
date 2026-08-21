@@ -21,7 +21,7 @@ import math
 import re
 from typing import Any, Dict, List, Mapping, Optional
 
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 
@@ -284,8 +284,12 @@ def maybe_send_high_disagreement_alert(
         if status == "partial_failed":
             logger.warning(
                 "High-disagreement alert dispatch finished status=%s channels=%s",
-                status,
-                dispatch_channel_summaries(dispatch_result),
+                sanitize_diagnostic_text(
+                    getattr(dispatch_result, "status", None)
+                ),
+                sanitize_diagnostic_text(
+                    dispatch_channel_summaries(dispatch_result)
+                ),
             )
         else:
             logger.info("High-disagreement alert dispatch finished")

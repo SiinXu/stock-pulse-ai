@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Set
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 
 logger = logging.getLogger(__name__)
@@ -1116,7 +1116,7 @@ class DailyBriefService:
             if status == "partial_failed" and success:
                 logger.warning(
                     "[DailyBrief] notification partial_failed channels=%s",
-                    channels,
+                    sanitize_diagnostic_text(channels),
                 )
                 return "degraded", True
             if status == "sent" and success:

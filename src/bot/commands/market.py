@@ -15,7 +15,7 @@ from src.bot.commands.base import BotCommand
 from src.bot.application_context import to_analysis_request_context
 from src.bot.models import BotMessage, BotResponse
 from src.schemas.request_context import AnalysisRequestContext
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 
@@ -172,8 +172,8 @@ class MarketCommand(BotCommand):
                         logger.warning(
                             "[MarketCommand] Closed-market skip notice dispatch "
                             "status=%s channels=%s",
-                            dispatch.status,
-                            channel_summaries,
+                            sanitize_diagnostic_text(getattr(dispatch, "status", None)),
+                            sanitize_diagnostic_text(channel_summaries),
                         )
                 return
 

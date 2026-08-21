@@ -35,7 +35,7 @@ from src.schemas.market_light import (
     resolve_market_light_sentiment_score,
 )
 from src.plugins.event_hooks import dispatch_market_review_event
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 
 logger = logging.getLogger(__name__)
@@ -424,13 +424,13 @@ def run_market_review(
                         trigger_source,
                         history_query_id,
                         persist_region,
-                        channel_summaries,
+                        sanitize_diagnostic_text(channel_summaries),
                     )
                 elif dispatch.success:
                     logger.info(
                         "[MarketReview] component=market_review action=send_notification "
                         "status=%s trigger_source=%s query_id=%s region=%s",
-                        dispatch.status or "success",
+                        sanitize_diagnostic_text(dispatch.status or "success"),
                         trigger_source,
                         history_query_id,
                         persist_region,
@@ -439,11 +439,11 @@ def run_market_review(
                     logger.warning(
                         "[MarketReview] component=market_review action=send_notification "
                         "status=%s trigger_source=%s query_id=%s region=%s channels=%s",
-                        dispatch.status or "failed",
+                        sanitize_diagnostic_text(dispatch.status or "failed"),
                         trigger_source,
                         history_query_id,
                         persist_region,
-                        channel_summaries,
+                        sanitize_diagnostic_text(channel_summaries),
                     )
             elif not send_notification:
                 logger.info(
