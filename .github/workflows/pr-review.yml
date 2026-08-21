@@ -1,14 +1,27 @@
 # Automated pull request review with syntax checks and advisory AI reporting.
 #
 # Default-off for PR throughput: not in the main ruleset required checks and no longer
-# auto-runs on pull_request. Maintainers opt in via workflow_dispatch on a PR branch.
+# auto-runs on pull_request. Maintainers opt in via workflow_dispatch with a required
+# pr_number. The security-check job is checkout-free and reads PR metadata plus the
+# changed-file inventory through the GitHub API only.
 #
-# Security model when dispatched (fork-safe if ever re-enabled on pull_request):
+# Security model:
+# - workflow_dispatch fails closed unless pr_number is a positive integer that identifies
+#   an accessible pull request in this repository.
+# - security-check is checkout-free. It snapshots head/base via pulls.get, inventories files
+#   with SHA-pinned repos.compareCommits of those exact commit SHAs (same-repo and fork),
+#   re-gets, and fail-closes on head/base drift before emitting outputs. pulls.listFiles
+#   cannot pin a SHA; a re-get equality guard alone does not close B->A->B ABA. GitHub
+#   documents cross-repo compare as USERNAME:BRANCH (mutable) and allows commit SHAs in the
+#   same repository network; owner:SHA is not that documented fork qualifier. Compare 404s
+#   and the 300-file truncation cap fail-close. Downstream ai-review checkouts use the
+#   emitted SHAs with no github.sha fallback.
 # - Fork PRs: read-only static checks only. Repository secrets and write jobs are skipped.
-# - Same-repo PRs targeting the default branch: static checks + AI review + labels/comments.
+# - Same-repo PRs targeting the default branch: static checks + AI review; write jobs stay
+#   gated on pull_request and therefore remain idle on this dispatch-only trigger.
 # - AI review runs trusted scripts from the PR base commit only; the PR tree is analysis data.
 # - LLM secrets (GEMINI_API_KEY / OPENAI_API_KEY) are available only to the AI review step and
-#   only on same-repo runs (GitHub withholds repository secrets from fork pull_request workflows).
+#   only on same-repo runs.
 # - AI review is auxiliary: continue-on-error so a provider outage never blocks the PR.
 
 name: PR Review
@@ -18,10 +31,15 @@ permissions: {}
 on:
   # Opt-in only — do not auto-run on every PR (runner/cost contention with required CI).
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number to review (required positive integer)
+        required: true
+        type: string
 
 # Avoid duplicate comments when the same pull request triggers multiple runs.
 concurrency:
-  group: pr-review-${{ github.event.pull_request.number || github.run_id }}
+  group: pr-review-${{ inputs.pr_number || github.run_id }}
   cancel-in-progress: true
 
 jobs:
@@ -31,70 +49,142 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      pull-requests: read
     outputs:
-      safe_to_run: ${{ steps.check_sensitive.outputs.safe_to_run }}
-      sensitive_files_changed: ${{ steps.check_sensitive.outputs.sensitive_files_changed }}
-      is_fork: ${{ steps.trust.outputs.is_fork }}
-      is_default_branch: ${{ steps.trust.outputs.is_default_branch }}
+      safe_to_run: ${{ steps.snapshot.outputs.safe_to_run }}
+      sensitive_files_changed: ${{ steps.snapshot.outputs.sensitive_files_changed }}
+      is_fork: ${{ steps.snapshot.outputs.is_fork }}
+      is_default_branch: ${{ steps.snapshot.outputs.is_default_branch }}
+      base_sha: ${{ steps.snapshot.outputs.base_sha }}
+      head_sha: ${{ steps.snapshot.outputs.head_sha }}
     
     steps:
-      - name: 🔐 Classify Pull Request Trust
-        id: trust
+      - name: 🔐 Snapshot Pull Request Trust And Inventory
+        id: snapshot
         env:
+          PR_NUMBER: ${{ inputs.pr_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
-          IS_FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.id != github.event.repository.id }}
-          REF_TYPE: ${{ github.ref_type }}
-          TARGET_REF: ${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}
-        run: |
-          echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"
-          if [ "$REF_TYPE" = "branch" ] && [ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then
-            echo "is_default_branch=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_default_branch=false" >> "$GITHUB_OUTPUT"
-          fi
-          if [ "$IS_FORK" = "true" ]; then
-            echo "## Fork Pull Request Policy" >> "$GITHUB_STEP_SUMMARY"
-            echo "" >> "$GITHUB_STEP_SUMMARY"
-            echo "This run is limited to read-only static checks." >> "$GITHUB_STEP_SUMMARY"
-            echo "AI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions." >> "$GITHUB_STEP_SUMMARY"
-          fi
-
-      - name: 📥 Checkout Code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
-          fetch-depth: 0
-      
-      - name: 🔄 Fetch Base Branch
-        env:
-          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
-        run: git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"
-      
-      - name: 🔒 Check Sensitive File Changes
-        id: check_sensitive
-        env:
-          BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
-        run: |
-          escape_dynamic_text() {
-            perl -CSDA -pe 's/([^\x00-\x7F]|&)/sprintf("\\u{%X}", ord($1))/ge'
-          }
-          SENSITIVE_FILES=$(git diff --name-only "origin/$BASE_REF...HEAD" | grep -E '^(\.github/workflows/.*\.yml|\.github/scripts/.*\.py)$' || echo "")
-          
-          if [ -n "$SENSITIVE_FILES" ]; then
-            echo "⚠️ **Sensitive files changed; manual review is required.**" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Changed sensitive files:" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "$SENSITIVE_FILES" | escape_dynamic_text >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "The change is flagged for focused manual review; automated checks will continue." >> $GITHUB_STEP_SUMMARY
-            echo "sensitive_files_changed=true" >> $GITHUB_OUTPUT
-            echo "safe_to_run=true" >> $GITHUB_OUTPUT
-          else
-            echo "✅ No sensitive file changes detected" >> $GITHUB_STEP_SUMMARY
-            echo "sensitive_files_changed=false" >> $GITHUB_OUTPUT
-            echo "safe_to_run=true" >> $GITHUB_OUTPUT
-          fi
+          script: |
+            const prNumber = process.env.PR_NUMBER || '';
+            if (!/^[1-9][0-9]*$/.test(prNumber)) {
+              core.setFailed('workflow_dispatch requires a positive integer pr_number');
+              return;
+            }
+            const defaultBranch = process.env.DEFAULT_BRANCH || '';
+            if (!defaultBranch) {
+              core.setFailed('repository default branch is unavailable');
+              return;
+            }
+            if (!context.payload.repository || context.payload.repository.id == null) {
+              core.setFailed('repository metadata is unavailable');
+              return;
+            }
+            const unsafeDynamicPattern = /[^\x00-\x7F]|&/gu;
+            const escapeDynamicText = value => value.replace(unsafeDynamicPattern, character => {
+              const codePoint = character.codePointAt(0);
+              const hexadecimal = codePoint.toString(16).toUpperCase();
+              return codePoint <= 0xFFFF
+                ? `\\u${hexadecimal.padStart(4, '0')}`
+                : `\\u{${hexadecimal}}`;
+            });
+            const missingMetadata = pull => !pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || !pull.head.repo.owner || typeof pull.head.repo.owner.login !== 'string' || !pull.head.repo.owner.login || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha;
+            let firstPull;
+            try {
+              const firstResponse = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: Number(prNumber),
+              });
+              firstPull = firstResponse.data;
+            } catch (error) {
+              const status = error.status || 'unknown';
+              core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);
+              return;
+            }
+            if (missingMetadata(firstPull)) {
+              core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);
+              return;
+            }
+            let files;
+            try {
+              const comparison = await github.rest.repos.compareCommits({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                base: firstPull.base.sha,
+                head: firstPull.head.sha,
+              });
+              files = comparison.data && comparison.data.files;
+            } catch (error) {
+              const status = error.status || 'unknown';
+              core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: ${status}`);
+              return;
+            }
+            if (!Array.isArray(files)) {
+              core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: invalid response`);
+              return;
+            }
+            if (files.length >= 300) {
+              core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: file inventory is truncated`);
+              return;
+            }
+            for (const file of files) {
+              if (!file || typeof file.filename !== 'string' || !file.filename) {
+                core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: a changed file is missing its filename`);
+                return;
+              }
+            }
+            let secondPull;
+            try {
+              const secondResponse = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: Number(prNumber),
+              });
+              secondPull = secondResponse.data;
+            } catch (error) {
+              const status = error.status || 'unknown';
+              core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);
+              return;
+            }
+            if (missingMetadata(secondPull)) {
+              core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);
+              return;
+            }
+            if (firstPull.head.sha !== secondPull.head.sha || firstPull.base.sha !== secondPull.base.sha || firstPull.base.ref !== secondPull.base.ref || String(firstPull.head.repo.id) !== String(secondPull.head.repo.id)) {
+              core.setFailed(`Pull request ${prNumber} changed during the API snapshot`);
+              return;
+            }
+            const pull = secondPull;
+            const isFork = String(pull.head.repo.id) !== String(context.payload.repository.id);
+            const isDefaultBranch = pull.base.ref === defaultBranch;
+            const sensitivePattern = /^(\.github\/workflows\/.*\.yml|\.github\/scripts\/.*\.py)$/;
+            const sensitiveFiles = files
+              .map(file => file.filename)
+              .filter(filename => sensitivePattern.test(filename));
+            core.setOutput('is_fork', isFork ? 'true' : 'false');
+            core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');
+            core.setOutput('base_sha', pull.base.sha);
+            core.setOutput('head_sha', pull.head.sha);
+            if (isFork) {
+              core.summary.addRaw('## Fork Pull Request Policy\n\nThis run is limited to read-only static checks.\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\n');
+              await core.summary.write();
+            }
+            if (sensitiveFiles.length > 0) {
+              const escaped = sensitiveFiles.map(escapeDynamicText).join('\n');
+              core.summary.addRaw('⚠️ **Sensitive files changed; manual review is required.**\n\nChanged sensitive files:\n\n```\n');
+              core.summary.addRaw(`${escaped}\n`);
+              core.summary.addRaw('```\n\nThe change is flagged for focused manual review; automated checks will continue.\n');
+              await core.summary.write();
+              core.setOutput('sensitive_files_changed', 'true');
+              core.setOutput('safe_to_run', 'true');
+            } else {
+              core.summary.addRaw('✅ No sensitive file changes detected\n');
+              await core.summary.write();
+              core.setOutput('sensitive_files_changed', 'false');
+              core.setOutput('safe_to_run', 'true');
+            }
 
   # ==================== Static checks before AI review ====================
   auto-check:
@@ -303,7 +393,7 @@ jobs:
         id: trusted-review-inputs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          ref: ${{ needs.security-check.outputs.base_sha }}
           sparse-checkout: |
             .github/scripts
             .github/requirements-review.txt
@@ -317,7 +407,7 @@ jobs:
         id: pull-request-analysis-inputs
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ needs.security-check.outputs.head_sha }}
           fetch-depth: 0
           path: pr-code
       

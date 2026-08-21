@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import subprocess
 import tempfile
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -35,7 +34,8 @@ SECRET_EXPRESSION_RE = re.compile(
 )
 
 PR_REVIEW_WORKFLOW = ".github/workflows/pr-review.yml"
-TRUST_CLASSIFIER_ID = "trust"
+SNAPSHOT_ID = "snapshot"
+SECURITY_CHECK_STEP_IDS = (SNAPSHOT_ID,)
 TRUSTED_REVIEW_CHECKOUT_ID = "trusted-review-inputs"
 PULL_REQUEST_REVIEW_CHECKOUT_ID = "pull-request-analysis-inputs"
 FETCH_REVIEW_BASE_ID = "fetch-analysis-base"
@@ -79,8 +79,8 @@ TRUSTED_REVIEW_RUN_LINES = (
     'mv -- ai_review_result.txt "${trusted_output}"',
     "fi",
 )
-TRUSTED_REVIEW_REF = "${{ github.event.pull_request.base.sha || github.sha }}"
-PULL_REQUEST_REVIEW_REF = "${{ github.event.pull_request.head.sha || github.sha }}"
+TRUSTED_REVIEW_REF = "${{ needs.security-check.outputs.base_sha }}"
+PULL_REQUEST_REVIEW_REF = "${{ needs.security-check.outputs.head_sha }}"
 TRUSTED_REVIEW_BASE_ENV = {
     "BASE_REF": "${{ github.base_ref || github.event.repository.default_branch }}",
 }
@@ -88,39 +88,150 @@ FETCH_REVIEW_BASE_COMMAND = (
     'git fetch origin "$BASE_REF:refs/remotes/origin/$BASE_REF"'
 )
 SECURITY_CHECK_OUTPUTS = {
-    "safe_to_run": "${{ steps.check_sensitive.outputs.safe_to_run }}",
-    "sensitive_files_changed": "${{ steps.check_sensitive.outputs.sensitive_files_changed }}",
-    "is_fork": "${{ steps.trust.outputs.is_fork }}",
-    "is_default_branch": "${{ steps.trust.outputs.is_default_branch }}",
+    "safe_to_run": "${{ steps.snapshot.outputs.safe_to_run }}",
+    "sensitive_files_changed": "${{ steps.snapshot.outputs.sensitive_files_changed }}",
+    "is_fork": "${{ steps.snapshot.outputs.is_fork }}",
+    "is_default_branch": "${{ steps.snapshot.outputs.is_default_branch }}",
+    "base_sha": "${{ steps.snapshot.outputs.base_sha }}",
+    "head_sha": "${{ steps.snapshot.outputs.head_sha }}",
 }
-TRUST_CLASSIFIER_ENV = {
+PR_REVIEW_DISPATCH_INPUT = {
+    "description": "Pull request number to review (required positive integer)",
+    "required": "true",
+    "type": "string",
+}
+SNAPSHOT_ENV = {
+    "PR_NUMBER": "${{ inputs.pr_number }}",
     "DEFAULT_BRANCH": "${{ github.event.repository.default_branch }}",
-    "IS_FORK": (
-        "${{ github.event_name == 'pull_request' && "
-        "github.event.pull_request.head.repo.id != github.event.repository.id }}"
-    ),
-    "REF_TYPE": "${{ github.ref_type }}",
-    "TARGET_REF": (
-        "${{ github.event_name == 'pull_request' && github.base_ref || github.ref_name }}"
-    ),
 }
-TRUST_CLASSIFIER_RUN_LINES = (
-    'echo "is_fork=$IS_FORK" >> "$GITHUB_OUTPUT"',
-    'if [ "$REF_TYPE" = "branch" ] && [ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then',
-    'echo "is_default_branch=true" >> "$GITHUB_OUTPUT"',
-    "else",
-    'echo "is_default_branch=false" >> "$GITHUB_OUTPUT"',
-    "fi",
-    'if [ "$IS_FORK" = "true" ]; then',
-    'echo "## Fork Pull Request Policy" >> "$GITHUB_STEP_SUMMARY"',
-    'echo "" >> "$GITHUB_STEP_SUMMARY"',
-    'echo "This run is limited to read-only static checks." >> "$GITHUB_STEP_SUMMARY"',
-    (
-        'echo "AI review, automatic labels, and review comments are skipped because fork '
-        'workflows do not receive repository secrets or write permissions." '
-        '>> "$GITHUB_STEP_SUMMARY"'
-    ),
-    "fi",
+SECURITY_CHECK_FORBIDDEN_SUBSTRINGS = (
+    "actions/checkout@",
+    "git diff",
+    "git fetch",
+    "git checkout",
+    "git clone",
+    "git pull",
+    "git worktree",
+)
+SNAPSHOT_SCRIPT_LINES = (
+    "const prNumber = process.env.PR_NUMBER || '';",
+    "if (!/^[1-9][0-9]*$/.test(prNumber)) {",
+    "core.setFailed('workflow_dispatch requires a positive integer pr_number');",
+    "return;",
+    "}",
+    "const defaultBranch = process.env.DEFAULT_BRANCH || '';",
+    "if (!defaultBranch) {",
+    "core.setFailed('repository default branch is unavailable');",
+    "return;",
+    "}",
+    "if (!context.payload.repository || context.payload.repository.id == null) {",
+    "core.setFailed('repository metadata is unavailable');",
+    "return;",
+    "}",
+    "const unsafeDynamicPattern = /[^\\x00-\\x7F]|&/gu;",
+    "const escapeDynamicText = value => value.replace(unsafeDynamicPattern, character => {",
+    "const codePoint = character.codePointAt(0);",
+    "const hexadecimal = codePoint.toString(16).toUpperCase();",
+    "return codePoint <= 0xFFFF",
+    "? `\\\\u${hexadecimal.padStart(4, '0')}`",
+    ": `\\\\u{${hexadecimal}}`;",
+    "});",
+    "const missingMetadata = pull => !pull || !pull.head || !pull.head.repo || pull.head.repo.id == null || !pull.head.repo.owner || typeof pull.head.repo.owner.login !== 'string' || !pull.head.repo.owner.login || typeof pull.head.sha !== 'string' || !pull.head.sha || !pull.base || typeof pull.base.ref !== 'string' || !pull.base.ref || typeof pull.base.sha !== 'string' || !pull.base.sha;",
+    "let firstPull;",
+    "try {",
+    "const firstResponse = await github.rest.pulls.get({",
+    "owner: context.repo.owner,",
+    "repo: context.repo.repo,",
+    "pull_number: Number(prNumber),",
+    "});",
+    "firstPull = firstResponse.data;",
+    "} catch (error) {",
+    "const status = error.status || 'unknown';",
+    "core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);",
+    "return;",
+    "}",
+    "if (missingMetadata(firstPull)) {",
+    "core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);",
+    "return;",
+    "}",
+    "let files;",
+    "try {",
+    "const comparison = await github.rest.repos.compareCommits({",
+    "owner: context.repo.owner,",
+    "repo: context.repo.repo,",
+    "base: firstPull.base.sha,",
+    "head: firstPull.head.sha,",
+    "});",
+    "files = comparison.data && comparison.data.files;",
+    "} catch (error) {",
+    "const status = error.status || 'unknown';",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: ${status}`);",
+    "return;",
+    "}",
+    "if (!Array.isArray(files)) {",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: invalid response`);",
+    "return;",
+    "}",
+    "if (files.length >= 300) {",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: file inventory is truncated`);",
+    "return;",
+    "}",
+    "for (const file of files) {",
+    "if (!file || typeof file.filename !== 'string' || !file.filename) {",
+    "core.setFailed(`Unable to compare pinned SHAs for pull request ${prNumber}: a changed file is missing its filename`);",
+    "return;",
+    "}",
+    "}",
+    "let secondPull;",
+    "try {",
+    "const secondResponse = await github.rest.pulls.get({",
+    "owner: context.repo.owner,",
+    "repo: context.repo.repo,",
+    "pull_number: Number(prNumber),",
+    "});",
+    "secondPull = secondResponse.data;",
+    "} catch (error) {",
+    "const status = error.status || 'unknown';",
+    "core.setFailed(`Unable to read pull request ${prNumber}: ${status}`);",
+    "return;",
+    "}",
+    "if (missingMetadata(secondPull)) {",
+    "core.setFailed(`Pull request ${prNumber} is missing head or base metadata`);",
+    "return;",
+    "}",
+    "if (firstPull.head.sha !== secondPull.head.sha || firstPull.base.sha !== secondPull.base.sha || firstPull.base.ref !== secondPull.base.ref || String(firstPull.head.repo.id) !== String(secondPull.head.repo.id)) {",
+    "core.setFailed(`Pull request ${prNumber} changed during the API snapshot`);",
+    "return;",
+    "}",
+    "const pull = secondPull;",
+    "const isFork = String(pull.head.repo.id) !== String(context.payload.repository.id);",
+    "const isDefaultBranch = pull.base.ref === defaultBranch;",
+    "const sensitivePattern = /^(\\.github\\/workflows\\/.*\\.yml|\\.github\\/scripts\\/.*\\.py)$/;",
+    "const sensitiveFiles = files",
+    ".map(file => file.filename)",
+    ".filter(filename => sensitivePattern.test(filename));",
+    "core.setOutput('is_fork', isFork ? 'true' : 'false');",
+    "core.setOutput('is_default_branch', isDefaultBranch ? 'true' : 'false');",
+    "core.setOutput('base_sha', pull.base.sha);",
+    "core.setOutput('head_sha', pull.head.sha);",
+    "if (isFork) {",
+    "core.summary.addRaw('## Fork Pull Request Policy\\n\\nThis run is limited to read-only static checks.\\nAI review, automatic labels, and review comments are skipped because fork workflows do not receive repository secrets or write permissions.\\n');",
+    "await core.summary.write();",
+    "}",
+    "if (sensitiveFiles.length > 0) {",
+    "const escaped = sensitiveFiles.map(escapeDynamicText).join('\\n');",
+    "core.summary.addRaw('⚠️ **Sensitive files changed; manual review is required.**\\n\\nChanged sensitive files:\\n\\n```\\n');",
+    "core.summary.addRaw(`${escaped}\\n`);",
+    "core.summary.addRaw('```\\n\\nThe change is flagged for focused manual review; automated checks will continue.\\n');",
+    "await core.summary.write();",
+    "core.setOutput('sensitive_files_changed', 'true');",
+    "core.setOutput('safe_to_run', 'true');",
+    "} else {",
+    "core.summary.addRaw('✅ No sensitive file changes detected\\n');",
+    "await core.summary.write();",
+    "core.setOutput('sensitive_files_changed', 'false');",
+    "core.setOutput('safe_to_run', 'true');",
+    "}",
 )
 TRUSTED_REVIEW_JOB_IF_LINES = (
     "needs.security-check.outputs.safe_to_run == 'true' &&",
@@ -195,6 +306,7 @@ APPROVED_JOB_PERMISSIONS = frozenset(
         (".github/workflows/config-check.yml", "config-check", "contents", "read"),
         (".github/workflows/benchmarks.yml", "benchmark", "contents", "read"),
         (".github/workflows/pr-review.yml", "security-check", "contents", "read"),
+        (".github/workflows/pr-review.yml", "security-check", "pull-requests", "read"),
         (".github/workflows/pr-review.yml", "auto-check", "contents", "read"),
         (".github/workflows/pr-review.yml", "ai-review", "contents", "read"),
         (".github/workflows/pr-review.yml", "labeler", "pull-requests", "write"),
@@ -335,6 +447,92 @@ def _pinned_action(step: MappingNode, expected_action: str) -> bool:
     target = _scalar_value(step, "uses") or ""
     action, separator, ref = target.rpartition("@")
     return bool(separator and action == expected_action and SHA_RE.fullmatch(ref))
+
+
+def _nonempty_stripped_lines(value: str) -> tuple[str, ...]:
+    """Normalize a YAML block scalar to compared contract lines."""
+    return tuple(line.strip() for line in value.splitlines() if line.strip())
+
+
+def _github_script_step_errors(
+    step: MappingNode,
+    *,
+    expected_env: dict[str, str],
+    expected_script_lines: tuple[str, ...],
+    label: str,
+) -> list[str]:
+    """Require one pinned github-script step with an exact API-only contract."""
+    errors = _mapping_shape_errors(
+        step,
+        {"name", "id", "env", "uses", "with"},
+        label,
+    )
+    if _scalar_value(step, "run") is not None:
+        errors.append(f"{label} must not run shell commands")
+    if not _pinned_action(step, "actions/github-script"):
+        errors.append(f"{label} must use pinned actions/github-script")
+    if _scalar_mapping(step, "env") != expected_env:
+        errors.append(f"{label} must retain its exact environment")
+    with_mapping = _scalar_mapping(step, "with")
+    if with_mapping is None or set(with_mapping) != {"script"}:
+        errors.append(f"{label} must declare only a github-script")
+        blob = _scalar_value(step, "uses") or ""
+    else:
+        script_lines = _nonempty_stripped_lines(with_mapping["script"])
+        if script_lines != expected_script_lines:
+            errors.append(f"{label} must retain its exact API-only contract")
+        blob = "\n".join((_scalar_value(step, "uses") or "", with_mapping["script"]))
+    lowered = blob.lower()
+    for forbidden in SECURITY_CHECK_FORBIDDEN_SUBSTRINGS:
+        if forbidden.lower() in lowered:
+            errors.append(f"{label} must not {forbidden}")
+    return errors
+
+
+def _pr_review_trigger_errors(document: MappingNode, relative_path: str) -> list[str]:
+    """Keep PR Review opt-in via workflow_dispatch with a required pr_number."""
+    on_node = _named_mapping_value(document, "on")
+    if on_node is None:
+        return [f"{relative_path}: PR Review must trigger only on workflow_dispatch"]
+    keys = _mapping_keys(on_node)
+    if keys is None or keys != ["workflow_dispatch"]:
+        return [f"{relative_path}: PR Review must trigger only on workflow_dispatch"]
+    dispatch = _named_mapping_value(on_node, "workflow_dispatch")
+    if dispatch is None:
+        return [f"{relative_path}: workflow_dispatch must require pr_number"]
+    errors = _mapping_shape_errors(
+        dispatch,
+        {"inputs"},
+        f"{relative_path}: workflow_dispatch",
+    )
+    inputs = _named_mapping_value(dispatch, "inputs")
+    if inputs is None:
+        return errors + [f"{relative_path}: workflow_dispatch must require pr_number"]
+    errors.extend(
+        _mapping_shape_errors(
+            inputs,
+            {"pr_number"},
+            f"{relative_path}: workflow_dispatch inputs",
+        )
+    )
+    pr_number = _named_mapping_value(inputs, "pr_number")
+    if pr_number is None:
+        return errors + [f"{relative_path}: workflow_dispatch must require pr_number"]
+    errors.extend(
+        _mapping_shape_errors(
+            pr_number,
+            set(PR_REVIEW_DISPATCH_INPUT),
+            f"{relative_path}: workflow_dispatch.pr_number",
+        )
+    )
+    actual = {
+        field: _scalar_value(pr_number, field) for field in PR_REVIEW_DISPATCH_INPUT
+    }
+    if actual != PR_REVIEW_DISPATCH_INPUT:
+        errors.append(
+            f"{relative_path}: workflow_dispatch.pr_number must retain its exact required input contract"
+        )
+    return errors
 
 
 def _contains_secret_outside(
@@ -513,6 +711,8 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
         if _mapping_values(document, forbidden_key):
             errors.append(f"{relative_path}: workflow-level '{forbidden_key}' is not allowed")
 
+    errors.extend(_pr_review_trigger_errors(document, relative_path))
+
     jobs = _named_mapping_value(document, "jobs")
     security_check = _named_mapping_value(jobs, "security-check") if jobs is not None else None
     if security_check is None:
@@ -537,36 +737,33 @@ def _trusted_review_dependency_errors(document: Node, relative_path: str) -> lis
         ):
             errors.append(f"{relative_path}: security-check must declare one steps sequence")
         else:
-            trust_steps = [
+            security_steps = [
                 step
                 for step in security_steps_values[0].value
                 if isinstance(step, MappingNode)
-                and _scalar_value(step, "id") == TRUST_CLASSIFIER_ID
             ]
-            if len(trust_steps) != 1:
+            if len(security_steps) != len(security_steps_values[0].value):
+                errors.append(f"{relative_path}: every security-check step must be a mapping")
+            step_ids = tuple(_scalar_value(step, "id") or "" for step in security_steps)
+            if step_ids != SECURITY_CHECK_STEP_IDS:
                 errors.append(
-                    f"{relative_path}: security-check must declare one reviewed trust classifier"
+                    f"{relative_path}: security-check must retain the exact API-only step order"
                 )
-            else:
-                trust_step = trust_steps[0]
+            identified_security_steps = {
+                step_id: step
+                for step_id, step in zip(step_ids, security_steps)
+                if step_id and step_ids.count(step_id) == 1
+            }
+            snapshot_step = identified_security_steps.get(SNAPSHOT_ID)
+            if snapshot_step is not None:
                 errors.extend(
-                    _mapping_shape_errors(
-                        trust_step,
-                        {"name", "id", "env", "run"},
-                        f"{relative_path}: trust classifier step",
+                    _github_script_step_errors(
+                        snapshot_step,
+                        expected_env=SNAPSHOT_ENV,
+                        expected_script_lines=SNAPSHOT_SCRIPT_LINES,
+                        label=f"{relative_path}: SHA-pinned snapshot step",
                     )
                 )
-                trust_run = _scalar_value(trust_step, "run") or ""
-                trust_run_lines = tuple(
-                    line.strip() for line in trust_run.splitlines() if line.strip()
-                )
-                if (
-                    _scalar_mapping(trust_step, "env") != TRUST_CLASSIFIER_ENV
-                    or trust_run_lines != TRUST_CLASSIFIER_RUN_LINES
-                ):
-                    errors.append(
-                        f"{relative_path}: trust classifier must retain its exact case-sensitive contract"
-                    )
 
     for job_name, expected_condition in (
         ("labeler", LABELER_JOB_IF_LINES),
@@ -963,11 +1160,14 @@ jobs:
     security_output_lines = "\n".join(
         f"      {key}: {value}" for key, value in SECURITY_CHECK_OUTPUTS.items()
     )
-    trust_classifier_env_lines = "\n".join(
-        f"          {key}: {value}" for key, value in TRUST_CLASSIFIER_ENV.items()
+    snapshot_env_lines = "\n".join(
+        f"          {key}: {value}" for key, value in SNAPSHOT_ENV.items()
     )
-    trust_classifier_run_lines = "\n".join(
-        f"          {line}" for line in TRUST_CLASSIFIER_RUN_LINES
+    snapshot_script_lines = "\n".join(
+        f"            {line}" for line in SNAPSHOT_SCRIPT_LINES
+    )
+    dispatch_input_lines = "\n".join(
+        f"        {key}: {value}" for key, value in PR_REVIEW_DISPATCH_INPUT.items()
     )
     trusted_if_lines = "\n".join(f"      {line}" for line in TRUSTED_REVIEW_JOB_IF_LINES)
     labeler_if_lines = "\n".join(f"      {line}" for line in LABELER_JOB_IF_LINES)
@@ -978,7 +1178,11 @@ jobs:
     trusted_env_lines = "\n".join(f"          {key}: {value}" for key, value in TRUSTED_REVIEW_ENV.items())
     trusted_review = f"""name: PR Review
 permissions: {{}}
-on: pull_request
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+{dispatch_input_lines}
 jobs:
   security-check:
     name: Security check
@@ -988,12 +1192,14 @@ jobs:
     outputs:
 {security_output_lines}
     steps:
-      - name: Classify pull request trust
-        id: {TRUST_CLASSIFIER_ID}
+      - name: Snapshot pull request trust and inventory
+        id: {SNAPSHOT_ID}
         env:
-{trust_classifier_env_lines}
-        run: |
-{trust_classifier_run_lines}
+{snapshot_env_lines}
+        uses: actions/github-script@{sha} # v9.0.0
+        with:
+          script: |
+{snapshot_script_lines}
   ai-review:
     name: AI review
     runs-on: ubuntu-latest
@@ -1103,47 +1309,84 @@ jobs:
     if errors := trusted_errors(trusted_review):
         raise AssertionError(f"trusted review fixture failed: {errors!r}")
 
-    def classifier_result(ref_type: str, target_ref: str, default_branch: str) -> str:
-        """Execute the guarded classifier exactly as GitHub Actions does."""
-        with tempfile.TemporaryDirectory() as classifier_directory:
-            output_path = Path(classifier_directory) / "output"
-            summary_path = Path(classifier_directory) / "summary"
-            completed = subprocess.run(
-                ["bash", "-eu", "-c", "\n".join(TRUST_CLASSIFIER_RUN_LINES)],
-                check=False,
-                capture_output=True,
-                text=True,
-                env={
-                    "DEFAULT_BRANCH": default_branch,
-                    "GITHUB_OUTPUT": str(output_path),
-                    "GITHUB_STEP_SUMMARY": str(summary_path),
-                    "IS_FORK": "false",
-                    "REF_TYPE": ref_type,
-                    "TARGET_REF": target_ref,
-                },
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "on:\n  workflow_dispatch:\n",
+                "on:\n  pull_request:\n  workflow_dispatch:\n",
+                1,
             )
-            if completed.returncode != 0:
-                raise AssertionError(
-                    "trust classifier fixture failed: "
-                    f"stdout={completed.stdout!r}, stderr={completed.stderr!r}"
-                )
-            outputs = dict(
-                line.split("=", 1)
-                for line in output_path.read_text(encoding="utf-8").splitlines()
+        ),
+        "PR Review must trigger only on workflow_dispatch",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace("        required: true\n", "        required: false\n", 1)
+        ),
+        "workflow_dispatch.pr_number must retain its exact required input contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "      - name: Snapshot pull request trust and inventory\n",
+                "      - name: Checkout untrusted pull request\n"
+                f"        uses: actions/checkout@{sha} # v5.1.0\n"
+                "      - name: Snapshot pull request trust and inventory\n",
+                1,
             )
-            return outputs["is_default_branch"]
-
-    classifier_cases = {
-        ("branch", "main", "main"): "true",
-        ("tag", "main", "main"): "false",
-        ("branch", "MAIN", "main"): "false",
-    }
-    for inputs, expected in classifier_cases.items():
-        actual = classifier_result(*inputs)
-        if actual != expected:
-            raise AssertionError(
-                f"trust classifier returned {actual!r} for {inputs!r}; expected {expected!r}"
+        ),
+        "security-check must retain the exact API-only step order",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "const comparison = await github.rest.repos.compareCommits({",
+                "const comparison = await github.paginate(github.rest.pulls.listFiles, {",
+                1,
             )
+        ),
+        "exact API-only contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "base: firstPull.base.sha,",
+                "base: firstPull.base.ref,",
+                1,
+            )
+        ),
+        "exact API-only contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "head: firstPull.head.sha,",
+                "head: `${firstPull.head.repo.owner.login}:${firstPull.head.sha}`,",
+                1,
+            )
+        ),
+        "exact API-only contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "if (firstPull.head.sha !== secondPull.head.sha || firstPull.base.sha !== secondPull.base.sha || firstPull.base.ref !== secondPull.base.ref || String(firstPull.head.repo.id) !== String(secondPull.head.repo.id)) {",
+                "if (false) {",
+                1,
+            )
+        ),
+        "exact API-only contract",
+    )
+    _expect_failure(
+        trusted_errors(
+            trusted_review.replace(
+                "const isDefaultBranch = pull.base.ref === defaultBranch;",
+                "const isDefaultBranch = pull.base.ref.toLowerCase() === defaultBranch.toLowerCase();",
+                1,
+            )
+        ),
+        "exact API-only contract",
+    )
     _expect_failure(
         trusted_errors(
             trusted_review.replace(
@@ -1178,27 +1421,6 @@ jobs:
         "default-branch",
     )
     _expect_failure(
-        trusted_errors(
-            trusted_review.replace(
-                '          if [ "$REF_TYPE" = "branch" ] && '
-                '[ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then\n',
-                '          if [ "$REF_TYPE" = "branch" ] && '
-                '[ "${TARGET_REF,,}" = "${DEFAULT_BRANCH,,}" ]; then\n',
-            )
-        ),
-        "exact case-sensitive contract",
-    )
-    _expect_failure(
-        trusted_errors(
-            trusted_review.replace(
-                '          if [ "$REF_TYPE" = "branch" ] && '
-                '[ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then\n',
-                '          if [ "$TARGET_REF" = "$DEFAULT_BRANCH" ]; then\n',
-            )
-        ),
-        "exact case-sensitive contract",
-    )
-    _expect_failure(
         trusted_errors(trusted_review.replace("    continue-on-error: true\n", "", 1)),
         "continue-on-error",
     )
@@ -1211,16 +1433,6 @@ jobs:
             )
         ),
         "static-check gate",
-    )
-    _expect_failure(
-        trusted_errors(
-            trusted_review.replace(
-                f"          TARGET_REF: {TRUST_CLASSIFIER_ENV['TARGET_REF']}\n",
-                "          TARGET_REF: ${{ github.base_ref || "
-                "github.event.repository.default_branch }}\n",
-            )
-        ),
-        "exact case-sensitive contract",
     )
     _expect_failure(
         trusted_errors(
@@ -1496,7 +1708,7 @@ jobs:
         trusted_errors(trusted_review.replace(f"id: {FETCH_REVIEW_BASE_ID}", f"id: {SETUP_REVIEW_PYTHON_ID}")),
         "exact reviewed step order",
     )
-    print("Workflow supply-chain self-tests passed (52 cases).")
+    print("Workflow supply-chain self-tests passed (55 cases).")
 
 
 def parse_args() -> argparse.Namespace:

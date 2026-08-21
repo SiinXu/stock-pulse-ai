@@ -91,10 +91,10 @@ collision-free audit batches. Immutable VCS sources are reported separately
 because they are not present in the PyPI advisory database; all other skips fail.
 
 `.github/requirements-review.txt` is the reviewed review-tool manifest. The
-read-only static job consumes the pull-request copy because it receives no
-secrets. The `ai-review` job is re-enabled for same-repository pull requests
-that target the default branch. It is non-blocking (`continue-on-error: true`)
-and still skips fork pull requests.
+read-only static job may still consume the dispatch worktree because it receives
+no secrets. The `ai-review` job runs for same-repository pull requests that
+target the default branch when maintainers opt in via `workflow_dispatch`. It is
+non-blocking (`continue-on-error: true`) and still skips fork pull requests.
 
 Repository secrets may appear only under the `ai-review` job, and only as the
 exact reviewed LLM keys `GEMINI_API_KEY` and `OPENAI_API_KEY` on the trusted
@@ -103,29 +103,36 @@ review step environment. The executable guard rejects every other
 rejects every `secrets:` forwarding key, including `secrets: inherit` on local
 or reusable workflow jobs.
 
-Threat model for this `pull_request` design:
+Threat model for this opt-in `workflow_dispatch` design:
 
-- Fork workflows never receive repository secrets from GitHub, and the trust
+- `workflow_dispatch` has no pull-request event SHA. `security-check` therefore
+  snapshots head/base through `pulls.get`, inventories files with SHA-pinned
+  `repos.compareCommits` of those exact commit SHAs, re-gets, and fail-closes
+  on drift before emitting checkout SHAs. GitHub documents cross-repo compare
+  as `USERNAME:BRANCH` (mutable) and allows commit SHAs in the same repository
+  network; `owner:SHA` is not used. `pulls.listFiles` cannot pin a SHA; a
+  re-get equality guard alone does not close B→A→B ABA.
+- Fork workflows never receive repository secrets from GitHub, and the API
   classifier still skips AI review, labels, and comments for forks.
-- Same-repository collaborators can open a pull request whose head workflow
-  definition runs before merge. The residual risk is a write-access collaborator
-  editing the workflow to exfiltrate the two LLM secrets. Mitigations: secrets
-  only on the reviewed AI step env allowlist; trusted scripts and dependency
-  inputs are checked out from the PR base commit; static checks remain
-  secret-free; AI review cannot block merge.
-- A later hardening step may move privileged review to `pull_request_target`
-  with GitHub API-only diffs (no PR code checkout). That switch is intentionally
-  separate from this re-enable.
+- Same-repository collaborators can dispatch review against a pull request.
+  Residual risk is a write-access collaborator editing the workflow to
+  exfiltrate the two LLM secrets. Mitigations: secrets only on the reviewed AI
+  step env allowlist; trusted scripts and dependency inputs are checked out from
+  the captured PR base SHA; analysis checkout uses the captured head SHA with no
+  `github.sha` fallback; static checks remain secret-free; AI review cannot
+  block merge.
+- Re-enabling automatic `pull_request` or `pull_request_target` remains out of
+  scope.
 
-A read-only classifier compares the PR base or dispatched ref with the default
-branch case-sensitively and also requires a branch ref, so a tag named after the
-default branch is untrusted. Write-capable label and comment jobs consume that
-exact output and do not run for another branch or tag. Base refs enter shell
-commands only through quoted environment variables. The workflow guard locks
-the AI same-repo/default-branch gate, secret allowlist, classifier, write-job
-gates, and the retained seven-step AI job shape, including Action identities,
-inputs, commands, runner, and step order. Extra local Actions, package installs,
-or execution settings fail closed.
+The API classifier compares `pull.base.ref` with the repository default branch
+using exact, case-sensitive equality. Write-capable label and comment jobs still
+require `github.event_name == 'pull_request'` plus that same-repository /
+default-branch output, so they stay idle on this dispatch-only trigger. Base
+refs enter shell commands only through quoted environment variables. The
+workflow guard locks the AI same-repo/default-branch gate, secret allowlist,
+SHA-pinned snapshot, write-job gates, and the retained seven-step AI job shape,
+including Action identities, inputs, commands, runner, and step order. Extra
+local Actions, package installs, or execution settings fail closed.
 Before the trusted script runs, the job removes any pull-request-provided result
 node. A result is accepted only as a regular file, moved into the runner-owned
 temporary directory, and uploaded from that trusted path; an unavailable
@@ -186,12 +193,23 @@ contains every read-only job permission. Docker publish
 jobs do not request `id-token: write` because they authenticate with registry
 credentials and do not perform OIDC attestation.
 
-The PR Review workflow remains a `pull_request` workflow. Fork runs stay
+The PR Review workflow is opt-in via `workflow_dispatch` with a required
+`pr_number`. The `security-check` job is checkout-free. It snapshots head/base
+SHAs through `pulls.get`, inventories files with SHA-pinned
+`repos.compareCommits` of those commits, re-gets the pull request, and
+fail-closes on head/base drift before emitting usable outputs. `pulls.listFiles`
+cannot pin a SHA, so a re-get equality guard alone does not close a B→A→B ABA
+race; the SHA-pinned compare is what binds inventory to downstream checkout
+SHAs. GitHub compare truncates at 300 files and that inventory fail-closes. The
+job does not checkout, fetch, or `git diff` PR-head or fork code. Fork runs stay
 read-only and secret-free. Same-repository runs targeting the default branch
-may use the two reviewed LLM secrets only inside `ai-review`. Write-capable jobs
-require a same-repository head, a branch ref, and an exact, case-sensitive
-default-branch match. Pinning, permission declarations, base-ref handling, the
-AI gate, and the secret allowlist must not weaken that isolation.
+may use the two reviewed LLM secrets only inside `ai-review`, which checkouts
+the emitted API SHAs with no `github.sha` fallback. Write-capable jobs remain
+gated on `github.event_name == 'pull_request'` plus the API-derived
+same-repository head and exact, case-sensitive default-branch match, so they
+stay idle on this dispatch-only trigger. Pinning, permission declarations,
+API-only security-check, the AI gate, and the secret allowlist must not weaken
+that isolation.
 
 ## Time-Bounded Exceptions
 
