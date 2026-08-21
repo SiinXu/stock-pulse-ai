@@ -61,10 +61,12 @@ score-only view and is not expanded or rewritten by this addition.
 
 The evaluator consumes the runner's already-redacted `tool_calls` fields:
 `step`, `tool`, `arguments`, exact Boolean `success` / `cached`, optional exact
-Boolean `timeout` / `guarded`, `duration`, and bounded guard metadata. The
-benchmark supplies stable scenario task ID, source run ID, replay execution ID,
-market and stock identity. Raw argument bodies are not returned; only a bounded
-canonical SHA-256 fingerprint is retained.
+Boolean `timeout` / `guarded`, `duration`, and bounded guard metadata. Extra
+redacted runner-log fields (for example `result_preview`) are projected away;
+they do not reject an otherwise valid call and are not counted in
+`rejected_call_count`. The benchmark supplies stable scenario task ID, source
+run ID, replay execution ID, market and stock identity. Raw argument bodies
+are not returned; only a bounded canonical SHA-256 fingerprint is retained.
 
 | Metric | Deterministic meaning |
 | --- | --- |

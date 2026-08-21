@@ -50,6 +50,7 @@ MAX_ARGUMENT_KEYS = 32
 MAX_ARGUMENT_ITEMS = 64
 MAX_ARGUMENT_STRING_CHARS = 512
 MAX_ARGUMENT_JSON_CHARS = 4_096
+_TOOL_CALL_INPUT_FIELDS = frozenset(TrajectoryToolCallInput.model_fields)
 
 
 def evaluate_agent_trajectory(
@@ -216,11 +217,7 @@ def _parse_run(
     # Slice lazily: an oversized source must never be fully materialized here.
     for raw_call in islice(calls_raw, source_limit):
         try:
-            call = (
-                raw_call
-                if isinstance(raw_call, TrajectoryToolCallInput)
-                else TrajectoryToolCallInput.model_validate(raw_call)
-            )
+            call = _parse_tool_call(raw_call)
             normalize_tool_arguments(call.arguments)
         except (ValidationError, TypeError, ValueError, OverflowError):
             rejected += 1
@@ -233,6 +230,24 @@ def _parse_run(
     except ValidationError:
         return None
     return run, rejected, clipped
+
+
+def _parse_tool_call(raw_call: Any) -> TrajectoryToolCallInput:
+    """Validate one runner tool-call after projecting documented input fields.
+
+    The owned runner log may carry extra already-redacted keys such as
+    ``result_preview``. Those fields are not part of the trajectory input
+    contract; dropping the whole call would make sample-dependent rates
+    unavailable even when the documented fields are valid.
+    """
+    if isinstance(raw_call, TrajectoryToolCallInput):
+        return raw_call
+    if not isinstance(raw_call, Mapping):
+        raise TypeError("tool call must be a mapping")
+    projected = {
+        key: raw_call[key] for key in _TOOL_CALL_INPUT_FIELDS if key in raw_call
+    }
+    return TrajectoryToolCallInput.model_validate(projected)
 
 
 _PreparedCall = Tuple[TrajectoryToolCallInput, str, str, Tuple[str, str], Optional[int]]
