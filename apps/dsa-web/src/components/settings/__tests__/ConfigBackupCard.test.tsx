@@ -105,7 +105,7 @@ describe('ConfigBackupCard', () => {
       },
     });
 
-    expect(await screen.findByText('导入失败')).toBeInTheDocument();
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重新加载' })).not.toBeInTheDocument();
   });
 });
