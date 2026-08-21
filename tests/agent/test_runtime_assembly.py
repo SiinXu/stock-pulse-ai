@@ -62,12 +62,26 @@ def test_runtime_assembly_leaf_does_not_import_factory_or_native_adapter():
     assert "src.agent.runtime.native_adapter" not in targets
 
 
+def test_runtime_assembly_does_not_introduce_bare_get_config():
+    """New category-timeout refresh must use composition-root config, not get_config()."""
+    import ast
+
+    source = Path("src/agent/runtime_assembly.py").read_text(encoding="utf-8")
+    names = [
+        node.id
+        for node in ast.walk(ast.parse(source))
+        if isinstance(node, ast.Name) and node.id == "get_config"
+    ]
+    assert names == []
+
+
 def test_factory_reexports_runtime_assembly_entrypoints():
     """Preserve both public factory import paths as leaf function identities."""
     from src.agent import factory, runtime_assembly
 
     assert factory.get_tool_registry is runtime_assembly.get_tool_registry
     assert factory.build_agent_executor is runtime_assembly.build_agent_executor
+    assert factory.apply_tool_category_timeouts is runtime_assembly.apply_tool_category_timeouts
 
 
 @pytest.mark.parametrize(

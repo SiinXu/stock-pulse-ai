@@ -134,9 +134,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 294709,
-      "measuredGzipBytes": 294309,
-      "note": "Rebaselined after omitting the playground graph from production (T18 / Refs #883). Playground was a second async importer that forced extra named splits; those modules now live on the remaining route chunk. Measured zlib-9 + 400 B headroom."
+      "maxGzipBytes": 295193,
+      "measuredGzipBytes": 294793,
+      "note": "Rebaselined after adding four Agent category-timeout Settings fields (Refs #1423). Hosted zlib-9 294793 B + 400 B headroom."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -365,9 +365,9 @@
       "match": [
         "assets/SettingsPage-*.js"
       ],
-      "maxGzipBytes": 294709,
-      "measuredGzipBytes": 294309,
-      "note": "Same-pattern family after T18 playground omission (Refs #883). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
+      "maxGzipBytes": 295193,
+      "measuredGzipBytes": 294793,
+      "note": "Same-pattern family after adding four Agent category-timeout Settings fields (Refs #1423). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
     },
     {
       "id": "PortfolioRiskMetricsPanel-family",
@@ -467,9 +467,9 @@
         "assets/settingsPage-*.js",
         "assets/settingsTranslations-*.js"
       ],
-      "maxGzipBytes": 336695,
-      "measuredGzipBytes": 336295,
-      "note": "Settings route after T18 playground omission inlined IntelligenceSourcesPanel into SettingsPage (Refs #883). Measured zlib-9 sum + 400 B headroom."
+      "maxGzipBytes": 337179,
+      "measuredGzipBytes": 336779,
+      "note": "Settings route after adding four Agent category-timeout Settings fields (Refs #1423). Hosted zlib-9 sum + 400 B headroom."
     },
     {
       "id": "portfolio-route",

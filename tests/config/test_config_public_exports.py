@@ -106,6 +106,7 @@ EXPECTED_PUBLIC_EXPORTS = {
     "parse_env_bool",
     "parse_env_float",
     "parse_env_int",
+    "parse_optional_category_tool_timeout",
     "parse_hermes_channel",
     "parse_notification_quiet_hours",
     "parse_notification_route_channels",

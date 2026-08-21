@@ -253,12 +253,49 @@ def peek_process_tool_registry():
     return _TOOL_REGISTRY_BUILDING
 
 
+def _load_category_timeout_config():
+    """Return the live Config used to refresh category tool timeouts."""
+    try:
+        from src.application_services import get_application_services
+
+        return get_application_services().config
+    except Exception as exc:  # broad-exception: fallback_recorded - registry construction stays available without live config
+        log_safe_exception(
+            logger,
+            "Live config unavailable while resolving category tool timeouts",
+            exc,
+            error_code="tool_registry_category_timeout_config_unavailable",
+            level=logging.DEBUG,
+        )
+        return None
+
+
+def _apply_category_timeouts(registry, config=None) -> None:
+    """Attach the current category timeout map to an existing ToolRegistry."""
+    from src.agent.runtime.guards import resolve_category_tool_timeouts
+
+    source = config if config is not None else _load_category_timeout_config()
+    registry.set_category_timeouts(resolve_category_tool_timeouts(source))
+
+
+def apply_tool_category_timeouts(registry=None, config=None) -> None:
+    """Refresh category timeouts on the process registry without rebuilding it."""
+    target = registry
+    if target is None:
+        target = get_installed_tool_registry()
+    if target is None:
+        return
+    with _TOOL_REGISTRY_LOCK:
+        _apply_category_timeouts(target, config)
+
+
 def get_tool_registry():
     """Return a cached ToolRegistry (built once, shared across requests)."""
     global _TOOL_REGISTRY, _TOOL_REGISTRY_BUILDING
 
     with _TOOL_REGISTRY_LOCK:
         if _TOOL_REGISTRY is not None:
+            _apply_category_timeouts(_TOOL_REGISTRY)
             return _TOOL_REGISTRY
         # Re-entrant construction (same thread holds the RLock): expose the
         # in-progress registry so agent_tool plugins can attach without nesting
@@ -274,6 +311,7 @@ def get_tool_registry():
         from src.agent.tools.backtest_tools import ALL_BACKTEST_TOOLS
 
         registry = ToolRegistry()
+        _apply_category_timeouts(registry)
         _TOOL_REGISTRY_BUILDING = registry
         try:
             # Core non-plugin tools. Agent Web Search tools register via the
@@ -456,6 +494,7 @@ def get_tool_registry():
                 if registry.get(tool_def.name) is None:
                     registry.register(tool_def)
 
+            _apply_category_timeouts(registry)
             _TOOL_REGISTRY = registry
             logger.info(
                 "[AgentFactory] ToolRegistry cached (%d tools)",

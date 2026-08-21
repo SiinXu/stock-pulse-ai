@@ -15,7 +15,8 @@ import logging
 import math
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from types import MappingProxyType
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,38 @@ _CAPABILITY_NAME_PATTERN = re.compile(
     r"^[a-z][a-z0-9_]{0,31}:[a-z][a-z0-9_]{0,31}$"
 )
 _PARAMETER_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,63}$")
+TOOL_TIMEOUT_CATEGORIES = ("data", "search", "analysis", "action")
+TOOL_TIMEOUT_CATEGORY_ALIASES = {"market": "data"}
+
+
+def normalize_tool_timeout_category(category: Optional[str]) -> Optional[str]:
+    """Map a tool category onto the four timeout buckets, if any."""
+    if not isinstance(category, str):
+        return None
+    key = category.strip().lower()
+    if not key:
+        return None
+    key = TOOL_TIMEOUT_CATEGORY_ALIASES.get(key, key)
+    if key in TOOL_TIMEOUT_CATEGORIES:
+        return key
+    return None
+
+
+def _normalize_category_timeout_map(
+    timeouts: Optional[Mapping[str, Any]] = None,
+) -> Mapping[str, float]:
+    normalized: Dict[str, float] = {}
+    source = timeouts or {}
+    for category in TOOL_TIMEOUT_CATEGORIES:
+        raw_value = source.get(category, 0.0)
+        try:
+            value = float(raw_value)
+        except (TypeError, ValueError):
+            value = 0.0
+        if not math.isfinite(value) or value < 0:
+            value = 0.0
+        normalized[category] = value
+    return MappingProxyType(normalized)
 
 
 # ============================================================
@@ -447,12 +480,36 @@ class ToolRegistry:
         )
     """
 
-    def __init__(self):
+    def __init__(self, category_timeouts: Optional[Mapping[str, float]] = None):
         self._tools: Dict[str, ToolDefinition] = {}
         self._definition_versions: Dict[str, int] = {}
         self._inventory_declarations: Dict[str, ToolInventoryDeclaration] = {}
         self._inventory_entries: Dict[str, ToolInventoryEntry] = {}
         self._registry_generation = 0
+        self._category_timeouts: Mapping[str, float] = _normalize_category_timeout_map(
+            category_timeouts
+        )
+
+    def set_category_timeouts(self, timeouts: Optional[Mapping[str, float]] = None) -> None:
+        """Replace the optional per-category tool timeout map."""
+        self._category_timeouts = _normalize_category_timeout_map(timeouts)
+
+    def category_timeouts(self) -> Mapping[str, float]:
+        """Return the frozen per-category timeout map (``0`` means no category cap)."""
+        return self._category_timeouts
+
+    def category_timeout_seconds(self, category: Optional[str]) -> float:
+        """Return the positive category cap for a tool category, else ``0``."""
+        key = normalize_tool_timeout_category(category)
+        if key is None:
+            return 0.0
+        try:
+            value = float(self._category_timeouts.get(key, 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+        if not math.isfinite(value) or value < 0:
+            return 0.0
+        return value
 
     # ----- Registration -----
 

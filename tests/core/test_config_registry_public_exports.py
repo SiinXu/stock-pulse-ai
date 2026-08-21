@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "49ef86286d891981789205574f00062d206d8e1887b2574ee3d99c1692855011"
+    "5418d7f1ee8159aa7f9a21ceeab5c568471ea436ce2adbbfc660b25a30bbed53"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "3bc4e6ab8dae584891e5ae133def42ea87f56e6c0f93d2e1a0d4d8bdc2f851e8"
+    "12213a8d093d8ed9c997755071f6c3198bba32400924a284a5f5e6acbff0573b"
 )
 
 
@@ -105,6 +105,8 @@ def test_config_registry_module_annotations_are_stable():
 
 def test_config_registry_contract_snapshot_is_stable():
     # Snapshot refresh for converged registry registrations.
+    # Intended delta versus the previous hash is the four
+    # AGENT_{DATA,SEARCH,ANALYSIS,ACTION}_TOOL_TIMEOUT_S keys only.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

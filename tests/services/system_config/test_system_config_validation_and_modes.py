@@ -1017,6 +1017,23 @@ class SystemConfigServiceTestCase(_SystemConfigServiceTestCaseBase):
         self.assertEqual(issues["GENERATION_BACKEND_MAX_CONCURRENCY"]["expected"], "<=16")
         self.assertEqual(issues["LOCAL_CLI_BACKEND_MAX_CONCURRENCY"]["expected"], "<=4")
 
+    def test_validate_reports_category_tool_timeout_numeric_maximum(self) -> None:
+        validation = self.service.validate(
+            items=[
+                {"key": "AGENT_DATA_TOOL_TIMEOUT_S", "value": "5000"},
+                {"key": "AGENT_SEARCH_TOOL_TIMEOUT_S", "value": "3601"},
+                {"key": "AGENT_ANALYSIS_TOOL_TIMEOUT_S", "value": "3600.1"},
+                {"key": "AGENT_ACTION_TOOL_TIMEOUT_S", "value": "4000"},
+            ]
+        )
+
+        self.assertFalse(validation["valid"])
+        issues = {issue["key"]: issue for issue in validation["issues"]}
+        self.assertEqual(issues["AGENT_DATA_TOOL_TIMEOUT_S"]["expected"], "<=3600")
+        self.assertEqual(issues["AGENT_SEARCH_TOOL_TIMEOUT_S"]["expected"], "<=3600")
+        self.assertEqual(issues["AGENT_ANALYSIS_TOOL_TIMEOUT_S"]["expected"], "<=3600")
+        self.assertEqual(issues["AGENT_ACTION_TOOL_TIMEOUT_S"]["expected"], "<=3600")
+
     def test_validate_accepts_report_language_english(self) -> None:
         validation = self.service.validate(items=[{"key": "REPORT_LANGUAGE", "value": "en"}])
 

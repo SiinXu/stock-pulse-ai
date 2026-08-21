@@ -571,28 +571,38 @@ def test_parallel_fence_deadline_timeouts_are_logged(caplog, monkeypatch):
         lambda futures, timeout=None: list(futures),
     )
 
+    scripted = iter(
+        [
+            0.0,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            2.0,
+            0.0,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            0.1,
+            2.0,
+        ]
+    )
+
+    def _monotonic():
+        try:
+            return next(scripted)
+        except StopIteration:
+            return 100.0
+
     with caplog.at_level(logging.WARNING), patch(
         "src.agent.runner.time.monotonic",
-        side_effect=[
-            0.0,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            2.0,
-            0.0,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            0.1,
-            2.0,
-        ],
+        side_effect=_monotonic,
     ):
         result = run_agent_loop(
             messages=[],

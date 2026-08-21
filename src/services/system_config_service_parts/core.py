@@ -69,11 +69,14 @@ class _SystemConfigCoreMethods:
     @staticmethod
     def _reload_runtime_singletons() -> None:
         """Reset runtime singleton services after config reload."""
+        from src.agent.runtime_assembly import apply_tool_category_timeouts
         from src.agent.tools.data_tools import reset_fetcher_manager
+        from src.config import get_config as get_runtime_config
         from src.search_service import reset_search_service
 
         reset_fetcher_manager()
         reset_search_service()
+        apply_tool_category_timeouts(config=get_runtime_config())
 
     @classmethod
     def _build_display_config_map(cls, raw_config_map: Dict[str, str]) -> Dict[str, str]:

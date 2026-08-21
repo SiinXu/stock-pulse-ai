@@ -91,6 +91,22 @@ class TestAgentRuntimeGuardRegistry(unittest.TestCase):
         self.assertEqual(field["validation"]["min"], 0)
         self.assertEqual(field["help_key"], "settings.agent.runtime_guards")
 
+    def test_category_tool_timeout_defaults(self) -> None:
+        keys = (
+            "AGENT_DATA_TOOL_TIMEOUT_S",
+            "AGENT_SEARCH_TOOL_TIMEOUT_S",
+            "AGENT_ANALYSIS_TOOL_TIMEOUT_S",
+            "AGENT_ACTION_TOOL_TIMEOUT_S",
+        )
+        for key in keys:
+            field = get_field_definition(key)
+            self.assertEqual(field["category"], "agent", key)
+            self.assertEqual(field["ui_control"], "number", key)
+            self.assertEqual(field["default_value"], "0", key)
+            self.assertEqual(field["validation"]["min"], 0, key)
+            self.assertEqual(field["help_key"], "settings.agent.runtime_guards", key)
+            self.assertNotEqual(field["display_order"], 9000, key)
+
     def test_identical_call_and_stage_entry_defaults(self) -> None:
         identical = get_field_definition("AGENT_MAX_IDENTICAL_TOOL_CALLS")
         stage_entries = get_field_definition("AGENT_MAX_STAGE_ENTRIES")
