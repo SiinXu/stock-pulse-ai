@@ -288,15 +288,17 @@ describe('NotificationChannelsPanel', () => {
       channel: 'feishu',
       maskToken: '******',
     })));
-    expect(await screen.findByText(/测试失败|Test failed/i)).toBeInTheDocument();
-    expect(screen.getByText(/该渠道缺少必填配置|Required channel fields are missing/)).toBeInTheDocument();
-    expect(screen.queryByText(/测试成功|Test succeeded|Test success/i)).not.toBeInTheDocument();
-    expect(screen.queryByTestId('notification-channel-bind-events')).not.toBeInTheDocument();
+    const dialog = await screen.findByRole('dialog', { name: '飞书' });
+    const failureAlert = await within(dialog).findByRole('alert');
+    expect(failureAlert).toHaveTextContent(/测试失败|Test failed/);
+    expect(failureAlert).toHaveTextContent(/该渠道缺少必填配置|Required channel fields are missing/);
+    expect(within(dialog).queryByText(/测试成功|Test succeeded|Test success/i)).not.toBeInTheDocument();
+    expect(within(dialog).queryByTestId('notification-channel-bind-events')).not.toBeInTheDocument();
     expect(onBindEvents).not.toHaveBeenCalled();
-    await waitFor(() => {
-      expect(screen.getByTestId('notification-channel-card-feishu')).toHaveAttribute('data-channel-health', 'failed');
-    });
-    expect(screen.getByTestId('notification-channel-card-feishu')).toHaveTextContent(/已配置|Configured/);
+    const card = screen.getByTestId('notification-channel-card-feishu');
+    await waitFor(() => expect(card).toHaveAttribute('data-channel-health', 'failed'));
+    expect(card).toHaveTextContent(/已配置|Configured/);
+    expect(card).toHaveTextContent(/测试失败|Test failed/);
   });
 
   it('renders event routing overview and per-card event chips', () => {
