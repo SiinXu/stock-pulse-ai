@@ -17,7 +17,8 @@
     "exclude_newer_packages": {
       "cryptography": "2026-07-31T14:25:11Z",
       "mcp": "2026-07-29T00:00:00Z",
-      "mcp-types": "2026-07-29T00:00:00Z"
+      "mcp-types": "2026-07-29T00:00:00Z",
+      "pip": "2026-08-04T22:51:15Z"
     },
     "universal": true
   },
@@ -124,5 +125,5 @@
       ]
     }
   },
-  "lock_sha256": "8dd4473c36e96b11b4307436ffe30ab3f3fb015549719d96ecbd24d9ad9ed6ad"
+  "lock_sha256": "c6f8d7dbaff48273fb021f3fbb7ad7dc242b9c79da1aa28688f478d2770bb6e9"
 }
