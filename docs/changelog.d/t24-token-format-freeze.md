@@ -1,0 +1,1 @@
+- [Tests] Froze theme token formats behind a ratchet (Refs #1300).
