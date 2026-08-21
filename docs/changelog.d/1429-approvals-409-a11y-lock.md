@@ -1,0 +1,1 @@
+- [Tests] Wait for the Approvals confirm a11y lock to release after a 409 refresh before clicking Save rule (Refs #1429).
