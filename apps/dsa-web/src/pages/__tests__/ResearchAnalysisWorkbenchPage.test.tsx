@@ -1217,6 +1217,56 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     ));
   });
 
+  it('blocks pending-only submission while a fallback history lookup is in flight', async () => {
+    watchlistCodes = ['AAPL'];
+    const lookup = createDeferred<{
+      total: number;
+      page: number;
+      limit: number;
+      items: HistoryItem[];
+    }>();
+    vi.mocked(historyApi.getList).mockImplementation((_params, options) => {
+      expect(options?.signal).toBeInstanceOf(AbortSignal);
+      return lookup.promise;
+    });
+    useStockPoolStore.setState({
+      stockBarItems: [],
+      isLoadingStockBar: false,
+      stockBarRefreshFailed: false,
+    });
+    renderWorkbench();
+
+    const pendingButton = await screen.findByRole('button', { name: '仅未分析' });
+    await waitFor(() => expect(historyApi.getList).toHaveBeenCalled());
+    expect(historyApi.getList).toHaveBeenCalledWith(
+      expect.objectContaining({ stockCode: 'AAPL', limit: 1 }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
+    );
+    expect(pendingButton).toBeDisabled();
+    fireEvent.click(pendingButton);
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+
+    await act(async () => {
+      lookup.resolve({
+        total: 1,
+        page: 1,
+        limit: 1,
+        items: [{
+          ...historyItem,
+          stockCode: 'AAPL',
+          createdAt: '2020-01-01T00:00:00Z',
+        }],
+      });
+      await lookup.promise;
+    });
+
+    await waitFor(() => expect(pendingButton).toBeEnabled());
+    fireEvent.click(pendingButton);
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(
+      expect.objectContaining({ stockCodes: ['AAPL'] }),
+    ));
+  });
+
   it('blocks pending-only submission while today coverage is unavailable', async () => {
     watchlistCodes = ['AAPL'];
     useStockPoolStore.setState({

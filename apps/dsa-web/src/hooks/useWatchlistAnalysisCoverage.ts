@@ -8,6 +8,9 @@ import { getShanghaiDateKey, getTodayInShanghai } from '../utils/format';
 import { normalizeStockCode } from '../utils/stockCode';
 import { toStockBarItemFromHistoryItem } from '../utils/stockBar';
 
+/** Upstream `ae19329d6` HomePage bound: at most four in-flight fallback `getList` calls. */
+export const WATCHLIST_HISTORY_LOOKUP_CONCURRENCY = 4;
+
 type WatchlistHistoryLookupRequest = {
   entries: Array<[string, string]>;
   signature: string;
@@ -39,6 +42,62 @@ export type WatchlistAnalysisCoverage = {
 function getStockCodeKey(code?: string | null): string {
   const trimmed = (code ?? '').trim();
   return trimmed ? normalizeStockCode(trimmed).toUpperCase() : '';
+}
+
+function isAbortError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') return false;
+  const name = 'name' in error ? String(error.name) : '';
+  const code = 'code' in error ? String(error.code) : '';
+  return name === 'AbortError' || name === 'CanceledError' || code === 'ERR_CANCELED';
+}
+
+type WatchlistHistoryLookupResult = {
+  key: string;
+  item: StockBarItem | null;
+  failed: boolean;
+};
+
+async function lookupWatchlistHistory(
+  entries: Array<[string, string]>,
+  isCanceled: () => boolean,
+  signal: AbortSignal,
+): Promise<WatchlistHistoryLookupResult[]> {
+  const results: Array<WatchlistHistoryLookupResult | undefined> = new Array(entries.length);
+  let nextIndex = 0;
+
+  const runWorker = async () => {
+    while (!isCanceled() && !signal.aborted) {
+      const index = nextIndex;
+      if (index >= entries.length) {
+        return;
+      }
+      nextIndex += 1;
+      const [key, code] = entries[index];
+      try {
+        const response = await historyApi.getList(
+          { stockCode: code, limit: 1 },
+          { signal },
+        );
+        if (isCanceled() || signal.aborted) {
+          return;
+        }
+        results[index] = {
+          key,
+          item: response.items[0] ? toStockBarItemFromHistoryItem(response.items[0]) : null,
+          failed: false,
+        };
+      } catch (error) {
+        if (isCanceled() || signal.aborted || isAbortError(error)) {
+          return;
+        }
+        results[index] = { key, item: null, failed: true };
+      }
+    }
+  };
+
+  const workerCount = Math.min(WATCHLIST_HISTORY_LOOKUP_CONCURRENCY, entries.length);
+  await Promise.all(Array.from({ length: workerCount }, () => runWorker()));
+  return results.filter((entry): entry is WatchlistHistoryLookupResult => entry !== undefined);
 }
 
 export function useWatchlistAnalysisCoverage({
@@ -95,23 +154,23 @@ export function useWatchlistAnalysisCoverage({
   }), [missingHistoryEntries, missingHistorySignature]);
 
   useEffect(() => {
-    if (!canLookupHistory || lookupRequest.entries.length === 0) return undefined;
+    if (!canLookupHistory || lookupRequest.entries.length === 0) {
+      return undefined;
+    }
 
+    let isCanceled = false;
+    const abortController = new AbortController();
     const missingKeys = lookupRequest.entries.map(([key]) => key);
-    let active = true;
-    void Promise.all(lookupRequest.entries.map(async ([key, code]) => {
-      try {
-        const response = await historyApi.getList({ stockCode: code, limit: 1 });
-        return {
-          key,
-          item: response.items[0] ? toStockBarItemFromHistoryItem(response.items[0]) : null,
-          failed: false,
-        };
-      } catch {
-        return { key, item: null, failed: true };
+    const request = lookupRequest;
+
+    void lookupWatchlistHistory(
+      request.entries,
+      () => isCanceled,
+      abortController.signal,
+    ).then((results) => {
+      if (isCanceled || abortController.signal.aborted) {
+        return;
       }
-    })).then((results) => {
-      if (!active) return;
       const nextItems = new Map<string, StockBarItem>();
       const failedKeys = new Set<string>();
       for (const result of results) {
@@ -120,17 +179,18 @@ export function useWatchlistAnalysisCoverage({
       }
       setHistoryItemsByCode(nextItems);
       setHistoryLookup({
-        request: lookupRequest,
-        signature: lookupRequest.signature,
+        request,
+        signature: request.signature,
         settledKeys: new Set(missingKeys),
         failedKeys,
       });
     });
 
     return () => {
-      active = false;
+      isCanceled = true;
+      abortController.abort();
     };
-  }, [canLookupHistory, lookupRequest]);
+  }, [canLookupHistory, lookupRequest, missingHistorySignature]);
 
   const activeTaskByCode = useMemo(() => {
     const result = new Map<string, TaskInfo>();
