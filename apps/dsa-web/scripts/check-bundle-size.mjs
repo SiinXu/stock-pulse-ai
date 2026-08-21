@@ -7,6 +7,11 @@
  * splitting one route or component into many smaller chunks cannot hide
  * growth behind the per-file budgets (Refs #883).
  *
+ * A family with source "indexHtmlModulepreload" (id "criticalPath") ignores
+ * its match globs and instead sums the type="module" entry script plus every
+ * rel="modulepreload" href in the built index.html. Renaming a split sibling
+ * therefore still counts against the family.
+ *
  * Usage (from apps/dsa-web after a production build):
  *   node scripts/check-bundle-size.mjs
  *   node scripts/check-bundle-size.mjs --print
@@ -36,6 +41,8 @@ const FORBIDDEN_PRODUCTION_ASSET_GLOBS = Object.freeze([
   'assets/PlaygroundRenderPage-*.js',
   'assets/ComponentPlaygroundPage-*.js',
 ]);
+const INDEX_HTML_MODULEPRELOAD_SOURCE = 'indexHtmlModulepreload';
+const CRITICAL_PATH_FAMILY_ID = 'criticalPath';
 
 function fail(message) {
   console.error(`bundle-size: ${message}`);
@@ -115,6 +122,138 @@ function assertBudgetRuleShape(rule, label, seenIds) {
   }
 }
 
+function normalizeAggregateSource(rule) {
+  if (rule.id === CRITICAL_PATH_FAMILY_ID && rule.source !== INDEX_HTML_MODULEPRELOAD_SOURCE) {
+    throw new Error(
+      `Aggregate rule ${CRITICAL_PATH_FAMILY_ID} requires source "${INDEX_HTML_MODULEPRELOAD_SOURCE}"`,
+    );
+  }
+  if (rule.source === undefined) {
+    return undefined;
+  }
+  if (rule.source !== INDEX_HTML_MODULEPRELOAD_SOURCE) {
+    throw new Error(`Aggregate rule ${rule.id} has unknown source: ${rule.source}`);
+  }
+  return rule.source;
+}
+
+function getQuotedAttr(tag, name) {
+  const match = tag.match(new RegExp(`\\b${name}\\s*=\\s*(["'])([^"']*)\\1`, 'i'));
+  return match ? match[2] : null;
+}
+
+function normalizeAssetHref(href, label) {
+  if (typeof href !== 'string' || !href.trim()) {
+    throw new Error(`${label} href is empty`);
+  }
+  let value = href.trim();
+  const hashIndex = value.indexOf('#');
+  if (hashIndex >= 0) {
+    value = value.slice(0, hashIndex);
+  }
+  const queryIndex = value.indexOf('?');
+  if (queryIndex >= 0) {
+    value = value.slice(0, queryIndex);
+  }
+  if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(value)) {
+    try {
+      value = new URL(value).pathname;
+    } catch {
+      throw new Error(`${label} href is not a build asset: ${href}`);
+    }
+  }
+  value = value.replace(/\\/g, '/');
+  while (value.startsWith('./')) {
+    value = value.slice(2);
+  }
+  value = value.replace(/^\/+/, '');
+  if (!value.startsWith('assets/') || value.split('/').includes('..')) {
+    throw new Error(`${label} href is not a build asset: ${href}`);
+  }
+  if (!(value.endsWith('.js') || value.endsWith('.css'))) {
+    throw new Error(`${label} href is not a js/css asset: ${href}`);
+  }
+  return value;
+}
+
+function collectIndexHtmlCriticalPath(outDir) {
+  const indexPath = path.join(outDir, 'index.html');
+  if (!existsSync(indexPath)) {
+    throw new Error(
+      `index.html not found under ${outDir}. Run \`npm run build\` first.`,
+    );
+  }
+
+  const html = readFileSync(indexPath, 'utf8');
+  const matched = [];
+  const seen = new Set();
+  let hasEntry = false;
+
+  const add = (href, label) => {
+    const relativePath = normalizeAssetHref(href, label);
+    if (seen.has(relativePath)) {
+      return;
+    }
+    seen.add(relativePath);
+    matched.push(relativePath);
+  };
+
+  for (const tag of html.match(/<script\b[^>]*>/gi) || []) {
+    const type = (getQuotedAttr(tag, 'type') || '').toLowerCase();
+    if (type !== 'module') {
+      continue;
+    }
+    const src = getQuotedAttr(tag, 'src');
+    if (!src) {
+      continue;
+    }
+    add(src, 'criticalPath entry script');
+    hasEntry = true;
+  }
+
+  if (!hasEntry) {
+    throw new Error('index.html has no type="module" entry script with src');
+  }
+
+  for (const tag of html.match(/<link\b[^>]*>/gi) || []) {
+    const rel = (getQuotedAttr(tag, 'rel') || '').toLowerCase();
+    if (rel !== 'modulepreload') {
+      continue;
+    }
+    const href = getQuotedAttr(tag, 'href');
+    if (!href) {
+      throw new Error('criticalPath modulepreload link is missing href');
+    }
+    add(href, 'criticalPath modulepreload');
+  }
+
+  return matched;
+}
+
+function gzipBytesForMatchedPaths(ruleId, matchedPaths, gzipByRelativePath) {
+  return matchedPaths.reduce((total, relativePath) => {
+    const size = gzipByRelativePath.get(relativePath);
+    if (typeof size !== 'number') {
+      throw new Error(`Aggregate rule ${ruleId} has no gzip size for ${relativePath}`);
+    }
+    return total + size;
+  }, 0);
+}
+
+function resolveAggregateMatchedPaths(rule, relativePaths, gzipByRelativePath, outDir) {
+  if (rule.source === INDEX_HTML_MODULEPRELOAD_SOURCE) {
+    const matchedPaths = collectIndexHtmlCriticalPath(outDir);
+    const missing = matchedPaths.filter((relativePath) => !gzipByRelativePath.has(relativePath));
+    if (missing.length > 0) {
+      throw new Error(
+        `Aggregate rule ${rule.id} references missing build artifacts: ${missing.join(', ')}.`,
+      );
+    }
+    return matchedPaths;
+  }
+  return matchRelativePaths(relativePaths, rule.match);
+}
+
 function loadBudget(budgetPath) {
   if (!existsSync(budgetPath)) {
     throw new Error(`Budget file not found: ${budgetPath}`);
@@ -152,8 +291,10 @@ function loadBudget(budgetPath) {
   const aggregateRules = [];
   for (const rule of budget.aggregateRules || []) {
     assertBudgetRuleShape(rule, 'aggregate rule', aggregateIds);
+    const source = normalizeAggregateSource(rule);
     aggregateRules.push({
       ...rule,
+      source,
       match: normalizeMatchPatterns(rule.match, `Aggregate rule ${rule.id}`),
     });
   }
@@ -299,11 +440,13 @@ function main() {
 
   const aggregateResults = [];
   for (const rule of budget.aggregateRules) {
-    const matchedPaths = matchRelativePaths(relativePaths, rule.match);
-    const gzipBytes = matchedPaths.reduce(
-      (total, relativePath) => total + (gzipByRelativePath.get(relativePath) || 0),
-      0,
+    const matchedPaths = resolveAggregateMatchedPaths(
+      rule,
+      relativePaths,
+      gzipByRelativePath,
+      outDir,
     );
+    const gzipBytes = gzipBytesForMatchedPaths(rule.id, matchedPaths, gzipByRelativePath);
     const ok = matchedPaths.length > 0 && gzipBytes <= rule.maxGzipBytes;
     if (matchedPaths.length > 0 && gzipBytes > rule.maxGzipBytes) {
       failures += 1;
@@ -338,7 +481,7 @@ function main() {
         );
         for (const relativePath of result.matchedPaths) {
           console.log(
-            `    ${relativePath}  gzip=${formatBytes(gzipByRelativePath.get(relativePath) || 0)}`,
+            `    ${relativePath}  gzip=${formatBytes(gzipByRelativePath.get(relativePath))}`,
           );
         }
       }

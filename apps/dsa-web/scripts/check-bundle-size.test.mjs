@@ -286,6 +286,228 @@ describe('bundle size aggregate families (Refs #883)', () => {
   });
 });
 
+describe('criticalPath aggregate family (Refs #883)', () => {
+  const entryContents = Buffer.from("export const entry = 'critical-path-entry';\n".repeat(48));
+  const splitContents = Buffer.from("export const split = 'critical-path-sibling';\n".repeat(40));
+
+  function writeHashedAsset(root, name, contents) {
+    writeFileSync(path.join(root, 'assets', name), contents);
+    return gzipSync(contents, { level: 9 }).length;
+  }
+
+  function writeIndexHtml(root, { entry, modulepreloads = [] }) {
+    const preloadTags = modulepreloads
+      .map((href) => `<link rel="modulepreload" crossorigin href="/${href}">`)
+      .join('\n');
+    writeFileSync(
+      path.join(root, 'index.html'),
+      `<!doctype html><html><head>
+<script>window.__theme = 'dark';</script>
+<script type="module" crossorigin src="/${entry}"></script>
+${preloadTags}
+<link rel="stylesheet" href="/assets/index-not-critical.css">
+</head><body></body></html>`,
+    );
+  }
+
+  function criticalPathRule(maxGzipBytes, extra = {}) {
+    return {
+      id: 'criticalPath',
+      source: 'indexHtmlModulepreload',
+      match: ['assets/index-*.js'],
+      maxGzipBytes,
+      ...extra,
+    };
+  }
+
+  it('sums the entry script and modulepreload hrefs at the exact family cap', () => {
+    const root = createOutput();
+    const entryGzip = writeHashedAsset(root, 'index-aaa.js', entryContents);
+    const vendorGzip = writeHashedAsset(root, 'vendor-react-bbb.js', splitContents);
+    writeHashedAsset(
+      root,
+      'HomePage-ccc.js',
+      Buffer.from("export const lazy = 'not-on-critical-path';\n".repeat(32)),
+    );
+    writeIndexHtml(root, {
+      entry: 'assets/index-aaa.js',
+      modulepreloads: ['assets/vendor-react-bbb.js'],
+    });
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [criticalPathRule(entryGzip + vendorGzip)],
+    );
+
+    const result = runChecker(budgetPath);
+    const familyBlock = result.stdout.slice(result.stdout.indexOf('bundle-size: aggregate families:'));
+
+    expect(result.status).toBe(0);
+    expect(familyBlock).toContain('[OK] criticalPath');
+    expect(familyBlock).toContain(`gzip=${entryGzip + vendorGzip} B`);
+    expect(familyBlock).toContain('assets/index-aaa.js');
+    expect(familyBlock).toContain('assets/vendor-react-bbb.js');
+    expect(familyBlock).not.toContain('HomePage-ccc.js');
+    expect(result.stdout).toContain('1 aggregate family within budget');
+  });
+
+  it('fails a renamed split that evades the match glob but stays on the modulepreload graph', () => {
+    const root = createOutput();
+    const entryGzip = writeHashedAsset(root, 'index-aaa.js', entryContents);
+    const siblingGzip = writeHashedAsset(root, 'vendor-split-bbb.js', splitContents);
+    const perAssetCap = Math.max(entryGzip, siblingGzip);
+    writeIndexHtml(root, {
+      entry: 'assets/index-aaa.js',
+      modulepreloads: ['assets/vendor-split-bbb.js'],
+    });
+    const budgetPath = writeBudget(
+      root,
+      [
+        {
+          id: 'js-entry',
+          match: 'assets/index-*.js',
+          maxGzipBytes: perAssetCap,
+        },
+      ],
+      [criticalPathRule(perAssetCap)],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(entryGzip).toBeLessThanOrEqual(perAssetCap);
+    expect(siblingGzip).toBeLessThanOrEqual(perAssetCap);
+    expect(entryGzip + siblingGzip).toBeGreaterThan(perAssetCap);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('FAIL criticalPath');
+    expect(result.stderr).toContain(`gzip=${entryGzip + siblingGzip} B`);
+    expect(result.stderr).toContain(`budget=${perAssetCap} B`);
+    expect(result.stderr).toContain('assets/index-aaa.js, assets/vendor-split-bbb.js');
+    expect(result.stderr).toContain('aggregate family exceeded budget');
+    expect(result.stdout).toContain('assets=2');
+  });
+
+  it('does not bill a glob-matching sibling that is absent from index.html', () => {
+    const root = createOutput();
+    const entryGzip = writeHashedAsset(root, 'index-aaa.js', entryContents);
+    writeHashedAsset(root, 'index-extra.js', splitContents);
+    writeIndexHtml(root, { entry: 'assets/index-aaa.js' });
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [criticalPathRule(entryGzip)],
+    );
+
+    const result = runChecker(budgetPath);
+    const familyBlock = result.stdout.slice(result.stdout.indexOf('bundle-size: aggregate families:'));
+
+    expect(result.status).toBe(0);
+    expect(familyBlock).toContain(`gzip=${entryGzip} B`);
+    expect(familyBlock).toContain('assets=1');
+    expect(familyBlock).toContain('assets/index-aaa.js');
+    expect(familyBlock).not.toContain('index-extra.js');
+  });
+
+  it('counts an entry that is also modulepreloaded once', () => {
+    const root = createOutput();
+    const entryGzip = writeHashedAsset(root, 'index-aaa.js', entryContents);
+    writeIndexHtml(root, {
+      entry: 'assets/index-aaa.js',
+      modulepreloads: ['assets/index-aaa.js'],
+    });
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [criticalPathRule(entryGzip)],
+    );
+
+    const result = runChecker(budgetPath);
+    const familyBlock = result.stdout.slice(result.stdout.indexOf('bundle-size: aggregate families:'));
+
+    expect(result.status).toBe(0);
+    expect(familyBlock).toContain(`gzip=${entryGzip} B`);
+    expect(familyBlock).toContain('assets=1');
+    expect(familyBlock.match(/assets\/index-aaa\.js/g)).toHaveLength(1);
+  });
+
+  it('fails when index.html is missing', () => {
+    const root = createOutput();
+    writeHashedAsset(root, 'index-aaa.js', entryContents);
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [criticalPathRule(1_000_000)],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('index.html not found');
+  });
+
+  it('fails when a modulepreload href is missing from the build assets', () => {
+    const root = createOutput();
+    writeHashedAsset(root, 'index-aaa.js', entryContents);
+    writeIndexHtml(root, {
+      entry: 'assets/index-aaa.js',
+      modulepreloads: ['assets/vendor-missing-bbb.js'],
+    });
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [criticalPathRule(1_000_000)],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'Aggregate rule criticalPath references missing build artifacts: assets/vendor-missing-bbb.js.',
+    );
+  });
+
+  it('fails closed when criticalPath is missing the indexHtmlModulepreload source', () => {
+    const root = createOutput();
+    writeHashedAsset(root, 'index-aaa.js', entryContents);
+    writeIndexHtml(root, { entry: 'assets/index-aaa.js' });
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [{
+        id: 'criticalPath',
+        match: 'assets/index-*.js',
+        maxGzipBytes: 1_000_000,
+      }],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain(
+      'Aggregate rule criticalPath requires source "indexHtmlModulepreload"',
+    );
+  });
+
+  it('fails closed on an unknown aggregate source', () => {
+    const root = createOutput();
+    writeHashedAsset(root, 'index-aaa.js', entryContents);
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [{
+        id: 'contract-family',
+        match: 'assets/index-*.js',
+        source: 'invented',
+        maxGzipBytes: 1_000_000,
+      }],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Aggregate rule contract-family has unknown source: invented');
+  });
+});
+
 describe('first-paint entry budget (Refs #883)', () => {
   const budgetPath = path.join(WEB_ROOT, 'scripts', 'bundle-size-budget.json');
   const eslintPath = path.join(WEB_ROOT, 'eslint.config.js');
