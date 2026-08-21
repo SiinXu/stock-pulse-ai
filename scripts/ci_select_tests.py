@@ -4,10 +4,22 @@
 """Map changed repository paths to a selective offline pytest target list.
 
 Used by the PR-tier backend planner and selective job so most pull requests
-avoid a full-suite run. When mapping is uncertain (shared infrastructure,
-config, conftest, or an unprovable merge-base), the script prints ``FULL``
-and exits 0. Hosted CI must schedule the four ``backend-tests`` shards for
-that result; ``offline-tests-selective`` refuses to run the unsharded suite.
+avoid a full-suite run. The mapper fails closed to ``FULL`` when:
+
+- mapping is uncertain (shared infrastructure, config, conftest)
+- the merge-base cannot be proven
+- a changed path matches no mapping
+- a ``tests/`` path is not a collectable ``test_*.py`` module
+- a mapping is an empty tuple outside ``NONE_PREFIXES``
+- a mapping's targets are all missing or its globs match nothing
+
+Hosted CI must schedule the four ``backend-tests`` shards for ``FULL``;
+``offline-tests-selective`` refuses to run the unsharded suite. ``NONE`` is
+allowed only for the explicit ``NONE_PREFIXES`` allowlist (``docs/`` and
+``apps/dsa-web/``) excluding ``BACKEND_WEB_CONTRACT_PREFIXES`` (the
+``backend_web_contract`` paths in ``.github/workflows/ci.yml``). Those
+shared web/runtime files map to the backend tests that cover the contract.
+Any other empty selection is ``FULL``.
 
 Usage:
   python scripts/ci_select_tests.py --base origin/main
@@ -46,6 +58,27 @@ FULL_SUITE_PREFIXES: tuple[str, ...] = (
     ".github/workflows/ci.yml",
 )
 
+# CLI ``NONE`` (empty pytest target list) is allowed only for these prefixes.
+# Empty-tuple mappings outside this allowlist fail closed to ``FULL``.
+# ``BACKEND_WEB_CONTRACT_PREFIXES`` live under ``apps/dsa-web/`` but are not
+# NONE: they are the ``backend_web_contract`` filter in ci.yml.
+NONE_PREFIXES: tuple[str, ...] = (
+    "apps/dsa-web/",
+    "docs/",
+)
+
+# Same path set as ci.yml ``backend_web_contract``. Longer prefixes listed
+# before ``apps/dsa-web/`` in ``PATH_TO_TARGETS`` so first-match cannot yield
+# NONE. Keep this tuple in lockstep with that YAML filter.
+BACKEND_WEB_CONTRACT_PREFIXES: tuple[str, ...] = (
+    "apps/dsa-web/public/",
+    "apps/dsa-web/src/components/settings/llmProviderTemplates.ts",
+    "apps/dsa-web/src/locales/settingsHelp.ts",
+    "apps/dsa-web/src/locales/settingsHelp.en.ts",
+    "apps/dsa-web/src/locales/settingsHelp.zh.ts",
+    "apps/dsa-web/src/utils/systemConfigI18n.ts",
+)
+
 # First-match path map: longer prefixes must be listed before shorter ones
 # (for example src/bot/ before src/). Changed path prefix → pytest roots.
 PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
@@ -55,7 +88,10 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "src/data_provider/",
         ("tests/data_provider", "tests/contract/test_provider_fallback.py"),
     ),
-    ("src/agent/", ("tests/agent", "tests/skill_opinion_outcomes")),
+    (
+        "src/agent/",
+        ("tests/agent", "tests/skill_opinion_outcomes", "tests/test_agent_*.py"),
+    ),
     ("src/services/diagnostics/", (
         "tests/test_run_diagnostics_p1.py",
         "tests/test_run_diagnostics_p2.py",
@@ -68,14 +104,61 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     )),
     ("src/services/", ("tests/services",)),
     ("src/repositories/", ("tests/repositories", "tests/services")),
-    ("src/schemas/", ("tests/test_api_schema_pydantic.py", "tests/api")),
-    ("src/market/", ("tests/services", "tests/test_market_analyzer.py")),
-    ("src/migrations/", ("tests/migrations", "tests/test_storage.py")),
+    ("src/schemas/", ("tests/schemas", "tests/test_api_schema_pydantic.py", "tests/api")),
+    ("src/market/", ("tests/market", "tests/services")),
+    (
+        "src/migrations/",
+        (
+            "tests/test_schema_migrations.py",
+            "tests/test_migration_cli_readonly.py",
+            "tests/test_approval_migration.py",
+            "tests/test_investment_framework_migration.py",
+            "tests/test_storage.py",
+        ),
+    ),
     ("src/storage", ("tests/test_storage.py", "tests/storage")),
     ("src/", ("tests/",)),
     ("scripts/", ("tests/scripts", "tests/test_ci_workflow.py")),
-    ("tests/", ()),  # filled from the changed path itself
-    ("apps/dsa-web/", ()),  # web-only; backend selective returns empty → smoke only
+    (
+        "apps/dsa-web/public/",
+        (
+            "tests/data/test_stock_index_loader.py",
+            "tests/test_generate_index_from_csv.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/components/settings/llmProviderTemplates.ts",
+        (
+            "tests/test_daily_analysis_workflow_llm_env.py",
+            "tests/test_provider_catalog.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/locales/settingsHelp.ts",
+        (
+            "tests/scripts/test_merge_resolvers.py",
+            "tests/test_config_registry.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/locales/settingsHelp.en.ts",
+        (
+            "tests/scripts/test_merge_resolvers.py",
+            "tests/test_config_registry.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/locales/settingsHelp.zh.ts",
+        (
+            "tests/scripts/test_merge_resolvers.py",
+            "tests/test_config_registry.py",
+        ),
+    ),
+    (
+        "apps/dsa-web/src/utils/systemConfigI18n.ts",
+        ("tests/test_config_registry.py",),
+    ),
+    ("apps/dsa-web/", ()),  # remaining web-only; backend selective returns empty → smoke only
     ("docs/", ()),
     (".github/", ("tests/test_ci_workflow.py",)),
 )
@@ -104,28 +187,77 @@ def _git_diff_names(base: str) -> list[str] | None:
     return [line.strip() for line in result.stdout.splitlines() if line.strip()]
 
 
+def _matches_prefix(path: str, prefix: str) -> bool:
+    return path == prefix.rstrip("/") or path.startswith(prefix)
+
+
 def _forces_full(path: str) -> bool:
     normalized = path.replace("\\", "/")
-    for prefix in FULL_SUITE_PREFIXES:
-        if normalized == prefix or normalized.startswith(prefix):
-            return True
-    return False
+    return any(_matches_prefix(normalized, prefix) for prefix in FULL_SUITE_PREFIXES)
+
+
+def _is_backend_web_contract(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return any(
+        _matches_prefix(normalized, prefix) for prefix in BACKEND_WEB_CONTRACT_PREFIXES
+    )
+
+
+def _is_none_allowlisted(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    # Shared web/runtime contracts must not use the apps/dsa-web/ NONE map.
+    if _is_backend_web_contract(normalized):
+        return False
+    return any(_matches_prefix(normalized, prefix) for prefix in NONE_PREFIXES)
+
+
+def _is_collectable_pytest_module(path: str) -> bool:
+    filename = path.rsplit("/", 1)[-1]
+    return path.endswith(".py") and filename.startswith("test_")
+
+
+def _is_glob(target: str) -> bool:
+    return any(char in target for char in "*?[")
+
+
+def _expand_target(target: str) -> set[str]:
+    """Resolve one mapping target against the repo root.
+
+    Literal paths are returned as-is. Glob patterns are expanded so a pattern
+    cannot survive as a non-existent pytest argument.
+    """
+    if not target:
+        return set()
+    if not _is_glob(target):
+        return {target}
+    return {
+        str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+        for path in REPO_ROOT.glob(target)
+    }
 
 
 def _targets_for_path(path: str) -> set[str]:
     normalized = path.replace("\\", "/")
-    if normalized.startswith("tests/") and normalized.endswith(".py"):
-        # Pytest only collects ``test_*.py`` in this repository.  Helper,
-        # fixture, and nested conftest modules can affect many consumers, but
-        # passing one of them as the sole explicit target collects zero tests
-        # and makes pytest exit 5.  Their dependency surface is not encoded in
+    if normalized.startswith("tests/"):
+        # Pytest only collects ``test_*.py`` in this repository. Helper
+        # modules, nested conftest, fixtures, SQL/JSON/images, and other
+        # support files can affect many consumers. Passing one of them as
+        # the sole explicit target collects zero tests (pytest exit 5) or
+        # skips the consumers. Their dependency surface is not encoded in
         # this lightweight mapper, so fail closed to the full suite.
-        if not normalized.rsplit("/", 1)[-1].startswith("test_"):
-            return {"FULL"}
-        return {normalized}
+        if _is_collectable_pytest_module(normalized):
+            return {normalized}
+        return {"FULL"}
     for prefix, targets in PATH_TO_TARGETS:
-        if normalized == prefix.rstrip("/") or normalized.startswith(prefix):
-            return {target for target in targets if target}
+        if not _matches_prefix(normalized, prefix):
+            continue
+        selected = {target for target in targets if target}
+        if selected:
+            return selected
+        # Empty mapping is NONE only on the explicit allowlist.
+        if _is_none_allowlisted(normalized):
+            return set()
+        return {"FULL"}
     # Unknown top-level paths → full suite for safety.
     return {"FULL"}
 
@@ -141,15 +273,27 @@ def select_targets(paths: Sequence[str]) -> list[str] | str:
         selected |= _targets_for_path(path)
         if "FULL" in selected:
             return "FULL"
-    # Drop missing paths so pytest does not fail collection on stale maps.
+    mapped_any = bool(selected)
+    expanded: set[str] = set()
+    for target in selected:
+        expanded |= _expand_target(target)
+        if "FULL" in expanded:
+            return "FULL"
+    # Drop missing extras so pytest does not fail collection on a stale sibling
+    # target. If every mapped target is missing or every glob matched nothing,
+    # fail closed to the full suite rather than selecting nothing.
     existing = sorted(
         target
-        for target in selected
+        for target in expanded
         if (REPO_ROOT / target).exists()
     )
     if not existing:
-        # Docs/web-only changes: no backend pytest targets.
-        return []
+        if mapped_any:
+            return "FULL"
+        # Empty selection is NONE only when every path is on the allowlist.
+        if paths and all(_is_none_allowlisted(path) for path in paths):
+            return []
+        return "FULL"
     return existing
 
 

@@ -61,6 +61,26 @@ def test_backend_gate_pr_is_selective() -> None:
     assert selective.get("continue-on-error", False) is False
 
 
+def test_backend_web_contract_filter_still_schedules_backend_jobs() -> None:
+    """Shared web/runtime contract files must keep backend validation scheduled."""
+
+    workflow = _workflow()
+    changes = workflow["jobs"]["changes"]
+    assert "backend_web_contract" in changes["outputs"]["backend"]
+    filter_step = next(
+        step for step in changes["steps"] if step.get("id") == "filter"
+    )
+    filters = yaml.safe_load(filter_step["with"]["filters"])
+    contract_paths = filters["backend_web_contract"]
+    assert "apps/dsa-web/public/**" in contract_paths
+    assert any(path.endswith("llmProviderTemplates.ts") for path in contract_paths)
+    assert any(path.endswith("systemConfigI18n.ts") for path in contract_paths)
+    planner = next(
+        step for step in changes["steps"] if step.get("id") == "backend-selection"
+    )
+    assert "backend_web_contract" in planner["if"]
+
+
 def test_changes_job_plans_full_pr_suite_before_scheduling_backend_jobs() -> None:
     workflow = _workflow()
     job = workflow["jobs"]["changes"]

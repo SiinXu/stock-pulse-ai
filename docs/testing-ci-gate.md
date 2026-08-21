@@ -1,7 +1,7 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-19
+- Last verified: 2026-08-22
 - Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
@@ -322,7 +322,7 @@ To avoid a doubled full offline suite on every PR:
 | `backend-gate` offline phase | `./scripts/ci_gate.sh offline-tests-selective` via `scripts/ci_select_tests.py` (prints `NONE` / path targets). Mapping `FULL` is fail-closed in that script and is scheduled as four `backend-tests` shards plus `offline-tests-combine` under the same required check name. Planner and selective job pin `github.event.pull_request.base.sha` so a later `origin/main` fetch cannot remap `NONE` → `FULL`. | Four `offline-tests-shard` jobs followed by one `offline-tests-combine` coverage-floor check |
 | `python-minimum` | `./scripts/ci_gate.sh python-min-smoke` (3.10 import + small contract suite) | Four `python-minimum-tests` shards (`./scripts/ci_gate.sh offline-tests-shard` on Python 3.10, 45-minute job bound); required `python-minimum` check fails unless every shard result is `success` |
 
-Selective mapping fails closed to the **sharded** full offline suite when infrastructure paths change (for example `tests/conftest.py`, `ci.yml`, coverage floor scripts, or top-level config), or when the merge-base cannot be proven. It must not run `offline_test_suite` inside the 45-minute selective job. Hosted counterexamples: PR #1375 run 32238883191 and PR #1377 run 32238746609 printed planner `NONE`, remapped to `FULL` after `git fetch --depth=1 origin main`, and cancelled at 45m21s.
+Selective mapping fails closed to the **sharded** full offline suite when infrastructure paths change (for example `tests/conftest.py`, `ci.yml`, coverage floor scripts, or top-level config), when the merge-base cannot be proven, when a changed path matches no mapping, when a `tests/` path is not a collectable `test_*.py` module (helpers, nested conftest, fixtures, SQL/JSON, images), when a mapping is an empty tuple outside the `NONE` allowlist, or when every mapped target is missing / every glob matches nothing. `NONE` is allowed only for `docs/`-only and remaining `apps/dsa-web/`-only change sets (`NONE_PREFIXES` in `scripts/ci_select_tests.py`). The `backend_web_contract` paths in `.github/workflows/ci.yml` (`apps/dsa-web/public/**`, settings help locales, `systemConfigI18n.ts`, and `llmProviderTemplates.ts`) are excluded from that allowlist and map to the backend tests that cover the shared contract. Any other empty selection is `FULL`. Collectable `tests/test_*.py` files still map to themselves. The 45-minute selective job must not run `offline_test_suite`. Hosted counterexamples: PR #1375 run 32238883191 and PR #1377 run 32238746609 printed planner `NONE`, remapped to `FULL` after `git fetch --depth=1 origin main`, and cancelled at 45m21s.
 
 ## Push-to-main CI
 
