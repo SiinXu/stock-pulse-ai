@@ -55,6 +55,46 @@ describe('reportVersionCompareApi', () => {
     expect(result.items[0]?.configFingerprint).toBe('abc123');
   });
 
+  it('preserves extra keys on valid list payloads (toCamelCase pass-through)', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        stock_code: '600519',
+        total: 1,
+        page: 1,
+        limit: 20,
+        unexpected_list_field: 'keep-list',
+        items: [
+          {
+            run_id: '12',
+            query_id: 'q1',
+            stock_code: '600519',
+            unexpected_item_field: 'keep-item',
+          },
+        ],
+      },
+    });
+
+    const result = await reportVersionCompareApi.listRuns({ stockCode: '600519' });
+    expect(result).toEqual({
+      stockCode: '600519',
+      total: 1,
+      page: 1,
+      limit: 20,
+      unexpectedListField: 'keep-list',
+      items: [
+        {
+          runId: '12',
+          queryId: 'q1',
+          stockCode: '600519',
+          unexpectedItemField: 'keep-item',
+          configComponents: {},
+          configComplete: false,
+          configMissingKeys: [],
+        },
+      ],
+    });
+  });
+
   it('compares runs and camelCases nested payloads', async () => {
     vi.mocked(apiClient.get).mockResolvedValue({
       data: {
@@ -201,6 +241,143 @@ describe('reportVersionCompareApi', () => {
       reportVersionCompareApi.listRuns({ stockCode: '600519' }),
     ).rejects.toSatisfy((error: unknown) => {
       expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
+  });
+
+  it('preserves extra keys on valid compare payloads (toCamelCase pass-through)', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        status: 'ok',
+        stock_code: '600519',
+        unexpected_compare_field: 'keep-compare',
+        base_run: {
+          run_id: '1',
+          query_id: 'a',
+          stock_code: '600519',
+          unexpected_run_field: 'keep-base',
+        },
+        target_run: {
+          run_id: '2',
+          query_id: 'b',
+          stock_code: '600519',
+        },
+        config_diff: {
+          comparison_status: 'unknown',
+          unexpected_diff_field: 'keep-diff',
+        },
+        engine_status: 'ok',
+      },
+    });
+
+    const result = await reportVersionCompareApi.compare({
+      stockCode: '600519',
+      baseRunId: '1',
+      targetRunId: '2',
+    });
+    expect(result).toEqual({
+      status: 'ok',
+      stockCode: '600519',
+      unexpectedCompareField: 'keep-compare',
+      baseRun: {
+        runId: '1',
+        queryId: 'a',
+        stockCode: '600519',
+        unexpectedRunField: 'keep-base',
+        configComponents: {},
+        configComplete: false,
+        configMissingKeys: [],
+      },
+      targetRun: {
+        runId: '2',
+        queryId: 'b',
+        stockCode: '600519',
+        configComponents: {},
+        configComplete: false,
+        configMissingKeys: [],
+      },
+      configDiff: {
+        comparisonStatus: 'unknown',
+        unexpectedDiffField: 'keep-diff',
+        components: [],
+        baseMissingKeys: [],
+        targetMissingKeys: [],
+        identical: false,
+        hasDifferences: false,
+        baseComplete: false,
+        targetComplete: false,
+      },
+      fieldDiffs: [],
+      optionalSections: [],
+      engineStatus: 'ok',
+    });
+  });
+
+  it('rejects compare payloads whose nested base run is missing required runId', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        status: 'ok',
+        stock_code: '600519',
+        base_run: {
+          query_id: 'a',
+          stock_code: '600519',
+        },
+        target_run: {
+          run_id: '2',
+          query_id: 'b',
+          stock_code: '600519',
+        },
+        config_diff: {},
+        engine_status: 'ok',
+      },
+    });
+    await expect(
+      reportVersionCompareApi.compare({
+        stockCode: '600519',
+        baseRunId: '1',
+        targetRunId: '2',
+      }),
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(isApiRequestError(error)).toBe(true);
+      const parsed = getParsedApiError(error);
+      expect(parsed.code).toBe('api_response_validation_failed');
+      expect(parsed.message).toContain('ReportVersionCompareResponse');
+      return true;
+    });
+  });
+
+  it('rejects compare payloads whose nested delta is missing required baseRecordId', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: {
+        status: 'ok',
+        stock_code: '600519',
+        base_run: {
+          run_id: '1',
+          query_id: 'a',
+          stock_code: '600519',
+        },
+        target_run: {
+          run_id: '2',
+          query_id: 'b',
+          stock_code: '600519',
+        },
+        config_diff: {},
+        engine_status: 'ok',
+        delta: {
+          baseline_status: 'ok',
+          target_record_id: 2,
+        },
+      },
+    });
+    await expect(
+      reportVersionCompareApi.compare({
+        stockCode: '600519',
+        baseRunId: '1',
+        targetRunId: '2',
+      }),
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      expect(getParsedApiError(error).message).toContain('ReportVersionCompareResponse');
       return true;
     });
   });

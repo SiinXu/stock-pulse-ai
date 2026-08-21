@@ -7,8 +7,7 @@
 import { z } from 'zod';
 import type { components } from '../types/api.generated';
 import apiClient from './index';
-import { assertCamelCasePayload } from './parseCamelCasePayload';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 
 type OpenApiRunItem = components['schemas']['ReportVersionRunItem'];
 type OpenApiRunList = components['schemas']['ReportVersionRunListResponse'];
@@ -342,6 +341,32 @@ function normalizeRunItem(item: ReportVersionRunItem): ReportVersionRunItem {
   };
 }
 
+function normalizeOptionalSection(row: OptionalSectionPresence): OptionalSectionPresence {
+  return {
+    ...row,
+    basePresent: row.basePresent ?? false,
+    targetPresent: row.targetPresent ?? false,
+    baseItemCount: row.baseItemCount ?? 0,
+    targetItemCount: row.targetItemCount ?? 0,
+    basePreview: row.basePreview ?? [],
+    targetPreview: row.targetPreview ?? [],
+  };
+}
+
+function normalizeConfigDiff(diff: ConfigFingerprintDiff): ConfigFingerprintDiff {
+  return {
+    ...diff,
+    components: diff.components ?? [],
+    baseMissingKeys: diff.baseMissingKeys ?? [],
+    targetMissingKeys: diff.targetMissingKeys ?? [],
+    identical: diff.identical ?? false,
+    hasDifferences: diff.hasDifferences ?? false,
+    comparisonStatus: diff.comparisonStatus ?? 'unknown',
+    baseComplete: diff.baseComplete ?? false,
+    targetComplete: diff.targetComplete ?? false,
+  };
+}
+
 export const reportVersionCompareApi = {
   listRuns: async (
     params: ListReportVersionRunsParams,
@@ -357,17 +382,16 @@ export const reportVersionCompareApi = {
       '/api/v1/report-version-compare/runs',
       { params: queryParams, signal: params.signal },
     );
-    const data = toCamelCase<ReportVersionRunListResponse>(response.data);
-    const shaped: ReportVersionRunListResponse = {
-      ...data,
-      items: (data.items ?? []).map((item) => normalizeRunItem(toCamelCase<ReportVersionRunItem>(item))),
-    };
-    return assertCamelCasePayload<ReportVersionRunListResponse>(
-      shaped,
+    const parsed = parseCamelCasePayload<ReportVersionRunListResponse>(
+      response.data,
       reportVersionRunListResponseSchema,
       'ReportVersionRunListResponse',
       'reportVersionCompare',
     );
+    return {
+      ...parsed,
+      items: (parsed.items ?? []).map((item) => normalizeRunItem(item)),
+    };
   },
 
   compare: async (
@@ -384,44 +408,21 @@ export const reportVersionCompareApi = {
         signal: params.signal,
       },
     );
-    const data = toCamelCase<ReportVersionCompareResponse>(response.data);
-    const shaped: ReportVersionCompareResponse = {
-      ...data,
-      baseRun: normalizeRunItem(toCamelCase<ReportVersionRunItem>(data.baseRun)),
-      targetRun: normalizeRunItem(toCamelCase<ReportVersionRunItem>(data.targetRun)),
-      configDiff: {
-        ...toCamelCase<ConfigFingerprintDiff>(data.configDiff),
-        components: (data.configDiff?.components ?? []).map((item) =>
-          toCamelCase<ConfigComponentDiff>(item),
-        ),
-        baseMissingKeys: data.configDiff?.baseMissingKeys ?? [],
-        targetMissingKeys: data.configDiff?.targetMissingKeys ?? [],
-        identical: data.configDiff?.identical ?? false,
-        hasDifferences: data.configDiff?.hasDifferences ?? false,
-        comparisonStatus: data.configDiff?.comparisonStatus ?? 'unknown',
-        baseComplete: data.configDiff?.baseComplete ?? false,
-        targetComplete: data.configDiff?.targetComplete ?? false,
-      },
-      fieldDiffs: (data.fieldDiffs ?? []).map((item) => toCamelCase<ReportFieldDiff>(item)),
-      optionalSections: (data.optionalSections ?? []).map((item) => {
-        const row = toCamelCase<OptionalSectionPresence>(item);
-        return {
-          ...row,
-          basePresent: row.basePresent ?? false,
-          targetPresent: row.targetPresent ?? false,
-          baseItemCount: row.baseItemCount ?? 0,
-          targetItemCount: row.targetItemCount ?? 0,
-          basePreview: row.basePreview ?? [],
-          targetPreview: row.targetPreview ?? [],
-        };
-      }),
-      delta: data.delta ? toCamelCase<AnalysisDeltaPayload>(data.delta) : data.delta,
-    };
-    return assertCamelCasePayload<ReportVersionCompareResponse>(
-      shaped,
+    const parsed = parseCamelCasePayload<ReportVersionCompareResponse>(
+      response.data,
       reportVersionCompareResponseSchema,
       'ReportVersionCompareResponse',
       'reportVersionCompare',
     );
+    return {
+      ...parsed,
+      baseRun: normalizeRunItem(parsed.baseRun),
+      targetRun: normalizeRunItem(parsed.targetRun),
+      configDiff: normalizeConfigDiff(parsed.configDiff),
+      fieldDiffs: parsed.fieldDiffs ?? [],
+      optionalSections: (parsed.optionalSections ?? []).map((item) => (
+        normalizeOptionalSection(item)
+      )),
+    };
   },
 };
