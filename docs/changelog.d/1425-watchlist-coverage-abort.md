@@ -1,0 +1,1 @@
+- [Fixed] Abort and bound watchlist coverage fallback history lookups so stale or in-flight results cannot mark pending analysis (Refs #1425).
