@@ -40,8 +40,7 @@ def _dispatch_and_log_notification(
     status = str(getattr(dispatch, "status", "") or "")
     if status == "partial_failed":
         logger.warning(
-            "%s status=partial_failed channels=%s",
-            failure_message,
+            "Notification dispatch finished status=partial_failed channels=%s",
             channels,
         )
     elif getattr(dispatch, "success", False):

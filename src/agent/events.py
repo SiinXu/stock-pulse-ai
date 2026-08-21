@@ -634,12 +634,20 @@ def build_event_monitor_from_config(
                 channels,
             )
         elif not bool(getattr(dispatch, "success", False)):
-            logger.info(
-                "[EventMonitor] No notification channel available for alert: %s status=%s channels=%s",
-                title,
-                status or "failed",
-                channels,
-            )
+            if status == "no_channel":
+                logger.info(
+                    "[EventMonitor] No notification channel available for alert: %s status=%s channels=%s",
+                    title,
+                    status,
+                    channels,
+                )
+            else:
+                logger.warning(
+                    "[EventMonitor] Alert dispatch %s title=%s channels=%s",
+                    status or "failed",
+                    title,
+                    channels,
+                )
 
     monitor.on_trigger(_notify)
     logger.info("[EventMonitor] Loaded %d configured alert rule(s)", len(monitor.rules))

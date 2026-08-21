@@ -2680,6 +2680,37 @@ class TestEventMonitorConfigIntegration(unittest.TestCase):
             any("partial_failed" in line and "wechat" in line for line in captured.output)
         )
 
+    def test_configured_event_monitor_all_failed_is_not_no_channel(self):
+        from src.agent.events import TriggeredAlert, build_event_monitor_from_config
+        from src.notification import ChannelAttemptResult, NotificationDispatchResult
+
+        config = SimpleNamespace(
+            agent_event_monitor_enabled=True,
+            agent_event_alert_rules_json='[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}]',
+        )
+        notifier = MagicMock(spec_set=["send_with_results"])
+        notifier.send_with_results.return_value = NotificationDispatchResult(
+            dispatched=True,
+            success=False,
+            status="all_failed",
+            channel_results=[
+                ChannelAttemptResult(channel="wechat", success=False, error_code="exception"),
+            ],
+        )
+
+        monitor = build_event_monitor_from_config(config=config, notifier=notifier)
+        self.assertIsNotNone(monitor)
+        with self.assertLogs("src.agent.events", level="WARNING") as captured:
+            monitor._callbacks[0](TriggeredAlert(rule=monitor.rules[0], message="hit"))
+
+        notifier.send_with_results.assert_called_once()
+        self.assertTrue(
+            any("all_failed" in line and "wechat" in line for line in captured.output)
+        )
+        self.assertFalse(
+            any("No notification channel available" in line for line in captured.output)
+        )
+
     def test_build_event_monitor_from_config_accepts_price_change_percent(self):
         from src.agent.events import PriceChangeAlert, build_event_monitor_from_config
 
