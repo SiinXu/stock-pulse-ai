@@ -31,4 +31,13 @@ describe('main bootstrap locale-neutral first paint', () => {
     expect(source).not.toContain('首页');
     expect(source).not.toContain('Settings');
   });
+
+  it('paints a non-textual nav frame from index.html before JS executes', () => {
+    const source = fs.readFileSync(path.join(sourceRoot, '../index.html'), 'utf8');
+    expect(source).toContain('[data-locale-neutral-shell]::before');
+    expect(source).toContain('[data-locale-neutral-shell]::after');
+    expect(source).toContain('<div id="root"><div data-locale-neutral-shell aria-busy="true" class="min-h-dvh bg-base"></div></div>');
+    expect(source).not.toMatch(/extra-locale/);
+    expect(source).not.toContain('modulepreload');
+  });
 });

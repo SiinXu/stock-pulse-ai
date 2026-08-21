@@ -11,7 +11,7 @@ import { ApiErrorAlert } from './components/common/ApiErrorAlert';
 import { ToastProvider } from './components/common/ToastProvider';
 import { Shell } from './components/layout/Shell';
 import {
-  PageLoadingFallback,
+  AppShellSkeleton,
   RouteOutletBoundary,
   StandaloneRouteBoundary,
 } from './components/layout/RouteBoundary';
@@ -104,7 +104,7 @@ const AppLayout: React.FC = () => {
   }, [location.pathname]);
 
   if (isLoading) {
-    return <PageLoadingFallback />;
+    return <AppShellSkeleton />;
   }
 
   if (loadError) {

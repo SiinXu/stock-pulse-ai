@@ -28,6 +28,38 @@ export const PageLoadingFallback: React.FC<PageLoadingFallbackProps> = ({ fullPa
   );
 };
 
+/** Non-textual nav frame shown before auth/status content. No copy. */
+export const AppShellSkeleton: React.FC = () => (
+  <div
+    data-app-shell-skeleton=""
+    aria-busy="true"
+    className="h-dvh overflow-hidden bg-background"
+  >
+    <div
+      data-shell-mobile-header="true"
+      className="pointer-events-none fixed inset-x-0 top-0 z-40 flex min-w-0 items-center gap-3 px-3 pt-[max(0.75rem,env(safe-area-inset-top))] lg:hidden"
+    >
+      <span className="h-10 w-10 rounded-lg bg-card shadow-soft-card" />
+      <span className="h-4 max-w-[8rem] flex-1 rounded bg-muted" />
+    </div>
+    <div className="mx-auto flex h-full w-full overflow-hidden">
+      <aside
+        data-shell-sidebar="true"
+        className="sticky top-0 z-40 hidden h-full w-20 shrink-0 self-start bg-background px-2 py-4 lg:flex lg:flex-col lg:items-center lg:gap-3"
+      >
+        <span className="h-8 w-8 rounded-lg bg-muted" />
+        <span className="h-8 w-8 rounded-lg bg-muted" />
+        <span className="h-8 w-8 rounded-lg bg-muted" />
+        <span className="h-8 w-8 rounded-lg bg-muted" />
+      </aside>
+      <div
+        data-shell-main="true"
+        className="relative mt-[calc(2.75rem+max(0.75rem,env(safe-area-inset-top)))] mb-3 mx-3 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-soft-card lg:mt-4 lg:mb-4 lg:ml-1 lg:mr-4"
+      />
+    </div>
+  </div>
+);
+
 type RouteErrorBoundaryProps = {
   children: React.ReactNode;
   resetKey: string;
