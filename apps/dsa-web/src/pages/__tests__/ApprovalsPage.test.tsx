@@ -9,7 +9,8 @@ import {
 import { MemoryRouter } from 'react-router-dom';
 import { approvalsApi } from '../../api/approvals';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
-import type { ApprovalProposal, ApprovalRule } from '../../types/approvals';
+import { createDeferred } from '../../test-utils';
+import type { ApprovalProposal, ApprovalProposalPage, ApprovalRule } from '../../types/approvals';
 import ApprovalsPage from '../ApprovalsPage';
 
 vi.mock('../../api/approvals', () => ({
@@ -62,6 +63,19 @@ async function openDecisionConfirm(name: 'Approve original signal' | 'Reject and
   return screen.findByRole('dialog', { name });
 }
 
+function expectApprovalsConfirmLockHeld() {
+  const page = screen.getByTestId('approvals-page');
+  expect(page.closest('[inert]')).not.toBeNull();
+  expect(page.closest('[aria-hidden="true"]')).not.toBeNull();
+  expect(document.body.style.overflow).toBe('hidden');
+}
+
+async function waitForApprovalsConfirmLockHeld() {
+  await waitFor(() => {
+    expectApprovalsConfirmLockHeld();
+  });
+}
+
 async function waitForApprovalsConfirmLockReleased() {
   await waitFor(() => {
     const page = screen.getByTestId('approvals-page');
@@ -69,6 +83,19 @@ async function waitForApprovalsConfirmLockReleased() {
     expect(page.closest('[aria-hidden="true"]')).toBeNull();
     expect(document.body.style.overflow).not.toBe('hidden');
   });
+}
+
+function happyListPage(): ApprovalProposalPage {
+  return {
+    items: [
+      proposal('a'.repeat(32), 'pending', new Date(Date.now() + 60_000).toISOString()),
+      proposal('b'.repeat(32), 'approved', new Date(Date.now() + 30_000).toISOString()),
+      proposal('c'.repeat(32), 'expired', new Date(Date.now() - 1_000).toISOString()),
+    ],
+    page: 1,
+    pageSize: 50,
+    total: 3,
+  };
 }
 
 const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
@@ -102,16 +129,7 @@ function renderPage() {
 
 function mockHappyLoad(nextRule: ApprovalRule = rule) {
   vi.mocked(approvalsApi.getRule).mockResolvedValue(nextRule);
-  vi.mocked(approvalsApi.list).mockResolvedValue({
-    items: [
-      proposal('a'.repeat(32), 'pending', new Date(Date.now() + 60_000).toISOString()),
-      proposal('b'.repeat(32), 'approved', new Date(Date.now() + 30_000).toISOString()),
-      proposal('c'.repeat(32), 'expired', new Date(Date.now() - 1_000).toISOString()),
-    ],
-    page: 1,
-    pageSize: 50,
-    total: 3,
-  });
+  vi.mocked(approvalsApi.list).mockResolvedValue(happyListPage());
   vi.mocked(approvalsApi.decide).mockImplementation(async (id, decision) => (
     proposal(
       id,
@@ -335,14 +353,8 @@ describe('ApprovalsPage', () => {
   });
 
   it('refreshes after a 409 and recovers rule editing errors', async () => {
-    vi.mocked(approvalsApi.decide).mockRejectedValueOnce({
-      isAxiosError: true,
-      message: 'Conflict',
-      response: {
-        status: 409,
-        data: { error: 'approval_version_conflict', message: 'Conflict' },
-      },
-    });
+    const decision = createDeferred<ApprovalProposal>();
+    const recoveryList = createDeferred<ApprovalProposalPage>();
     vi.mocked(approvalsApi.updateRule).mockResolvedValueOnce({
       ...rule,
       enabled: true,
@@ -354,7 +366,42 @@ describe('ApprovalsPage', () => {
     const ruleSwitch = await screen.findByRole('switch', { name: 'Enable human approval' });
     fireEvent.click(ruleSwitch);
     const dialog = await openDecisionConfirm('Approve original signal');
+    await waitForApprovalsConfirmLockHeld();
+
+    vi.mocked(approvalsApi.decide).mockReturnValue(decision.promise);
+    void decision.promise.catch(() => undefined);
+    vi.mocked(approvalsApi.list).mockImplementation(() => recoveryList.promise);
+
     fireEvent.click(within(dialog).getByRole('button', { name: 'Approve original signal' }));
+    const busyConfirm = await within(dialog).findByRole('button', { name: 'Processing…' });
+    expect(busyConfirm).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Cancel' })).toBeDisabled();
+    expectApprovalsConfirmLockHeld();
+    // Isolation hides the page from the accessibility tree; queryByRole is not a lock-release signal.
+    expect(screen.queryByRole('button', { name: 'Save rule' })).not.toBeInTheDocument();
+    fireEvent.click(busyConfirm);
+    expect(approvalsApi.decide).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      decision.reject({
+        isAxiosError: true,
+        message: 'Conflict',
+        response: {
+          status: 409,
+          data: { error: 'approval_version_conflict', message: 'Conflict' },
+        },
+      });
+    });
+    await waitFor(() => expect(approvalsApi.list).toHaveBeenCalledTimes(2));
+    expect(screen.getByRole('dialog', { name: 'Approve original signal' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Processing…' })).toBeDisabled();
+    expectApprovalsConfirmLockHeld();
+    expect(screen.queryByRole('button', { name: 'Save rule' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Approval state changed; the page was refreshed.')).not.toBeInTheDocument();
+
+    await act(async () => {
+      recoveryList.resolve(happyListPage());
+    });
     expect(await screen.findByText('Approval state changed; the page was refreshed.')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'Approve original signal' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();

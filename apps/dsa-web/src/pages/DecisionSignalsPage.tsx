@@ -94,6 +94,7 @@ import {
   useDecisionSignalDetailQueries,
   useDecisionSignalListQuery,
   useDecisionSignalOutcomeStatsQuery,
+  useDecisionSignalStatusMutation,
 } from '../hooks';
 import { useStockIndex } from '../hooks/useStockIndex';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -346,7 +347,6 @@ const DecisionSignalsPage: React.FC = () => {
     { source: 'latest', items: latestItems },
     { source: 'timeline', items: timelineItems },
   ];
-  const statusUpdateInFlightRef = useRef(false);
   const didObserveViewNavigationRef = useRef(false);
   useEffect(() => {
     if (!didObserveViewNavigationRef.current) {
@@ -1062,22 +1062,28 @@ const DecisionSignalsPage: React.FC = () => {
     void loadTimelineForContext(activeStockContext, timelineFilters);
   }, [activeStockContext, loadTimelineForContext, timelineFilters]);
 
-  const [statusUpdating, setStatusUpdating] = useState(false);
+  const {
+    runStatusUpdate,
+    releaseStatusUpdate,
+    isUpdating: statusUpdating,
+  } = useDecisionSignalStatusMutation({
+    isMounted: () => mountedRef.current,
+  });
 
   const handleStatusUpdate = async () => {
-    if (!pendingStatus || statusUpdateInFlightRef.current) return;
-    statusUpdateInFlightRef.current = true;
-    setStatusUpdating(true);
+    if (!pendingStatus) return;
     setStatusError(null);
+    const result = await runStatusUpdate({
+      signalId: pendingStatus.item.id,
+      status: pendingStatus.status,
+    });
+    if (result.kind === 'ignored' || result.kind === 'unmounted') return;
+    if (result.kind === 'error') {
+      setStatusError(result.error);
+      return;
+    }
     try {
-      // Status write stays a single-shot page-owned call: the deferred double-click
-      // guard and in-flight ref must stay byte-identical to the prior contract.
-      // List/detail/stats already use TanStack Query; status can graduate once a
-      // shared mutation helper preserves that guard without isPending races.
-      const updated = await decisionSignalsApi.updateStatus(pendingStatus.item.id, {
-        status: pendingStatus.status,
-      });
-      if (!mountedRef.current) return;
+      const updated = result.item;
       setPendingStatus(null);
       setStatusError(null);
       setLatestItems((current) => current.flatMap((item) => {
@@ -1109,13 +1115,8 @@ const DecisionSignalsPage: React.FC = () => {
       });
       await loadSignalsForPage(page);
       await loadOutcomeStats();
-    } catch (err) {
-      if (mountedRef.current) {
-        setStatusError(getParsedApiError(err));
-      }
     } finally {
-      if (mountedRef.current) setStatusUpdating(false);
-      statusUpdateInFlightRef.current = false;
+      releaseStatusUpdate();
     }
   };
 
