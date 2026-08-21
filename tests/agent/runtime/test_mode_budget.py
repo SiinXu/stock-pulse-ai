@@ -9,6 +9,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from src.agent.executor import AgentExecutor
 from src.agent.llm_adapter import ToolCall
 from src.agent.protocols import StageFailureReason
 from src.agent.runner import run_agent_loop
@@ -19,6 +20,7 @@ from src.agent.runtime.mode_budget import (
     estimate_usage_cost_usd,
     resolve_mode_budget_limits,
 )
+from src.config import Config
 from src.agent.tools.registry import (
     ToolDefinition,
     ToolParameter,
@@ -239,3 +241,133 @@ def test_disabled_mode_budget_does_not_cap():
     limits = resolve_mode_budget_limits(cfg, mode="quick")
     assert limits.enabled is False
     assert limits.effective_max_steps(99) == 99
+
+
+def _chat_executor(*, adapter, max_steps: int, config) -> AgentExecutor:
+    return AgentExecutor(
+        tool_registry=_echo_registry(),
+        llm_adapter=adapter,
+        max_steps=max_steps,
+        config=config,
+    )
+
+
+def _run_chat_loop(executor: AgentExecutor):
+    return executor._run_loop(
+        messages=[{"role": "user", "content": "hi"}],
+        tool_decls=[],
+        parse_dashboard=False,
+    )
+
+
+def _unique_tool_turns(count: int) -> List[_FakeResponse]:
+    return [
+        _FakeResponse(
+            tool_calls=[
+                ToolCall(
+                    id=f"c{index}",
+                    name="echo",
+                    arguments={"message": f"x{index}"},
+                )
+            ],
+            content="need tool",
+        )
+        for index in range(count)
+    ]
+
+
+def test_chat_factory_disabled_does_not_clip_max_steps():
+    """AGENT_MODE_BUDGET_ENABLED=false must reach Chat and not clip AGENT_MAX_STEPS."""
+    cfg = SimpleNamespace(agent_mode_budget_enabled=False)
+    adapter = _adapter(_unique_tool_turns(11) + [_FakeResponse(content="done")])
+    executor = _chat_executor(adapter=adapter, max_steps=20, config=cfg)
+    result = _run_chat_loop(executor)
+    assert result.success is True
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["limits"]["enabled"] is False
+    assert result.total_steps > 10
+    assert adapter.call_with_tools.call_count > 10
+
+
+def test_chat_factory_enabled_tiny_tool_cap_breaches_budget_tools():
+    """An enabled Chat account with a tiny tool cap still breaches with budget_tools."""
+    cfg = SimpleNamespace(
+        agent_mode_budget_enabled=True,
+        agent_mode_budget_max_tool_calls=1,
+        agent_mode_budget_max_llm_turns=0,
+        agent_mode_budget_max_cost_usd=0.0,
+        agent_mode_budget_max_tokens=0,
+    )
+    t1 = ToolCall(id="c1", name="echo", arguments={"message": "a"})
+    t2 = ToolCall(id="c2", name="echo", arguments={"message": "b"})
+    adapter = _adapter([
+        _FakeResponse(tool_calls=[t1], content="t1"),
+        _FakeResponse(tool_calls=[t2], content="t2"),
+    ])
+    executor = _chat_executor(adapter=adapter, max_steps=5, config=cfg)
+    result = _run_chat_loop(executor)
+    assert result.success is False
+    assert result.failure_reason == StageFailureReason.BUDGET_TOOLS
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["limits"]["enabled"] is True
+    assert result.budget_snapshot["breach"]["reason"] == "budget_tools"
+
+
+def test_chat_factory_default_on_still_clips_chat_turn_budget():
+    """Default-on Chat still applies the built-in 10-turn cap (compatibility)."""
+    cfg = SimpleNamespace(agent_mode_budget_enabled=True)
+    adapter = _adapter(_unique_tool_turns(11) + [_FakeResponse(content="done")])
+    executor = _chat_executor(adapter=adapter, max_steps=20, config=cfg)
+    result = _run_chat_loop(executor)
+    assert result.success is False
+    assert result.failure_reason == StageFailureReason.BUDGET_TURNS
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["limits"]["enabled"] is True
+    assert result.budget_snapshot["limits"]["max_llm_turns"] == 10
+
+
+def test_classic_analyzer_does_not_import_mode_budget():
+    """Classic single-pass analyzer must not import the Agent mode-budget module."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo_root = Path(__file__).resolve().parents[3]
+    pythonpath = os.pathsep.join(
+        [str(repo_root), os.environ.get("PYTHONPATH", "")]
+    ).rstrip(os.pathsep)
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "import sys; import src.analyzer; "
+                "assert 'src.agent.runtime.mode_budget' not in sys.modules, "
+                "sorted(k for k in sys.modules if 'mode_budget' in k)"
+            ),
+        ],
+        cwd=str(repo_root),
+        env={**os.environ, "PYTHONPATH": pythonpath},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_config_has_no_undocumented_per_mode_budget_override_fields():
+    """Per-mode AGENT_MODE_BUDGET_<MODE>_* env keys are not a Config side channel."""
+    documented = {
+        "agent_mode_budget_enabled",
+        "agent_mode_budget_max_llm_turns",
+        "agent_mode_budget_max_tool_calls",
+        "agent_mode_budget_max_cost_usd",
+        "agent_mode_budget_max_tokens",
+    }
+    leftover = [
+        name
+        for name in Config.__dataclass_fields__
+        if name.startswith("agent_mode_budget_") and name not in documented
+    ]
+    assert leftover == []

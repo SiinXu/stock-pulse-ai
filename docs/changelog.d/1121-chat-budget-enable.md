@@ -1,0 +1,1 @@
+- [Fixed] Honor AGENT_MODE_BUDGET_ENABLED on the Chat/single-agent loop so disabling mode budgets no longer leaves Chat clipped to the default caps (Refs #1121).
