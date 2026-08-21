@@ -351,6 +351,30 @@ ${preloadTags}
     expect(result.stdout).toContain('1 aggregate family within budget');
   });
 
+  it('fails when the modulepreload graph is 1 gzip byte over the family cap', () => {
+    const root = createOutput();
+    const entryGzip = writeHashedAsset(root, 'index-aaa.js', entryContents);
+    const vendorGzip = writeHashedAsset(root, 'vendor-react-bbb.js', splitContents);
+    writeIndexHtml(root, {
+      entry: 'assets/index-aaa.js',
+      modulepreloads: ['assets/vendor-react-bbb.js'],
+    });
+    const measured = entryGzip + vendorGzip;
+    const budgetPath = writeBudget(
+      root,
+      [],
+      [criticalPathRule(measured - 1)],
+    );
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('FAIL criticalPath');
+    expect(result.stderr).toContain(`gzip=${measured} B`);
+    expect(result.stderr).toContain(`budget=${measured - 1} B`);
+    expect(result.stderr).toContain('aggregate family exceeded budget');
+  });
+
   it('fails a renamed split that evades the match glob but stays on the modulepreload graph', () => {
     const root = createOutput();
     const entryGzip = writeHashedAsset(root, 'index-aaa.js', entryContents);
@@ -625,7 +649,8 @@ describe('first-paint entry budget (Refs #883)', () => {
       source: 'indexHtmlModulepreload',
       match: ['assets/index-*.js'],
     }));
-    expect(criticalPath.measuredGzipBytes).toBe(373653);
+    expect(criticalPath.measuredGzipBytes).toBe(338951);
+    expect(criticalPath.maxGzipBytes).toBe(339351);
     expect(criticalPath.maxGzipBytes).toBe(criticalPath.measuredGzipBytes + 400);
     expect(budget.aggregateRules[budget.aggregateRules.length - 1].id).toBe('criticalPath');
     expect(budget.rules.some((rule) => rule.id === 'criticalPath')).toBe(false);

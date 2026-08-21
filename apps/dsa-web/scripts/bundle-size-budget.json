@@ -536,9 +536,9 @@
       "match": [
         "assets/index-*.js"
       ],
-      "maxGzipBytes": 374053,
-      "measuredGzipBytes": 373653,
-      "note": "Critical-path family. Ignores match globs and sums the type=module entry script plus every rel=modulepreload href in the built index.html so a renamed split still counts (Refs #883). Measured zlib-9 on origin/main 3e0846a13: 373653 B and 373650 B across two production builds (10 assets). Cap = measured max + 400 B headroom, matching already-split aggregate families such as locale-ja-family and settings-route. match is required by the budget merge resolver and is not used for this source."
+      "maxGzipBytes": 339351,
+      "measuredGzipBytes": 338951,
+      "note": "Critical-path family. Ignores match globs and sums the type=module entry script plus every rel=modulepreload href in the built index.html so a renamed split still counts (Refs #883). Measured zlib-9 on origin/main 8df586b60 (after #1447 English UI_TEXT split and #1455 dead CSS): 338951 B and 338947 B across two production builds (11 assets). Cap = measured max + 400 B headroom, matching already-split aggregate families such as locale-ja-family and settings-route. match is required by the budget merge resolver and is not used for this source."
     }
   ]
 }
