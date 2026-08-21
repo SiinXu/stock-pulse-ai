@@ -441,6 +441,60 @@ describe('ApprovalsPage', () => {
     expect(approvalsApi.list).toHaveBeenCalledTimes(2);
   });
 
+  it('shows an unlabeled rule-save 409 without silent refresh', async () => {
+    vi.mocked(approvalsApi.updateRule).mockRejectedValueOnce({
+      isAxiosError: true,
+      message: 'Conflict',
+      response: {
+        status: 409,
+        data: { message: 'Conflict' },
+      },
+    });
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('switch', { name: 'Enable human approval' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save rule' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Approval state changed; the page was refreshed.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save rule' })).toBeEnabled();
+    expect(approvalsApi.getRule).toHaveBeenCalledTimes(1);
+    expect(approvalsApi.list).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows an unlabeled decide 409 without silent refresh or lock bypass', async () => {
+    vi.mocked(approvalsApi.decide).mockRejectedValueOnce({
+      isAxiosError: true,
+      message: 'Conflict',
+      response: {
+        status: 409,
+        data: { message: 'Conflict' },
+      },
+    });
+    renderPage();
+
+    const dialog = await openDecisionConfirm('Approve original signal');
+    await waitForApprovalsConfirmLockHeld();
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Approve original signal' }));
+
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent(
+      'The request could not be completed. Review the details and try again.',
+    );
+    expect(screen.queryByText('Approval state changed; the page was refreshed.')).not.toBeInTheDocument();
+    expect(approvalsApi.list).toHaveBeenCalledTimes(1);
+    expect(approvalsApi.getRule).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog', { name: 'Approve original signal' })).toBeInTheDocument();
+    expectApprovalsConfirmLockHeld();
+    expect(screen.queryByRole('button', { name: 'Save rule' })).not.toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitForApprovalsConfirmLockReleased();
+    expect(screen.getByRole('button', { name: 'Approve original signal' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Save rule' })).toBeEnabled();
+    expect(approvalsApi.list).toHaveBeenCalledTimes(1);
+    expect(approvalsApi.getRule).toHaveBeenCalledTimes(1);
+  });
+
   it('does not hide a rule-save error after successful background polling', async () => {
     const intervalSpy = vi.spyOn(window, 'setInterval');
     vi.mocked(approvalsApi.updateRule).mockRejectedValueOnce({

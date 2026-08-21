@@ -123,6 +123,10 @@ the sole surface for busy or for accepted long-running work.
 | Stock Screening | Capability / poll errors local | Local progress + `formatTaskMessage` | Domain-specific panel OK |
 | Backtest | No 409/job attach path today | Unknown-outcome banner after client wait timeout | `POST /backtest/run` is synchronous: no task id, status, or cancel. Do not invent resume/cancel. |
 | Scheduler status API | `runNowAvailable` / `runNowBlockReason` | Tracked run lifecycle | Align copy with busy class |
+| Approvals rule-save / decide | `resolveBusyRecoveryDecision` `reload` refreshes; unlabeled/generic 409 fail-closed | Page notice / confirm error | Remaining page conversion after #1225/#1366 |
+| Investment Framework save / deactivate | Helper `reload` offers Load latest; unlabeled 409 has no CTA | Card error + draft preserved only on `reload` | Revision codes still mapper-`generic` |
+| Settings env-import | Helper `reload` offers Reload; unlabeled 409 has no Reload | `ApiErrorAlert` | |
+| Settings config rollback | Helper `reload` offers Load latest; `rollback_unavailable` and unlabeled 409 have no Reload | `ApiErrorAlert` | Do not invent Reload when no snapshot exists |
 
 ## Related documents
 

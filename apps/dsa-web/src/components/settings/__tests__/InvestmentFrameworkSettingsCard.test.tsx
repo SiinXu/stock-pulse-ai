@@ -428,6 +428,49 @@ describe('InvestmentFrameworkSettingsCard', () => {
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
   });
 
+  it('shows an unlabeled save 409 without offering load-latest recovery', async () => {
+    getFramework.mockResolvedValue({
+      frameworkId: 1,
+      scope: 'local',
+      version: 2,
+      activeVersion: 2,
+      revision: 3,
+      isActive: true,
+      content: {
+        title: 'Existing',
+        freeFormRules: 'Hold cash when uncertain',
+        riskRules: [],
+        trackingCriteria: [],
+      },
+      createdAt: '2026-07-26T00:00:00Z',
+      updatedAt: '2026-07-26T00:00:00Z',
+      versionCreatedAt: '2026-07-26T00:00:00Z',
+    });
+    updateFramework.mockRejectedValue({
+      isAxiosError: true,
+      message: 'Conflict',
+      response: {
+        status: 409,
+        data: { message: 'Conflict' },
+      },
+    });
+
+    render(<InvestmentFrameworkSettingsCard />);
+
+    const basicsDialog = await openFrameworkBasics();
+    fireEvent.change(screen.getByLabelText('自由规则'), {
+      target: { value: 'My unlabeled 409 draft' },
+    });
+    confirmFrameworkBasics(basicsDialog);
+    fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '载入服务器最新版本' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/当前草稿仍被保留/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '保存新版本' })).toBeEnabled();
+    expect(getFramework).toHaveBeenCalledTimes(1);
+  });
+
   it('preserves evaluation dimensions while editing free-form fields', async () => {
     getFramework.mockResolvedValue({
       frameworkId: 1,

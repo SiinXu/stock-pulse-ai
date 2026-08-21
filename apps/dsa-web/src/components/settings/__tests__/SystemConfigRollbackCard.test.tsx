@@ -134,4 +134,31 @@ describe('SystemConfigRollbackCard', () => {
     expect(await screen.findByText('没有可回滚的配置')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '载入最新配置' })).not.toBeInTheDocument();
   });
+
+  it('does not offer a reload action for an unlabeled HTTP 409 rollback failure', async () => {
+    const onReloadLatest = vi.fn().mockResolvedValue(undefined);
+    rollback.mockRejectedValue({
+      isAxiosError: true,
+      message: 'Conflict',
+      response: {
+        status: 409,
+        data: { message: 'Conflict' },
+      },
+    });
+
+    render(
+      <SystemConfigRollbackCard
+        configVersion="v3"
+        onRolledBack={vi.fn()}
+        onReloadLatest={onReloadLatest}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '回滚配置' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认回滚' }));
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '载入最新配置' })).not.toBeInTheDocument();
+    expect(onReloadLatest).not.toHaveBeenCalled();
+  });
 });

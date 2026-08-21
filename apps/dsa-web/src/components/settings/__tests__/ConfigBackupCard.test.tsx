@@ -108,4 +108,41 @@ describe('ConfigBackupCard', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '重新加载' })).not.toBeInTheDocument();
   });
+
+  it('does not offer reload recovery for an unlabeled HTTP 409 env-import failure', async () => {
+    const load = vi.fn().mockResolvedValue(true);
+    importEnv.mockRejectedValue({
+      isAxiosError: true,
+      message: 'Conflict',
+      response: {
+        status: 409,
+        data: { message: 'Conflict' },
+      },
+    });
+
+    render(
+      <ConfigBackupCard
+        configVersion="v1"
+        hasDirty={false}
+        disabled={false}
+        load={load}
+        onSchedulerKeysImported={vi.fn()}
+        onRefreshSetupStatus={vi.fn()}
+        onRolledBack={vi.fn()}
+        onReloadLatest={vi.fn()}
+      />,
+    );
+
+    const input = document.querySelector('input[type="file"][accept=".env,.txt"]');
+    expect(input).not.toBeNull();
+    fireEvent.change(input as HTMLInputElement, {
+      target: {
+        files: [new File(['STOCK_LIST=300750\n'], 'backup.env', { type: 'text/plain' })],
+      },
+    });
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '重新加载' })).not.toBeInTheDocument();
+    expect(load).not.toHaveBeenCalled();
+  });
 });
