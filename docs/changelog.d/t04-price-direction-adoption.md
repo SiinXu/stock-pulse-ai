@@ -1,0 +1,1 @@
+- [Fixed] Honored the market price-direction preference across portfolio, backtest and screening (Refs #881).

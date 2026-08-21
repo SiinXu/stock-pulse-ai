@@ -14,6 +14,7 @@ import type {
   ReportLanguage,
 } from '../../types/analysis';
 import { markdownToPlainText } from '../../utils/markdown';
+import { coerceMarketId } from '../../utils/marketFormat';
 import {
   getMarketReviewSectionKind,
   isGenericMarketReviewTitle,
@@ -22,6 +23,7 @@ import {
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 import { getUiLocale } from '../../utils/uiLocale';
 import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, Spinner, useClipboard } from '../common';
+import { SignedChangeText } from '../theme/SignedChangeText';
 import { ScoreGauge } from './ScoreGauge';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
@@ -275,6 +277,29 @@ const formatRankingChange = (value: unknown): string => {
   return `${sign}${numeric.toFixed(2)}%`;
 };
 
+const renderSignedMarketChange = (
+  value: unknown,
+  formatted: string,
+  market?: string | null,
+  className?: string,
+  fallbackClassName?: string,
+): React.ReactNode => {
+  const numeric = coerceFiniteNumber(value);
+  if (numeric === null) {
+    return fallbackClassName ? <span className={fallbackClassName}>{formatted}</span> : formatted;
+  }
+  return (
+    <SignedChangeText
+      value={numeric}
+      market={coerceMarketId(market) || undefined}
+      className={className}
+      fallbackClassName={fallbackClassName}
+    >
+      {formatted}
+    </SignedChangeText>
+  );
+};
+
 export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
   report,
   recordId,
@@ -390,7 +415,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       value: summary?.trendPrediction || marketReviewText.noRiskWatch,
     },
   ], [marketReviewText, reportText.marketSentiment, summary]);
-  const indexColumns: readonly DataTableColumn<MarketReviewIndex>[] = [
+  const buildIndexColumns = (market?: string | null): readonly DataTableColumn<MarketReviewIndex>[] => [
     {
       id: 'index',
       header: marketReviewText.index,
@@ -407,7 +432,11 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
       id: 'change',
       header: marketReviewText.change,
       nowrap: true,
-      cell: (index) => formatMarketPercent(index.changePct),
+      cell: (index) => renderSignedMarketChange(
+        index.changePct,
+        formatMarketPercent(index.changePct),
+        market,
+      ),
     },
     {
       id: 'high-low',
@@ -576,7 +605,7 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                 {marketData.indices.length > 0 ? (
                   <DataTable
                     caption={`${marketData.title || displayTitle}: ${marketReviewText.index}`}
-                    columns={indexColumns}
+                    columns={buildIndexColumns(marketData.id)}
                     rows={marketData.indices}
                     getRowKey={(index) => index.code || index.name}
                     emptyState={{ title: marketReviewText.noBreadthData }}
@@ -620,9 +649,13 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
                           {rows.slice(0, 5).map((item, index) => (
                             <div key={`${item.name}-${index}`} className="flex items-center justify-between gap-3 text-sm">
                               <span className="min-w-0 truncate text-foreground">{item.name}</span>
-                              <span className="shrink-0 font-mono text-secondary-text">
-                                {formatRankingChange(item.changePct)}
-                              </span>
+                              {renderSignedMarketChange(
+                                item.changePct,
+                                formatRankingChange(item.changePct),
+                                marketData.id,
+                                'shrink-0 font-mono',
+                                'shrink-0 font-mono text-secondary-text',
+                              )}
                             </div>
                           ))}
                         </div>
