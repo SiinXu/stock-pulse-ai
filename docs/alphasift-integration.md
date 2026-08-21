@@ -200,7 +200,7 @@ AlphaSift 侧已在 `ZhuLinsen/alphasift@9f522747caafd3c0b1ddb7e14d5cf44c8580b6c
   - 最近一次成功结果与本次尝试相互独立。提交失败、任务失败、任务失效、可恢复轮询错误或全数据源失败都不会清空 last-good；页面会明确标注「正在显示上次成功结果」，重试严格复用最近一次已校验的 `market/strategy/max_results` 快照。只有新运行成功或用户显式修改参数时才替换或丢弃该结果。
   - 未开启或适配层不可用等能力原因只在页面顶部展示一次，不在结果空态中重复同一说明。
   - 成功响应包含 `snapshot_source` 时，运行状态卡会显示实际快照 provider；当前契约没有可信的快照时间字段，因此页面不生成或推断 as-of 时间。provider 为空时不显示占位来源。
-  - **热点题材 empty / degraded / last-good**：空结果、无缓存或刷新失败时，热点区块内的刷新重试（含折叠态）与「打开数据源设置」挂在同一恢复控件组；失败刷新或失败后回吐缓存的 200（`cache_used` 且 `fallback_used`，卡片仍在）保留并标注上次成功卡片，正文使用 last-good 文案而不是空列表文案；成功的实时 fallback（`fallback_used`、`cache_used=false`，即使带 `source_errors`）视为健康列表，不套用 last-good 或降级。降级详情仍映射 `source_errors`，Data Sources 位于热点 section 恢复表面，而不是页面孤立按钮。健康热点卡片不展示该 CTA。默认打开页面时的成功缓存读取（`cache_used` 且非 `fallback_used`）仍视为健康，不套用 last-good 标题。
+  - **热点题材 empty / degraded / last-good**：空结果、无缓存或刷新失败时，热点区块内的刷新重试（含折叠态）与「打开数据源设置」挂在同一恢复控件组；失败刷新或失败后回吐缓存的 200（`cache_used` 且 `fallback_used`，卡片仍在）保留并标注上次成功卡片，正文使用 last-good 文案而不是空列表文案；成功的实时 fallback（`fallback_used`、`cache_used=false`，即使带 `source_errors`）视为健康列表，不套用 last-good 或降级。降级详情仍映射 `source_errors`，Data Sources 位于热点 section 恢复表面，而不是页面孤立按钮。健康热点卡片不展示该 CTA。默认打开页面时的成功缓存读取会把 `cache_used` 标为 true 并把 `fallback_used` 清为 false，因此不会把上次成功实时 fallback 快照误标成 last-good。
   - #871 中更广的热点 provider/as-of 可见性仍是后续范围；选股运行空/降级已覆盖，热点 empty/degraded 恢复条挂在热点表面，不宣称关闭整个问题。
 - 选股页使用共享下拉框选择策略，市场、策略参数和返回数量收纳在“参数设置”弹窗中；参数校验或任务提交失败时弹窗保留输入并保持打开，任务受理后关闭弹窗并继续轮询。
 - 当前只暴露 A 股 `cn` 市场。
