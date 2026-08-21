@@ -89,7 +89,6 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
         </div>
 
         <div className="relative z-10 flex shrink-0 items-center gap-1.5">
-          {/* No cancel action: analysis HTTP has no task-cancel route. */}
           {onOpenRunFlow ? (
             <IconButton
               type="button"
