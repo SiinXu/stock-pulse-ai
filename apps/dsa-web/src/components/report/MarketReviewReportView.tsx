@@ -269,8 +269,8 @@ const formatMarketHighLow = (high: unknown, low: unknown): string => {
 };
 
 const formatRankingChange = (value: unknown): string => {
-  const numeric = typeof value === 'number' ? value : Number(String(value ?? '').replace(/%$/, ''));
-  if (!Number.isFinite(numeric)) {
+  const numeric = coerceFiniteNumber(value);
+  if (numeric === null) {
     return '-';
   }
   const sign = numeric > 0 ? '+' : '';
