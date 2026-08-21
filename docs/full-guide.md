@@ -1983,7 +1983,7 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 
 ### 按模式硬预算（#1121 / #125）
 
-每种运行模式（`quick` / `standard` / `full` / `specialist` / chat）对 LLM 轮次、工具调用与估算 USD 成本设有硬上限（可选 token 上限见 `AGENT_MODE_BUDGET_MAX_TOKENS`）。消耗记录在共享的 `mode_budget` 账户中，并可在诊断中查看（`ctx.meta["mode_budget"]` / `result.budget_snapshot`）。超限时以 `success=false` 明确终止并给出原因码（`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`）。既有的剩余墙钟预算跳过仍使用 `budget_skip` / `timeout`，并写入同一快照——预算概念统一，不另造并行体系。配置项为 `AGENT_MODE_BUDGET_*`（见 `.env.example`）。
+每种运行模式（`quick` / `standard` / `full` / `specialist` / chat）对 LLM 轮次、工具调用与估算 USD 成本设有硬上限（可选 token 上限见 `AGENT_MODE_BUDGET_MAX_TOKENS`）。消耗记录在共享的 `mode_budget` 账户中，并可在诊断中查看（`ctx.meta["mode_budget"]` / `result.budget_snapshot`）。超限时以 `success=false` 明确终止并给出原因码（`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`）。既有的剩余墙钟预算跳过仍使用 `budget_skip` / `timeout`，并写入同一快照——预算概念统一，不另造并行体系。已注册键为 `AGENT_MODE_BUDGET_ENABLED` 与全局收紧项 `AGENT_MODE_BUDGET_MAX_*`。可选的按模式上限是 Config 属性（`agent_mode_budget_<mode>_max_llm_turns` / `max_tool_calls` / `max_cost_usd`，`mode` 为 `quick|standard|full|specialist|chat`）；加载器会把未注册的可选环境变量 `AGENT_MODE_BUDGET_<MODE>_MAX_*` 映射到这些属性。它们不是 Web Settings 字段。除非需要按模式封顶，否则优先使用全局收紧项；`0` 表示保留该模式内置默认值。详见 `.env.example`。
 
 
 ## Agent 运行时护栏

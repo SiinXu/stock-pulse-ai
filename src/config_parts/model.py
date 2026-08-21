@@ -325,6 +325,8 @@ class Config:
     agent_mode_budget_max_tool_calls: int = 0
     agent_mode_budget_max_cost_usd: float = 0.0
     agent_mode_budget_max_tokens: int = 0
+    # Optional per-mode overrides (not Settings/registry keys). 0 keeps the
+    # built-in mode default. resolve_mode_budget_limits reads these attributes.
     agent_mode_budget_quick_max_llm_turns: int = 0
     agent_mode_budget_quick_max_tool_calls: int = 0
     agent_mode_budget_quick_max_cost_usd: float = 0.0

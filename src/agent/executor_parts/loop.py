@@ -37,7 +37,11 @@ class _LoopMethods:
         mode always preserves the raw text.
         """
         chat_tool_registry = _CHAT_TOOL_REGISTRY.get()
-        budget_account = create_mode_budget_account(mode="chat", chat=True)
+        budget_account = create_mode_budget_account(
+            getattr(self, "config", None),
+            mode="chat",
+            chat=True,
+        )
         effective_max_steps = budget_account.limits.effective_max_steps(self.max_steps)
         loop_result = run_agent_loop(
             messages=messages,
