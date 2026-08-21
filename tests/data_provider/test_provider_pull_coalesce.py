@@ -38,6 +38,26 @@ class _Clock:
         self.value += seconds
 
 
+def _frozen_wall() -> datetime:
+    return datetime(2026, 8, 21, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def _freeze_provider_pull_clocks(*, clock: Optional[_Clock] = None) -> _Clock:
+    """Inject monotonic TTL clock and frozen wall current_as_of for wired tests.
+
+    Wired realtime/chip paths omit as_of, so keys use wall-clock 5s buckets while
+    expiry uses monotonic time. Tests that treat a later manager call as a TTL
+    hit must freeze both clocks. A bare reset restores live wall time.
+    """
+    injected = clock if clock is not None else _Clock()
+    reset_provider_pull_coalesce_for_tests(
+        ttl_seconds=5.0,
+        clock=injected,
+        wall_clock=_frozen_wall,
+    )
+    return injected
+
+
 class _RecordingLoader:
     def __init__(
         self,
@@ -298,6 +318,38 @@ def test_ttl_expiry_and_new_as_of_are_misses() -> None:
     assert expired_loader.calls == 1
 
 
+def test_wall_as_of_bucket_advance_misses_without_monotonic_expiry() -> None:
+    clock = _Clock()
+    wall = {"now": datetime(2026, 8, 21, 12, 0, 0, tzinfo=timezone.utc)}
+
+    def _wall() -> datetime:
+        return wall["now"]
+
+    cache = ProviderPullCoalesce(ttl_seconds=5.0, clock=clock, wall_clock=_wall)
+    first_loader = _RecordingLoader(result="first")
+    first = cache.get_or_load(
+        provider="EfinanceFetcher",
+        symbol="600519",
+        capability=REALTIME_QUOTE_CAPABILITY,
+        loader=first_loader,
+    )
+    assert first == "first"
+    assert first_loader.calls == 1
+
+    wall["now"] = datetime(2026, 8, 21, 12, 0, 5, tzinfo=timezone.utc)
+    second_loader = _RecordingLoader(result="second")
+    second = cache.get_or_load(
+        provider="EfinanceFetcher",
+        symbol="600519",
+        capability=REALTIME_QUOTE_CAPABILITY,
+        loader=second_loader,
+    )
+    assert second == "second"
+    assert second_loader.calls == 1
+    assert first_loader.calls == 1
+    assert clock.value == 0.0
+
+
 def test_exception_and_empty_results_are_not_cached_as_success() -> None:
     cache = ProviderPullCoalesce(ttl_seconds=5.0)
     failing = _RecordingLoader(error=RuntimeError("provider down"))
@@ -405,6 +457,7 @@ def test_wired_realtime_path_coalesces_and_keeps_fallback(mock_get_config) -> No
         enable_realtime_quote=True,
         realtime_source_priority="efinance,akshare_em",
     )
+    _freeze_provider_pull_clocks()
     started = threading.Event()
     release = threading.Event()
     primary = _DummyFetcher(
@@ -458,6 +511,7 @@ def test_wired_realtime_breaker_still_skips_open_provider(mock_get_config) -> No
         enable_realtime_quote=True,
         realtime_source_priority="efinance,akshare_em",
     )
+    _freeze_provider_pull_clocks()
     breaker = CircuitBreaker(failure_threshold=1, cooldown_seconds=60.0)
     breaker.record_failure("efinance_rt", "timeout")
     assert not breaker.is_available("efinance_rt")
@@ -493,16 +547,7 @@ def test_wired_realtime_ttl_expiry_reloads(mock_get_config) -> None:
         enable_realtime_quote=True,
         realtime_source_priority="efinance",
     )
-    clock = _Clock()
-
-    def _wall() -> datetime:
-        return datetime(2026, 8, 21, 12, 0, 0, tzinfo=timezone.utc)
-
-    reset_provider_pull_coalesce_for_tests(
-        ttl_seconds=5.0,
-        clock=clock,
-        wall_clock=_wall,
-    )
+    clock = _freeze_provider_pull_clocks()
     primary = _DummyFetcher("EfinanceFetcher", 0, result=_quote())
     manager = _manager([primary])
 
@@ -570,6 +615,7 @@ def _enable_chip_config():
 def test_wired_chip_path_coalesces_same_key_concurrency(mock_get_config) -> None:
     mock_get_config.return_value = _enable_chip_config()
     get_chip_circuit_breaker().reset()
+    _freeze_provider_pull_clocks()
     started = threading.Event()
     release = threading.Event()
     result = _chip()
@@ -617,16 +663,7 @@ def test_wired_chip_path_coalesces_same_key_concurrency(mock_get_config) -> None
 def test_wired_chip_ttl_hit_expiry_and_mutation_isolation(mock_get_config) -> None:
     mock_get_config.return_value = _enable_chip_config()
     get_chip_circuit_breaker().reset()
-    clock = _Clock()
-
-    def _wall() -> datetime:
-        return datetime(2026, 8, 21, 12, 0, 0, tzinfo=timezone.utc)
-
-    reset_provider_pull_coalesce_for_tests(
-        ttl_seconds=5.0,
-        clock=clock,
-        wall_clock=_wall,
-    )
+    clock = _freeze_provider_pull_clocks()
     result = _chip()
     primary = _ChipDummyFetcher("TushareFetcher", 0, result=result)
     manager = _manager([primary])
@@ -652,6 +689,7 @@ def test_wired_chip_ttl_hit_expiry_and_mutation_isolation(mock_get_config) -> No
 def test_wired_chip_placeholder_and_empty_are_not_cached(mock_get_config) -> None:
     mock_get_config.return_value = _enable_chip_config()
     get_chip_circuit_breaker().reset()
+    _freeze_provider_pull_clocks()
     placeholder = ChipDistribution(code="600519")
     backup_chip = _chip(avg_cost=15.0)
     primary = _ChipDummyFetcher("TushareFetcher", 0, result=placeholder)
@@ -669,7 +707,7 @@ def test_wired_chip_placeholder_and_empty_are_not_cached(mock_get_config) -> Non
     assert second.avg_cost == 15.0
 
     get_chip_circuit_breaker().reset()
-    reset_provider_pull_coalesce_for_tests()
+    _freeze_provider_pull_clocks()
     started = threading.Event()
     release = threading.Event()
     empty_primary = _ChipDummyFetcher(
@@ -717,6 +755,7 @@ def test_wired_chip_open_circuit_skips_provider_before_coalesce(
     mock_get_config.return_value = _enable_chip_config()
     breaker = get_chip_circuit_breaker()
     breaker.reset()
+    _freeze_provider_pull_clocks()
     source_key = "tushare_chip"
     breaker.record_failure(source_key, "provider_error")
     breaker.record_failure(source_key, "provider_error")
@@ -745,6 +784,7 @@ def test_wired_chip_open_circuit_skips_provider_before_coalesce(
 def test_wired_chip_exceptions_do_not_poison_cache(mock_get_config) -> None:
     mock_get_config.return_value = _enable_chip_config()
     get_chip_circuit_breaker().reset()
+    _freeze_provider_pull_clocks()
     backup_chip = _chip(avg_cost=19.0)
     primary = _ChipDummyFetcher(
         "TushareFetcher",
@@ -769,7 +809,7 @@ def test_wired_chip_exceptions_do_not_poison_cache(mock_get_config) -> None:
     assert primary_keys == []
 
     get_chip_circuit_breaker().reset()
-    reset_provider_pull_coalesce_for_tests()
+    _freeze_provider_pull_clocks()
     started = threading.Event()
     release = threading.Event()
     raising = _ChipDummyFetcher(
@@ -821,6 +861,7 @@ def test_wired_chip_owner_identity_preserved_on_first_success(
 ) -> None:
     mock_get_config.return_value = _enable_chip_config()
     get_chip_circuit_breaker().reset()
+    _freeze_provider_pull_clocks()
     result = _chip()
     primary = _ChipDummyFetcher("TushareFetcher", 0, result=result)
     manager = _manager([primary])
@@ -842,6 +883,7 @@ def test_wired_chip_store_does_not_satisfy_realtime_pull(mock_get_config) -> Non
         realtime_source_priority="efinance",
     )
     get_chip_circuit_breaker().reset()
+    _freeze_provider_pull_clocks()
     chip_fetcher = _ChipDummyFetcher("TushareFetcher", 0, result=_chip())
     quote_fetcher = _DummyFetcher("EfinanceFetcher", 0, result=_quote())
     manager = _manager([chip_fetcher, quote_fetcher])
