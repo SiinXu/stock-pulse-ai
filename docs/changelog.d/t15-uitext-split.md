@@ -1,0 +1,1 @@
+- [Changed] Split per-language UI text out of the entry chunk (Refs #883).
