@@ -131,6 +131,8 @@ PROVIDER_DAILY_CACHE_MEMORY_MAX_ENTRIES=256
 
 Set an individual TTL or stale window to `0` to disable that behavior, or set `PROVIDER_DAILY_CACHE_ENABLED=false` to disable this provider-manager cache. Stale data is marked with `is_stale=true`, its age, layer, and source; it must not be presented as a live quote.
 
+Realtime quote provider attempts through `DataFetcherManager` also share a **process-local** short-TTL (5s) in-flight coalesce helper keyed by `provider + normalized symbol + as_of + capability`. Concurrent same-key pulls share one underlying provider call. The helper stores only successful quotes; failures, empty results, timeouts, and waiter cancellation never cache as success and do not skip fallback, circuit admission, validation, or per-fetcher rate limits. It does not replace daily L1/L2 cache, AkShare/TickFlow/Longbridge snapshot caches, or `REALTIME_CACHE_TTL` (that value remains a staleness annotation, not this process TTL). There is no new environment key.
+
 ## Data Provider Plugins
 
 `DataProvider` and `DataProviderRegistration` are now the stable plugin
