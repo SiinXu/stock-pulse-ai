@@ -1,0 +1,1 @@
+- [Fixed] PR-tier backend test selection maps `src/market`, `src/schemas`, `src/agent`, and `src/migrations` to their existing tests and fails closed to the full suite when a mapping evaporates.

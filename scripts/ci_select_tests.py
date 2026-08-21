@@ -4,10 +4,16 @@
 """Map changed repository paths to a selective offline pytest target list.
 
 Used by the PR-tier backend planner and selective job so most pull requests
-avoid a full-suite run. When mapping is uncertain (shared infrastructure,
-config, conftest, or an unprovable merge-base), the script prints ``FULL``
-and exits 0. Hosted CI must schedule the four ``backend-tests`` shards for
-that result; ``offline-tests-selective`` refuses to run the unsharded suite.
+avoid a full-suite run. The mapper fails closed to ``FULL`` when:
+
+- mapping is uncertain (shared infrastructure, config, conftest)
+- the merge-base cannot be proven
+- a changed path matches no mapping
+- a mapping's targets are all missing or its globs match nothing
+
+Hosted CI must schedule the four ``backend-tests`` shards for ``FULL``;
+``offline-tests-selective`` refuses to run the unsharded suite. ``NONE`` is
+reserved for paths that map to an empty target list by design (docs, web).
 
 Usage:
   python scripts/ci_select_tests.py --base origin/main
@@ -55,7 +61,10 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "src/data_provider/",
         ("tests/data_provider", "tests/contract/test_provider_fallback.py"),
     ),
-    ("src/agent/", ("tests/agent", "tests/skill_opinion_outcomes")),
+    (
+        "src/agent/",
+        ("tests/agent", "tests/skill_opinion_outcomes", "tests/test_agent_*.py"),
+    ),
     ("src/services/diagnostics/", (
         "tests/test_run_diagnostics_p1.py",
         "tests/test_run_diagnostics_p2.py",
@@ -68,9 +77,18 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     )),
     ("src/services/", ("tests/services",)),
     ("src/repositories/", ("tests/repositories", "tests/services")),
-    ("src/schemas/", ("tests/test_api_schema_pydantic.py", "tests/api")),
-    ("src/market/", ("tests/services", "tests/test_market_analyzer.py")),
-    ("src/migrations/", ("tests/migrations", "tests/test_storage.py")),
+    ("src/schemas/", ("tests/schemas", "tests/test_api_schema_pydantic.py", "tests/api")),
+    ("src/market/", ("tests/market", "tests/services")),
+    (
+        "src/migrations/",
+        (
+            "tests/test_schema_migrations.py",
+            "tests/test_migration_cli_readonly.py",
+            "tests/test_approval_migration.py",
+            "tests/test_investment_framework_migration.py",
+            "tests/test_storage.py",
+        ),
+    ),
     ("src/storage", ("tests/test_storage.py", "tests/storage")),
     ("src/", ("tests/",)),
     ("scripts/", ("tests/scripts", "tests/test_ci_workflow.py")),
@@ -112,6 +130,26 @@ def _forces_full(path: str) -> bool:
     return False
 
 
+def _is_glob(target: str) -> bool:
+    return any(char in target for char in "*?[")
+
+
+def _expand_target(target: str) -> set[str]:
+    """Resolve one mapping target against the repo root.
+
+    Literal paths are returned as-is. Glob patterns are expanded so a pattern
+    cannot survive as a non-existent pytest argument.
+    """
+    if not target:
+        return set()
+    if not _is_glob(target):
+        return {target}
+    return {
+        str(path.relative_to(REPO_ROOT)).replace("\\", "/")
+        for path in REPO_ROOT.glob(target)
+    }
+
+
 def _targets_for_path(path: str) -> set[str]:
     normalized = path.replace("\\", "/")
     if normalized.startswith("tests/") and normalized.endswith(".py"):
@@ -141,14 +179,24 @@ def select_targets(paths: Sequence[str]) -> list[str] | str:
         selected |= _targets_for_path(path)
         if "FULL" in selected:
             return "FULL"
-    # Drop missing paths so pytest does not fail collection on stale maps.
+    mapped_any = bool(selected)
+    expanded: set[str] = set()
+    for target in selected:
+        expanded |= _expand_target(target)
+        if "FULL" in expanded:
+            return "FULL"
+    # Drop missing extras so pytest does not fail collection on a stale sibling
+    # target. If every mapped target is missing or every glob matched nothing,
+    # fail closed to the full suite rather than selecting nothing.
     existing = sorted(
         target
-        for target in selected
+        for target in expanded
         if (REPO_ROOT / target).exists()
     )
     if not existing:
-        # Docs/web-only changes: no backend pytest targets.
+        if mapped_any:
+            return "FULL"
+        # Docs/web-only changes: empty mapping by design.
         return []
     return existing
 
