@@ -1,5 +1,5 @@
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
-import AxiosMockAdapter from 'axios-mock-adapter';
+import type AxiosMockAdapter from 'axios-mock-adapter';
 import apiClient from '../api';
 import {
   FIXTURE_TIMESTAMP,
@@ -18,6 +18,13 @@ import {
   fixtureSystemConfigItems,
 } from './fixtures';
 import type { PlaygroundFixtureProfile, PlaygroundRequestLog } from './types';
+
+// Development-only constructor. Vite replaces import.meta.env.DEV at build
+// time so production never statically resolves axios-mock-adapter.
+let AxiosMockAdapterCtor: typeof AxiosMockAdapter | undefined;
+if (import.meta.env.DEV) {
+  AxiosMockAdapterCtor = (await import('axios-mock-adapter')).default;
+}
 
 type TimedRequestConfig = InternalAxiosRequestConfig & {
   __playgroundRequestId?: string;
@@ -350,7 +357,10 @@ export function installPlaygroundApiMock(
     [fixtureDecisionSignal.id, { memorable: true, ignored: false }],
   ]);
   const delayResponse = options.delayResponse ?? (profile === 'slow' ? 1200 : 120);
-  const mock = new AxiosMockAdapter(apiClient, { delayResponse });
+  if (!AxiosMockAdapterCtor) {
+    throw new Error('Playground API mock is not available in production builds');
+  }
+  const mock = new AxiosMockAdapterCtor(apiClient, { delayResponse });
   let requestSequence = 0;
 
   const requestInterceptor = apiClient.interceptors.request.use((config) => {

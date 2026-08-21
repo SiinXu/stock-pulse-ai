@@ -1,0 +1,1 @@
+- [Chore] Load axios-mock-adapter from playground mockApi via dynamic import so production builds never statically resolve it (Refs #883).
