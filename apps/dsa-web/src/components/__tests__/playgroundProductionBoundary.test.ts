@@ -159,15 +159,22 @@ describe('playground production boundary', () => {
       expect(rule?.maxGzipBytes).toBe((rule?.measuredGzipBytes ?? 0) + ROUTE_HEADROOM_BYTES);
     }
 
-    const preservedCaps: Array<[string, number]> = [
-      ['locale-ja-family', 171148],
-      ['locale-extra-family', 22628],
-      ['portfolio-route', 94224],
+    const alreadySplitLocaleFamilies = [
+      'locale-ja-family',
+      'locale-de-family',
+      'locale-ko-family',
+      'locale-fr-family',
+      'locale-es-family',
+      'locale-zh-TW-family',
+      'locale-ms-family',
+      'locale-id-family',
+      'locale-extra-family',
     ];
-    for (const [id, maxGzipBytes] of preservedCaps) {
+    for (const id of alreadySplitLocaleFamilies) {
       const rule = budget.aggregateRules?.find((entry) => entry.id === id);
       expect(rule, id).toBeDefined();
-      expect(rule?.maxGzipBytes).toBe(maxGzipBytes);
+      expect(rule?.measuredGzipBytes).toBeGreaterThan(0);
+      expect(rule?.maxGzipBytes).toBe((rule?.measuredGzipBytes ?? 0) + ROUTE_HEADROOM_BYTES);
     }
 
     const ruleIds = (budget.rules ?? []).map((rule) => rule.id);
