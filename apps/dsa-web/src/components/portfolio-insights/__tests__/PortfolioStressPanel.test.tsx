@@ -143,6 +143,29 @@ describe('PortfolioStressPanel data-quality column', () => {
     expect(screen.queryByText('realtime_quote_best_effort')).not.toBeInTheDocument();
   });
 
+  it('renders zh known quality and limitation labels instead of raw codes', async () => {
+    runStressPreset.mockResolvedValue(makeResult({
+      snapshotDataQuality: 'partial',
+      snapshotLimitations: ['realtime_quote_best_effort'],
+      positionImpacts: [makeImpact({
+        dataQuality: 'partial',
+        priceStale: true,
+        limitations: ['realtime_quote_best_effort'],
+      })],
+    }));
+
+    await renderPanel('zh');
+    await runAnalysis('运行分析');
+
+    expect(screen.getByText('部分可用 · 过期 · 实时行情为尽力获取')).toBeInTheDocument();
+    expect(screen.queryByText('partial')).not.toBeInTheDocument();
+    expect(screen.queryByText('realtime_quote_best_effort')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: '假设与限制' }));
+    expect(screen.getByText('实时行情为尽力获取')).toBeInTheDocument();
+    expect(screen.queryByText('realtime_quote_best_effort')).not.toBeInTheDocument();
+  });
+
   it('joins partial quality without stale separately from stale-only rows', async () => {
     runStressPreset.mockResolvedValue(makeResult({
       snapshotDataQuality: 'partial',

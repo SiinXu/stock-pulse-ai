@@ -1,0 +1,1 @@
+- [Tests] Lock zh known data-quality labels in Alert Trigger History and Portfolio Stress through the existing formatters (Refs #887).
