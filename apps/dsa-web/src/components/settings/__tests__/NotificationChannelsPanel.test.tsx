@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +10,7 @@ import {
 } from '../notificationChannels';
 import {
   computeNotificationConfigurationFingerprint,
+  getNotificationChannelTestRecord,
   resetNotificationChannelTestStatusForTests,
   setNotificationChannelTestRecord,
 } from '../notificationChannelTestStatus';
@@ -462,6 +463,117 @@ describe('NotificationChannelsPanel', () => {
     expect(within(emailDialog).queryByRole('alert')).not.toBeInTheDocument();
     expect(within(emailDialog).queryByText(/测试失败|Test failed|飞书|Feishu/)).not.toBeInTheDocument();
     expect(screen.getByTestId('notification-channel-card-feishu')).toHaveTextContent(/测试失败|Test failed/);
+  });
+
+  it('does not let a stale same-channel probe overwrite a newer result after switch-away-and-back', async () => {
+    const firstProbe = createDeferred<TestNotificationChannelResponse>();
+    const secondProbe = createDeferred<TestNotificationChannelResponse>();
+    testNotificationChannel
+      .mockImplementationOnce(() => firstProbe.promise)
+      .mockImplementationOnce(() => secondProbe.promise);
+    const feishuItem = buildItem({
+      key: 'FEISHU_WEBHOOK_URL',
+      value: 'https://example.com/hook',
+      schema: {
+        ...buildItem().schema!,
+        key: 'FEISHU_WEBHOOK_URL',
+        title: 'Feishu webhook',
+        options: [],
+      },
+    });
+    const emailItem = buildItem({
+      key: 'EMAIL_SMTP_HOST',
+      value: 'smtp.example.com',
+      schema: {
+        ...buildItem().schema!,
+        key: 'EMAIL_SMTP_HOST',
+        title: 'SMTP host',
+        options: [],
+      },
+    });
+    const configFingerprint = await computeNotificationConfigurationFingerprint(
+      'feishu',
+      'config-v1',
+      [{ key: feishuItem.key, value: feishuItem.value }],
+    );
+    const identity = { configVersion: 'config-v1', configFingerprint };
+
+    renderHub(
+      <NotificationChannelsPanel
+        items={[feishuItem, emailItem]}
+        configuredChannels={['feishu', 'email']}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+        configVersion="config-v1"
+        persistedValuesByKey={{
+          FEISHU_WEBHOOK_URL: feishuItem.value,
+          EMAIL_SMTP_HOST: emailItem.value,
+        }}
+        eventRoutes={buildNotificationEventRoutes({
+          NOTIFICATION_REPORT_CHANNELS: 'email',
+        }, ['feishu', 'email'])}
+        onBindEvents={vi.fn()}
+        maskToken="******"
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId('notification-channel-card-feishu'));
+    fireEvent.click(screen.getByTestId('notification-channel-send-test'));
+    await waitFor(() => expect(testNotificationChannel).toHaveBeenCalledWith(expect.objectContaining({
+      channel: 'feishu',
+    })));
+
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    fireEvent.click(screen.getByTestId('notification-channel-card-email'));
+    fireEvent.click(screen.getByRole('button', { name: '关闭' }));
+    fireEvent.click(screen.getByTestId('notification-channel-card-feishu'));
+
+    const dialog = await screen.findByRole('dialog', { name: '飞书' });
+    const sendTest = within(dialog).getByTestId('notification-channel-send-test');
+    expect(sendTest).not.toBeDisabled();
+
+    fireEvent.click(sendTest);
+    await waitFor(() => expect(testNotificationChannel).toHaveBeenCalledTimes(2));
+
+    secondProbe.resolve({
+      success: false,
+      message: 'required channel fields are missing',
+      errorCode: 'config_missing',
+      stage: 'notification_send',
+      retryable: false,
+      latencyMs: 8,
+      attempts: [],
+    });
+
+    await waitFor(() => expect(screen.getByTestId('notification-channel-card-feishu'))
+      .toHaveAttribute('data-channel-health', 'failed'));
+    const failureAlert = await within(dialog).findByRole('alert');
+    expect(failureAlert).toHaveTextContent(/测试失败|Test failed/);
+    expect(getNotificationChannelTestRecord('feishu', identity)?.outcome).toBe('failed');
+
+    firstProbe.resolve({
+      success: true,
+      message: 'stale probe succeeded',
+      errorCode: null,
+      stage: 'notification_send',
+      retryable: false,
+      latencyMs: 40,
+      attempts: [],
+    });
+    await act(async () => {
+      await firstProbe.promise;
+    });
+
+    expect(getNotificationChannelTestRecord('feishu', identity)?.outcome).toBe('failed');
+    expect(screen.getByTestId('notification-channel-card-feishu'))
+      .toHaveAttribute('data-channel-health', 'failed');
+    expect(screen.getByTestId('notification-channel-card-feishu'))
+      .toHaveTextContent(/测试失败|Test failed/);
+    expect(within(dialog).queryByText(/测试成功|Test succeeded|Test success|stale probe succeeded/i))
+      .not.toBeInTheDocument();
+    expect(within(dialog).getByRole('alert')).toHaveTextContent(/测试失败|Test failed/);
+    expect(within(dialog).queryByTestId('notification-channel-bind-events')).not.toBeInTheDocument();
   });
 
   it('renders event routing overview and per-card event chips', () => {

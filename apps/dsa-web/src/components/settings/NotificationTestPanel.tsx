@@ -21,6 +21,7 @@ import type { UiLanguage } from '../../i18n/uiText';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 import { mapApiErrorToActionable } from '../../utils/apiReasonMapper';
 import {
+  beginNotificationChannelTest,
   classifyNotificationTestOutcome,
   computeNotificationConfigurationFingerprint,
   setNotificationChannelTestRecord,
@@ -103,24 +104,26 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
   }, [isTitleEdited, isContentEdited, t]);
 
   const runTest = async () => {
+    const selectedChannel = channel;
+    const attemptId = beginNotificationChannelTest(selectedChannel);
     setError(null);
     setResult(null);
     setIsTesting(true);
     let configFingerprint: string | null = null;
     try {
       const definition = NOTIFICATION_CHANNELS.find(
-        (candidate) => getNotificationRoutingValue(candidate) === channel,
+        (candidate) => getNotificationRoutingValue(candidate) === selectedChannel,
       );
       const identityItems = definition
         ? normalizedItems.filter((item) => definition.prefixes.some((prefix) => item.key.startsWith(prefix)))
         : [];
       configFingerprint = await computeNotificationConfigurationFingerprint(
-        channel,
+        selectedChannel,
         configVersion,
         identityItems,
       );
       const payload = await systemConfigApi.testNotificationChannel({
-        channel,
+        channel: selectedChannel,
         items: normalizedItems,
         maskToken,
         title: title.trim() || t('settings.notificationTestTitleValue'),
@@ -130,7 +133,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
       setResult(payload);
       const outcome = classifyNotificationTestOutcome(payload);
       setNotificationChannelTestRecord({
-        channel,
+        channel: selectedChannel,
         outcome,
         message: payload.message,
         errorCode: payload.errorCode,
@@ -138,13 +141,13 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
         configVersion,
         configFingerprint,
         at: Date.now(),
-      });
+      }, attemptId);
     } catch (requestError: unknown) {
       const parsed = getParsedApiError(requestError, language);
       setError(parsed);
       if (configFingerprint) {
         setNotificationChannelTestRecord({
-          channel,
+          channel: selectedChannel,
           outcome: 'failed',
           message: parsed.message,
           errorCode: parsed.code,
@@ -152,7 +155,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
           configVersion,
           configFingerprint,
           at: Date.now(),
-        });
+        }, attemptId);
       }
     } finally {
       setIsTesting(false);

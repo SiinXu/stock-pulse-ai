@@ -31,12 +31,14 @@ import {
   type NotificationEventRoutes,
 } from './notificationEventRoutes';
 import {
+  beginNotificationChannelTest,
   classifyNotificationTestOutcome,
   clearNotificationChannelTestRecord,
   clearNotificationChannelTestRecords,
   computeNotificationConfigurationFingerprint,
   getNotificationChannelTestRecord,
   getNotificationChannelTestStatusVersion,
+  isCurrentNotificationChannelTest,
   resolveNotificationChannelHealth,
   setNotificationChannelTestRecord,
   subscribeNotificationChannelTestStatus,
@@ -287,7 +289,9 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     const testChannel = toTestChannel(openChannel.id, openChannel.routingValue);
     if (!testChannel) return;
     const testItems = openChannelItems.map((item) => ({ key: item.key, value: String(item.value ?? '') }));
+    const attemptId = beginNotificationChannelTest(testChannel);
     const isSelectedChannel = () => openChannelIdRef.current === selectedChannelId;
+    const isCurrentAttempt = () => isCurrentNotificationChannelTest(testChannel, attemptId);
     setIsTesting(true);
     setModalFeedback(null);
     let configFingerprint: string | null = null;
@@ -306,7 +310,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         timeoutSeconds: 20,
       });
       const outcome = classifyNotificationTestOutcome(payload);
-      setNotificationChannelTestRecord({
+      const committed = setNotificationChannelTestRecord({
         channel: testChannel,
         outcome,
         message: payload.message,
@@ -315,8 +319,8 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         configVersion,
         configFingerprint,
         at: Date.now(),
-      });
-      if (!isSelectedChannel()) return;
+      }, attemptId);
+      if (!committed || !isSelectedChannel()) return;
       if (outcome === 'verified') {
         setModalFeedback({
           outcome,
@@ -344,7 +348,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
       const parsed = getParsedApiError(requestError, language);
       const mapped = mapApiErrorToActionable(parsed);
       if (configFingerprint) {
-        setNotificationChannelTestRecord({
+        const committed = setNotificationChannelTestRecord({
           channel: testChannel,
           outcome: 'failed',
           message: parsed.message,
@@ -353,9 +357,11 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
           configVersion,
           configFingerprint,
           at: Date.now(),
-        });
+        }, attemptId);
+        if (!committed || !isSelectedChannel()) return;
+      } else if (!isCurrentAttempt() || !isSelectedChannel()) {
+        return;
       }
-      if (!isSelectedChannel()) return;
       setModalFeedback({
         outcome: 'failed',
         title: t('settings.notificationTestFailure'),
@@ -363,7 +369,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
         technical: [parsed.code, mapped.technicalReason].filter(Boolean).join(' · ') || undefined,
       });
     } finally {
-      if (isSelectedChannel()) {
+      if (isCurrentAttempt() && isSelectedChannel()) {
         setIsTesting(false);
       }
     }

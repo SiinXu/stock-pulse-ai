@@ -1,0 +1,1 @@
+- [Fixed] Same-channel notification probes keep the latest attempt: a slower stale result cannot overwrite a newer verified, degraded, or failed outcome (Refs #866).
