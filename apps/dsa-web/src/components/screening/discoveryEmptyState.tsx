@@ -30,6 +30,8 @@ export function getDiscoveryResultsEmptyKind(
   if (status === 'degraded_empty' || reason === 'provider_unavailable') {
     return 'source_unavailable';
   }
+  // Backend empty_universe means the selected watchlist/portfolio/index page
+  // has no symbols. That is an unconfigured universe, not a quote-source outage.
   if (reason === 'empty_universe') return 'unconfigured';
   return 'no_hits';
 }
@@ -73,27 +75,27 @@ export function createDiscoveryResultsEmptyState({
   if (kind === 'unconfigured') {
     return {
       title: text.diagnosticEmpty,
-      description: text.sourcesUnavailableDescription,
+      description: text.noHitsDescription,
       action: (
         <div className="flex flex-wrap items-center justify-center gap-2">
           <Button
             type="button"
             variant="primary"
-            aria-label={`${text.openDataSources} · ${text.diagnosticEmpty}`}
-            onClick={onOpenDataSources}
-          >
-            <Settings2 className="h-4 w-4" aria-hidden="true" />
-            {text.openDataSources}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
             disabled={loading}
             aria-label={`${text.retry} · ${text.diagnosticEmpty}`}
             onClick={onRetry}
           >
             <Play className="h-4 w-4" aria-hidden="true" />
             {text.retry}
+          </Button>
+          <Button
+            type="button"
+            variant="secondary"
+            aria-label={`${text.openDataSources} · ${text.diagnosticEmpty}`}
+            onClick={onOpenDataSources}
+          >
+            <Settings2 className="h-4 w-4" aria-hidden="true" />
+            {text.openDataSources}
           </Button>
         </div>
       ),

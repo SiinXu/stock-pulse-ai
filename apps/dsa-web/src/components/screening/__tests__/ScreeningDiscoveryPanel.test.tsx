@@ -207,9 +207,14 @@ describe('ScreeningDiscoveryPanel empty and degraded states', () => {
     }));
     const unconfiguredPanel = (await screen.findByText(titles.unconfigured)).closest('[data-state-panel="empty"]');
     expect(unconfiguredPanel).not.toBeNull();
+    expect(within(unconfiguredPanel as HTMLElement).getByText(text.noHitsDescription)).toBeInTheDocument();
+    expect(within(unconfiguredPanel as HTMLElement).queryByText(text.sourcesUnavailableDescription)).toBeNull();
+    expect(within(unconfiguredPanel as HTMLElement).getByRole('button', {
+      name: `${text.retry} · ${titles.unconfigured}`,
+    })).toHaveAttribute('data-variant', 'primary');
     expect(within(unconfiguredPanel as HTMLElement).getByRole('button', {
       name: `${text.openDataSources} · ${titles.unconfigured}`,
-    })).toBeInTheDocument();
+    })).toHaveAttribute('data-variant', 'secondary');
     expect(screen.queryByText(titles.noHits)).not.toBeInTheDocument();
     expect(screen.queryByText(titles.degraded)).not.toBeInTheDocument();
   });
@@ -230,16 +235,19 @@ describe('ScreeningDiscoveryPanel empty and degraded states', () => {
     expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
   });
 
-  it('links unconfigured discovery empty state to Settings data sources', async () => {
+  it('links unconfigured discovery empty state to Settings data sources without calling it a snapshot failure', async () => {
     await renderCompletedDiscovery(emptyDiscoveryResult({
       status: 'empty',
       emptyReason: 'empty_universe',
+      emptyMessage: 'The selected universe has no symbols for this page.',
     }));
     const emptyPanel = (await screen.findByText(text.diagnosticEmpty)).closest('[data-state-panel="empty"]');
     expect(emptyPanel).not.toBeNull();
-    expect(within(emptyPanel as HTMLElement).getByText(text.sourcesUnavailableDescription)).toBeInTheDocument();
+    expect(within(emptyPanel as HTMLElement).getByText(text.noHitsDescription)).toBeInTheDocument();
+    expect(within(emptyPanel as HTMLElement).queryByText(text.sourcesUnavailableDescription)).toBeNull();
     expect(screen.queryByText(text.discoveryNoHits)).not.toBeInTheDocument();
     expect(screen.queryByText(text.sourcesUnavailableTitle)).not.toBeInTheDocument();
+    expect(screen.queryByText('The selected universe has no symbols for this page.')).not.toBeInTheDocument();
     fireEvent.click(within(emptyPanel as HTMLElement).getByRole('button', {
       name: `${text.openDataSources} · ${text.diagnosticEmpty}`,
     }));
