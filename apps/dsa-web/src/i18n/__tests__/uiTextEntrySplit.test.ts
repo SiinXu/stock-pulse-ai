@@ -11,10 +11,12 @@ import { UI_LANGUAGES } from '../uiLanguages';
 import { UI_TEXT } from '../uiText';
 import { zh } from '../uiTextZh';
 import {
+  getLoadedEnglishUiText,
   isUiLanguageTranslationsLoaded,
+  loadEnglishUiTextPayload,
   loadUiLanguageTranslations,
+  unloadEnglishUiTextForTests,
 } from '../translations';
-import { getLoadedEnglishUiText, loadEnglishUiTextPayload, unloadEnglishUiTextForTests } from '../englishUiTextState';
 
 const i18nRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -28,12 +30,12 @@ describe('English UI_TEXT entry split (Refs #883)', () => {
   it('does not statically import the English payload from the entry uiText module', () => {
     const uiTextSource = fs.readFileSync(path.join(i18nRoot, 'uiText.ts'), 'utf8');
     const loaderSource = fs.readFileSync(path.join(i18nRoot, 'translations/index.ts'), 'utf8');
-    const stateSource = fs.readFileSync(path.join(i18nRoot, 'englishUiTextState.ts'), 'utf8');
 
     expect(uiTextSource).not.toMatch(/from ['"]\.\/uiTextEn['"]/);
     expect(uiTextSource).not.toMatch(/import\(\s*['"]\.\/uiTextEn['"]\s*\)/);
+    expect(loaderSource).toContain("import('../uiTextEn')");
+    expect(loaderSource).toContain('ENGLISH_UI_TEXT_LOADER');
     expect(loaderSource).toContain('loadEnglishUiTextPayload');
-    expect(stateSource).toContain("import('./uiTextEn')");
   });
 
   it('keeps Simplified Chinese readable without the English catalog', () => {
