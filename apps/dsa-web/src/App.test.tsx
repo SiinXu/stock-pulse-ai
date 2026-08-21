@@ -140,7 +140,13 @@ describe('App routing behavior', () => {
 
     const { container } = render(<App />);
 
-    expect(container.querySelector('[data-control="spinner"]')).toBeInTheDocument();
+    expect(container.querySelector('[data-app-shell-skeleton]')).toBeInTheDocument();
+    expect(container.querySelector('[data-shell-sidebar]')).toBeInTheDocument();
+    expect(container.querySelector('[data-shell-main]')).toBeInTheDocument();
+    expect(container.querySelector('[data-shell-mobile-header]')).toBeInTheDocument();
+    expect(container.querySelector('[data-control="spinner"]')).not.toBeInTheDocument();
+    expect(container.querySelector('[data-app-shell-skeleton]')?.textContent).toBe('');
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
   });
 
   it('redirects protected routes to login when auth is enabled but user is not logged in', async () => {
