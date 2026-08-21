@@ -94,7 +94,7 @@
         background: rgba(0, 0, 0, 0.08);
       }
       html.light [data-locale-neutral-shell]::after {
-        background: #F7F8F7;
+        background: rgb(255, 255, 255);
         border-color: rgba(0, 0, 0, 0.08);
       }
       @media (min-width: 1024px) {
@@ -103,10 +103,11 @@
           height: auto;
           align-self: stretch;
           margin: 1rem 0.5rem;
-          background: transparent;
+          border-radius: 0.75rem;
+          background: rgba(255, 255, 255, 0.04);
         }
         html.light [data-locale-neutral-shell]::before {
-          background: transparent;
+          background: rgba(0, 0, 0, 0.04);
         }
         [data-locale-neutral-shell]::after {
           margin: 1rem 1rem 1rem 0.25rem;
