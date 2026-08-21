@@ -66,7 +66,9 @@ CLI 本身就是显式选择加入的边界。不存在运行时
 
 评估器消费 runner 已脱敏的 `tool_calls` 字段：`step`、`tool`、
 `arguments`、严格布尔的 `success` / `cached`、可选严格布尔的 `timeout` /
-`guarded`、`duration` 及有界 guard 元数据。Benchmark 补充稳定的场景 task
+`guarded`、`duration` 及有界 guard 元数据。Runner 日志上额外的已脱敏字段
+（例如 `result_preview`）会被投影去掉，不会因此拒绝一条其余字段合法的调用，
+也不会计入 `rejected_call_count`。Benchmark 补充稳定的场景 task
 ID、源 run ID、回放 execution ID、市场与标的身份。原始参数体不会出现在
 结果中，只保留有界规范化内容的 SHA-256 指纹。
 

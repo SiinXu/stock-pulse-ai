@@ -1,0 +1,1 @@
+- [Fixed] Agent trajectory evaluation no longer drops runner tool calls that include extra redacted fields such as result_preview.

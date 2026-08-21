@@ -66,7 +66,11 @@ class TrajectoryRubric(_StrictModel):
 
 
 class TrajectoryToolCallInput(_StrictModel):
-    """One strict, already-redacted runner tool-call record."""
+    """One strict, already-redacted runner tool-call record.
+
+    Extra redacted runner-log keys are projected away by the evaluator before
+    validation; they are not stored here and must not reject a valid call.
+    """
 
     tool: str = Field(min_length=1, max_length=120)
     arguments: Dict[str, Any] = Field(default_factory=dict)

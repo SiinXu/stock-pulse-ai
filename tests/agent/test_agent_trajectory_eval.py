@@ -266,6 +266,44 @@ def test_string_boolean_is_rejected_instead_of_coerced() -> None:
     assert result.runs[0].rejected_call_count == 1
 
 
+def test_extra_redacted_runner_fields_do_not_reject_valid_calls() -> None:
+    """Counterexample: runner logs may carry result_preview after #1050.
+
+    Extra redacted fields must be projected away. Rejecting the whole call
+    would make selection and sample-dependent rates unavailable even when
+    required_tools and the documented call fields are present.
+    """
+    result = _evaluate(
+        [
+            _call(
+                result_preview='{"stock_code":"600519","price":100.0}',
+                unknown_runner_field="ignored",
+            )
+        ]
+    )
+
+    assert result.metrics.sample_size == 1
+    assert result.provenance.rejected_call_count == 0
+    assert result.metrics.tool_selection_precision == 1.0
+    assert result.metrics.tool_selection_recall == 1.0
+    assert result.metrics.tool_selection_f1 == 1.0
+    assert result.metrics.tool_call_success_rate == 1.0
+    assert result.metrics.productive_step_rate == 1.0
+    assert result.metrics.redundancy_rate == 0.0
+    assert result.metrics.retry_rate == 0.0
+    assert result.metrics.cache_hit_rate == 0.0
+    assert "result_preview" not in result.steps[0].model_dump()
+
+
+def test_extra_runner_fields_do_not_bypass_strict_boolean_validation() -> None:
+    result = _evaluate(
+        [_call(success="false", result_preview='{"ok":true}')]  # type: ignore[arg-type]
+    )
+
+    assert result.metrics.sample_size == 0
+    assert result.provenance.rejected_call_count == 1
+
+
 @pytest.mark.parametrize("value", [math.nan, math.inf, -math.inf, 10**1000])
 def test_non_finite_or_unbounded_duration_is_rejected(value: object) -> None:
     result = _evaluate([_call(duration=value)])  # type: ignore[arg-type]

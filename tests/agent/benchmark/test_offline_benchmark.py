@@ -111,9 +111,20 @@ def test_benchmark_emits_joinable_strict_trajectory_evaluations() -> None:
         assert provenance["engine_version"] == "agent-trajectory-eval-v2"
         assert provenance["run_count"] == 1
         assert trajectory["runs"][0]["task_id"] == detail["scenario_id"]
-        assert trajectory["metrics"]["tool_selection_precision"] is not None
-        assert "tool_selection_accuracy" not in trajectory["metrics"]
-        assert "step_efficiency" not in trajectory["metrics"]
+        assert trajectory["runs"][0]["rejected_call_count"] == 0
+        metrics = trajectory["metrics"]
+        assert metrics["sample_size"] > 0
+        assert metrics["tool_selection_precision"] is not None
+        assert metrics["tool_selection_recall"] is not None
+        assert metrics["tool_selection_f1"] is not None
+        assert metrics["tool_call_success_rate"] is not None
+        assert metrics["productive_step_rate"] is not None
+        assert metrics["redundancy_rate"] is not None
+        assert metrics["retry_rate"] is not None
+        assert metrics["cache_hit_rate"] is not None
+        assert metrics["task_completion_rate"] is not None
+        assert "tool_selection_accuracy" not in metrics
+        assert "step_efficiency" not in metrics
         evaluation_ids.add(provenance["evaluation_id"])
     assert len(evaluation_ids) == len(details)
     json.dumps(report, allow_nan=False, sort_keys=True)
