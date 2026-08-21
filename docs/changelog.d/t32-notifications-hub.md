@@ -1,0 +1,1 @@
+- [Added] Added notification channel cards with test-to-bind (Refs #866).

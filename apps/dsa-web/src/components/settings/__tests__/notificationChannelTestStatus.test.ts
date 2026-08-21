@@ -73,4 +73,17 @@ describe('notificationChannelTestStatus', () => {
       ],
     })).toBe('degraded');
   });
+
+  it('classifies an all-failed or success:false probe as failed, not verified', () => {
+    expect(classifyNotificationTestOutcome({
+      success: false,
+      attempts: [],
+    })).toBe('failed');
+    expect(classifyNotificationTestOutcome({
+      success: false,
+      attempts: [
+        { channel: 'feishu', success: false, message: 'missing webhook', stage: 'send', retryable: false },
+      ],
+    })).toBe('failed');
+  });
 });

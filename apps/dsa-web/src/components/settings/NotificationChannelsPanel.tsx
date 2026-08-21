@@ -459,6 +459,8 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
               ? text.bindVerified
               : lastTest?.outcome === 'degraded'
                 ? text.bindDegraded
+              : lastTest?.outcome === 'failed'
+                ? text.lastTestFailed
               : text.bindNeedsTest;
           const statusVariant = !configured
             ? 'default'
@@ -476,12 +478,24 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                 ? text.lastTestPartial
                 : text.lastTestFailed)
             : text.lastTestNever;
+          const channelHealth = !configured
+            ? 'unconfigured'
+            : hasPendingConfiguration && lastTest
+              ? 'draft'
+            : lastTest?.outcome === 'verified'
+              ? 'verified'
+              : lastTest?.outcome === 'degraded'
+                ? 'degraded'
+              : lastTest?.outcome === 'failed'
+                ? 'failed'
+                : 'needs_test';
           return (
             <button
               key={channel.id}
               type="button"
               aria-haspopup="dialog"
               data-testid={`notification-channel-card-${channel.id}`}
+              data-channel-health={channelHealth}
               onClick={() => setOpenChannelId(channel.id)}
               className={cn(
                 'flex flex-col gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
