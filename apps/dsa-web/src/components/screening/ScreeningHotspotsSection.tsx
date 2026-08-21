@@ -128,7 +128,7 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
             variant="warning"
             className="mb-3"
             title={hotspots.length > 0 ? text.showingLastGoodTitle : degraded ? text.sourcesUnavailableTitle : undefined}
-            message={hotspotError}
+            message={hotspots.length > 0 ? text.showingLastGoodMessage : hotspotError}
           />
         ) : null}
 

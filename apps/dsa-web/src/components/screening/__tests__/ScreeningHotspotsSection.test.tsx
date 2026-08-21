@@ -87,7 +87,7 @@ describe('getHotspotPanelKind', () => {
     expect(getHotspotPanelKind(1, '', empty, unavailable)).toBe('healthy');
   });
 
-  it('treats a 200 payload with cacheUsed/fallbackUsed and sourceErrors as last-good, not a healthy cache read', () => {
+  it('treats failure-serve-cache as last-good and does not treat a successful live fallback as last-good', () => {
     expect(isLastGoodHotspotResponse({
       enabled: true,
       provider: 'akshare',
@@ -97,6 +97,15 @@ describe('getHotspotPanelKind', () => {
       fallbackUsed: true,
       sourceErrors: ['alphasift_hotspot_source_error'],
     })).toBe(true);
+    expect(isLastGoodHotspotResponse({
+      enabled: true,
+      provider: 'akshare',
+      hotspotCount: 1,
+      hotspots: [hotspot],
+      cacheUsed: false,
+      fallbackUsed: true,
+      sourceErrors: ['alphasift_hotspot_source_error', 'alphasift_hotspot_direct_fallback_used'],
+    })).toBe(false);
     expect(isLastGoodHotspotResponse({
       enabled: true,
       provider: 'akshare',
@@ -167,8 +176,10 @@ describe('ScreeningHotspotsSection recovery contract', () => {
     const hotspotSection = getHotspotSection();
     const alert = within(hotspotSection).getByRole('status');
     expect(within(alert).getByText(text.showingLastGoodTitle)).toBeInTheDocument();
-    expect(within(alert).getByText(text.hotspotLoadFailed)).toBeInTheDocument();
+    expect(within(alert).getByText(text.showingLastGoodMessage)).toBeInTheDocument();
+    expect(within(alert).queryByText(text.hotspotLoadFailed)).not.toBeInTheDocument();
     expect(within(alert).queryByText(text.sourcesUnavailableTitle)).not.toBeInTheDocument();
+    expect(within(alert).queryByText(text.refreshDescription)).not.toBeInTheDocument();
     expect(within(hotspotSection).getByText('AI Compute')).toBeInTheDocument();
     expect(within(hotspotSection).queryByText(text.refreshDescription)).not.toBeInTheDocument();
     fireEvent.click(within(hotspotSection).getByRole('button', { name: text.refreshHotspots }));

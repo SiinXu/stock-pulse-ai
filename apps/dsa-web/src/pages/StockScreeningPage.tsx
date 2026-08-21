@@ -276,7 +276,9 @@ const StockScreeningPage: React.FC = () => {
         setHotspotDetail(null);
       }
       setHotspotDetailError('');
-      if (nextHotspots.length === 0 || isLastGoodHotspotResponse(result)) {
+      if (isLastGoodHotspotResponse(result)) {
+        setHotspotError(text.showingLastGoodMessage);
+      } else if (nextHotspots.length === 0) {
         setHotspotError(formatHotspotEmptyMessage(result, text));
       }
     } catch (err) {

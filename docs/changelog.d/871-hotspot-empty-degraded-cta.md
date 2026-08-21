@@ -1,1 +1,1 @@
-- [Fixed] Discover hotspots now distinguish genuine empty, source-degraded, and last-good cached states, with Retry and a Data Sources Hub CTA on the hotspot panel instead of a bare mapped error (Refs #871).
+- [Fixed] Discover hotspots distinguish genuine empty, source-degraded, and last-good cached states: last-good uses serve-cache flags plus its own body copy, and a successful live fallback is not labeled last-good (Refs #871).

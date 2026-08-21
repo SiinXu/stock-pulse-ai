@@ -44,10 +44,11 @@ export const formatHotspotEmptyMessage = (result: AlphaSiftHotspotsResponse, tex
 
 export const isLastGoodHotspotResponse = (result: AlphaSiftHotspotsResponse): boolean => {
   const hotspots = result.hotspots || [];
-  const sourceErrors = (result.sourceErrors || []).filter(Boolean);
+  // Serve-cache after live failure sets cacheUsed and fallbackUsed together.
+  // Live fallback that still returned cards has cacheUsed=false.
   return hotspots.length > 0
-    && (result.cacheUsed === true || result.fallbackUsed === true)
-    && sourceErrors.length > 0;
+    && result.cacheUsed === true
+    && result.fallbackUsed === true;
 };
 
 export const getHotspotPanelKind = (
