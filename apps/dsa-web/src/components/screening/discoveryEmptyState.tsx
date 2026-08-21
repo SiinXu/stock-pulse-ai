@@ -1,6 +1,5 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { Play, Settings2 } from 'lucide-react';
 import type { CandidateDiscoveryResponse } from '../../api/candidateDiscovery';
 import { Button } from '../common';
 import type { ScreeningResultsEmptyState } from './ScreeningResultsSection';
@@ -43,78 +42,30 @@ export function createDiscoveryResultsEmptyState({
   onOpenDataSources,
   onRetry,
 }: EmptyStateOptions): ScreeningResultsEmptyState {
-  if (kind === 'source_unavailable') {
-    return {
-      title: text.sourcesUnavailableTitle,
-      description: text.sourcesUnavailableDescription,
-      action: (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={loading}
-            aria-label={`${text.retry} · ${text.sourcesUnavailableTitle}`}
-            onClick={onRetry}
-          >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            {text.retry}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            aria-label={`${text.openDataSources} · ${text.sourcesUnavailableTitle}`}
-            onClick={onOpenDataSources}
-          >
-            <Settings2 className="h-4 w-4" aria-hidden="true" />
-            {text.openDataSources}
-          </Button>
-        </div>
-      ),
-    };
-  }
-  if (kind === 'unconfigured') {
-    return {
-      title: text.diagnosticEmpty,
-      description: text.noHitsDescription,
-      action: (
-        <div className="flex flex-wrap items-center justify-center gap-2">
-          <Button
-            type="button"
-            variant="primary"
-            disabled={loading}
-            aria-label={`${text.retry} · ${text.diagnosticEmpty}`}
-            onClick={onRetry}
-          >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            {text.retry}
-          </Button>
-          <Button
-            type="button"
-            variant="secondary"
-            aria-label={`${text.openDataSources} · ${text.diagnosticEmpty}`}
-            onClick={onOpenDataSources}
-          >
-            <Settings2 className="h-4 w-4" aria-hidden="true" />
-            {text.openDataSources}
-          </Button>
-        </div>
-      ),
-    };
+  const degraded = kind === 'source_unavailable';
+  const title = degraded
+    ? text.sourcesUnavailableTitle
+    : kind === 'unconfigured'
+      ? text.diagnosticEmpty
+      : text.discoveryNoHits;
+  const retry = (
+    <Button variant="primary" disabled={loading} aria-label={`${text.retry} · ${title}`} onClick={onRetry}>
+      {text.retry}
+    </Button>
+  );
+  if (!degraded && kind !== 'unconfigured') {
+    return { title, description: text.noHitsDescription, action: retry };
   }
   return {
-    title: text.discoveryNoHits,
-    description: text.noHitsDescription,
+    title,
+    description: degraded ? text.sourcesUnavailableDescription : text.noHitsDescription,
     action: (
-      <Button
-        type="button"
-        variant="primary"
-        disabled={loading}
-        aria-label={`${text.retry} · ${text.discoveryNoHits}`}
-        onClick={onRetry}
-      >
-        <Play className="h-4 w-4" aria-hidden="true" />
-        {text.retry}
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        {retry}
+        <Button variant="secondary" aria-label={`${text.openDataSources} · ${title}`} onClick={onOpenDataSources}>
+          {text.openDataSources}
+        </Button>
+      </div>
     ),
   };
 }
