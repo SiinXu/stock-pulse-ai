@@ -2716,20 +2716,101 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
-    const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: '标记失效' }));
-    const confirmButton = await screen.findByRole('button', { name: '确定' });
+    const dialog = await screen.findByRole('dialog', { name: '信号详情' });
+    fireEvent.click(await within(dialog).findByRole('button', { name: '标记失效' }));
+    expect(await screen.findByRole('heading', { name: '更新信号状态' })).toBeInTheDocument();
+    const confirmButton = screen.getByRole('button', { name: '确定' });
 
     fireEvent.click(confirmButton);
     fireEvent.click(confirmButton);
 
-    expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(confirmButton).toBeDisabled());
 
     await act(async () => {
       statusUpdate.resolve({ ...signal, status: 'invalidated' });
       await statusUpdate.promise;
     });
+  });
+
+  it('keeps processing toast and blocks a second status write while list and stats reload', async () => {
+    const listReload = createDeferred<DecisionSignalListResponse>();
+    const statsReload = createDeferred<DecisionSignalOutcomeStatsResponse>();
+    let deferListReload = false;
+    let deferStatsReload = false;
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async () => (
+      deferListReload ? listReload.promise : listResponse()
+    ));
+    vi.mocked(decisionSignalsApi.getOutcomeStats).mockImplementation(async () => (
+      deferStatsReload ? statsReload.promise : outcomeStats
+    ));
+    vi.mocked(decisionSignalsApi.updateStatus).mockResolvedValueOnce({
+      ...signal,
+      status: 'invalidated',
+    });
+    renderPage();
+
+    await screen.findByText('贵州茅台');
+    chooseOption(screen.getByLabelText('状态'), '');
+    fireEvent.click(screen.getByRole('button', { name: '筛选' }));
+    await waitFor(() => {
+      const lastListParams = vi.mocked(decisionSignalsApi.list).mock.calls.at(-1)?.[0];
+      expect(lastListParams).toEqual(expect.objectContaining({ page: 1, pageSize: 20 }));
+      expect(lastListParams?.status).toBeUndefined();
+    });
+
+    const listCallsBeforeWrite = vi.mocked(decisionSignalsApi.list).mock.calls.length;
+    const statsCallsBeforeWrite = vi.mocked(decisionSignalsApi.getOutcomeStats).mock.calls.length;
+    deferListReload = true;
+    deferStatsReload = true;
+
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    const drawer = await screen.findByRole('dialog', { name: '信号详情' });
+    fireEvent.click(await within(drawer).findByRole('button', { name: '标记失效' }));
+    fireEvent.click(await screen.findByRole('button', { name: '确定' }));
+
+    await waitFor(() => expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(decisionSignalsApi.list).toHaveBeenCalledTimes(listCallsBeforeWrite + 1));
+    expect(decisionSignalsApi.getOutcomeStats).toHaveBeenCalledTimes(statsCallsBeforeWrite);
+
+    const processingToast = await screen.findByText('处理中...');
+    expect(processingToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
+    expect(within(processingToast.closest('[data-overlay-root="toast"]')!).getByText('更新信号状态')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '更新信号状态' })).not.toBeInTheDocument();
+    expect(await within(drawer).findByText('已失效')).toBeInTheDocument();
+
+    const archiveButton = within(drawer).getByRole('button', { name: '归档' });
+    const closeButton = within(drawer).getByRole('button', { name: '关闭信号' });
+    expect(archiveButton).toBeDisabled();
+    expect(closeButton).toBeDisabled();
+    fireEvent.click(archiveButton);
+    fireEvent.click(closeButton);
+    const confirmAgain = screen.queryByRole('dialog', { name: '更新信号状态' });
+    if (confirmAgain) {
+      fireEvent.click(within(confirmAgain).getByRole('button', { name: '确定' }));
+    }
+    expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      listReload.resolve(listResponse([{ ...signal, status: 'invalidated' }]));
+      await listReload.promise;
+    });
+    await waitFor(() => {
+      expect(decisionSignalsApi.getOutcomeStats).toHaveBeenCalledTimes(statsCallsBeforeWrite + 1);
+    });
+    expect(await screen.findByText('处理中...')).toBeInTheDocument();
+    expect(within(drawer).getByRole('button', { name: '归档' })).toBeDisabled();
+    fireEvent.click(within(drawer).getByRole('button', { name: '关闭信号' }));
+    expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      statsReload.resolve(outcomeStats);
+      await statsReload.promise;
+    });
+    await waitFor(() => expect(screen.queryByText('处理中...')).not.toBeInTheDocument());
+    expect(decisionSignalsApi.list).toHaveBeenCalledTimes(listCallsBeforeWrite + 1);
+    expect(decisionSignalsApi.getOutcomeStats).toHaveBeenCalledTimes(statsCallsBeforeWrite + 1);
+    expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1);
   });
 
   it('clamps to a valid page after status update removes the only item on the last page', async () => {
@@ -2772,10 +2853,12 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
 
     const statusConfirmDialog = screen.getByRole('dialog', { name: '更新信号状态' });
     const statusError = await within(statusConfirmDialog).findByRole('alert');
+    expect(statusError).toHaveTextContent('请求未能完成，请稍后重试。');
     expect(statusError).not.toHaveTextContent('status update failed');
     expect(screen.getByRole('heading', { name: '更新信号状态' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '确定' })).toBeEnabled();
     expect(within(dialog).getByText('有效')).toBeInTheDocument();
+    expect(screen.queryByText('处理中...')).not.toBeInTheDocument();
   });
 
   it.each([
