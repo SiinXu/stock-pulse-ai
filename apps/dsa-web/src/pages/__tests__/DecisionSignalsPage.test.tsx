@@ -2716,14 +2716,15 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     renderPage();
 
     fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
-    const dialog = await screen.findByRole('dialog');
-    fireEvent.click(within(dialog).getByRole('button', { name: '标记失效' }));
-    const confirmButton = await screen.findByRole('button', { name: '确定' });
+    const dialog = await screen.findByRole('dialog', { name: '信号详情' });
+    fireEvent.click(await within(dialog).findByRole('button', { name: '标记失效' }));
+    expect(await screen.findByRole('heading', { name: '更新信号状态' })).toBeInTheDocument();
+    const confirmButton = screen.getByRole('button', { name: '确定' });
 
     fireEvent.click(confirmButton);
     fireEvent.click(confirmButton);
 
-    expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(decisionSignalsApi.updateStatus).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(confirmButton).toBeDisabled());
 
     await act(async () => {

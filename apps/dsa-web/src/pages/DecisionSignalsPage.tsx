@@ -94,6 +94,7 @@ import {
   useDecisionSignalDetailQueries,
   useDecisionSignalListQuery,
   useDecisionSignalOutcomeStatsQuery,
+  useDecisionSignalStatusMutation,
 } from '../hooks';
 import { useStockIndex } from '../hooks/useStockIndex';
 import { useWatchlist } from '../hooks/useWatchlist';
@@ -346,7 +347,6 @@ const DecisionSignalsPage: React.FC = () => {
     { source: 'latest', items: latestItems },
     { source: 'timeline', items: timelineItems },
   ];
-  const statusUpdateInFlightRef = useRef(false);
   const didObserveViewNavigationRef = useRef(false);
   useEffect(() => {
     if (!didObserveViewNavigationRef.current) {
@@ -1062,61 +1062,54 @@ const DecisionSignalsPage: React.FC = () => {
     void loadTimelineForContext(activeStockContext, timelineFilters);
   }, [activeStockContext, loadTimelineForContext, timelineFilters]);
 
-  const [statusUpdating, setStatusUpdating] = useState(false);
+  const { runStatusUpdate, isUpdating: statusUpdating } = useDecisionSignalStatusMutation({
+    isMounted: () => mountedRef.current,
+  });
 
   const handleStatusUpdate = async () => {
-    if (!pendingStatus || statusUpdateInFlightRef.current) return;
-    statusUpdateInFlightRef.current = true;
-    setStatusUpdating(true);
+    if (!pendingStatus) return;
     setStatusError(null);
-    try {
-      // Status write stays a single-shot page-owned call: the deferred double-click
-      // guard and in-flight ref must stay byte-identical to the prior contract.
-      // List/detail/stats already use TanStack Query; status can graduate once a
-      // shared mutation helper preserves that guard without isPending races.
-      const updated = await decisionSignalsApi.updateStatus(pendingStatus.item.id, {
-        status: pendingStatus.status,
-      });
-      if (!mountedRef.current) return;
-      setPendingStatus(null);
-      setStatusError(null);
-      setLatestItems((current) => current.flatMap((item) => {
-        if (item.id !== updated.id) return [item];
-        return updated.status === 'active' ? [updated] : [];
-      }));
-      setTimelineItems((current) => current.flatMap((item) => {
-        if (item.id !== updated.id) return [item];
-        return appliedTimelineContext?.status === 'active' && updated.status !== 'active' ? [] : [updated];
-      }));
-      setSelected((current) => {
-        if (!current || current.item.id !== updated.id) return current;
-        if (current.source === 'latest') {
-          return updated.status === 'active' ? { source: 'latest', item: updated } : null;
-        }
-        if (current.source === 'timeline') {
-          return appliedTimelineContext?.status === 'active' && updated.status !== 'active'
-            ? null
-            : { source: 'timeline', item: updated };
-        }
-        if (current.source === 'persisted') {
-          return { source: 'persisted', item: updated };
-        }
-        if (current.source === 'outcome') {
-          return { source: 'outcome', item: updated };
-        }
-        if (!parseSourceReportId(appliedFilters.sourceReportId) && appliedFilters.status && updated.status !== appliedFilters.status) return null;
-        return { source: 'list', item: updated };
-      });
-      await loadSignalsForPage(page);
-      await loadOutcomeStats();
-    } catch (err) {
-      if (mountedRef.current) {
-        setStatusError(getParsedApiError(err));
-      }
-    } finally {
-      if (mountedRef.current) setStatusUpdating(false);
-      statusUpdateInFlightRef.current = false;
+    const result = await runStatusUpdate({
+      signalId: pendingStatus.item.id,
+      status: pendingStatus.status,
+    });
+    if (result.kind === 'ignored' || result.kind === 'unmounted') return;
+    if (result.kind === 'error') {
+      setStatusError(result.error);
+      return;
     }
+    const updated = result.item;
+    setPendingStatus(null);
+    setStatusError(null);
+    setLatestItems((current) => current.flatMap((item) => {
+      if (item.id !== updated.id) return [item];
+      return updated.status === 'active' ? [updated] : [];
+    }));
+    setTimelineItems((current) => current.flatMap((item) => {
+      if (item.id !== updated.id) return [item];
+      return appliedTimelineContext?.status === 'active' && updated.status !== 'active' ? [] : [updated];
+    }));
+    setSelected((current) => {
+      if (!current || current.item.id !== updated.id) return current;
+      if (current.source === 'latest') {
+        return updated.status === 'active' ? { source: 'latest', item: updated } : null;
+      }
+      if (current.source === 'timeline') {
+        return appliedTimelineContext?.status === 'active' && updated.status !== 'active'
+          ? null
+          : { source: 'timeline', item: updated };
+      }
+      if (current.source === 'persisted') {
+        return { source: 'persisted', item: updated };
+      }
+      if (current.source === 'outcome') {
+        return { source: 'outcome', item: updated };
+      }
+      if (!parseSourceReportId(appliedFilters.sourceReportId) && appliedFilters.status && updated.status !== appliedFilters.status) return null;
+      return { source: 'list', item: updated };
+    });
+    await loadSignalsForPage(page);
+    await loadOutcomeStats();
   };
 
   const handleFeedbackSubmit = useCallback(async (feedbackValue: DecisionSignalFeedbackValue) => {
