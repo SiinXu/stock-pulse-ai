@@ -1,1 +1,1 @@
-- [Fixed] Apply an unlayered home-stock-scroll-shell so the mobile stock-bar stays out of the page scroll chain while desktop clipping and pinch-to-zoom remain unchanged (Refs #1424).
+- [Fixed] Apply an unlayered home-stock-scroll-shell on StockBar and HomeStockWorkspace so mobile overflow is visible, nested ScrollArea remains the pan surface, and desktop clipping plus pinch-to-zoom stay unchanged; the live Home page still mounts HomeWatchlistGroupsSection rather than these shells (Refs #1424).
