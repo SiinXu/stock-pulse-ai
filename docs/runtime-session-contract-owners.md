@@ -1,8 +1,8 @@
 # Shared Runtime Session Contract Owners
 
 - Status: `Living`
-- Last verified: 2026-08-22 against `origin/main` `bb3e7fead` (after [#1469](https://github.com/SiinXu/stock-pulse-ai/pull/1469) T1 inventory; T2 standard BoundToolSession double)
-- Issue: [#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 inventory + T2 standard BoundToolSession double
+- Last verified: 2026-08-23 against `241e7e02d` (#1055 T3 ToolSurface fence reads)
+- Issue: [#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 inventory + T2 standard BoundToolSession double + T3 ToolSurface fence reads
 - Chinese: [runtime-session-contract-owners_CN.md](runtime-session-contract-owners_CN.md)
 
 This page is the owner map for **shared runtime session, probe, and presentation
@@ -11,7 +11,10 @@ standard test double or public-surface mock still omits it.
 
 T2 of #1055 promotes `make_bound_tool_session` as the standard double and adds
 fail-closed regressions for omitted `deadline_monotonic` / `cancelled_check`.
-It does **not** change production runtime behavior.
+T3 reads `context.deadline_monotonic` and `context.cancelled_check` directly in
+ToolSurface so a duck that omits either attribute cannot become an unlimited
+fence. A real `ToolAccessContext` may still pass `None` (no absolute deadline /
+no cancel probe).
 
 ## Purpose
 
@@ -70,6 +73,7 @@ PR** must:
 | Native tool dispatch | `src/agent/runner_parts/tools.py` reads `tool_session.deadline_monotonic` directly. A duck without the attribute raises `AttributeError`; it must not become an unbounded wait. |
 | Analysis runner cancel | `TaskRunContext.is_cancel_requested` is a required frozen-dataclass field. `_run_analysis_command` treats a missing callable as a contract error, not silent `False`. |
 | ToolSurface cancellation probe | A broken `cancelled_check()` fails closed (`cancelled=True`) before the handler starts. |
+| ToolSurface deadline / cancel fence | `src/agent/tools/surface.py` reads `context.deadline_monotonic` and `context.cancelled_check` directly. A duck without either attribute raises `AttributeError`; it must not become an unlimited run. `None` still means no absolute deadline / no cancel callable. |
 | ToolSurface deny-by-default | Unregistered names and missing capabilities are denied before the handler. Do not add a parallel executor. |
 | Readiness generation probe | Probe exceptions and timeouts never become `ok`. Configured backend + unreadable status → `reason_code=generation_backend_probe_failed`. |
 | Config presentation | Every `.env.example` key must be explicitly registered. Inference is not the Settings contract for a documented key. |
@@ -81,10 +85,6 @@ Known remaining leniency (document, do not extend):
   `category_timeout_seconds` callable as **no category cap** (`0.0`). That
   helper is not a license to omit `deadline_monotonic` on objects passed to
   `_execute_tools`.
-- `ToolSurface._effective_dispatch_deadline` still uses
-  `getattr(context, "deadline_monotonic", None)`. A duck `ToolAccessContext`
-  without the field currently means “no absolute deadline”. T2 must not
-  silently preserve that as the desired production path.
 
 ## Contract inventory
 
@@ -92,7 +92,7 @@ Known remaining leniency (document, do not extend):
 | --- | --- | --- | --- | --- |
 | BoundToolSession `deadline_monotonic` | `src/agent/runtime/tool_session.py` | `BoundToolSession(...)` in `src/agent/runner_parts/loop.py` and `src/agent/planning/product.py` | `tests/agent/runtime/bound_tool_session_double.py` (`make_bound_tool_session`), `tests/agent/runtime/test_bound_tool_session_double.py`, `tests/agent/runtime/test_tool_session.py` (`_session`), `tests/agent/runtime/test_native_session_bridge.py` (`_native_session`), `tests/test_agent_frozen_context.py` (`_native_session`), `tests/agent/test_agent_runner_public_surface.py` (`_ToolCompletionFence.deadline_monotonic`) | Native `_execute_tools` requires the attribute. The standard helper must construct the real class and pass `deadline_monotonic` plus `cancelled_check`. |
 | Runner completion fence `deadline_monotonic` | `src/agent/runner.py` `_ToolCompletionFence` | Built inside `_execute_tools` from the earlier of batch timeout and `tool_session.deadline_monotonic` | `tests/agent/test_agent_runner_public_surface.py`, `tests/agent/test_tool_timeout.py` | Fence methods stay on the production class; AST/public-surface pins catch runner-module shape drift. |
-| ToolAccessContext timeout / deadline / cancel | `src/agent/tools/execution.py` `ToolAccessContext`; fences in `src/agent/tools/surface.py` | `BoundToolSession` builds the context per call; callers do not invent a second context type | `tests/agent/runtime/test_tool_session.py`, `tests/agent/test_tool_timeout.py`, `docs/agent-tool-surface.md` | Deny-by-default and timeout/cancel fences stay in ToolSurface. Do not add a private wait that bypasses the surface. |
+| ToolAccessContext timeout / deadline / cancel | `src/agent/tools/execution.py` `ToolAccessContext`; fences in `src/agent/tools/surface.py` | `BoundToolSession` builds the context per call; callers do not invent a second context type | `tests/agent/tools/test_agent_tool_surface.py` (omitted-attribute regressions), `tests/agent/runtime/test_tool_session.py`, `tests/agent/test_tool_timeout.py`, `docs/agent-tool-surface.md` | Deny-by-default and timeout/cancel fences stay in ToolSurface. Missing `deadline_monotonic` / `cancelled_check` attributes raise `AttributeError`. Do not add a private wait that bypasses the surface. |
 | `TaskRunContext.is_cancel_requested` | `src/task_execution.py` | `src/services/task_queue/worker.py` `_execute_command` passes `lambda: self._is_cancel_requested(task_id)` | `tests/test_task_execution.py`, `tests/services/test_local_first_boundaries.py` (`_analysis_task_context`, `test_async_analysis_command_requires_explicit_cancel_protocol`) | Missing callable is `AttributeError`, not `False`. Cooperative cancel also returns true after `cancelled` / `interrupted`. |
 | Analysis HTTP cancel flag + `cancelTask` | `apps/dsa-web/src/api/analysis.ts`; route `POST /api/v1/analysis/tasks/{task_id}/cancel` | Generated OpenAPI `paths` plus `analysisApi.cancelTask`; TaskPanel reads `ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE` | `apps/dsa-web/src/api/__tests__/analysis.test.ts`; every `vi.mock('../../api/analysis')` / `vi.mock('../../../api/analysis')` must `importActual` and spread | Kind-scoped: discovery cancel is a different path. Mocks that replace the whole module drop the landed cancel field. |
 | Generation-backend probe payload | `src/services/generation_backend_status_service.py`; consumed by `src/core/readiness.py` `check_llm_runtime` | `GenerationBackendStatusService(effective_map=...).get_status()` | `tests/services/test_generation_backend_status_service.py`, `tests/core/test_readiness.py` (`generation_status` / probe exceptions) | Probe exceptions → `failed` with `generation_backend_probe_failed`. Do not invent `ok` from a partial mapping. |
@@ -126,7 +126,8 @@ New tests that drive `_execute_tools` must use this helper, not
 `SimpleNamespace`. `tests/agent/runtime/test_bound_tool_session_double.py`
 fails if the helper omits a production-required field, and
 `_execute_tools` raises `AttributeError` when `deadline_monotonic` is
-missing.
+missing. ToolSurface omitted-attribute regressions live in
+`tests/agent/tools/test_agent_tool_surface.py`.
 
 **Remaining observer (do not copy as the standard double).**
 
@@ -139,7 +140,7 @@ missing.
   only `execution_id`. That is helper semantics, not an `_execute_tools`
   license.
 
-**Validation.** `python -m pytest tests/agent/runtime/test_bound_tool_session_double.py tests/agent/runtime/test_tool_session.py tests/agent/test_tool_timeout.py tests/test_agent_frozen_context.py tests/agent/test_agent_runner_public_surface.py tests/security/test_sensitive_redaction.py -q` after session-field changes. If `_execute_tools` or `_ToolCompletionFence` AST changes, the public-surface hash/pin test is the ratchet.
+**Validation.** `python -m pytest tests/agent/runtime/test_bound_tool_session_double.py tests/agent/runtime/test_tool_session.py tests/agent/test_tool_timeout.py tests/agent/tools/test_agent_tool_surface.py tests/test_agent_frozen_context.py tests/agent/test_agent_runner_public_surface.py tests/security/test_sensitive_redaction.py -q` after session-field or ToolSurface fence-read changes. If `_execute_tools` or `_ToolCompletionFence` AST changes, the public-surface hash/pin test is the ratchet.
 
 ## 2. TaskRunContext `is_cancel_requested` (landed with #1466)
 
@@ -248,12 +249,16 @@ audit, and deny-by-default. Checklist: `NEW_TOOL_CHECKLIST` in
 
 **Fail-closed.** Broken cancellation probes fail closed before the handler.
 Unregistered tools and missing capabilities are denied. Do not add a
-tool-local wait that ignores `deadline_monotonic`.
+tool-local wait that ignores `deadline_monotonic`. Omitting the
+`deadline_monotonic` or `cancelled_check` **attribute** is `AttributeError`,
+not an unlimited fence. Passing `None` remains the explicit “no absolute
+deadline / no cancel probe” value.
 
 **Deprecation path for ducks.** New production and test call sites should
 pass a real `ToolAccessContext` (or let `BoundToolSession` build it). Do not
-add more `getattr(context, "deadline_monotonic", None)` readers. Tightening
-the remaining getattr is outside the T2 session-double slice.
+add `getattr(context, "deadline_monotonic", None)` or
+`getattr(context, "cancelled_check", None)` readers. T3 already tightened
+the ToolSurface fence reads.
 
 ## 5. Generation-backend probe payload
 
@@ -321,7 +326,7 @@ Do not expand `TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_*` to green a new key.
 | Analysis runner `SimpleNamespace` stubs | Real `TaskRunContext` | #1466 already requires the cancel callable. Remaining stubs must follow `_analysis_task_context`. |
 | Factory-style `vi.mock('../../api/analysis', () => ({ analysisApi: {...} }))` | `importActual` + spread | After #1466 this is the required Web pattern. New factory mocks are contract bugs. |
 | Duck sessions used as the “standard double” | `make_bound_tool_session` | T2 of #1055. Timeout `_execute_tools` ducks are replaced. Redaction keeps `ExecuteToolsObserverSession` with the required fields. |
-| `getattr(context, "deadline_monotonic", None)` as the desired API | Required field on `ToolAccessContext` | Still remaining. Do not add more getattr fallbacks. Tightening ToolSurface is outside the T2 session-double slice. |
+| `getattr(context, "deadline_monotonic", None)` / `getattr(context, "cancelled_check", None)` as the desired API | Required fields on `ToolAccessContext` | T3 of #1055. ToolSurface reads both attributes directly. Do not reintroduce getattr fallbacks on this fence. |
 | Inferred Settings metadata for a documented env key | Explicit `config_registry_parts` entry | Already fail-closed. Inference remains only for runtime-only compatibility values. |
 
 Do not add parallel session types, a second task lifecycle, a second analysis
@@ -352,16 +357,15 @@ python3 scripts/collect_changelog.py --check
 Confirm filenames in this page with `ls` / editor search before changing a
 row. Docs-only edits do not require the full offline pytest suite.
 
-## Remaining (after #1055 T2)
+## Remaining (after #1055 T3)
 
-T2 delivered the standard `BoundToolSession` helper and fail-closed
-missing-field regressions, including `cancelled_check` on the helper and
-redaction observer. Still out of this slice:
-
-- Tightening `ToolSurface._effective_dispatch_deadline` so
-  `getattr(context, "deadline_monotonic", None)` is no longer the desired
-  production read.
-- Do not weaken ToolSurface deny-by-default, redaction, or timeouts.
+In-scope #1055 timeout-fence work on this page is complete: T1 inventoried
+owners, T2 standardized the BoundToolSession double, and T3 made ToolSurface
+read `deadline_monotonic` / `cancelled_check` directly. Do not weaken
+ToolSurface deny-by-default, redaction, or timeouts. Out-of-scope items
+([#1023](https://github.com/SiinXu/stock-pulse-ai/issues/1023) bulk
+registration, [#204](https://github.com/SiinXu/stock-pulse-ai/issues/204)
+routing, Agent redesign) stay on their own issues.
 
 ## Related
 

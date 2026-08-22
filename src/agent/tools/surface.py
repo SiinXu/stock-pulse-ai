@@ -685,7 +685,7 @@ def _effective_dispatch_deadline(
     started_monotonic: float,
 ) -> Optional[float]:
     deadlines = []
-    absolute = getattr(context, "deadline_monotonic", None)
+    absolute = context.deadline_monotonic
     if absolute is not None:
         try:
             normalized_absolute = float(absolute)
@@ -720,7 +720,7 @@ def _execution_fence_error(
     context: ToolAccessContext,
     deadline_monotonic: Optional[float],
 ) -> Optional[Dict[str, Any]]:
-    cancelled_check = getattr(context, "cancelled_check", None)
+    cancelled_check = context.cancelled_check
     if cancelled_check is not None:
         try:
             cancelled = bool(cancelled_check())

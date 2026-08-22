@@ -10,6 +10,8 @@ import time
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from src.agent.stock_scope import StockScope
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.surface import ToolSurface
@@ -784,6 +786,58 @@ def test_slow_outbound_policy_cannot_start_handler_after_call_deadline() -> None
     assert result["error"]["code"] == "timeout"
     assert result["error"]["details"]["handler_started"] is False
     assert calls == []
+
+
+def test_omitted_deadline_monotonic_on_duck_context_fails_closed() -> None:
+    calls = []
+
+    class MissingDeadlineContext:
+        granted_capabilities = frozenset({_TEST_CAPABILITY})
+        timeout_seconds = None
+        cancelled_check = None
+
+    with pytest.raises(AttributeError, match="deadline_monotonic"):
+        ToolSurface(_registry_with_echo(calls)).execute_tool(
+            "echo",
+            {"message": "must-not-run"},
+            MissingDeadlineContext(),
+        )
+
+    assert calls == []
+
+
+def test_omitted_cancelled_check_on_duck_context_fails_closed() -> None:
+    calls = []
+
+    class MissingCancelledCheckContext:
+        granted_capabilities = frozenset({_TEST_CAPABILITY})
+        timeout_seconds = None
+        deadline_monotonic = None
+
+    with pytest.raises(AttributeError, match="cancelled_check"):
+        ToolSurface(_registry_with_echo(calls)).execute_tool(
+            "echo",
+            {"message": "must-not-run"},
+            MissingCancelledCheckContext(),
+        )
+
+    assert calls == []
+
+
+def test_explicit_none_deadline_monotonic_is_not_an_absolute_fence() -> None:
+    calls = []
+    result = ToolSurface(_registry_with_echo(calls)).execute_tool(
+        "echo",
+        {"message": "ok"},
+        ToolAccessContext(
+            granted_capabilities=frozenset({_TEST_CAPABILITY}),
+            deadline_monotonic=None,
+        ),
+    )
+
+    assert result["ok"] is True
+    assert result["result"] == {"message": "ok", "mode": "plain"}
+    assert calls == [("ok", "plain")]
 
 
 def test_cancellation_during_outbound_policy_prevents_handler_dispatch() -> None:

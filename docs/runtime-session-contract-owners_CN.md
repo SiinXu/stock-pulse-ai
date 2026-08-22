@@ -1,13 +1,13 @@
 # 共享运行时 Session 契约所有权
 
 - 状态：`Living`
-- 最近核验：2026-08-22，对照 `origin/main` `bb3e7fead`（[#1469](https://github.com/SiinXu/stock-pulse-ai/pull/1469) T1 清单之后；T2 标准 BoundToolSession double）
-- Issue：[#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 清单 + T2 标准 BoundToolSession double
+- 最近核验：2026-08-23，对照 `241e7e02d`（#1055 T3 ToolSurface 栅栏读取）
+- Issue：[#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 清单 + T2 标准 BoundToolSession double + T3 ToolSurface 栅栏读取
 - English：[runtime-session-contract-owners.md](runtime-session-contract-owners.md)
 
 本页是**共享运行时 session、探针与配置展示契约**的 owner 地图。目的是避免生产侧新增必填字段后，标准 test double 或公开展示 mock 仍然漏字段。
 
-#1055 T2 把 `make_bound_tool_session` 提升为标准 double，并为漏掉 `deadline_monotonic` / `cancelled_check` 增加 fail-closed 回归。本页**不改变生产运行时行为**。
+#1055 T2 把 `make_bound_tool_session` 提升为标准 double，并为漏掉 `deadline_monotonic` / `cancelled_check` 增加 fail-closed 回归。T3 在 ToolSurface 中直接读取 `context.deadline_monotonic` 与 `context.cancelled_check`，duck 缺任一属性不得变成无限栅栏。真实 `ToolAccessContext` 仍可传入 `None`（无绝对 deadline / 无取消探针）。
 
 ## 目的
 
@@ -55,6 +55,7 @@
 | Native 工具分发 | `src/agent/runner_parts/tools.py` 直接读 `tool_session.deadline_monotonic`。duck 缺属性应 `AttributeError`，不得变成无界等待。 |
 | 分析 runner 取消 | `TaskRunContext.is_cancel_requested` 是冻结 dataclass 的必填字段。`_run_analysis_command` 把缺 callable 当成契约错误，而不是静默 `False`。 |
 | ToolSurface 取消探针 | 损坏的 `cancelled_check()` 在 handler 启动前 fail-closed（`cancelled=True`）。 |
+| ToolSurface deadline / 取消栅栏 | `src/agent/tools/surface.py` 直接读 `context.deadline_monotonic` 与 `context.cancelled_check`。duck 缺任一属性应 `AttributeError`，不得变成无限运行。`None` 仍表示无绝对 deadline / 无取消 callable。 |
 | ToolSurface 默认拒绝 | 未注册名称与缺 capability 在 handler 前拒绝。不要再加第二条执行器。 |
 | 就绪 generation 探针 | 探针异常与超时不得变成 `ok`。已配置后端但状态不可读 → `reason_code=generation_backend_probe_failed`。 |
 | 配置展示 | 每个 `.env.example` 键必须显式登记。推断不能作为已文档化键的 Settings 契约。 |
@@ -63,7 +64,6 @@
 已知仍偏宽松（只记录，不要扩大）：
 
 - `resolve_session_category_timeout_seconds` 把缺失的 `category_timeout_seconds` callable 视为**无类别上限**（`0.0`）。这不是把缺 `deadline_monotonic` 的对象传给 `_execute_tools` 的许可。
-- `ToolSurface._effective_dispatch_deadline` 仍使用 `getattr(context, "deadline_monotonic", None)`。duck context 缺字段目前等于“无绝对 deadline”。T2 不得把这当成生产期望路径继续静默保留。
 
 ## 契约清单
 
@@ -71,7 +71,7 @@
 | --- | --- | --- | --- | --- |
 | BoundToolSession `deadline_monotonic` | `src/agent/runtime/tool_session.py` | `BoundToolSession(...)`：`src/agent/runner_parts/loop.py`、`src/agent/planning/product.py` | `tests/agent/runtime/bound_tool_session_double.py`（`make_bound_tool_session`）、`tests/agent/runtime/test_bound_tool_session_double.py`、`tests/agent/runtime/test_tool_session.py`（`_session`）、`tests/agent/runtime/test_native_session_bridge.py`（`_native_session`）、`tests/test_agent_frozen_context.py`（`_native_session`）、`tests/agent/test_agent_runner_public_surface.py`（`_ToolCompletionFence.deadline_monotonic`） | Native `_execute_tools` 要求该属性。标准 helper 必须构造真实类，并传入 `deadline_monotonic` 与 `cancelled_check`。 |
 | Runner 完成栅栏 `deadline_monotonic` | `src/agent/runner.py` `_ToolCompletionFence` | `_execute_tools` 内取 batch 超时与 `tool_session.deadline_monotonic` 的较早者 | `tests/agent/test_agent_runner_public_surface.py`、`tests/agent/test_tool_timeout.py` | 栅栏方法留在生产类上；AST / 公开展示钉住 runner 模块形状漂移。 |
-| ToolAccessContext 超时 / deadline / 取消 | `src/agent/tools/execution.py` `ToolAccessContext`；栅栏在 `src/agent/tools/surface.py` | 由 `BoundToolSession` 按次构造；调用方不要发明第二种 context | `tests/agent/runtime/test_tool_session.py`、`tests/agent/test_tool_timeout.py`、`docs/agent-tool-surface.md` | 默认拒绝与超时/取消栅栏留在 ToolSurface。不要加绕过 surface 的私有等待。 |
+| ToolAccessContext 超时 / deadline / 取消 | `src/agent/tools/execution.py` `ToolAccessContext`；栅栏在 `src/agent/tools/surface.py` | 由 `BoundToolSession` 按次构造；调用方不要发明第二种 context | `tests/agent/tools/test_agent_tool_surface.py`（缺属性负例）、`tests/agent/runtime/test_tool_session.py`、`tests/agent/test_tool_timeout.py`、`docs/agent-tool-surface.md` | 默认拒绝与超时/取消栅栏留在 ToolSurface。缺 `deadline_monotonic` / `cancelled_check` 属性应 `AttributeError`。不要加绕过 surface 的私有等待。 |
 | `TaskRunContext.is_cancel_requested` | `src/task_execution.py` | `src/services/task_queue/worker.py` `_execute_command` 传入 `lambda: self._is_cancel_requested(task_id)` | `tests/test_task_execution.py`、`tests/services/test_local_first_boundaries.py`（`_analysis_task_context`、`test_async_analysis_command_requires_explicit_cancel_protocol`） | 缺 callable 是 `AttributeError`，不是 `False`。进入 `cancelled` / `interrupted` 后该 callable 仍为 true。 |
 | 分析 HTTP cancel 标志 + `cancelTask` | `apps/dsa-web/src/api/analysis.ts`；路由 `POST /api/v1/analysis/tasks/{task_id}/cancel` | 生成 OpenAPI `paths` 与 `analysisApi.cancelTask`；TaskPanel 读 `ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE` | `apps/dsa-web/src/api/__tests__/analysis.test.ts`；所有 `vi.mock('../../api/analysis')` / `vi.mock('../../../api/analysis')` 必须 `importActual` 并展开 | 按 kind 隔离：discovery cancel 是另一条路径。整模块替换的 mock 会丢掉已落地的 cancel 字段。 |
 | Generation-backend 探针载荷 | `src/services/generation_backend_status_service.py`；由 `src/core/readiness.py` `check_llm_runtime` 消费 | `GenerationBackendStatusService(effective_map=...).get_status()` | `tests/services/test_generation_backend_status_service.py`、`tests/core/test_readiness.py`（`generation_status` / 探针异常） | 探针异常 → `failed` 且 `generation_backend_probe_failed`。不要用残缺 mapping 发明 `ok`。 |
@@ -96,6 +96,7 @@
 驱动 `_execute_tools` 的新测试必须使用该 helper，不要用 `SimpleNamespace`。
 `tests/agent/runtime/test_bound_tool_session_double.py` 会在 helper 漏生产必填
 字段时失败；缺 `deadline_monotonic` 时 `_execute_tools` 抛 `AttributeError`。
+ToolSurface 缺属性负例见 `tests/agent/tools/test_agent_tool_surface.py`。
 
 **遗留观察 double（不要当作标准 double 复制）。**
 
@@ -190,9 +191,9 @@ vi.mock('../../api/analysis', async () => {
 
 **Owner。** ToolSurface（`src/agent/tools/surface.py`）拥有鉴权、超时、审计与默认拒绝。清单见 `NEW_TOOL_CHECKLIST` 与 [agent-tool-surface_CN.md](agent-tool-surface_CN.md)。
 
-**Fail-closed。** 损坏的取消探针在 handler 前失败关闭。未注册工具与缺 capability 被拒绝。不要增加忽略 `deadline_monotonic` 的工具内等待。
+**Fail-closed。** 损坏的取消探针在 handler 前失败关闭。未注册工具与缺 capability 被拒绝。不要增加忽略 `deadline_monotonic` 的工具内等待。漏掉 `deadline_monotonic` 或 `cancelled_check` **属性**是 `AttributeError`，不是无限栅栏。传入 `None` 仍表示“无绝对 deadline / 无取消探针”。
 
-**Duck 废弃路径。** 新的生产与测试调用点应传入真实 `ToolAccessContext`（或让 `BoundToolSession` 构造）。不要再增加 `getattr(context, "deadline_monotonic", None)` 读取点。收紧现存 getattr 不属于 T2 session-double 切片。
+**Duck 废弃路径。** 新的生产与测试调用点应传入真实 `ToolAccessContext`（或让 `BoundToolSession` 构造）。不要再增加 `getattr(context, "deadline_monotonic", None)` 或 `getattr(context, "cancelled_check", None)` 读取点。T3 已收紧 ToolSurface 栅栏读取。
 
 ## 5. Generation-backend 探针载荷
 
@@ -246,7 +247,7 @@ vi.mock('../../api/analysis', async () => {
 | 分析 runner 的 `SimpleNamespace` stub | 真实 `TaskRunContext` | #1466 已要求 cancel callable。其余 stub 必须跟随 `_analysis_task_context`。 |
 | Factory 式 `vi.mock('../../api/analysis', () => ({ analysisApi: {...} }))` | `importActual` + 展开 | #1466 之后这是 Web 必用模式。新的 factory mock 属于契约缺陷。 |
 | 把 duck session 当作“标准 double” | `make_bound_tool_session` | #1055 T2。timeout 的 `_execute_tools` duck 已替换。脱敏保留带必填字段的 `ExecuteToolsObserverSession`。 |
-| 把 `getattr(context, "deadline_monotonic", None)` 当成期望 API | `ToolAccessContext` 上的必填字段 | 仍未收紧。不要增加更多 getattr 回退。收紧 ToolSurface 不属于 T2 session-double 切片。 |
+| 把 `getattr(context, "deadline_monotonic", None)` / `getattr(context, "cancelled_check", None)` 当成期望 API | `ToolAccessContext` 上的必填字段 | #1055 T3。ToolSurface 直接读这两个属性。不要在此栅栏上重新引入 getattr 回退。 |
 | 对已文档化 env 键使用推断的 Settings 元数据 | 显式 `config_registry_parts` 条目 | 已经 fail-closed。推断只留给仅运行时兼容的值。 |
 
 不要增加并行 session 类型、第二套任务生命周期、第二条分析 cancel 路由，或第二套 generation-backend 解析器。
@@ -275,14 +276,9 @@ python3 scripts/collect_changelog.py --check
 
 改某一行前，用 `ls` / 编辑器搜索确认本页文件名仍与仓库一致。纯文档改动不要求跑完整离线 pytest。
 
-## Remaining（#1055 T2 之后）
+## Remaining（#1055 T3 之后）
 
-T2 已交付标准 `BoundToolSession` helper，以及漏字段 fail-closed 回归（helper
-与脱敏 observer 均包含 `cancelled_check`）。本切片仍未覆盖：
-
-- 收紧 `ToolSurface._effective_dispatch_deadline`，使
-  `getattr(context, "deadline_monotonic", None)` 不再是期望的生产读取方式。
-- 不得削弱 ToolSurface 默认拒绝、脱敏或超时。
+本页范围内的 #1055 超时栅栏工作已完成：T1 完成 owner 清单，T2 标准化 BoundToolSession double，T3 让 ToolSurface 直接读取 `deadline_monotonic` / `cancelled_check`。不得削弱 ToolSurface 默认拒绝、脱敏或超时。范围外项（[#1023](https://github.com/SiinXu/stock-pulse-ai/issues/1023) 批量注册、[#204](https://github.com/SiinXu/stock-pulse-ai/issues/204) 路由、Agent 重设计）仍属各自 issue。
 
 ## 相关
 

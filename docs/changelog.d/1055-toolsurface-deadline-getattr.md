@@ -1,0 +1,2 @@
+- [Fixed] Fail closed when a ToolSurface context omits deadline_monotonic or cancelled_check instead of treating the missing attribute as an unlimited fence (Refs #1055).
+- [Docs] Record the #1055 T3 ToolSurface fence reads as fail-closed on the owner map.

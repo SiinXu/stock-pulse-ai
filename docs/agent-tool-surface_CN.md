@@ -33,7 +33,7 @@ ToolRegistry.resolve / bind_definition
 | 项 | 要求 |
 | --- | --- |
 | `permission` | 使用 `ToolPolicy.declared(...)`，且必须是 `SUPPORTED_AGENT_TOOL_CAPABILITIES` 的非空子集。缺少授权时返回 `permission_denied`。 |
-| `timeout` | 遵守 `ToolAccessContext.timeout_seconds` / `deadline_monotonic`。不要另加绕过 surface 围栏的私有等待。 |
+| `timeout` | 遵守 `ToolAccessContext.timeout_seconds` / `deadline_monotonic`。缺 `deadline_monotonic` 或 `cancelled_check` 属性必须 fail-closed（`AttributeError`）；不要用 getattr 把缺属性变成无限栅栏。`None` 仍表示无绝对 deadline / 无取消探针。不要另加绕过 surface 围栏的私有等待。 |
 | `audit` | 由 ToolSurface 在成功与拒绝时发出 `build_tool_audit`。不要记录原始密钥或不可信文档正文。 |
 | `hitl_need` | 工具**不得**再加一条并行审批路径。高风险建议覆写仍走既有 HITL 风控门（`docs/human-approvals.md`）。默认不做工具级 HITL。 |
 
