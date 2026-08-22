@@ -35,3 +35,5 @@ StockPulse 可选用 Tesseract 从**本地图片**以及**内嵌位图的 PDF �
 - 配置与安装命令见英文文档 `docs/agent-ocr-tool_EN.md` 与 `.env.example`。
 
 `builtin.ocr` 仅在开关、文件根、`requirements-ocr.txt`、系统 Tesseract 与语言包全部就绪后注册 `extract_image_text`。
+
+PR CI（`ocr-stock-extractor`）在提取器路径变更时安装 `requirements-ocr.txt` 与 `tesseract-ocr`/`tesseract-ocr-eng`，运行既有离线提取测试，并将依赖缺失导致的 skip 视为失败。该门禁不安装 `chi_sim`，也不把 network 测试提升为阻断项。

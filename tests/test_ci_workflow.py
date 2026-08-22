@@ -1,6 +1,7 @@
 """Guard the hosted CI contract for two-tier and minimum Python gates."""
 
 import re
+from fnmatch import fnmatch
 from pathlib import Path
 
 import yaml
@@ -12,6 +13,67 @@ FRONTEND_EXECUTION_CONDITION = (
     "${{ needs.ai-governance.result == 'success' && "
     "needs.changes.result == 'success' && "
     "needs.changes.outputs.frontend == 'true' }}"
+)
+OCR_EXECUTION_CONDITION = (
+    "${{ needs.ai-governance.result == 'success' && "
+    "needs.changes.result == 'success' && "
+    "needs.changes.outputs.ocr_extractor == 'true' }}"
+)
+DESKTOP_EXECUTION_CONDITION = (
+    "${{ needs.ai-governance.result == 'success' && "
+    "needs.changes.result == 'success' && "
+    "needs.changes.outputs.desktop == 'true' }}"
+)
+OCR_EXTRACTOR_TEST_FILES = (
+    "tests/services/test_image_stock_extractor_litellm.py",
+    "tests/services/test_image_stock_extractor_contract.py",
+    "tests/services/test_ocr_extraction_service.py",
+    "tests/agent/tools/test_ocr_tools.py",
+    "tests/agent/tools/test_ocr_tool_surface_runtime.py",
+    "tests/config/test_ocr_config.py",
+    "tests/plugins/test_ocr_agent_tool.py",
+)
+OCR_EXTRACTOR_SOURCE_FILES = (
+    "src/services/image_stock_extractor.py",
+    "src/services/ocr_extraction_service.py",
+    "src/agent/tools/ocr_tools.py",
+    "src/plugins/builtin/ocr.py",
+    "src/api/v1/endpoints/stocks.py",
+)
+OCR_EXTRACTOR_FIXTURE_PATHS = (
+    "tests/fixtures/ocr/**",
+    "tests/fixtures/multimodal/sample_financial_report.pdf",
+)
+OCR_EXTRACTOR_PATH_FILTER = (
+    *OCR_EXTRACTOR_SOURCE_FILES,
+    *OCR_EXTRACTOR_TEST_FILES,
+    *OCR_EXTRACTOR_FIXTURE_PATHS,
+    "requirements-ocr.txt",
+    ".github/workflows/ci.yml",
+)
+DESKTOP_PATH_FILTER = (
+    "apps/dsa-desktop/**",
+    "scripts/run-desktop.ps1",
+    "scripts/build-desktop*.ps1",
+    "scripts/build-desktop*.sh",
+    "scripts/build-all.ps1",
+    "scripts/build-all-macos.sh",
+    "scripts/build-backend.ps1",
+    "scripts/build-backend-macos.sh",
+    "scripts/verify-desktop-updater-artifacts.ps1",
+    "scripts/prepare-embedded-ollama.js",
+    "requirements-desktop.txt",
+    "THIRD_PARTY_NOTICES",
+    ".github/workflows/desktop-release.yml",
+    ".github/workflows/ci.yml",
+)
+DESKTOP_TEST_PINNED_REPO_FILES = (
+    "scripts/verify-desktop-updater-artifacts.ps1",
+    "scripts/build-backend-macos.sh",
+    "scripts/build-desktop-macos.sh",
+    "scripts/prepare-embedded-ollama.js",
+    "THIRD_PARTY_NOTICES",
+    ".github/workflows/desktop-release.yml",
 )
 
 
@@ -765,3 +827,217 @@ def test_report_export_stack_font_install_retries_mirrors_and_stays_fail_closed(
     assert "tests/services/test_report_export_service.py" in test_step["run"]
     assert "tests/api/test_report_export_api.py" in test_step["run"]
     assert "tests/config/test_report_export_config.py" in test_step["run"]
+
+
+def _ocr_stock_extractor_job() -> dict:
+    return _workflow()["jobs"]["ocr-stock-extractor"]
+
+
+def _desktop_gate_job() -> dict:
+    return _workflow()["jobs"]["desktop-gate"]
+
+
+def _path_filters() -> dict:
+    changes = _workflow()["jobs"]["changes"]
+    filter_step = next(step for step in changes["steps"] if step.get("id") == "filter")
+    return yaml.safe_load(filter_step["with"]["filters"])
+
+
+def _assert_path_filter_entry_exists(relative: str) -> None:
+    if relative.endswith("/**"):
+        directory = REPOSITORY_ROOT / relative[:-3]
+        assert directory.is_dir(), relative
+        return
+    if "*" in relative:
+        matches = list(REPOSITORY_ROOT.glob(relative))
+        assert matches, relative
+        return
+    assert (REPOSITORY_ROOT / relative).is_file(), relative
+
+
+def _path_filter_covers(relative: str, filters: set[str]) -> bool:
+    for entry in filters:
+        if entry.endswith("/**"):
+            prefix = entry[:-2]  # keep the trailing slash
+            if relative.startswith(prefix):
+                return True
+            continue
+        if fnmatch(relative, entry):
+            return True
+    return False
+
+
+def test_changes_job_exposes_ocr_and_desktop_path_filters() -> None:
+    workflow = _workflow()
+    changes = workflow["jobs"]["changes"]
+    filters = _path_filters()
+
+    assert changes["outputs"]["ocr_extractor"] == (
+        "${{ steps.filter.outputs.ocr_extractor }}"
+    )
+    assert changes["outputs"]["desktop"] == "${{ steps.filter.outputs.desktop }}"
+    assert set(filters["ocr_extractor"]) == set(OCR_EXTRACTOR_PATH_FILTER)
+    assert set(filters["desktop"]) == set(DESKTOP_PATH_FILTER)
+    for relative in (*OCR_EXTRACTOR_PATH_FILTER, *DESKTOP_PATH_FILTER):
+        _assert_path_filter_entry_exists(relative)
+
+
+def test_desktop_path_filter_covers_files_pinned_by_desktop_unit_tests() -> None:
+    """Changing repo-root files that npm test reads must not skip desktop-gate."""
+
+    filters = set(_path_filters()["desktop"])
+    main_test = (
+        REPOSITORY_ROOT / "apps" / "dsa-desktop" / "tests" / "main.test.js"
+    ).read_text(encoding="utf-8")
+    macos_test = (
+        REPOSITORY_ROOT / "apps" / "dsa-desktop" / "tests" / "macos-packaging.test.js"
+    ).read_text(encoding="utf-8")
+    ollama_test = (
+        REPOSITORY_ROOT
+        / "apps"
+        / "dsa-desktop"
+        / "tests"
+        / "embedded-ollama-build.test.js"
+    ).read_text(encoding="utf-8")
+
+    assert "verify-desktop-updater-artifacts.ps1" in main_test
+    assert "build-backend-macos.sh" in macos_test
+    assert "build-desktop-macos.sh" in macos_test
+    assert "prepare-embedded-ollama" in ollama_test
+    assert "THIRD_PARTY_NOTICES" in ollama_test
+    assert "desktop-release.yml" in main_test
+
+    for relative in DESKTOP_TEST_PINNED_REPO_FILES:
+        _assert_path_filter_entry_exists(relative)
+        assert _path_filter_covers(relative, filters), relative
+
+    build_all_macos = (REPOSITORY_ROOT / "scripts" / "build-all-macos.sh").read_text(
+        encoding="utf-8"
+    )
+    build_all_windows = (REPOSITORY_ROOT / "scripts" / "build-all.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "build-backend-macos.sh" in build_all_macos
+    assert "build-backend.ps1" in build_all_windows
+    assert _path_filter_covers("scripts/build-backend-macos.sh", filters)
+    assert _path_filter_covers("scripts/build-backend.ps1", filters)
+
+
+def test_ocr_path_filter_covers_files_executed_by_ocr_job() -> None:
+    """OCR job pytest files, sources, and fixtures must all trigger the matrix."""
+
+    filters = set(_path_filters()["ocr_extractor"])
+    ocr_job = _ocr_stock_extractor_job()
+    test_step = next(
+        step
+        for step in ocr_job["steps"]
+        if step.get("name")
+        == "✅ OCR stock-extractor tests (dependency skips are failures)"
+    )
+    for relative in OCR_EXTRACTOR_TEST_FILES:
+        assert relative in test_step["run"]
+        assert relative in filters
+    for relative in OCR_EXTRACTOR_SOURCE_FILES:
+        assert relative in filters
+    extraction_test = (
+        REPOSITORY_ROOT / "tests" / "services" / "test_ocr_extraction_service.py"
+    ).read_text(encoding="utf-8")
+    assert "fixtures" in extraction_test and "multimodal" in extraction_test
+    assert "sample_financial_report.pdf" in extraction_test
+    assert "tests/fixtures/ocr/**" in filters
+    assert "tests/fixtures/multimodal/sample_financial_report.pdf" in filters
+
+
+def test_ocr_stock_extractor_is_path_triggered_fail_closed_and_offline() -> None:
+    job = _ocr_stock_extractor_job()
+    steps_by_name = {step["name"]: step for step in job["steps"]}
+    validation = steps_by_name["🔒 Validate ocr-stock-extractor prerequisites"]
+    no_ocr = steps_by_name["No OCR extractor changes"]
+    test_step = steps_by_name["✅ OCR stock-extractor tests (dependency skips are failures)"]
+    import_step = steps_by_name["🔎 Assert OCR imports"]
+    tesseract_step = steps_by_name["🔤 Install Tesseract OCR engine"]
+
+    assert job["name"] == "ocr-stock-extractor"
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == "${{ always() && !cancelled() }}"
+    assert job["timeout-minutes"] <= 25
+    assert job["permissions"] == {"contents": "read"}
+    _assert_job_fail_closed(job)
+    assert "secrets." not in yaml.safe_dump(job)
+    assert validation["if"] == (
+        "${{ always() && (needs.ai-governance.result != 'success' || "
+        "needs.changes.result != 'success' || "
+        "(needs.changes.outputs.ocr_extractor != 'true' && "
+        "needs.changes.outputs.ocr_extractor != 'false')) }}"
+    )
+    assert validation["run"].rstrip().endswith("exit 1")
+    assert no_ocr["if"] == (
+        "${{ needs.ai-governance.result == 'success' && "
+        "needs.changes.result == 'success' && "
+        "needs.changes.outputs.ocr_extractor == 'false' }}"
+    )
+    assert "exit 1" not in no_ocr["run"]
+    assert test_step["if"] == OCR_EXECUTION_CONDITION
+    assert import_step["if"] == OCR_EXECUTION_CONDITION
+    assert tesseract_step["if"] == OCR_EXECUTION_CONDITION
+    assert '-m "not network"' in test_step["run"]
+    assert "pytest -m network" not in test_step["run"]
+    for relative in OCR_EXTRACTOR_TEST_FILES:
+        assert relative in test_step["run"]
+    assert "must execute stock-extractor tests, not skip them" in test_step["run"]
+    assert "system Tesseract + pytesseract not installed" in test_step["run"]
+    assert "assess_ocr_dependencies" in import_step["run"]
+    assert "requirements-ocr.txt" in steps_by_name[
+        "📦 Install dependencies (native + optional OCR)"
+    ]["run"]
+    assert "tesseract-ocr-eng" in tesseract_step["run"]
+    assert "|| true" not in tesseract_step["run"]
+    assert "continue-on-error" not in tesseract_step["run"]
+    assert "/etc/apt/apt-mirrors.txt" in tesseract_step["run"]
+    assert "azure.archive.ubuntu.com" in tesseract_step["run"]
+    assert "prefer_runner_public_archive" in tesseract_step["run"]
+    assert "/var/lib/apt/lists/partial" in tesseract_step["run"]
+
+
+def test_desktop_gate_runs_existing_unit_tests_without_packaging() -> None:
+    job = _desktop_gate_job()
+    steps_by_name = {step["name"]: step for step in job["steps"]}
+    validation = steps_by_name["🔒 Validate desktop-gate prerequisites"]
+    no_desktop = steps_by_name["No desktop changes"]
+    install = steps_by_name["📦 Install"]
+    unit = steps_by_name["🧪 Unit tests"]
+
+    assert job["name"] == "desktop-gate"
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == "${{ always() && !cancelled() }}"
+    assert job["timeout-minutes"] <= 20
+    assert job["permissions"] == {"contents": "read"}
+    assert job["defaults"]["run"]["working-directory"] == "apps/dsa-desktop"
+    _assert_job_fail_closed(job)
+    assert "secrets." not in yaml.safe_dump(job)
+    assert validation["if"] == (
+        "${{ always() && (needs.ai-governance.result != 'success' || "
+        "needs.changes.result != 'success' || "
+        "(needs.changes.outputs.desktop != 'true' && "
+        "needs.changes.outputs.desktop != 'false')) }}"
+    )
+    assert validation["working-directory"] == "."
+    assert validation["run"].rstrip().endswith("exit 1")
+    assert no_desktop["if"] == (
+        "${{ needs.ai-governance.result == 'success' && "
+        "needs.changes.result == 'success' && "
+        "needs.changes.outputs.desktop == 'false' }}"
+    )
+    assert no_desktop["working-directory"] == "."
+    assert "exit 1" not in no_desktop["run"]
+    assert install["if"] == DESKTOP_EXECUTION_CONDITION
+    assert unit["if"] == DESKTOP_EXECUTION_CONDITION
+    assert install["run"] == "npm ci"
+    assert unit["run"] == "npm test"
+    assert install["env"]["ELECTRON_SKIP_BINARY_DOWNLOAD"] == "1"
+    assert unit["env"]["ELECTRON_SKIP_BINARY_DOWNLOAD"] == "1"
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert "npm run build" not in runs
+    assert not any("electron-builder" in command for command in runs)
+    assert not any("prepare:ollama" in command for command in runs)
+    assert not any("build-all" in command for command in runs)

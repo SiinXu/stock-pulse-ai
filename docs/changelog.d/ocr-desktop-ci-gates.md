@@ -1,0 +1,1 @@
+- [Chore] Add path-triggered blocking CI jobs for OCR stock-extractor tests and desktop unit tests.

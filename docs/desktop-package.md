@@ -84,6 +84,8 @@ npm run dev
 
 禁止用 `npm audit fix --force` 或空白 `audit` 忽略清单代替上述显式 pins。新出现的 advisory 应先判断是**运行时 / 更新链**还是**仅构建机**暴露，再决定是否升 pin 或写明 applicability。
 
+PR CI（`desktop-gate`）在桌面路径变更时运行 `npm ci` 与 `npm test`，不执行 `electron-builder` 或下载内嵌 Ollama runtime；完整打包仍由 `.github/workflows/desktop-release.yml` 负责。
+
 本地校验：
 
 ```bash

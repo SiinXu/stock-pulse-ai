@@ -121,9 +121,11 @@ docs: update the README deployment guide
 | backend-gate | PR：path-selective offline pytest；mapping 为 FULL 时复用 `backend-tests` 四分片（必需检查名仍为 `backend-gate`）；push-to-main：分片完整 suite + coverage floor | ✅ |
 | python-minimum | PR：Python 3.10 import/schema smoke；push-to-main：在 Python 3.10 上运行分片完整 offline suite（必需检查名仍为 `python-minimum`） | ✅ |
 | pydanticai-installed | 安装可选 PydanticAI 依赖并执行不允许跳过的实验运行时测试 | ✅ |
+| ocr-stock-extractor | 始终给出结论；OCR / 图片股票提取路径变更时安装 `requirements-ocr.txt` 与 Tesseract，并执行不允许跳过的既有提取测试；无相关变更时记录摘要；变更检测不可用时 fail closed | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
 | openapi-types-gate | 重新生成后端 OpenAPI 快照与 Web TypeScript 类型并拒绝已提交产物漂移 | ✅ |
 | web-gate | 始终给出结论；Web 变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test:coverage`，再按场景运行运行时性能预算（阻断型结构指标失败关闭，观察只告警，跳过表示不可用），然后 `npm run build` 并阻断 bundle size budget；无 Web 变更时记录摘要；变更检测不可用时 fail closed | ✅ |
+| desktop-gate | 始终给出结论；桌面路径变更时执行 `cd apps/dsa-desktop && npm ci && npm test`（不做 Electron 打包）；无桌面变更时记录摘要；变更检测不可用时 fail closed | ✅ |
 | web-e2e | 同一关联路径触发；以隔离运行时启动真实后端、Vite 与本地 fake 模型端点并执行 `npm run test:smoke` | ✅（触发时） |
 | pr-review | 通过 `workflow_dispatch` 且必须填写 `pr_number` 的按需辅助审查。`security-check` 不 checkout：先用 `pulls.get` 快照 head/base SHA，再对这些精确 commit SHA（同仓与 fork）做 SHA 固定的 `repos.compareCommits` 清单（`pulls.listFiles` 不能钉 SHA；仅靠再次 get 相等检查无法闭合 B→A→B ABA；GitHub 文档中的跨仓限定符是可变的 `USERNAME:BRANCH`，因此不使用 `owner:SHA`），然后再次 get，head/base 漂移或 compare 404 时失败关闭，之后才发出输出。后续任务仍可运行变更文件语法/flake8、约 1000 行规模提示（排除 lock/生成文件），以及钉在这些 API SHA 上的同仓 AI 审查（需仓库 Secrets `GEMINI_API_KEY` 和/或 `OPENAI_API_KEY`；无 `github.sha` 回退）。Fork PR 只读（无 secrets、无写操作）。AI 审查不阻断合入。请在 Actions 页选择该 PR 分支作为 workflow ref（以便后续静态检查仍看到该工作树），并传入 PR 编号；缺少有效 `pr_number` 时失败关闭。 | ❌（辅助项） |
 | network-smoke | 定时/手动执行 `pytest -m network` + `scripts/test.sh quick`（非阻断） | ❌（观测项） |
@@ -170,6 +172,24 @@ DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
 
 # 真实登录后故意失败的安全诊断验收；临时 spec 与默认结果会自动清理
 python scripts/check_playwright_failure_diagnostics.py
+
+# 桌面单测（如修改了 apps/dsa-desktop/ 或桌面打包脚本）
+cd apps/dsa-desktop
+npm ci
+npm test
+cd ../..
+
+# 可选 OCR + 图片股票提取（CI job ocr-stock-extractor）
+# 需要系统 Tesseract（`tesseract-ocr` + `tesseract-ocr-eng`）
+python -m pip install --build-constraint build-constraints.txt -r requirements-ocr.txt
+python -m pytest -m "not network" \
+  tests/services/test_image_stock_extractor_litellm.py \
+  tests/services/test_image_stock_extractor_contract.py \
+  tests/services/test_ocr_extraction_service.py \
+  tests/agent/tools/test_ocr_tools.py \
+  tests/agent/tools/test_ocr_tool_surface_runtime.py \
+  tests/config/test_ocr_config.py \
+  tests/plugins/test_ocr_agent_tool.py
 
 # 离线分析质量面板（无网络、无 live LLM；结构/信任夹具，不衡量 market alpha）
 ./scripts/run_analysis_quality_panel.sh

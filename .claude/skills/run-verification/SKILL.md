@@ -84,10 +84,12 @@ npm run test:smoke                 # playwright.config.ts self-hosts backend + w
 
 The backend webServer requires Python deps installed (`python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt`). e2e failures follow the same Step 3 baseline attribution as unit tests — many e2e specs are already red on main.
 
-**desktop** (web first, then desktop):
+**desktop** (PR gate first; packaging when the change needs a build):
 
 ```bash
-cd apps/dsa-web && npm run build
+cd apps/dsa-desktop && npm ci && npm test
+# Packaging / installer verification, when required:
+cd ../dsa-web && npm run build
 cd ../dsa-desktop && npm install && npm run build
 ```
 
