@@ -45,10 +45,25 @@ class _InvalidTrend:
         return ["not", "a", "mapping"]
 
 
+def _high_field_trust() -> dict:
+    return {
+        "schema_version": "field_trust_v1",
+        "analysis_input": {
+            "schema_version": "field_trust_analysis_input/1.0",
+            "confidence": "high",
+            "gaps": [],
+            "conflict_count": 0,
+            "failed_provider_count": 0,
+        },
+    }
+
+
 def _quote(
     source: RealtimeSource = RealtimeSource.AKSHARE_EM,
     **overrides,
 ) -> UnifiedRealtimeQuote:
+    if "field_trust" not in overrides:
+        overrides["field_trust"] = _high_field_trust()
     return UnifiedRealtimeQuote(
         code="600519",
         name="贵州茅台",
@@ -113,6 +128,9 @@ def test_quote_block_maps_available_missing_fallback_and_explicit_stale() -> Non
     assert available.status == ContextFieldStatus.AVAILABLE
     assert available.source == "akshare_em"
     assert available.items["price"].value == 1880.0
+    assert "field_trust" not in available.items
+    assert available.metadata["analysis_input"]["confidence"] == "high"
+    assert available.metadata["analysis_input"]["gap_codes"] == []
 
     missing = AnalysisContextBuilder.build(
         _artifacts(realtime_quote=None)
@@ -133,6 +151,7 @@ def test_quote_block_maps_available_missing_fallback_and_explicit_stale() -> Non
                 "source": "fallback",
                 "price": 1870.0,
                 "fallback_from": "primary_realtime_provider",
+                "field_trust": _high_field_trust(),
             }
         )
     ).blocks["quote"]
@@ -199,6 +218,7 @@ def test_quote_block_ignores_invalid_or_legacy_timestamp_metadata() -> None:
                 "provider_timestamp": "not-a-date",
                 "fetched_at": "2026-05-31T10:00:05+00:00",
                 "timestamp": 0,
+                "field_trust": _high_field_trust(),
             }
         )
     ).blocks["quote"]
@@ -215,6 +235,7 @@ def test_quote_block_ignores_invalid_or_legacy_timestamp_metadata() -> None:
                 "source": "akshare_em",
                 "price": 1870.0,
                 "timestamp": 0,
+                "field_trust": _high_field_trust(),
             }
         )
     ).blocks["quote"]
@@ -227,6 +248,7 @@ def test_quote_block_ignores_invalid_or_legacy_timestamp_metadata() -> None:
                 "source": "akshare_em",
                 "price": 1870.0,
                 "provider_timestamp": "2026-05-31 10:00:00",
+                "field_trust": _high_field_trust(),
             }
         )
     ).blocks["quote"]
@@ -695,3 +717,53 @@ def test_builder_module_stays_zero_fetch_and_zero_storage_import(monkeypatch) ->
     pack = reloaded.AnalysisContextBuilder.build(_artifacts())
 
     assert pack.blocks["quote"].status == ContextFieldStatus.AVAILABLE
+
+
+def test_quote_block_degrades_missing_field_trust_instead_of_high_available() -> None:
+    block = AnalysisContextBuilder.build(
+        _artifacts(realtime_quote=_quote(field_trust=None))
+    ).blocks["quote"]
+
+    assert block.status == ContextFieldStatus.PARTIAL
+    assert "quote_trust_metadata_absent" in block.warnings
+    assert block.metadata["analysis_input"]["confidence"] == "low"
+    assert "metadata_absent" in block.metadata["analysis_input"]["gap_codes"]
+    assert "field_trust" not in block.items
+    assert block.items["price"].value == 1880.0
+
+
+def test_quote_block_rebuilds_legacy_field_trust_without_analysis_input() -> None:
+    block = AnalysisContextBuilder.build(
+        _artifacts(
+            realtime_quote=_quote(
+                field_trust={
+                    "schema_version": "field_trust_v1",
+                    "fields": {
+                        "price": {
+                            "source": "efinance",
+                            "origin": "primary",
+                            "staleness": "fresh",
+                            "conflict": True,
+                        }
+                    },
+                    "conflicts": [
+                        {
+                            "field": "price",
+                            "values": [
+                                {"provider": "efinance", "value": 1880.0},
+                                {"provider": "akshare_em", "value": 2100.0},
+                            ],
+                        }
+                    ],
+                }
+            )
+        )
+    ).blocks["quote"]
+
+    assert block.status == ContextFieldStatus.PARTIAL
+    assert "quote_trust_conflict" in block.warnings
+    assert block.metadata["analysis_input"]["confidence"] == "low"
+    assert "conflict" in block.metadata["analysis_input"]["gap_codes"]
+    assert block.metadata["analysis_input"]["conflict_count"] >= 1
+    assert "field_trust" not in block.items
+    assert block.items["price"].value == 1880.0

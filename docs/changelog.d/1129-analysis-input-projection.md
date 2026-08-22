@@ -1,0 +1,2 @@
+- [Added] Project existing field-trust analysis_input gaps and confidence into AnalysisContextPack quote metadata and High-eligibility so a fresh conflicted quote cannot silently remain High (Refs #1129).
+- [Changed] Treat missing or legacy field-trust payloads as unknown/degraded analysis input instead of trusted available quotes (Refs #1129).

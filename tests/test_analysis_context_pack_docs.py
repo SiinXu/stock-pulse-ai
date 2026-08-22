@@ -241,7 +241,7 @@ def test_analysis_context_pack_docs_record_issue_1386_p3_quality_boundaries() ->
         "`is_stale`",
         "`stale_seconds`",
         "`fallback_from`",
-        "`STALE > FALLBACK > AVAILABLE`",
+        "`STALE > FALLBACK > PARTIAL > AVAILABLE`",
         "builder 只映射上游 artifact，不做质量评分",
         "`is_partial_bar`、`is_estimated`、`estimated_fields`",
         "`daily_bars` 不承载 partial/estimated",

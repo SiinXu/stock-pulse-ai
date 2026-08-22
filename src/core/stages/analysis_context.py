@@ -142,6 +142,13 @@ class _AnalysisContextStageMixin:
                 'stale_seconds': getattr(realtime_quote, 'stale_seconds', None),
                 'fallback_from': getattr(realtime_quote, 'fallback_from', None),
             }
+            from src.analysis_context_pack.quote_trust import (
+                bound_analysis_input_from_quote,
+            )
+
+            analysis_input = bound_analysis_input_from_quote(realtime_quote)
+            if analysis_input:
+                enhanced['realtime']['analysis_input'] = analysis_input
             # Remove None values to reduce context size
             enhanced['realtime'] = {k: v for k, v in enhanced['realtime'].items() if v is not None}
 

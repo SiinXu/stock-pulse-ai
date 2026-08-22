@@ -333,6 +333,9 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
         self.assertIs(enhanced["realtime"]["is_stale"], False)
         self.assertEqual(enhanced["realtime"]["stale_seconds"], 5)
         self.assertEqual(enhanced["realtime"]["fallback_from"], "efinance")
+        self.assertEqual(enhanced["realtime"]["analysis_input"]["confidence"], "low")
+        self.assertIn("metadata_absent", enhanced["realtime"]["analysis_input"]["gap_codes"])
+        self.assertNotIn("field_trust", enhanced["realtime"])
         self.assertTrue(enhanced["today"]["is_partial_bar"])
         self.assertTrue(enhanced["today"]["is_estimated"])
         self.assertEqual(

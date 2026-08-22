@@ -146,7 +146,20 @@ def _builder_artifacts(*, fundamental_context: dict) -> PipelineAnalysisArtifact
             "date": "2026-03-26",
         },
         enhanced_context={},
-        realtime_quote={"price": 1880.0, "source": "mock_quote"},
+        realtime_quote={
+            "price": 1880.0,
+            "source": "mock_quote",
+            "field_trust": {
+                "schema_version": "field_trust_v1",
+                "analysis_input": {
+                    "schema_version": "field_trust_analysis_input/1.0",
+                    "confidence": "high",
+                    "gaps": [],
+                    "conflict_count": 0,
+                    "failed_provider_count": 0,
+                },
+            },
+        },
         trend_result={"trend_status": "available"},
         chip_data={"source": "mock_chip", "date": "2026-03-26"},
         fundamental_context=fundamental_context,
