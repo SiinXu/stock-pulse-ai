@@ -36,6 +36,39 @@ _MIN_CALIBRATION_SAMPLES = 30
 _ROLLING_WINDOW = 50
 
 
+def _canonical_memory_date(record: Any) -> str:
+    created_at = getattr(record, "created_at", None)
+    if created_at is None:
+        return ""
+    try:
+        return created_at.date().isoformat()
+    except (AttributeError, TypeError, ValueError):
+        return ""
+
+
+def _canonical_memory_price(raw_result: Dict[str, Any]) -> float:
+    price = raw_result.get("current_price")
+    if price is None:
+        return 0.0
+    try:
+        return float(price)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _raw_result_from_history_record(record: Any) -> Dict[str, Any]:
+    raw_result = getattr(record, "raw_result", None)
+    if isinstance(raw_result, str) and raw_result:
+        try:
+            parsed = json.loads(raw_result)
+        except (TypeError, ValueError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    if isinstance(raw_result, dict):
+        return dict(raw_result)
+    return {}
+
+
 @dataclass
 class CalibrationResult:
     """Confidence calibration data for an agent or skill."""
@@ -105,41 +138,27 @@ class AgentMemory:
         if not self.enabled:
             return []
 
+        records = self._load_stock_history_records(stock_code, limit)
+        if not records:
+            return []
+
+        from src.agent.protocols import normalize_decision_signal
+
+        return [
+            self._entry_from_history_record(stock_code, record, normalize_decision_signal)
+            for record in records
+        ]
+
+    def _load_stock_history_records(self, stock_code: str, limit: int) -> List[Any]:
+        """Load AnalysisHistory rows. Expected storage failures skip inject."""
         try:
-            from src.agent.protocols import normalize_decision_signal
+            from sqlalchemy.exc import SQLAlchemyError
+
             from src.storage import get_db
+
             db = get_db()
             records = db.get_analysis_history(code=stock_code, limit=limit)
-            entries = []
-            for r in records:
-                raw_result: Dict[str, Any] = {}
-                if isinstance(getattr(r, "raw_result", None), str) and r.raw_result:
-                    try:
-                        parsed = json.loads(r.raw_result)
-                        if isinstance(parsed, dict):
-                            raw_result = parsed
-                    except (TypeError, ValueError):
-                        raw_result = {}
-                elif isinstance(getattr(r, "raw_result", None), dict):
-                    raw_result = dict(r.raw_result)
-
-                # Canonical buy|hold|sell only. Never copy operation_advice prose
-                # into signal; missing or non-canonical decision_type becomes hold.
-                signal = normalize_decision_signal(raw_result.get("decision_type"))
-                price_at_analysis = raw_result.get("current_price")
-                if price_at_analysis is None:
-                    price_at_analysis = 0.0
-
-                entries.append(AnalysisMemoryEntry(
-                    stock_code=stock_code,
-                    date=(r.created_at.date().isoformat() if getattr(r, "created_at", None) else ""),
-                    signal=signal,
-                    sentiment_score=getattr(r, "sentiment_score", 50) or 50,
-                    price_at_analysis=float(price_at_analysis or 0.0),
-                    was_correct=None,
-                ))
-            return entries
-        except Exception as exc:  # broad-exception: fallback_recorded - history lookup failures are safely logged and return no entries
+        except (RuntimeError, SQLAlchemyError) as exc:
             log_safe_exception(
                 logger,
                 "Agent memory stock history lookup failed",
@@ -149,6 +168,26 @@ class AgentMemory:
                 context={"stock_code": stock_code},
             )
             return []
+        if not records:
+            return []
+        return list(records)
+
+    def _entry_from_history_record(
+        self,
+        stock_code: str,
+        record: Any,
+        normalize_decision_signal: Any,
+    ) -> AnalysisMemoryEntry:
+        """Map one history row. Never copy operation_advice into signal."""
+        raw_result = _raw_result_from_history_record(record)
+        return AnalysisMemoryEntry(
+            stock_code=stock_code,
+            date=_canonical_memory_date(record),
+            signal=normalize_decision_signal(raw_result.get("decision_type")),
+            sentiment_score=getattr(record, "sentiment_score", 50) or 50,
+            price_at_analysis=_canonical_memory_price(raw_result),
+            was_correct=None,
+        )
 
     # -----------------------------------------------------------------
     # Confidence calibration

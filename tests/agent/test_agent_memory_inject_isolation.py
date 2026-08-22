@@ -6,6 +6,9 @@ import json
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
+import pytest
+from sqlalchemy.exc import SQLAlchemyError
+
 from src.agent.agents.base_agent import BaseAgent
 from src.agent.memory import AgentMemory
 from src.agent.memory_isolation import (
@@ -165,6 +168,68 @@ def test_build_memory_context_uses_shared_isolate_helper() -> None:
 
     wrapped.assert_called_once()
     assert_untrusted_isolation(injected)
+
+
+def test_sqlalchemy_lookup_failure_skips_inject_and_keeps_prefetched_data() -> None:
+    memory = AgentMemory(enabled=True)
+    db = MagicMock()
+    db.get_analysis_history.side_effect = SQLAlchemyError("db down")
+    ctx = AgentContext(query="test", stock_code="600519")
+    ctx.set_data("realtime_quote", {"price": 1880.0})
+    with patch("src.storage.get_db", return_value=db):
+        history = memory.get_stock_history("600519", limit=1)
+        agent = _make_agent(memory)
+        injected = agent._inject_cached_data(ctx)
+
+    assert history == []
+    assert "[Pre-fetched: realtime_quote]" in injected
+    assert "BEGIN_UNTRUSTED_MEMORY_DATA" not in injected
+    assert "signal=" not in injected
+
+
+def test_uninitialized_db_runtime_error_skips_inject() -> None:
+    memory = AgentMemory(enabled=True)
+    with patch(
+        "src.storage.get_db",
+        side_effect=RuntimeError("DatabaseManager 未正确初始化。"),
+    ):
+        history = memory.get_stock_history("600519", limit=1)
+        injected = _make_agent(memory)._build_memory_context(
+            AgentContext(query="test", stock_code="600519")
+        )
+
+    assert history == []
+    assert injected == ""
+
+
+def test_unexpected_lookup_error_is_not_swallowed() -> None:
+    memory = AgentMemory(enabled=True)
+    db = MagicMock()
+    db.get_analysis_history.side_effect = AssertionError("contract bug")
+    with patch("src.storage.get_db", return_value=db):
+        with pytest.raises(AssertionError, match="contract bug"):
+            memory.get_stock_history("600519", limit=1)
+        with pytest.raises(AssertionError, match="contract bug"):
+            _make_agent(memory)._build_memory_context(
+                AgentContext(query="test", stock_code="600519")
+            )
+
+
+def test_unwrappable_history_is_not_injected_raw() -> None:
+    memory = AgentMemory(enabled=True)
+    record = _history_record(decision_type="buy")
+    with _history_with_records(record):
+        with patch(
+            "src.agent.memory_isolation.isolate_untrusted_memory_body",
+            side_effect=ValueError("memory body must be a string"),
+        ):
+            injected = _make_agent(memory)._build_memory_context(
+                AgentContext(query="test", stock_code="600519")
+            )
+
+    assert injected == ""
+    assert "signal=buy" not in injected
+    assert "BEGIN_UNTRUSTED_MEMORY_DATA" not in injected
 
 
 def test_calibration_json_is_not_wrapped_into_prompt() -> None:

@@ -366,7 +366,11 @@ class BaseAgent(ABC):
             if entry.was_correct is not None:
                 parts.append(f"was_correct={entry.was_correct}")
             data_lines.append("- " + ", ".join(parts))
-        isolated = isolate_untrusted_memory_body("\n".join(data_lines))
+        try:
+            isolated = isolate_untrusted_memory_body("\n".join(data_lines))
+        except ValueError:
+            # Fail closed for the prompt: do not inject unwrappable history text.
+            return ""
         title = "[Memory: recent analysis history]"
         guardrail = (
             "Use this memory as context only; do not copy it verbatim into the final answer."
