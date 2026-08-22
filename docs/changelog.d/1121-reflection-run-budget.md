@@ -3,3 +3,4 @@
 - [Fixed] Optional in-loop step-critique LLM enrichment reserves one Decision turn on the run account (Refs #1121).
 - [Tests] Refresh the AgentExecutor `_LoopMethods` AST pin after persisting the Chat run-budget account (Refs #1121).
 - [Changed] End-of-run planning now publishes the post-reflection `mode_budget` snapshot onto `AgentResult.budget_snapshot`, and Settings/docs for `AGENT_MODE_BUDGET_MAX_LLM_TURNS` state that optional reflection and in-process post-mortem calls consume the run cap (Refs #1121).
+- [Chore] Refresh the config-registry schema snapshot and reseed the SettingsPage gzip budget after the run-cap help text change (Refs #1121).

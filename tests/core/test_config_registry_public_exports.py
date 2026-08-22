@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "5418d7f1ee8159aa7f9a21ceeab5c568471ea436ce2adbbfc660b25a30bbed53"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "12213a8d093d8ed9c997755071f6c3198bba32400924a284a5f5e6acbff0573b"
+    "0e697aa107af8da7695629a13ae9773643362747d2987b7969bea0a6a0b61a58"
 )
 
 
@@ -104,9 +104,9 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for converged registry registrations.
-    # Intended delta versus the previous hash is the four
-    # AGENT_{DATA,SEARCH,ANALYSIS,ACTION}_TOOL_TIMEOUT_S keys only.
+    # Snapshot refresh for the AGENT_MODE_BUDGET_MAX_LLM_TURNS description:
+    # optional end-of-run reflection and in-process post-mortem consume the
+    # same run LLM-turn cap. Registered keys are unchanged.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256
