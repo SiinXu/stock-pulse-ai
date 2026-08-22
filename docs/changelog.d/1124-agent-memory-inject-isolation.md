@@ -1,0 +1,1 @@
+- [Fixed] Isolate default-off BaseAgent AgentMemory prompt inject as untrusted data, canonicalize history signals to buy|hold|sell, and skip inject on specific storage lookup failures instead of swallowing all exceptions (Refs #1124).

@@ -20,7 +20,6 @@
     {"path":"src/agent/memory.py","scope":"<module>.AgentMemory.from_config","caught":["Exception"],"digest":"4adf474640f535c8ef6b7e83f4363b79b031c984d0dd2aed4f7ee99de2f7bc39"},
     {"path":"src/agent/memory.py","scope":"<module>.AgentMemory.get_calibration","caught":["Exception"],"digest":"37e74f4a4206996c94a91c9696fa8eb08d3dde3e7b90ba98eac8918e5c7777db"},
     {"path":"src/agent/memory.py","scope":"<module>.AgentMemory.get_skill_performance","caught":["Exception"],"digest":"41f48f415d524a076d430f4bd83515dad49b9dd7b45a0f2666702cc70b0f6074"},
-    {"path":"src/agent/memory.py","scope":"<module>.AgentMemory.get_stock_history","caught":["Exception"],"digest":"c117a1705e8898ee81596027c354f25bc16bec26e2e7b037392f737121ecdb45"},
     {"path":"src/agent/runner.py","scope":"<module>._try_repair_json","caught":["Exception"],"digest":"f36db75653927281892e70590d56aa97f624e8093bfc7cb380a0dfacca7edd24"},
     {"path":"src/agent/runner.py","scope":"<module>.try_parse_json","caught":["Exception"],"digest":"353676eecf80eca2f985a7e5f35b070afdbd8f69991f6675bf1a4a6c17a28d4c"},
     {"path":"src/agent/runtime/native_adapter.py","scope":"<module>.NativeRuntimeAdapter.start._worker","caught":["Exception"],"digest":"5c53747a47bd88173bc9aa90a1f44c2d6055a374d0567d996658dc0cbceee42d"},
