@@ -111,7 +111,9 @@ MCP / 事件触发仍使用 `api_client` / `analysis_submitter`。不要把市�
 发现或 AlphaSift 折进本事件。
 
 DAG-2 在 `ScheduledTaskService.create_task` 与 `set_enabled`（HTTP 创建/启用/
-禁用）写入 `scheduled_task.write`。attempt 在定义写入前提交。metadata 仅含
+禁用）写入 `scheduled_task.write`。记录器位于
+`src/services/scheduled_task_parts/mutation_audit.py`，再绑定到
+`scheduled_task_service` 门面；生产调用方仍导入该门面。attempt 在定义写入前提交。metadata 仅含
 task_type、schema_version、enabled、schedule_kind、calendar_market、
 requested_enabled 与 idempotent，不含 name、payload、密钥或股票代码。HTTP
 `503` `security_audit_unavailable` 带 `operation_completed`：attempt 无法写入

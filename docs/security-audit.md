@@ -117,7 +117,9 @@ Legend:
 DAG-1 extended `AnalysisSubmissionCommand` with `query_source`, `request_context`, `portfolio_context`, `strict_skill_selection`, and actor identity, and shares `record_audit` plus attempt-before-protected-operation fail-closed order. HTTP async / MCP / event-trigger keep `api_client` / `analysis_submitter`. Do not fold market-review, candidate discovery, or AlphaSift into this event.
 
 DAG-2 records `scheduled_task.write` at `ScheduledTaskService.create_task` and
-`set_enabled` (HTTP create/enable/disable). Attempt is committed before the
+`set_enabled` (HTTP create/enable/disable). The recorder lives in
+`src/services/scheduled_task_parts/mutation_audit.py` and is rebound onto the
+`scheduled_task_service` facade; production callers keep importing the facade. Attempt is committed before the
 definition write. Metadata is limited to task_type, schema_version, enabled,
 schedule_kind, calendar_market, requested_enabled, and idempotent — never
 name, payload, secrets, or stock codes. HTTP `503` `security_audit_unavailable`

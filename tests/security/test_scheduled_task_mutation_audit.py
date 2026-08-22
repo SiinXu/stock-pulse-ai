@@ -6,10 +6,14 @@ from __future__ import annotations
 
 import json
 from datetime import datetime
+from types import FunctionType
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+
+import src.services.scheduled_task_parts.mutation_audit as mutation_audit
+import src.services.scheduled_task_service as scheduled_task_service
 
 from src.api import deps as api_deps
 from src.api.v1.endpoints import scheduled_tasks
@@ -756,3 +760,35 @@ def test_quarantine_disable_does_not_emit_scheduled_task_write(
         assert persisted.enabled is False
     assert _write_events(audit, phase="attempt") == []
     assert _write_events(audit, phase="completion") == []
+
+
+def test_mutation_audit_methods_remain_on_scheduled_task_service_facade() -> None:
+    required = mutation_audit.EXPECTED_MUTATION_AUDIT_METHOD_NAMES
+    assert required == (
+        "_resolve_mutation_audit_recorder",
+        "_record_scheduled_task_mutation_audit",
+        "_complete_scheduled_task_mutation_success",
+        "_complete_scheduled_task_mutation_failure",
+        "create_task",
+        "set_enabled",
+    )
+    for name in required:
+        method = getattr(ScheduledTaskService, name)
+        assert callable(method), name
+        function = vars(ScheduledTaskService)[name]
+        if isinstance(function, (staticmethod, classmethod)):
+            function = function.__func__
+        assert isinstance(function, FunctionType)
+        assert function.__module__ == "src.services.scheduled_task_service", name
+        assert function.__qualname__ == f"ScheduledTaskService.{name}", name
+        assert function.__globals__ is vars(scheduled_task_service), name
+
+
+def test_mutation_audit_owner_is_not_a_second_public_api() -> None:
+    package = __import__(
+        "src.services.scheduled_task_parts",
+        fromlist=["*"],
+    )
+    assert getattr(package, "__all__", ()) in ((), None)
+    for name in mutation_audit.EXPECTED_MUTATION_AUDIT_METHOD_NAMES:
+        assert not hasattr(package, name)
