@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
+from src.auth import refresh_auth_state
 from src.config import Config
 from src.services.paper_portfolio_service import (
     PaperAccountRequiredError,
@@ -388,6 +389,7 @@ def _client(tmp_path):
     old_env_file = os.environ.get("ENV_FILE")
     old_database_path = os.environ.get("DATABASE_PATH")
     old_initial_cash = os.environ.get("PAPER_PORTFOLIO_INITIAL_CASH")
+    old_admin_auth = os.environ.get("ADMIN_AUTH_ENABLED")
     env_path = tmp_path / ".env"
     db_path = tmp_path / "paper_api.db"
     static_dir = tmp_path / "empty-static"
@@ -408,7 +410,9 @@ def _client(tmp_path):
     os.environ["ENV_FILE"] = str(env_path)
     os.environ["DATABASE_PATH"] = str(db_path)
     os.environ["PAPER_PORTFOLIO_INITIAL_CASH"] = str(_INITIAL_CASH)
+    os.environ["ADMIN_AUTH_ENABLED"] = "false"
     Config.reset_instance()
+    refresh_auth_state()
     DatabaseManager.reset_instance()
     app = create_app(static_dir=Path(static_dir))
     client = TestClient(app)
@@ -422,6 +426,7 @@ def _client(tmp_path):
             ("ENV_FILE", old_env_file),
             ("DATABASE_PATH", old_database_path),
             ("PAPER_PORTFOLIO_INITIAL_CASH", old_initial_cash),
+            ("ADMIN_AUTH_ENABLED", old_admin_auth),
         ):
             if value is None:
                 os.environ.pop(key, None)

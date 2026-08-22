@@ -19,6 +19,7 @@ from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 ensure_litellm_stub()
 
+from src.auth import refresh_auth_state
 from src.config import Config
 from src.core.config_manager import ConfigManager
 from src.services.system_config_service import (
@@ -55,6 +56,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
                 "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS",
                 "PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK",
                 "PREDICTION_RESOLVE_RETRY_JITTER_RATIO",
+                "ADMIN_AUTH_ENABLED",
             )
         }
         for key in (
@@ -68,6 +70,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS",
             "PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK",
             "PREDICTION_RESOLVE_RETRY_JITTER_RATIO",
+            "ADMIN_AUTH_ENABLED",
         ):
             os.environ.pop(key, None)
         self._original_queue = AnalysisTaskQueue._instance
@@ -99,6 +102,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
                 executor.shutdown(wait=False)
         AnalysisTaskQueue._instance = self._original_queue
         Config.reset_instance()
+        refresh_auth_state()
         for key, value in self._saved_non_llm_env.items():
             if value is None:
                 os.environ.pop(key, None)
