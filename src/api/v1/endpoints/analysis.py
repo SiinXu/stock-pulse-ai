@@ -10,9 +10,7 @@ into response models. Use-case orchestration lives in
 
 Private helpers remain importable here as thin facades so existing API tests that
 patch or call ``src.api.v1.endpoints.analysis.*`` keep working without wire changes.
-Public re-exports include ``TaskStatusEnum`` and ``TaskEventType``; status and
-SSE contract tests read those names from this module even when a helper only
-uses one of them in-process.
+``TaskStatusEnum`` and ``TaskEventType`` are public re-exports on this module.
 """
 
 from __future__ import annotations
@@ -58,11 +56,8 @@ from src.core.market_review_runtime import (
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.services.name_to_code_resolver import resolve_name_to_code
 from src.services.task_queue import get_task_queue
-from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
-
-# HTTP-module facade: ``TaskEventType`` / ``deep_thaw`` serve the SSE adapter;
-# ``TaskStatusEnum`` is a public attribute for analysis status/cancel tests
-# (``analysis_endpoint_module.TaskStatusEnum``). Do not drop it as unused.
+from src.task_execution import TaskEventType, deep_thaw
+from src.task_execution import TaskStatusEnum as _TaskStatusEnum
 from src.api.v1.services.analysis_cancel_audit import (
     AnalysisCancelAuditCompletionUnavailable,
 )
@@ -70,6 +65,9 @@ from src.services.security_audit_service import (
     SecurityAuditRecorder,
     SecurityAuditUnavailable,
 )
+
+# Status/SSE contract tests read these names from this HTTP module.
+TaskStatusEnum = _TaskStatusEnum
 
 logger = logging.getLogger(__name__)
 

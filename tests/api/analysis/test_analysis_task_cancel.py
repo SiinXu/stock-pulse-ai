@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from src.api.middlewares.auth import EXEMPT_PATHS, _path_exempt
 from src.api.v1.endpoints import analysis as endpoint
 from src.api.v1.services.analysis_api_service import STOCK_ANALYSIS_TASK_KIND
-from src.task_execution import TaskCommand, TaskNotFoundError, TaskRunContext, TaskStatusEnum
+from src.task_execution import TaskCommand, TaskEventType, TaskNotFoundError, TaskRunContext, TaskStatusEnum
 from tests.security.test_security_audit_integrations import _RecordingAudit
 
 
@@ -63,13 +63,15 @@ class AnalysisTaskCancelHttpTests(unittest.TestCase):
         self.assertNotIn("/api/v1/analysis/tasks/task-analysis-1/cancel", EXEMPT_PATHS)
 
     def test_http_module_keeps_public_task_lifecycle_facade(self) -> None:
+        from src.api.v1.endpoints.analysis import TaskEventType as exported_event_type
+        from src.api.v1.endpoints.analysis import TaskStatusEnum as exported_status_enum
+
         self.assertIs(endpoint.TaskStatusEnum, TaskStatusEnum)
-        self.assertTrue(hasattr(endpoint, "TaskEventType"))
-        self.assertEqual(endpoint.TaskStatusEnum.CANCEL_REQUESTED.value, "cancel_requested")
-        self.assertEqual(endpoint.TaskStatusEnum.CANCELLED.value, "cancelled")
-        self.assertEqual(endpoint.TaskStatusEnum.COMPLETED.value, "completed")
-        self.assertEqual(endpoint.TaskStatusEnum.FAILED.value, "failed")
-        self.assertEqual(endpoint.TaskStatusEnum.INTERRUPTED.value, "interrupted")
+        self.assertIs(endpoint.TaskEventType, TaskEventType)
+        self.assertIs(exported_status_enum, TaskStatusEnum)
+        self.assertIs(exported_event_type, TaskEventType)
+        self.assertEqual(list(endpoint.TaskStatusEnum), list(TaskStatusEnum))
+        self.assertEqual(list(endpoint.TaskEventType), list(TaskEventType))
 
     def test_unknown_task_returns_404_without_calling_cancel(self) -> None:
         fake_queue = MagicMock()
