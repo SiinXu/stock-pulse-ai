@@ -1,0 +1,1 @@
+- [Docs] Document shared runtime session contract owners, paired tests, and fail-closed mock obligations after analysis-task cancel landed (Refs #1055).

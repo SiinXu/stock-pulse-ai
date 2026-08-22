@@ -28,7 +28,7 @@ src/core/readiness.py
 GET /api/v1/system/readiness
 ```
 
-只读、不写配置、不跑模型 smoke、不在进程启动时自动调用。探测异常与单检查超时不得报 `ok`。
+只读、不写配置、不跑模型 smoke、不在进程启动时自动调用。探测异常与单检查超时不得报 `ok`。generation-backend 状态载荷字段与测试义务见 [共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md)。
 
 ## 配置
 

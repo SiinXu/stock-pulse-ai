@@ -79,3 +79,4 @@ ToolRegistry.resolve / bind_definition
 - [人工审批（HITL）](human-approvals.md)
 - [插件开发指南](plugin-development-guide_zh.md)
 - [另类数据插件契约](alternative-data-plugin-contract_zh.md)
+- [共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md) — BoundToolSession / ToolAccessContext 字段与 test double 义务

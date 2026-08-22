@@ -26,7 +26,7 @@ This is the entry point for project documentation. The README covers the project
 | Troubleshoot runtime issues | [FAQ (EN)](FAQ_EN.md) | [Changelog](CHANGELOG.md) |
 | Troubleshoot data-source failures | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | [FAQ (EN)](FAQ_EN.md), [Chinese version](data-source-stability.md) |
 | Review log/error/audit/trace secret handling | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | [Durable Security Audit](security-audit.md) / [中文](security-audit_zh.md), [Outbound HTTP Policy](security-outbound-policy.md) |
-| Contribute code or docs | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md), [Business Architecture](business-architecture.md), [Technical Architecture](architecture-overview.md), [ADR Registry](adr/README.md), [API Spec](architecture/api_spec.json) |
+| Contribute code or docs | [Contributing Guide (EN)](CONTRIBUTING_EN.md) | [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md), [Shared runtime session contract owners](runtime-session-contract-owners.md) ([中文](runtime-session-contract-owners_CN.md)), [Business Architecture](business-architecture.md), [Technical Architecture](architecture-overview.md), [ADR Registry](adr/README.md), [API Spec](architecture/api_spec.json) |
 
 ## Getting Started
 
@@ -132,6 +132,7 @@ This is the entry point for project documentation. The README covers the project
 | [Engineering Efficiency Playbook (EN)](engineering-efficiency-playbook_EN.md) | Operational guide for parallel fix/merge trains: batch merges, conflict graphs, config registry guards, squash false-close defense, self-iteration acceptance, host resource limits, and worktree safety ([中文](engineering-efficiency-playbook.md); `AGENTS.md` remains the contract) |
 | [Offline Test Gate (timeouts, coverage floor, markers)](testing-ci-gate.md) | Per-test timeout, faulthandler, measured coverage floor, strict markers, and manual benchmarks |
 | [Config-access ratchet](config-access-ratchet.md) | Shrink-only bare `get_config()` gate, preferred injection / composition-root path, and legitimate baseline changes (ADR-011 / issue #625) |
+| [Shared runtime session contract owners](runtime-session-contract-owners.md) ([中文](runtime-session-contract-owners_CN.md)) | BoundToolSession / TaskRunContext / HTTP cancel / ToolAccessContext / generation-backend probe / config-registry owners, paired tests, fail-closed rules, and deprecation path (#1055 T1) |
 | [Import-cycle ratchet](import-cycle-ratchet.md) | Shrink-only bidirectional package-pair gate, failure reading, and legitimate baseline path (ADR-010) |
 | [Service-split template](service-split-template.md) | Behavior-preserving facade / re-export checklist, ratchet verification, shim-removal criteria, and a historical audit of merged PR #1352 (Refs #1088) |
 | [Offline Analysis Quality Panel](analysis-quality-panel.md) | Fixed-panel offline trust fixtures, extension guide, and non-claims (#617 Phase A) |
