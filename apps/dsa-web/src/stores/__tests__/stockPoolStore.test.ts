@@ -27,6 +27,7 @@ vi.mock('../../api/analysis', async () => {
   return {
     ...actual,
     analysisApi: {
+      ...actual.analysisApi,
       analyzeAsync: vi.fn(),
       getTasks: vi.fn(),
       getStatus: vi.fn(),

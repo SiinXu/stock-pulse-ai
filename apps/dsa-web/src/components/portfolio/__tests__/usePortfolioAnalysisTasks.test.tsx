@@ -15,13 +15,18 @@ import { usePortfolioAnalysisTasks } from '../usePortfolioAnalysisTasks';
 const getStatus = vi.fn();
 const getTasks = vi.fn();
 
-vi.mock('../../../api/analysis', () => ({
-  analysisApi: {
-    getStatus: (...args: unknown[]) => getStatus(...args),
-    getTasks: (...args: unknown[]) => getTasks(...args),
-    getTaskStreamUrl: () => '/api/v1/analysis/tasks/stream',
-  },
-}));
+vi.mock('../../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/analysis')>('../../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      getStatus: (...args: unknown[]) => getStatus(...args),
+      getTasks: (...args: unknown[]) => getTasks(...args),
+      getTaskStreamUrl: () => '/api/v1/analysis/tasks/stream',
+    },
+  };
+});
 
 vi.mock('../../../hooks/useTaskStream', () => ({
   useTaskStream: () => ({

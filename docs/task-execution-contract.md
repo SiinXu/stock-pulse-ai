@@ -80,6 +80,9 @@ this final commit boundary.
 A pending command cancelled before execution never invokes its runner. Runners can
 poll `TaskRunContext.is_cancel_requested()`; it also returns true after
 `cancelled` or `interrupted` so a late-running callable observes the stop fence.
+The stock-analysis adapter polls that callable before `analyze_stock`, on
+progress, and after pipeline return. The callable is required on
+`TaskRunContext`; missing it is a contract error, not a silent `False`.
 
 `TaskCommand.on_done` is an optional executor-finalization cleanup hook. The
 queue attaches it only after executor admission and invokes it once when the

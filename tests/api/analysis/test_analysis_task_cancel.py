@@ -14,7 +14,7 @@ from fastapi import HTTPException
 from src.api.middlewares.auth import EXEMPT_PATHS, _path_exempt
 from src.api.v1.endpoints import analysis as endpoint
 from src.api.v1.services.analysis_api_service import STOCK_ANALYSIS_TASK_KIND
-from src.task_execution import TaskNotFoundError, TaskStatusEnum
+from src.task_execution import TaskCommand, TaskNotFoundError, TaskRunContext, TaskStatusEnum
 
 
 def _stock_analysis_task(**overrides: object) -> SimpleNamespace:
@@ -294,6 +294,59 @@ class AnalysisTaskCancelQueueTests(unittest.TestCase):
             future = self.queue._futures.get(background.task_id)
             if future is not None:
                 future.result(timeout=3)
+
+
+class AnalysisTaskCancelRunnerProtocolTests(unittest.TestCase):
+    def _context(self, *, cancel_requested: bool = False) -> TaskRunContext:
+        return TaskRunContext(
+            task_id="task-analysis-1",
+            trace_id="trace-analysis-1",
+            command=TaskCommand(
+                kind=STOCK_ANALYSIS_TASK_KIND,
+                run=lambda _context: None,
+                metadata={"stock_code": "600519", "report_type": "detailed"},
+                none_is_success=False,
+            ),
+            update_progress=MagicMock(),
+            append_flow_event=MagicMock(),
+            is_cancel_requested=lambda: cancel_requested,
+            commit_final_result=lambda operation: (True, operation()),
+        )
+
+    def test_runner_rejects_duck_typed_context_without_cancel_protocol(self) -> None:
+        from src.services.task_queue import AnalysisTaskQueue
+
+        queue = object.__new__(AnalysisTaskQueue)
+        context = SimpleNamespace(
+            command=SimpleNamespace(metadata={"stock_code": "600519"}),
+            task_id="task-analysis-1",
+            trace_id="trace-analysis-1",
+            update_progress=MagicMock(),
+        )
+        with self.assertRaises(AttributeError) as caught:
+            AnalysisTaskQueue._run_analysis_command(queue, context)
+        self.assertIn("is_cancel_requested", str(caught.exception))
+
+    def test_runner_skips_analyze_stock_when_cancel_already_requested(self) -> None:
+        from src.services.analysis_service import AnalysisService
+        from src.services.task_queue import AnalysisTaskQueue
+
+        queue = object.__new__(AnalysisTaskQueue)
+        service = MagicMock(spec=AnalysisService)
+        with patch("src.services.analysis_service.AnalysisService", return_value=service):
+            result = AnalysisTaskQueue._run_analysis_command(
+                queue,
+                self._context(cancel_requested=True),
+            )
+        service.analyze_stock.assert_not_called()
+        self.assertEqual(
+            result,
+            {
+                "query_id": "task-analysis-1",
+                "stock_code": "600519",
+                "cancelled": True,
+            },
+        )
 
 
 if __name__ == "__main__":

@@ -192,7 +192,7 @@ const STATE_SURFACE_VISUAL_OVERRIDE_ALLOWLIST = new Map<string, readonly ExactBu
     },
   ]],
   ['../tasks/TaskPanel.tsx', [{
-    line: 302,
+    line: 303,
     owner: 'UIUX-HARNESS',
     removeWhen: 'TaskPanel migrates from Card to Surface after every caller moves layout sizing to an external wrapper.',
     tokens: ['dynamic:className'],

@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -25,7 +27,33 @@ from src.core.stages.orchestration import _OrchestrationStageMixin
 from src.services.analysis_service import AnalysisService
 from src.services.stock_service import StockService
 from src.services.task_queue import AnalysisTaskQueue, KnownTaskFailure
-from src.task_execution import TaskCommand, TaskStatusEnum
+from src.task_execution import TaskCommand, TaskRunContext, TaskStatusEnum
+
+
+def _analysis_task_context(
+    *,
+    cancel_requested: bool = False,
+    is_cancel_requested: Callable[[], bool] | None = None,
+    update_progress: Any = None,
+) -> TaskRunContext:
+    """Build a real runner context; duck-typed stubs are not accepted."""
+    return TaskRunContext(
+        task_id="task-local",
+        trace_id="trace-local",
+        command=TaskCommand(
+            kind="stock_analysis",
+            run=lambda _context: None,
+            metadata={
+                "stock_code": "600519",
+                "report_type": "detailed",
+            },
+            none_is_success=False,
+        ),
+        update_progress=update_progress or MagicMock(),
+        append_flow_event=MagicMock(),
+        is_cancel_requested=is_cancel_requested or (lambda: cancel_requested),
+        commit_final_result=lambda operation: (True, operation()),
+    )
 
 
 def _missing_error() -> LocalDataMissingError:
@@ -179,6 +207,19 @@ def test_async_analysis_command_preserves_local_missing_details() -> None:
     service.last_error = str(_missing_error())
     service.last_error_code = "local_market_data_missing"
     service.last_error_details = _missing_error().to_dict()
+    context = _analysis_task_context()
+    queue = object.__new__(AnalysisTaskQueue)
+
+    with patch("src.services.analysis_service.AnalysisService", return_value=service):
+        with pytest.raises(KnownTaskFailure) as exc_info:
+            AnalysisTaskQueue._run_analysis_command(queue, context)
+
+    assert exc_info.value.error_code == "local_market_data_missing"
+    assert exc_info.value.message_params["fields"] == ["volume"]
+
+
+def test_async_analysis_command_requires_explicit_cancel_protocol() -> None:
+    service = MagicMock(spec=AnalysisService)
     context = SimpleNamespace(
         command=SimpleNamespace(
             metadata={
@@ -193,11 +234,83 @@ def test_async_analysis_command_preserves_local_missing_details() -> None:
     queue = object.__new__(AnalysisTaskQueue)
 
     with patch("src.services.analysis_service.AnalysisService", return_value=service):
-        with pytest.raises(KnownTaskFailure) as exc_info:
+        with pytest.raises(AttributeError, match="is_cancel_requested"):
             AnalysisTaskQueue._run_analysis_command(queue, context)
 
-    assert exc_info.value.error_code == "local_market_data_missing"
-    assert exc_info.value.message_params["fields"] == ["volume"]
+    service.analyze_stock.assert_not_called()
+
+
+def test_async_analysis_command_skips_pipeline_when_cancel_requested() -> None:
+    service = MagicMock(spec=AnalysisService)
+    service.analyze_stock.return_value = None
+    service.last_error = str(_missing_error())
+    service.last_error_code = "local_market_data_missing"
+    service.last_error_details = _missing_error().to_dict()
+    context = _analysis_task_context(cancel_requested=True)
+    queue = object.__new__(AnalysisTaskQueue)
+
+    with patch("src.services.analysis_service.AnalysisService", return_value=service):
+        result = AnalysisTaskQueue._run_analysis_command(queue, context)
+
+    service.analyze_stock.assert_not_called()
+    assert result == {
+        "query_id": "task-local",
+        "stock_code": "600519",
+        "cancelled": True,
+    }
+
+
+def test_async_analysis_command_skips_progress_when_cancel_requested() -> None:
+    cancel_state = {"requested": False}
+    progress = MagicMock()
+    service = MagicMock(spec=AnalysisService)
+
+    def _analyze(**kwargs):  # type: ignore[no-untyped-def]
+        cancel_state["requested"] = True
+        kwargs["progress_callback"](40, "analyzing")
+        return {"query_id": "task-local", "stock_code": "600519"}
+
+    service.analyze_stock.side_effect = _analyze
+    context = _analysis_task_context(
+        is_cancel_requested=lambda: cancel_state["requested"],
+        update_progress=progress,
+    )
+    queue = object.__new__(AnalysisTaskQueue)
+
+    with patch("src.services.analysis_service.AnalysisService", return_value=service):
+        result = AnalysisTaskQueue._run_analysis_command(queue, context)
+
+    progress.assert_not_called()
+    assert result["stock_code"] == "600519"
+    assert "cancelled" not in result
+
+
+def test_async_analysis_command_cancel_after_local_missing_returns_cancelled() -> None:
+    cancel_state = {"requested": False}
+    service = MagicMock(spec=AnalysisService)
+
+    def _analyze(**_kwargs):  # type: ignore[no-untyped-def]
+        cancel_state["requested"] = True
+        return None
+
+    service.analyze_stock.side_effect = _analyze
+    service.last_error = str(_missing_error())
+    service.last_error_code = "local_market_data_missing"
+    service.last_error_details = _missing_error().to_dict()
+    context = _analysis_task_context(
+        is_cancel_requested=lambda: cancel_state["requested"],
+    )
+    queue = object.__new__(AnalysisTaskQueue)
+
+    with patch("src.services.analysis_service.AnalysisService", return_value=service):
+        result = AnalysisTaskQueue._run_analysis_command(queue, context)
+
+    service.analyze_stock.assert_called_once()
+    assert result == {
+        "query_id": "task-local",
+        "stock_code": "600519",
+        "cancelled": True,
+    }
 
 
 def test_async_task_terminal_state_preserves_local_missing_code_and_details(

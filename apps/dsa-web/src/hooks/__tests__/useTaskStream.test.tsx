@@ -6,11 +6,16 @@ const { getTaskStreamUrl } = vi.hoisted(() => ({
   getTaskStreamUrl: vi.fn(() => 'http://localhost/api/v1/analysis/tasks/stream'),
 }));
 
-vi.mock('../../api/analysis', () => ({
-  analysisApi: {
-    getTaskStreamUrl,
-  },
-}));
+vi.mock('../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../api/analysis')>('../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      getTaskStreamUrl,
+    },
+  };
+});
 
 type MockEventSourceInstance = {
   listeners: Record<string, ((event: MessageEvent<string>) => void) | undefined>;

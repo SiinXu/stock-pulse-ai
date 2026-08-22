@@ -223,11 +223,16 @@ vi.mock('../../api/systemConfig', () => ({
   },
 }));
 
-vi.mock('../../api/analysis', () => ({
-  analysisApi: {
-    analyzeAsync: (...args: unknown[]) => analyzeAsync(...args),
-  },
-}));
+vi.mock('../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../api/analysis')>('../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      analyzeAsync: (...args: unknown[]) => analyzeAsync(...args),
+    },
+  };
+});
 
 vi.mock('../../components/settings/RuntimeCapabilitiesPanel', () => ({
   RuntimeCapabilitiesPanel: () => (

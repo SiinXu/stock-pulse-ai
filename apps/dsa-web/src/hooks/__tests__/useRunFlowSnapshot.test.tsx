@@ -7,11 +7,16 @@ import type { UseTaskStreamOptions } from '../useTaskStream';
 import { useRunFlowSnapshot } from '../useRunFlowSnapshot';
 import { createDeferred } from '../../test-utils';
 
-vi.mock('../../api/analysis', () => ({
-  analysisApi: {
-    getTaskFlow: vi.fn(),
-  },
-}));
+vi.mock('../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../api/analysis')>('../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      getTaskFlow: vi.fn(),
+    },
+  };
+});
 
 vi.mock('../../api/history', () => ({
   historyApi: {
