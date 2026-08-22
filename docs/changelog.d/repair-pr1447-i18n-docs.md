@@ -1,0 +1,1 @@
+- [Docs] Align bilingual Web i18n conventions with the shipped zh-only builtin first-paint path; English is an off-entry catalog that uses the locale-neutral shell (Refs #1447, #883).
