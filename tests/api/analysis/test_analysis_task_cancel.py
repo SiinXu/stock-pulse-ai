@@ -62,6 +62,15 @@ class AnalysisTaskCancelHttpTests(unittest.TestCase):
         self.assertNotIn("/api/v1/analysis/tasks/{task_id}/cancel", EXEMPT_PATHS)
         self.assertNotIn("/api/v1/analysis/tasks/task-analysis-1/cancel", EXEMPT_PATHS)
 
+    def test_http_module_keeps_public_task_lifecycle_facade(self) -> None:
+        self.assertIs(endpoint.TaskStatusEnum, TaskStatusEnum)
+        self.assertTrue(hasattr(endpoint, "TaskEventType"))
+        self.assertEqual(endpoint.TaskStatusEnum.CANCEL_REQUESTED.value, "cancel_requested")
+        self.assertEqual(endpoint.TaskStatusEnum.CANCELLED.value, "cancelled")
+        self.assertEqual(endpoint.TaskStatusEnum.COMPLETED.value, "completed")
+        self.assertEqual(endpoint.TaskStatusEnum.FAILED.value, "failed")
+        self.assertEqual(endpoint.TaskStatusEnum.INTERRUPTED.value, "interrupted")
+
     def test_unknown_task_returns_404_without_calling_cancel(self) -> None:
         fake_queue = MagicMock()
         fake_queue.get_task.return_value = None

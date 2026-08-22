@@ -10,6 +10,9 @@ into response models. Use-case orchestration lives in
 
 Private helpers remain importable here as thin facades so existing API tests that
 patch or call ``src.api.v1.endpoints.analysis.*`` keep working without wire changes.
+Public re-exports include ``TaskStatusEnum`` and ``TaskEventType``; status and
+SSE contract tests read those names from this module even when a helper only
+uses one of them in-process.
 """
 
 from __future__ import annotations
@@ -56,6 +59,10 @@ from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.services.name_to_code_resolver import resolve_name_to_code
 from src.services.task_queue import get_task_queue
 from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
+
+# HTTP-module facade: ``TaskEventType`` / ``deep_thaw`` serve the SSE adapter;
+# ``TaskStatusEnum`` is a public attribute for analysis status/cancel tests
+# (``analysis_endpoint_module.TaskStatusEnum``). Do not drop it as unused.
 from src.api.v1.services.analysis_cancel_audit import (
     AnalysisCancelAuditCompletionUnavailable,
 )
