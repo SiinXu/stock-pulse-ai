@@ -1,0 +1,2 @@
+- [Added] Render a small quote-trust source/confidence/gap summary in analysis reports and the Web report context panel from existing pack overview metadata (Refs #1129).
+- [Fixed] Surface `quote_unavailable` when a report overview quote block is missing so Jinja and the Web panel no longer render empty gaps.

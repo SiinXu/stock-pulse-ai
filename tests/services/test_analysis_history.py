@@ -40,6 +40,14 @@ except ModuleNotFoundError:
     get_history_list = None
     get_stock_bar = None
 
+
+class _WorkingAudit:
+    def record_attempt(self, **fields):
+        return None
+
+    def record_completion(self, **fields):
+        return None
+
 from src.config import Config
 from src.storage import (
     DatabaseManager,
@@ -233,7 +241,11 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         db.delete_analysis_history_records.return_value = 0
 
         with self.assertRaises(Exception) as raised:
-            delete_history_by_code("600519", db_manager=db)
+            delete_history_by_code(
+                "600519",
+                db_manager=db,
+                security_audit=_WorkingAudit(),
+            )
 
         self.assertEqual(getattr(raised.exception, "status_code", None), 500)
         self.assertEqual(raised.exception.detail.get("error"), "internal_error")
@@ -246,7 +258,11 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         with patch("src.api.v1.endpoints.history.HistoryService") as service_class:
             service_class.return_value.delete_history_by_code.return_value = 3
 
-            response = delete_history_by_code("600519", db_manager=db)
+            response = delete_history_by_code(
+                "600519",
+                db_manager=db,
+                security_audit=_WorkingAudit(),
+            )
 
         self.assertEqual(response.deleted, 3)
         service_class.assert_called_once_with(db)
@@ -270,7 +286,11 @@ class AnalysisHistoryTestCase(unittest.TestCase):
             ) as delete,
         ):
             with self.assertRaises(Exception) as raised:
-                delete_history_by_code(" ", db_manager=self.db)
+                delete_history_by_code(
+                    " ",
+                    db_manager=self.db,
+                    security_audit=_WorkingAudit(),
+                )
 
         self.assertEqual(getattr(raised.exception, "status_code", None), 400)
         query.assert_not_called()

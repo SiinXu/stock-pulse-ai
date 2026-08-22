@@ -378,6 +378,121 @@ describe('AnalysisContextSummary', () => {
     )).toBeInTheDocument();
   });
 
+  it('renders a quote-trust summary from overview source, status, and gap warnings', () => {
+    const conflictedOverview: AnalysisContextPackOverview = {
+      ...overview,
+      blocks: [
+        {
+          key: 'quote',
+          label: '行情',
+          status: 'partial',
+          source: 'efinance',
+          warnings: ['quote_trust_conflict'],
+          missingReasons: [],
+        },
+        overview.blocks[1],
+      ],
+      counts: {
+        ...overview.counts,
+        available: 0,
+        partial: 1,
+      },
+    };
+
+    render(<AnalysisContextSummary overview={conflictedOverview} language="en" />);
+    fireEvent.click(screen.getAllByText('Input Blocks')[0]);
+
+    const quoteTrust = screen.getByTestId('analysis-context-quote-trust');
+    expect(quoteTrust).toHaveTextContent('Field trust');
+    expect(quoteTrust).toHaveTextContent('Analysis confidence Low');
+    expect(quoteTrust).toHaveTextContent('Providers disagreed');
+    expect(screen.queryByText(/circuit_key/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/provider_attempts/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/field_trust_v1/)).not.toBeInTheDocument();
+  });
+
+  it('shows stale, skipped-check, and missing-metadata quote-trust gaps', () => {
+    const cases: Array<{ warnings: string[]; expected: string }> = [
+      { warnings: ['quote_trust_stale'], expected: 'Provider timestamp exceeded the realtime TTL' },
+      {
+        warnings: ['quote_trust_conflict_check_skipped'],
+        expected: 'Cross-source comparison did not finish',
+      },
+      {
+        warnings: ['quote_trust_metadata_absent'],
+        expected: 'Quote carried no field-level trust metadata',
+      },
+    ];
+
+    for (const item of cases) {
+      const { unmount } = render(
+        <AnalysisContextSummary
+          overview={{
+            ...overview,
+            blocks: [
+              {
+                key: 'quote',
+                label: 'Quote',
+                status: 'partial',
+                source: 'efinance',
+                warnings: item.warnings,
+                missingReasons: [],
+              },
+            ],
+            counts: { ...overview.counts, available: 0, partial: 1 },
+          }}
+          language="en"
+        />,
+      );
+      fireEvent.click(screen.getAllByText('Input Blocks')[0]);
+      expect(screen.getByTestId('analysis-context-quote-trust')).toHaveTextContent(item.expected);
+      expect(screen.getByTestId('analysis-context-quote-trust')).toHaveTextContent('Analysis confidence Low');
+      unmount();
+    }
+  });
+
+  it('shows quote_unavailable when the overview quote block is missing', () => {
+    const missingQuoteOverview: AnalysisContextPackOverview = {
+      ...overview,
+      blocks: [
+        {
+          key: 'quote',
+          label: 'Quote',
+          status: 'missing',
+          source: null,
+          warnings: [],
+          missingReasons: ['realtime_quote_missing'],
+        },
+      ],
+      counts: {
+        ...overview.counts,
+        available: 0,
+        missing: 1,
+        fetchFailed: 0,
+      },
+    };
+
+    render(<AnalysisContextSummary overview={missingQuoteOverview} language="en" />);
+    fireEvent.click(screen.getAllByText('Input Blocks')[0]);
+
+    const quoteTrust = screen.getByTestId('analysis-context-quote-trust');
+    expect(quoteTrust).toHaveTextContent('Analysis confidence Low');
+    expect(quoteTrust).toHaveTextContent('No realtime quote available from any provider');
+    expect(quoteTrust).toHaveTextContent('Field trust');
+  });
+
+  it('does not false-degrade a fresh non-conflict quote-trust summary', () => {
+    render(<AnalysisContextSummary overview={overview} language="en" />);
+    fireEvent.click(screen.getAllByText('Input Blocks')[0]);
+
+    const quoteTrust = screen.getByTestId('analysis-context-quote-trust');
+    expect(quoteTrust).toHaveTextContent('Analysis confidence High');
+    expect(quoteTrust).not.toHaveTextContent('Providers disagreed');
+    expect(quoteTrust).not.toHaveTextContent('realtime TTL');
+    expect(quoteTrust).not.toHaveTextContent('did not finish');
+    expect(quoteTrust).not.toHaveTextContent('no field-level trust metadata');
+  });
+
   it('does not render without an overview', () => {
     const { container } = render(<AnalysisContextSummary overview={null} />);
     expect(container).toBeEmptyDOMElement();

@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
+from src.analysis_context_pack.quote_trust import report_summary_from_overview
 from src.analyzer import AnalysisResult
 from src.config import get_config
 from src.market.phase_summary import format_public_market_status_line, format_public_phase_pack_excerpt
@@ -436,6 +437,10 @@ def render(
             "truncation_notice": truncation_notice(total_omitted, report_language),
             # Issue #238: optional valuation projection; None omits the section entirely.
             "valuation_projection": valuation_projection,
+            # Issue #1129 DAG-2: bounded quote-trust summary from pack overview.
+            "quote_trust_summary": report_summary_from_overview(
+                getattr(r, "analysis_context_pack_overview", None)
+            ),
         })
 
     display_buckets = [

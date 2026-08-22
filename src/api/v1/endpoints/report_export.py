@@ -7,22 +7,25 @@ without editing ``history.py`` (parallel-batch ownership boundary).
 
 from __future__ import annotations
 
+import hashlib
 import logging
+import os
 import re
 import unicodedata
 from typing import Annotated, Any, Mapping, Optional
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
 
-from src.api.deps import get_database_manager
+from src.api.deps import get_database_manager, require_security_audit_service
 from src.api.v1.errors import api_error
 from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.report_export import (
     ReportExportCapabilitiesResponse,
     ReportExportCapabilityLanguage,
 )
+from src.auth import is_auth_enabled
 from src.services.history_service import (
     HistoryService,
     MarkdownReportGenerationError,
@@ -39,12 +42,186 @@ from src.services.report_export_service import (
     export_report,
     get_export_capabilities,
 )
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditService,
+    SecurityAuditUnavailable,
+    require_security_audit_recorder,
+)
 from src.storage import DatabaseManager
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+REPORT_EXPORT_EVENT_TYPE = "report.export"
+REPORT_EXPORT_TARGET_TYPE = "analysis_history"
+_IDENTITY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,119}")
+
+
+class ReportExportAuditCompletionUnavailable(RuntimeError):
+    """Raised when export already produced bytes but audit completion could not be stored."""
+
+    def __init__(self, *, record_id: str, format: str) -> None:
+        super().__init__("security_audit_unavailable")
+        self.record_id = record_id
+        self.format = format
+
+
+def _audit_target_id(record_id: str) -> str:
+    """Return a bounded audit identity without persisting arbitrary route text."""
+    if _IDENTITY_PATTERN.fullmatch(record_id):
+        return record_id
+    return f"sha256:{hashlib.sha256(record_id.encode('utf-8')).hexdigest()[:24]}"
+
+
+def _report_export_audit_actor() -> str:
+    """Return the attributable operator class for the single-admin model."""
+    if os.getenv("DSA_DESKTOP_MODE") == "true":
+        return "desktop_operator"
+    if is_auth_enabled():
+        return "authenticated_admin"
+    return "local_operator"
+
+
+def _resolved_record_id(detail: Optional[Mapping[str, Any]]) -> Optional[str]:
+    if not isinstance(detail, Mapping):
+        return None
+    raw_id = detail.get("id")
+    if raw_id not in (None, ""):
+        return str(raw_id)
+    query_id = detail.get("query_id")
+    if query_id not in (None, ""):
+        return str(query_id)
+    return None
+
+
+def _export_lookup_mode(
+    record_id: str,
+    detail: Optional[Mapping[str, Any]],
+) -> Optional[str]:
+    resolved = _resolved_record_id(detail)
+    if resolved is None:
+        return None
+    try:
+        if int(record_id) == int(resolved):
+            return "primary_key"
+    except (TypeError, ValueError):
+        pass
+    return "query_id"
+
+
+def _report_export_audit_unavailable(
+    *,
+    operation_completed: bool = False,
+    record_id: str | None = None,
+    format: str | None = None,
+) -> HTTPException:
+    detail = {
+        "error": "security_audit_unavailable",
+        "message": (
+            "Report export was generated, but audit completion could not be persisted"
+            if operation_completed
+            else "Security audit storage is unavailable"
+        ),
+        "operation_completed": operation_completed,
+    }
+    if record_id is not None:
+        detail["record_id"] = record_id
+    if format is not None:
+        detail["format"] = format
+    return HTTPException(status_code=503, detail=detail)
+
+
+def _report_export_audit_metadata(
+    *,
+    format: str,
+    lookup_key: str,
+    resolved_record_id: str | None = None,
+    lookup_mode: str | None = None,
+    byte_length: int | None = None,
+) -> dict[str, object]:
+    metadata: dict[str, object] = {
+        "format": format,
+        "lookup_key": _audit_target_id(lookup_key),
+    }
+    if resolved_record_id is not None:
+        metadata["resolved_record_id"] = _audit_target_id(resolved_record_id)
+    if lookup_mode is not None:
+        metadata["lookup_mode"] = lookup_mode
+    if byte_length is not None:
+        metadata["byte_length"] = int(byte_length)
+    return metadata
+
+
+def _record_report_export_audit(
+    security_audit: SecurityAuditRecorder,
+    *,
+    phase: str,
+    correlation_id: str,
+    record_id: str,
+    format: str,
+    outcome: str = "success",
+    reason_code: str = "export_completed",
+    resolved_record_id: str | None = None,
+    lookup_mode: str | None = None,
+    byte_length: int | None = None,
+) -> None:
+    service = require_security_audit_recorder(security_audit)
+    audited_id = resolved_record_id or record_id
+    common = {
+        "event_type": REPORT_EXPORT_EVENT_TYPE,
+        "actor_type": "administrator",
+        "actor_id": _report_export_audit_actor(),
+        "execution_id": correlation_id,
+        "action": REPORT_EXPORT_EVENT_TYPE,
+        "target_type": REPORT_EXPORT_TARGET_TYPE,
+        "target_id": _audit_target_id(audited_id),
+        "correlation_id": correlation_id,
+        "metadata": _report_export_audit_metadata(
+            format=format,
+            lookup_key=record_id,
+            resolved_record_id=resolved_record_id,
+            lookup_mode=lookup_mode,
+            byte_length=byte_length,
+        ),
+    }
+    if phase == "attempt":
+        service.record_attempt(**common)
+        return
+    service.record_completion(
+        **common,
+        outcome=outcome,
+        reason_code=reason_code,
+    )
+
+
+def _record_report_export_completion_best_effort(
+    security_audit: SecurityAuditRecorder,
+    *,
+    correlation_id: str,
+    record_id: str,
+    format: str,
+    outcome: str,
+    reason_code: str,
+    resolved_record_id: str | None = None,
+    lookup_mode: str | None = None,
+) -> None:
+    try:
+        _record_report_export_audit(
+            security_audit,
+            phase="completion",
+            correlation_id=correlation_id,
+            record_id=record_id,
+            format=format,
+            outcome=outcome,
+            reason_code=reason_code,
+            resolved_record_id=resolved_record_id,
+            lookup_mode=lookup_mode,
+        )
+    except SecurityAuditUnavailable:
+        return
 
 
 def _filename_stem_for_record(record_id: str, detail: Optional[Mapping[str, Any]]) -> str:
@@ -134,7 +311,8 @@ def get_report_export_capabilities(
         500: {"description": "Export or report generation failed", "model": ErrorResponse},
         503: {
             "description": (
-                "PDF/HTML dependency, font, deadline, or render worker unavailable"
+                "PDF/HTML dependency, font, deadline, or render worker unavailable; "
+                "or security audit unavailable (operation_completed)"
             ),
             "model": ErrorResponse,
         },
@@ -148,7 +326,14 @@ def get_report_export_capabilities(
         "lossless. HTML and PDF preserve visible wording but drop link "
         "destinations and complete image destinations, replace images with an "
         "omission note, and enforce explicit byte/table bounds. PDF also "
-        "enforces page/time/concurrency limits and exact glyph coverage."
+        "enforces page/time/concurrency limits and exact glyph coverage. "
+        "Invalid format is rejected before audit. Attempt is persisted before "
+        "markdown load; attempt-store failure returns 503 "
+        "operation_completed=false without generating bytes. After generation, "
+        "completion-store failure returns 503 operation_completed=true with "
+        "record_id and format and does not return the file. Domain 404/413/"
+        "429/500/503 export codes are unchanged. GET /history/export/capabilities "
+        "and GET /history/{id}/markdown are not this event."
     ),
 )
 def export_history_report(
@@ -162,6 +347,7 @@ def export_history_report(
         ),
     ] = "md",
     db_manager: DatabaseManager = Depends(get_database_manager),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> Response:
     if format not in ("md", "html", "pdf"):
         raise api_error(
@@ -169,8 +355,30 @@ def export_history_report(
             "export_format_invalid",
             "Unsupported export format. Supported formats: md, html, pdf.",
         )
+
+    correlation_id = SecurityAuditService.new_correlation_id()
+    try:
+        _record_report_export_audit(
+            security_audit,
+            phase="attempt",
+            correlation_id=correlation_id,
+            record_id=record_id,
+            format=format,
+        )
+    except SecurityAuditUnavailable:
+        raise _report_export_audit_unavailable(operation_completed=False) from None
+
     service = HistoryService(db_manager)
     detail = service.resolve_and_get_detail(record_id)
+    lookup_mode = _export_lookup_mode(record_id, detail)
+    resolved_record_id = _resolved_record_id(detail)
+    completion_fields = {
+        "correlation_id": correlation_id,
+        "record_id": record_id,
+        "format": format,
+        "resolved_record_id": resolved_record_id,
+        "lookup_mode": lookup_mode,
+    }
 
     try:
         markdown_content = service.get_markdown_report(record_id)
@@ -181,6 +389,12 @@ def export_history_report(
             exc,
             error_code="generation_failed",
             context={"record_id": record_id},
+        )
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code="generation_failed",
+            **completion_fields,
         )
         raise api_error(
             500,
@@ -195,6 +409,12 @@ def export_history_report(
             error_code="internal_error",
             context={"record_id": record_id},
         )
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code="internal_error",
+            **completion_fields,
+        )
         raise api_error(
             500,
             "internal_error",
@@ -202,6 +422,12 @@ def export_history_report(
         ) from exc
 
     if markdown_content is None:
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="rejected",
+            reason_code="not_found",
+            **completion_fields,
+        )
         raise api_error(
             404,
             "not_found",
@@ -217,8 +443,20 @@ def export_history_report(
             title=stem,
         )
     except ReportExportFormatError as exc:
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="rejected",
+            reason_code=exc.error_code,
+            **completion_fields,
+        )
         raise api_error(400, exc.error_code, exc.message) from exc
     except ReportExportDependencyError as exc:
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code=exc.error_code,
+            **completion_fields,
+        )
         dependency = "markdown-it-py" if format == "html" else "fpdf2"
         raise api_error(
             503,
@@ -230,6 +468,12 @@ def export_history_report(
             },
         ) from exc
     except ReportExportFontError as exc:
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code=exc.error_code,
+            **completion_fields,
+        )
         raise api_error(
             503,
             exc.error_code,
@@ -237,10 +481,28 @@ def export_history_report(
             params={"env": "REPORT_EXPORT_PDF_FONT_PATH"},
         ) from exc
     except ReportExportLimitError as exc:
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code=exc.error_code,
+            **completion_fields,
+        )
         raise api_error(exc.status_code, exc.error_code, exc.message) from exc
     except ReportExportBusyError as exc:
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code=exc.error_code,
+            **completion_fields,
+        )
         raise api_error(exc.status_code, exc.error_code, exc.message) from exc
     except ReportExportWorkerError as exc:
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code=exc.error_code,
+            **completion_fields,
+        )
         raise api_error(exc.status_code, exc.error_code, exc.message) from exc
     except ReportExportError as exc:
         log_safe_exception(
@@ -250,7 +512,37 @@ def export_history_report(
             error_code=exc.error_code,
             context={"record_id": record_id, "format": format},
         )
+        _record_report_export_completion_best_effort(
+            security_audit,
+            outcome="failure",
+            reason_code=exc.error_code or "internal_error",
+            **completion_fields,
+        )
         raise api_error(500, exc.error_code, "Report export failed.") from exc
+
+    try:
+        _record_report_export_audit(
+            security_audit,
+            phase="completion",
+            correlation_id=correlation_id,
+            record_id=record_id,
+            format=format,
+            outcome="success",
+            reason_code="export_completed",
+            resolved_record_id=resolved_record_id,
+            lookup_mode=lookup_mode,
+            byte_length=len(artifact.content),
+        )
+    except SecurityAuditUnavailable:
+        completion_error = ReportExportAuditCompletionUnavailable(
+            record_id=_audit_target_id(resolved_record_id or record_id),
+            format=format,
+        )
+        raise _report_export_audit_unavailable(
+            operation_completed=True,
+            record_id=completion_error.record_id,
+            format=completion_error.format,
+        ) from completion_error
 
     return Response(
         content=artifact.content,

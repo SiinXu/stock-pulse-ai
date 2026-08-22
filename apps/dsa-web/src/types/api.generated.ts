@@ -624,7 +624,7 @@ export interface paths {
         put?: never;
         /**
          * 取消正在运行的个股分析任务
-         * @description Kind-scoped adapter over the process-local queue cancel port. Only stock_analysis tasks are accepted; discovery, market review, and other kinds return 404 without cancelling. The request is idempotent: a later POST returns the current snapshot, including a competing completed or failed terminal state. Processing cancel is cooperative — the snapshot becomes cancel_requested immediately and cancelled when the runner returns. Reports or notifications that already persisted are not rolled back.
+         * @description Kind-scoped adapter over the process-local queue cancel port. Only stock_analysis tasks are accepted; discovery, market review, and other kinds return 404 without cancelling. The request is idempotent: a later POST returns the current snapshot, including a competing completed or failed terminal state. Processing cancel is cooperative — the snapshot becomes cancel_requested immediately and cancelled when the runner returns. Reports or notifications that already persisted are not rolled back. Existing 200/404 cancel protocol is unchanged. Attempt is persisted before cancel; attempt-store failure returns 503 operation_completed=false without calling cancel. After cancel has run, completion-store failure returns 503 operation_completed=true with task_id and status.
          */
         post: operations["cancelAnalysisTask"];
         delete?: never;
@@ -1597,7 +1597,7 @@ export interface paths {
         post?: never;
         /**
          * 删除历史分析记录
-         * @description 按历史记录主键 ID 批量删除分析历史
+         * @description 按历史记录主键 ID 批量删除分析历史。Empty record_ids is rejected before audit. Attempt is persisted before delete; attempt-store failure returns 503 operation_completed=false and does not delete. After rows are deleted, completion-store failure returns 503 operation_completed=true with scope and deleted. Zero deletes remain HTTP 200. Internal HistoryService delete is not this event.
          */
         delete: operations["delete_history_records_api_v1_history_delete"];
         options?: never;
@@ -1617,7 +1617,7 @@ export interface paths {
         post?: never;
         /**
          * 按股票代码删除历史分析记录
-         * @description 删除指定股票代码的所有分析历史记录（支持代码变体归一化匹配）
+         * @description 删除指定股票代码的所有分析历史记录（支持代码变体归一化匹配）。Blank stock_code is rejected before audit. Attempt is persisted before delete; attempt-store failure returns 503 operation_completed=false and does not delete. After rows are deleted, completion-store failure returns 503 operation_completed=true with scope and deleted. Zero deletes remain HTTP 200. Internal HistoryService delete is not this event.
          */
         delete: operations["delete_history_by_code_api_v1_history_by_code__stock_code__delete"];
         options?: never;
@@ -1768,7 +1768,7 @@ export interface paths {
         };
         /**
          * Export a history report
-         * @description Export an analysis history record as Markdown (always), HTML (office-friendly; optional markdown-it-py), or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. HTML and PDF preserve visible wording but drop link destinations and complete image destinations, replace images with an omission note, and enforce explicit byte/table bounds. PDF also enforces page/time/concurrency limits and exact glyph coverage.
+         * @description Export an analysis history record as Markdown (always), HTML (office-friendly; optional markdown-it-py), or PDF (optional fpdf2 + font). Content is converted from the same Markdown intermediate representation used by GET /history/{id}/markdown. Markdown is lossless. HTML and PDF preserve visible wording but drop link destinations and complete image destinations, replace images with an omission note, and enforce explicit byte/table bounds. PDF also enforces page/time/concurrency limits and exact glyph coverage. Invalid format is rejected before audit. Attempt is persisted before markdown load; attempt-store failure returns 503 operation_completed=false without generating bytes. After generation, completion-store failure returns 503 operation_completed=true with record_id and format and does not return the file. Domain 404/413/429/500/503 export codes are unchanged. GET /history/export/capabilities and GET /history/{id}/markdown are not this event.
          */
         get: operations["export_history_report_api_v1_history__record_id__export_get"];
         put?: never;
@@ -21052,6 +21052,15 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Security audit unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     get_task_run_flow_api_v1_analysis_tasks__task_id__flow_get: {
@@ -24372,6 +24381,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     delete_history_by_code_api_v1_history_by_code__stock_code__delete: {
@@ -24423,6 +24441,15 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -24884,7 +24911,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description PDF/HTML dependency, font, deadline, or render worker unavailable */
+            /** @description PDF/HTML dependency, font, deadline, or render worker unavailable; or security audit unavailable (operation_completed) */
             503: {
                 headers: {
                     [name: string]: unknown;
