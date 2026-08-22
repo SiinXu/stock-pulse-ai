@@ -40,10 +40,10 @@ Client presentation phases (`AsyncTaskClientPhase`):
 | *(POST in flight)* | `submitting` | Button `isLoading` / `aria-busy`; no second submit |
 | `pending` | `queued` | TaskPanel / progress notice; not bare task id |
 | `processing` | `in_progress` | TaskPanel progress + `formatTaskMessage` |
-| `cancel_requested` | `cancel_requested` | Warning pulse; still active |
+| `cancel_requested` | `cancel_requested` | Warning pulse; still active; no second cancel action |
 | `completed` | `completed` | Terminal success; optional “view report” |
 | `failed` | `failed` | Terminal danger; technical detail under disclosure |
-| `cancelled` / `interrupted` | `cancelled` / `interrupted` | Terminal warning; dismiss allowed |
+| `cancelled` / `interrupted` | `cancelled` / `interrupted` | Terminal warning; dismiss allowed. SSE still uses the legacy event name `task_failed`; clients must branch on `status` and must not treat cancel as `analysis_failed`. |
 
 Helpers: `mapTaskStatusToClientPhase`, `isActiveTaskStatus`,
 `isTerminalTaskStatus`, `normalizeTaskProgress` in
@@ -115,7 +115,7 @@ the sole surface for busy or for accepted long-running work.
 
 | Entry | Busy / 409 | Progress / terminal | Notes |
 | --- | --- | --- | --- |
-| Analysis Workbench launch / batch | `resolveBusyRecoveryDecision` + Actionable inline + TaskPanel / RunFlow | TaskPanel + RunFlow | Attach/view-tasks, wait+dismiss, retry-same-operation, or reload from the shared assistant. Partial batches may still offer View Tasks after accepted work. |
+| Analysis Workbench launch / batch | `resolveBusyRecoveryDecision` + Actionable inline + TaskPanel / RunFlow | TaskPanel + RunFlow | Attach/view-tasks, wait+dismiss, retry-same-operation, or reload from the shared assistant. Partial batches may still offer View Tasks after accepted work. Pending/processing stock-analysis tasks expose HTTP cancel via `POST /api/v1/analysis/tasks/{task_id}/cancel` when that OpenAPI path exists; copy is “Cancel requested” / “Cancelled”, never “stopped immediately”. Persist/notify that already happened is not undone. |
 | Portfolio position analysis | Reattach when the assistant returns `attach_or_view_tasks` + task id | Shared TaskPanel | `portfolio_busy` uses retry-same-operation; non-busy errors stay on `ApiErrorAlert` |
 | Market Review | Busy alert + launch block until dismiss; attach/poll when `existing_task_id` is present | Runner notices + optional RunFlow | Lock 409 may omit task id (`wait_and_dismiss`) |
 | Settings run-now | Disable + busy reason + tracked state + inline recovery | Poll until idle | 409/busy is not toast-only |

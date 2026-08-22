@@ -1,0 +1,1 @@
+- [Added] Exposed kind-scoped HTTP cancel for running stock analysis tasks and wired TaskPanel to the real queue cancel contract (Refs #1448).

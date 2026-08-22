@@ -347,6 +347,47 @@ describe('useDashboardLifecycle', () => {
     expect(removeTask).toHaveBeenCalledWith(failedTask.taskId);
   });
 
+  it('treats cancelled SSE task_failed events as updates, not analysis failures', () => {
+    const syncTaskFailed = vi.fn();
+    const syncTaskUpdated = vi.fn();
+    const removeTask = vi.fn();
+
+    renderHook(() =>
+      useDashboardLifecycle({
+        loadInitialHistory: vi.fn().mockResolvedValue(undefined),
+        refreshHistory: vi.fn().mockResolvedValue(undefined),
+        refreshActiveTasks: vi.fn().mockResolvedValue(undefined),
+        syncTaskCreated: vi.fn(),
+        syncTaskUpdated,
+        syncTaskFailed,
+        removeTask,
+        terminalRetentionMs: 8_000,
+        ...defaultMocks,
+      }),
+      { wrapper: createWrapper() },
+    );
+
+    const taskStreamOptions = vi.mocked(useTaskStream).mock.calls[0]?.[0];
+    const cancelledTask = {
+      ...createTask(),
+      status: 'cancelled' as const,
+      progress: 40,
+    };
+
+    act(() => {
+      taskStreamOptions?.onTaskFailed?.(cancelledTask);
+    });
+
+    expect(syncTaskUpdated).toHaveBeenCalledWith(cancelledTask);
+    expect(syncTaskFailed).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(8_000);
+    });
+
+    expect(removeTask).toHaveBeenCalledWith(cancelledTask.taskId);
+  });
+
   it('reconciles active tasks when the SSE stream connects', async () => {
     const refreshActiveTasks = vi.fn().mockResolvedValue(undefined);
 

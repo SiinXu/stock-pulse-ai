@@ -25,7 +25,7 @@ import { serializeMarketReviewRegions } from '../utils/marketReviewRegion';
 import type { components, paths } from '../types/api.generated';
 
 /**
- * OpenAPI path a future analysis-task cancel route would occupy.
+ * OpenAPI path for analysis-task cancel.
  * Discovery cancel (`/api/v1/discover/screen/tasks/{task_id}/cancel`) is
  * kind-scoped to candidate discovery and must not be reused here.
  */
@@ -33,13 +33,12 @@ type AnalysisTaskCancelPath = '/api/v1/analysis/tasks/{task_id}/cancel';
 
 /**
  * Whether the generated OpenAPI document exposes analysis-task cancel.
- * The process-local queue can cancel (`TaskExecutionPort.cancel`), but the
- * analysis HTTP surface currently has list/status/stream/flow only.
- * Keep this `false` (and do not render a cancel control) until the path exists.
+ * Keep this aligned with `paths`; TaskPanel renders a cancel control only
+ * when the path exists.
  */
 export const ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE: (
   AnalysisTaskCancelPath extends keyof paths ? true : false
-) = false;
+) = true;
 
 type OpenApiAnalysisResultResponse = components['schemas']['AnalysisResultResponse'];
 type OpenApiTaskAccepted = components['schemas']['TaskAccepted'];
@@ -494,6 +493,33 @@ export const analysisApi = {
       taskListResponseSchema,
       'TaskListResponse',
     );
+  },
+
+  /**
+   * Request cancel for a stock-analysis task.
+   * Kind-scoped: non-analysis tasks 404. Idempotent: repeats return the
+   * current snapshot. Processing cancel is cooperative and does not undo
+   * reports or notifications that already persisted.
+   */
+  cancelTask: async (taskId: string): Promise<TaskStatus> => {
+    const response = await apiClient.post<Record<string, unknown>>(
+      `/api/v1/analysis/tasks/${encodeURIComponent(taskId)}/cancel`,
+    );
+
+    const data = parseCamelCasePayload<TaskStatus>(
+      response.data,
+      taskStatusSchema,
+      'CancelTaskStatus',
+    );
+
+    if (data.result) {
+      data.result = toCamelCase<AnalysisResult>(data.result);
+      if (data.result.report) {
+        data.result.report = toCamelCase<AnalysisReport>(data.result.report);
+      }
+    }
+
+    return data;
   },
 
   /**

@@ -613,6 +613,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/analysis/tasks/{task_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * 取消正在运行的个股分析任务
+         * @description Kind-scoped adapter over the process-local queue cancel port. Only stock_analysis tasks are accepted; discovery, market review, and other kinds return 404 without cancelling. The request is idempotent: a later POST returns the current snapshot, including a competing completed or failed terminal state. Processing cancel is cooperative — the snapshot becomes cancel_requested immediately and cancelled when the runner returns. Reports or notifications that already persisted are not rolled back.
+         */
+        post: operations["cancelAnalysisTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/analysis/tasks/{task_id}/flow": {
         parameters: {
             query?: never;
@@ -20986,6 +21006,46 @@ export interface operations {
                 content: {
                     "application/json": unknown;
                     "text/event-stream": unknown;
+                };
+            };
+        };
+    };
+    cancelAnalysisTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                task_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 任务取消快照 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TaskStatus"];
+                };
+            };
+            /** @description 任务不存在或不是个股分析任务 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

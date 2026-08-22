@@ -208,8 +208,12 @@ The bounded, connectivity-free `SystemConfigService.update()` and the task's
 `completed` transition then share the queue's final-result commit boundary, so a
 cancelled or interrupted pull cannot leave an activation side effect behind.
 
-This contract does not add HTTP cancel/retry routes, an external broker, or
-cross-process task sharing. Restart recovery (below) is deliberately narrower
+This contract does not add a second lifecycle, an external broker, or
+cross-process task sharing. HTTP adapters may expose the existing `cancel`
+port for one kind at a time: analysis uses
+`POST /api/v1/analysis/tasks/{task_id}/cancel` and discovery uses
+`POST /api/v1/discover/screen/tasks/{task_id}/cancel`. Those routes must not
+be reused across kinds. Restart recovery (below) is deliberately narrower
 than a distributed queue.
 
 ## Single-Process Authority

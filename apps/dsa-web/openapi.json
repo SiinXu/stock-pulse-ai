@@ -41611,6 +41611,59 @@
         ]
       }
     },
+    "/api/v1/analysis/tasks/{task_id}/cancel": {
+      "post": {
+        "description": "Kind-scoped adapter over the process-local queue cancel port. Only stock_analysis tasks are accepted; discovery, market review, and other kinds return 404 without cancelling. The request is idempotent: a later POST returns the current snapshot, including a competing completed or failed terminal state. Processing cancel is cooperative — the snapshot becomes cancel_requested immediately and cancelled when the runner returns. Reports or notifications that already persisted are not rolled back.",
+        "operationId": "cancelAnalysisTask",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskStatus"
+                }
+              }
+            },
+            "description": "任务取消快照"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "任务不存在或不是个股分析任务"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "取消正在运行的个股分析任务",
+        "tags": [
+          "Analysis"
+        ]
+      }
+    },
     "/api/v1/analysis/tasks/{task_id}/flow": {
       "get": {
         "description": "根据 task_id 查询任务数据流/信息流快照；活跃任务缺少诊断时返回骨架流。",
