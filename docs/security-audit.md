@@ -103,7 +103,7 @@ Legend:
 | Scheduled-task dispatch | `src/services/scheduled_task_service.py` → `submit_tasks_batch` (`query_source="scheduled_task"`, actor `scheduler`/`scheduled_task`) | **Landed** | Attempt is committed before the admission fence so SQLite is not double-locked; retry of an owned execution is not a new `analysis.submit` | DAG-1 |
 | Portfolio position analysis | `src/api/v1/endpoints/portfolio.py` `analyze_position` (`query_source="portfolio"`, actor `api_client`/`portfolio_submitter`) | **Landed** | HTTP analysis admission; holding quantity/cost/account are queue kwargs only | DAG-1 |
 | HTTP sync `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **Landed** | Same `analysis.submit` contract as async; attempt before `analyze_stock`, completion `success`/`failure` | DAG-1 |
-| Scheduled-task create/enable/disable | `src/api/v1/endpoints/scheduled_tasks.py` → `ScheduledTaskService.create_task` / `set_enabled` | **Landed** | `scheduled_task.write` attempt-before-persist; HTTP actor `administrator`/`authenticated_admin`/`local_operator`/`desktop_operator`. Internal quarantine uses `repository.set_enabled` and is not this event. No PUT/PATCH/DELETE definition routes exist | DAG-2 |
+| Scheduled-task create/enable/disable | `src/api/v1/endpoints/scheduled_tasks.py` → `ScheduledTaskService.create_task` / `set_enabled` | **Landed** | `scheduled_task.write` attempt-before-persist; HTTP actor `administrator`/`authenticated_admin`/`local_operator`/`desktop_operator`. Attempt-store `503` uses `operation_completed=false`; post-write completion-store `503` uses `operation_completed=true` plus `task_id`/`enabled`. Reject/failure completion is best-effort so domain `400`/`404`/`500` is preserved. Internal quarantine uses `repository.set_enabled` and is not this event. No PUT/PATCH/DELETE definition routes exist | DAG-2 |
 | Analysis HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task` (route on `main` via [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466)) | **Missing** | Privileged stop of running analysis. #1466 landed the route **without** security-audit. DAG-3 is audit-only and must not change cancel wire behavior | DAG-3 |
 | Report Markdown/HTML/PDF export | `src/api/v1/endpoints/report_export.py` | **Missing** | AUDIT-02 export / protected-data. Optional follow-on | DAG-4 |
 | History delete (by code / by ids) | `src/api/v1/endpoints/history.py` | **Missing** | Protected-data destruction. Optional follow-on | DAG-4 |
@@ -120,8 +120,14 @@ DAG-2 records `scheduled_task.write` at `ScheduledTaskService.create_task` and
 `set_enabled` (HTTP create/enable/disable). Attempt is committed before the
 definition write. Metadata is limited to task_type, schema_version, enabled,
 schedule_kind, calendar_market, requested_enabled, and idempotent — never
-name, payload, secrets, or stock codes. Scheduler quarantine still uses
-`repository.set_enabled` and does not emit this event.
+name, payload, secrets, or stock codes. HTTP `503` `security_audit_unavailable`
+includes `operation_completed`: `false` when the attempt could not be written
+(mutation not persisted) and `true` when the definition write succeeded but
+completion could not be written (`task_id` and `enabled` are included). Domain
+validation/not-found/contract errors keep `400`/`404`/`500`; reject/failure
+completion recording is best-effort and must not replace those statuses.
+Scheduler quarantine still uses `repository.set_enabled` and does not emit this
+event.
 
 DAG-5 should audit `SystemConfigService.update` once rather than patching each caller. The already-audited HTTP `system_config.write` path must not double-emit.
 
@@ -146,9 +152,9 @@ or size evidence—never image bytes, prompts, stdout, or secrets.
 
 ## Remaining Coverage DAG
 
-Do not merge DAG-1 through DAG-5. Do not include watchlist, portfolio CRUD, or
-alerts. Do not fold market-review, candidate discovery, or AlphaSift into
-DAG-1.
+Do not stack remaining DAG-3 through DAG-5 into one PR. Do not include
+watchlist, portfolio CRUD, or alerts. Do not fold market-review, candidate
+discovery, or AlphaSift into DAG-1.
 
 ```text
 DAG-0  this coverage map (docs only; no runtime behavior)

@@ -769,6 +769,8 @@ class ScheduledTaskService:
         item: Dict[str, Any],
     ) -> None:
         """Persist success completion; surface write-done/audit-failed distinctly."""
+        from src.services.security_audit_service import SecurityAuditUnavailable
+
         try:
             self._record_scheduled_task_mutation_audit(
                 phase="completion",
@@ -782,9 +784,7 @@ class ScheduledTaskService:
                 reason_code=reason_code,
                 recorder=recorder,
             )
-        except Exception as exc:  # broad-exception: fallback_recorded - map to completion-unavailable
-            from src.services.security_audit_service import SecurityAuditUnavailable
-
+        except SecurityAuditUnavailable as exc:
             log_safe_exception(
                 logger,
                 "Scheduled task mutation audit completion unavailable after mutation",
@@ -792,9 +792,7 @@ class ScheduledTaskService:
                 error_code="scheduled_task_mutation_audit_completion_unavailable",
                 context={"operation": operation, "target_id": target_id},
             )
-            if isinstance(exc, SecurityAuditUnavailable):
-                raise ScheduledTaskMutationAuditCompletionUnavailable(item) from None
-            raise ScheduledTaskMutationAuditCompletionUnavailable(item) from exc
+            raise ScheduledTaskMutationAuditCompletionUnavailable(item) from None
 
     def _complete_scheduled_task_mutation_failure(
         self,
@@ -810,6 +808,8 @@ class ScheduledTaskService:
         recorder: Any,
     ) -> None:
         """Best-effort reject/failure completion; never mask the domain error."""
+        from src.services.security_audit_service import SecurityAuditUnavailable
+
         try:
             self._record_scheduled_task_mutation_audit(
                 phase="completion",
@@ -823,7 +823,7 @@ class ScheduledTaskService:
                 reason_code=reason_code,
                 recorder=recorder,
             )
-        except Exception as exc:  # broad-exception: fallback_recorded - preserve domain error
+        except SecurityAuditUnavailable as exc:
             log_safe_exception(
                 logger,
                 "Scheduled task mutation failure audit completion unavailable",
@@ -903,12 +903,17 @@ class ScheduledTaskService:
                     "updated_at": now_value,
                 }
             )
-        except ScheduledTaskMutationAuditCompletionUnavailable:
-            raise
         except SecurityAuditUnavailable:
             raise
         except Exception as exc:  # broad-exception: fallback_recorded - complete the attempt before re-raising the mutation error.
             outcome, reason_code = _mutation_error_audit_fields(exc)
+            log_safe_exception(
+                logger,
+                "Scheduled task create mutation failed",
+                exc,
+                error_code=reason_code,
+                context={"operation": "create", "target_id": task_id},
+            )
             self._complete_scheduled_task_mutation_failure(
                 operation="create",
                 target_id=task_id,
@@ -1047,12 +1052,17 @@ class ScheduledTaskService:
                 success_reason_code = (
                     "scheduled_task_enabled" if enabled else "scheduled_task_disabled"
                 )
-        except ScheduledTaskMutationAuditCompletionUnavailable:
-            raise
         except SecurityAuditUnavailable:
             raise
         except Exception as exc:  # broad-exception: fallback_recorded - complete the attempt before re-raising the mutation error.
             outcome, reason_code = _mutation_error_audit_fields(exc)
+            log_safe_exception(
+                logger,
+                "Scheduled task enablement mutation failed",
+                exc,
+                error_code=reason_code,
+                context={"operation": operation, "target_id": task_id},
+            )
             self._complete_scheduled_task_mutation_failure(
                 operation=operation,
                 target_id=task_id,

@@ -93,7 +93,7 @@ English version: [Durable Security Audit](security-audit.md).
 | 定时任务派发 | `src/services/scheduled_task_service.py` → `submit_tasks_batch`（`query_source="scheduled_task"`，actor `scheduler`/`scheduled_task`） | **已落地** | attempt 在入队 fence 前单独提交，避免 SQLite 双重写锁；已拥有执行的 retry 不是新的 `analysis.submit` | DAG-1 |
 | 组合持仓分析 | `src/api/v1/endpoints/portfolio.py` `analyze_position`（`query_source="portfolio"`，actor `api_client`/`portfolio_submitter`） | **已落地** | HTTP 分析入队；持仓数量/成本/账户只作为队列 kwargs | DAG-1 |
 | HTTP 同步 `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **已落地** | 与异步共用 `analysis.submit` 合同；`analyze_stock` 前写 attempt，completion 为 `success`/`failure` | DAG-1 |
-| 定时任务创建/启用/禁用 | `src/api/v1/endpoints/scheduled_tasks.py` → `ScheduledTaskService.create_task` / `set_enabled` | **已落地** | `scheduled_task.write` 先 attempt 再持久化；HTTP actor 为 `administrator`/`authenticated_admin`/`local_operator`/`desktop_operator`。内部隔离走 `repository.set_enabled`，不是本事件。不存在 PUT/PATCH/DELETE 定义路由 | DAG-2 |
+| 定时任务创建/启用/禁用 | `src/api/v1/endpoints/scheduled_tasks.py` → `ScheduledTaskService.create_task` / `set_enabled` | **已落地** | `scheduled_task.write` 先 attempt 再持久化；HTTP actor 为 `administrator`/`authenticated_admin`/`local_operator`/`desktop_operator`。attempt 写入失败的 `503` 为 `operation_completed=false`；定义已写入但 completion 失败的 `503` 为 `operation_completed=true` 并带 `task_id`/`enabled`。拒绝/失败 completion 为尽力写入，不得覆盖领域 `400`/`404`/`500`。内部隔离走 `repository.set_enabled`，不是本事件。不存在 PUT/PATCH/DELETE 定义路由 | DAG-2 |
 | 分析 HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task`（路由已随 [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466) 进入 `main`） | **缺失** | 停止运行中分析的特权控制。#1466 已落地路由但**不含**安全审计。DAG-3 只补审计，不得改 cancel 线协议 | DAG-3 |
 | 报告 Markdown/HTML/PDF 导出 | `src/api/v1/endpoints/report_export.py` | **缺失** | AUDIT-02 导出/受保护数据。可选后续 | DAG-4 |
 | 历史删除（按代码 / 按 id） | `src/api/v1/endpoints/history.py` | **缺失** | 受保护数据销毁。可选后续 | DAG-4 |
@@ -113,8 +113,12 @@ MCP / 事件触发仍使用 `api_client` / `analysis_submitter`。不要把市�
 DAG-2 在 `ScheduledTaskService.create_task` 与 `set_enabled`（HTTP 创建/启用/
 禁用）写入 `scheduled_task.write`。attempt 在定义写入前提交。metadata 仅含
 task_type、schema_version、enabled、schedule_kind、calendar_market、
-requested_enabled 与 idempotent，不含 name、payload、密钥或股票代码。调度器
-隔离仍走 `repository.set_enabled`，不写本事件。
+requested_enabled 与 idempotent，不含 name、payload、密钥或股票代码。HTTP
+`503` `security_audit_unavailable` 带 `operation_completed`：attempt 无法写入
+时为 `false`（定义未持久化）；定义已写入但 completion 无法写入时为 `true`
+（含 `task_id` 与 `enabled`）。校验/不存在/契约错误仍返回 `400`/`404`/`500`；
+拒绝/失败 completion 为尽力写入，不得替换这些状态。调度器隔离仍走
+`repository.set_enabled`，不写本事件。
 
 DAG-5 应在 `SystemConfigService.update` 上审计一次，而不是逐入口打补丁。
 已经审计的 HTTP `system_config.write` 路径不得重复写入。
@@ -138,7 +142,7 @@ prompt、stdout 或密钥。
 
 ## 剩余覆盖 DAG
 
-不要把 DAG-1 到 DAG-5 合成一个 PR。不要纳入自选、组合 CRUD 或告警。不要把
+不要把剩余的 DAG-3 到 DAG-5 合成一个 PR。不要纳入自选、组合 CRUD 或告警。不要把
 市场复盘、候选发现或 AlphaSift 折进 DAG-1。
 
 ```text
