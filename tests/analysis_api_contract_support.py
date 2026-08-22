@@ -30,7 +30,7 @@ try:
     from src.api.v1.endpoints.analysis import (
         trigger_analysis as _trigger_analysis,
         trigger_market_review,
-        _handle_sync_analysis,
+        _handle_sync_analysis as _handle_sync_analysis_impl,
         _build_analysis_report,
         _load_sync_fundamental_sources,
         get_analysis_status,
@@ -41,6 +41,11 @@ try:
         """Call the endpoint with its mandatory audit dependency explicitly."""
         kwargs["security_audit"] = SecurityAuditRecorderStub()
         return _trigger_analysis(*args, **kwargs)
+
+    def _handle_sync_analysis(*args, **kwargs):
+        """Call the sync helper with its mandatory audit dependency explicitly."""
+        kwargs.setdefault("security_audit", SecurityAuditRecorderStub())
+        return _handle_sync_analysis_impl(*args, **kwargs)
 except Exception:  # pragma: no cover - optional dependency environments
     create_app = None
     analysis_endpoint_module = None

@@ -1,0 +1,1 @@
+- [Fixed] Emit fail-closed `analysis.submit` security-audit events for bot, scheduled-task dispatch, portfolio position analysis, and HTTP sync `/analyze`, preserving query_source, actor identity, and secret-free metadata (Refs #1062).

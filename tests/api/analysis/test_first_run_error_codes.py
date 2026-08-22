@@ -15,6 +15,7 @@ import pytest
 from fastapi import HTTPException
 
 from src.api.v1.endpoints.analysis import _handle_sync_analysis, trigger_market_review
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 from src.api.v1.schemas.analysis import AnalyzeRequest, MarketReviewRequest
 from src.services.analysis_service import (
     AnalysisService,
@@ -45,7 +46,11 @@ def test_sync_analyze_maps_missing_llm_to_422_llm_not_configured() -> None:
         return_value=service,
     ):
         with pytest.raises(HTTPException) as exc_info:
-            _handle_sync_analysis("600519", AnalyzeRequest(stock_code="600519", async_mode=False))
+            _handle_sync_analysis(
+                "600519",
+                AnalyzeRequest(stock_code="600519", async_mode=False),
+                security_audit=SecurityAuditRecorderStub(),
+            )
 
     assert exc_info.value.status_code == 422
     detail = exc_info.value.detail
@@ -64,7 +69,11 @@ def test_sync_analyze_keeps_generic_500_when_llm_is_configured_path_fails() -> N
         return_value=service,
     ):
         with pytest.raises(HTTPException) as exc_info:
-            _handle_sync_analysis("600519", AnalyzeRequest(stock_code="600519", async_mode=False))
+            _handle_sync_analysis(
+                "600519",
+                AnalyzeRequest(stock_code="600519", async_mode=False),
+                security_audit=SecurityAuditRecorderStub(),
+            )
 
     assert exc_info.value.status_code == 500
     assert exc_info.value.detail["error"] == "analysis_failed"

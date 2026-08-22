@@ -66,6 +66,7 @@ from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.run_flow import build_task_run_flow_snapshot
 from src.services.security_audit_service import (
     SecurityAuditRecorder,
+    SecurityAuditService,
     SecurityAuditUnavailable,
     require_security_audit_recorder,
 )
@@ -165,8 +166,15 @@ class AnalysisApiService:
         outcome: str = "pending",
         reason_code: str = "attempt_started",
         metadata: dict[str, Any] | None = None,
+        actor_type: str | None = None,
+        actor_id: str | None = None,
     ) -> None:
         try:
+            extra: dict[str, Any] = {}
+            if actor_type is not None:
+                extra["actor_type"] = actor_type
+            if actor_id is not None:
+                extra["actor_id"] = actor_id
             AnalysisSubmissionService.record_audit(
                 service,
                 phase=phase,
@@ -175,6 +183,7 @@ class AnalysisApiService:
                 outcome=outcome,
                 reason_code=reason_code,
                 metadata=metadata,
+                **extra,
             )
         except SecurityAuditUnavailable:
             raise api_error(
@@ -390,7 +399,11 @@ class AnalysisApiService:
                     "sync_mode_batch_unsupported",
                     "同步模式仅支持单只股票分析，请使用 async_mode=true 进行批量分析",
                 )
-            return self.handle_sync_analysis(stock_codes[0], request)
+            return self.handle_sync_analysis(
+                stock_codes[0],
+                request,
+                security_audit=self.require_analysis_audit_service(security_audit),
+            )
 
         # Async mode submits one task per stock.
         return self.handle_async_analysis_batch(
@@ -511,7 +524,9 @@ class AnalysisApiService:
 
     def handle_sync_analysis(self, 
         stock_code: str,
-        request: AnalyzeRequest
+        request: AnalyzeRequest,
+        *,
+        security_audit: SecurityAuditRecorder,
     ) -> AnalysisResultResponse:
         """
         处理同步分析请求
@@ -527,6 +542,23 @@ class AnalysisApiService:
         )
     
         query_id = uuid.uuid4().hex
+        correlation_id = SecurityAuditService.new_correlation_id()
+        audit_metadata = AnalysisSubmissionService.bounded_audit_metadata(
+            report_type=getattr(request, "report_type", "detailed") or "detailed",
+            analysis_phase=getattr(request, "analysis_phase", "auto") or "auto",
+            batch_size=1,
+            query_source="api",
+            execution_mode="sync",
+        )
+        self.record_analysis_submission_audit(
+            security_audit,
+            phase="attempt",
+            correlation_id=correlation_id,
+            stock_code=stock_code,
+            metadata=audit_metadata,
+        )
+        outcome = "failure"
+        reason_code = "internal_error"
     
         try:
             service = AnalysisService()
@@ -548,6 +580,7 @@ class AnalysisApiService:
                 error_message = service.last_error or f"分析股票 {stock_code} 失败"
                 if service.last_error_code == LOCAL_MARKET_DATA_MISSING_ERROR_CODE:
                     details = getattr(service, "last_error_details", None)
+                    outcome, reason_code = "failure", LOCAL_MARKET_DATA_MISSING_ERROR_CODE
                     raise api_error(
                         409,
                         LOCAL_MARKET_DATA_MISSING_ERROR_CODE,
@@ -558,12 +591,14 @@ class AnalysisApiService:
                 # Known first-run configuration gap: map only this condition to a
                 # stable 422 so clients can show setup guidance instead of a generic 500.
                 if is_llm_not_configured_error(service.last_error_code, error_message):
+                    outcome, reason_code = "failure", LLM_NOT_CONFIGURED_ERROR_CODE
                     raise api_error(
                         422,
                         LLM_NOT_CONFIGURED_ERROR_CODE,
                         "No LLM model is configured",
                         params={"stock_code": stock_code},
                     )
+                outcome, reason_code = "failure", "analysis_failed"
                 raise api_error(500, "analysis_failed", error_message)
 
             # Build report structure
@@ -582,6 +617,7 @@ class AnalysisApiService:
                 fallback_raw_result_payload=raw_result_snapshot or result,
             )
 
+            outcome, reason_code = "success", "analysis_completed"
             return AnalysisResultResponse(
                 query_id=query_id,
                 trace_id=result.get("trace_id") or query_id,
@@ -603,6 +639,16 @@ class AnalysisApiService:
                 context={"stock_code": stock_code},
             )
             raise api_error(500, "internal_error", f"分析过程发生错误: {str(e)}")
+        finally:
+            self.record_analysis_submission_audit(
+                security_audit,
+                phase="completion",
+                correlation_id=correlation_id,
+                stock_code=stock_code,
+                outcome=outcome,
+                reason_code=reason_code,
+                metadata=audit_metadata,
+            )
 
     def trigger_market_review(
             self,

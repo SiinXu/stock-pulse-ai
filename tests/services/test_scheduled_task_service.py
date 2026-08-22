@@ -294,6 +294,14 @@ def definition_values(row) -> dict:
     }
 
 
+class _SilentSecurityAudit:
+    def record_attempt(self, **_fields):
+        return None
+
+    def record_completion(self, **_fields):
+        return None
+
+
 def build_service(
     database,
     queue=None,
@@ -301,6 +309,7 @@ def build_service(
     market_status=MarketSessionStatus.OPEN,
     market_session_provider=None,
     agent_skill_ids_provider=None,
+    security_audit_factory=None,
 ):
     return ScheduledTaskService(
         repository=ScheduledTaskRepository(database),
@@ -314,6 +323,7 @@ def build_service(
             agent_skill_ids_provider
             or (lambda: {"persona_tail_risk"})
         ),
+        security_audit_factory=security_audit_factory or (lambda: _SilentSecurityAudit()),
     )
 
 

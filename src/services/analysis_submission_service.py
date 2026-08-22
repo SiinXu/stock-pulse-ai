@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from src.report_language import normalize_report_language
 from src.services.security_audit_service import (
@@ -13,6 +13,10 @@ from src.services.security_audit_service import (
 )
 from src.services.task_queue import get_task_queue as _default_get_task_queue
 from src.data_provider.base import normalize_stock_code
+
+DEFAULT_ANALYSIS_ACTOR_TYPE = "api_client"
+DEFAULT_ANALYSIS_ACTOR_ID = "analysis_submitter"
+ANALYSIS_SUBMIT_EVENT_TYPE = "analysis.submit"
 
 
 @dataclass(frozen=True)
@@ -32,6 +36,12 @@ class AnalysisSubmissionCommand:
     use_memory: bool | None = None
     enable_debate: bool | None = None
     debate_max_rounds: int | None = None
+    query_source: str | None = None
+    request_context: Any | None = None
+    portfolio_context: Mapping[str, Any] | None = None
+    strict_skill_selection: bool = False
+    actor_type: str = DEFAULT_ANALYSIS_ACTOR_TYPE
+    actor_id: str = DEFAULT_ANALYSIS_ACTOR_ID
 
 
 @dataclass(frozen=True)
@@ -49,6 +59,27 @@ class AnalysisSubmissionService:
         self.get_task_queue = get_task_queue or _default_get_task_queue
 
     @staticmethod
+    def bounded_audit_metadata(
+        *,
+        report_type: str,
+        analysis_phase: str,
+        batch_size: int,
+        query_source: str | None = None,
+        execution_mode: str | None = None,
+    ) -> dict[str, Any]:
+        """Stable, secret-free metadata for analysis.submit events."""
+        metadata: dict[str, Any] = {
+            "report_type": report_type,
+            "analysis_phase": analysis_phase,
+            "batch_size": batch_size,
+        }
+        if query_source:
+            metadata["query_source"] = query_source
+        if execution_mode:
+            metadata["execution_mode"] = execution_mode
+        return metadata
+
+    @staticmethod
     def record_audit(
         service: SecurityAuditRecorder,
         *,
@@ -58,13 +89,15 @@ class AnalysisSubmissionService:
         outcome: str = "pending",
         reason_code: str = "attempt_started",
         metadata: dict[str, Any] | None = None,
+        actor_type: str = DEFAULT_ANALYSIS_ACTOR_TYPE,
+        actor_id: str = DEFAULT_ANALYSIS_ACTOR_ID,
     ) -> None:
         common = dict(
-            event_type="analysis.submit",
-            actor_type="api_client",
-            actor_id="analysis_submitter",
+            event_type=ANALYSIS_SUBMIT_EVENT_TYPE,
+            actor_type=actor_type,
+            actor_id=actor_id,
             execution_id=correlation_id,
-            action="analysis.submit",
+            action=ANALYSIS_SUBMIT_EVENT_TYPE,
             target_type="stock",
             target_id=stock_code,
             correlation_id=correlation_id,
@@ -119,16 +152,25 @@ class AnalysisSubmissionService:
             submit_kwargs["enable_debate"] = command.enable_debate
         if command.debate_max_rounds is not None:
             submit_kwargs["debate_max_rounds"] = command.debate_max_rounds
+        if command.query_source is not None:
+            submit_kwargs["query_source"] = command.query_source
+        if command.request_context is not None:
+            submit_kwargs["request_context"] = command.request_context
+        if command.portfolio_context is not None:
+            submit_kwargs["portfolio_context"] = dict(command.portfolio_context)
+        if command.strict_skill_selection:
+            submit_kwargs["strict_skill_selection"] = True
 
         correlations = {
             stock_code: SecurityAuditService.new_correlation_id()
             for stock_code in stock_codes
         }
-        audit_metadata = {
-            "report_type": command.report_type,
-            "analysis_phase": command.analysis_phase,
-            "batch_size": len(stock_codes),
-        }
+        audit_metadata = self.bounded_audit_metadata(
+            report_type=command.report_type,
+            analysis_phase=command.analysis_phase,
+            batch_size=len(stock_codes),
+            query_source=command.query_source,
+        )
         for stock_code in stock_codes:
             self.record_audit(
                 security_audit,
@@ -136,6 +178,8 @@ class AnalysisSubmissionService:
                 correlation_id=correlations[stock_code],
                 stock_code=stock_code,
                 metadata=audit_metadata,
+                actor_type=command.actor_type,
+                actor_id=command.actor_id,
             )
 
         try:
@@ -152,6 +196,8 @@ class AnalysisSubmissionService:
                     outcome="failure",
                     reason_code="task_submission_failed",
                     metadata=audit_metadata,
+                    actor_type=command.actor_type,
+                    actor_id=command.actor_id,
                 )
             raise
 
@@ -178,6 +224,8 @@ class AnalysisSubmissionService:
                 outcome=outcome,
                 reason_code=reason_code,
                 metadata=audit_metadata,
+                actor_type=command.actor_type,
+                actor_id=command.actor_id,
             )
 
         return AnalysisSubmissionResult(
@@ -201,6 +249,12 @@ def build_submission_command(
     use_memory: bool | None = None,
     enable_debate: bool | None = None,
     debate_max_rounds: int | None = None,
+    query_source: str | None = None,
+    request_context: Any | None = None,
+    portfolio_context: Mapping[str, Any] | None = None,
+    strict_skill_selection: bool = False,
+    actor_type: str = DEFAULT_ANALYSIS_ACTOR_TYPE,
+    actor_id: str = DEFAULT_ANALYSIS_ACTOR_ID,
 ) -> AnalysisSubmissionCommand:
     """Snapshot caller-owned values before handing them to the queue."""
     return AnalysisSubmissionCommand(
@@ -217,4 +271,12 @@ def build_submission_command(
         use_memory=use_memory,
         enable_debate=enable_debate,
         debate_max_rounds=debate_max_rounds,
+        query_source=query_source,
+        request_context=request_context,
+        portfolio_context=(
+            dict(portfolio_context) if portfolio_context is not None else None
+        ),
+        strict_skill_selection=strict_skill_selection,
+        actor_type=actor_type,
+        actor_id=actor_id,
     )
