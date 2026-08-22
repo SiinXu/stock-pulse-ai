@@ -10,7 +10,7 @@ Per-field trust is additive metadata on the existing realtime quote fallback cha
 | --- | --- |
 | Quote `field_trust` | schema, per-field source/origin/lag/staleness/conflict, conflict checks, provider attempts/health, analysis input |
 | API `StockFieldTrustResponse` | `status` (`ok` / `degraded` / `unavailable`), the same field rows, conflicts, provider health, and `analysis_input` |
-| Analysis input | provider-neutral `{ confidence, gaps[] }`; `high` only when every covered field is fresh, attributed, and conflict-free |
+| Analysis input | provider-neutral `{ confidence, gaps[] }`; `high` only when every covered field is fresh, attributed, and conflict-free. `AnalysisContextBuilder` copies a bounded `{confidence, conflict_count, gap_codes, failed_provider_count}` into quote-block metadata. A non-high payload (conflict, stale, unattributed, provider failure, skipped comparison, or missing/legacy metadata) maps the quote block to `partial` (or keeps `stale`/`fallback`) so the existing core-degraded rule forbids `confidence_level=High`. The full `field_trust` blob is not copied as a quote item. |
 | Web panel | Visible degradation for stale, conflict, missing metadata, provider failure, and unavailable quotes |
 
 `status=ok` is reserved for a complete, fresh, attributed, conflict-free view whose provider-health rows are all `ok`. Missing metadata, unknown staleness, skipped conflict checks (including a comparison that failed closed), stale fields, conflicts, preferred-provider failures, later-source empty/failed/unavailable supplement attempts, and a circuit snapshot with `available=false` are degradation signals. They must not coexist with `status=ok` or analysis `confidence=high`. Cross-source identities use the same source tokens as field attribution (`efinance`, `akshare_em`), not fetcher class names. Provider-health rows keep those public tokens but look up circuit snapshots by the exact route/circuit key carried on the attempt, so a CN `akshare_em` row cannot inherit an ETF or HK circuit. The Web panel localizes known status and gap codes from `FIELD_TRUST_TEXT`; backend English `message`/`detail` strings are not preferred over that copy.
@@ -22,8 +22,8 @@ This lane owns the trust contract only. The analysis projection is a stable, pro
 ## Compatibility
 
 - `UnifiedRealtimeQuote.field_trust` is optional. Absent metadata must be read as unknown, never trusted.
-- Quote `to_dict()` includes `field_trust` when present so analysis `_safe_to_dict(realtime_quote)` receives gaps/confidence.
-- Recording helpers fail open for data (they never break the quote path) and fail closed for trust (missing payload is unknown).
+- Quote `to_dict()` includes `field_trust` when present. Analysis consumption is through `_to_dict(realtime_quote)` plus the bounded `analysis_input` projection; receiving the nested object is not the same as treating it as trusted.
+- Recording helpers fail open for data (they never break the quote path) and fail closed for trust (missing or legacy payload is unknown, never `high`).
 
 ## Rollback
 

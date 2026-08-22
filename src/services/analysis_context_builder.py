@@ -8,6 +8,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Sequence
 
+from src.analysis_context_pack.quote_trust import (
+    QUOTE_TRUST_ITEM_SKIP_KEYS,
+    analysis_input_is_high,
+    bound_analysis_input_metadata,
+    quote_trust_warning_codes,
+    resolve_quote_analysis_input,
+)
 from src.analysis_context_pack.snapshot import stamp_pack_snapshot_identity
 from src.schemas.analysis_context_pack import (
     AnalysisContextBlock,
@@ -190,6 +197,9 @@ def _build_quote_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextB
     )
     timestamp = _quote_timestamp(artifacts, quote)
     is_fallback = fallback_from is not None or source == "fallback"
+    analysis_input = resolve_quote_analysis_input(quote, artifacts.realtime_quote)
+    trust_warnings = quote_trust_warning_codes(analysis_input)
+    trust_degraded = not analysis_input_is_high(analysis_input)
 
     if _has_explicit_quote_stale_marker(artifacts, quote):
         status = ContextFieldStatus.STALE
@@ -198,6 +208,14 @@ def _build_quote_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextB
         status = ContextFieldStatus.FALLBACK
         if fallback_from is None:
             warnings.append(_REALTIME_FALLBACK_WARNING)
+    elif trust_degraded:
+        # Conflict / missing metadata / skipped checks stay visible as partial
+        # so the existing core-degraded High ban fires without a new schema.
+        status = ContextFieldStatus.PARTIAL
+
+    for warning in trust_warnings:
+        if warning not in warnings:
+            warnings.append(warning)
 
     items = {
         key: AnalysisContextItem(
@@ -209,15 +227,17 @@ def _build_quote_block(artifacts: PipelineAnalysisArtifacts) -> AnalysisContextB
             warnings=list(warnings),
         )
         for key, value in quote.items()
-        if value is not None
+        if value is not None and key not in QUOTE_TRUST_ITEM_SKIP_KEYS
     }
+    metadata = _quote_metadata(artifacts, quote)
+    metadata["analysis_input"] = bound_analysis_input_metadata(analysis_input)
     return AnalysisContextBlock(
         status=status,
         items=items,
         source=source,
         timestamp=timestamp,
         warnings=warnings,
-        metadata=_quote_metadata(artifacts, quote),
+        metadata=metadata,
     )
 
 

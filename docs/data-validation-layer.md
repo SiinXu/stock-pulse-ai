@@ -51,7 +51,7 @@ Before technical-indicator synthesis, OHLCV frames are validated through `prepar
 
 When a realtime quote is supplemented from a secondary provider, matching finite fields are compared. Divergences above `DATA_VALIDATION_CROSS_SOURCE_REL_THRESHOLD` emit WARN evidence with provider attribution. Values are always kept; a single missing provider is a no-op so one source failure cannot interrupt overall analysis.
 
-Field-level trust (Issue #1129) records those comparisons, supplement attribution, lag/staleness, and provider-health attempts on the returned quote. The Web stock workspace and `GET /api/v1/stocks/{code}/trust` surface the same payload; analysis receives a provider-neutral `gaps` + `confidence` projection and must not treat a conflict as a chosen winner. See [field-trust-panel.md](./field-trust-panel.md).
+Field-level trust (Issue #1129) records those comparisons, supplement attribution, lag/staleness, and provider-health attempts on the returned quote. The Web stock workspace and `GET /api/v1/stocks/{code}/trust` surface the same payload. Analysis consumes the existing provider-neutral `analysis_input` (`gaps` + `confidence`) through `AnalysisContextPack` quote-block metadata and the existing core-degraded High ban; a fresh but conflicted quote cannot remain High-eligible, and a conflict is never treated as a chosen winner. Missing or legacy payloads fail closed as `metadata_absent`. See [field-trust-panel.md](./field-trust-panel.md).
 
 ## Evidence and diagnostics
 
