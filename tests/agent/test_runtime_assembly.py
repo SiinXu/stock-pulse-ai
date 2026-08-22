@@ -82,6 +82,10 @@ def test_factory_reexports_runtime_assembly_entrypoints():
     assert factory.get_tool_registry is runtime_assembly.get_tool_registry
     assert factory.build_agent_executor is runtime_assembly.build_agent_executor
     assert factory.apply_tool_category_timeouts is runtime_assembly.apply_tool_category_timeouts
+    assert (
+        factory.reset_process_tool_registry_for_tests
+        is runtime_assembly.reset_process_tool_registry_for_tests
+    )
 
 
 @pytest.mark.parametrize(
@@ -146,6 +150,26 @@ def test_factory_forwarded_patches_restore_leaf_state():
     finally:
         factory._TOOL_REGISTRY = original_registry
         factory.build_agent_executor = original_builder
+
+
+def test_reset_process_tool_registry_for_tests_clears_installed_and_building_cache():
+    from src.agent import factory, runtime_assembly
+
+    marker = object()
+    building = object()
+    original_registry = runtime_assembly._TOOL_REGISTRY
+    original_building = runtime_assembly._TOOL_REGISTRY_BUILDING
+    try:
+        runtime_assembly._TOOL_REGISTRY = marker
+        runtime_assembly._TOOL_REGISTRY_BUILDING = building
+        factory.reset_process_tool_registry_for_tests()
+        assert runtime_assembly.get_installed_tool_registry() is None
+        assert runtime_assembly.peek_process_tool_registry() is None
+        assert runtime_assembly._TOOL_REGISTRY is None
+        assert runtime_assembly._TOOL_REGISTRY_BUILDING is None
+    finally:
+        runtime_assembly._TOOL_REGISTRY = original_registry
+        runtime_assembly._TOOL_REGISTRY_BUILDING = original_building
 
 
 def test_factory_runtime_signature_keeps_eager_annotations():
