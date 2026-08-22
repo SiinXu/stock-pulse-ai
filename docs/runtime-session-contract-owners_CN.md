@@ -1,7 +1,7 @@
 # 共享运行时 Session 契约所有权
 
 - 状态：`Living`
-- 最近核验：2026-08-23，对照 #1055 T3 ToolSurface 栅栏读取（提交后填入 SHA）
+- 最近核验：2026-08-23，对照 `241e7e02d`（#1055 T3 ToolSurface 栅栏读取）
 - Issue：[#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 清单 + T2 标准 BoundToolSession double + T3 ToolSurface 栅栏读取
 - English：[runtime-session-contract-owners.md](runtime-session-contract-owners.md)
 

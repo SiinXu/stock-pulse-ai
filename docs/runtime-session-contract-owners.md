@@ -1,7 +1,7 @@
 # Shared Runtime Session Contract Owners
 
 - Status: `Living`
-- Last verified: 2026-08-23 against #1055 T3 ToolSurface fence reads (SHA filled after commit)
+- Last verified: 2026-08-23 against `241e7e02d` (#1055 T3 ToolSurface fence reads)
 - Issue: [#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 inventory + T2 standard BoundToolSession double + T3 ToolSurface fence reads
 - Chinese: [runtime-session-contract-owners_CN.md](runtime-session-contract-owners_CN.md)
 
