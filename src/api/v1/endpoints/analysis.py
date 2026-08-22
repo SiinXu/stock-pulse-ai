@@ -55,7 +55,7 @@ from src.core.market_review_runtime import (
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.services.name_to_code_resolver import resolve_name_to_code
 from src.services.task_queue import get_task_queue
-from src.task_execution import TaskEventType, deep_thaw
+from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
 from src.api.v1.services.analysis_cancel_audit import (
     AnalysisCancelAuditCompletionUnavailable,
 )
