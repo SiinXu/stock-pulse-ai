@@ -41,6 +41,7 @@ from src.config_parts.parsers import (
     CATEGORY_TOOL_TIMEOUT_MAX_S,
     parse_optional_category_tool_timeout,
 )
+from tests.agent.runtime.bound_tool_session_double import make_bound_tool_session
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
@@ -599,9 +600,7 @@ def test_mixed_deadlines_reversed_completion_order_still_fences_late_short():
 
 
 def _in_flight_freeze_session(registry, *, execution_id, security_audit):
-    from src.agent.runtime.tool_session import BoundToolSession
-
-    return BoundToolSession(
+    return make_bound_tool_session(
         registry,
         execution_id=execution_id,
         allowed_tools=["slow"],
@@ -706,8 +705,6 @@ def test_new_session_uses_refreshed_registry_timeouts():
 
 
 def test_bound_session_freezes_category_timeout_snapshot():
-    from src.agent.runtime.tool_session import BoundToolSession
-
     registry = ToolRegistry()
     registry.set_category_timeouts({"data": 9})
     _register_echo(
@@ -716,7 +713,7 @@ def test_bound_session_freezes_category_timeout_snapshot():
         category="data",
         handler=lambda message: {"echo": message},
     )
-    session = BoundToolSession(
+    session = make_bound_tool_session(
         registry,
         execution_id="session-freeze",
         allowed_tools=["echo"],
@@ -730,10 +727,7 @@ def test_bound_session_freezes_category_timeout_snapshot():
 
 
 def test_resolve_session_category_timeout_accepts_minimal_and_invalid_doubles():
-    from src.agent.runtime.tool_session import (
-        BoundToolSession,
-        resolve_session_category_timeout_seconds,
-    )
+    from src.agent.runtime.tool_session import resolve_session_category_timeout_seconds
 
     class MinimalSession:
         execution_id = "minimal"
@@ -760,7 +754,7 @@ def test_resolve_session_category_timeout_accepts_minimal_and_invalid_doubles():
         category="data",
         handler=lambda message: {"echo": message},
     )
-    session = BoundToolSession(
+    session = make_bound_tool_session(
         registry,
         execution_id="helper-freeze",
         allowed_tools=["echo"],
@@ -772,29 +766,25 @@ def test_resolve_session_category_timeout_accepts_minimal_and_invalid_doubles():
     assert resolve_session_category_timeout_seconds(session, "missing") == 0.0
 
 
-def test_execute_tools_minimal_session_omitting_category_timeout_still_dispatches():
+def test_execute_tools_standard_session_without_category_timeout_still_dispatches():
     dispatched = []
-
-    class RecordingSession:
-        execution_id = "minimal-category-timeout"
-        deadline_monotonic = None
-
-        @staticmethod
-        def is_non_retriable_cached(_cache_key: str) -> bool:
-            return False
-
-        @staticmethod
-        def execute(name: str, arguments: dict, **_kwargs) -> dict:
-            dispatched.append(name)
-            return {
-                "result_text": json.dumps({"echo": arguments.get("message")}),
-                "ok": True,
-            }
+    registry = ToolRegistry()
+    _register_echo(
+        registry,
+        name="echo",
+        category="data",
+        handler=lambda message: dispatched.append("echo") or {"echo": message},
+    )
+    session = make_bound_tool_session(
+        registry,
+        execution_id="minimal-category-timeout",
+        derive_granted_permissions=True,
+    )
 
     tool_calls_log = []
     results = _execute_tools(
         [ToolCall(id="call-1", name="echo", arguments={"message": "public"})],
-        RecordingSession(),
+        session,
         step=1,
         progress_callback=None,
         tool_calls_log=tool_calls_log,
@@ -806,32 +796,24 @@ def test_execute_tools_minimal_session_omitting_category_timeout_still_dispatche
     assert tool_calls_log[0]["success"] is True
 
 
-def test_execute_tools_honors_duck_typed_category_timeout():
-    class CappedSession:
-        execution_id = "duck-typed-category-timeout"
-        deadline_monotonic = None
+def test_execute_tools_honors_session_category_timeout():
+    def slow_handler(message):
+        time.sleep(0.2)
+        return {"echo": message}
 
-        @staticmethod
-        def is_non_retriable_cached(_cache_key: str) -> bool:
-            return False
-
-        @staticmethod
-        def category_timeout_seconds(_name: str) -> float:
-            return 0.05
-
-        @staticmethod
-        def execute(name: str, arguments: dict, **_kwargs) -> dict:
-            del name
-            time.sleep(0.2)
-            return {
-                "result_text": json.dumps({"echo": arguments.get("message")}),
-                "ok": True,
-            }
+    registry = ToolRegistry()
+    registry.set_category_timeouts({"data": 0.05})
+    _register_echo(registry, name="echo", category="data", handler=slow_handler)
+    session = make_bound_tool_session(
+        registry,
+        execution_id="session-category-timeout",
+        derive_granted_permissions=True,
+    )
 
     tool_calls_log = []
     results = _execute_tools(
         [ToolCall(id="call-slow", name="echo", arguments={"message": "slow"})],
-        CappedSession(),
+        session,
         step=1,
         progress_callback=None,
         tool_calls_log=tool_calls_log,

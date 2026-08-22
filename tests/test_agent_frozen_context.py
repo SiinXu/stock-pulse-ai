@@ -15,7 +15,7 @@ from src.services.history_loader import (
     reset_frozen_target_date,
     set_frozen_target_date,
 )
-from tests.security_audit_test_utils import SecurityAuditRecorderStub
+from tests.agent.runtime.bound_tool_session_double import make_bound_tool_session
 
 
 class _FakeToolCall:
@@ -52,12 +52,11 @@ def _make_spy_registry(tool_names: list[str], observed: list):
 
 def _native_session(registry: ToolRegistry) -> BoundToolSession:
     """Strict session matching the runner's own construction."""
-    return BoundToolSession(
+    return make_bound_tool_session(
         registry,
         execution_id="frozen-context-test",
         allowed_tools=registry.list_names(),
         granted_permissions=registry.supported_declared_capabilities(),
-        security_audit=SecurityAuditRecorderStub(),
     )
 
 
