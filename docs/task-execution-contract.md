@@ -216,7 +216,10 @@ cross-process task sharing. HTTP adapters may expose the existing `cancel`
 port for one kind at a time: analysis uses
 `POST /api/v1/analysis/tasks/{task_id}/cancel` and discovery uses
 `POST /api/v1/discover/screen/tasks/{task_id}/cancel`. Those routes must not
-be reused across kinds. Restart recovery (below) is deliberately narrower
+be reused across kinds. Test doubles for `TaskRunContext.is_cancel_requested`
+and the Web `ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE` flag are owned by
+[Shared runtime session contract owners](runtime-session-contract-owners.md).
+Restart recovery (below) is deliberately narrower
 than a distributed queue.
 
 ## Single-Process Authority

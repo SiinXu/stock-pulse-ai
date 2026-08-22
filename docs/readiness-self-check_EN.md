@@ -71,6 +71,9 @@ Registered in the shared config registry and loaded into `Config.readiness_check
 - Task queue missing, shut down, zero workers, or stats failure → `failed`
 - Check timeout → `failed` for required checks (`reason_code=check_timeout`)
 
+Generation-backend status payload fields and test-double obligations:
+[Shared runtime session contract owners](runtime-session-contract-owners.md).
+
 ## Related endpoints
 
 - `GET /api/v1/system/config/setup/status`

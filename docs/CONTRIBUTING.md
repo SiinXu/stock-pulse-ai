@@ -104,6 +104,7 @@ docs: update the README deployment guide
 - 函数和类需要添加英文 docstring
 - 非直观逻辑使用英文注释
 - 新功能需要更新相关文档
+- 若给 `BoundToolSession`、`TaskRunContext`、`ToolAccessContext`、分析 API cancel、generation-backend 状态或配置注册表展示契约新增生产必填字段，同一 PR 必须更新 [共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md)（[EN](runtime-session-contract-owners.md)）中列出的成对测试与标准 double，不得靠残缺 mock 让子集变绿
 
 ### 并行合并与工程效率操作
 

@@ -80,3 +80,4 @@ Do not treat a green handler unit test as proof of ToolSurface authorization.
 - [Human approvals (HITL)](human-approvals_EN.md)
 - [Plugin development guide](plugin-development-guide.md)
 - [Alternative-data plugin contract](alternative-data-plugin-contract.md)
+- [Shared runtime session contract owners](runtime-session-contract-owners.md) — BoundToolSession / ToolAccessContext fields and test-double obligations
