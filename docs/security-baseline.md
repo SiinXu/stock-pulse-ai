@@ -1,7 +1,7 @@
 # Security and Compliance Baseline
 
 Status: Maintainer baseline
-Last reviewed: 2026-07-26
+Last reviewed: 2026-08-22
 Applies to: StockPulse backend, API, Web and desktop clients, Agent and Bot integrations, data providers, notifications, reports, automation, and release workflows
 
 The optional Agent risk-control exception is defined in
@@ -276,9 +276,8 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 | --- | --- | --- |
 | Multi-user identity, role and workspace authorization, consent, data ownership, export, deletion, and privacy audit are not implemented. | `AUTH-05`, `COMP-04` | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) |
 | Structured Agent observability is not yet a complete queryable cross-stage event and trace foundation. | `AUDIT-01`, `AUDIT-02` | [#222](https://github.com/SiinXu/stock-pulse-ai/issues/222) |
-| Durable security-audit trail for auth, config, tools, analysis, HITL, plugins, MCP, and local process (OCR/CLI) is implemented with retention, capacity, and administrator query; evidence-package export remains product-scoped under #127. | `AUDIT-01` through `AUDIT-04` | [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) (implementation), [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) (evidence package) |
-| Analysis reports do not yet provide a complete exportable, redacted evidence chain and audit package. | `AUDIT-05` | [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) |
-| High-risk Agent actions do not yet have configurable, attributable human approval gates. | `AUDIT-04` | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) |
+| Remaining privileged-path coverage: analysis admission bypasses (bot, scheduled dispatch, portfolio analyze, HTTP sync), scheduled-task mutations, incoming HTTP analysis cancel after [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466), optional report-export/history-delete, and `SystemConfigService.update` bypasses. | `AUDIT-02` | [#1062](https://github.com/SiinXu/stock-pulse-ai/issues/1062) (coverage map in [security-audit.md](security-audit.md); sequenced DAG-1..5, not a mega-PR). Parent requirement [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) |
+| Analysis reports do not yet provide a complete exportable, redacted evidence chain and audit package. Existing evidence-package / audit-package HTTP export is already security-audited; remaining work is product completeness, not a second security sink. | `AUDIT-05` | [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127) |
 | Product-level investment and limitation disclosures are not yet guaranteed consistently across every report, notification, Web surface, and supported language. | `COMP-01` through `COMP-03`, `COMP-05` | [#144](https://github.com/SiinXu/stock-pulse-ai/issues/144) |
 | Central redaction rules still need regression hardening against prose-log over-scrubbing while preserving fail-closed secret removal. | `SECRET-03` | Accepted residual - owner: Security maintainers; review date: 2026-10-23. |
 
@@ -292,6 +291,8 @@ These completed tracks are implementation evidence, not open gaps. Residual risk
 | Fail-closed unauthenticated public-bind startup policy | `AUTH-01`, `AUTH-02` | [#534](https://github.com/SiinXu/stock-pulse-ai/issues/534) (completed) |
 | Shared SSRF and outbound egress policy | `NET-01` through `NET-06` | [#171](https://github.com/SiinXu/stock-pulse-ai/issues/171) (completed) |
 | Strict Agent ToolSurface execution sandbox | `INPUT-04`, `NET-04`, `AUDIT-02` | [#191](https://github.com/SiinXu/stock-pulse-ai/issues/191): registered tools require a supported declared capability and an execution-owned grant; schema, stock scope, recursively nested URL arguments, and bounded argument inspection fail closed before handler dispatch; denials use redacted structured and durable audit evidence |
+| Configurable HITL approval gates | `AUDIT-04` | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) (completed 2026-07-25): default-off; attributable `approval_proposal` / `approval_transition` / `approval_consume` / `approval_rule` events on the durable security-audit trail |
+| Durable security-audit Phase 1 trail | `AUDIT-01` through `AUDIT-03` | [#535](https://github.com/SiinXu/stock-pulse-ai/issues/535) implementation slices including [#1010](https://github.com/SiinXu/stock-pulse-ai/pull/1010): `security-audit-v1` SQLite store, pre-persistence redaction, retention/capacity, administrator query, and original privileged HTTP/MCP/tool/HITL/plugin/local-process connections. Remaining coverage is [#1062](https://github.com/SiinXu/stock-pulse-ai/issues/1062), not a rebuild |
 | Central sensitive-data redaction expansion | `SECRET-03` | [#176](https://github.com/SiinXu/stock-pulse-ai/issues/176) (completed) |
 | Dependency and workflow supply-chain hardening | `SUPPLY-01` through `SUPPLY-05` | [#326](https://github.com/SiinXu/stock-pulse-ai/issues/326) (completed) |
 | Constrained AlphaSift repair installation | `SUPPLY-01` | [#359](https://github.com/SiinXu/stock-pulse-ai/issues/359) (completed by [#531](https://github.com/SiinXu/stock-pulse-ai/pull/531)) |
