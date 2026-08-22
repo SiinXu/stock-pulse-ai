@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 import yaml
@@ -33,11 +34,13 @@ from src.services.security_audit_service import (
     SecurityAuditUnavailable,
 )
 from src.services.system_config_service import (
+    ConfigValidationError,
     SystemConfigService,
     SystemConfigWriteAuditCompletionUnavailable,
 )
 from src.services.system_config_service_parts.write_audit import (
     SYSTEM_CONFIG_WRITE_EVENT_TYPE,
+    _persist_already_ran,
 )
 from src.storage import DatabaseManager
 from tests.security.test_security_audit_integrations import (
@@ -294,6 +297,55 @@ def test_domain_409_preserved_when_reject_completion_fails(
         )
 
     assert exc_info.value.status_code == 409
+    assert manager.read_config_map()["LOG_LEVEL"] == "INFO"
+
+
+def test_persist_already_ran_excludes_rolled_back_activation() -> None:
+    rolled_back = ConfigValidationError(
+        issues=[{"code": "runtime_activation_failed"}]
+    )
+    unrestored = RuntimeError("Configuration activation and restoration failed")
+
+    assert _persist_already_ran(rolled_back) is False
+    assert _persist_already_ran(unrestored) is True
+
+
+def test_runtime_activation_failed_preserves_400_when_reject_completion_fails(
+    tmp_path, monkeypatch
+) -> None:
+    service, manager, _env_path = _config_service(
+        tmp_path, monkeypatch, "LOG_LEVEL=INFO"
+    )
+    audit = _RecordingAudit(fail_completion=True)
+    rolled_back = ConfigValidationError(
+        issues=[
+            {
+                "key": "RUNTIME_CONFIG",
+                "code": "runtime_activation_failed",
+                "severity": "error",
+                "message": (
+                    "The candidate configuration could not be activated; "
+                    "the previous runtime configuration was restored."
+                ),
+            }
+        ]
+    )
+
+    with patch.object(service, "_update_validated", side_effect=rolled_back):
+        with pytest.raises(HTTPException) as exc_info:
+            system_config_endpoint.update_system_config(
+                request=UpdateSystemConfigRequest(
+                    config_version=manager.get_config_version(),
+                    reload_now=True,
+                    items=[{"key": "LOG_LEVEL", "value": "DEBUG"}],
+                ),
+                service=service,
+                security_audit=audit,
+            )
+
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"] == "validation_failed"
+    assert exc_info.value.detail["issues"][0]["code"] == "runtime_activation_failed"
     assert manager.read_config_map()["LOG_LEVEL"] == "INFO"
 
 

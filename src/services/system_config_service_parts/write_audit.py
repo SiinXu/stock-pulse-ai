@@ -140,12 +140,13 @@ def _write_error_audit_fields(exc: BaseException) -> tuple[str, str]:
 
 
 def _persist_already_ran(exc: BaseException) -> bool:
-    issues = getattr(exc, "issues", None) or []
-    if any(
-        isinstance(issue, Mapping) and issue.get("code") == "runtime_activation_failed"
-        for issue in issues
-    ):
-        return True
+    """True only when durable config stayed mutated after the exception.
+
+    ``runtime_activation_failed`` is raised only after a successful restore
+    that rewrites the previous ``.env`` snapshot, so reject-completion
+    outages must keep the domain validation error instead of a post-persist
+    ``503``.
+    """
     return isinstance(exc, RuntimeError) and "activation and restoration failed" in str(exc)
 
 
