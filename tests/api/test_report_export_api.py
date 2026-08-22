@@ -34,8 +34,25 @@ class _FakeHistoryService:
         return self.markdown
 
 
+class _WorkingAudit:
+    def record_attempt(self, **fields):
+        return None
+
+    def record_completion(self, **fields):
+        return None
+
+
 def _patch_history(monkeypatch, service: _FakeHistoryService):
     monkeypatch.setattr(export_endpoint, "HistoryService", lambda _db: service)
+
+
+def _export(record_id, *, format, db_manager):
+    return export_endpoint.export_history_report(
+        record_id,
+        format=format,
+        db_manager=db_manager,
+        security_audit=_WorkingAudit(),
+    )
 
 
 def test_capabilities_endpoint_returns_typed_sanitized_model(monkeypatch):
@@ -100,9 +117,7 @@ def test_capabilities_endpoint_returns_typed_sanitized_model(monkeypatch):
 def test_export_markdown_attachment_uses_rfc5987_unicode_filename(monkeypatch):
     markdown = "# 测试报告\n\n内容"
     _patch_history(monkeypatch, _FakeHistoryService(markdown, {"id": "中钨高新"}))
-    response = export_endpoint.export_history_report(
-        "中钨高新", format="md", db_manager=object()
-    )
+    response = _export("中钨高新", format="md", db_manager=object())
     assert response.status_code == 200
     assert response.media_type.startswith("text/markdown")
     assert response.body.decode("utf-8") == markdown
@@ -123,7 +138,7 @@ def test_content_disposition_blocks_header_injection_and_bounds_length():
 def test_export_not_found(monkeypatch):
     _patch_history(monkeypatch, _FakeHistoryService(None, detail=None))
     with pytest.raises(HTTPException) as exc:
-        export_endpoint.export_history_report("missing", format="md", db_manager=object())
+        _export("missing", format="md", db_manager=object())
     assert exc.value.status_code == 404
     assert exc.value.detail["error"] == "not_found"
 
@@ -131,7 +146,7 @@ def test_export_not_found(monkeypatch):
 def test_export_invalid_format_direct_call_still_returns_stable_400(monkeypatch):
     _patch_history(monkeypatch, _FakeHistoryService("# ok", {"id": 1}))
     with pytest.raises(HTTPException) as exc:
-        export_endpoint.export_history_report("1", format="xlsx", db_manager=object())
+        _export("1", format="xlsx", db_manager=object())
     assert exc.value.status_code == 400
     assert exc.value.detail["error"] == "export_format_invalid"
 
@@ -164,7 +179,7 @@ def test_export_error_mapping_is_bounded_and_sanitized(monkeypatch, raised, stat
 
     monkeypatch.setattr(export_endpoint, "export_report", _raise)
     with pytest.raises(HTTPException) as exc:
-        export_endpoint.export_history_report("1", format="pdf", db_manager=object())
+        _export("1", format="pdf", db_manager=object())
     assert exc.value.status_code == status
     assert exc.value.detail["error"] == code
     payload = json.dumps(exc.value.detail)
@@ -175,7 +190,7 @@ def test_export_error_mapping_is_bounded_and_sanitized(monkeypatch, raised, stat
 def test_generation_failure_does_not_expose_raw_service_detail(monkeypatch):
     _patch_history(monkeypatch, _FakeHistoryService("# ok", {"id": 1}, raise_gen=True))
     with pytest.raises(HTTPException) as exc:
-        export_endpoint.export_history_report("1", format="md", db_manager=object())
+        _export("1", format="md", db_manager=object())
     assert exc.value.status_code == 500
     assert "raw provider detail" not in json.dumps(exc.value.detail)
 
@@ -214,9 +229,7 @@ def test_export_html_attachment_uses_html_suffix(monkeypatch):
             },
         )(),
     )
-    response = export_endpoint.export_history_report(
-        "7", format="html", db_manager=object()
-    )
+    response = _export("7", format="html", db_manager=object())
     assert response.status_code == 200
     assert response.media_type.startswith("text/html")
     assert ".html" in response.headers["content-disposition"]

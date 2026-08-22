@@ -16,6 +16,14 @@ from src.repositories.base import BaseRepository, RepositoryError
 from src.repositories.stock_repo import StockRepository
 
 
+class _WorkingAudit:
+    def record_attempt(self, **fields):
+        return None
+
+    def record_completion(self, **fields):
+        return None
+
+
 def test_base_repository_log_and_raise_wraps_cause() -> None:
     repo = BaseRepository(db_manager=MagicMock())
     logger = MagicMock()
@@ -205,7 +213,11 @@ def test_history_delete_by_code_maps_repository_error_to_500() -> None:
             error_code="analysis_history_delete_no_progress",
         )
         with pytest.raises(HTTPException) as raised:
-            delete_history_by_code("600519", db_manager=db)
+            delete_history_by_code(
+                "600519",
+                db_manager=db,
+                security_audit=_WorkingAudit(),
+            )
 
     assert raised.value.status_code == 500
     assert raised.value.detail.get("error") == "internal_error"
