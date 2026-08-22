@@ -846,21 +846,45 @@ jobs:
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
         run: |
           set -euo pipefail
+          # GitHub-hosted Ubuntu images use mirror+file:/etc/apt/apt-mirrors.txt
+          # with azure.archive.ubuntu.com first and archive.ubuntu.com next.
+          # A degraded Azure front-end can ignore indexes until a long wrapper
+          # fires; keep apt-native timeouts short and retry once against the
+          # runner's already-listed public archive. Do not hide missing Tesseract.
           apt_options=(
             -o Acquire::Retries=2
             -o Acquire::http::Timeout=15
             -o Acquire::https::Timeout=15
           )
+          apt_mirrors="/etc/apt/apt-mirrors.txt"
+
+          prefer_runner_public_archive() {
+            if [ ! -f "${apt_mirrors}" ]; then
+              echo "GitHub runner apt mirror list ${apt_mirrors} is absent; retrying with apt-native timeouts only."
+              return 0
+            fi
+            tmp="$(mktemp)"
+            awk '!/azure[.]archive[.]ubuntu[.]com/' "${apt_mirrors}" > "${tmp}"
+            if [ ! -s "${tmp}" ]; then
+              rm -f "${tmp}"
+              echo "::error::Runner apt mirror list has no non-Azure fallback URI." >&2
+              return 1
+            fi
+            sudo cp "${tmp}" "${apt_mirrors}"
+            rm -f "${tmp}"
+            echo "Preferred the runner public Ubuntu archive fallback in ${apt_mirrors}."
+          }
+
           install_tesseract() {
             sudo timeout --kill-after=10s 90s apt-get "${apt_options[@]}" update \
               && sudo timeout --kill-after=10s 120s apt-get "${apt_options[@]}" install \
                 -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
           }
           if ! install_tesseract; then
-            echo "First Tesseract apt attempt failed; retrying once."
+            prefer_runner_public_archive
             sudo rm -rf /var/lib/apt/lists/partial
             if ! install_tesseract; then
-              echo "::error::Tesseract installation failed after two bounded apt attempts." >&2
+              echo "::error::Tesseract installation failed after one bounded Azure-mirror attempt and one public-archive fallback." >&2
               exit 1
             fi
           fi

@@ -867,6 +867,10 @@ def test_ocr_stock_extractor_is_path_triggered_fail_closed_and_offline() -> None
     assert "tesseract-ocr-eng" in tesseract_step["run"]
     assert "|| true" not in tesseract_step["run"]
     assert "continue-on-error" not in tesseract_step["run"]
+    assert "/etc/apt/apt-mirrors.txt" in tesseract_step["run"]
+    assert "azure.archive.ubuntu.com" in tesseract_step["run"]
+    assert "prefer_runner_public_archive" in tesseract_step["run"]
+    assert "/var/lib/apt/lists/partial" in tesseract_step["run"]
 
 
 def test_desktop_gate_runs_existing_unit_tests_without_packaging() -> None:
