@@ -7666,12 +7666,16 @@ export interface components {
         };
         /** DecisionSignalFeedbackItem */
         DecisionSignalFeedbackItem: {
+            /** Actor Id */
+            actor_id?: string | null;
             /** Created At */
             created_at?: string | null;
             /** Feedback Value */
             feedback_value?: ("useful" | "not_useful") | null;
             /** Note */
             note?: string | null;
+            /** Provenance Source */
+            provenance_source?: ("system_resolve" | "user_feedback" | "operator") | null;
             /** Reason Code */
             reason_code?: string | null;
             /** Signal Id */

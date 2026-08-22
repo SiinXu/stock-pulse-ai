@@ -169,6 +169,8 @@ def test_outcome_run_list_stats_signal_outcomes_and_feedback(client_and_db) -> N
     empty_feedback_resp = client.get(f"/api/v1/decision-signals/{signal_id}/feedback")
     assert empty_feedback_resp.status_code == 200, empty_feedback_resp.text
     assert empty_feedback_resp.json()["feedback_value"] is None
+    assert empty_feedback_resp.json()["provenance_source"] is None
+    assert empty_feedback_resp.json()["actor_id"] is None
 
     put_feedback_resp = client.put(
         f"/api/v1/decision-signals/{signal_id}/feedback",
@@ -182,10 +184,14 @@ def test_outcome_run_list_stats_signal_outcomes_and_feedback(client_and_db) -> N
     assert put_feedback_resp.status_code == 200, put_feedback_resp.text
     assert put_feedback_resp.json()["feedback_value"] == "useful"
     assert put_feedback_resp.json()["source"] == "web"
+    assert put_feedback_resp.json()["provenance_source"] == "user_feedback"
+    assert put_feedback_resp.json()["actor_id"] == "local_admin"
 
     get_feedback_resp = client.get(f"/api/v1/decision-signals/{signal_id}/feedback")
     assert get_feedback_resp.status_code == 200, get_feedback_resp.text
     assert get_feedback_resp.json()["reason_code"] == "matched_plan"
+    assert get_feedback_resp.json()["provenance_source"] == "user_feedback"
+    assert get_feedback_resp.json()["actor_id"] == "local_admin"
 
 
 def test_feedback_put_rejects_fact_fields_and_leaves_outcomes_unchanged(client_and_db) -> None:
@@ -342,6 +348,83 @@ def test_feedback_put_rejects_soul_markers_and_oversize_notes(client_and_db) -> 
     item = outcomes_resp.json()["items"][0]
     assert item["outcome"] == "hit"
     assert item["stock_return_pct"] == before["stock_return_pct"]
+
+
+def test_feedback_put_rejects_client_provenance_and_keeps_transport_source(
+    client_and_db,
+) -> None:
+    client, _db = client_and_db
+    created_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(trace_id="trace-memory-provenance-api"),
+    )
+    assert created_resp.status_code == 200, created_resp.text
+    signal_id = created_resp.json()["item"]["id"]
+
+    empty = client.get(f"/api/v1/decision-signals/{signal_id}/feedback")
+    assert empty.status_code == 200, empty.text
+    assert empty.json()["feedback_value"] is None
+    assert empty.json()["provenance_source"] is None
+    assert empty.json()["actor_id"] is None
+
+    spoof_source = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "provenance_source": "system_resolve",
+        },
+    )
+    assert spoof_source.status_code == 422, spoof_source.text
+
+    spoof_actor = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "actor_id": "root",
+        },
+    )
+    assert spoof_actor.status_code == 422, spoof_actor.text
+
+    spoof_operator = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "provenance_source": "operator",
+        },
+    )
+    assert spoof_operator.status_code == 422, spoof_operator.text
+
+    spoof_transport = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "system_resolve",
+        },
+    )
+    assert spoof_transport.status_code == 422, spoof_transport.text
+
+    still_empty = client.get(f"/api/v1/decision-signals/{signal_id}/feedback")
+    assert still_empty.status_code == 200, still_empty.text
+    assert still_empty.json()["feedback_value"] is None
+    assert still_empty.json()["provenance_source"] is None
+
+    ok_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "reason_code": "matched_plan",
+            "note": "opinion only",
+            "source": "web",
+        },
+    )
+    assert ok_resp.status_code == 200, ok_resp.text
+    body = ok_resp.json()
+    assert body["source"] == "web"
+    assert body["provenance_source"] == "user_feedback"
+    assert body["actor_id"] == "local_admin"
 
 
 def test_outcome_api_rejects_invalid_params_and_returns_404(client_and_db) -> None:

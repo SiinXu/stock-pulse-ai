@@ -83,6 +83,8 @@ class AgentPredictionRecord:
     no_verifiable_reason: Optional[str] = None
     notes: Optional[str] = None
     resolved_at: Optional[datetime] = None
+    provenance_source: Optional[str] = None
+    actor_id: Optional[str] = None
 
     def is_terminal(self) -> bool:
         return self.status in TERMINAL_AGENT_PREDICTION_STATUSES

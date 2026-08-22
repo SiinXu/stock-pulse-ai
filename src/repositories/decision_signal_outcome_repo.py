@@ -9,6 +9,12 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import and_, desc, func, select
 
 from src.schemas.memory_fact_opinion import lock_fact_payload, lock_opinion_payload
+from src.schemas.memory_provenance import (
+    FEEDBACK_ACTOR_ID,
+    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+    PROVENANCE_SOURCE_USER_FEEDBACK,
+    apply_server_provenance,
+)
 from src.schemas.memory_write_guard import reject_feedback_write_fields
 from src.storage import (
     DatabaseManager,
@@ -110,6 +116,11 @@ class DecisionSignalOutcomeRepository:
 
     def upsert_outcome(self, fields: Dict[str, Any]) -> Tuple[DecisionSignalOutcomeRecord, bool]:
         lock_fact_payload(fields)
+        fields = apply_server_provenance(
+            fields,
+            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+            actor_id=None,
+        )
         now = utc_naive_now()
         with self.db.get_session() as session:
             existing = session.execute(
@@ -223,6 +234,11 @@ class DecisionSignalOutcomeRepository:
     def upsert_feedback(self, fields: Dict[str, Any]) -> DecisionSignalFeedbackRecord:
         lock_opinion_payload(fields)
         reject_feedback_write_fields(fields)
+        fields = apply_server_provenance(
+            fields,
+            provenance_source=PROVENANCE_SOURCE_USER_FEEDBACK,
+            actor_id=FEEDBACK_ACTOR_ID,
+        )
         now = utc_naive_now()
         with self.db.get_session() as session:
             existing = session.execute(

@@ -8765,6 +8765,17 @@
       },
       "DecisionSignalFeedbackItem": {
         "properties": {
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -8801,6 +8812,22 @@
               }
             ],
             "title": "Note"
+          },
+          "provenance_source": {
+            "anyOf": [
+              {
+                "enum": [
+                  "system_resolve",
+                  "user_feedback",
+                  "operator"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Source"
           },
           "reason_code": {
             "anyOf": [
@@ -8851,6 +8878,7 @@
         "type": "object"
       },
       "DecisionSignalFeedbackRequest": {
+        "additionalProperties": false,
         "properties": {
           "feedback_value": {
             "enum": [

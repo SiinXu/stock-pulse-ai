@@ -1,0 +1,1 @@
+- [Changed] Stamp server-owned provenance_source and optional actor_id on governed memory writes; transport source stays web/api (Refs #1124).

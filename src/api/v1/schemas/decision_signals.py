@@ -12,11 +12,16 @@ from src.api.v1.schemas.market_phase import MarketPhaseValue
 from src.schemas.decision_action import DecisionAction
 from src.schemas.decision_profile import DecisionProfile
 from src.schemas.memory_fact_opinion import lock_opinion_payload
+from src.schemas.memory_provenance import reject_client_provenance_keys
 from src.schemas.memory_write_guard import (
     FEEDBACK_NOTE_MAX_LENGTH,
     FEEDBACK_REASON_CODE_MAX_LENGTH,
     reject_memory_write_text,
 )
+
+MemoryProvenanceSource = Literal[
+    "system_resolve", "user_feedback", "operator"
+]
 
 
 DecisionSignalSourceType = Literal["analysis", "agent", "alert", "market_review", "manual"]
@@ -247,6 +252,8 @@ class DecisionSignalOutcomeStatsResponse(BaseModel):
 
 
 class DecisionSignalFeedbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     feedback_value: DecisionSignalFeedbackValue
     reason_code: Optional[str] = Field(
         None, json_schema_extra={"maxLength": FEEDBACK_REASON_CODE_MAX_LENGTH}
@@ -258,9 +265,10 @@ class DecisionSignalFeedbackRequest(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def _reject_fact_fields(cls, value: Any) -> Any:
+    def _reject_fact_and_client_provenance(cls, value: Any) -> Any:
         if isinstance(value, Mapping):
             lock_opinion_payload(value)
+            reject_client_provenance_keys(value)
         return value
 
     @field_validator("reason_code", "note")
@@ -286,6 +294,8 @@ class DecisionSignalFeedbackItem(BaseModel):
     reason_code: Optional[str] = None
     note: Optional[str] = None
     source: Optional[DecisionSignalFeedbackSource] = None
+    provenance_source: Optional[MemoryProvenanceSource] = None
+    actor_id: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
 

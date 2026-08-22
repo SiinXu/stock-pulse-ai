@@ -25,6 +25,10 @@ from src.schemas.agent_episode import (
     TrajectoryStepSummary,
     reject_episode_free_text,
 )
+from src.schemas.memory_provenance import (
+    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+    stamp_memory_provenance,
+)
 from src.storage import DatabaseManager
 
 logger = logging.getLogger(__name__)
@@ -168,6 +172,8 @@ class AgentEpisodeRepository(BaseRepository):
                 "lessons": lessons,
                 "outcome_labels": outcome,
                 "created_at": _as_utc_aware(row.created_at) or datetime.now(timezone.utc),
+                "provenance_source": row.provenance_source,
+                "actor_id": row.actor_id,
             }
         )
 
@@ -176,6 +182,10 @@ class AgentEpisodeRepository(BaseRepository):
         now = _as_utc_naive(self._clock())
         if now is None:
             raise ValueError("agent episode clock must return a datetime")
+        stamp = stamp_memory_provenance(
+            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+            actor_id=None,
+        )
         values = {
             "schema_version": episode.schema_version or AGENT_EPISODE_SCHEMA_VERSION,
             "episode_id": episode.episode_id,
@@ -200,6 +210,8 @@ class AgentEpisodeRepository(BaseRepository):
                 else None
             ),
             "created_at": now,
+            "provenance_source": stamp["provenance_source"],
+            "actor_id": stamp["actor_id"],
         }
         try:
             with self.db.get_session() as session:
@@ -219,7 +231,7 @@ class AgentEpisodeRepository(BaseRepository):
             existing = self.get_by_episode_id(episode.episode_id)
             if existing is not None and existing.model_dump(
                 mode="json",
-                exclude={"id", "created_at"},
+                exclude={"id", "created_at", "provenance_source", "actor_id"},
             ) == episode.model_dump(mode="json"):
                 return existing
             if existing is not None:

@@ -58,7 +58,7 @@ outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
 | 威胁 | 当前契约 | 缺口 |
 | --- | --- | --- |
 | **投毒（Poisoning）** | 生产 decision-memory 只准入带 `signal_id`、有大小上限的结构化已结算 outcome，并将 prompt 块标为不可信数据。分层投影字段拒绝自由文本。 | 用户笔记与自由文本反馈是意见，不是行情事实。可选 `AGENT_MEMORY_ENABLED` 校准注入默认关闭，且当前未做隔离包装。 |
-| **事实 vs 意见** | 系统行情 actuals 在 `decision_signal_outcomes` 与 `agent_predictions.outcome_json`（`resolved` 行不可变）。用户反馈是 sidecar 意见表。DAG-1 在 `src/schemas/memory_fact_opinion.py` 锁定事实/意见写入键：prediction resolve、decision-signal outcome/feedback upsert 以及 `PUT /api/v1/decision-signals/{signal_id}/feedback` 对混合载荷 **拒绝**。反馈不能改写 PredictionOutcome actuals。 | 传输通道 `source`（`web` / `api`）**不是** provenance。持久化记忆写入仍需服务端盖章的 `source` ∈ `system_resolve` / `user_feedback` / `operator`，以及可选的会话 `actor_id`（DAG-3）。 |
+| **事实 vs 意见** | 系统行情 actuals 在 `decision_signal_outcomes` 与 `agent_predictions.outcome_json`（`resolved` 行不可变）。用户反馈是 sidecar 意见表。DAG-1 在 `src/schemas/memory_fact_opinion.py` 锁定事实/意见写入键：prediction resolve、decision-signal outcome/feedback upsert 以及 `PUT /api/v1/decision-signals/{signal_id}/feedback` 对混合载荷 **拒绝**。反馈不能改写 PredictionOutcome actuals。传输通道 `source`（`web` / `api`）**不是** provenance。DAG-3 在 `src/schemas/memory_provenance.py` 由服务端盖章 `provenance_source` ∈ `system_resolve` / `user_feedback` / `operator` 以及可选会话 `actor_id`（反馈写入为 `local_admin`）。客户端提交的 provenance 键会被 **拒绝**。历史 prediction/episode 行保持 NULL；已有反馈行可回填 `user_feedback`。 | 可选 `actor_id` 是 `AUTH-05` 下的管理员/会话标识，不是多租户授权。持久化存储 / principal 赋值仍属 [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118) / [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230)。 |
 | **Soul 边界伪造** | Soul/Persona 组装会拒绝 Soul 边界标记。用户可写记忆文本（`PUT .../feedback` 的 `note`/`reason_code`、仓库 upsert、episode 的 `user_feedback` / `extra` / `remedy`）对 Soul 边界标记、超限和非法 C0 控制字符 **拒绝**，不会截断或剥离后存储。既有上限不变：反馈 note 1000、reason_code 64、episode 字符串 256 / remedy 300。密钥脱敏仍存在，但不能代替写路径拒绝。 | Prompt 隔离在注入时仍会截断（分析构建保持失败即跳过）。那不是写路径契约。 |
 | **租户 / actor** | 产品是单管理员模型（`AUTH-05`）。分层 `principal_id` 拒绝仅存在于进程内基础层。 | 基础层 principal 测试不是生产隔离。可选 `actor_id` 是管理员/会话标识，不是多租户授权。跨用户隔离仍属 [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) / [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。 |
 
@@ -70,7 +70,7 @@ outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
 - 持久化生命周期存储与用户 UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)（吸收已关闭的 [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) 与 [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)）。
 - 经安全审查的生产 prompt 消费。
 - 偏好层：[#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117)（吸收已关闭的 [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)）。
-- 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。DAG-1（事实/意见锁定）和 DAG-2（`src/schemas/memory_write_guard.py` 的 Soul/超限写路径拒绝）已落地。剩余：DAG-3 服务端盖章 provenance。不要并入 #1118 存储/UI、#1119 遗忘策略或 #1105 产品反馈 API。
+- 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。DAG-0 威胁注释、DAG-1 事实/意见锁定、DAG-2 Soul/超限写路径拒绝（`src/schemas/memory_write_guard.py`）和 DAG-3 服务端盖章 provenance（`src/schemas/memory_provenance.py`）已落地。不要并入 #1118 存储/UI、#1119 遗忘策略或 #1105 产品反馈 API。在 DAG-3 金丝雀通过且维护者确认全部验收项之前保持 issue 开放。
 
 不要重开 #250、#198 或 #150。
 

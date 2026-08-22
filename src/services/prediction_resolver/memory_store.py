@@ -20,6 +20,11 @@ from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from src.schemas.memory_fact_opinion import lock_prediction_outcome_actuals
+from src.schemas.memory_provenance import (
+    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+    reject_client_provenance_keys,
+    stamp_memory_provenance,
+)
 
 
 STATUS_PENDING = "pending"
@@ -77,6 +82,8 @@ class MemoryPredictionRecord:
     resolved_at: Optional[datetime] = None
     next_attempt_at: Optional[datetime] = None
     retry_exhausted: bool = False
+    provenance_source: Optional[str] = None
+    actor_id: Optional[str] = None
 
     def snapshot(self) -> "MemoryPredictionRecord":
         return replace(
@@ -238,6 +245,11 @@ class InMemoryPredictionStore:
         if not isinstance(outcome, Mapping):
             raise ValueError("outcome must be a mapping")
         lock_prediction_outcome_actuals(outcome)
+        reject_client_provenance_keys(outcome)
+        stamp = stamp_memory_provenance(
+            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+            actor_id=None,
+        )
         now = as_of or self._clock()
         with self._lock:
             row = self._rows.get(canonical)
@@ -251,6 +263,8 @@ class InMemoryPredictionStore:
             row.outcome = dict(outcome)
             row.resolved_at = now
             row.updated_at = now
+            row.provenance_source = stamp["provenance_source"]
+            row.actor_id = stamp["actor_id"]
             row.lease_owner = None
             row.lease_token = None
             row.lease_expires_at = None
@@ -278,6 +292,11 @@ class InMemoryPredictionStore:
         if outcome:
             payload.update(dict(outcome))
         lock_prediction_outcome_actuals(payload)
+        reject_client_provenance_keys(payload)
+        stamp = stamp_memory_provenance(
+            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+            actor_id=None,
+        )
         with self._lock:
             row = self._rows.get(canonical)
             if row is None:
@@ -289,6 +308,8 @@ class InMemoryPredictionStore:
             row.status = STATUS_DATA_UNAVAILABLE
             row.outcome = payload
             row.updated_at = now
+            row.provenance_source = stamp["provenance_source"]
+            row.actor_id = stamp["actor_id"]
             row.lease_owner = None
             row.lease_token = None
             row.lease_expires_at = None

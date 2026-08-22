@@ -41,6 +41,11 @@ from src.schemas.agent_prediction import (
     AgentPredictionRecord,
 )
 from src.schemas.memory_fact_opinion import lock_prediction_outcome_actuals
+from src.schemas.memory_provenance import (
+    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+    reject_client_provenance_keys,
+    stamp_memory_provenance,
+)
 from src.schemas.prediction_record import (
     NoVerifiableReason,
     PREDICTION_HORIZON_TOKENS,
@@ -163,6 +168,8 @@ class AgentPredictionRepository(BaseRepository):
             no_verifiable_reason=row.no_verifiable_reason,
             notes=row.notes,
             resolved_at=row.resolved_at,
+            provenance_source=row.provenance_source,
+            actor_id=row.actor_id,
         )
 
     def insert_pending(
@@ -514,6 +521,11 @@ class AgentPredictionRepository(BaseRepository):
         if not isinstance(outcome, Mapping):
             raise ValueError("outcome must be a mapping")
         lock_prediction_outcome_actuals(outcome)
+        reject_client_provenance_keys(outcome)
+        stamp = stamp_memory_provenance(
+            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+            actor_id=None,
+        )
         now = as_of or self._clock()
         token = str(expected_lease_token or "").strip() or None
         if token is not None and len(token) > 64:
@@ -544,6 +556,8 @@ class AgentPredictionRepository(BaseRepository):
                         lease_owner=None,
                         lease_token=None,
                         lease_expires_at=None,
+                        provenance_source=stamp["provenance_source"],
+                        actor_id=stamp["actor_id"],
                     )
                 )
                 applied = int(result.rowcount or 0) == 1
@@ -600,6 +614,11 @@ class AgentPredictionRepository(BaseRepository):
             }
         )
         lock_prediction_outcome_actuals(payload)
+        reject_client_provenance_keys(payload)
+        stamp = stamp_memory_provenance(
+            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+            actor_id=None,
+        )
         conditions = [
             agent_predictions_table.c.prediction_id == canonical,
             agent_predictions_table.c.status == STATUS_RESOLVING,
@@ -618,6 +637,8 @@ class AgentPredictionRepository(BaseRepository):
                         lease_owner=None,
                         lease_token=None,
                         lease_expires_at=None,
+                        provenance_source=stamp["provenance_source"],
+                        actor_id=stamp["actor_id"],
                     )
                 )
                 applied = int(result.rowcount or 0) == 1

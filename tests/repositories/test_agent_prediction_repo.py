@@ -16,6 +16,7 @@ from sqlalchemy.pool import NullPool
 from src.config import Config
 from src.migrations.registry import (
     AGENT_PREDICTION_SCHEMA_MIGRATION,
+    MEMORY_WRITE_PROVENANCE_MIGRATION,
     get_migrations,
 )
 from src.migrations.runner import MigrationRunner
@@ -152,7 +153,10 @@ def test_fresh_database_manager_applies_prediction_schema(isolated_db) -> None:
             {"version": AGENT_PREDICTION_SCHEMA_MIGRATION.id},
         ).scalar_one()
     assert applied == 1
-    assert get_migrations()[-1].id == AGENT_PREDICTION_SCHEMA_MIGRATION.id
+    assert AGENT_PREDICTION_SCHEMA_MIGRATION.id in {
+        migration.id for migration in get_migrations()
+    }
+    assert get_migrations()[-1].id == MEMORY_WRITE_PROVENANCE_MIGRATION.id
 
 
 def test_due_query_uses_status_resolve_after_index(isolated_db) -> None:
@@ -205,6 +209,10 @@ def test_migration_applies_on_existing_database_without_predictions(
                 "DELETE FROM schema_migrations WHERE version = :version",
                 {"version": AGENT_PREDICTION_SCHEMA_MIGRATION.id},
             )
+            connection.exec_driver_sql(
+                "DELETE FROM schema_migrations WHERE version = :version",
+                {"version": MEMORY_WRITE_PROVENANCE_MIGRATION.id},
+            )
             tables = {
                 row[0]
                 for row in connection.exec_driver_sql(
@@ -217,6 +225,7 @@ def test_migration_applies_on_existing_database_without_predictions(
         result = MigrationRunner().apply_pending(engine)
         assert result.success is True
         assert AGENT_PREDICTION_SCHEMA_MIGRATION.id in result.executed_ids
+        assert MEMORY_WRITE_PROVENANCE_MIGRATION.id in result.executed_ids
         inspector = inspect(engine)
         assert "agent_predictions" in inspector.get_table_names()
         assert "ix_agent_prediction_status_resolve_after" in _index_names(
@@ -229,7 +238,7 @@ def test_migration_applies_on_existing_database_without_predictions(
         assert count == 1
         verification = MigrationRunner().verify(engine)
         assert verification.success is True
-        assert verification.current_version == AGENT_PREDICTION_SCHEMA_MIGRATION.id
+        assert verification.current_version == MEMORY_WRITE_PROVENANCE_MIGRATION.id
     finally:
         engine.dispose()
         DatabaseManager.reset_instance()

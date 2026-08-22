@@ -37,6 +37,8 @@ agent_predictions_table = Table(
     Column("source_decision_id", String(128)),
     Column("no_verifiable_reason", String(64)),
     Column("notes", String(500)),
+    Column("provenance_source", String(32)),
+    Column("actor_id", String(128)),
     Column("attempts", Integer, nullable=False, default=0),
     Column("created_at", DateTime, nullable=False),
     Column("updated_at", DateTime, nullable=False),

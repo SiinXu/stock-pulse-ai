@@ -21,6 +21,7 @@ from src.services.decision_profile_calibration_service import (
 )
 from src.services.decision_signal_data_quality import normalize_decision_signal_data_quality
 from src.schemas.memory_fact_opinion import lock_opinion_payload
+from src.schemas.memory_provenance import reject_client_provenance_keys
 from src.schemas.memory_write_guard import (
     FEEDBACK_NOTE_MAX_LENGTH,
     FEEDBACK_REASON_CODE_MAX_LENGTH,
@@ -378,6 +379,8 @@ class DecisionSignalOutcomeService:
                 "reason_code": None,
                 "note": None,
                 "source": None,
+                "provenance_source": None,
+                "actor_id": None,
                 "created_at": None,
                 "updated_at": None,
             }
@@ -414,6 +417,7 @@ class DecisionSignalOutcomeService:
             ),
             "source": self._normalize_enum(source or "api", FEEDBACK_SOURCES, "source"),
         }
+        reject_client_provenance_keys(fields)
         lock_opinion_payload(fields)
         row = self.repo.upsert_feedback(fields)
         return self._serialize_feedback(row)
@@ -741,6 +745,8 @@ class DecisionSignalOutcomeService:
             "reason_code": row.reason_code,
             "note": row.note,
             "source": row.source,
+            "provenance_source": row.provenance_source,
+            "actor_id": row.actor_id,
             "created_at": row.created_at.isoformat() if row.created_at else None,
             "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         }
