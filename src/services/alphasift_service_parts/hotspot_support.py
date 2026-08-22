@@ -267,6 +267,7 @@ def _load_alphasift_hotspot_cache(*, provider: str, top: int) -> Optional[Dict[s
         "hotspots": selected,
         "hotspot_count": len(selected),
         "cache_used": True,
+        "fallback_used": False,  # cache hit is not failure-serve-cache
         "cached_at": raw.get("cached_at") or payload.get("cached_at"),
     })
     cached["source_errors"] = _classify_hotspot_source_errors(

@@ -1,0 +1,1 @@
+- [Fixed] Discover hotspots distinguish genuine empty, source-degraded, and last-good cached states: last-good uses serve-cache flags plus its own body copy, and a successful live fallback is not labeled last-good (Refs #871).

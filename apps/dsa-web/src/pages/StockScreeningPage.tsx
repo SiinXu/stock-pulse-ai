@@ -15,7 +15,7 @@ import {
   getParsedApiError,
   toApiErrorMessage,
 } from '../api/error';
-import { AppPage, Button } from '../components/common';
+import { AppPage } from '../components/common';
 import { ScreeningConfigurationModal } from '../components/screening/ScreeningConfigurationModal';
 import { ScreeningHotspotsSection } from '../components/screening/ScreeningHotspotsSection';
 import ScreeningPageAlerts from '../components/screening/ScreeningPageAlerts';
@@ -24,7 +24,7 @@ import { useRouteFocusTarget } from '../components/routing';
 import { ScreeningResultsSection } from '../components/screening/ScreeningResultsSection';
 import { ScreeningRunStatusCard } from '../components/screening/ScreeningRunStatusCard';
 import { ScreeningStrategyBar } from '../components/screening/ScreeningStrategyBar';
-import { formatHotspotEmptyMessage } from '../components/screening/hotspotModel';
+import { formatHotspotEmptyMessage, isLastGoodHotspotResponse } from '../components/screening/hotspotModel';
 import { getScreeningDegradationReasons } from '../components/screening/screeningDegradation';
 import createScreeningResultsEmptyState from '../components/screening/screeningResultsEmptyState';
 import {
@@ -276,7 +276,9 @@ const StockScreeningPage: React.FC = () => {
         setHotspotDetail(null);
       }
       setHotspotDetailError('');
-      if (nextHotspots.length === 0) {
+      if (isLastGoodHotspotResponse(result)) {
+        setHotspotError(text.showingLastGoodMessage);
+      } else if (nextHotspots.length === 0) {
         setHotspotError(formatHotspotEmptyMessage(result, text));
       }
     } catch (err) {
@@ -612,9 +614,7 @@ const StockScreeningPage: React.FC = () => {
         onRefresh={() => void loadHotspots(true)}
         onSelectHotspot={handleHotspotSelect}
         onAnalyzeStock={handleAnalyzeHotspotStock}
-        dataSourcesAction={(hotspotError || hotspotDetailError || (hotspotDetail?.sourceErrors || []).length > 0 || (hotspotDetail?.missingFields || []).length > 0) ? (
-          <Button size="default" variant="secondary" aria-label={`${text.openDataSources} · ${text.hotspots}`} onClick={handleOpenDataSources}>{text.openDataSources}</Button>
-        ) : undefined}
+        onOpenDataSources={handleOpenDataSources}
       />
 
       <ScreeningStrategyBar

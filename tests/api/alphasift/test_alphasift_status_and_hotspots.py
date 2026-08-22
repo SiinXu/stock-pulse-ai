@@ -500,9 +500,52 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
                 payload = self._hotspots(config=config, provider="akshare", top=1, refresh=False)
 
         self.assertEqual(payload["cache_used"], True)
+        self.assertFalse(payload.get("fallback_used"))
         self.assertEqual(payload["cached_at"], "2026-06-07T12:00:00Z")
         self.assertEqual(payload["hotspot_count"], 1)
         self.assertEqual(payload["hotspots"][0]["topic"], "玻璃基板")
+        discover.assert_not_called()
+
+    def test_hotspots_default_cache_read_does_not_keep_stored_live_fallback_flag(self) -> None:
+        config = self._config(enabled=True)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cache_path = Path(tmpdir) / "hotspots.json"
+            cache_path.write_text(
+                json.dumps({
+                    "cached_at": "2026-06-07T12:00:00Z",
+                    "payload": {
+                        "enabled": True,
+                        "provider": "akshare",
+                        "provider_used": "dsa_eastmoney_board_change",
+                        "fallback_used": True,
+                        "cache_used": False,
+                        "source_errors": [
+                            "alphasift_hotspot_source_error",
+                            "alphasift_hotspot_direct_fallback_used",
+                        ],
+                        "hotspots": [
+                            {"topic": "MLCC", "heat_score": 91.0},
+                            {"topic": "铜缆高速连接", "heat_score": 88.0},
+                            {"topic": "机器人执行器", "heat_score": 80.0},
+                        ],
+                        "hotspot_count": 3,
+                    },
+                }),
+                encoding="utf-8",
+            )
+            discover = MagicMock()
+            with (
+                patch("src.services.alphasift_service.DSA_ALPHASIFT_HOTSPOT_CACHE_PATH", cache_path),
+                patch("src.services.alphasift_service._get_alphasift_status_snapshot", return_value=({}, True, {})),
+                patch("src.services.alphasift_service._import_alphasift_hotspot", return_value=SimpleNamespace(discover_hotspots=discover)),
+            ):
+                payload = self._hotspots(config=config, provider="akshare", top=12, refresh=False)
+
+        self.assertEqual(payload["cache_used"], True)
+        self.assertFalse(payload.get("fallback_used"))
+        self.assertEqual(payload["hotspot_count"], 3)
+        self.assertEqual(payload["hotspots"][0]["topic"], "MLCC")
         discover.assert_not_called()
 
     def test_hotspots_refresh_falls_back_to_cache_when_provider_returns_only_errors(self) -> None:

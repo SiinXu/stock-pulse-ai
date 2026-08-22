@@ -46,7 +46,7 @@ export type ScreeningHotspotsSectionProps = {
   onRefresh: () => void;
   onSelectHotspot: (topic: string) => void;
   onAnalyzeStock: (stock: AlphaSiftHotspotDetail['stocks'][number]) => void;
-  dataSourcesAction?: React.ReactNode;
+  onOpenDataSources: () => void;
 };
 
 export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> = ({
@@ -66,8 +66,10 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
   onRefresh,
   onSelectHotspot,
   onAnalyzeStock,
-  dataSourcesAction,
-}) => (
+  onOpenDataSources,
+}) => {
+  const degraded = Boolean(hotspotError) && !hotspots.length && hotspotError !== text.noCachedHotspots && hotspotError !== text.hotspotUnavailable;
+  return (
       <Surface as="section" level="interactive" padding="md">
         <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
           <div className="flex items-start gap-3">
@@ -106,7 +108,16 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
                 {text.refreshHotspots}
               </Button>
               ) : null}
-              {dataSourcesAction}
+              {hotspotError || hotspotDetailError || hotspotDetail?.sourceErrors?.length || hotspotDetail?.missingFields?.length ? (
+              <Button
+                size="default"
+                variant="secondary"
+                aria-label={`${text.openDataSources} · ${text.hotspots}`}
+                onClick={onOpenDataSources}
+              >
+                {text.openDataSources}
+              </Button>
+              ) : null}
             </div>
             <p className="text-xs text-secondary-text">{formatUiText(text.updatedAt, { time: formatHotspotUpdatedAt(hotspotsUpdatedAt, language, text) })}</p>
           </div>
@@ -116,8 +127,8 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
           <InlineAlert
             variant="warning"
             className="mb-3"
-            title={hotspots.length > 0 ? text.showingLastGoodTitle : undefined}
-            message={hotspotError}
+            title={hotspots.length > 0 ? text.showingLastGoodTitle : degraded ? text.sourcesUnavailableTitle : undefined}
+            message={hotspots.length > 0 ? text.showingLastGoodMessage : hotspotError}
           />
         ) : null}
 
@@ -132,7 +143,7 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
           </Surface>
         ) : hotspots.length === 0 ? (
           <Surface level="interactive" padding="sm" className="text-sm text-secondary-text">
-            {text.refreshDescription}
+            {degraded ? text.sourcesUnavailableDescription : text.refreshDescription}
           </Surface>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
@@ -333,5 +344,5 @@ export const ScreeningHotspotsSection: React.FC<ScreeningHotspotsSectionProps> =
           </Surface>
         ) : null}
       </Surface>
-
-);
+  );
+};

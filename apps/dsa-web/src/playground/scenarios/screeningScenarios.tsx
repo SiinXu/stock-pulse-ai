@@ -86,6 +86,7 @@ const ScreeningHotspotsSectionStory = () => {
       onRefresh={() => undefined}
       onSelectHotspot={() => undefined}
       onAnalyzeStock={() => undefined}
+      onOpenDataSources={() => undefined}
     />
   );
 };

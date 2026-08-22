@@ -4,11 +4,12 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AlphaSiftHotspot, AlphaSiftHotspotDetail } from '../../../api/alphasift';
 import { SCREENING_TEXT } from '../../../locales/screening';
-import { Button } from '../../common';
 import { ScreeningHotspotsSection, type ScreeningHotspotsSectionProps } from '../ScreeningHotspotsSection';
+import { getHotspotPanelKind, isLastGoodHotspotResponse } from '../hotspotModel';
 
 const text = SCREENING_TEXT.en;
 const dataSourcesName = `${text.openDataSources} · ${text.hotspots}`;
+const mappedSourceError = text.hotspotUnavailableDetail.replace('{detail}', text.diagnosticNetwork);
 
 const hotspot: AlphaSiftHotspot = {
   topic: 'ai-compute',
@@ -39,19 +40,6 @@ const degradedDetail: AlphaSiftHotspotDetail = {
   stockCount: 1,
 };
 
-function dataSourcesSlot(onOpenDataSources: () => void) {
-  return (
-    <Button
-      size="default"
-      variant="secondary"
-      aria-label={dataSourcesName}
-      onClick={onOpenDataSources}
-    >
-      {text.openDataSources}
-    </Button>
-  );
-}
-
 function getHotspotSection() {
   const section = screen.getByRole('heading', { name: text.hotspots }).closest('section');
   expect(section).not.toBeNull();
@@ -79,16 +67,126 @@ function renderSection(overrides: Partial<ScreeningHotspotsSectionProps> = {}) {
       onRefresh={onRefresh}
       onSelectHotspot={() => undefined}
       onAnalyzeStock={() => undefined}
-      dataSourcesAction={dataSourcesSlot(onOpenDataSources)}
+      onOpenDataSources={onOpenDataSources}
       {...overrides}
     />,
   );
   return { onRefresh, onOpenDataSources, ...view };
 }
 
+describe('getHotspotPanelKind', () => {
+  const empty = text.noCachedHotspots;
+  const unavailable = text.hotspotUnavailable;
+
+  it('distinguishes genuine empty, degraded, cached, and healthy lists', () => {
+    expect(getHotspotPanelKind(0, empty, empty, unavailable)).toBe('empty');
+    expect(getHotspotPanelKind(0, unavailable, empty, unavailable)).toBe('empty');
+    expect(getHotspotPanelKind(0, mappedSourceError, empty, unavailable)).toBe('degraded');
+    expect(getHotspotPanelKind(0, text.hotspotLoadFailed, empty, unavailable)).toBe('degraded');
+    expect(getHotspotPanelKind(1, text.hotspotLoadFailed, empty, unavailable)).toBe('cached');
+    expect(getHotspotPanelKind(1, '', empty, unavailable)).toBe('healthy');
+  });
+
+  it('treats failure-serve-cache as last-good and does not treat a successful live fallback as last-good', () => {
+    expect(isLastGoodHotspotResponse({
+      enabled: true,
+      provider: 'akshare',
+      hotspotCount: 1,
+      hotspots: [hotspot],
+      cacheUsed: true,
+      fallbackUsed: true,
+      sourceErrors: ['alphasift_hotspot_source_error'],
+    })).toBe(true);
+    expect(isLastGoodHotspotResponse({
+      enabled: true,
+      provider: 'akshare',
+      hotspotCount: 1,
+      hotspots: [hotspot],
+      cacheUsed: false,
+      fallbackUsed: true,
+      sourceErrors: ['alphasift_hotspot_source_error', 'alphasift_hotspot_direct_fallback_used'],
+    })).toBe(false);
+    expect(isLastGoodHotspotResponse({
+      enabled: true,
+      provider: 'akshare',
+      hotspotCount: 1,
+      hotspots: [hotspot],
+      cacheUsed: true,
+      fallbackUsed: false,
+      sourceErrors: [],
+    })).toBe(false);
+  });
+});
+
 describe('ScreeningHotspotsSection recovery contract', () => {
   afterEach(() => {
     cleanup();
+  });
+
+  it('renders a genuine empty hotspot run with Retry and Data Sources, not as a source outage', () => {
+    const { onRefresh, onOpenDataSources } = renderSection({
+      hotspotError: text.noCachedHotspots,
+    });
+
+    const hotspotSection = getHotspotSection();
+    const alert = within(hotspotSection).getByRole('status');
+    expect(within(alert).getByText(text.noCachedHotspots)).toBeInTheDocument();
+    expect(within(alert).queryByText(text.sourcesUnavailableTitle)).not.toBeInTheDocument();
+    expect(within(alert).queryByText(text.showingLastGoodTitle)).not.toBeInTheDocument();
+    expect(within(hotspotSection).getByText(text.refreshDescription)).toBeInTheDocument();
+    expect(within(hotspotSection).queryByText(text.sourcesUnavailableDescription)).not.toBeInTheDocument();
+    expect(screen.queryByText('eastmoney_hotspot_unavailable')).not.toBeInTheDocument();
+    const retry = within(hotspotSection).getByRole('button', { name: text.refreshHotspots });
+    const dataSources = within(hotspotSection).getByRole('button', { name: dataSourcesName });
+    expect(retry).toHaveAttribute('data-control', 'button');
+    expect(dataSources).toHaveAttribute('data-control', 'button');
+    fireEvent.click(retry);
+    fireEvent.click(dataSources);
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onOpenDataSources).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders a degraded empty hotspot run with mapped copy and Data Sources, not the idle empty hint', () => {
+    const { onRefresh, onOpenDataSources } = renderSection({
+      hotspotError: mappedSourceError,
+    });
+
+    const hotspotSection = getHotspotSection();
+    const alert = within(hotspotSection).getByRole('status');
+    expect(within(alert).getByText(text.sourcesUnavailableTitle)).toBeInTheDocument();
+    expect(within(alert).getByText(mappedSourceError)).toBeInTheDocument();
+    expect(within(alert).queryByText(text.showingLastGoodTitle)).not.toBeInTheDocument();
+    expect(within(hotspotSection).getByText(text.sourcesUnavailableDescription)).toBeInTheDocument();
+    expect(within(hotspotSection).queryByText(text.refreshDescription)).not.toBeInTheDocument();
+    expect(screen.queryByText('eastmoney_hotspot_unavailable')).not.toBeInTheDocument();
+    expect(screen.queryByText(/RemoteDisconnected/)).not.toBeInTheDocument();
+    fireEvent.click(within(hotspotSection).getByRole('button', { name: text.refreshHotspots }));
+    fireEvent.click(within(hotspotSection).getByRole('button', { name: dataSourcesName }));
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onOpenDataSources).toHaveBeenCalledTimes(1);
+  });
+
+  it('labels preserved last-good hotspots and keeps Retry plus Data Sources on that alert', () => {
+    const { onRefresh, onOpenDataSources } = renderSection({
+      hotspots: [hotspot],
+      hotspotsUpdatedAt: '2026-08-05T12:00:00Z',
+      hotspotError: text.hotspotLoadFailed,
+    });
+
+    const hotspotSection = getHotspotSection();
+    const alert = within(hotspotSection).getByRole('status');
+    expect(within(alert).getByText(text.showingLastGoodTitle)).toBeInTheDocument();
+    expect(within(alert).getByText(text.showingLastGoodMessage)).toBeInTheDocument();
+    expect(within(alert).queryByText(text.hotspotLoadFailed)).not.toBeInTheDocument();
+    expect(within(alert).queryByText(text.sourcesUnavailableTitle)).not.toBeInTheDocument();
+    expect(within(alert).queryByText(text.refreshDescription)).not.toBeInTheDocument();
+    expect(within(hotspotSection).getByText('AI Compute')).toBeInTheDocument();
+    expect(within(hotspotSection).queryByText(text.refreshDescription)).not.toBeInTheDocument();
+    fireEvent.click(within(hotspotSection).getByRole('button', { name: text.refreshHotspots }));
+    fireEvent.click(within(hotspotSection).getByRole('button', { name: dataSourcesName }));
+    expect(screen.getByText('AI Compute')).toBeInTheDocument();
+    expect(onRefresh).toHaveBeenCalledTimes(1);
+    expect(onOpenDataSources).toHaveBeenCalledTimes(1);
   });
 
   it('places Data Sources on the empty hotspot alert instead of a page sibling, with Retry still in the section', () => {
@@ -103,6 +201,7 @@ describe('ScreeningHotspotsSection recovery contract', () => {
     const alert = within(hotspotSection).getByRole('status');
     const dataSources = within(hotspotSection).getByRole('button', { name: dataSourcesName });
     expect(within(alert).getByText(text.hotspotUnavailable)).toBeInTheDocument();
+    expect(within(alert).queryByText(text.sourcesUnavailableTitle)).not.toBeInTheDocument();
     expect(retry).toHaveAttribute('data-control', 'button');
     expect(dataSources).toHaveAttribute('data-control', 'button');
     expect(dataSources).toHaveAttribute('type', 'button');
@@ -134,39 +233,6 @@ describe('ScreeningHotspotsSection recovery contract', () => {
     expect(onOpenDataSources).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps Retry and Data Sources on the expanded empty-error surface, not as a page sibling', () => {
-    const { onRefresh, onOpenDataSources } = renderSection({
-      hotspotError: text.hotspotUnavailable,
-    });
-
-    const hotspotSection = getHotspotSection();
-    expect(within(hotspotSection).getByText(text.refreshDescription)).toBeInTheDocument();
-    expect(within(hotspotSection).getByRole('status')).toHaveTextContent(text.hotspotUnavailable);
-    fireEvent.click(within(hotspotSection).getByRole('button', { name: text.refreshHotspots }));
-    fireEvent.click(within(hotspotSection).getByRole('button', { name: dataSourcesName }));
-    expect(onRefresh).toHaveBeenCalledTimes(1);
-    expect(onOpenDataSources).toHaveBeenCalledTimes(1);
-  });
-
-  it('labels preserved last-good hotspots and keeps Retry plus Data Sources on that alert', () => {
-    const { onRefresh, onOpenDataSources } = renderSection({
-      hotspots: [hotspot],
-      hotspotsUpdatedAt: '2026-08-05T12:00:00Z',
-      hotspotError: text.hotspotLoadFailed,
-    });
-
-    const hotspotSection = getHotspotSection();
-    const alert = within(hotspotSection).getByRole('status');
-    expect(within(alert).getByText(text.showingLastGoodTitle)).toBeInTheDocument();
-    expect(within(alert).getByText(text.hotspotLoadFailed)).toBeInTheDocument();
-    expect(within(hotspotSection).getByText('AI Compute')).toBeInTheDocument();
-    fireEvent.click(within(hotspotSection).getByRole('button', { name: text.refreshHotspots }));
-    fireEvent.click(within(hotspotSection).getByRole('button', { name: dataSourcesName }));
-    expect(screen.getByText('AI Compute')).toBeInTheDocument();
-    expect(onRefresh).toHaveBeenCalledTimes(1);
-    expect(onOpenDataSources).toHaveBeenCalledTimes(1);
-  });
-
   it('places Data Sources on the degraded hotspot panel so mapped source_errors are not the only recovery UI', () => {
     const { onRefresh, onOpenDataSources } = renderSection({
       hotspots: [hotspot],
@@ -189,12 +255,12 @@ describe('ScreeningHotspotsSection recovery contract', () => {
     renderSection({
       hotspots: [hotspot],
       hotspotsUpdatedAt: '2026-08-05T12:00:00Z',
-      dataSourcesAction: undefined,
     });
 
     expect(screen.getByText('AI Compute')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: dataSourcesName })).not.toBeInTheDocument();
     expect(screen.queryByText(text.showingLastGoodTitle)).not.toBeInTheDocument();
+    expect(screen.queryByText(text.sourcesUnavailableTitle)).not.toBeInTheDocument();
   });
 
   it('keeps Data Sources reachable when screening is disabled and Retry is blocked', () => {

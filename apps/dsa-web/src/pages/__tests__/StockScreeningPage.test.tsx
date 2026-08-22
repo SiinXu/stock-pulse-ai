@@ -588,6 +588,132 @@ describe('StockScreeningPage', () => {
     expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
   });
 
+  it('labels a 200 last-good hotspot payload as cached, keeps the cards, and keeps Retry plus Data Sources', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getHotspots.mockResolvedValueOnce({
+      enabled: true,
+      provider: 'akshare',
+      providerUsed: 'akshare',
+      cacheUsed: true,
+      fallbackUsed: true,
+      cachedAt: '2026-06-07T12:00:00Z',
+      hotspots: [{ topic: 'MLCC', name: 'MLCC', heatScore: 91, stage: 'warming' }],
+      hotspotCount: 1,
+      sourceErrors: ['alphasift_hotspot_source_error'],
+    });
+
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    const section = hotspotSection as HTMLElement;
+    const alert = within(section).getByRole('status');
+    expect(within(alert).getByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(within(alert).queryByText('无法获取行情快照')).not.toBeInTheDocument();
+    expect(screen.queryByText('alphasift_hotspot_source_error')).not.toBeInTheDocument();
+    fireEvent.click(within(section).getByRole('button', { name: /展开热点题材/ }));
+    expect(within(section).getByText('MLCC')).toBeInTheDocument();
+    const retry = within(section).getByRole('button', { name: /刷新热点题材/ });
+    const dataSources = within(section).getByRole('button', { name: '打开数据源设置 · 热点题材' });
+    expect(retry).toHaveAttribute('data-control', 'button');
+    expect(dataSources).toHaveAttribute('data-control', 'button');
+    fireEvent.click(dataSources);
+    expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
+  });
+
+  it('does not render a successful live hotspot fallback as last-good or degraded', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getHotspots.mockResolvedValueOnce({
+      enabled: true,
+      provider: 'akshare',
+      providerUsed: 'dsa_eastmoney_board_change',
+      cacheUsed: false,
+      fallbackUsed: true,
+      cachedAt: null,
+      hotspots: [{ topic: '铜缆高速连接', name: '铜缆高速连接', heatScore: 88, stage: 'warming' }],
+      hotspotCount: 1,
+      sourceErrors: ['alphasift_hotspot_source_error', 'alphasift_hotspot_direct_fallback_used'],
+    });
+
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    const section = hotspotSection as HTMLElement;
+    expect(within(section).queryByRole('status')).not.toBeInTheDocument();
+    expect(within(section).queryByText('正在显示上次成功结果')).not.toBeInTheDocument();
+    expect(within(section).queryByText('无法获取行情快照')).not.toBeInTheDocument();
+    expect(within(section).queryByText('热点题材暂未返回数据')).not.toBeInTheDocument();
+    expect(within(section).queryByText(/热点题材暂未返回数据/)).not.toBeInTheDocument();
+    fireEvent.click(within(section).getByRole('button', { name: /展开热点题材/ }));
+    expect(within(section).getByText('铜缆高速连接')).toBeInTheDocument();
+    expect(within(section).queryByRole('button', { name: '打开数据源设置 · 热点题材' })).not.toBeInTheDocument();
+    expect(screen.queryByText('alphasift_hotspot_direct_fallback_used')).not.toBeInTheDocument();
+  });
+
+  it('does not show empty-list copy on last-good hotspot cards', async () => {
+    getAlphaSiftStatus.mockResolvedValueOnce({
+      enabled: true,
+      available: true,
+      installSpecIsDefault: true,
+    });
+    getHotspots.mockResolvedValueOnce({
+      enabled: true,
+      provider: 'akshare',
+      providerUsed: 'akshare',
+      cacheUsed: true,
+      fallbackUsed: true,
+      cachedAt: '2026-06-07T12:00:00Z',
+      hotspots: [{ topic: 'MLCC', name: 'MLCC', heatScore: 91, stage: 'warming' }],
+      hotspotCount: 1,
+      sourceErrors: ['alphasift_hotspot_source_error'],
+    });
+
+    render(
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <StockScreeningPage />
+      </RouteFocusRegistrationContext.Provider>,
+    );
+
+    expect(await screen.findByText('选股已开启')).toBeInTheDocument();
+    await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: false }));
+    const hotspotSection = screen.getByRole('heading', { name: '热点题材' }).closest('section');
+    expect(hotspotSection).not.toBeNull();
+    const section = hotspotSection as HTMLElement;
+    const alert = within(section).getByRole('status');
+    expect(within(alert).getByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(within(alert).getByText('当前尝试未能替换结果，以下候选仍来自上次成功选股。')).toBeInTheDocument();
+    expect(within(alert).queryByText('热点题材暂未返回数据')).not.toBeInTheDocument();
+    expect(within(alert).queryByText(/热点题材暂未返回数据/)).not.toBeInTheDocument();
+    expect(within(alert).queryByText('暂无缓存热点题材，展开后可点击刷新拉取实时数据。')).not.toBeInTheDocument();
+    expect(within(section).queryByText('点击刷新后会拉取热点概念/行业排行、热度分、生命周期阶段和活跃龙头。')).not.toBeInTheDocument();
+    expect(within(section).queryByText('本次筛选未能从可用数据源获取行情快照。请检查数据源配置后重试，或调整筛选条件。')).not.toBeInTheDocument();
+    fireEvent.click(within(section).getByRole('button', { name: /展开热点题材/ }));
+    expect(within(section).getByText('MLCC')).toBeInTheDocument();
+    expect(within(alert).getByText('当前尝试未能替换结果，以下候选仍来自上次成功选股。')).toBeInTheDocument();
+    expect(within(section).queryByText(/热点题材暂未返回数据/)).not.toBeInTheDocument();
+  });
+
   it('prefers merged hotspot route summaries over raw timeline items', async () => {
     getAlphaSiftStatus.mockResolvedValueOnce({
       enabled: true,
@@ -1020,7 +1146,6 @@ describe('StockScreeningPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /刷新热点题材/ }));
 
     await waitFor(() => expect(getHotspots).toHaveBeenCalledWith({ provider: 'akshare', top: 12, refresh: true }));
-    expect(await screen.findByText(/请求未能完成，请稍后重试/)).toBeInTheDocument();
     expect(await screen.findByText('正在显示上次成功结果')).toBeInTheDocument();
     expect(screen.queryByText(/manual refresh failed/)).not.toBeInTheDocument();
     expect(screen.getByText('强势领先')).toBeInTheDocument();
@@ -1030,6 +1155,9 @@ describe('StockScreeningPage', () => {
     expect(hotspotSection).not.toBeNull();
     const alert = within(hotspotSection as HTMLElement).getByRole('status');
     expect(within(alert).getByText('正在显示上次成功结果')).toBeInTheDocument();
+    expect(within(alert).getByText('当前尝试未能替换结果，以下候选仍来自上次成功选股。')).toBeInTheDocument();
+    expect(within(alert).queryByText(/请求未能完成，请稍后重试/)).not.toBeInTheDocument();
+    expect(within(alert).queryByText(/热点题材暂未返回数据/)).not.toBeInTheDocument();
     expect(within(hotspotSection as HTMLElement).getByRole('button', { name: /刷新热点题材/ })).toHaveAttribute('data-control', 'button');
     fireEvent.click(within(hotspotSection as HTMLElement).getByRole('button', { name: '打开数据源设置 · 热点题材' }));
     expect(navigate).toHaveBeenCalledWith('/settings?section=data_sources&view=providers');
