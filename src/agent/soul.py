@@ -9,7 +9,8 @@ from typing import Any, Dict, Optional
 
 AGENT_SOUL_VERSION = "1.0.0"
 AGENT_SOUL_MARKER = "<!-- stockpulse-agent-soul -->"
-_AGENT_SOUL_END_MARKER = "<!-- /stockpulse-agent-soul -->"
+AGENT_SOUL_END_MARKER = "<!-- /stockpulse-agent-soul -->"
+_AGENT_SOUL_END_MARKER = AGENT_SOUL_END_MARKER
 
 # This is the only normative Soul source. Prompt assemblers import the
 # composer below instead of copying any of these rules into their own prompts.
@@ -157,6 +158,7 @@ __all__ = [
     "AGENT_SOUL_CHARTER",
     "AGENT_SOUL_HASH",
     "AGENT_SOUL_MARKER",
+    "AGENT_SOUL_END_MARKER",
     "AGENT_SOUL_SYSTEM_BLOCK",
     "AGENT_SOUL_VERSION",
     "compose_agent_soul_prompt",

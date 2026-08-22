@@ -77,7 +77,7 @@ Also accepted in the CHECK constraint for forward compatibility with the A1 cont
 
 ### Fact versus opinion (#1124 DAG-1)
 
-`outcome_json` is the PredictionOutcome actuals payload. Resolve and `data_unavailable` writes call `lock_prediction_outcome_actuals()` so user-opinion keys (`feedback_value`, `note`, `user_feedback`, transport `source`, …) cannot enter that JSON. Decision-signal user feedback remains a sidecar table and uses `lock_opinion_payload()` so market-actuals keys cannot ride along. Mixed payloads are rejected, not stripped and stored as facts. This slice does not add #1105 product feedback APIs or server-stamped provenance.
+`outcome_json` is the PredictionOutcome actuals payload. Resolve and `data_unavailable` writes call `lock_prediction_outcome_actuals()` so user-opinion keys (`feedback_value`, `note`, `user_feedback`, transport `source`, …) cannot enter that JSON. Decision-signal user feedback remains a sidecar table and uses `lock_opinion_payload()` so market-actuals keys cannot ride along. Mixed payloads are rejected, not stripped and stored as facts. Feedback `note`/`reason_code` and episode free-text (`user_feedback`, `extra` values, `remedy`) also reject Soul-boundary markers, oversize, and illegal C0 controls at the write boundary (`src/schemas/memory_write_guard.py`, #1124 DAG-2). This slice does not add #1105 product feedback APIs or server-stamped provenance.
 
 ## Concurrency
 

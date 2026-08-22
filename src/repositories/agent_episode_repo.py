@@ -23,6 +23,7 @@ from src.schemas.agent_episode import (
     EpisodeLesson,
     EpisodeOutcomeLabels,
     TrajectoryStepSummary,
+    reject_episode_free_text,
 )
 from src.storage import DatabaseManager
 
@@ -171,6 +172,7 @@ class AgentEpisodeRepository(BaseRepository):
         )
 
     def append(self, episode: AgentEpisodeCreate) -> AgentEpisode:
+        reject_episode_free_text(episode)
         now = _as_utc_naive(self._clock())
         if now is None:
             raise ValueError("agent episode clock must return a datetime")

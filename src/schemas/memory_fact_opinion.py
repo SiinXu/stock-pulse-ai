@@ -6,8 +6,9 @@ System market actuals (PredictionOutcome / decision-signal outcomes) and user
 opinion (feedback sidecars, episode labels) must not share write keys. Mixed
 payloads are rejected, not stripped and stored as facts.
 
-This module is the DAG-1 contract only. It does not stamp provenance (DAG-3),
-reject Soul-boundary markers (DAG-2), or add product feedback APIs (#1105).
+This module is the DAG-1 contract only. Soul-marker and oversize reject lives
+in ``memory_write_guard`` (DAG-2). It does not stamp provenance (DAG-3) or add
+product feedback APIs (#1105).
 """
 
 from __future__ import annotations

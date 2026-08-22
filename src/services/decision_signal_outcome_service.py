@@ -21,6 +21,11 @@ from src.services.decision_profile_calibration_service import (
 )
 from src.services.decision_signal_data_quality import normalize_decision_signal_data_quality
 from src.schemas.memory_fact_opinion import lock_opinion_payload
+from src.schemas.memory_write_guard import (
+    FEEDBACK_NOTE_MAX_LENGTH,
+    FEEDBACK_REASON_CODE_MAX_LENGTH,
+    reject_memory_write_text,
+)
 from src.services.decision_signal_service import (
     HORIZONS,
     SIGNAL_STATUSES,
@@ -388,11 +393,25 @@ class DecisionSignalOutcomeService:
         source: str = "api",
     ) -> Dict[str, Any]:
         signal = self._require_existing_signal(signal_id)
+        reject_memory_write_text(
+            reason_code,
+            field_name="reason_code",
+            max_length=FEEDBACK_REASON_CODE_MAX_LENGTH,
+        )
+        reject_memory_write_text(
+            note,
+            field_name="note",
+            max_length=FEEDBACK_NOTE_MAX_LENGTH,
+        )
         fields = {
             "signal_id": signal.id,
             "feedback_value": self._normalize_enum(feedback_value, FEEDBACK_VALUES, "feedback_value"),
-            "reason_code": self._optional_public_text(reason_code, "reason_code", max_length=64),
-            "note": self._optional_public_text(note, "note", max_length=1000),
+            "reason_code": self._optional_public_text(
+                reason_code, "reason_code", max_length=FEEDBACK_REASON_CODE_MAX_LENGTH
+            ),
+            "note": self._optional_public_text(
+                note, "note", max_length=FEEDBACK_NOTE_MAX_LENGTH
+            ),
             "source": self._normalize_enum(source or "api", FEEDBACK_SOURCES, "source"),
         }
         lock_opinion_payload(fields)

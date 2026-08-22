@@ -18,8 +18,10 @@ except ModuleNotFoundError:
     sys.modules["litellm"] = MagicMock()
 
 import src.auth as auth
+from src.agent.soul import AGENT_SOUL_END_MARKER, AGENT_SOUL_MARKER
 from src.api.app import create_app
 from src.config import Config
+from src.schemas.memory_write_guard import FEEDBACK_NOTE_MAX_LENGTH
 from src.storage import DatabaseManager, StockDaily
 
 
@@ -233,6 +235,113 @@ def test_feedback_put_rejects_fact_fields_and_leaves_outcomes_unchanged(client_a
     assert item["stock_return_pct"] == 5.0
     assert item["eval_status"] == before["eval_status"]
     assert item["start_price"] == before["start_price"]
+
+
+def test_feedback_put_rejects_soul_markers_and_oversize_notes(client_and_db) -> None:
+    client, db = client_and_db
+    created_resp = client.post(
+        "/api/v1/decision-signals",
+        json=_payload(trace_id="trace-soul-oversize-api"),
+    )
+    assert created_resp.status_code == 200, created_resp.text
+    signal_id = created_resp.json()["item"]["id"]
+    _seed_bars(db)
+
+    run_resp = client.post(
+        "/api/v1/decision-signals/outcomes/run",
+        json={"signal_id": signal_id},
+    )
+    assert run_resp.status_code == 200, run_resp.text
+    before = run_resp.json()["items"][0]
+    assert before["outcome"] == "hit"
+
+    marker_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "note": f"looks fine {AGENT_SOUL_MARKER}",
+        },
+    )
+    assert marker_resp.status_code == 422, marker_resp.text
+
+    end_marker_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "note": AGENT_SOUL_END_MARKER,
+        },
+    )
+    assert end_marker_resp.status_code == 422, end_marker_resp.text
+
+    mixed_case_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "note": "<!-- StockPulse-Agent-Soul -->",
+        },
+    )
+    assert mixed_case_resp.status_code == 422, mixed_case_resp.text
+
+    control_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "note": "ok\x00spoof",
+        },
+    )
+    assert control_resp.status_code == 422, control_resp.text
+
+    oversize_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "source": "web",
+            "note": "n" * (FEEDBACK_NOTE_MAX_LENGTH + 1),
+        },
+    )
+    assert oversize_resp.status_code == 422, oversize_resp.text
+
+    empty_feedback = client.get(f"/api/v1/decision-signals/{signal_id}/feedback")
+    assert empty_feedback.status_code == 200, empty_feedback.text
+    assert empty_feedback.json()["feedback_value"] is None
+
+    legal_note = "n" * FEEDBACK_NOTE_MAX_LENGTH
+    ok_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "useful",
+            "reason_code": "matched_plan",
+            "note": legal_note,
+            "source": "web",
+        },
+    )
+    assert ok_resp.status_code == 200, ok_resp.text
+    assert ok_resp.json()["note"] == legal_note
+    assert ok_resp.json()["source"] == "web"
+
+    overwrite_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "not_useful",
+            "source": "web",
+            "note": "stockpulse-agent-soul",
+        },
+    )
+    assert overwrite_resp.status_code == 422, overwrite_resp.text
+    kept = client.get(f"/api/v1/decision-signals/{signal_id}/feedback")
+    assert kept.status_code == 200, kept.text
+    assert kept.json()["feedback_value"] == "useful"
+    assert kept.json()["note"] == legal_note
+
+    outcomes_resp = client.get(f"/api/v1/decision-signals/{signal_id}/outcomes")
+    assert outcomes_resp.status_code == 200, outcomes_resp.text
+    item = outcomes_resp.json()["items"][0]
+    assert item["outcome"] == "hit"
+    assert item["stock_return_pct"] == before["stock_return_pct"]
 
 
 def test_outcome_api_rejects_invalid_params_and_returns_404(client_and_db) -> None:

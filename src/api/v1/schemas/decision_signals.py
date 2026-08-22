@@ -6,12 +6,17 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Mapping, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator
 
 from src.api.v1.schemas.market_phase import MarketPhaseValue
 from src.schemas.decision_action import DecisionAction
 from src.schemas.decision_profile import DecisionProfile
 from src.schemas.memory_fact_opinion import lock_opinion_payload
+from src.schemas.memory_write_guard import (
+    FEEDBACK_NOTE_MAX_LENGTH,
+    FEEDBACK_REASON_CODE_MAX_LENGTH,
+    reject_memory_write_text,
+)
 
 
 DecisionSignalSourceType = Literal["analysis", "agent", "alert", "market_review", "manual"]
@@ -243,8 +248,12 @@ class DecisionSignalOutcomeStatsResponse(BaseModel):
 
 class DecisionSignalFeedbackRequest(BaseModel):
     feedback_value: DecisionSignalFeedbackValue
-    reason_code: Optional[str] = Field(None, json_schema_extra={"maxLength": 64})
-    note: Optional[str] = Field(None, json_schema_extra={"maxLength": 1000})
+    reason_code: Optional[str] = Field(
+        None, json_schema_extra={"maxLength": FEEDBACK_REASON_CODE_MAX_LENGTH}
+    )
+    note: Optional[str] = Field(
+        None, json_schema_extra={"maxLength": FEEDBACK_NOTE_MAX_LENGTH}
+    )
     source: DecisionSignalFeedbackSource = "api"
 
     @model_validator(mode="before")
@@ -253,6 +262,22 @@ class DecisionSignalFeedbackRequest(BaseModel):
         if isinstance(value, Mapping):
             lock_opinion_payload(value)
         return value
+
+    @field_validator("reason_code", "note")
+    @classmethod
+    def _reject_soul_or_controls(
+        cls, value: Optional[str], info: ValidationInfo
+    ) -> Optional[str]:
+        max_length = (
+            FEEDBACK_NOTE_MAX_LENGTH
+            if info.field_name == "note"
+            else FEEDBACK_REASON_CODE_MAX_LENGTH
+        )
+        return reject_memory_write_text(
+            value,
+            field_name=str(info.field_name),
+            max_length=max_length,
+        )
 
 
 class DecisionSignalFeedbackItem(BaseModel):
