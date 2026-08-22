@@ -314,6 +314,7 @@ def test_config_257_item_connection_update_uses_bounded_audit_evidence(
         )
     finally:
         Config.reset_instance()
+        os.environ.pop("ADMIN_AUTH_ENABLED", None)
 
     assert response.status_code == 200, response.text
     assert response.json()["applied_count"] == 257

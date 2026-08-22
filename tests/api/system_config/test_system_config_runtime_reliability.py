@@ -9,7 +9,7 @@ import tempfile
 import threading
 import unittest
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import ANY, Mock, patch
 
 from fastapi import HTTPException
 
@@ -627,6 +627,8 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             validate_connectivity=True,
             connectivity_timeout_seconds=12.0,
             actor="authenticated_admin",
+            security_audit=ANY,
+            source="http_put",
         )
 
     def test_rollback_api_returns_conflict_when_snapshot_is_unavailable(self) -> None:
