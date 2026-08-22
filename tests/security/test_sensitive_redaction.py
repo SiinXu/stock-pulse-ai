@@ -20,6 +20,7 @@ from src.agent.llm_adapter import ToolCall
 from src.agent.provider_trace import extract_provider_trace_turns
 from src.agent.public_contract import sanitize_stream_event
 from src.agent.runner import _execute_tools
+from tests.agent.runtime.bound_tool_session_double import ExecuteToolsObserverSession
 from src.agent.tools.execution import (
     ToolAccessContext,
     build_tool_audit,
@@ -1324,21 +1325,19 @@ def test_provider_trace_drops_every_secret_bearing_identity_before_persistence(
 def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
     dispatched_names: list[str] = []
 
-    class RecordingSession:
-        execution_id = "native-redaction-test"
-        deadline_monotonic = None
+    def _record_execute(name: str, arguments: dict) -> dict:
+        dispatched_names.append(name)
+        return {
+            "result_text": json.dumps({"echo": arguments.get("message")}),
+            "ok": True,
+        }
 
-        @staticmethod
-        def is_non_retriable_cached(_cache_key: str) -> bool:
-            return False
-
-        @staticmethod
-        def execute(name: str, arguments: dict, **_kwargs) -> dict:
-            dispatched_names.append(name)
-            return {
-                "result_text": json.dumps({"echo": arguments.get("message")}),
-                "ok": True,
-            }
+    recording_session = ExecuteToolsObserverSession(
+        execution_id="native-redaction-test",
+        execute_handler=_record_execute,
+        deadline_monotonic=None,
+        cancelled_check=None,
+    )
 
     tool_call = ToolCall(
         id="call-public",
@@ -1350,7 +1349,7 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
 
     results = _execute_tools(
         [tool_call],
-        RecordingSession(),
+        recording_session,
         step=1,
         progress_callback=events.append,
         tool_calls_log=tool_calls_log,
@@ -1369,14 +1368,16 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
         "tool_calls_log": tool_calls_log,
     })
 
-    class BlockingSession(RecordingSession):
-        @staticmethod
-        def execute(name: str, arguments: dict, **_kwargs) -> dict:
-            time.sleep(0.05)
-            return {
-                "result_text": json.dumps({"echo": arguments.get("message")}),
-                "ok": True,
-            }
+    blocking_session = ExecuteToolsObserverSession(
+        execution_id="native-redaction-test",
+        execute_handler=lambda name, arguments: {
+            "result_text": json.dumps({"echo": arguments.get("message")}),
+            "ok": True,
+        },
+        deadline_monotonic=None,
+        cancelled_check=None,
+        block_seconds=0.05,
+    )
 
     timed_out_call = ToolCall(
         id="call-timeout",
@@ -1387,7 +1388,7 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
 
     _execute_tools(
         [timed_out_call],
-        BlockingSession(),
+        blocking_session,
         step=2,
         progress_callback=None,
         tool_calls_log=timed_out_log,
@@ -1412,7 +1413,7 @@ def test_native_tool_trace_redacts_name_without_changing_dispatch() -> None:
 
     _execute_tools(
         queued_calls,
-        BlockingSession(),
+        blocking_session,
         step=3,
         progress_callback=None,
         tool_calls_log=queued_log,

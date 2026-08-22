@@ -1,16 +1,17 @@
 # Shared Runtime Session Contract Owners
 
 - Status: `Living`
-- Last verified: 2026-08-22 against `origin/main` `39657d6b9` (after [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466) landed analysis-task HTTP cancel)
-- Issue: [#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 (docs / owner inventory only)
+- Last verified: 2026-08-22 against `origin/main` `bb3e7fead` (after [#1469](https://github.com/SiinXu/stock-pulse-ai/pull/1469) T1 inventory; T2 standard BoundToolSession double)
+- Issue: [#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 inventory + T2 standard BoundToolSession double
 - Chinese: [runtime-session-contract-owners_CN.md](runtime-session-contract-owners_CN.md)
 
 This page is the owner map for **shared runtime session, probe, and presentation
 contracts**. It exists so a production-required field cannot land while the
 standard test double or public-surface mock still omits it.
 
-It does **not** change runtime behavior. Follow-up fail-closed BoundToolSession
-double work is T2 of #1055 and is listed under Remaining.
+T2 of #1055 promotes `make_bound_tool_session` as the standard double and adds
+fail-closed regressions for omitted `deadline_monotonic` / `cancelled_check`.
+It does **not** change production runtime behavior.
 
 ## Purpose
 
@@ -89,7 +90,7 @@ Known remaining leniency (document, do not extend):
 
 | Contract | Owner module | Production constructor | Must update together | Fail-closed expectation |
 | --- | --- | --- | --- | --- |
-| BoundToolSession `deadline_monotonic` | `src/agent/runtime/tool_session.py` | `BoundToolSession(...)` in `src/agent/runner_parts/loop.py` and `src/agent/planning/product.py` | `tests/agent/runtime/test_tool_session.py` (`_session`), `tests/agent/runtime/test_native_session_bridge.py` (`_native_session`), `tests/test_agent_frozen_context.py` (`_native_session`), `tests/agent/test_agent_runner_public_surface.py` (`_ToolCompletionFence.deadline_monotonic`) | Native `_execute_tools` requires the attribute. Standard helpers must construct the real class, not a partial duck. |
+| BoundToolSession `deadline_monotonic` | `src/agent/runtime/tool_session.py` | `BoundToolSession(...)` in `src/agent/runner_parts/loop.py` and `src/agent/planning/product.py` | `tests/agent/runtime/bound_tool_session_double.py` (`make_bound_tool_session`), `tests/agent/runtime/test_bound_tool_session_double.py`, `tests/agent/runtime/test_tool_session.py` (`_session`), `tests/agent/runtime/test_native_session_bridge.py` (`_native_session`), `tests/test_agent_frozen_context.py` (`_native_session`), `tests/agent/test_agent_runner_public_surface.py` (`_ToolCompletionFence.deadline_monotonic`) | Native `_execute_tools` requires the attribute. The standard helper must construct the real class and pass `deadline_monotonic` plus `cancelled_check`. |
 | Runner completion fence `deadline_monotonic` | `src/agent/runner.py` `_ToolCompletionFence` | Built inside `_execute_tools` from the earlier of batch timeout and `tool_session.deadline_monotonic` | `tests/agent/test_agent_runner_public_surface.py`, `tests/agent/test_tool_timeout.py` | Fence methods stay on the production class; AST/public-surface pins catch runner-module shape drift. |
 | ToolAccessContext timeout / deadline / cancel | `src/agent/tools/execution.py` `ToolAccessContext`; fences in `src/agent/tools/surface.py` | `BoundToolSession` builds the context per call; callers do not invent a second context type | `tests/agent/runtime/test_tool_session.py`, `tests/agent/test_tool_timeout.py`, `docs/agent-tool-surface.md` | Deny-by-default and timeout/cancel fences stay in ToolSurface. Do not add a private wait that bypasses the surface. |
 | `TaskRunContext.is_cancel_requested` | `src/task_execution.py` | `src/services/task_queue/worker.py` `_execute_command` passes `lambda: self._is_cancel_requested(task_id)` | `tests/test_task_execution.py`, `tests/services/test_local_first_boundaries.py` (`_analysis_task_context`, `test_async_analysis_command_requires_explicit_cancel_protocol`) | Missing callable is `AttributeError`, not `False`. Cooperative cancel also returns true after `cancelled` / `interrupted`. |
@@ -112,28 +113,33 @@ session factory (`src/agent/planning/product.py`). Native dispatch:
 `src/agent/runner_parts/tools.py`. PydanticAI reuses the same session
 (`src/agent/runtime/pydantic_ai_toolset.py`); it is not a second authority.
 
-**Standard test helper (preferred).** Real-class helpers already exist:
+**Standard test helper.** `tests/agent/runtime/bound_tool_session_double.py`
+`make_bound_tool_session` constructs a real `BoundToolSession` and always
+passes `deadline_monotonic` and `cancelled_check`. File-local `_session` /
+`_native_session` wrappers import that helper:
 
 - `tests/agent/runtime/test_tool_session.py` `_session`
 - `tests/agent/runtime/test_native_session_bridge.py` `_native_session`
 - `tests/test_agent_frozen_context.py` `_native_session`
 
-T2 should promote one of these (or a shared import of it) as **the** standard
-double. Until then, new tests that drive `_execute_tools` must use a real
-`BoundToolSession`, not `SimpleNamespace`.
+New tests that drive `_execute_tools` must use this helper, not
+`SimpleNamespace`. `tests/agent/runtime/test_bound_tool_session_double.py`
+fails if the helper omits a production-required field, and
+`_execute_tools` raises `AttributeError` when `deadline_monotonic` is
+missing.
 
-**Current ducks (do not copy).**
+**Remaining observer (do not copy as the standard double).**
 
-- `tests/agent/test_tool_timeout.py` `RecordingSession` / `CappedSession` set
-  `deadline_monotonic = None` by hand.
-- `tests/security/test_sensitive_redaction.py` `RecordingSession` does the same
-  so redaction can observe dispatch without a full session.
+- `ExecuteToolsObserverSession` in `bound_tool_session_double.py` is only for
+  redaction traces that must dispatch secret/unregistered names without
+  `canonical_tool_name`. It still carries `deadline_monotonic` and
+  `cancelled_check`.
 - `test_resolve_session_category_timeout_accepts_minimal_and_invalid_doubles`
   documents that the **category-cap helper** accepts a `MinimalSession` with
   only `execution_id`. That is helper semantics, not an `_execute_tools`
   license.
 
-**Validation.** `python -m pytest tests/agent/runtime/test_tool_session.py tests/agent/test_tool_timeout.py tests/test_agent_frozen_context.py tests/agent/test_agent_runner_public_surface.py tests/security/test_sensitive_redaction.py -q` after session-field changes. If `_execute_tools` or `_ToolCompletionFence` AST changes, the public-surface hash/pin test is the ratchet.
+**Validation.** `python -m pytest tests/agent/runtime/test_bound_tool_session_double.py tests/agent/runtime/test_tool_session.py tests/agent/test_tool_timeout.py tests/test_agent_frozen_context.py tests/agent/test_agent_runner_public_surface.py tests/security/test_sensitive_redaction.py -q` after session-field changes. If `_execute_tools` or `_ToolCompletionFence` AST changes, the public-surface hash/pin test is the ratchet.
 
 ## 2. TaskRunContext `is_cancel_requested` (landed with #1466)
 
@@ -246,8 +252,8 @@ tool-local wait that ignores `deadline_monotonic`.
 
 **Deprecation path for ducks.** New production and test call sites should
 pass a real `ToolAccessContext` (or let `BoundToolSession` build it). Do not
-add more `getattr(context, "deadline_monotonic", None)` readers. T2 may
-tighten the remaining getattr.
+add more `getattr(context, "deadline_monotonic", None)` readers. Tightening
+the remaining getattr is outside the T2 session-double slice.
 
 ## 5. Generation-backend probe payload
 
@@ -300,12 +306,12 @@ Do not expand `TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_*` to green a new key.
 
 | Double kind | Allowed? | Obligation |
 | --- | --- | --- |
-| Real `BoundToolSession` via `_session` / `_native_session` | Required for `_execute_tools` and session-gate tests | Add new required constructor fields to the helper in the same PR |
+| Real `BoundToolSession` via `make_bound_tool_session` | Required for `_execute_tools` and session-gate tests | Add new required constructor fields (`deadline_monotonic`, `cancelled_check`, …) to `STANDARD_BOUND_TOOL_SESSION_FIELDS` and the helper in the same PR |
 | Real `TaskRunContext` via `_analysis_task_context` or the dataclass | Required for analysis/queue runner tests | Include `is_cancel_requested` |
 | `vi.importActual` spread of `apps/dsa-web/src/api/analysis.ts` | Required for Web analysis mocks | Override only methods the test needs |
 | `SimpleNamespace` / factory `vi.mock` that lists a subset of fields | Deprecated except for an explicit negative test | The negative test must expect `AttributeError` / type failure, not silent success |
 | `MinimalSession` with only `execution_id` | Allowed only as input to `resolve_session_category_timeout_seconds` | Missing category cap means no cap (`0.0`); do not pass this object to `_execute_tools` as a general session |
-| Security `RecordingSession` duck | Temporary until T2 | Already carries `deadline_monotonic`; adding another production-required session field requires updating this duck **or** switching it to the real helper in the same PR |
+| `ExecuteToolsObserverSession` | Allowed only for redaction traces of unregistered/secret names | Must include `deadline_monotonic` and `cancelled_check`. Do not use it as the standard session double |
 
 ## Deprecation path
 
@@ -314,8 +320,8 @@ Do not expand `TEMP_ENV_EXAMPLE_UNREGISTERED_DEBT_*` to green a new key.
 | Relative `deadline_seconds` on the session | Absolute `deadline_monotonic` | Already renamed in production. Do not reintroduce the relative name. |
 | Analysis runner `SimpleNamespace` stubs | Real `TaskRunContext` | #1466 already requires the cancel callable. Remaining stubs must follow `_analysis_task_context`. |
 | Factory-style `vi.mock('../../api/analysis', () => ({ analysisApi: {...} }))` | `importActual` + spread | After #1466 this is the required Web pattern. New factory mocks are contract bugs. |
-| Duck sessions used as the “standard double” | Shared real `BoundToolSession` helper | T2 of #1055. This T1 docs slice does not delete the existing timeout/redaction ducks. |
-| `getattr(context, "deadline_monotonic", None)` as the desired API | Required field on `ToolAccessContext` | T2 may fail closed. Do not add more getattr fallbacks in the meantime. |
+| Duck sessions used as the “standard double” | `make_bound_tool_session` | T2 of #1055. Timeout `_execute_tools` ducks are replaced. Redaction keeps `ExecuteToolsObserverSession` with the required fields. |
+| `getattr(context, "deadline_monotonic", None)` as the desired API | Required field on `ToolAccessContext` | Still remaining. Do not add more getattr fallbacks. Tightening ToolSurface is outside the T2 session-double slice. |
 | Inferred Settings metadata for a documented env key | Explicit `config_registry_parts` entry | Already fail-closed. Inference remains only for runtime-only compatibility values. |
 
 Do not add parallel session types, a second task lifecycle, a second analysis
@@ -333,6 +339,7 @@ from src.agent.tools.execution import ToolAccessContext
 from src.task_execution import TaskRunContext
 from src.services.generation_backend_status_service import GenerationBackendStatusService
 assert "deadline_monotonic" in BoundToolSession.__init__.__code__.co_varnames
+assert "cancelled_check" in BoundToolSession.__init__.__code__.co_varnames
 assert "deadline_monotonic" in ToolAccessContext.__dataclass_fields__
 assert "is_cancel_requested" in TaskRunContext.__dataclass_fields__
 assert hasattr(GenerationBackendStatusService, "get_status")
@@ -345,13 +352,15 @@ python3 scripts/collect_changelog.py --check
 Confirm filenames in this page with `ls` / editor search before changing a
 row. Docs-only edits do not require the full offline pytest suite.
 
-## Remaining (#1055 T2, not this slice)
+## Remaining (after #1055 T2)
 
-- Promote the real `BoundToolSession` helper as the standard double.
-- Add a regression that fails if that helper omits a production-required
-  session field (today: at least `deadline_monotonic`).
-- Keep the documented “missing category cap means no cap” helper test, or
-  stop calling `_execute_tools` with incomplete objects.
+T2 delivered the standard `BoundToolSession` helper and fail-closed
+missing-field regressions, including `cancelled_check` on the helper and
+redaction observer. Still out of this slice:
+
+- Tightening `ToolSurface._effective_dispatch_deadline` so
+  `getattr(context, "deadline_monotonic", None)` is no longer the desired
+  production read.
 - Do not weaken ToolSurface deny-by-default, redaction, or timeouts.
 
 ## Related

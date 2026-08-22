@@ -1,13 +1,13 @@
 # 共享运行时 Session 契约所有权
 
 - 状态：`Living`
-- 最近核验：2026-08-22，对照 `origin/main` `39657d6b9`（[#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466) 已合入分析任务 HTTP cancel）
-- Issue：[#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1（仅文档 / 所有权清单）
+- 最近核验：2026-08-22，对照 `origin/main` `bb3e7fead`（[#1469](https://github.com/SiinXu/stock-pulse-ai/pull/1469) T1 清单之后；T2 标准 BoundToolSession double）
+- Issue：[#1055](https://github.com/SiinXu/stock-pulse-ai/issues/1055) T1 清单 + T2 标准 BoundToolSession double
 - English：[runtime-session-contract-owners.md](runtime-session-contract-owners.md)
 
 本页是**共享运行时 session、探针与配置展示契约**的 owner 地图。目的是避免生产侧新增必填字段后，标准 test double 或公开展示 mock 仍然漏字段。
 
-本页**不改变运行时行为**。后续把 BoundToolSession double 收成 fail-closed 的工作属于 #1055 T2，见文末 Remaining。
+#1055 T2 把 `make_bound_tool_session` 提升为标准 double，并为漏掉 `deadline_monotonic` / `cancelled_check` 增加 fail-closed 回归。本页**不改变生产运行时行为**。
 
 ## 目的
 
@@ -69,7 +69,7 @@
 
 | 契约 | Owner 模块 | 生产构造点 | 必须同 PR 更新 | Fail-closed 期望 |
 | --- | --- | --- | --- | --- |
-| BoundToolSession `deadline_monotonic` | `src/agent/runtime/tool_session.py` | `BoundToolSession(...)`：`src/agent/runner_parts/loop.py`、`src/agent/planning/product.py` | `tests/agent/runtime/test_tool_session.py`（`_session`）、`tests/agent/runtime/test_native_session_bridge.py`（`_native_session`）、`tests/test_agent_frozen_context.py`（`_native_session`）、`tests/agent/test_agent_runner_public_surface.py`（`_ToolCompletionFence.deadline_monotonic`） | Native `_execute_tools` 要求该属性。标准 helper 必须构造真实类，而不是残缺 duck。 |
+| BoundToolSession `deadline_monotonic` | `src/agent/runtime/tool_session.py` | `BoundToolSession(...)`：`src/agent/runner_parts/loop.py`、`src/agent/planning/product.py` | `tests/agent/runtime/bound_tool_session_double.py`（`make_bound_tool_session`）、`tests/agent/runtime/test_bound_tool_session_double.py`、`tests/agent/runtime/test_tool_session.py`（`_session`）、`tests/agent/runtime/test_native_session_bridge.py`（`_native_session`）、`tests/test_agent_frozen_context.py`（`_native_session`）、`tests/agent/test_agent_runner_public_surface.py`（`_ToolCompletionFence.deadline_monotonic`） | Native `_execute_tools` 要求该属性。标准 helper 必须构造真实类，并传入 `deadline_monotonic` 与 `cancelled_check`。 |
 | Runner 完成栅栏 `deadline_monotonic` | `src/agent/runner.py` `_ToolCompletionFence` | `_execute_tools` 内取 batch 超时与 `tool_session.deadline_monotonic` 的较早者 | `tests/agent/test_agent_runner_public_surface.py`、`tests/agent/test_tool_timeout.py` | 栅栏方法留在生产类上；AST / 公开展示钉住 runner 模块形状漂移。 |
 | ToolAccessContext 超时 / deadline / 取消 | `src/agent/tools/execution.py` `ToolAccessContext`；栅栏在 `src/agent/tools/surface.py` | 由 `BoundToolSession` 按次构造；调用方不要发明第二种 context | `tests/agent/runtime/test_tool_session.py`、`tests/agent/test_tool_timeout.py`、`docs/agent-tool-surface.md` | 默认拒绝与超时/取消栅栏留在 ToolSurface。不要加绕过 surface 的私有等待。 |
 | `TaskRunContext.is_cancel_requested` | `src/task_execution.py` | `src/services/task_queue/worker.py` `_execute_command` 传入 `lambda: self._is_cancel_requested(task_id)` | `tests/test_task_execution.py`、`tests/services/test_local_first_boundaries.py`（`_analysis_task_context`、`test_async_analysis_command_requires_explicit_cancel_protocol`） | 缺 callable 是 `AttributeError`，不是 `False`。进入 `cancelled` / `interrupted` 后该 callable 仍为 true。 |
@@ -84,21 +84,29 @@
 
 **Owner。** 构造：`src/agent/runtime/tool_session.py`。生产调用方：native loop（`src/agent/runner_parts/loop.py`）与 planning product session 工厂（`src/agent/planning/product.py`）。Native 分发：`src/agent/runner_parts/tools.py`。PydanticAI 复用同一 session（`src/agent/runtime/pydantic_ai_toolset.py`），不是第二权威。
 
-**标准测试 helper（优先）。** 真实类 helper 已经存在：
+**标准测试 helper。** `tests/agent/runtime/bound_tool_session_double.py` 的
+`make_bound_tool_session` 构造真实 `BoundToolSession`，并始终传入
+`deadline_monotonic` 与 `cancelled_check`。文件内 `_session` /
+`_native_session` 包装器导入该 helper：
 
 - `tests/agent/runtime/test_tool_session.py` `_session`
 - `tests/agent/runtime/test_native_session_bridge.py` `_native_session`
 - `tests/test_agent_frozen_context.py` `_native_session`
 
-T2 应把其中之一（或共享导入）提升为**标准** double。在此之前，驱动 `_execute_tools` 的新测试必须使用真实 `BoundToolSession`，不要用 `SimpleNamespace`。
+驱动 `_execute_tools` 的新测试必须使用该 helper，不要用 `SimpleNamespace`。
+`tests/agent/runtime/test_bound_tool_session_double.py` 会在 helper 漏生产必填
+字段时失败；缺 `deadline_monotonic` 时 `_execute_tools` 抛 `AttributeError`。
 
-**当前 duck（不要复制）。**
+**遗留观察 double（不要当作标准 double 复制）。**
 
-- `tests/agent/test_tool_timeout.py` 的 `RecordingSession` / `CappedSession` 手写 `deadline_monotonic = None`。
-- `tests/security/test_sensitive_redaction.py` 的 `RecordingSession` 同样如此，以便在不全量 session 下观察分发脱敏。
-- `test_resolve_session_category_timeout_accepts_minimal_and_invalid_doubles` 记录**类别上限 helper** 可以接受只有 `execution_id` 的 `MinimalSession`。这是 helper 语义，不是把该对象交给 `_execute_tools` 的许可。
+- `bound_tool_session_double.py` 中的 `ExecuteToolsObserverSession` 仅用于
+  必须在没有 `canonical_tool_name` 的情况下分发密钥/未注册名称的脱敏轨迹。
+  它仍然携带 `deadline_monotonic` 与 `cancelled_check`。
+- `test_resolve_session_category_timeout_accepts_minimal_and_invalid_doubles`
+  记录**类别上限 helper** 可以接受只有 `execution_id` 的 `MinimalSession`。
+  这是 helper 语义，不是把该对象交给 `_execute_tools` 的许可。
 
-**核验。** 改 session 字段后运行 `python -m pytest tests/agent/runtime/test_tool_session.py tests/agent/test_tool_timeout.py tests/test_agent_frozen_context.py tests/agent/test_agent_runner_public_surface.py tests/security/test_sensitive_redaction.py -q`。若 `_execute_tools` 或 `_ToolCompletionFence` 的 AST 变化，公开展示 hash/pin 测试就是棘轮。
+**核验。** 改 session 字段后运行 `python -m pytest tests/agent/runtime/test_bound_tool_session_double.py tests/agent/runtime/test_tool_session.py tests/agent/test_tool_timeout.py tests/test_agent_frozen_context.py tests/agent/test_agent_runner_public_surface.py tests/security/test_sensitive_redaction.py -q`。若 `_execute_tools` 或 `_ToolCompletionFence` 的 AST 变化，公开展示 hash/pin 测试就是棘轮。
 
 ## 2. TaskRunContext `is_cancel_requested`（随 #1466 落地）
 
@@ -184,7 +192,7 @@ vi.mock('../../api/analysis', async () => {
 
 **Fail-closed。** 损坏的取消探针在 handler 前失败关闭。未注册工具与缺 capability 被拒绝。不要增加忽略 `deadline_monotonic` 的工具内等待。
 
-**Duck 废弃路径。** 新的生产与测试调用点应传入真实 `ToolAccessContext`（或让 `BoundToolSession` 构造）。不要再增加 `getattr(context, "deadline_monotonic", None)` 读取点。T2 可以收紧现存 getattr。
+**Duck 废弃路径。** 新的生产与测试调用点应传入真实 `ToolAccessContext`（或让 `BoundToolSession` 构造）。不要再增加 `getattr(context, "deadline_monotonic", None)` 读取点。收紧现存 getattr 不属于 T2 session-double 切片。
 
 ## 5. Generation-backend 探针载荷
 
@@ -223,12 +231,12 @@ vi.mock('../../api/analysis', async () => {
 
 | Double 类型 | 是否允许 | 义务 |
 | --- | --- | --- |
-| 经 `_session` / `_native_session` 的真实 `BoundToolSession` | `_execute_tools` 与 session 栅栏测试必须使用 | 新的必填构造字段必须在同一 PR 写入 helper |
+| 经 `make_bound_tool_session` 的真实 `BoundToolSession` | `_execute_tools` 与 session 栅栏测试必须使用 | 新的必填构造字段（`deadline_monotonic`、`cancelled_check` 等）必须在同一 PR 写入 `STANDARD_BOUND_TOOL_SESSION_FIELDS` 与 helper |
 | 经 `_analysis_task_context` 或 dataclass 的真实 `TaskRunContext` | 分析/队列 runner 测试必须使用 | 必须包含 `is_cancel_requested` |
 | 对 `apps/dsa-web/src/api/analysis.ts` 做 `vi.importActual` 展开 | Web 分析 mock 必须使用 | 只覆盖本测试需要的方法 |
 | 只列出部分字段的 `SimpleNamespace` / factory `vi.mock` | 除明确的负例测试外已废弃 | 负例必须期望 `AttributeError` / 类型失败，而不是静默成功 |
 | 只有 `execution_id` 的 `MinimalSession` | 仅允许作为 `resolve_session_category_timeout_seconds` 的输入 | 缺类别上限表示无上限（`0.0`）；不要把它当作通用 session 传给 `_execute_tools` |
-| Security `RecordingSession` duck | T2 前暂时保留 | 已带 `deadline_monotonic`；再增加生产必填 session 字段时，必须在同一 PR 更新该 duck **或**改用真实 helper |
+| `ExecuteToolsObserverSession` | 仅允许用于未注册/密钥名称的脱敏轨迹 | 必须包含 `deadline_monotonic` 与 `cancelled_check`。不要把它当作标准 session double |
 
 ## 废弃路径
 
@@ -237,8 +245,8 @@ vi.mock('../../api/analysis', async () => {
 | session 上的相对 `deadline_seconds` | 绝对 `deadline_monotonic` | 生产侧已改名。不要重新引入相对名。 |
 | 分析 runner 的 `SimpleNamespace` stub | 真实 `TaskRunContext` | #1466 已要求 cancel callable。其余 stub 必须跟随 `_analysis_task_context`。 |
 | Factory 式 `vi.mock('../../api/analysis', () => ({ analysisApi: {...} }))` | `importActual` + 展开 | #1466 之后这是 Web 必用模式。新的 factory mock 属于契约缺陷。 |
-| 把 duck session 当作“标准 double” | 共享的真实 `BoundToolSession` helper | #1055 T2。本 T1 文档切片不删除现有 timeout/redaction duck。 |
-| 把 `getattr(context, "deadline_monotonic", None)` 当成期望 API | `ToolAccessContext` 上的必填字段 | T2 可以改为 fail-closed。在此之前不要增加更多 getattr 回退。 |
+| 把 duck session 当作“标准 double” | `make_bound_tool_session` | #1055 T2。timeout 的 `_execute_tools` duck 已替换。脱敏保留带必填字段的 `ExecuteToolsObserverSession`。 |
+| 把 `getattr(context, "deadline_monotonic", None)` 当成期望 API | `ToolAccessContext` 上的必填字段 | 仍未收紧。不要增加更多 getattr 回退。收紧 ToolSurface 不属于 T2 session-double 切片。 |
 | 对已文档化 env 键使用推断的 Settings 元数据 | 显式 `config_registry_parts` 条目 | 已经 fail-closed。推断只留给仅运行时兼容的值。 |
 
 不要增加并行 session 类型、第二套任务生命周期、第二条分析 cancel 路由，或第二套 generation-backend 解析器。
@@ -255,6 +263,7 @@ from src.agent.tools.execution import ToolAccessContext
 from src.task_execution import TaskRunContext
 from src.services.generation_backend_status_service import GenerationBackendStatusService
 assert "deadline_monotonic" in BoundToolSession.__init__.__code__.co_varnames
+assert "cancelled_check" in BoundToolSession.__init__.__code__.co_varnames
 assert "deadline_monotonic" in ToolAccessContext.__dataclass_fields__
 assert "is_cancel_requested" in TaskRunContext.__dataclass_fields__
 assert hasattr(GenerationBackendStatusService, "get_status")
@@ -266,11 +275,13 @@ python3 scripts/collect_changelog.py --check
 
 改某一行前，用 `ls` / 编辑器搜索确认本页文件名仍与仓库一致。纯文档改动不要求跑完整离线 pytest。
 
-## Remaining（#1055 T2，不属于本切片）
+## Remaining（#1055 T2 之后）
 
-- 把真实 `BoundToolSession` helper 提升为标准 double。
-- 增加回归：该 helper 漏生产必填 session 字段（当前至少 `deadline_monotonic`）时失败。
-- 保留“缺类别上限表示无上限”的 helper 测试，或停止把不完整对象传给 `_execute_tools`。
+T2 已交付标准 `BoundToolSession` helper，以及漏字段 fail-closed 回归（helper
+与脱敏 observer 均包含 `cancelled_check`）。本切片仍未覆盖：
+
+- 收紧 `ToolSurface._effective_dispatch_deadline`，使
+  `getattr(context, "deadline_monotonic", None)` 不再是期望的生产读取方式。
 - 不得削弱 ToolSurface 默认拒绝、脱敏或超时。
 
 ## 相关

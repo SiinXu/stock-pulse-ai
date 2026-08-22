@@ -1,0 +1,2 @@
+- [Tests] Promote a shared real BoundToolSession helper as the standard session double and fail closed when it omits deadline_monotonic or cancelled_check (Refs #1055).
+- [Docs] Record the #1055 T2 standard BoundToolSession helper and remaining ToolSurface getattr path.
