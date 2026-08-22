@@ -6,7 +6,7 @@ import logging
 import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from src.api.deps import (
     get_runtime_scheduler_service,
@@ -28,6 +28,7 @@ from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.scheduled_task_service import (
     ScheduledTaskContractError,
     ScheduledTaskError,
+    ScheduledTaskMutationAuditCompletionUnavailable,
     ScheduledTaskNotFoundError,
     ScheduledTaskService,
     ScheduledTaskUnsupportedSchemaError,
@@ -52,12 +53,28 @@ def _scheduled_task_audit_actor() -> str:
     return "local_operator"
 
 
-def _security_audit_unavailable():
-    return api_error(
-        503,
-        "security_audit_unavailable",
-        "Security audit storage is unavailable",
-    )
+def _security_audit_unavailable(
+    *,
+    operation_completed: bool = False,
+    item: Optional[dict] = None,
+):
+    detail = {
+        "error": "security_audit_unavailable",
+        "message": (
+            "Scheduled task mutation was persisted, but audit completion "
+            "could not be persisted"
+            if operation_completed
+            else "Security audit storage is unavailable"
+        ),
+        "operation_completed": operation_completed,
+    }
+    if item is not None:
+        task_id = item.get("id")
+        if task_id is not None:
+            detail["task_id"] = task_id
+        if "enabled" in item:
+            detail["enabled"] = item["enabled"]
+    return HTTPException(status_code=503, detail=detail)
 
 
 def _mutation_audit_fields(security_audit: SecurityAuditRecorder) -> dict:
@@ -129,6 +146,11 @@ def create_scheduled_task(
             task_id=response.id,
         )
         return response
+    except ScheduledTaskMutationAuditCompletionUnavailable as exc:
+        raise _security_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
     except SecurityAuditUnavailable:
         raise _security_audit_unavailable() from None
     except ScheduledTaskError as exc:
@@ -253,6 +275,11 @@ def enable_scheduled_task(
             task_id=response.id,
         )
         return response
+    except ScheduledTaskMutationAuditCompletionUnavailable as exc:
+        raise _security_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
     except SecurityAuditUnavailable:
         raise _security_audit_unavailable() from None
     except ScheduledTaskError as exc:
@@ -297,6 +324,11 @@ def disable_scheduled_task(
             task_id=response.id,
         )
         return response
+    except ScheduledTaskMutationAuditCompletionUnavailable as exc:
+        raise _security_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
     except SecurityAuditUnavailable:
         raise _security_audit_unavailable() from None
     except ScheduledTaskError as exc:

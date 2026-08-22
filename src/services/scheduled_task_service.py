@@ -112,6 +112,14 @@ class ScheduledTaskUnsupportedSchemaError(ScheduledTaskError):
         )
 
 
+class ScheduledTaskMutationAuditCompletionUnavailable(RuntimeError):
+    """Raised when the durable mutation succeeded but audit completion failed."""
+
+    def __init__(self, item: Dict[str, Any]) -> None:
+        super().__init__("security_audit_unavailable")
+        self.item = item
+
+
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -747,6 +755,83 @@ class ScheduledTaskService:
             )
             raise SecurityAuditUnavailable() from None
 
+    def _complete_scheduled_task_mutation_success(
+        self,
+        *,
+        operation: str,
+        target_id: str,
+        correlation_id: str,
+        actor_type: str,
+        actor_id: str,
+        metadata: Mapping[str, Any] | None,
+        reason_code: str,
+        recorder: Any,
+        item: Dict[str, Any],
+    ) -> None:
+        """Persist success completion; surface write-done/audit-failed distinctly."""
+        try:
+            self._record_scheduled_task_mutation_audit(
+                phase="completion",
+                operation=operation,
+                target_id=target_id,
+                correlation_id=correlation_id,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                metadata=metadata,
+                outcome="success",
+                reason_code=reason_code,
+                recorder=recorder,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - map to completion-unavailable
+            from src.services.security_audit_service import SecurityAuditUnavailable
+
+            log_safe_exception(
+                logger,
+                "Scheduled task mutation audit completion unavailable after mutation",
+                exc,
+                error_code="scheduled_task_mutation_audit_completion_unavailable",
+                context={"operation": operation, "target_id": target_id},
+            )
+            if isinstance(exc, SecurityAuditUnavailable):
+                raise ScheduledTaskMutationAuditCompletionUnavailable(item) from None
+            raise ScheduledTaskMutationAuditCompletionUnavailable(item) from exc
+
+    def _complete_scheduled_task_mutation_failure(
+        self,
+        *,
+        operation: str,
+        target_id: str,
+        correlation_id: str,
+        actor_type: str,
+        actor_id: str,
+        metadata: Mapping[str, Any] | None,
+        outcome: str,
+        reason_code: str,
+        recorder: Any,
+    ) -> None:
+        """Best-effort reject/failure completion; never mask the domain error."""
+        try:
+            self._record_scheduled_task_mutation_audit(
+                phase="completion",
+                operation=operation,
+                target_id=target_id,
+                correlation_id=correlation_id,
+                actor_type=actor_type,
+                actor_id=actor_id,
+                metadata=metadata,
+                outcome=outcome,
+                reason_code=reason_code,
+                recorder=recorder,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - preserve domain error
+            log_safe_exception(
+                logger,
+                "Scheduled task mutation failure audit completion unavailable",
+                exc,
+                error_code="scheduled_task_mutation_failure_audit_unavailable",
+                context={"operation": operation, "target_id": target_id},
+            )
+
     def create_task(
         self,
         contract: Mapping[str, Any],
@@ -757,7 +842,10 @@ class ScheduledTaskService:
         security_audit: Any = None,
     ) -> Dict[str, Any]:
         """Validate and persist one supported scheduled definition."""
-        from src.services.security_audit_service import SecurityAuditService
+        from src.services.security_audit_service import (
+            SecurityAuditService,
+            SecurityAuditUnavailable,
+        )
 
         task_id = uuid.uuid4().hex
         correlation_id = SecurityAuditService.new_correlation_id()
@@ -815,10 +903,13 @@ class ScheduledTaskService:
                     "updated_at": now_value,
                 }
             )
+        except ScheduledTaskMutationAuditCompletionUnavailable:
+            raise
+        except SecurityAuditUnavailable:
+            raise
         except Exception as exc:  # broad-exception: fallback_recorded - complete the attempt before re-raising the mutation error.
             outcome, reason_code = _mutation_error_audit_fields(exc)
-            self._record_scheduled_task_mutation_audit(
-                phase="completion",
+            self._complete_scheduled_task_mutation_failure(
                 operation="create",
                 target_id=task_id,
                 correlation_id=correlation_id,
@@ -830,19 +921,19 @@ class ScheduledTaskService:
                 recorder=security_audit,
             )
             raise
-        self._record_scheduled_task_mutation_audit(
-            phase="completion",
+        item = self._task_item(row)
+        self._complete_scheduled_task_mutation_success(
             operation="create",
             target_id=task_id,
             correlation_id=correlation_id,
             actor_type=actor_type,
             actor_id=actor_id,
             metadata=metadata,
-            outcome="success",
             reason_code="scheduled_task_created",
             recorder=security_audit,
+            item=item,
         )
-        return self._task_item(row)
+        return item
 
     def list_tasks(
         self,
@@ -884,7 +975,10 @@ class ScheduledTaskService:
         security_audit: Any = None,
     ) -> Dict[str, Any]:
         """Enable or disable one supported definition."""
-        from src.services.security_audit_service import SecurityAuditService
+        from src.services.security_audit_service import (
+            SecurityAuditService,
+            SecurityAuditUnavailable,
+        )
 
         operation = "enable" if enabled else "disable"
         correlation_id = SecurityAuditService.new_correlation_id()
@@ -915,21 +1009,8 @@ class ScheduledTaskService:
             }
             if bool(existing.enabled) is bool(enabled):
                 item = self._task_item(existing)
-                reason_code = "already_enabled" if enabled else "already_disabled"
-                self._record_scheduled_task_mutation_audit(
-                    phase="completion",
-                    operation=operation,
-                    target_id=task_id,
-                    correlation_id=correlation_id,
-                    actor_type=actor_type,
-                    actor_id=actor_id,
-                    metadata=metadata,
-                    outcome="success",
-                    reason_code=reason_code,
-                    recorder=security_audit,
-                )
-                return item
-            if (
+                success_reason_code = "already_enabled" if enabled else "already_disabled"
+            elif (
                 existing.execution_generation
                 >= MAX_SCHEDULED_TASK_EXECUTION_GENERATION
                 and enabled
@@ -937,35 +1018,42 @@ class ScheduledTaskService:
                 raise ScheduledTaskContractError(
                     "Scheduled task execution generation cannot advance"
                 )
-            now_value = self._now(now or self._clock())
-            next_run = None
-            if enabled:
-                next_run = next_daily_run_at(
-                    schedule_time=contract["schedule_time"],
-                    timezone_name=contract["timezone"],
-                    after=now_value,
+            else:
+                now_value = self._now(now or self._clock())
+                next_run = None
+                if enabled:
+                    next_run = next_daily_run_at(
+                        schedule_time=contract["schedule_time"],
+                        timezone_name=contract["timezone"],
+                        after=now_value,
+                    )
+                row = self.repository.set_enabled(
+                    task_id,
+                    expected_schema_version=existing.schema_version,
+                    expected_execution_generation=existing.execution_generation,
+                    enabled=bool(enabled),
+                    next_run_at=next_run,
+                    updated_at=now_value,
                 )
-            row = self.repository.set_enabled(
-                task_id,
-                expected_schema_version=existing.schema_version,
-                expected_execution_generation=existing.execution_generation,
-                enabled=bool(enabled),
-                next_run_at=next_run,
-                updated_at=now_value,
-            )
-            if row is None:
-                current = self.repository.get_task(task_id)
-                if current is None:
-                    raise ScheduledTaskNotFoundError(task_id)
-                self._validate_persisted_task(current)
-                raise ScheduledTaskContractError(
-                    "Scheduled task definition changed during enablement"
+                if row is None:
+                    current = self.repository.get_task(task_id)
+                    if current is None:
+                        raise ScheduledTaskNotFoundError(task_id)
+                    self._validate_persisted_task(current)
+                    raise ScheduledTaskContractError(
+                        "Scheduled task definition changed during enablement"
+                    )
+                item = self._task_item(row)
+                success_reason_code = (
+                    "scheduled_task_enabled" if enabled else "scheduled_task_disabled"
                 )
-            item = self._task_item(row)
+        except ScheduledTaskMutationAuditCompletionUnavailable:
+            raise
+        except SecurityAuditUnavailable:
+            raise
         except Exception as exc:  # broad-exception: fallback_recorded - complete the attempt before re-raising the mutation error.
             outcome, reason_code = _mutation_error_audit_fields(exc)
-            self._record_scheduled_task_mutation_audit(
-                phase="completion",
+            self._complete_scheduled_task_mutation_failure(
                 operation=operation,
                 target_id=task_id,
                 correlation_id=correlation_id,
@@ -977,19 +1065,16 @@ class ScheduledTaskService:
                 recorder=security_audit,
             )
             raise
-        self._record_scheduled_task_mutation_audit(
-            phase="completion",
+        self._complete_scheduled_task_mutation_success(
             operation=operation,
             target_id=task_id,
             correlation_id=correlation_id,
             actor_type=actor_type,
             actor_id=actor_id,
             metadata=metadata,
-            outcome="success",
-            reason_code=(
-                "scheduled_task_enabled" if enabled else "scheduled_task_disabled"
-            ),
+            reason_code=success_reason_code,
             recorder=security_audit,
+            item=item,
         )
         return item
 

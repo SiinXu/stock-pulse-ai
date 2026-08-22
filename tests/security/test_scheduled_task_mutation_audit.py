@@ -17,6 +17,7 @@ from src.config import Config
 from src.repositories.scheduled_task_repo import ScheduledTaskRepository
 from src.services.scheduled_task_service import (
     SCHEDULED_TASK_WRITE_EVENT_TYPE,
+    ScheduledTaskMutationAuditCompletionUnavailable,
     ScheduledTaskNotFoundError,
     ScheduledTaskService,
     ScheduledTaskValidationError,
@@ -255,10 +256,11 @@ def test_create_completion_failure_keeps_persisted_task(mutation_database) -> No
         security_audit_factory=lambda: audit,
     )
 
-    with pytest.raises(SecurityAuditUnavailable):
+    with pytest.raises(ScheduledTaskMutationAuditCompletionUnavailable) as exc_info:
         service.create_task(task_contract(), now=NOW)
 
     assert service.list_tasks()["total"] == 1
+    assert exc_info.value.item["id"] == service.list_tasks()["items"][0]["id"]
     assert len(_write_events(audit, phase="attempt")) == 1
     assert _write_events(audit, phase="completion") == []
 
@@ -371,4 +373,191 @@ def test_http_create_fails_closed_when_audit_attempt_unavailable(
 
     assert response.status_code == 503
     assert response.json()["detail"]["error"] == "security_audit_unavailable"
+    assert response.json()["detail"]["operation_completed"] is False
+    assert service.list_tasks()["total"] == 0
+
+
+def test_idempotent_enable_completion_failure_is_not_rewritten_as_mutation_failure(
+    mutation_database,
+) -> None:
+    audit = _RecordingAudit()
+    service = build_service(
+        mutation_database,
+        security_audit_factory=lambda: audit,
+    )
+    created = service.create_task(task_contract(), now=NOW)
+
+    class _FailFirstCompletion:
+        def __init__(self, inner: _RecordingAudit) -> None:
+            self.inner = inner
+            self.failed = False
+
+        def record_attempt(self, **fields):
+            return self.inner.record_attempt(**fields)
+
+        def record_completion(self, **fields):
+            if not self.failed:
+                self.failed = True
+                raise SecurityAuditUnavailable()
+            return self.inner.record_completion(**fields)
+
+    with pytest.raises(ScheduledTaskMutationAuditCompletionUnavailable) as exc_info:
+        service.set_enabled(
+            created["id"],
+            True,
+            now=NOW,
+            security_audit=_FailFirstCompletion(audit),
+        )
+
+    assert exc_info.value.item["id"] == created["id"]
+    assert service.get_task(created["id"])["enabled"] is True
+    enable_completions = [
+        event
+        for event in _write_events(audit, phase="completion")
+        if event["action"] == "scheduled_task.enable"
+    ]
+    assert enable_completions == []
+    assert all(
+        event["reason_code"] != "scheduled_task_mutation_failed"
+        for event in audit.completions
+    )
+
+
+def test_create_validation_failure_is_not_masked_by_completion_unavailable(
+    mutation_database,
+) -> None:
+    audit = _RecordingAudit(fail_completion=True)
+    service = build_service(
+        mutation_database,
+        security_audit_factory=lambda: audit,
+    )
+    contract = task_contract()
+    contract["name"] = ""
+
+    with pytest.raises(ScheduledTaskValidationError):
+        service.create_task(contract, now=NOW)
+
+    assert service.list_tasks()["total"] == 0
+    assert len(_write_events(audit, phase="attempt")) == 1
+    assert _write_events(audit, phase="completion") == []
+
+
+def test_enable_missing_task_is_not_masked_by_completion_unavailable(
+    mutation_database,
+) -> None:
+    audit = _RecordingAudit(fail_completion=True)
+    service = build_service(
+        mutation_database,
+        security_audit_factory=lambda: audit,
+    )
+
+    with pytest.raises(ScheduledTaskNotFoundError):
+        service.set_enabled("missingtaskid00000000000000000000", True, now=NOW)
+
+    assert service.list_tasks()["total"] == 0
+    assert len(_write_events(audit, phase="attempt")) == 1
+    assert _write_events(audit, phase="completion") == []
+
+
+def _mutation_http_app(mutation_database, audit):
+    service = ScheduledTaskService(
+        repository=ScheduledTaskRepository(mutation_database),
+        clock=lambda: datetime(2026, 7, 25, 12, 0),
+        security_audit_factory=lambda: audit,
+    )
+    app = FastAPI()
+    app.include_router(scheduled_tasks.router, prefix="/api/v1/scheduled-tasks")
+    app.state.scheduled_task_service = service
+    app.state.runtime_scheduler_service = FakeRuntimeScheduler()
+    app.dependency_overrides[api_deps.require_security_audit_service] = lambda: audit
+    return app, service
+
+
+def test_http_create_completion_failure_reports_operation_completed(
+    mutation_database,
+) -> None:
+    audit = _RecordingAudit(fail_completion=True)
+    app, service = _mutation_http_app(mutation_database, audit)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/scheduled-tasks",
+            json={
+                "name": "Completed write",
+                "schedule": {
+                    "time": "16:30",
+                    "timezone": "America/New_York",
+                    "calendar_market": "us",
+                },
+                "payload": {"stock_code": "AAPL"},
+            },
+        )
+
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["error"] == "security_audit_unavailable"
+    assert detail["operation_completed"] is True
+    assert service.list_tasks()["total"] == 1
+    assert detail["task_id"] == service.list_tasks()["items"][0]["id"]
+    assert detail["enabled"] is True
+
+
+def test_http_enable_completion_failure_reports_operation_completed(
+    mutation_database,
+) -> None:
+    audit = _RecordingAudit()
+    app, service = _mutation_http_app(mutation_database, audit)
+    created = service.create_task(task_contract(), now=datetime(2026, 7, 25, 12, 0))
+    audit.fail_completion = True
+
+    with TestClient(app) as client:
+        response = client.post(f"/api/v1/scheduled-tasks/{created['id']}/disable")
+
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["error"] == "security_audit_unavailable"
+    assert detail["operation_completed"] is True
+    assert detail["task_id"] == created["id"]
+    assert detail["enabled"] is False
+    assert service.get_task(created["id"])["enabled"] is False
+
+
+def test_http_validation_failure_is_not_masked_by_completion_unavailable(
+    mutation_database,
+) -> None:
+    audit = _RecordingAudit(fail_completion=True)
+    app, service = _mutation_http_app(mutation_database, audit)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/scheduled-tasks",
+            json={
+                "name": "Invalid timezone",
+                "schedule": {
+                    "time": "16:30",
+                    "timezone": "Mars/Olympus",
+                    "calendar_market": "us",
+                },
+                "payload": {"stock_code": "AAPL"},
+            },
+        )
+
+    assert response.status_code == 400
+    assert response.json()["detail"]["error"] == "scheduled_task_validation_error"
+    assert service.list_tasks()["total"] == 0
+
+
+def test_http_enable_missing_task_is_not_masked_by_completion_unavailable(
+    mutation_database,
+) -> None:
+    audit = _RecordingAudit(fail_completion=True)
+    app, service = _mutation_http_app(mutation_database, audit)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/scheduled-tasks/missingtaskid00000000000000000000/enable"
+        )
+
+    assert response.status_code == 404
+    assert response.json()["detail"]["error"] == "scheduled_task_not_found"
     assert service.list_tasks()["total"] == 0
