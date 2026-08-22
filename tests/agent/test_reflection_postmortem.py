@@ -778,6 +778,37 @@ def test_reflection_records_one_run_account_turn_when_room_remains() -> None:
     assert len(calls) == 1
     assert account.llm_turns == 2
     assert account.breach is None
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == 2
+
+
+def test_postmortem_updates_ctx_mode_budget_snapshot() -> None:
+    account = _run_account(max_llm_turns=4, llm_turns=1)
+    ctx = _ctx(mode_budget_account=account)
+
+    result = reflect_resolved_forecast(
+        _miss_item(signals=["evidence_gap"]),
+        config=_config(),
+        llm_complete=lambda _s, _u: json.dumps(
+            {
+                "lessons": [
+                    {
+                        "kind": "evidence_gap",
+                        "severity": "high",
+                        "claim_ref": "c1",
+                        "remedy": "Need volume confirmation.",
+                        "source_step": "postmortem",
+                    }
+                ]
+            }
+        ),
+        budget=LlmCallBudget(total=1),
+        ctx=ctx,
+    )
+
+    assert result.status == "completed"
+    assert account.llm_turns == 2
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == 2
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == account.llm_turns
 
 
 def test_postmortem_skips_llm_when_run_account_at_max_llm_turns() -> None:
@@ -798,6 +829,7 @@ def test_postmortem_skips_llm_when_run_account_at_max_llm_turns() -> None:
     assert result.validation_status == BUDGET_SKIPPED
     assert result.skip_reason
     assert account.llm_turns == 2
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == 2
     assert any(lesson.kind == "evidence_gap" for lesson in result.lessons)
     assert snapshot_soul_identity() == soul_before
     assert AGENT_SOUL_HASH == soul_before.content_hash

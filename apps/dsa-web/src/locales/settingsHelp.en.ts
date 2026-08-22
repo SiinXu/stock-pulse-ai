@@ -1323,10 +1323,13 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   },
   'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS': {
     title: 'Mode Budget Max LLM Turns (global)',
-    summary: 'Global tightener for mode LLM turn caps; 0 keeps mode defaults.',
-    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps.',
-    impact: ['Controls hard terminate budgets for Agent runs by mode.'],
-    notes: ['On breach the run ends with success=false and an explicit budget reason code.'],
+    summary: 'Global tightener for mode LLM turn caps; 0 keeps mode defaults. Optional end-of-run reflection and in-process post-mortem LLM calls consume this same cap.',
+    usage: 'Configure under Agent settings. 0 keeps mode defaults for numeric caps. When reflection or post-mortem is enabled, those LLM calls count toward the run total and appear on the final budget snapshot.',
+    impact: ['Controls hard terminate budgets for Agent runs by mode, including optional reflection and post-mortem calls.'],
+    notes: [
+      'On breach the run ends with success=false and an explicit budget reason code.',
+      'Optional reflection or post-mortem that cannot fit is budget_skipped rather than silent success.',
+    ],
     valueNotes: ['Requires process restart to take effect.'],
   },
   'settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS': {

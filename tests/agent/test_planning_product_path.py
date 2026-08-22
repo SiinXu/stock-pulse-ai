@@ -19,6 +19,7 @@ from src.agent.planning.product import (
     resolve_planning_settings,
     try_run_with_planning,
 )
+from src.agent.runtime.mode_budget import ModeBudgetAccount, ModeBudgetLimits
 from src.agent.tools.registry import (
     ToolDefinition,
     ToolParameter,
@@ -255,6 +256,111 @@ def test_product_path_calls_real_reflection_adapter_with_trajectory_evidence() -
     assert reflection["status"] == "completed"
     assert reflection["validation_status"] == "valid"
     assert reflection["lessons"][0]["kind"] == "evidence_gap"
+
+
+def test_product_path_budget_snapshot_includes_reflection_llm_turn() -> None:
+    """AgentResult.budget_snapshot must include the post-loop reflection charge."""
+    tools = ["get_realtime_quote", "get_daily_history", "analyze_trend"]
+    llm = MagicMock()
+    llm.call_completion.return_value = SimpleNamespace(
+        provider="test",
+        content=json.dumps({"lessons": [], "revised": False}),
+    )
+    executor = AgentExecutor(_registry_with_tools(tools), llm, max_steps=3)
+    account = ModeBudgetAccount(
+        limits=ModeBudgetLimits(
+            mode="chat",
+            enabled=True,
+            max_llm_turns=4,
+            max_tool_calls=0,
+            max_cost_usd=0.0,
+            max_tokens=0,
+        ),
+        llm_turns=1,
+    )
+    stale = account.snapshot()
+    synth = AgentResult(
+        success=True,
+        content='{"action":"hold"}',
+        dashboard={"action": "hold"},
+        total_steps=1,
+        budget_snapshot=stale,
+    )
+
+    def _loop(*_args: Any, **_kwargs: Any) -> AgentResult:
+        executor.mode_budget_account = account
+        return synth
+
+    with patch(
+        "src.agent.planning.product._resolve_config",
+        return_value=_enabled_config(
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+        ),
+    ), patch(
+        "src.agent.planning.product._open_plan_tool_session",
+        return_value=_SuccessfulSession(),
+    ), patch.object(executor, "_run_loop", side_effect=_loop):
+        result = executor.run("Analyze stock 600519", context={"stock_code": "600519"})
+
+    assert result.success is True
+    assert result.planning_metadata["reflection_result"]["status"] == "completed"
+    assert account.llm_turns == 2
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["used"]["llm_turns"] == 2
+    assert result.budget_snapshot["used"]["llm_turns"] == account.llm_turns
+    assert result.planning_metadata["mode_budget"]["used"]["llm_turns"] == 2
+    assert stale["used"]["llm_turns"] == 1
+
+
+def test_product_path_budget_snapshot_stays_at_cap_when_reflection_skipped() -> None:
+    tools = ["get_realtime_quote", "get_daily_history", "analyze_trend"]
+    llm = MagicMock()
+    llm.call_completion.side_effect = AssertionError("LLM must not run at cap")
+    executor = AgentExecutor(_registry_with_tools(tools), llm, max_steps=3)
+    account = ModeBudgetAccount(
+        limits=ModeBudgetLimits(
+            mode="chat",
+            enabled=True,
+            max_llm_turns=2,
+            max_tool_calls=0,
+            max_cost_usd=0.0,
+            max_tokens=0,
+        ),
+        llm_turns=2,
+    )
+    synth = AgentResult(
+        success=True,
+        content='{"action":"hold"}',
+        dashboard={"action": "hold"},
+        total_steps=1,
+        budget_snapshot=account.snapshot(),
+    )
+
+    def _loop(*_args: Any, **_kwargs: Any) -> AgentResult:
+        executor.mode_budget_account = account
+        return synth
+
+    with patch(
+        "src.agent.planning.product._resolve_config",
+        return_value=_enabled_config(
+            agent_reflection_enabled=True,
+            agent_reflection_llm_budget=1,
+            agent_reflection_in_chat=False,
+        ),
+    ), patch(
+        "src.agent.planning.product._open_plan_tool_session",
+        return_value=_SuccessfulSession(),
+    ), patch.object(executor, "_run_loop", side_effect=_loop):
+        result = executor.run("Analyze stock 600519", context={"stock_code": "600519"})
+
+    assert result.success is True
+    assert result.planning_metadata["reflection_result"]["status"] == "budget_skipped"
+    assert account.llm_turns == 2
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["used"]["llm_turns"] == 2
+    llm.call_completion.assert_not_called()
 
 
 def test_reflection_provider_failure_is_explicit_without_changing_run_success() -> None:

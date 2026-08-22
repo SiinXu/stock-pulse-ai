@@ -250,6 +250,9 @@ def try_consume_with_run_account(
     )
     if block is not None:
         call_budget.record_skip(reason=f"budget_exhausted:{reason}")
+        account = _mode_budget_account_from_ctx(ctx)
+        if account is not None:
+            _refresh_mode_budget_snapshot(ctx, account)
         return False
     if not call_budget.try_consume(reason=reason):
         return False

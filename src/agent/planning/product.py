@@ -283,7 +283,7 @@ def run_with_planning(
             success=False,
             tool_calls_log=plan_tool_log,
         )
-        return AgentResult(
+        result = AgentResult(
             success=False,
             error=f"Plan execution terminated: {reason}",
             tool_calls_log=plan_tool_log,
@@ -294,6 +294,13 @@ def run_with_planning(
             timed_out=bool(exec_result.timed_out),
             planning_metadata=planning_metadata,
         )
+        _apply_live_mode_budget_snapshot(
+            result,
+            executor=executor,
+            context=effective_context,
+            planning_metadata=planning_metadata,
+        )
+        return result
 
     # Successful plan: inject observation evidence and run LLM synthesis.
     evidence = compact_observation_summary(exec_result.step_observations)
@@ -347,6 +354,12 @@ def run_with_planning(
         context=effective_context,
         success=bool(result.success),
         tool_calls_log=result.tool_calls_log,
+    )
+    _apply_live_mode_budget_snapshot(
+        result,
+        executor=executor,
+        context=effective_context,
+        planning_metadata=result.planning_metadata,
     )
     return result
 
@@ -490,6 +503,63 @@ def _maybe_attach_end_of_run_reflection(
             "replan_reason_kinds", list(multi.replan_reason_kinds)
         )
 
+
+def _resolve_mode_budget_account(
+    executor: Any,
+    context: Optional[Dict[str, Any]],
+) -> Any:
+    """Return the live run account from executor or planning context."""
+    if isinstance(context, dict):
+        account = context.get("mode_budget_account")
+        if account is None:
+            nested = context.get("meta")
+            if isinstance(nested, dict):
+                account = nested.get("mode_budget_account")
+        if account is not None:
+            return account
+    if executor is None:
+        return None
+    account = getattr(executor, "mode_budget_account", None)
+    if account is not None:
+        return account
+    return getattr(executor, "_mode_budget_account", None)
+
+
+def _apply_live_mode_budget_snapshot(
+    result: Any,
+    *,
+    executor: Any,
+    context: Optional[Dict[str, Any]] = None,
+    planning_metadata: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Copy the post-reflection account snapshot onto the returned AgentResult.
+
+    ``_run_loop`` freezes ``budget_snapshot`` before optional reflection
+    charges the same account. Diagnostics must show the final used turns.
+    """
+    account = _resolve_mode_budget_account(executor, context)
+    snapshot_fn = getattr(account, "snapshot", None)
+    if not callable(snapshot_fn):
+        return
+    try:
+        payload = snapshot_fn()
+    except Exception as exc:  # broad-exception: fallback_recorded - snapshot is diagnostic
+        log_safe_exception(
+            logger,
+            "Could not snapshot mode budget after reflection",
+            exc,
+            error_code="agent_reflection_mode_budget_snapshot_failed",
+            level=logging.INFO,
+        )
+        return
+    if not isinstance(payload, dict):
+        return
+    if result is not None:
+        result.budget_snapshot = payload
+    if isinstance(planning_metadata, dict):
+        planning_metadata["mode_budget"] = payload
+
+
 def _attach_mode_budget_account(
     ctx: Any,
     *,
@@ -497,17 +567,7 @@ def _attach_mode_budget_account(
     context: Optional[Dict[str, Any]],
 ) -> None:
     """Copy the live run account onto the reflection ctx when one exists."""
-    account = None
-    if isinstance(context, dict):
-        account = context.get("mode_budget_account")
-        if account is None:
-            nested = context.get("meta")
-            if isinstance(nested, dict):
-                account = nested.get("mode_budget_account")
-    if account is None and executor is not None:
-        account = getattr(executor, "mode_budget_account", None)
-        if account is None:
-            account = getattr(executor, "_mode_budget_account", None)
+    account = _resolve_mode_budget_account(executor, context)
     if account is None:
         return
     meta = getattr(ctx, "meta", None)

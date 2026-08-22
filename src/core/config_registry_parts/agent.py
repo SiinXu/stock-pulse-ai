@@ -385,7 +385,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "AGENT_MODE_BUDGET_MAX_LLM_TURNS": {
         "title": "Mode Budget Max LLM Turns (global)",
-        "description": "Optional global tightener for per-mode LLM turn caps. 0 keeps mode defaults (quick=6, standard=10, full/specialist=12, chat=10). Exceeding terminates with budget_turns.",
+        "description": "Optional global tightener for per-mode LLM turn caps. 0 keeps mode defaults (quick=6, standard=10, full/specialist=12, chat=10). The cap includes optional end-of-run reflection and in-process post-mortem LLM calls. Exceeding terminates with budget_turns; skipped optional work uses budget_skipped. Final usage is on result.budget_snapshot / ctx.meta['mode_budget'].",
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",

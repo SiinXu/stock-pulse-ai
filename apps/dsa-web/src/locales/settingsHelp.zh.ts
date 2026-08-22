@@ -1359,10 +1359,13 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
   },
   'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS': {
     title: '模式预算最大 LLM 轮次（全局）',
-    summary: '全局收紧各模式 LLM 轮次上限；0 表示保留模式默认。',
-    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。',
-    impact: ['控制各模式 Agent 运行的硬终止预算。'],
-    notes: ['超限时以 success=false 明确终止，并给出预算原因码。'],
+    summary: '全局收紧各模式 LLM 轮次上限；0 表示保留模式默认。可选的运行结束反思与进程内后验 LLM 调用计入同一上限。',
+    usage: '在 Agent 设置中配置；数值项填 0 表示保留模式默认。开启反思或后验时，这些 LLM 调用会计入本次运行总额，并出现在最终预算快照中。',
+    impact: ['控制各模式 Agent 运行的硬终止预算，包含可选反思与后验调用。'],
+    notes: [
+      '超限时以 success=false 明确终止，并给出预算原因码。',
+      '装不下的可选反思/后验记为 budget_skipped，不会静默当成功。',
+    ],
     valueNotes: ['修改后需要重启进程生效。'],
   },
   'settings.agent.AGENT_MODE_BUDGET_MAX_TOOL_CALLS': {

@@ -44,11 +44,15 @@ Entry: `src/agent/evolution/reflection.py` (`run_reflection_loop`, etc.).
 4. When `ctx.meta["mode_budget_account"]` is present, each reflection LLM call
    also consumes one run-account turn. The production Chat/single-agent loop
    persists that account on the executor so end-of-run planning reflection can
-   find it. A run-account skip uses the existing `budget_skipped` /
-   `terminate_reason=budget` vocabulary and does not increment past
-   `max_llm_turns`. These calls use `llm_complete`, not `run_agent_loop`, so
-   they are not double-counted. End-of-run reflection does not reserve a
-   Decision turn; optional in-loop step-critique enrichment does.
+   find it. After optional reflection, the planning product path rewrites
+   `AgentResult.budget_snapshot` (and `planning_metadata["mode_budget"]`) from
+   that live account so diagnostics include the extra turn. A run-account skip
+   uses the existing `budget_skipped` / `terminate_reason=budget` vocabulary and
+   does not increment past `max_llm_turns`. These calls use `llm_complete`, not
+   `run_agent_loop`, so they are not double-counted. End-of-run reflection does
+   not reserve a Decision turn; optional in-loop step-critique enrichment does.
+   The run LLM-turn cap is `AGENT_MODE_BUDGET_MAX_LLM_TURNS` (there is no
+   `AGENT_MAX_RUN_LLM_CALLS` key).
 5. Optional in-run revise limited by `AGENT_REFLECTION_MAX_REVISE` (default 1).
 6. Soul / ToolSurface identity is snapshotted and re-asserted after the path.
 
@@ -63,7 +67,10 @@ Entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`, `run_po
 5. Batch LLM spend capped by `AGENT_POSTMORTEM_LLM_BUDGET` (default 8).
 6. Budget exhaustion records `budget_skipped` (not silent success).
 7. When a caller supplies a run `ctx` with `mode_budget_account`, post-mortem
-   LLM calls charge that same account. Skip stays `budget_skipped`.
+   LLM calls charge that same account and refresh `ctx.meta["mode_budget"]`.
+   Post-mortem is not an `AgentResult` path; callers that need a result snapshot
+   must read the account or `ctx.meta["mode_budget"]`. Skip stays
+   `budget_skipped`.
 
 ## Configuration
 
