@@ -104,7 +104,7 @@ Legend:
 | Portfolio position analysis | `src/api/v1/endpoints/portfolio.py` `analyze_position` (`query_source="portfolio"`, actor `api_client`/`portfolio_submitter`) | **Landed** | HTTP analysis admission; holding quantity/cost/account are queue kwargs only | DAG-1 |
 | HTTP sync `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **Landed** | Same `analysis.submit` contract as async; attempt before `analyze_stock`, completion `success`/`failure` | DAG-1 |
 | Scheduled-task create/enable/disable | `src/api/v1/endpoints/scheduled_tasks.py` | **Missing** | Privileged automation control plane. No PUT/PATCH/DELETE definition routes exist | DAG-2 |
-| Analysis HTTP cancel | Open PR [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466); not on `main` | **Missing (incoming)** | Privileged stop of running analysis. #1466 adds the route **without** security-audit. Do not stack audit onto that PR | DAG-3 after #1466 merges |
+| Analysis HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task` (route on `main` via [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466)) | **Missing** | Privileged stop of running analysis. #1466 landed the route **without** security-audit. DAG-3 is audit-only and must not change cancel wire behavior | DAG-3 |
 | Report Markdown/HTML/PDF export | `src/api/v1/endpoints/report_export.py` | **Missing** | AUDIT-02 export / protected-data. Optional follow-on | DAG-4 |
 | History delete (by code / by ids) | `src/api/v1/endpoints/history.py` | **Missing** | Protected-data destruction. Optional follow-on | DAG-4 |
 | Config profiles apply/save | `src/services/config_profile_service.py` → `SystemConfigService.update` | **Missing** | Same privileged config mutation as HTTP `system_config.write` | DAG-5 |
@@ -155,8 +155,8 @@ DAG-0  this coverage map (docs only; no runtime behavior)
   │            independent of DAG-1
   │
   ├── DAG-3  analysis HTTP cancel audit
-  │            blocked on PR #1466 merge; rebase onto that head;
-  │            do not stack onto the in-flight cancel PR
+  │            route already on main via #1466;
+  │            add durable audit without changing cancel wire behavior
   │
   └── DAG-4  report export + history delete
                optional AUDIT-02; independent
@@ -173,7 +173,7 @@ Suggested later titles (English, no tool prefix):
 1. `docs: publish privileged security-audit coverage map for #1062` (DAG-0, landed)
 2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths` (DAG-1, landed)
 3. `feat: emit security-audit events for scheduled-task mutations`
-4. `feat: audit analysis task cancel at the HTTP boundary` (after #1466)
+4. `feat: audit analysis task cancel at the HTTP boundary` (route already on main via #1466)
 5. `feat: audit report export and history deletion`
 
 Keep #1062 open until remaining in-scope rows are **Landed** or explicitly

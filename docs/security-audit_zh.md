@@ -94,7 +94,7 @@ English version: [Durable Security Audit](security-audit.md).
 | 组合持仓分析 | `src/api/v1/endpoints/portfolio.py` `analyze_position`（`query_source="portfolio"`，actor `api_client`/`portfolio_submitter`） | **已落地** | HTTP 分析入队；持仓数量/成本/账户只作为队列 kwargs | DAG-1 |
 | HTTP 同步 `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **已落地** | 与异步共用 `analysis.submit` 合同；`analyze_stock` 前写 attempt，completion 为 `success`/`failure` | DAG-1 |
 | 定时任务创建/启用/禁用 | `src/api/v1/endpoints/scheduled_tasks.py` | **缺失** | 特权自动化控制面。不存在 PUT/PATCH/DELETE 定义路由 | DAG-2 |
-| 分析 HTTP cancel | 开放 PR [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466)；不在 `main` | **缺失（即将进入）** | 停止运行中分析的特权控制。#1466 增加路由但**不含**安全审计。不要把审计叠进该 PR | DAG-3，待 #1466 合并后 rebase |
+| 分析 HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task`（路由已随 [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466) 进入 `main`） | **缺失** | 停止运行中分析的特权控制。#1466 已落地路由但**不含**安全审计。DAG-3 只补审计，不得改 cancel 线协议 | DAG-3 |
 | 报告 Markdown/HTML/PDF 导出 | `src/api/v1/endpoints/report_export.py` | **缺失** | AUDIT-02 导出/受保护数据。可选后续 | DAG-4 |
 | 历史删除（按代码 / 按 id） | `src/api/v1/endpoints/history.py` | **缺失** | 受保护数据销毁。可选后续 | DAG-4 |
 | 配置预设应用/保存 | `src/services/config_profile_service.py` → `SystemConfigService.update` | **缺失** | 与 HTTP `system_config.write` 同一特权配置变更 | DAG-5 |
@@ -147,8 +147,8 @@ DAG-0  本覆盖图（仅文档；无运行时行为）
   │            独立于 DAG-1
   │
   ├── DAG-3  分析 HTTP cancel 审计
-  │            阻塞于 PR #1466 合并；rebase 到该 head；
-  │            不要叠进进行中的 cancel PR
+  │            路由已随 #1466 进入 main；
+  │            只补持久审计，不得改 cancel 线协议
   │
   └── DAG-4  报告导出 + 历史删除
                可选 AUDIT-02；独立
@@ -165,7 +165,7 @@ DAG-5  SystemConfigService.update 旁路
 1. `docs: publish privileged security-audit coverage map for #1062`（DAG-0，已落地）
 2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths`（DAG-1，已落地）
 3. `feat: emit security-audit events for scheduled-task mutations`
-4. `feat: audit analysis task cancel at the HTTP boundary`（#1466 之后）
+4. `feat: audit analysis task cancel at the HTTP boundary`（路由已随 #1466 进入 main）
 5. `feat: audit report export and history deletion`
 
 在范围内剩余行变为 **已落地** 或带负责人的 **延期** 之前，保持 #1062 开放。

@@ -1,1 +1,2 @@
 - [Fixed] Emit fail-closed `analysis.submit` security-audit events for bot, scheduled-task dispatch, portfolio position analysis, and HTTP sync `/analyze`, preserving query_source, actor identity, and secret-free metadata (Refs #1062).
+- [Docs] Record that analysis HTTP cancel from #1466 is already on `main`; DAG-3 remains audit-only and is not blocked on that merge (Refs #1062).

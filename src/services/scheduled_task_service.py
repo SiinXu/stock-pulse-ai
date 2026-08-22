@@ -1624,10 +1624,7 @@ class ScheduledTaskService:
                     now,
                     error_code="scheduled_task_dispatch_state_lost",
                 )
-            if owned:
-                admission_audit["accepted"] = True
-            else:
-                admission_audit["duplicate"] = True
+            admission_audit["accepted" if owned else "duplicate"] = True
             return self._running_admission_fields(
                 current_run,
                 now,

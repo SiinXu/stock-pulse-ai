@@ -630,7 +630,7 @@ class AnalysisApiService:
 
         except HTTPException:
             raise
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Sync analysis maps unexpected failures to HTTP 500 after safe-logging; completion audit still runs in finally.
             log_safe_exception(
                 logger,
                 "Stock analysis failed",
