@@ -21,7 +21,6 @@ from src.api.v1.schemas.portfolio import PortfolioPositionAnalysisRequest
 from src.bot.commands.analyze import AnalyzeCommand
 from src.bot.models import BotMessage, ChatType
 from src.config import Config
-from src.services.security_audit_service import SecurityAuditUnavailable
 from src.services.task_queue import DuplicateTaskError, TaskInfo
 from src.storage import DatabaseManager
 from tests.security.test_security_audit_integrations import _RecordingAudit
@@ -46,6 +45,7 @@ def scheduled_database(tmp_path):
     finally:
         DatabaseManager.reset_instance()
         Config.reset_instance()
+
 
 CANARY = "admission-audit-canary-secret"
 PII_USER = "user-canary-42"
@@ -73,6 +73,18 @@ def _visible_audit_payload(audit: _RecordingAudit) -> str:
         ensure_ascii=False,
         default=str,
     )
+
+
+def _analysis_attempts(audit: _RecordingAudit) -> list[dict]:
+    return [event for event in audit.attempts if event.get("event_type") == "analysis.submit"]
+
+
+def _analysis_completions(audit: _RecordingAudit) -> list[dict]:
+    return [
+        event
+        for event in audit.completions
+        if event.get("event_type") == "analysis.submit"
+    ]
 
 
 def test_bot_attempt_failure_prevents_queue_submission() -> None:
@@ -352,13 +364,14 @@ def test_sync_analyze_success_and_failure_use_correlated_completions() -> None:
 
 def test_scheduled_attempt_failure_prevents_dispatch(scheduled_database) -> None:
     queue = FakeTaskQueue()
-    audit = _RecordingAudit(fail_attempt=True)
+    audit = _RecordingAudit()
     service = build_service(
         scheduled_database,
         queue,
         security_audit_factory=lambda: audit,
     )
     task = service.create_task(task_contract(), now=NOW)
+    audit.fail_attempt = True
 
     result = service.tick(now=DUE)
 
@@ -366,8 +379,8 @@ def test_scheduled_attempt_failure_prevents_dispatch(scheduled_database) -> None
     assert queue.submit_calls == []
     run = service.list_runs(task["id"])["items"][0]
     assert run["error_code"] == "security_audit_unavailable"
-    assert audit.attempts == []
-    assert audit.completions == []
+    assert _analysis_attempts(audit) == []
+    assert _analysis_completions(audit) == []
 
 
 def test_scheduled_dispatch_records_scheduler_actor_without_payload_secrets(
@@ -386,13 +399,15 @@ def test_scheduled_dispatch_records_scheduler_actor_without_payload_secrets(
 
     assert len(queue.submit_calls) == 1
     assert queue.submit_calls[0]["query_source"] == "scheduled_task"
-    assert audit.attempts[0]["event_type"] == "analysis.submit"
-    assert audit.attempts[0]["actor_type"] == "scheduler"
-    assert audit.attempts[0]["actor_id"] == "scheduled_task"
-    assert audit.attempts[0]["target_id"] == "600519"
-    assert audit.completions[0]["outcome"] == "accepted"
-    assert audit.attempts[0]["correlation_id"] == audit.completions[0]["correlation_id"]
-    assert audit.attempts[0]["metadata"]["query_source"] == "scheduled_task"
+    attempts = _analysis_attempts(audit)
+    completions = _analysis_completions(audit)
+    assert attempts[0]["event_type"] == "analysis.submit"
+    assert attempts[0]["actor_type"] == "scheduler"
+    assert attempts[0]["actor_id"] == "scheduled_task"
+    assert attempts[0]["target_id"] == "600519"
+    assert completions[0]["outcome"] == "accepted"
+    assert attempts[0]["correlation_id"] == completions[0]["correlation_id"]
+    assert attempts[0]["metadata"]["query_source"] == "scheduled_task"
     visible = _visible_audit_payload(audit)
     assert "password" not in visible
     assert CANARY not in visible
@@ -431,9 +446,11 @@ def test_scheduled_audit_records_admitted_report_type(
     service.tick(now=DUE)
 
     assert queue.submit_calls[0]["report_type"] == expected_report_type
-    assert audit.attempts[0]["metadata"]["report_type"] == expected_report_type
-    assert audit.completions[0]["metadata"]["report_type"] == expected_report_type
-    assert audit.completions[0]["outcome"] == "accepted"
+    attempts = _analysis_attempts(audit)
+    completions = _analysis_completions(audit)
+    assert attempts[0]["metadata"]["report_type"] == expected_report_type
+    assert completions[0]["metadata"]["report_type"] == expected_report_type
+    assert completions[0]["outcome"] == "accepted"
 
 
 def test_scheduled_invalid_execution_id_does_not_audit_as_accepted(
@@ -458,8 +475,9 @@ def test_scheduled_invalid_execution_id_does_not_audit_as_accepted(
     run = service.list_runs(task["id"])["items"][0]
     assert run["status"] == "interrupted"
     assert run["error_code"] == "scheduled_task_dispatch_state_lost"
-    assert audit.completions[0]["outcome"] == "failure"
-    assert audit.completions[0]["reason_code"] == "submission_not_resolved"
+    completions = _analysis_completions(audit)
+    assert completions[0]["outcome"] == "failure"
+    assert completions[0]["reason_code"] == "submission_not_resolved"
 
 
 def test_scheduled_queue_rejection_completes_as_failure(scheduled_database) -> None:
@@ -475,9 +493,11 @@ def test_scheduled_queue_rejection_completes_as_failure(scheduled_database) -> N
     service.tick(now=DUE)
 
     assert len(queue.submit_calls) == 1
-    assert audit.completions[0]["outcome"] == "failure"
-    assert audit.completions[0]["reason_code"] == "task_submission_failed"
-    assert audit.attempts[0]["correlation_id"] == audit.completions[0]["correlation_id"]
+    attempts = _analysis_attempts(audit)
+    completions = _analysis_completions(audit)
+    assert completions[0]["outcome"] == "failure"
+    assert completions[0]["reason_code"] == "task_submission_failed"
+    assert attempts[0]["correlation_id"] == completions[0]["correlation_id"]
 
 
 def test_existing_async_http_analysis_submit_contract_is_unchanged() -> None:

@@ -1,0 +1,1 @@
+- [Added] Emit fail-closed `scheduled_task.write` security-audit events for scheduled-task create, enable, and disable, with redacted queryable metadata and HTTP `503` when the audit store is unavailable (Refs #1062).

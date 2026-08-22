@@ -93,7 +93,7 @@ English version: [Durable Security Audit](security-audit.md).
 | 定时任务派发 | `src/services/scheduled_task_service.py` → `submit_tasks_batch`（`query_source="scheduled_task"`，actor `scheduler`/`scheduled_task`） | **已落地** | attempt 在入队 fence 前单独提交，避免 SQLite 双重写锁；已拥有执行的 retry 不是新的 `analysis.submit` | DAG-1 |
 | 组合持仓分析 | `src/api/v1/endpoints/portfolio.py` `analyze_position`（`query_source="portfolio"`，actor `api_client`/`portfolio_submitter`） | **已落地** | HTTP 分析入队；持仓数量/成本/账户只作为队列 kwargs | DAG-1 |
 | HTTP 同步 `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **已落地** | 与异步共用 `analysis.submit` 合同；`analyze_stock` 前写 attempt，completion 为 `success`/`failure` | DAG-1 |
-| 定时任务创建/启用/禁用 | `src/api/v1/endpoints/scheduled_tasks.py` | **缺失** | 特权自动化控制面。不存在 PUT/PATCH/DELETE 定义路由 | DAG-2 |
+| 定时任务创建/启用/禁用 | `src/api/v1/endpoints/scheduled_tasks.py` → `ScheduledTaskService.create_task` / `set_enabled` | **已落地** | `scheduled_task.write` 先 attempt 再持久化；HTTP actor 为 `administrator`/`authenticated_admin`/`local_operator`/`desktop_operator`。内部隔离走 `repository.set_enabled`，不是本事件。不存在 PUT/PATCH/DELETE 定义路由 | DAG-2 |
 | 分析 HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task`（路由已随 [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466) 进入 `main`） | **缺失** | 停止运行中分析的特权控制。#1466 已落地路由但**不含**安全审计。DAG-3 只补审计，不得改 cancel 线协议 | DAG-3 |
 | 报告 Markdown/HTML/PDF 导出 | `src/api/v1/endpoints/report_export.py` | **缺失** | AUDIT-02 导出/受保护数据。可选后续 | DAG-4 |
 | 历史删除（按代码 / 按 id） | `src/api/v1/endpoints/history.py` | **缺失** | 受保护数据销毁。可选后续 | DAG-4 |
@@ -109,6 +109,12 @@ DAG-1 已扩展 `AnalysisSubmissionCommand`（`query_source`、`request_context`
 `record_audit` 以及“先 attempt 再执行受保护操作”的 fail-closed 顺序。HTTP 异步 /
 MCP / 事件触发仍使用 `api_client` / `analysis_submitter`。不要把市场复盘、候选
 发现或 AlphaSift 折进本事件。
+
+DAG-2 在 `ScheduledTaskService.create_task` 与 `set_enabled`（HTTP 创建/启用/
+禁用）写入 `scheduled_task.write`。attempt 在定义写入前提交。metadata 仅含
+task_type、schema_version、enabled、schedule_kind、calendar_market、
+requested_enabled 与 idempotent，不含 name、payload、密钥或股票代码。调度器
+隔离仍走 `repository.set_enabled`，不写本事件。
 
 DAG-5 应在 `SystemConfigService.update` 上审计一次，而不是逐入口打补丁。
 已经审计的 HTTP `system_config.write` 路径不得重复写入。
@@ -143,7 +149,8 @@ DAG-0  本覆盖图（仅文档；无运行时行为）
   │            + HTTP 同步 /analyze
   │            保留 query_source / 上下文 kwargs / actor 身份
   │
-  ├── DAG-2  定时任务创建/启用/禁用
+  ├── DAG-2  定时任务创建/启用/禁用（已落地）
+  │            HTTP 创建/启用/禁用；不是派发，也不是隔离
   │            独立于 DAG-1
   │
   ├── DAG-3  分析 HTTP cancel 审计
@@ -164,7 +171,7 @@ DAG-5  SystemConfigService.update 旁路
 
 1. `docs: publish privileged security-audit coverage map for #1062`（DAG-0，已落地）
 2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths`（DAG-1，已落地）
-3. `feat: emit security-audit events for scheduled-task mutations`
+3. `feat: emit security-audit events for scheduled-task mutations`（DAG-2，已落地）
 4. `feat: audit analysis task cancel at the HTTP boundary`（路由已随 #1466 进入 main）
 5. `feat: audit report export and history deletion`
 
@@ -177,7 +184,7 @@ DAG-5  SystemConfigService.update 旁路
 
 - 线上 #1062 工作流 A–D 与验收复选框仍全部未勾。原始 A 清单的
   HTTP/MCP/工具/HITL/插件/本地进程路径以及证据包导出已经是 **已落地** 或
-  **部分**。后续复选框应只列 DAG-1..5。
+  **部分**。后续复选框应只列 DAG-3..5。
 - [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) HITL 门控已关闭
   并写入 `approval_*` 事件。Current Gaps 若仍写“门控缺失”则过时；见
   [security-baseline.md](security-baseline.md)。
@@ -218,7 +225,8 @@ correlation / UTC 时间过滤，需要有效的单管理员会话。认证关�
 鉴权中间件豁免仅限 login、status、health、scorecard、docs 与 OpenAPI。能力
 写入**不**在豁免名单；未认证拒绝会写入 `capability.write` 或 fail-closed
 `503`。Actor id 是有界 token（`admin_session`、`unauthenticated`、
-`capability_registry`、`analysis_submitter`、`bot`、`scheduled_task`、`portfolio_submitter`），不是邮箱。MCP 能力
+`capability_registry`、`analysis_submitter`、`bot`、`scheduled_task`、`portfolio_submitter`、
+`authenticated_admin`、`local_operator`、`desktop_operator`），不是邮箱。MCP 能力
 `security_audit_admin` 为 `not_exposed`。
 
 内存 outbound-activity 环形缓冲（`GET /api/v1/security/outbound-activity`）
@@ -237,7 +245,8 @@ SQLite 文件对操作员可写。本交付没有哈希链、HMAC 或 WORM 设�
 
 受保护路径在执行前写入 attempt。写入失败则 fail-closed，错误码为
 `security_audit_unavailable`：不发登录 cookie、不改配置、不调用工具 handler、
-不入队分析、MCP 拒绝、管理员插件变更停止、本地 OCR/CLI 进程不启动。
+不入队分析、MCP 拒绝、管理员插件变更停止、本地 OCR/CLI 进程不启动、
+定时任务创建/启用/禁用不落库。
 completion 写入失败同样对外可见，禁止静默吞掉。
 
 审计写失败有可见告警路径：服务通过 `log_safe_exception` 记录脱敏错误日志，
