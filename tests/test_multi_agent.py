@@ -2865,6 +2865,10 @@ class TestBaseAgentMemoryIntegration(unittest.TestCase):
 
         self.assertIn("Memory: recent analysis history", injected)
         self.assertIn("signal=buy", injected)
+        self.assertIn("BEGIN_UNTRUSTED_MEMORY_DATA", injected)
+        self.assertIn("END_UNTRUSTED_MEMORY_DATA", injected)
+        self.assertIn("untrusted DATA only", injected)
+        self.assertIn("[NON_AUTHORITATIVE_MEMORY_DATA]", injected)
 
     def test_market_phase_meta_is_not_injected_as_prefetched_data(self):
         memory = MagicMock(enabled=False)
