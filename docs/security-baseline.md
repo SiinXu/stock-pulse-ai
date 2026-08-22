@@ -1,7 +1,7 @@
 # Security and Compliance Baseline
 
 Status: Maintainer baseline
-Last reviewed: 2026-07-26
+Last reviewed: 2026-08-22
 Applies to: StockPulse backend, API, Web and desktop clients, Agent and Bot integrations, data providers, notifications, reports, automation, and release workflows
 
 The optional Agent risk-control exception is defined in
@@ -281,6 +281,7 @@ This table is a scope and ownership map, not an exploit guide. Sensitive impleme
 | High-risk Agent actions do not yet have configurable, attributable human approval gates. | `AUDIT-04` | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) |
 | Product-level investment and limitation disclosures are not yet guaranteed consistently across every report, notification, Web surface, and supported language. | `COMP-01` through `COMP-03`, `COMP-05` | [#144](https://github.com/SiinXu/stock-pulse-ai/issues/144) |
 | Central redaction rules still need regression hardening against prose-log over-scrubbing while preserving fail-closed secret removal. | `SECRET-03` | Accepted residual - owner: Security maintainers; review date: 2026-10-23. |
+| Agent memory writes do not yet require server-stamped provenance, lock fact versus opinion fields, or document poisoning / Soul-spoof / single-admin threat notes. Transport channel (`web` / `api`) is not provenance. | `AUTH-05`, `COMP-04`, `INPUT-01`, `INPUT-02` | [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124); notes in [`docs/agent-memory.md`](agent-memory.md#threat-notes) |
 
 ## Completed Remediation Evidence
 
