@@ -1,6 +1,6 @@
 # Principal 作用域分层 Agent 记忆
 
-**状态**：Issue [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) 与 [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198) 的基础投影 + 生命周期切片
+**状态**：分层记忆基础 + 生命周期（分层记忆尚未接入生产 prompt）。持久化存储/UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。
 
 **English**: [agent-memory.md](agent-memory.md)
 
@@ -14,7 +14,7 @@
 | `src/agent/memory_governance.py` | 知情同意、保留期、按 principal 删除/清空、访问审计 |
 | `src/agent/memory_isolation.py` | 面向 prompt 的不可信数据隔离 |
 
-既有 `AgentMemory` / `BaseAgent` 行为不变。**尚未**接入生产 prompt 注入。
+既有 `AgentMemory` / `BaseAgent` 行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 校准注入默认关闭，且当前不经过 `isolate_untrusted_memory_body`（见[威胁注释](#threat-notes)）。
 
 ## 诚实命名
 
@@ -50,9 +50,29 @@ outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
 
 详见 `docs/decision-signals.md`「历史决策记忆注入」。
 
+<a id="threat-notes"></a>
+## 威胁注释（#1124）
+
+共享/长期记忆的短安全基线。这是范围图，不是利用指南，也不是记忆产品说明。
+
+| 威胁 | 当前契约 | 缺口 |
+| --- | --- | --- |
+| **投毒（Poisoning）** | 生产 decision-memory 只准入带 `signal_id`、有大小上限的结构化已结算 outcome，并将 prompt 块标为不可信数据。分层投影字段拒绝自由文本。 | 用户笔记与自由文本反馈是意见，不是行情事实。可选 `AGENT_MEMORY_ENABLED` 校准注入默认关闭，且当前未做隔离包装。 |
+| **事实 vs 意见** | 系统行情 actuals 在 `decision_signal_outcomes` 与 `agent_predictions.outcome_json`（`resolved` 行不可变）。用户反馈是 sidecar 意见表，不得改写这些 actuals。 | 传输通道 `source`（`web` / `api`）**不是** provenance。持久化记忆写入仍需服务端盖章的 `source` ∈ `system_resolve` / `user_feedback` / `operator`，以及可选的会话 `actor_id`。 |
+| **Soul 边界伪造** | Soul/Persona 组装会拒绝 Soul 边界标记。反馈 `note` 有长度上限并做密钥脱敏。 | 用户可写记忆文本尚未拒绝 Soul 边界标记或标记注入载荷。 |
+| **租户 / actor** | 产品是单管理员模型（`AUTH-05`）。分层 `principal_id` 拒绝仅存在于进程内基础层。 | 基础层 principal 测试不是生产隔离。可选 `actor_id` 是管理员/会话标识，不是多租户授权。跨用户隔离仍属 [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) / [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。 |
+
+写路径上的非法、超限或标记注入载荷必须 **拒绝**，不得截断后当事实存储。Decision-memory **准入** 保持失败即关闭（不准入则不注入）；分析 **构建** 失败保持失败即跳过（跳过注入、分析继续）。见[安全基线 Current Gaps](security-baseline.md#current-gaps)。
+
 ## 剩余范围
 
-权威 principal 赋值、持久化存储、用户 UI、经安全审查的生产 prompt 消费、#150 偏好层。#250 与 #198 保持 open。
+- 权威 principal 赋值（API/bot/CLI/定时任务）与遗留迁移。
+- 持久化生命周期存储与用户 UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)（吸收已关闭的 [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) 与 [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)）。
+- 经安全审查的生产 prompt 消费。
+- 偏好层：[#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117)（吸收已关闭的 [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)）。
+- 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。
+
+不要重开 #250、#198 或 #150。
 
 ## 回滚
 

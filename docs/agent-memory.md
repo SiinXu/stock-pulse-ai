@@ -1,6 +1,6 @@
 # Principal-scoped layered Agent memory
 
-**Status**: foundation + lifecycle for [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) and [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)
+**Status**: layered foundation + lifecycle (no production layered-memory hook). Durable store/UX: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124).
 
 **Chinese**: [agent-memory_CN.md](agent-memory_CN.md)
 
@@ -14,7 +14,7 @@
 | `src/agent/memory_governance.py` | Consent, retention, principal delete/clear, access audit |
 | `src/agent/memory_isolation.py` | Untrusted-data isolation for any future prompt path |
 
-Existing `AgentMemory` / `BaseAgent` calibration behavior is unchanged. **No production prompt injection** is wired yet.
+Existing `AgentMemory` / `BaseAgent` calibration behavior is unchanged. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` calibration inject is default-off and is not wrapped by `isolate_untrusted_memory_body` (see [Threat notes](#threat-notes)).
 
 ## Honest layer naming
 
@@ -72,14 +72,29 @@ must:
 
 See `docs/decision-signals.md` §历史决策记忆注入.
 
+<a id="threat-notes"></a>
+## Threat notes (#1124)
+
+Short Agent-safety baseline for shared/long-term memory. This is a scope map, not an exploit guide and not a memory product.
+
+| Threat | Current contract | Gap |
+| --- | --- | --- |
+| **Poisoning** | Production decision-memory admits only size-capped structured completed outcomes with `signal_id` and wraps the prompt block as untrusted data. Layered projected fields reject free-form prose. | User notes and free-form feedback are opinions, not market facts. Optional `AGENT_MEMORY_ENABLED` calibration inject is default-off and currently unisolated. |
+| **Actuals vs opinion** | System market actuals live on `decision_signal_outcomes` and `agent_predictions.outcome_json` (resolved rows are immutable). User feedback is a sidecar opinion table and must not mutate those actuals. | Transport channel `source` (`web` / `api`) is **not** provenance. Server-stamped `source` ∈ `system_resolve` / `user_feedback` / `operator` plus optional session `actor_id` are still required on persisted memory writes. |
+| **Soul spoof** | Soul/persona composition rejects Soul-boundary markers. Feedback notes are size-capped and secret-redacted. | User-writable memory text does not yet reject Soul-boundary markers or marker-injected payloads. |
+| **Tenant / actor** | Product is single-administrator (`AUTH-05`). Foundation `principal_id` rejection is in-process only. | Foundation principal tests are not production isolation. Optional `actor_id` is an admin/session identifier, not multi-tenant authorization. Cross-user isolation remains [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) / [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). |
+
+Write-path illegal, oversized, or marker-injected payloads must be **rejected**, not truncated and stored as facts. Decision-memory **admission** stays fail-closed (nothing admitted → no inject); analysis **build** failure stays fail-open (skip inject, continue analysis). See [security baseline current gaps](security-baseline.md#current-gaps).
+
 ## Remaining scope
 
 - Authoritative principal assignment across API/bot/CLI/scheduled runs; legacy migration.
-- Durable DB-backed lifecycle store; user-facing UI controls.
+- Durable DB-backed lifecycle store and user-facing UI controls: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118) (absorbs closed [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) and [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)).
 - Security-reviewed production prompt consumption.
-- Preference-profile layer under #150.
+- Preference-profile layer: [#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117) (absorbs closed [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)).
+- Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124).
 
-Issues #250 and #198 stay open until production ownership and UX land.
+Do not reopen #250, #198, or #150.
 
 ## Rollback
 

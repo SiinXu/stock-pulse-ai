@@ -1,0 +1,1 @@
+- [Docs] Document Agent memory provenance and anti-poisoning threat notes, record #1124 as a current security gap, and retarget remaining layered-memory scope from closed #250/#198/#150 to #1118/#1117 (Refs #1124).
