@@ -284,9 +284,8 @@ def test_registry_category_map_and_market_alias():
 
 def test_get_tool_registry_loads_category_map_and_refreshes_cache(monkeypatch):
     from src.agent import factory, runtime_assembly
+    from src.application_services import reset_application_services
 
-    original = runtime_assembly._TOOL_REGISTRY
-    original_building = runtime_assembly._TOOL_REGISTRY_BUILDING
     state = {"data": 21.0, "search": 0.0, "analysis": 8.0, "action": 5.0}
 
     def _fake_config():
@@ -302,8 +301,8 @@ def test_get_tool_registry_loads_category_map_and_refreshes_cache(monkeypatch):
         "_load_category_timeout_config",
         _fake_config,
     )
-    runtime_assembly._TOOL_REGISTRY = None
-    runtime_assembly._TOOL_REGISTRY_BUILDING = None
+    reset_application_services()
+    runtime_assembly.reset_process_tool_registry_for_tests()
     try:
         registry = runtime_assembly.get_tool_registry()
         assert registry.category_timeouts()["data"] == 21.0
@@ -317,8 +316,19 @@ def test_get_tool_registry_loads_category_map_and_refreshes_cache(monkeypatch):
         assert same.category_timeouts()["data"] == 4.0
         assert factory.apply_tool_category_timeouts is runtime_assembly.apply_tool_category_timeouts
     finally:
-        runtime_assembly._TOOL_REGISTRY = original
-        runtime_assembly._TOOL_REGISTRY_BUILDING = original_building
+        # Close the live composition root before dropping the cache pointer.
+        # Restoring a stale pointer while plugins still own an orphaned registry
+        # lets the next get_tool_registry() safety-net occupy search tool names.
+        reset_application_services()
+        runtime_assembly.reset_process_tool_registry_for_tests()
+
+
+def test_get_tool_registry_cache_refresh_does_not_orphan_live_root(monkeypatch):
+    from src.agent import runtime_assembly
+
+    test_get_tool_registry_loads_category_map_and_refreshes_cache(monkeypatch)
+    assert runtime_assembly.get_installed_tool_registry() is None
+    assert runtime_assembly.peek_process_tool_registry() is None
 
 
 def test_load_category_timeout_config_uses_application_services(monkeypatch):

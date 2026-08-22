@@ -53,6 +53,7 @@ _FORWARDED_ASSEMBLY_NAMES = frozenset(
         "build_executor",
         "get_skill_manager",
         "get_tool_registry",
+        "reset_process_tool_registry_for_tests",
         "resolve_skill_prompt_state",
     }
 )

@@ -289,6 +289,22 @@ def apply_tool_category_timeouts(registry=None, config=None) -> None:
         _apply_category_timeouts(target, config)
 
 
+def reset_process_tool_registry_for_tests() -> None:
+    """Drop the process ToolRegistry cache (tests only).
+
+    Pair with ``reset_application_services()`` so plugin-owned tools are
+    unregistered from the registry they attached to before this cache is
+    cleared. Restoring a stale cache pointer while a live composition root
+    still owns a different registry lets ``get_tool_registry()`` safety-net
+    copies occupy search tool names without plugin ownership.
+    """
+
+    global _TOOL_REGISTRY, _TOOL_REGISTRY_BUILDING
+    with _TOOL_REGISTRY_LOCK:
+        _TOOL_REGISTRY = None
+        _TOOL_REGISTRY_BUILDING = None
+
+
 def get_tool_registry():
     """Return a cached ToolRegistry (built once, shared across requests)."""
     global _TOOL_REGISTRY, _TOOL_REGISTRY_BUILDING
@@ -503,7 +519,6 @@ def get_tool_registry():
             return _TOOL_REGISTRY
         finally:
             _TOOL_REGISTRY_BUILDING = None
-
 
 
 def build_declarative_skill_manager(config: Config):
