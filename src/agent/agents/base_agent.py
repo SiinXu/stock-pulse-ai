@@ -17,12 +17,14 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.memory import AgentMemory
+from src.agent.memory_isolation import isolate_untrusted_memory_body
 from src.agent.protocols import (
     AgentContext,
     AgentOpinion,
     StageFailureReason,
     StageResult,
     StageStatus,
+    normalize_decision_signal,
 )
 from src.agent.public_contract import (
     AGENT_EXECUTION_FAILURE_MESSAGE,
@@ -346,11 +348,12 @@ class BaseAgent(ABC):
         if not entries:
             return ""
 
-        lines = ["[Memory: recent analysis history]"]
+        data_lines: List[str] = []
         for entry in entries:
+            signal = normalize_decision_signal(getattr(entry, "signal", None))
             parts = [
                 entry.date or "unknown_date",
-                f"signal={entry.signal or 'unknown'}",
+                f"signal={signal}",
                 f"sentiment={entry.sentiment_score}",
             ]
             if entry.price_at_analysis:
@@ -361,9 +364,13 @@ class BaseAgent(ABC):
                 parts.append(f"outcome_20d={entry.outcome_20d}")
             if entry.was_correct is not None:
                 parts.append(f"was_correct={entry.was_correct}")
-            lines.append("- " + ", ".join(parts))
-        lines.append("Use this memory as context only; do not copy it verbatim into the final answer.")
-        return "\n".join(lines)
+            data_lines.append("- " + ", ".join(parts))
+        isolated = isolate_untrusted_memory_body("\n".join(data_lines))
+        title = "[Memory: recent analysis history]"
+        guardrail = (
+            "Use this memory as context only; do not copy it verbatim into the final answer."
+        )
+        return f"{title}\n{isolated}\n{guardrail}"
 
     def _apply_memory_calibration(self, ctx: AgentContext, opinion: AgentOpinion, result: StageResult) -> None:
         """Adjust confidence using historical calibration when enabled."""

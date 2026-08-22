@@ -1,0 +1,1 @@
+- [Fixed] Isolate default-off BaseAgent AgentMemory prompt inject as untrusted data and canonicalize history signals to buy|hold|sell (Refs #1124).

@@ -26,6 +26,7 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from src.agent.protocols import normalize_decision_signal
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,9 @@ class AgentMemory:
                 elif isinstance(getattr(r, "raw_result", None), dict):
                     raw_result = dict(r.raw_result)
 
-                signal = raw_result.get("decision_type") or getattr(r, "operation_advice", "") or "hold"
+                # Canonical buy|hold|sell only. Never copy operation_advice prose
+                # into signal; missing or non-canonical decision_type becomes hold.
+                signal = normalize_decision_signal(raw_result.get("decision_type"))
                 price_at_analysis = raw_result.get("current_price")
                 if price_at_analysis is None:
                     price_at_analysis = 0.0
