@@ -4,13 +4,14 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Mapping, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from src.api.v1.schemas.market_phase import MarketPhaseValue
 from src.schemas.decision_action import DecisionAction
 from src.schemas.decision_profile import DecisionProfile
+from src.schemas.memory_fact_opinion import lock_opinion_payload
 
 
 DecisionSignalSourceType = Literal["analysis", "agent", "alert", "market_review", "manual"]
@@ -245,6 +246,13 @@ class DecisionSignalFeedbackRequest(BaseModel):
     reason_code: Optional[str] = Field(None, json_schema_extra={"maxLength": 64})
     note: Optional[str] = Field(None, json_schema_extra={"maxLength": 1000})
     source: DecisionSignalFeedbackSource = "api"
+
+    @model_validator(mode="before")
+    @classmethod
+    def _reject_fact_fields(cls, value: Any) -> Any:
+        if isinstance(value, Mapping):
+            lock_opinion_payload(value)
+        return value
 
 
 class DecisionSignalFeedbackItem(BaseModel):

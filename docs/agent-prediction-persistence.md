@@ -75,6 +75,10 @@ Also accepted in the CHECK constraint for forward compatibility with the A1 cont
 
 `resolved` rows cannot be updated (SQLite trigger + repository CAS `WHERE status IN ('pending','resolving')`).
 
+### Fact versus opinion (#1124 DAG-1)
+
+`outcome_json` is the PredictionOutcome actuals payload. Resolve and `data_unavailable` writes call `lock_prediction_outcome_actuals()` so user-opinion keys (`feedback_value`, `note`, `user_feedback`, transport `source`, …) cannot enter that JSON. Decision-signal user feedback remains a sidecar table and uses `lock_opinion_payload()` so market-actuals keys cannot ride along. Mixed payloads are rejected, not stripped and stored as facts. This slice does not add #1105 product feedback APIs or server-stamped provenance.
+
 ## Concurrency
 
 - Insert validates the real A1 `PredictionClaim`, horizon, status/claim invariants, model metadata, `as_of`, and provenance before using primary-key uniqueness; collisions return the existing row without overwrite. CHECK / NOT NULL failures are **not** treated as collisions, and malformed JSON is never read as empty claims.

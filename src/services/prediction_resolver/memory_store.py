@@ -19,6 +19,8 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
+from src.schemas.memory_fact_opinion import lock_prediction_outcome_actuals
+
 
 STATUS_PENDING = "pending"
 STATUS_RESOLVING = "resolving"
@@ -235,6 +237,7 @@ class InMemoryPredictionStore:
             raise ValueError("prediction_id is required")
         if not isinstance(outcome, Mapping):
             raise ValueError("outcome must be a mapping")
+        lock_prediction_outcome_actuals(outcome)
         now = as_of or self._clock()
         with self._lock:
             row = self._rows.get(canonical)
@@ -274,6 +277,7 @@ class InMemoryPredictionStore:
         }
         if outcome:
             payload.update(dict(outcome))
+        lock_prediction_outcome_actuals(payload)
         with self._lock:
             row = self._rows.get(canonical)
             if row is None:

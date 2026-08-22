@@ -186,6 +186,55 @@ def test_outcome_run_list_stats_signal_outcomes_and_feedback(client_and_db) -> N
     assert get_feedback_resp.json()["reason_code"] == "matched_plan"
 
 
+def test_feedback_put_rejects_fact_fields_and_leaves_outcomes_unchanged(client_and_db) -> None:
+    client, db = client_and_db
+    created_resp = client.post("/api/v1/decision-signals", json=_payload(trace_id="trace-fact-opinion-api"))
+    assert created_resp.status_code == 200, created_resp.text
+    signal_id = created_resp.json()["item"]["id"]
+    _seed_bars(db)
+
+    run_resp = client.post(
+        "/api/v1/decision-signals/outcomes/run",
+        json={"signal_id": signal_id},
+    )
+    assert run_resp.status_code == 200, run_resp.text
+    before = run_resp.json()["items"][0]
+    assert before["outcome"] == "hit"
+    assert before["stock_return_pct"] == 5.0
+
+    mixed_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={
+            "feedback_value": "not_useful",
+            "source": "web",
+            "outcome": "miss",
+            "start_price": 1,
+            "label": "miss",
+            "stock_return_pct": -99,
+        },
+    )
+    assert mixed_resp.status_code == 422, mixed_resp.text
+
+    empty_feedback = client.get(f"/api/v1/decision-signals/{signal_id}/feedback")
+    assert empty_feedback.status_code == 200, empty_feedback.text
+    assert empty_feedback.json()["feedback_value"] is None
+
+    ok_resp = client.put(
+        f"/api/v1/decision-signals/{signal_id}/feedback",
+        json={"feedback_value": "not_useful", "source": "web", "note": "opinion only"},
+    )
+    assert ok_resp.status_code == 200, ok_resp.text
+    assert ok_resp.json()["feedback_value"] == "not_useful"
+
+    outcomes_resp = client.get(f"/api/v1/decision-signals/{signal_id}/outcomes")
+    assert outcomes_resp.status_code == 200, outcomes_resp.text
+    item = outcomes_resp.json()["items"][0]
+    assert item["outcome"] == "hit"
+    assert item["stock_return_pct"] == 5.0
+    assert item["eval_status"] == before["eval_status"]
+    assert item["start_price"] == before["start_price"]
+
+
 def test_outcome_api_rejects_invalid_params_and_returns_404(client_and_db) -> None:
     client, _db = client_and_db
 
