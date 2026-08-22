@@ -440,3 +440,82 @@ def test_service_completion_unavailable_does_not_emit_failure_row() -> None:
     assert caught.value.detail["status"] == "cancel_requested"
     assert _cancel_events(audit, phase="completion") == []
     assert all(event.get("reason_code") != "cancel_failed" for event in audit.completions)
+
+
+def _queue_that_evicts_after_cancel(task, *, status=TaskStatusEnum.CANCELLED):
+    fake_queue = MagicMock()
+    fake_queue.get_task.return_value = task
+
+    def fake_cancel(task_id: str):
+        snapshot = _apply_cancel(task, task_id, status=status)
+        fake_queue.get_task.return_value = None
+        return snapshot
+
+    fake_queue.cancel.side_effect = fake_cancel
+    return fake_queue
+
+
+@pytest.mark.parametrize("status_lookup", ("missing", "db_error"))
+def test_post_cancel_status_failure_records_completion_and_reports_operation_completed(
+    status_lookup: str,
+) -> None:
+    audit = _RecordingAudit()
+    task = _stock_analysis_task()
+    fake_queue = _queue_that_evicts_after_cancel(task)
+    empty_db = MagicMock()
+    empty_db.get_analysis_history.return_value = []
+    db_patch = (
+        {"side_effect": RuntimeError("status store unavailable")}
+        if status_lookup == "db_error"
+        else {"return_value": empty_db}
+    )
+    with patch(
+        "src.api.v1.endpoints.analysis.get_task_queue",
+        return_value=fake_queue,
+    ), patch(
+        "src.storage.DatabaseManager.get_instance",
+        **db_patch,
+    ):
+        with pytest.raises(HTTPException) as caught:
+            _call_cancel("task-analysis-1", audit)
+
+    assert caught.value.status_code == 503
+    assert caught.value.detail["error"] == "security_audit_unavailable"
+    assert caught.value.detail["operation_completed"] is True
+    assert caught.value.detail["task_id"] == "task-analysis-1"
+    assert caught.value.detail["status"] == "cancelled"
+    fake_queue.cancel.assert_called_once_with("task-analysis-1")
+    attempts = _cancel_events(audit, phase="attempt")
+    completions = _cancel_events(audit, phase="completion")
+    assert len(attempts) == 1
+    assert len(completions) == 1
+    assert completions[0]["outcome"] == "success"
+    assert completions[0]["reason_code"] == "cancelled"
+    assert completions[0]["metadata"]["status_after"] == "cancelled"
+    assert all(event.get("reason_code") != "cancel_failed" for event in audit.completions)
+
+
+def test_http_post_cancel_status_failure_reports_operation_completed_true() -> None:
+    audit = _RecordingAudit()
+    task = _stock_analysis_task()
+    fake_queue = _queue_that_evicts_after_cancel(task)
+    empty_db = MagicMock()
+    empty_db.get_analysis_history.return_value = []
+    app = _cancel_http_app(audit)
+    with patch(
+        "src.api.v1.endpoints.analysis.get_task_queue",
+        return_value=fake_queue,
+    ), patch(
+        "src.storage.DatabaseManager.get_instance",
+        return_value=empty_db,
+    ):
+        with TestClient(app) as client:
+            response = client.post("/api/v1/analysis/tasks/task-analysis-1/cancel")
+    assert response.status_code == 503
+    detail = response.json()["detail"]
+    assert detail["error"] == "security_audit_unavailable"
+    assert detail["operation_completed"] is True
+    assert detail["task_id"] == "task-analysis-1"
+    assert detail["status"] == "cancelled"
+    fake_queue.cancel.assert_called_once_with("task-analysis-1")
+    assert _cancel_events(audit, phase="completion")

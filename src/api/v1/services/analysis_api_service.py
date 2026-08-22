@@ -1236,7 +1236,7 @@ class AnalysisApiService:
             metadata=metadata,
         )
         try:
-            task_queue.cancel(task_id)
+            cancel_snapshot = task_queue.cancel(task_id)
         except TaskNotFoundError as exc:
             record_analysis_cancel_completion_best_effort(
                 recorder,
@@ -1248,8 +1248,14 @@ class AnalysisApiService:
             )
             raise self._analysis_task_not_found(task_id) from exc
 
-        snapshot = self.get_analysis_status(task_id)
-        status_after = status_text(snapshot.status)
+        snapshot = None
+        try:
+            snapshot = self.get_analysis_status(task_id)
+            status_after = status_text(snapshot.status)
+        except HTTPException:
+            # Cancel already ran. Eviction or a DB status failure must not
+            # skip completion or hide the stop behind a domain 404/500.
+            status_after = status_text(getattr(cancel_snapshot, "status", None))
         completion_metadata = cancel_metadata(
             existing,
             status_before=status_before,
@@ -1268,9 +1274,14 @@ class AnalysisApiService:
             )
         except SecurityAuditUnavailable:
             raise AnalysisCancelAuditCompletionUnavailable(
-                task_id=str(snapshot.task_id),
+                task_id=str(snapshot.task_id) if snapshot is not None else task_id,
                 status=status_after,
             ) from None
+        if snapshot is None:
+            raise AnalysisCancelAuditCompletionUnavailable(
+                task_id=task_id,
+                status=status_after,
+            )
         return snapshot
 
     def load_sync_fundamental_sources(self, 
