@@ -31,6 +31,7 @@ from tests.services.test_scheduled_task_service import (
     FakeTaskQueue,
     RejectingSubmitQueue,
     build_service,
+    research_contract,
     task_contract,
 )
 
@@ -395,6 +396,70 @@ def test_scheduled_dispatch_records_scheduler_actor_without_payload_secrets(
     visible = _visible_audit_payload(audit)
     assert "password" not in visible
     assert CANARY not in visible
+
+
+def _analysis_contract_with_report_type(report_type: str) -> dict:
+    contract = task_contract()
+    contract["payload"]["report_type"] = report_type
+    return contract
+
+
+@pytest.mark.parametrize(
+    ("contract", "expected_report_type"),
+    [
+        (_analysis_contract_with_report_type("simple"), "simple"),
+        (_analysis_contract_with_report_type("full"), "full"),
+        (_analysis_contract_with_report_type("brief"), "brief"),
+        (research_contract("research_brief"), "brief"),
+        (research_contract("risk_check"), "detailed"),
+    ],
+)
+def test_scheduled_audit_records_admitted_report_type(
+    scheduled_database,
+    contract,
+    expected_report_type,
+) -> None:
+    queue = FakeTaskQueue()
+    audit = _RecordingAudit()
+    service = build_service(
+        scheduled_database,
+        queue,
+        security_audit_factory=lambda: audit,
+    )
+    service.create_task(contract, now=NOW)
+
+    service.tick(now=DUE)
+
+    assert queue.submit_calls[0]["report_type"] == expected_report_type
+    assert audit.attempts[0]["metadata"]["report_type"] == expected_report_type
+    assert audit.completions[0]["metadata"]["report_type"] == expected_report_type
+    assert audit.completions[0]["outcome"] == "accepted"
+
+
+def test_scheduled_invalid_execution_id_does_not_audit_as_accepted(
+    scheduled_database,
+) -> None:
+    class EmptyExecutionIdQueue(FakeTaskQueue):
+        def submit_tasks_batch(self, **kwargs):
+            self.submit_calls.append(kwargs)
+            return [SimpleNamespace(task_id="")], []
+
+    queue = EmptyExecutionIdQueue()
+    audit = _RecordingAudit()
+    service = build_service(
+        scheduled_database,
+        queue,
+        security_audit_factory=lambda: audit,
+    )
+    task = service.create_task(task_contract(), now=NOW)
+
+    service.tick(now=DUE)
+
+    run = service.list_runs(task["id"])["items"][0]
+    assert run["status"] == "interrupted"
+    assert run["error_code"] == "scheduled_task_dispatch_state_lost"
+    assert audit.completions[0]["outcome"] == "failure"
+    assert audit.completions[0]["reason_code"] == "submission_not_resolved"
 
 
 def test_scheduled_queue_rejection_completes_as_failure(scheduled_database) -> None:

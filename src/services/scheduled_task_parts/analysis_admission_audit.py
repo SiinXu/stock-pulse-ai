@@ -15,6 +15,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, Type
 # resolve them from that module's global namespace.
 _json_list = None  # type: ignore[assignment,misc]
 ScheduledTaskContractError = None  # type: ignore[assignment,misc]
+ScheduledTaskType = None  # type: ignore[assignment,misc]
 logger = None  # type: ignore[assignment,misc]
 log_safe_exception = None  # type: ignore[assignment,misc]
 ScheduledRunStatus = None  # type: ignore[assignment,misc]
@@ -56,15 +57,23 @@ class _AnalysisAdmissionAuditMethods:
         return bool(execution_history and execution_history[-1] in owned_history)
 
     def _audit_stock_code_for_run(self, run) -> str:
+        return self._audit_submission_context_for_run(run)[0]
+
+    def _audit_submission_context_for_run(self, run) -> tuple[str, str]:
+        """Best-effort stock code and admitted report_type for analysis.submit."""
         task = self.repository.get_task(run.task_id)
         if task is None:
-            return "unresolved"
+            return "unresolved", "detailed"
         try:
             payload = self._decode_payload(getattr(task, "payload_json", "") or "")
         except ScheduledTaskContractError:
-            return "unresolved"
-        code = str(payload.get("stock_code") or "").strip()
-        return code or "unresolved"
+            return "unresolved", "detailed"
+        code = str(payload.get("stock_code") or "").strip() or "unresolved"
+        task_type = str(getattr(task, "task_type", "") or "")
+        if task_type == ScheduledTaskType.RESEARCH_BRIEF.value:
+            return code, "brief"
+        report_type = str(payload.get("report_type") or "detailed")
+        return code, report_type or "detailed"
 
     def _begin_analysis_admission_audit(self, run) -> dict[str, Any]:
         """Persist analysis.submit attempt before the fenced queue write."""
@@ -87,10 +96,10 @@ class _AnalysisAdmissionAuditMethods:
             SecurityAuditUnavailable,
         )
 
-        stock_code = self._audit_stock_code_for_run(run)
+        stock_code, report_type = self._audit_submission_context_for_run(run)
         correlation_id = SecurityAuditService.new_correlation_id()
         metadata = AnalysisSubmissionService.bounded_audit_metadata(
-            report_type="detailed",
+            report_type=report_type,
             analysis_phase="auto",
             batch_size=1,
             query_source="scheduled_task",
@@ -195,6 +204,12 @@ class _AnalysisAdmissionAuditMethods:
                 error_code="scheduled_task_dispatch_failed",
             )
         admission_audit["queue_called"] = True
+        metadata = admission_audit.get("metadata")
+        if isinstance(metadata, dict):
+            admission_audit["metadata"] = {
+                **metadata,
+                "report_type": str(submission.get("report_type") or "detailed"),
+            }
         return accepted, duplicates, None
 
     def _run_admission_fence_with_audit(
@@ -304,6 +319,7 @@ EXPECTED_ANALYSIS_ADMISSION_AUDIT_METHOD_NAMES = (
     "_security_audit_recorder",
     "_looks_like_owned_retry",
     "_audit_stock_code_for_run",
+    "_audit_submission_context_for_run",
     "_begin_analysis_admission_audit",
     "_complete_analysis_admission_audit",
     "_submit_analysis_batch_with_audit",

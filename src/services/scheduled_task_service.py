@@ -1614,11 +1614,9 @@ class ScheduledTaskService:
                 duplicate = duplicates[0]
                 if duplicate.existing_contract != duplicate.requested_contract:
                     return self._conflict_wait_fields(now)
-                admission_audit["duplicate"] = True
                 execution_id = duplicate.existing_task_id
                 owned = False
             else:
-                admission_audit["accepted"] = True
                 execution_id = accepted[0].task_id
                 owned = True
             if not isinstance(execution_id, str) or not execution_id:
@@ -1626,6 +1624,10 @@ class ScheduledTaskService:
                     now,
                     error_code="scheduled_task_dispatch_state_lost",
                 )
+            if owned:
+                admission_audit["accepted"] = True
+            else:
+                admission_audit["duplicate"] = True
             return self._running_admission_fields(
                 current_run,
                 now,
