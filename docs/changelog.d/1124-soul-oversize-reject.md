@@ -1,0 +1,1 @@
+- [Fixed] Reject Soul-boundary markers and oversized user-writable memory notes at decision-signal feedback and episode write paths (Refs #1124).

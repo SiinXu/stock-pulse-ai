@@ -297,7 +297,7 @@ Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会�
 
 P5 通过 sidecar 表保存用户反馈和后验结果，不扩展 `decision_signals` 主表：
 
-- `decision_signal_feedback` 保存每个信号最新的 `useful|not_useful` 反馈、可选原因/备注和来源。
+- `decision_signal_feedback` 保存每个信号最新的 `useful|not_useful` 反馈、可选原因/备注和来源。反馈是意见 sidecar：`PUT /api/v1/decision-signals/{signal_id}/feedback` 不得改写 `decision_signal_outcomes` 或 `agent_predictions.outcome_json`。混入行情 actuals / PredictionOutcome 字段的载荷会被拒绝（#1124 DAG-1，`src/schemas/memory_fact_opinion.py`）。含 Soul 边界标记、超过 `note` 1000 / `reason_code` 64，或夹带非法 C0 控制字符的自由文本会被拒绝，不会截断后写入（#1124 DAG-2，`src/schemas/memory_write_guard.py`）。
 - `decision_signal_outcomes` 按 `(signal_id, horizon, engine_version)` 幂等保存后验评估结果。
 - 当前 `engine_version=decision-signal-v1`。
 - 后验评估只支持日线可验证的 `1d/3d/5d/10d`；`intraday/swing/long`、非方向动作、缺价和 forward bars 不足会写入 `eval_status=unable` 与明确 `unable_reason`。

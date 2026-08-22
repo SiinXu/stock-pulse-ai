@@ -106,6 +106,7 @@ docs: update README deployment section
 - Add English docstrings to functions and classes.
 - Add English comments for non-obvious logic.
 - Update relevant documentation when adding new features.
+- When adding a production-required field to `BoundToolSession`, `TaskRunContext`, `ToolAccessContext`, analysis-task HTTP cancel, generation-backend status, or config-registry presentation, update the paired tests and standard doubles listed in [Shared runtime session contract owners](runtime-session-contract-owners.md) ([中文](runtime-session-contract-owners_CN.md)) in the same PR. Incomplete mocks that keep a subset green are contract drift.
 
 ### Parallel Merges And Engineering Efficiency Operations
 

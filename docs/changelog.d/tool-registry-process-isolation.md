@@ -1,0 +1,1 @@
+- [Tests] Isolate the process ToolRegistry cache from composition-root teardown so builtin.web_search plugin loads stay deterministic under combined pytest order.

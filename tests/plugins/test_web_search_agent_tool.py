@@ -82,8 +82,7 @@ def test_application_services_registers_search_tools_on_process_registry(
 ) -> None:
     import src.agent.runtime_assembly as runtime_assembly
 
-    runtime_assembly._TOOL_REGISTRY = None
-    runtime_assembly._TOOL_REGISTRY_BUILDING = None
+    runtime_assembly.reset_process_tool_registry_for_tests()
     registry = ToolRegistry()
     monkeypatch.setattr(
         "src.agent.runtime_assembly.get_tool_registry",
@@ -106,8 +105,7 @@ def test_application_services_registers_search_tools_on_process_registry(
     services.close()
     for name in SEARCH_TOOL_NAMES:
         assert registry.get(name) is None
-    runtime_assembly._TOOL_REGISTRY = None
-    runtime_assembly._TOOL_REGISTRY_BUILDING = None
+    runtime_assembly.reset_process_tool_registry_for_tests()
 
 
 def test_get_tool_registry_includes_search_tools_after_composition_root() -> None:
@@ -119,13 +117,11 @@ def test_get_tool_registry_includes_search_tools_after_composition_root() -> Non
         set_application_services,
     )
 
-    original_registry = runtime_assembly._TOOL_REGISTRY
-    original_services = None
     try:
         # Reset process cache so this test owns construction.
-        runtime_assembly._TOOL_REGISTRY = None
+        runtime_assembly.reset_process_tool_registry_for_tests()
         set_application_services(None)
-        services = get_application_services()
+        get_application_services()
         # start_plugins runs during install; ensure search tools land on cache.
         registry = runtime_assembly.get_tool_registry()
         for name in SEARCH_TOOL_NAMES:
@@ -133,8 +129,8 @@ def test_get_tool_registry_includes_search_tools_after_composition_root() -> Non
         # Same object after plugins attached.
         assert runtime_assembly.get_tool_registry() is registry
     finally:
-        runtime_assembly._TOOL_REGISTRY = original_registry
         set_application_services(None)
+        runtime_assembly.reset_process_tool_registry_for_tests()
 
 
 def test_start_plugins_defers_search_tools_until_registry_build(monkeypatch) -> None:
@@ -156,10 +152,8 @@ def test_start_plugins_defers_search_tools_until_registry_build(monkeypatch) -> 
         _counting_get_tool_registry,
     )
 
-    original_registry = runtime_assembly._TOOL_REGISTRY
     try:
-        runtime_assembly._TOOL_REGISTRY = None
-        runtime_assembly._TOOL_REGISTRY_BUILDING = None
+        runtime_assembly.reset_process_tool_registry_for_tests()
         set_application_services(None)
 
         services = ApplicationServices(
@@ -177,7 +171,5 @@ def test_start_plugins_defers_search_tools_until_registry_build(monkeypatch) -> 
         for name in SEARCH_TOOL_NAMES:
             assert registry.get(name) is not None, name
     finally:
-        runtime_assembly._TOOL_REGISTRY = original_registry
-        runtime_assembly._TOOL_REGISTRY_BUILDING = None
         set_application_services(None)
-
+        runtime_assembly.reset_process_tool_registry_for_tests()

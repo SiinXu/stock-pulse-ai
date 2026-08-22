@@ -79,6 +79,7 @@ When adding or changing a user-visible or runtime-configurable environment varia
 - [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md)
 - [settings-help.md](settings-help.md)
 - [config-access-ratchet.md](config-access-ratchet.md) (code `get_config()` ratchet; different from this inventory)
+- [Shared runtime session contract owners](runtime-session-contract-owners.md) (documented-key registry guard and paired tests)
 - Chinese: [environment-variables.md](environment-variables.md)
 
 ## Full key inventory (machine-checked)

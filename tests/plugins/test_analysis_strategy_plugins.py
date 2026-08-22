@@ -201,6 +201,7 @@ def _write_external_strategy_plugin(directory, plugin_id: str, skill_name: str) 
 @pytest.fixture(autouse=True)
 def _isolated_application_root_and_skill_cache():
     reset_application_services()
+    runtime_assembly.reset_process_tool_registry_for_tests()
     cache_state = (
         runtime_assembly._SKILL_MANAGER_PROTOTYPE,
         runtime_assembly._SKILL_MANAGER_CUSTOM_DIR,
@@ -213,6 +214,7 @@ def _isolated_application_root_and_skill_cache():
     runtime_assembly._SKILL_MANAGER_CATALOG_GENERATION = -1
     yield
     reset_application_services()
+    runtime_assembly.reset_process_tool_registry_for_tests()
     (
         runtime_assembly._SKILL_MANAGER_PROTOTYPE,
         runtime_assembly._SKILL_MANAGER_CUSTOM_DIR,

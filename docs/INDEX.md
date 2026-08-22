@@ -22,7 +22,7 @@
 | 排查运行问题 | [FAQ](FAQ.md) | [更新日志](CHANGELOG.md) |
 | 处理数据源失败或降级 | [数据源稳定性与故障处理图示](data-source-stability.md) | [英文版](data-source-stability_EN.md)、[FAQ](FAQ.md) |
 | 查看日志、错误、审计与 trace 的敏感数据边界 | [敏感数据脱敏（英文）](security-sensitive-data-redaction.md) | [持久安全审计](security-audit_zh.md) / [EN](security-audit.md)、[出站 HTTP 安全策略（英文）](security-outbound-policy.md) |
-| 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [工程效率操作手册](engineering-efficiency-playbook.md)、[业务架构](business-architecture.md)、[技术架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
+| 参与开发或提交 PR | [贡献指南](CONTRIBUTING.md) | [工程效率操作手册](engineering-efficiency-playbook.md)、[共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md)（[EN](runtime-session-contract-owners.md)）、[业务架构](business-architecture.md)、[技术架构总览](architecture-overview.md)、[ADR 注册表](adr/README.md)、[API 规格](architecture/api_spec.json) |
 
 ## 快速开始
 
@@ -37,7 +37,7 @@
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
 | [环境变量清单与配置事实源](environment-variables.md) | `.env.example` / 注册表 / 文档三方清单、配置项新增流程与一致性检查 |
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
-| [持久安全审计](security-audit_zh.md) / [EN](security-audit.md) | 事件合同、特权路径覆盖、管理员查询、保留与容量、失败语义与回滚 |
+| [持久安全审计](security-audit_zh.md) / [EN](security-audit.md) | 事件合同、特权路径覆盖图（已落地/部分/缺失/延期）、剩余 DAG、管理员查询、保留与容量、篡改边界、失败语义与回滚 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | Tushare、TickFlow、AkShare、Efinance、YFinance、Longbridge 等已接入源的使用场景、fallback 链路和推荐配置 |
 | [Futu OpenD 组合持仓导入](futu-opend-portfolio-import.md) | OpenD 配置、FUTU_* 设置项、实盘持仓导入 API、降级语义与本地网关网络策略 |
 | [财务报表接入基本面分析](financial-reports-integration.md) | A 股优先的多期财报归一化、派生指标公式、充分性（insufficient fundamentals）与既有 fundamental_context 扩展 |
@@ -129,6 +129,7 @@
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Service-split template（英文）](service-split-template.md) | 行为保持的 facade / re-export 拆分清单、棘轮验证与兼容 shim 删除条件；含 merged PR #1352 偏差审计（Refs #1088） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
+| [共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md)（[EN](runtime-session-contract-owners.md)） | BoundToolSession / TaskRunContext / HTTP cancel / ToolAccessContext / generation-backend probe / 配置注册表的 owner、成对测试、fail-closed 与废弃路径（#1055 T1） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
 | [分析质量门](analysis-quality-gate.md) | 管线内禁止无中生有事实的质量门，复用 agent-eval 维度；annotate/intercept（#887） |
 | [预测 vs 实际跟踪归属](prediction-vs-actual-tracking.md) | #449→#1107：框架由 Agent Evolution Epic 承接；展示/适配器残留见子 issue |

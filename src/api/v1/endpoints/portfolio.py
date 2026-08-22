@@ -7,9 +7,10 @@ import logging
 from datetime import date
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, Header, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 
+from src.api.deps import require_security_audit_service
 from src.api.v1.errors import api_error, error_body
 from src.api.v1.schemas.analysis import TaskAccepted
 from src.api.v1.schemas.common import ErrorResponse
@@ -42,6 +43,14 @@ from src.api.v1.schemas.portfolio import (
     PaperTradeCreatedResponse,
 )
 from src.data_provider.futu_position_fetcher import FutuPositionFetchError
+from src.services.analysis_submission_service import (
+    AnalysisSubmissionService,
+    build_submission_command,
+)
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+)
 from src.services.task_queue import get_task_queue
 from src.services.portfolio_import_service import (
     PortfolioImportPreviewStaleError,
@@ -599,10 +608,20 @@ def get_snapshot(
     "/positions/{symbol}/analysis",
     status_code=202,
     response_model=TaskAccepted,
-    responses={400: {"model": ErrorResponse}, 404: {"model": ErrorResponse}, 409: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+        500: {"model": ErrorResponse},
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
+    },
     summary="Submit manual analysis for a held portfolio position",
 )
-def analyze_position(symbol: str, request: PortfolioPositionAnalysisRequest) -> TaskAccepted | JSONResponse:
+def analyze_position(
+    symbol: str,
+    request: PortfolioPositionAnalysisRequest,
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
+) -> TaskAccepted | JSONResponse:
     service = PortfolioService()
     try:
         context = _resolve_position_analysis_context(service, symbol=symbol, account_id=request.account_id)
@@ -614,9 +633,8 @@ def analyze_position(symbol: str, request: PortfolioPositionAnalysisRequest) -> 
         log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
         raise _internal_error("Resolve portfolio position failed", exc)
 
-    queue = get_task_queue()
-    accepted, duplicates = queue.submit_tasks_batch(
-        [context["symbol"]],
+    command = build_submission_command(
+        stock_codes=[context["symbol"]],
         stock_name=None,
         original_query=context["symbol"],
         selection_source="manual",
@@ -626,7 +644,22 @@ def analyze_position(symbol: str, request: PortfolioPositionAnalysisRequest) -> 
         analysis_phase=request.analysis_phase,
         force_refresh=bool(request.force),
         notify=True,
+        actor_type="api_client",
+        actor_id="portfolio_submitter",
     )
+    try:
+        submission = AnalysisSubmissionService(get_task_queue=get_task_queue).submit(
+            command,
+            security_audit=security_audit,
+        )
+    except SecurityAuditUnavailable:
+        raise api_error(
+            503,
+            "security_audit_unavailable",
+            "Security audit storage is unavailable",
+        ) from None
+    accepted = submission.accepted_tasks
+    duplicates = submission.duplicate_errors
     if duplicates:
         dup = duplicates[0]
         return JSONResponse(

@@ -28,6 +28,7 @@ from src.agent.tools.registry import (
     ToolRegistry,
 )
 from src.services.security_audit_service import SecurityAuditUnavailable
+from tests.agent.runtime.bound_tool_session_double import make_bound_tool_session
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
@@ -61,10 +62,9 @@ def _session(registry, **overrides) -> BoundToolSession:
         "execution_id": "exec-1",
         "allowed_tools": ["echo"],
         "granted_permissions": [_TEST_CAPABILITY],
-        "security_audit": SecurityAuditRecorderStub(),
     }
     params.update(overrides)
-    return BoundToolSession(registry, **params)
+    return make_bound_tool_session(registry, **params)
 
 
 # ---------------------------------------------------------------------------

@@ -14,6 +14,9 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from src.schemas.memory_fact_opinion import FACT_FIELD_NAMES
+from src.schemas.memory_write_guard import reject_memory_write_text
+
 AGENT_EPISODE_SCHEMA_VERSION: Literal["agent-episode-v1"] = "agent-episode-v1"
 
 AGENT_EPISODE_DEFAULT_RETENTION_DAYS = 90
@@ -68,6 +71,15 @@ class EpisodeLesson(_StrictEpisodeModel):
     remedy: Optional[str] = Field(default=None, max_length=AGENT_EPISODE_MAX_REMEDY)
     source_step: Optional[str] = Field(default=None, max_length=64)
 
+    @field_validator("remedy")
+    @classmethod
+    def _reject_soul_remedy(cls, value: Optional[str]) -> Optional[str]:
+        return reject_memory_write_text(
+            value,
+            field_name="remedy",
+            max_length=AGENT_EPISODE_MAX_REMEDY,
+        )
+
 
 class EpisodeOutcomeLabels(_StrictEpisodeModel):
     """Optional additive outcome labels (never required for resolution)."""
@@ -81,6 +93,15 @@ class EpisodeOutcomeLabels(_StrictEpisodeModel):
     prediction_id: Optional[str] = Field(default=None, max_length=128)
     extra: Dict[str, str] = Field(default_factory=dict)
 
+    @field_validator("user_feedback")
+    @classmethod
+    def _reject_soul_user_feedback(cls, value: Optional[str]) -> Optional[str]:
+        return reject_memory_write_text(
+            value,
+            field_name="user_feedback",
+            max_length=AGENT_EPISODE_MAX_STRING,
+        )
+
     @field_validator("extra")
     @classmethod
     def _bounded_extra(cls, value: Dict[str, str]) -> Dict[str, str]:
@@ -89,9 +110,44 @@ class EpisodeOutcomeLabels(_StrictEpisodeModel):
         for key, item in value.items():
             if not isinstance(key, str) or not key or len(key) > 64:
                 raise ValueError("outcome labels extra key is invalid")
+            if key in FACT_FIELD_NAMES:
+                raise ValueError(
+                    "outcome labels extra cannot carry PredictionOutcome actuals fields"
+                )
             if not isinstance(item, str) or len(item) > AGENT_EPISODE_MAX_STRING:
                 raise ValueError("outcome labels extra value is invalid")
+            reject_memory_write_text(
+                item,
+                field_name="extra",
+                max_length=AGENT_EPISODE_MAX_STRING,
+            )
         return value
+
+
+def reject_episode_free_text(episode: Any) -> None:
+    """Reject Soul markers / illegal controls on persisted episode free-text."""
+    labels = getattr(episode, "outcome_labels", None)
+    if labels is not None:
+        reject_memory_write_text(
+            getattr(labels, "user_feedback", None),
+            field_name="user_feedback",
+            max_length=AGENT_EPISODE_MAX_STRING,
+        )
+        extra = getattr(labels, "extra", None) or {}
+        if isinstance(extra, dict):
+            for item in extra.values():
+                reject_memory_write_text(
+                    item,
+                    field_name="extra",
+                    max_length=AGENT_EPISODE_MAX_STRING,
+                )
+    lessons = getattr(episode, "lessons", None) or []
+    for lesson in lessons:
+        reject_memory_write_text(
+            getattr(lesson, "remedy", None),
+            field_name="remedy",
+            max_length=AGENT_EPISODE_MAX_REMEDY,
+        )
 
 
 class AgentEpisodeCreate(_StrictEpisodeModel):
@@ -185,4 +241,5 @@ __all__ = [
     "EpisodeLesson",
     "EpisodeOutcomeLabels",
     "TrajectoryStepSummary",
+    "reject_episode_free_text",
 ]

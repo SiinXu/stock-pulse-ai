@@ -79,6 +79,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 - [LLM 配置指南](LLM_CONFIG_GUIDE.md)
 - [settings-help.md](settings-help.md)
 - [config-access-ratchet.md](config-access-ratchet.md)（代码访问 `get_config()` 棘轮，不同于本清单）
+- [共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md)（已文档化键注册守卫与成对测试）
 - English: [environment-variables_EN.md](environment-variables_EN.md)
 
 ## 完整键清单（机器校验）

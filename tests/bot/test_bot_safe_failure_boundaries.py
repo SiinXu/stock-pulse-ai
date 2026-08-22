@@ -162,19 +162,26 @@ def test_command_failures_return_only_stable_public_messages(caplog) -> None:
     message = _message("/fixture")
 
     task_queue = MagicMock()
-    task_queue.submit_task.side_effect = DuplicateTaskError(
-        "600519",
-        f"existing-{CANARY}",
+    task_queue.submit_tasks_batch.return_value = (
+        [],
+        [DuplicateTaskError("600519", f"existing-{CANARY}")],
     )
     with patch(
         "src.services.task_queue.get_task_queue",
         return_value=task_queue,
+    ), patch(
+        "src.services.security_audit_service.get_security_audit_service",
+        return_value=MagicMock(),
     ):
         analysis_duplicate_response = AnalyzeCommand().execute(message, ["600519"])
-    task_queue.submit_task.side_effect = RuntimeError(SENSITIVE_DIAGNOSTIC)
+    task_queue.submit_tasks_batch.side_effect = RuntimeError(SENSITIVE_DIAGNOSTIC)
+    task_queue.submit_tasks_batch.return_value = None
     with patch(
         "src.services.task_queue.get_task_queue",
         return_value=task_queue,
+    ), patch(
+        "src.services.security_audit_service.get_security_audit_service",
+        return_value=MagicMock(),
     ):
         analysis_exception_response = AnalyzeCommand().execute(message, ["600519"])
 

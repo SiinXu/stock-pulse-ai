@@ -45,7 +45,7 @@ from src.agent.tools.earnings_transcript_tools import (
 )
 from src.services.earnings_transcript_service import MAX_TRANSCRIPT_CHARS
 from src.plugins import build_agent_tool_extension_registry
-from tests.security_audit_test_utils import SecurityAuditRecorderStub
+from tests.agent.runtime.bound_tool_session_double import make_bound_tool_session
 
 
 _TEST_CAPABILITY = "analysis_context:read"
@@ -65,10 +65,9 @@ def _native_session(registry: ToolRegistry, **overrides) -> BoundToolSession:
         "execution_id": "native-bridge-test",
         "allowed_tools": registry.list_names(),
         "granted_permissions": registry.supported_declared_capabilities(),
-        "security_audit": SecurityAuditRecorderStub(),
     }
     params.update(overrides)
-    return BoundToolSession(registry, **params)
+    return make_bound_tool_session(registry, **params)
 
 
 def _quote_registry(recorded=None) -> ToolRegistry:
