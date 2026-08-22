@@ -123,9 +123,11 @@ After opening a PR, CI will automatically run the following PR checks:
 | `backend-gate` | PR: path-selective offline pytest; FULL mapping reuses the four `backend-tests` shards (required check name stays `backend-gate`); push-to-main: sharded full suite + coverage floor | ✅ |
 | `python-minimum` | PR: Python 3.10 import/schema smoke; push-to-main: sharded full offline suite on Python 3.10 (required check name stays `python-minimum`) | ✅ |
 | `pydanticai-installed` | Installs optional PydanticAI dependencies and runs experimental runtime tests with skips rejected | ✅ |
+| `ocr-stock-extractor` | Always concludes; for OCR / image stock-extractor path changes installs `requirements-ocr.txt` plus Tesseract and runs the existing extractor tests with skips rejected; otherwise records a no-OCR summary; fails closed when change detection is unavailable | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
 | `openapi-types-gate` | Regenerates the backend OpenAPI snapshot and Web TypeScript types and rejects checked-in artifact drift | ✅ |
 | `web-gate` | Always concludes; for Web changes runs `npm run lint` + `npm run test:i18n` + `npm run test:coverage`, then runtime performance budgets (blocking structural scenarios fail; observe warns; skip is unavailable), then `npm run build` and the bundle size budget; otherwise records a no-frontend summary; fails closed when change detection is unavailable | ✅ |
+| `desktop-gate` | Always concludes; for desktop path changes runs `cd apps/dsa-desktop && npm ci && npm test` without Electron packaging; otherwise records a no-desktop summary; fails closed when change detection is unavailable | ✅ |
 | `web-e2e` | Uses the same related-path trigger, starts the real backend, Vite, and a local fake model endpoint in isolation, then runs `npm run test:smoke` | ✅ (when triggered) |
 | `pr-review` | Opt-in advisory review via `workflow_dispatch` with a required `pr_number`. The `security-check` job is checkout-free: it snapshots head/base SHAs through `pulls.get`, inventories files with SHA-pinned `repos.compareCommits` of those exact commit SHAs for same-repo and fork PRs (`pulls.listFiles` cannot pin a SHA; a re-get equality guard alone does not close B→A→B ABA; GitHub's documented cross-repo qualifier is mutable `USERNAME:BRANCH`, so `owner:SHA` is not used), re-gets, and fail-closes on head/base drift or a compare 404 before emitting outputs. Downstream jobs may still run static syntax/flake8, a PR-size advisory (~1000 lines excluding lockfiles/generated), and same-repo AI review pinned to those API SHAs (requires `GEMINI_API_KEY` and/or `OPENAI_API_KEY` repository secrets; no `github.sha` fallback). Fork PRs stay read-only (no secrets, no write jobs). AI review is non-blocking. Dispatch from the Actions tab, select the PR branch as the workflow ref so downstream static checks still see that tree, and pass the pull request number; a dispatch without a valid `pr_number` fails closed. | ❌ (advisory) |
 
@@ -173,6 +175,24 @@ DSA_PLAYWRIGHT_ARTIFACT_CANARY=stockpulse-local-canary-change-me \
 
 # Real authenticated intentional-failure diagnostics acceptance; temporary files are cleaned
 python scripts/check_playwright_failure_diagnostics.py
+
+# Desktop unit tests (only if you changed apps/dsa-desktop/ or desktop packaging scripts)
+cd apps/dsa-desktop
+npm ci
+npm test
+cd ../..
+
+# Optional OCR + image stock extractor (CI job ocr-stock-extractor)
+# Requires system Tesseract (`tesseract-ocr` + `tesseract-ocr-eng`)
+python -m pip install --build-constraint build-constraints.txt -r requirements-ocr.txt
+python -m pytest -m "not network" \
+  tests/services/test_image_stock_extractor_litellm.py \
+  tests/services/test_image_stock_extractor_contract.py \
+  tests/services/test_ocr_extraction_service.py \
+  tests/agent/tools/test_ocr_tools.py \
+  tests/agent/tools/test_ocr_tool_surface_runtime.py \
+  tests/config/test_ocr_config.py \
+  tests/plugins/test_ocr_agent_tool.py
 
 # Offline analysis quality panel (no network, no live LLM; structural trust fixtures, not market alpha)
 ./scripts/run_analysis_quality_panel.sh

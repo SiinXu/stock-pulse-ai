@@ -158,14 +158,16 @@ The current repository CI mainly contains:
 
 | Check | Source | Description | Blocking? |
 | --- | --- | --- | --- |
-| `changes` | `.github/workflows/ci.yml` | Path-filter job that drives the backend, Docker, Web, and Web E2E jobs | Yes (always runs; drives triggered jobs) |
+| `changes` | `.github/workflows/ci.yml` | Path-filter job that drives the backend, Docker, Web, Web E2E, OCR stock-extractor, and desktop jobs | Yes (always runs; drives triggered jobs) |
 | `ai-governance` | `.github/workflows/ci.yml` | Validates `AGENTS.md` / `CLAUDE.md` / `.github` instructions / `.claude/skills` relationships | Yes |
 | `backend-gate` | `.github/workflows/ci.yml` | PR: path-selective offline pytest; FULL fallback uses the same 4 shards as push-to-main; push-to-main: full suite + coverage floor | Yes |
 | `python-minimum` | `.github/workflows/ci.yml` | PR: 3.10 import/schema smoke; push-to-main: sharded full offline suite on Python 3.10 | Yes |
 | `pydanticai-installed` | `.github/workflows/ci.yml` | Installs optional PydanticAI extras and runs experimental runtime tests with skips treated as failures | Yes |
+| `ocr-stock-extractor` | `.github/workflows/ci.yml` | Always concludes; for OCR / image stock-extractor path changes installs `requirements-ocr.txt` plus Tesseract and runs the existing extractor tests with skips treated as failures; otherwise records a no-OCR summary; fails closed when change detection is unavailable | Yes (always concludes; full OCR matrix only when extractor paths change) |
 | `docker-build` | `.github/workflows/ci.yml` | Builds the Docker image and smoke-tests imports of key modules | Yes |
 | `openapi-types-gate` | `.github/workflows/ci.yml` | Regenerates the backend OpenAPI snapshot and Web TypeScript definitions, then fails on checked-in artifact drift | Yes |
 | `web-gate` | `.github/workflows/ci.yml` | Always concludes on pull requests; runs the full Web lint, i18n, unit-test coverage gate, build, and bundle-size budget matrix only for frontend changes, otherwise records a no-frontend summary; fails closed when change detection is unavailable | Yes (always concludes on PR; full Web matrix only when frontend paths change) |
+| `desktop-gate` | `.github/workflows/ci.yml` | Always concludes; for desktop path changes runs `apps/dsa-desktop` `npm ci` + `npm test` without Electron packaging or embedded-runtime download; otherwise records a no-desktop summary; fails closed when change detection is unavailable | Yes (always concludes; full desktop unit matrix only when desktop paths change) |
 | `web-e2e` | `.github/workflows/ci.yml` | Real backend + Vite + Playwright smoke | No on PR; observation on push-to-main when path filter matches |
 | `api-real-client` | `.github/workflows/ci.yml` | `tests/api` with real Starlette TestClient | No on PR; observation on push-to-main |
 | `network-smoke` | `.github/workflows/network-smoke.yml` | `pytest -m network` + `scripts/test.sh quick` | No, observation item |
@@ -190,7 +192,7 @@ If there is a corresponding CI result on the existing PR, you can directly quote
 
 - Desktop client changes:
   - Applicable scope: `apps/dsa-desktop/`, `scripts/run-desktop.ps1`, `scripts/build-desktop*.ps1`, `scripts/build-*.sh`, `docs/desktop-package.md`
-  - Default execution: First build the Web, then build the desktop client
+  - Default execution: `cd apps/dsa-desktop && npm ci && npm test` (this is the PR `desktop-gate`). Full packaging still requires building Web first, then the desktop client.
   - If platform constraints prevent complete verification, explicitly state whether the Web build output, Electron build, and release workflow were verified.
 
 - API / Schema / authentication changes:

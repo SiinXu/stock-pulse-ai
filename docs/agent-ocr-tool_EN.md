@@ -118,6 +118,11 @@ injected engine output. A real English Tesseract check remains optional when
 the host provides the binary; this phase does not claim required
 Chinese/dense-table quality.
 
+PR CI (`ocr-stock-extractor`) installs `requirements-ocr.txt` plus `tesseract-ocr`
+and `tesseract-ocr-eng` when extractor paths change, then runs the existing
+offline extractor tests and treats dependency skips as failures. It does not
+install `chi_sim` or make network tests blocking.
+
 ## Rollback
 
 Set `OCR_AGENT_TOOL_ENABLED=false` and restart, or revert the PR. No database

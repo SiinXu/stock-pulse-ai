@@ -28,7 +28,8 @@ If any instruction in this file conflicts with `AGENTS.md`, follow `AGENTS.md`.
 
 - Backend changes: prefer `./scripts/ci_gate.sh`; at minimum run `python -m py_compile` on changed Python files and the closest deterministic tests.
 - Web changes: run `cd apps/dsa-web && npm ci && npm run lint && npm run build`.
-- Desktop changes: build web first, then desktop if feasible.
+- OCR / image stock-extractor changes: the PR `ocr-stock-extractor` job installs `requirements-ocr.txt` plus Tesseract and runs the existing extractor tests with skips rejected.
+- Desktop changes: run `cd apps/dsa-desktop && npm ci && npm test` (PR `desktop-gate`); build web first, then desktop packaging if feasible.
 - Review work should prioritize CI evidence (`gh pr checks`, workflow logs) before re-running local validation.
 - AI governance changes: run `python scripts/check_ai_assets.py`.
 

@@ -13,6 +13,25 @@ FRONTEND_EXECUTION_CONDITION = (
     "needs.changes.result == 'success' && "
     "needs.changes.outputs.frontend == 'true' }}"
 )
+OCR_EXECUTION_CONDITION = (
+    "${{ needs.ai-governance.result == 'success' && "
+    "needs.changes.result == 'success' && "
+    "needs.changes.outputs.ocr_extractor == 'true' }}"
+)
+DESKTOP_EXECUTION_CONDITION = (
+    "${{ needs.ai-governance.result == 'success' && "
+    "needs.changes.result == 'success' && "
+    "needs.changes.outputs.desktop == 'true' }}"
+)
+OCR_EXTRACTOR_TEST_FILES = (
+    "tests/services/test_image_stock_extractor_litellm.py",
+    "tests/services/test_image_stock_extractor_contract.py",
+    "tests/services/test_ocr_extraction_service.py",
+    "tests/agent/tools/test_ocr_tools.py",
+    "tests/agent/tools/test_ocr_tool_surface_runtime.py",
+    "tests/config/test_ocr_config.py",
+    "tests/plugins/test_ocr_agent_tool.py",
+)
 
 
 def _workflow() -> dict:
@@ -765,3 +784,130 @@ def test_report_export_stack_font_install_retries_mirrors_and_stays_fail_closed(
     assert "tests/services/test_report_export_service.py" in test_step["run"]
     assert "tests/api/test_report_export_api.py" in test_step["run"]
     assert "tests/config/test_report_export_config.py" in test_step["run"]
+
+
+def _ocr_stock_extractor_job() -> dict:
+    return _workflow()["jobs"]["ocr-stock-extractor"]
+
+
+def _desktop_gate_job() -> dict:
+    return _workflow()["jobs"]["desktop-gate"]
+
+
+def _path_filters() -> dict:
+    changes = _workflow()["jobs"]["changes"]
+    filter_step = next(step for step in changes["steps"] if step.get("id") == "filter")
+    return yaml.safe_load(filter_step["with"]["filters"])
+
+
+def test_changes_job_exposes_ocr_and_desktop_path_filters() -> None:
+    workflow = _workflow()
+    changes = workflow["jobs"]["changes"]
+    filters = _path_filters()
+
+    assert changes["outputs"]["ocr_extractor"] == (
+        "${{ steps.filter.outputs.ocr_extractor }}"
+    )
+    assert changes["outputs"]["desktop"] == "${{ steps.filter.outputs.desktop }}"
+    assert "src/services/image_stock_extractor.py" in filters["ocr_extractor"]
+    assert "src/services/ocr_extraction_service.py" in filters["ocr_extractor"]
+    assert "requirements-ocr.txt" in filters["ocr_extractor"]
+    assert ".github/workflows/ci.yml" in filters["ocr_extractor"]
+    assert "apps/dsa-desktop/**" in filters["desktop"]
+    assert "scripts/run-desktop.ps1" in filters["desktop"]
+    assert ".github/workflows/desktop-release.yml" in filters["desktop"]
+    assert ".github/workflows/ci.yml" in filters["desktop"]
+    for relative in OCR_EXTRACTOR_TEST_FILES:
+        assert relative in filters["ocr_extractor"]
+        assert (REPOSITORY_ROOT / relative).is_file()
+
+
+def test_ocr_stock_extractor_is_path_triggered_fail_closed_and_offline() -> None:
+    job = _ocr_stock_extractor_job()
+    steps_by_name = {step["name"]: step for step in job["steps"]}
+    validation = steps_by_name["🔒 Validate ocr-stock-extractor prerequisites"]
+    no_ocr = steps_by_name["No OCR extractor changes"]
+    test_step = steps_by_name["✅ OCR stock-extractor tests (dependency skips are failures)"]
+    import_step = steps_by_name["🔎 Assert OCR imports"]
+    tesseract_step = steps_by_name["🔤 Install Tesseract OCR engine"]
+
+    assert job["name"] == "ocr-stock-extractor"
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == "${{ always() && !cancelled() }}"
+    assert job["timeout-minutes"] <= 25
+    assert job["permissions"] == {"contents": "read"}
+    _assert_job_fail_closed(job)
+    assert "secrets." not in yaml.safe_dump(job)
+    assert validation["if"] == (
+        "${{ always() && (needs.ai-governance.result != 'success' || "
+        "needs.changes.result != 'success' || "
+        "(needs.changes.outputs.ocr_extractor != 'true' && "
+        "needs.changes.outputs.ocr_extractor != 'false')) }}"
+    )
+    assert validation["run"].rstrip().endswith("exit 1")
+    assert no_ocr["if"] == (
+        "${{ needs.ai-governance.result == 'success' && "
+        "needs.changes.result == 'success' && "
+        "needs.changes.outputs.ocr_extractor == 'false' }}"
+    )
+    assert "exit 1" not in no_ocr["run"]
+    assert test_step["if"] == OCR_EXECUTION_CONDITION
+    assert import_step["if"] == OCR_EXECUTION_CONDITION
+    assert tesseract_step["if"] == OCR_EXECUTION_CONDITION
+    assert '-m "not network"' in test_step["run"]
+    assert "pytest -m network" not in test_step["run"]
+    for relative in OCR_EXTRACTOR_TEST_FILES:
+        assert relative in test_step["run"]
+    assert "must execute stock-extractor tests, not skip them" in test_step["run"]
+    assert "system Tesseract + pytesseract not installed" in test_step["run"]
+    assert "assess_ocr_dependencies" in import_step["run"]
+    assert "requirements-ocr.txt" in steps_by_name[
+        "📦 Install dependencies (native + optional OCR)"
+    ]["run"]
+    assert "tesseract-ocr-eng" in tesseract_step["run"]
+    assert "|| true" not in tesseract_step["run"]
+    assert "continue-on-error" not in tesseract_step["run"]
+
+
+def test_desktop_gate_runs_existing_unit_tests_without_packaging() -> None:
+    job = _desktop_gate_job()
+    steps_by_name = {step["name"]: step for step in job["steps"]}
+    validation = steps_by_name["🔒 Validate desktop-gate prerequisites"]
+    no_desktop = steps_by_name["No desktop changes"]
+    install = steps_by_name["📦 Install"]
+    unit = steps_by_name["🧪 Unit tests"]
+
+    assert job["name"] == "desktop-gate"
+    assert job["needs"] == ["changes", "ai-governance"]
+    assert job["if"] == "${{ always() && !cancelled() }}"
+    assert job["timeout-minutes"] <= 20
+    assert job["permissions"] == {"contents": "read"}
+    assert job["defaults"]["run"]["working-directory"] == "apps/dsa-desktop"
+    _assert_job_fail_closed(job)
+    assert "secrets." not in yaml.safe_dump(job)
+    assert validation["if"] == (
+        "${{ always() && (needs.ai-governance.result != 'success' || "
+        "needs.changes.result != 'success' || "
+        "(needs.changes.outputs.desktop != 'true' && "
+        "needs.changes.outputs.desktop != 'false')) }}"
+    )
+    assert validation["working-directory"] == "."
+    assert validation["run"].rstrip().endswith("exit 1")
+    assert no_desktop["if"] == (
+        "${{ needs.ai-governance.result == 'success' && "
+        "needs.changes.result == 'success' && "
+        "needs.changes.outputs.desktop == 'false' }}"
+    )
+    assert no_desktop["working-directory"] == "."
+    assert "exit 1" not in no_desktop["run"]
+    assert install["if"] == DESKTOP_EXECUTION_CONDITION
+    assert unit["if"] == DESKTOP_EXECUTION_CONDITION
+    assert install["run"] == "npm ci"
+    assert unit["run"] == "npm test"
+    assert install["env"]["ELECTRON_SKIP_BINARY_DOWNLOAD"] == "1"
+    assert unit["env"]["ELECTRON_SKIP_BINARY_DOWNLOAD"] == "1"
+    runs = [step.get("run", "") for step in job["steps"] if "run" in step]
+    assert "npm run build" not in runs
+    assert not any("electron-builder" in command for command in runs)
+    assert not any("prepare:ollama" in command for command in runs)
+    assert not any("build-all" in command for command in runs)

@@ -26,7 +26,7 @@ From `git diff --name-only origin/main...HEAD` (or the task boundary):
 | `main.py`, `src/**`, `tests/**` | backend offline gate / path pytest; `py_compile` minimum |
 | Config / `.env.example` / `config_registry*` | **config registry guard** + doc consistency (hard-rules §2) |
 | `apps/dsa-web/**` | web lint, unit, build; i18n tests if copy/locales touched; smoke e2e only when UI journeys change |
-| `apps/dsa-desktop/**`, desktop scripts | web build then desktop build |
+| `apps/dsa-desktop/**`, desktop scripts | `cd apps/dsa-desktop && npm ci && npm test`; web then desktop build only when packaging is in scope |
 | `AGENTS.md`, `.claude/skills/**`, copilot mirrors | `python scripts/check_ai_assets.py` |
 | Docs only | no code tests required; verify every command/filename mentioned |
 

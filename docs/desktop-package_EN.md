@@ -69,6 +69,8 @@ On first run, Electron copies `.env.example` to the runtime `.env` when missing.
 
 ### Desktop verification
 
+PR CI (`desktop-gate`) runs `npm ci` and `npm test` when desktop paths change. It does not run `electron-builder` or download the embedded Ollama runtime; full packaging remains `.github/workflows/desktop-release.yml`.
+
 ```bash
 cd apps/dsa-desktop
 npm ci

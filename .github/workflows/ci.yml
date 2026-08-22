@@ -35,6 +35,8 @@ jobs:
       docker: ${{ steps.filter.outputs.docker }}
       frontend: ${{ steps.filter.outputs.frontend }}
       web_e2e: ${{ steps.filter.outputs.web_e2e }}
+      ocr_extractor: ${{ steps.filter.outputs.ocr_extractor }}
+      desktop: ${{ steps.filter.outputs.desktop }}
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -81,6 +83,35 @@ jobs:
               - 'server.py'
               - 'requirements.txt'
               - '.github/requirements-ci.txt'
+              - '.github/workflows/ci.yml'
+            # ocr-stock-extractor: optional Tesseract stack + image stock extractor
+            ocr_extractor:
+              - 'src/services/image_stock_extractor.py'
+              - 'src/services/ocr_extraction_service.py'
+              - 'src/agent/tools/ocr_tools.py'
+              - 'src/plugins/builtin/ocr.py'
+              - 'src/api/v1/endpoints/stocks.py'
+              - 'tests/services/test_image_stock_extractor_contract.py'
+              - 'tests/services/test_image_stock_extractor_litellm.py'
+              - 'tests/services/test_ocr_extraction_service.py'
+              - 'tests/agent/tools/test_ocr_tools.py'
+              - 'tests/agent/tools/test_ocr_tool_surface_runtime.py'
+              - 'tests/config/test_ocr_config.py'
+              - 'tests/plugins/test_ocr_agent_tool.py'
+              - 'tests/fixtures/ocr/**'
+              - 'requirements-ocr.txt'
+              - '.github/workflows/ci.yml'
+            # desktop-gate: Electron unit tests (not packaging / network download)
+            desktop:
+              - 'apps/dsa-desktop/**'
+              - 'scripts/run-desktop.ps1'
+              - 'scripts/build-desktop*.ps1'
+              - 'scripts/build-desktop*.sh'
+              - 'scripts/build-all.ps1'
+              - 'scripts/build-all-macos.sh'
+              - 'scripts/prepare-embedded-ollama.js'
+              - 'requirements-desktop.txt'
+              - '.github/workflows/desktop-release.yml'
               - '.github/workflows/ci.yml'
       - name: 🧭 Filter backend-safe frontend paths
         id: backend-filter
@@ -765,6 +796,141 @@ jobs:
             exit 1
           fi
 
+  ocr-stock-extractor:
+    name: ocr-stock-extractor
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: [changes, ai-governance]
+    if: ${{ always() && !cancelled() }}
+    permissions:
+      contents: read
+    steps:
+      - name: 🔒 Validate ocr-stock-extractor prerequisites
+        if: >-
+          ${{ always() &&
+          (needs.ai-governance.result != 'success' ||
+          needs.changes.result != 'success' ||
+          (needs.changes.outputs.ocr_extractor != 'true' &&
+          needs.changes.outputs.ocr_extractor != 'false')) }}
+        run: |
+          {
+            echo "## OCR stock extractor gate"
+            echo ""
+            echo "A required prerequisite failed or OCR change detection returned an unavailable result, so ocr-stock-extractor fails closed."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+      - name: No OCR extractor changes
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'false' }}
+        run: |
+          {
+            echo "## OCR stock extractor gate"
+            echo ""
+            echo "No OCR stock-extractor changes were detected. The optional Tesseract matrix was not required."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: 📥 Checkout
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 🐍 Setup Python
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            requirements.txt
+            constraints.txt
+            build-constraints.txt
+            .github/requirements-ci.txt
+            requirements-ocr.txt
+      - name: 🔤 Install Tesseract OCR engine
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
+        run: |
+          set -euo pipefail
+          apt_options=(
+            -o Acquire::Retries=2
+            -o Acquire::http::Timeout=15
+            -o Acquire::https::Timeout=15
+          )
+          install_tesseract() {
+            sudo timeout --kill-after=10s 90s apt-get "${apt_options[@]}" update \
+              && sudo timeout --kill-after=10s 120s apt-get "${apt_options[@]}" install \
+                -y --no-install-recommends tesseract-ocr tesseract-ocr-eng
+          }
+          if ! install_tesseract; then
+            echo "First Tesseract apt attempt failed; retrying once."
+            sudo rm -rf /var/lib/apt/lists/partial
+            if ! install_tesseract; then
+              echo "::error::Tesseract installation failed after two bounded apt attempts." >&2
+              exit 1
+            fi
+          fi
+          command -v tesseract >/dev/null
+          tesseract --version
+      - name: 📦 Install dependencies (native + optional OCR)
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
+        run: |
+          python -m pip install --upgrade --constraint constraints.txt pip
+          for attempt in 1 2 3; do
+            if python -m pip install --build-constraint build-constraints.txt \
+              -r .github/requirements-ci.txt \
+              -r requirements-ocr.txt; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "Dependency install failed after ${attempt} attempts." >&2
+              exit 1
+            fi
+            echo "Dependency install attempt ${attempt} failed, retrying in 15s..." >&2
+            sleep 15
+          done
+          python -m pip check
+      - name: 🔎 Assert OCR imports
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
+        run: |
+          python -c "
+          import importlib.metadata as metadata
+          import PIL  # noqa: F401
+          import pytesseract  # noqa: F401
+          from src.services.image_stock_extractor import extract_stock_codes_from_image  # noqa: F401
+          from src.services.ocr_extraction_service import assess_ocr_dependencies
+          report = assess_ocr_dependencies()
+          assert report['ready'] is True, report
+          print('Pillow', metadata.version('Pillow'))
+          print('pytesseract', metadata.version('pytesseract'))
+          print('tesseract', pytesseract.get_tesseract_version())
+          print('✅ OCR optional stack importable in the installed matrix')
+          "
+      - name: ✅ OCR stock-extractor tests (dependency skips are failures)
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
+        run: |
+          test_data_dir="$(mktemp -d)"
+          set +e
+          DATABASE_PATH="${test_data_dir}/stockpulse-ci.sqlite" \
+            python -m pytest -m "not network" -rs \
+            tests/services/test_image_stock_extractor_litellm.py \
+            tests/services/test_image_stock_extractor_contract.py \
+            tests/services/test_ocr_extraction_service.py \
+            tests/agent/tools/test_ocr_tools.py \
+            tests/agent/tools/test_ocr_tool_surface_runtime.py \
+            tests/config/test_ocr_config.py \
+            tests/plugins/test_ocr_agent_tool.py \
+            > /tmp/ocr_extractor_pytest.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/ocr_extractor_pytest.log
+          rm -rf "${test_data_dir}"
+          if [ "${status}" -ne 0 ]; then
+            exit "${status}"
+          fi
+          if grep -Eq "[0-9]+ skipped" /tmp/ocr_extractor_pytest.log; then
+            echo "::error::installed OCR matrix must execute stock-extractor tests, not skip them" >&2
+            exit 1
+          fi
+          if grep -Fq "system Tesseract + pytesseract not installed" /tmp/ocr_extractor_pytest.log; then
+            echo "::error::installed OCR matrix must not skip the real Tesseract fixture" >&2
+            exit 1
+          fi
+
   docker-build:
     name: docker-build
     runs-on: ubuntu-latest
@@ -1019,6 +1185,63 @@ jobs:
       - name: 📦 Bundle size budget
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.frontend == 'true' }}
         run: node scripts/check-bundle-size.mjs --print
+
+  desktop-gate:
+    name: desktop-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [changes, ai-governance]
+    if: ${{ always() && !cancelled() }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: apps/dsa-desktop
+    steps:
+      - name: 🔒 Validate desktop-gate prerequisites
+        if: >-
+          ${{ always() &&
+          (needs.ai-governance.result != 'success' ||
+          needs.changes.result != 'success' ||
+          (needs.changes.outputs.desktop != 'true' &&
+          needs.changes.outputs.desktop != 'false')) }}
+        working-directory: .
+        run: |
+          {
+            echo "## Desktop gate"
+            echo ""
+            echo "A required prerequisite failed or desktop change detection returned an unavailable result, so desktop-gate fails closed."
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit 1
+      - name: No desktop changes
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.desktop == 'false' }}
+        working-directory: .
+        run: |
+          {
+            echo "## Desktop gate"
+            echo ""
+            echo "No desktop changes were detected. The desktop unit-test matrix was not required."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: 📥 Checkout
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.desktop == 'true' }}
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: 🟢 Setup Node
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.desktop == 'true' }}
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: apps/dsa-desktop/package-lock.json
+      - name: 📦 Install
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.desktop == 'true' }}
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: npm ci
+      - name: 🧪 Unit tests
+        if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.desktop == 'true' }}
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+        run: npm test
 
   # Observation only: not in the main ruleset required checks. Skip on pull_request
   # so PR throughput stays on the blocking gate; still run on push-to-main when paths match.

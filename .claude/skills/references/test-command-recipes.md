@@ -20,7 +20,7 @@ Deterministic command menu so agents do not invent ad-hoc gates. Authoritative p
 | Web i18n | `cd apps/dsa-web && npm run test:i18n` |
 | Web build | `cd apps/dsa-web && npm run build` |
 | Web smoke e2e | `cd apps/dsa-web && npm run test:e2e-security-preflight && npx playwright install --with-deps chromium && npm run test:smoke` |
-| Desktop | Web build first, then `cd apps/dsa-desktop && npm install && npm run build` |
+| Desktop | PR gate: `cd apps/dsa-desktop && npm ci && npm test`. Packaging: Web build first, then `cd apps/dsa-desktop && npm install && npm run build` |
 | CI deps (Python) | `python -m pip install --upgrade --constraint constraints.txt pip && python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt` |
 
 ## Evidence minimum
