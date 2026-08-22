@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.deps import get_runtime_scheduler_service, get_scheduled_task_service
+from src.api.deps import (
+    get_runtime_scheduler_service,
+    get_scheduled_task_service,
+    require_security_audit_service,
+)
 from src.api.v1.errors import api_error
 from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.scheduled_tasks import (
@@ -18,19 +23,66 @@ from src.api.v1.schemas.scheduled_tasks import (
     ScheduledTaskStatusResponse,
     ScheduledTaskTodayResponse,
 )
+from src.auth import is_auth_enabled
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.scheduled_task_service import (
     ScheduledTaskContractError,
     ScheduledTaskError,
+    ScheduledTaskMutationAuditCompletionUnavailable,
     ScheduledTaskNotFoundError,
     ScheduledTaskService,
     ScheduledTaskUnsupportedSchemaError,
     ScheduledTaskValidationError,
 )
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def _scheduled_task_audit_actor() -> str:
+    """Return the attributable operator class for the single-admin model."""
+    if os.getenv("DSA_DESKTOP_MODE") == "true":
+        return "desktop_operator"
+    if is_auth_enabled():
+        return "authenticated_admin"
+    return "local_operator"
+
+
+def _security_audit_unavailable(
+    *,
+    operation_completed: bool = False,
+    item: Optional[dict] = None,
+):
+    detail = {
+        "error": "security_audit_unavailable",
+        "message": (
+            "Scheduled task mutation was persisted, but audit completion "
+            "could not be persisted"
+            if operation_completed
+            else "Security audit storage is unavailable"
+        ),
+        "operation_completed": operation_completed,
+    }
+    if item is not None:
+        task_id = item.get("id")
+        if task_id is not None:
+            detail["task_id"] = task_id
+        if "enabled" in item:
+            detail["enabled"] = item["enabled"]
+    return HTTPException(status_code=503, detail=detail)
+
+
+def _mutation_audit_fields(security_audit: SecurityAuditRecorder) -> dict:
+    return {
+        "security_audit": security_audit,
+        "actor_type": "administrator",
+        "actor_id": _scheduled_task_audit_actor(),
+    }
 
 
 def _service_error(exc: ScheduledTaskError):
@@ -79,10 +131,14 @@ def create_scheduled_task(
     request: ScheduledTaskCreateRequest,
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
     runtime_scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> ScheduledTaskItem:
     """Create one supported scheduled task."""
     try:
-        item = service.create_task(request.model_dump())
+        item = service.create_task(
+            request.model_dump(),
+            **_mutation_audit_fields(security_audit),
+        )
         response = ScheduledTaskItem.model_validate(item)
         _reconcile_after_mutation(
             runtime_scheduler,
@@ -90,6 +146,13 @@ def create_scheduled_task(
             task_id=response.id,
         )
         return response
+    except ScheduledTaskMutationAuditCompletionUnavailable as exc:
+        raise _security_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
+    except SecurityAuditUnavailable:
+        raise _security_audit_unavailable() from None
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.
@@ -196,10 +259,15 @@ def enable_scheduled_task(
     task_id: str,
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
     runtime_scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> ScheduledTaskItem:
     """Enable one understood scheduled definition."""
     try:
-        item = service.set_enabled(task_id, True)
+        item = service.set_enabled(
+            task_id,
+            True,
+            **_mutation_audit_fields(security_audit),
+        )
         response = ScheduledTaskItem.model_validate(item)
         _reconcile_after_mutation(
             runtime_scheduler,
@@ -207,6 +275,13 @@ def enable_scheduled_task(
             task_id=response.id,
         )
         return response
+    except ScheduledTaskMutationAuditCompletionUnavailable as exc:
+        raise _security_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
+    except SecurityAuditUnavailable:
+        raise _security_audit_unavailable() from None
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.
@@ -233,10 +308,15 @@ def disable_scheduled_task(
     task_id: str,
     service: ScheduledTaskService = Depends(get_scheduled_task_service),
     runtime_scheduler: RuntimeSchedulerService = Depends(get_runtime_scheduler_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> ScheduledTaskItem:
     """Disable one understood scheduled definition."""
     try:
-        item = service.set_enabled(task_id, False)
+        item = service.set_enabled(
+            task_id,
+            False,
+            **_mutation_audit_fields(security_audit),
+        )
         response = ScheduledTaskItem.model_validate(item)
         _reconcile_after_mutation(
             runtime_scheduler,
@@ -244,6 +324,13 @@ def disable_scheduled_task(
             task_id=response.id,
         )
         return response
+    except ScheduledTaskMutationAuditCompletionUnavailable as exc:
+        raise _security_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
+    except SecurityAuditUnavailable:
+        raise _security_audit_unavailable() from None
     except ScheduledTaskError as exc:
         raise _service_error(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary logs diagnostics and returns a stable envelope.

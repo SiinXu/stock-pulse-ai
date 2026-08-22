@@ -1,0 +1,1 @@
+- [Added] Emit fail-closed `scheduled_task.write` security-audit events for scheduled-task create, enable, and disable, with redacted queryable metadata. HTTP `503` distinguishes attempt-blocked writes (`operation_completed=false`) from persisted mutations whose completion row could not be stored (`operation_completed=true`) (Refs #1062).

@@ -42,6 +42,19 @@ from src.services.run_diagnostics import sanitize_diagnostic_text
 from src.services.task_queue import DuplicateTaskError
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.task_execution import TaskNotFoundError, TaskRetryInProgressError, TaskStatus
+from src.services.scheduled_task_parts.mutation_audit import (
+    DEFAULT_SCHEDULED_TASK_MUTATION_ACTOR_ID,
+    DEFAULT_SCHEDULED_TASK_MUTATION_ACTOR_TYPE,
+    SCHEDULED_TASK_MUTATION_TARGET_TYPE,
+    SCHEDULED_TASK_WRITE_EVENT_TYPE,
+    ScheduledTaskMutationAuditCompletionUnavailable,
+    _MUTATION_ACTION_BY_OPERATION,
+    _bounded_mutation_identity,
+    _bounded_mutation_metadata,
+    _bounded_mutation_name,
+    _mutation_error_audit_fields,
+    _mutation_metadata_from_contract,
+)
 from src.utils.sanitize import log_safe_exception
 
 if TYPE_CHECKING:
@@ -585,49 +598,6 @@ class ScheduledTaskService:
             "max_attempts": max_attempts,
         }
 
-    def create_task(
-        self,
-        contract: Mapping[str, Any],
-        *,
-        now: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
-        """Validate and persist one supported scheduled definition."""
-        normalized = self._normalize_contract(contract)
-        now_value = self._now(now or self._clock())
-        next_run = None
-        if normalized["enabled"]:
-            next_run = next_daily_run_at(
-                schedule_time=normalized["schedule_time"],
-                timezone_name=normalized["timezone"],
-                after=now_value,
-            )
-        row = self.repository.create_task(
-            {
-                "id": uuid.uuid4().hex,
-                "schema_version": normalized["schema_version"],
-                "execution_generation": 1,
-                "name": normalized["name"],
-                "task_type": normalized["task_type"],
-                "schedule_kind": normalized["schedule_kind"],
-                "schedule_time": normalized["schedule_time"],
-                "timezone": normalized["timezone"],
-                "calendar_market": normalized["calendar_market"],
-                "non_trading_day_policy": normalized["non_trading_day_policy"],
-                "payload_json": json.dumps(
-                    normalized["payload"],
-                    ensure_ascii=True,
-                    separators=(",", ":"),
-                    sort_keys=True,
-                ),
-                "enabled": normalized["enabled"],
-                "max_attempts": normalized["max_attempts"],
-                "next_run_at": next_run,
-                "created_at": now_value,
-                "updated_at": now_value,
-            }
-        )
-        return self._task_item(row)
-
     def list_tasks(
         self,
         *,
@@ -656,54 +626,6 @@ class ScheduledTaskService:
             "task": task,
             "latest_run": self._run_item(runs[0]) if runs else None,
         }
-
-    def set_enabled(
-        self,
-        task_id: str,
-        enabled: bool,
-        *,
-        now: Optional[datetime] = None,
-    ) -> Dict[str, Any]:
-        """Enable or disable one supported definition."""
-        existing = self.repository.get_task(task_id)
-        if existing is None:
-            raise ScheduledTaskNotFoundError(task_id)
-        contract = self._validate_persisted_task(existing)
-        if bool(existing.enabled) is bool(enabled):
-            return self._task_item(existing)
-        if (
-            existing.execution_generation
-            >= MAX_SCHEDULED_TASK_EXECUTION_GENERATION
-            and enabled
-        ):
-            raise ScheduledTaskContractError(
-                "Scheduled task execution generation cannot advance"
-            )
-        now_value = self._now(now or self._clock())
-        next_run = None
-        if enabled:
-            next_run = next_daily_run_at(
-                schedule_time=contract["schedule_time"],
-                timezone_name=contract["timezone"],
-                after=now_value,
-            )
-        row = self.repository.set_enabled(
-            task_id,
-            expected_schema_version=existing.schema_version,
-            expected_execution_generation=existing.execution_generation,
-            enabled=bool(enabled),
-            next_run_at=next_run,
-            updated_at=now_value,
-        )
-        if row is None:
-            current = self.repository.get_task(task_id)
-            if current is None:
-                raise ScheduledTaskNotFoundError(task_id)
-            self._validate_persisted_task(current)
-            raise ScheduledTaskContractError(
-                "Scheduled task definition changed during enablement"
-            )
-        return self._task_item(row)
 
     def list_runs(self, task_id: str, *, limit: int = 100) -> Dict[str, Any]:
         """List occurrence records without interpreting definition payloads."""
@@ -1971,11 +1893,15 @@ _admission_fields_module = importlib.import_module(_ADMISSION_FIELDS_MODULE_NAME
 _analysis_admission_audit_module = importlib.import_module(
     "src.services.scheduled_task_parts.analysis_admission_audit"
 )
+_mutation_audit_module = importlib.import_module(
+    "src.services.scheduled_task_parts.mutation_audit"
+)
 
 
 def _assemble_admission_fields_facade(
     fields_module=_admission_fields_module,
     audit_module=_analysis_admission_audit_module,
+    mutation_module=_mutation_audit_module,
 ) -> None:
     """Rebind admission field builders onto ScheduledTaskService."""
     bound_method_names = fields_module.bind_admission_fields_facade(
@@ -1996,6 +1922,34 @@ def _assemble_admission_fields_facade(
             "Unexpected ScheduledTaskService analysis admission audit methods: "
             f"{audit_names!r}"
         )
+    mutation_names = mutation_module.bind_mutation_audit_facade(
+        ScheduledTaskService,
+        globals(),
+    )
+    if mutation_names != mutation_module.EXPECTED_MUTATION_AUDIT_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected ScheduledTaskService mutation audit methods: "
+            f"{mutation_names!r}"
+        )
+    mutation_globals = (
+        SCHEDULED_TASK_MUTATION_TARGET_TYPE,
+        _MUTATION_ACTION_BY_OPERATION,
+        _bounded_mutation_identity,
+        _bounded_mutation_metadata,
+        _bounded_mutation_name,
+        _mutation_error_audit_fields,
+        _mutation_metadata_from_contract,
+    )
+    if mutation_globals != (
+        mutation_module.SCHEDULED_TASK_MUTATION_TARGET_TYPE,
+        mutation_module._MUTATION_ACTION_BY_OPERATION,
+        mutation_module._bounded_mutation_identity,
+        mutation_module._bounded_mutation_metadata,
+        mutation_module._bounded_mutation_name,
+        mutation_module._mutation_error_audit_fields,
+        mutation_module._mutation_metadata_from_contract,
+    ):
+        raise ImportError("ScheduledTaskService mutation audit globals drifted")
 
 
 _assemble_admission_fields_facade()
@@ -2005,17 +1959,25 @@ _admission_fields_module._install_facade_reload_hook(
 _analysis_admission_audit_module._install_facade_reload_hook(
     _assemble_admission_fields_facade
 )
+_mutation_audit_module._install_facade_reload_hook(
+    _assemble_admission_fields_facade
+)
 del (
     _ADMISSION_FIELDS_MODULE_NAME,
     _assemble_admission_fields_facade,
     _admission_fields_module,
     _analysis_admission_audit_module,
+    _mutation_audit_module,
 )
 
 
 __all__ = [
+    "DEFAULT_SCHEDULED_TASK_MUTATION_ACTOR_ID",
+    "DEFAULT_SCHEDULED_TASK_MUTATION_ACTOR_TYPE",
+    "SCHEDULED_TASK_WRITE_EVENT_TYPE",
     "ScheduledTaskContractError",
     "ScheduledTaskError",
+    "ScheduledTaskMutationAuditCompletionUnavailable",
     "ScheduledTaskNotFoundError",
     "ScheduledTaskService",
     "ScheduledTaskUnsupportedSchemaError",
