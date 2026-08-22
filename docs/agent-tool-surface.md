@@ -33,7 +33,7 @@ Every new Agent tool must declare all four items in
 | Item | Requirement |
 | --- | --- |
 | `permission` | `ToolPolicy.declared(...)` with a non-empty subset of `SUPPORTED_AGENT_TOOL_CAPABILITIES`. Missing grants return `permission_denied`. |
-| `timeout` | Honor `ToolAccessContext.timeout_seconds` / `deadline_monotonic`. Do not add a private wait that bypasses the surface fence. |
+| `timeout` | Honor `ToolAccessContext.timeout_seconds` / `deadline_monotonic`. Missing `deadline_monotonic` or `cancelled_check` attributes fail closed (`AttributeError`); do not getattr them into an unlimited fence. `None` still means no absolute deadline / no cancel probe. Do not add a private wait that bypasses the surface fence. |
 | `audit` | Let ToolSurface emit `build_tool_audit` on success and denial. Do not log raw secrets or untrusted document bodies. |
 | `hitl_need` | Tools do **not** add a parallel approval path. High-risk recommendation overrides stay on the existing HITL risk gate (`docs/human-approvals_EN.md`). Default is no tool-level HITL. |
 

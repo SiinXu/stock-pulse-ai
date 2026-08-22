@@ -129,7 +129,7 @@
 | [Import-cycle ratchet（英文）](import-cycle-ratchet.md) | 包级双向 import 对 shrink-only 门禁、失败读法与合法改 baseline 路径（ADR-010） |
 | [Service-split template（英文）](service-split-template.md) | 行为保持的 facade / re-export 拆分清单、棘轮验证与兼容 shim 删除条件；含 merged PR #1352 偏差审计（Refs #1088） |
 | [Config-access ratchet（英文）](config-access-ratchet.md) | 生产路径 bare `get_config()` shrink-only 门禁、注入 / composition-root 优先路径与 baseline 合法变更说明（ADR-011 / issue #625） |
-| [共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md)（[EN](runtime-session-contract-owners.md)） | BoundToolSession / TaskRunContext / HTTP cancel / ToolAccessContext / generation-backend probe / 配置注册表的 owner、成对测试、fail-closed 与废弃路径（#1055 T1） |
+| [共享运行时 session 契约所有权](runtime-session-contract-owners_CN.md)（[EN](runtime-session-contract-owners.md)） | BoundToolSession / TaskRunContext / HTTP cancel / ToolAccessContext / generation-backend probe / 配置注册表的 owner、成对测试、fail-closed 栅栏读取与废弃路径（#1055 T1–T3） |
 | [离线分析质量面板（英文）](analysis-quality-panel.md) | 固定面板离线信任夹具、扩展方式与非主张范围（#617 Phase A） |
 | [分析质量门](analysis-quality-gate.md) | 管线内禁止无中生有事实的质量门，复用 agent-eval 维度；annotate/intercept（#887） |
 | [预测 vs 实际跟踪归属](prediction-vs-actual-tracking.md) | #449→#1107：框架由 Agent Evolution Epic 承接；展示/适配器残留见子 issue |
