@@ -20,6 +20,7 @@ const NON_ANALYSIS_CANCEL_REPORT_TYPES = new Set([
   'market_review',
   'candidate_discovery',
   'alphasift_screen',
+  'local_model_pull',
 ]);
 
 function canCancelAnalysisTask(task: TaskInfo): boolean {

@@ -182,6 +182,23 @@ describe('TaskPanel', () => {
     expect(screen.queryByRole('button', { name: /取消|停止/ })).not.toBeInTheDocument();
   });
 
+  it('does not offer cancel for local model pull tasks listed in the panel', () => {
+    render(
+      <TaskPanel
+        tasks={[
+          {
+            ...baseTask,
+            stockCode: 'qwen2.5:7b',
+            stockName: 'qwen2.5:7b',
+            reportType: 'local_model_pull',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /取消|停止/ })).not.toBeInTheDocument();
+  });
+
   it('does not treat cancel-requested status as a clickable cancel action', () => {
     render(
       <TaskPanel
