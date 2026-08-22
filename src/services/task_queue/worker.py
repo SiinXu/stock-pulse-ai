@@ -243,9 +243,23 @@ class _TaskQueueWorkerMethods:
 
         metadata = deep_thaw(context.command.metadata)
         stock_code = str(metadata.get("stock_code") or "")
+        if context.is_cancel_requested():
+            logger.info(
+                "[TaskQueue] Analysis runner skipped after cancel request: %s (%s)",
+                context.task_id,
+                stock_code,
+            )
+            return {
+                "query_id": context.task_id,
+                "stock_code": stock_code,
+                "cancelled": True,
+            }
+
         service = AnalysisService()
 
         def on_progress(progress: int, message: str) -> None:
+            if context.is_cancel_requested():
+                return
             context.update_progress(progress, message)
 
         result = service.analyze_stock(
@@ -269,6 +283,20 @@ class _TaskQueueWorkerMethods:
             debate_max_rounds=metadata.get("debate_max_rounds"),
             request_context=request_context,
         )
+        if context.is_cancel_requested():
+            logger.info(
+                "[TaskQueue] Analysis runner observed cancel after pipeline return; "
+                "already persisted reports or notifications are not rolled back: %s (%s)",
+                context.task_id,
+                stock_code,
+            )
+            if result is None:
+                return {
+                    "query_id": context.task_id,
+                    "stock_code": stock_code,
+                    "cancelled": True,
+                }
+            return result
         if result is None:
             error_message = service.last_error or "分析返回空结果"
             from src.services.analysis_service import (

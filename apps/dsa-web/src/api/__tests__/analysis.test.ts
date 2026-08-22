@@ -359,10 +359,21 @@ describe('analysisApi response validation', () => {
     expect(list.tasks[0].stockCode).toBe('AAPL');
   });
 
-  it('does not expose an analysis-task cancel helper while HTTP cancel is absent', () => {
-    expect(ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE).toBe(false);
-    expect(analysisApi).not.toHaveProperty('cancelTask');
-    expect(analysisApi).not.toHaveProperty('cancel');
+  it('exposes analysis-task cancel when the OpenAPI path exists', async () => {
+    expect(ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE).toBe(true);
+    expect(analysisApi).toHaveProperty('cancelTask');
+    post.mockResolvedValueOnce({
+      data: {
+        task_id: 't-cancel',
+        status: 'cancel_requested',
+        message_code: 'task.cancel_requested',
+        progress: 40,
+      },
+    });
+    const status = await analysisApi.cancelTask('t-cancel');
+    expect(post).toHaveBeenCalledWith('/api/v1/analysis/tasks/t-cancel/cancel');
+    expect(status.taskId).toBe('t-cancel');
+    expect(status.status).toBe('cancel_requested');
   });
 
   it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(

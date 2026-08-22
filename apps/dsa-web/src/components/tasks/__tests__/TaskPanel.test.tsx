@@ -1,7 +1,19 @@
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { analysisApi } from '../../../api/analysis';
 import { TaskPanel } from '../TaskPanel';
 import type { TaskInfo } from '../../../types/analysis';
+
+vi.mock('../../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/analysis')>('../../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      cancelTask: vi.fn(),
+    },
+  };
+});
 
 const baseTask: TaskInfo = {
   taskId: 'task-1',
@@ -15,6 +27,10 @@ const baseTask: TaskInfo = {
 };
 
 describe('TaskPanel', () => {
+  beforeEach(() => {
+    vi.mocked(analysisApi.cancelTask).mockReset();
+  });
+
   it('renders requested analysis phase badges for active tasks', () => {
     render(
       <TaskPanel
@@ -112,8 +128,14 @@ describe('TaskPanel', () => {
     expect(screen.getByRole('button', { name: '查看 长飞光纤 运行流' })).toBeInTheDocument();
   });
 
-  it('does not render a cancel control for a running analysis task', () => {
+  it('renders a cancel control for a running analysis task and posts cancel', async () => {
     const onDismiss = vi.fn();
+    vi.mocked(analysisApi.cancelTask).mockResolvedValue({
+      taskId: 'task-1',
+      status: 'cancel_requested',
+      messageCode: 'task.cancel_requested',
+      progress: 40,
+    });
     render(
       <TaskPanel
         tasks={[baseTask]}
@@ -124,9 +146,57 @@ describe('TaskPanel', () => {
 
     expect(screen.getByLabelText('任务状态：分析中')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '查看 贵州茅台 运行流' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /取消|停止/ })).not.toBeInTheDocument();
+    const cancelButton = screen.getByRole('button', { name: '取消 贵州茅台 分析' });
+    fireEvent.click(cancelButton);
+    await waitFor(() => {
+      expect(analysisApi.cancelTask).toHaveBeenCalledWith('task-1');
+    });
     expect(screen.queryByRole('button', { name: '关闭 贵州茅台 任务' })).not.toBeInTheDocument();
     expect(onDismiss).not.toHaveBeenCalled();
+  });
+
+  it('shows a visible error when analysis cancel fails', async () => {
+    vi.mocked(analysisApi.cancelTask).mockRejectedValue(new Error('offline'));
+    render(<TaskPanel tasks={[baseTask]} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '取消 贵州茅台 分析' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toBeInTheDocument();
+    expect(alert.textContent?.trim()).not.toHaveLength(0);
+  });
+
+  it('does not offer cancel for market-review tasks listed in the panel', () => {
+    render(
+      <TaskPanel
+        tasks={[
+          {
+            ...baseTask,
+            stockCode: 'market_review',
+            stockName: '大盘复盘',
+            reportType: 'detailed',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /取消|停止/ })).not.toBeInTheDocument();
+  });
+
+  it('does not offer cancel for local model pull tasks listed in the panel', () => {
+    render(
+      <TaskPanel
+        tasks={[
+          {
+            ...baseTask,
+            stockCode: 'qwen2.5:7b',
+            stockName: 'qwen2.5:7b',
+            reportType: 'local_model_pull',
+          },
+        ]}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: /取消|停止/ })).not.toBeInTheDocument();
   });
 
   it('does not treat cancel-requested status as a clickable cancel action', () => {

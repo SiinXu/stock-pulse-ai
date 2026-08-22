@@ -435,6 +435,31 @@ def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
     return _analysis_api_service().get_task_run_flow(task_id)
 
 
+@router.post(
+    "/tasks/{task_id}/cancel",
+    response_model=TaskStatus,
+    responses={
+        200: {"description": "任务取消快照"},
+        404: {"description": "任务不存在或不是个股分析任务", "model": ErrorResponse},
+    },
+    summary="取消正在运行的个股分析任务",
+    description=(
+        "Kind-scoped adapter over the process-local queue cancel port. Only "
+        "stock_analysis tasks are accepted; discovery, market review, and other "
+        "kinds return 404 without cancelling. The request is idempotent: a later "
+        "POST returns the current snapshot, including a competing completed or "
+        "failed terminal state. Processing cancel is cooperative — the snapshot "
+        "becomes cancel_requested immediately and cancelled when the runner "
+        "returns. Reports or notifications that already persisted are not rolled "
+        "back."
+    ),
+    operation_id="cancelAnalysisTask",
+)
+def cancel_analysis_task(task_id: str) -> TaskStatus:
+    """Request cancellation of a stock analysis task."""
+    return _analysis_api_service().cancel_analysis_task(task_id)
+
+
 @router.get(
     "/status/{task_id}",
     response_model=TaskStatus,

@@ -165,6 +165,13 @@ export function useDashboardLifecycle({
       handleCompletedTask(task);
     },
     onTaskFailed: (task) => {
+      // SSE maps cancelled/interrupted to the legacy event name task_failed.
+      // Those are warning terminal states, not analysis failures.
+      if (task.status === 'cancelled' || task.status === 'interrupted') {
+        syncTaskUpdated(task);
+        handleNonCompletedTerminalTask(task);
+        return;
+      }
       syncTaskFailed(task);
       handleNonCompletedTerminalTask(task);
     },

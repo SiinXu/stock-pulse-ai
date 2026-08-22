@@ -5,12 +5,17 @@ import { historyApi } from '../../../api/history';
 import type { RunFlowSnapshot } from '../../../types/runFlow';
 import { RunFlowPanel } from '../RunFlowPanel';
 
-vi.mock('../../../api/analysis', () => ({
-  analysisApi: {
-    getTaskFlow: vi.fn(),
-    getTaskStreamUrl: vi.fn(() => 'http://localhost/api/v1/analysis/tasks/stream'),
-  },
-}));
+vi.mock('../../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/analysis')>('../../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      getTaskFlow: vi.fn(),
+      getTaskStreamUrl: vi.fn(() => 'http://localhost/api/v1/analysis/tasks/stream'),
+    },
+  };
+});
 
 vi.mock('../../../api/history', () => ({
   historyApi: {

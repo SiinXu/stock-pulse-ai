@@ -1,0 +1,2 @@
+- [Added] Exposed kind-scoped HTTP cancel for running stock analysis tasks and wired TaskPanel to the real queue cancel contract (Refs #1448).
+- [Tests] Require TaskRunContext.is_cancel_requested on analysis runner stubs and keep analysis API mocks aligned with HTTP cancel.

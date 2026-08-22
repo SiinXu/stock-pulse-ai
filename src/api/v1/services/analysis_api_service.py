@@ -78,7 +78,9 @@ from src.services.task_queue import (
     public_task_error,
     public_task_message,
 )
-from src.task_execution import TaskStatusEnum
+from src.task_execution import TaskNotFoundError, TaskStatusEnum
+
+STOCK_ANALYSIS_TASK_KIND = "stock_analysis"
 from src.utils.data_processing import parse_json_field
 from src.utils.market_review_region import (
     MARKET_REVIEW_REGION_VALID_INPUTS,
@@ -1127,6 +1129,26 @@ class AnalysisApiService:
 
         # 3. Task does not exist
         raise api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
+
+    def _analysis_task_not_found(self, task_id: str):
+        return api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
+
+    def cancel_analysis_task(self, task_id: str) -> TaskStatus:
+        """Request cancel for a kind-scoped stock analysis task.
+
+        Ownership is the same session that can list/status the task: the
+        process-local queue has no per-user ACL. Wrong-kind tasks (discovery,
+        market review, local model) 404 without calling ``cancel``.
+        """
+        task_queue = self.get_task_queue()
+        existing = task_queue.get_task(task_id)
+        if existing is None or getattr(existing, "kind", None) != STOCK_ANALYSIS_TASK_KIND:
+            raise self._analysis_task_not_found(task_id)
+        try:
+            task_queue.cancel(task_id)
+        except TaskNotFoundError as exc:
+            raise self._analysis_task_not_found(task_id) from exc
+        return self.get_analysis_status(task_id)
 
     def load_sync_fundamental_sources(self, 
         query_id: str,

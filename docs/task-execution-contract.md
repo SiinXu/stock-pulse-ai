@@ -80,6 +80,9 @@ this final commit boundary.
 A pending command cancelled before execution never invokes its runner. Runners can
 poll `TaskRunContext.is_cancel_requested()`; it also returns true after
 `cancelled` or `interrupted` so a late-running callable observes the stop fence.
+The stock-analysis adapter polls that callable before `analyze_stock`, on
+progress, and after pipeline return. The callable is required on
+`TaskRunContext`; missing it is a contract error, not a silent `False`.
 
 `TaskCommand.on_done` is an optional executor-finalization cleanup hook. The
 queue attaches it only after executor admission and invokes it once when the
@@ -208,8 +211,12 @@ The bounded, connectivity-free `SystemConfigService.update()` and the task's
 `completed` transition then share the queue's final-result commit boundary, so a
 cancelled or interrupted pull cannot leave an activation side effect behind.
 
-This contract does not add HTTP cancel/retry routes, an external broker, or
-cross-process task sharing. Restart recovery (below) is deliberately narrower
+This contract does not add a second lifecycle, an external broker, or
+cross-process task sharing. HTTP adapters may expose the existing `cancel`
+port for one kind at a time: analysis uses
+`POST /api/v1/analysis/tasks/{task_id}/cancel` and discovery uses
+`POST /api/v1/discover/screen/tasks/{task_id}/cancel`. Those routes must not
+be reused across kinds. Restart recovery (below) is deliberately narrower
 than a distributed queue.
 
 ## Single-Process Authority

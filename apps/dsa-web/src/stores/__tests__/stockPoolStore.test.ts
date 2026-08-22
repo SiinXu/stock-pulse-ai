@@ -27,6 +27,7 @@ vi.mock('../../api/analysis', async () => {
   return {
     ...actual,
     analysisApi: {
+      ...actual.analysisApi,
       analyzeAsync: vi.fn(),
       getTasks: vi.fn(),
       getStatus: vi.fn(),
@@ -1362,6 +1363,28 @@ describe('stockPoolStore', () => {
       progress: 100,
       messageCode: 'task.analysis.completed',
     });
+  });
+
+  it('does not treat a cancelled poll result as an analysis failure', async () => {
+    const task = createTask({ status: 'processing', progress: 45 });
+    useStockPoolStore.getState().syncTaskCreated(task);
+    useStockPoolStore.setState({ error: null });
+    vi.mocked(analysisApi.getStatus).mockResolvedValue({
+      taskId: task.taskId,
+      status: 'cancelled',
+      progress: 45,
+      message: '任务已取消',
+      messageCode: 'task.cancelled',
+    });
+
+    await useStockPoolStore.getState().pollKnownTasks();
+
+    expect(useStockPoolStore.getState().activeTasks[0]).toMatchObject({
+      taskId: task.taskId,
+      status: 'cancelled',
+      messageCode: 'task.cancelled',
+    });
+    expect(useStockPoolStore.getState().error).toBeNull();
   });
 
   it('treats interrupted tasks as terminal for polling and retention filtering', async () => {

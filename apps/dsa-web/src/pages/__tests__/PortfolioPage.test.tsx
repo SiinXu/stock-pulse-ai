@@ -68,6 +68,7 @@ const {
   getPortfolioRiskMetrics,
   getAnalysisStatus,
   getAnalysisTasks,
+  cancelAnalysisTask,
   getPortfolioHealth,
   refreshPortfolioHealth,
   analyzeBasket,
@@ -104,6 +105,7 @@ const {
   getPortfolioRiskMetrics: vi.fn(),
   getAnalysisStatus: vi.fn(),
   getAnalysisTasks: vi.fn(),
+  cancelAnalysisTask: vi.fn(),
   getPortfolioHealth: vi.fn(),
   refreshPortfolioHealth: vi.fn(),
   analyzeBasket: vi.fn(),
@@ -165,19 +167,25 @@ vi.mock('../../api/portfolioInsights', () => ({
   },
 }));
 
-vi.mock('../../api/analysis', () => ({
-  analysisApi: {
-    getStatus: getAnalysisStatus,
-    getTasks: getAnalysisTasks,
-    getTaskStreamUrl: () => '/api/v1/analysis/tasks/stream',
-    getTaskFlow: vi.fn(async () => ({
-      taskId: 'task-portfolio-1',
-      nodes: [],
-      edges: [],
-      events: [],
-    })),
-  },
-}));
+vi.mock('../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../api/analysis')>('../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      getStatus: getAnalysisStatus,
+      getTasks: getAnalysisTasks,
+      getTaskStreamUrl: () => '/api/v1/analysis/tasks/stream',
+      getTaskFlow: vi.fn(async () => ({
+        taskId: 'task-portfolio-1',
+        nodes: [],
+        edges: [],
+        events: [],
+      })),
+      cancelTask: cancelAnalysisTask,
+    },
+  };
+});
 
 vi.mock('../../hooks/useTaskStream', () => ({
   useTaskStream: () => ({
@@ -564,6 +572,11 @@ describe('PortfolioPage FX refresh', () => {
       pending: 0,
       processing: 0,
       tasks: [],
+    });
+    cancelAnalysisTask.mockResolvedValue({
+      taskId: 'task-portfolio-1',
+      status: 'cancel_requested',
+      progress: 0,
     });
 
     getAccounts.mockResolvedValue(makeAccounts());
@@ -2034,9 +2047,10 @@ describe('PortfolioPage FX refresh', () => {
     const taskItem = await within(taskPanel).findByTestId('task-panel-item');
     expect(taskItem).toBeInTheDocument();
     expect(within(taskItem).getAllByText('HK00700').length).toBeGreaterThan(0);
+    expect(within(taskItem).getByRole('button', { name: '取消 HK00700 分析' })).toBeInTheDocument();
     expect(screen.queryByText('已提交 HK00700 分析任务：task-portfolio-1')).not.toBeInTheDocument();
 
-    fireEvent.click(within(taskItem).getByRole('button', { name: /HK00700/ }));
+    fireEvent.click(within(taskItem).getByRole('button', { name: '查看 HK00700 运行流' }));
     await waitFor(() => {
       expect(`${router.state.location.pathname}${router.state.location.search}`).toBe(
         buildAnalysisWorkbenchHref({
@@ -2153,7 +2167,9 @@ describe('PortfolioPage FX refresh', () => {
     fireEvent.click(within(row as HTMLTableRowElement).getByRole('button', { name: '分析' }));
 
     const taskPanel = await screen.findByTestId('portfolio-analysis-task-panel');
-    expect(await within(taskPanel).findByTestId('task-panel-item')).toHaveTextContent('AAPL');
+    const busyItem = await within(taskPanel).findByTestId('task-panel-item');
+    expect(busyItem).toHaveTextContent('AAPL');
+    expect(within(busyItem).getByRole('button', { name: '取消 AAPL 分析' })).toBeInTheDocument();
     expect(screen.queryByTestId('actionable-api-error-inline')).not.toBeInTheDocument();
     expect(analyzePosition).toHaveBeenCalledTimes(1);
   });

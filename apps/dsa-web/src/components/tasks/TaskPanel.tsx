@@ -1,5 +1,8 @@
+import { useState } from 'react';
 import type React from 'react';
-import { ChevronDown, RefreshCw, Workflow, X } from 'lucide-react';
+import { Ban, ChevronDown, RefreshCw, Workflow, X } from 'lucide-react';
+import { ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE, analysisApi } from '../../api/analysis';
+import { getParsedApiError } from '../../api/error';
 import { Badge, Card, IconButton, Progress, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 import type { TaskInfo } from '../../types/analysis';
@@ -12,6 +15,29 @@ import { getRequestedPhaseLabel } from '../../utils/marketPhase';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { formatTaskMessage } from '../../utils/taskMessage';
 
+const NON_ANALYSIS_CANCEL_STOCK_CODES = new Set(['market_review', 'market', 'candidate_discovery']);
+const NON_ANALYSIS_CANCEL_REPORT_TYPES = new Set([
+  'market_review',
+  'candidate_discovery',
+  'alphasift_screen',
+  'local_model_pull',
+]);
+
+function canCancelAnalysisTask(task: TaskInfo): boolean {
+  if (!ANALYSIS_TASK_HTTP_CANCEL_AVAILABLE) {
+    return false;
+  }
+  if (task.status !== 'pending' && task.status !== 'processing') {
+    return false;
+  }
+  const stockCode = task.stockCode.trim().toLowerCase();
+  if (NON_ANALYSIS_CANCEL_STOCK_CODES.has(stockCode)) {
+    return false;
+  }
+  const reportType = (task.reportType || '').trim().toLowerCase();
+  return !NON_ANALYSIS_CANCEL_REPORT_TYPES.has(reportType);
+}
+
 /** Task item properties. */
 interface TaskItemProps {
   task: TaskInfo;
@@ -22,10 +48,30 @@ interface TaskItemProps {
 /** Individual task item. */
 const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) => {
   const { language, t } = useUiLanguage();
+  const [canceling, setCanceling] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
   const isPending = task.status === 'pending';
   const isProcessing = task.status === 'processing';
   const isCancelRequested = task.status === 'cancel_requested';
   const isCancelled = task.status === 'cancelled';
+  const showCancel = canCancelAnalysisTask(task);
+
+  const handleCancel = async (event: React.MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    if (canceling) {
+      return;
+    }
+    setCanceling(true);
+    setCancelError(null);
+    try {
+      await analysisApi.cancelTask(task.taskId);
+    } catch (error) {
+      const parsed = getParsedApiError(error, language);
+      setCancelError(parsed.message || t('taskPanel.cancelFailed'));
+    } finally {
+      setCanceling(false);
+    }
+  };
   const isCompleted = task.status === 'completed';
   const isFailed = task.status === 'failed';
   const isInterrupted = task.status === 'interrupted';
@@ -106,6 +152,23 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
               <Workflow className="h-4 w-4" aria-hidden="true" />
             </IconButton>
           ) : null}
+          {showCancel ? (
+            <IconButton
+              type="button"
+              variant="ghost"
+              size="compact"
+              tooltip={t('taskPanel.cancel')}
+              isLoading={canceling}
+              onClick={(event) => {
+                void handleCancel(event);
+              }}
+              aria-label={t('taskPanel.cancelAria', {
+                stock: task.stockName || task.stockCode,
+              })}
+            >
+              <Ban className="h-4 w-4" aria-hidden="true" />
+            </IconButton>
+          ) : null}
           <Badge
             variant={statusVariant}
             className="min-w-[4.75rem] max-w-[7rem] justify-center gap-1.5 whitespace-nowrap shadow-none"
@@ -134,6 +197,18 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onOpenRunFlow, onDismiss }) =
       {taskMessage ? (
         <p className="min-w-0 truncate text-xs text-secondary-text">
           {taskMessage}
+        </p>
+      ) : null}
+
+      {isCancelRequested ? (
+        <p className="min-w-0 text-xs text-warning">
+          {t('taskPanel.cancelRequestedHint')}
+        </p>
+      ) : null}
+
+      {cancelError ? (
+        <p className="min-w-0 text-xs text-danger" role="alert">
+          {cancelError}
         </p>
       ) : null}
 
