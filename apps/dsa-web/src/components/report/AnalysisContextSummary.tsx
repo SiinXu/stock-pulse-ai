@@ -5,6 +5,8 @@ import type {
   AnalysisContextPackOverview,
   ReportLanguage,
 } from '../../types/analysis';
+import type { UiLanguage } from '../../i18n/uiLanguages';
+import { FIELD_TRUST_TEXT, fieldTrustGapMessage } from '../../locales/fieldTrust';
 import { ANALYSIS_CONTEXT_CONTENT_TEXT } from '../../locales/reportContent';
 import {
   formatDataQualityLevel,
@@ -52,6 +54,32 @@ const STATUS_ORDER: AnalysisContextPackBlockStatus[] = [
 ];
 
 const DIAGNOSTIC_CODE_PATTERN = /^[a-z][a-z0-9_]{0,127}$/;
+const QUOTE_TRUST_WARNING_PREFIX = 'quote_trust_';
+
+const toUiLanguage = (language: ReportLanguage): UiLanguage => {
+  if (language === 'zh') return 'zh';
+  if (language === 'ko') return 'ko';
+  return 'en';
+};
+
+const quoteTrustGapCodes = (warnings: string[] | undefined): string[] => {
+  const codes: string[] = [];
+  for (const warning of warnings || []) {
+    const token = warning.trim().toLowerCase();
+    if (!token.startsWith(QUOTE_TRUST_WARNING_PREFIX)) continue;
+    const code = token.slice(QUOTE_TRUST_WARNING_PREFIX.length).replace(/^_+|_+$/g, '');
+    if (code && !codes.includes(code)) codes.push(code);
+  }
+  return codes;
+};
+
+const formatBlockWarning = (warning: string, language: ReportLanguage): string => {
+  const token = warning.trim().toLowerCase();
+  if (!token.startsWith(QUOTE_TRUST_WARNING_PREFIX)) return warning;
+  const code = token.slice(QUOTE_TRUST_WARNING_PREFIX.length).replace(/^_+|_+$/g, '');
+  const trustText = FIELD_TRUST_TEXT[toUiLanguage(language)] ?? FIELD_TRUST_TEXT.en;
+  return fieldTrustGapMessage(trustText, { code });
+};
 
 const getCount = (
   overview: AnalysisContextPackOverview,
@@ -226,6 +254,16 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
                   .map((reason) => formatMissingReason(reason, reportLanguage, block.status))
                   .join('; ')
                 : text.statusGuidance[block.status];
+              const trustText = FIELD_TRUST_TEXT[toUiLanguage(reportLanguage)] ?? FIELD_TRUST_TEXT.en;
+              const quoteGaps = block.key === 'quote' ? quoteTrustGapCodes(block.warnings) : [];
+              const quoteConfidence = block.key === 'quote' && quoteGaps.length === 0 && block.status === 'available'
+                ? 'high'
+                : block.key === 'quote'
+                  ? 'low'
+                  : null;
+              const localizedWarnings = (block.warnings || []).map((warning) => (
+                formatBlockWarning(warning, reportLanguage)
+              ));
               return (
                 <div
                   key={block.key}
@@ -245,12 +283,24 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
                     </Badge>
                   </div>
 
-                  {block.warnings?.length ? (
+                  {quoteConfidence ? (
+                    <p
+                      data-testid="analysis-context-quote-trust"
+                      className="mt-2 break-words text-xs leading-5 text-secondary-text [overflow-wrap:anywhere]"
+                    >
+                      {trustText.title}: {trustText.confidence}
+                      {' '}
+                      {quoteConfidence === 'high' ? trustText.confidenceHigh : trustText.confidenceLow}
+                      {quoteGaps.length ? ` · ${trustText.gaps}: ${quoteGaps.map((code) => fieldTrustGapMessage(trustText, { code })).join('; ')}` : ''}
+                    </p>
+                  ) : null}
+
+                  {localizedWarnings.length ? (
                     <InlineAlert
                       variant="warning"
                       size="compact"
                       title={text.warnings}
-                      message={block.warnings.join(', ')}
+                      message={localizedWarnings.join(', ')}
                       className="mt-3"
                     />
                   ) : null}

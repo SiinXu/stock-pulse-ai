@@ -1,0 +1,1 @@
+- [Added] Render a small quote-trust source/confidence/gap summary in analysis reports and the Web report context panel from existing pack overview metadata (Refs #1129).
