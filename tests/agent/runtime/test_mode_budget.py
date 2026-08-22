@@ -315,6 +315,20 @@ def test_chat_factory_enabled_tiny_tool_cap_breaches_budget_tools():
     assert result.budget_snapshot["breach"]["reason"] == "budget_tools"
 
 
+def test_run_loop_persists_mode_budget_account_on_executor():
+    """The live Chat/single-agent account stays on the executor after the loop."""
+    cfg = SimpleNamespace(agent_mode_budget_enabled=True)
+    adapter = _adapter([_FakeResponse(content="done")])
+    executor = _chat_executor(adapter=adapter, max_steps=5, config=cfg)
+    assert getattr(executor, "mode_budget_account", None) is None
+    result = _run_chat_loop(executor)
+    account = executor.mode_budget_account
+    assert account is not None
+    assert result.budget_snapshot is not None
+    assert account.llm_turns == result.budget_snapshot["used"]["llm_turns"]
+    assert account.llm_turns >= 1
+
+
 def test_chat_factory_default_on_still_clips_chat_turn_budget():
     """Default-on Chat still applies the built-in 10-turn cap (compatibility)."""
     cfg = SimpleNamespace(agent_mode_budget_enabled=True)

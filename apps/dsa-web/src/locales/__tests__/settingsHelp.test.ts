@@ -84,6 +84,25 @@ describe('fallback model settings help', () => {
   });
 
   it.each([
+    ['en-US', 'end-of-run reflection', 'post-mortem'],
+    ['zh-CN', '运行结束反思', '后验'],
+  ])('documents that AGENT_MODE_BUDGET_MAX_LLM_TURNS includes reflection in %s', (
+    locale,
+    reflectionText,
+    postmortemText,
+  ) => {
+    const content = getSettingsHelpContent(
+      'settings.agent.AGENT_MODE_BUDGET_MAX_LLM_TURNS',
+      undefined,
+      locale,
+    );
+    const copy = JSON.stringify(content);
+    expect(copy).toContain(reflectionText);
+    expect(copy).toContain(postmortemText);
+    expect(copy).toContain('budget_skipped');
+  });
+
+  it.each([
     ['zh-CN', '失效引用会保留并标记不可用', '显式替换或删除'],
     ['en-US', 'stale references remain marked unavailable', 'explicitly replaces or removes'],
   ])('keeps generic Connection model help consistent in %s', (locale, preservationText, actionText) => {

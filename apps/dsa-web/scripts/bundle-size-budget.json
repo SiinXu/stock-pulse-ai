@@ -141,9 +141,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 295193,
-      "measuredGzipBytes": 294793,
-      "note": "Rebaselined after adding four Agent category-timeout Settings fields (Refs #1423). Hosted zlib-9 294793 B + 400 B headroom."
+      "maxGzipBytes": 295635,
+      "measuredGzipBytes": 295235,
+      "note": "Reseeded after AGENT_MODE_BUDGET_MAX_LLM_TURNS Settings help named optional reflection/post-mortem run-cap consumption (Refs #1121). GitHub Actions Linux zlib-9 295235 B (local macOS zlib-9 295233 B) + 400 B headroom."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -381,9 +381,9 @@
       "match": [
         "assets/SettingsPage-*.js"
       ],
-      "maxGzipBytes": 295193,
-      "measuredGzipBytes": 294793,
-      "note": "Same-pattern family after adding four Agent category-timeout Settings fields (Refs #1423). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total."
+      "maxGzipBytes": 295635,
+      "measuredGzipBytes": 295235,
+      "note": "Same-pattern family after AGENT_MODE_BUDGET_MAX_LLM_TURNS Settings help named optional reflection/post-mortem run-cap consumption (Refs #1121). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured GitHub Actions Linux zlib-9 295235 B; local macOS zlib-9 295233 B."
     },
     {
       "id": "PortfolioRiskMetricsPanel-family",

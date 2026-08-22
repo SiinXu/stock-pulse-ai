@@ -14,6 +14,7 @@ from src.agent.evolution.guards import (
     snapshot_soul_identity,
     snapshot_tool_surface_denials,
 )
+from src.agent.runtime.mode_budget import ModeBudgetAccount, ModeBudgetLimits
 from src.agent.evolution.lessons import LESSON_KINDS, ReflectionLesson
 from src.agent.evolution.postmortem import (
     ResolvedClaimOutcome,
@@ -43,6 +44,24 @@ def _ctx(**meta: Any) -> SimpleNamespace:
         risk_flags=[],
         meta=dict(meta),
     )
+
+
+def _run_account(*, max_llm_turns: int, llm_turns: int = 0) -> ModeBudgetAccount:
+    return ModeBudgetAccount(
+        limits=ModeBudgetLimits(
+            mode="standard",
+            enabled=True,
+            max_llm_turns=max_llm_turns,
+            max_tool_calls=0,
+            max_cost_usd=0.0,
+            max_tokens=0,
+        ),
+        llm_turns=llm_turns,
+    )
+
+
+def _boom_llm(_system: str, _user: str) -> str:
+    raise AssertionError("LLM must not run when the run account forbids the call")
 
 
 def _config(**kwargs: Any) -> SimpleNamespace:
@@ -655,3 +674,208 @@ def test_config_registry_fields_present() -> None:
         field = get_field_definition(key)
         assert field is not None, key
         assert field["category"] == "agent"
+
+
+# ---------------------------------------------------------------------------
+# Run-account mode budget (#1121 Task 2)
+# ---------------------------------------------------------------------------
+
+
+def test_reflection_skips_when_run_account_already_at_max_llm_turns() -> None:
+    account = _run_account(max_llm_turns=3, llm_turns=3)
+    ctx = _ctx(episode_id="ep-run-cap", mode_budget_account=account)
+    soul_before = snapshot_soul_identity()
+    hash_before = AGENT_SOUL_HASH
+
+    result = run_reflection_loop(
+        ctx,
+        config=_config(),
+        llm_complete=_boom_llm,
+        budget=LlmCallBudget(total=1),
+    )
+
+    assert result.status == "budget_skipped"
+    assert result.terminate_reason == "budget"
+    assert result.validation_status == BUDGET_SKIPPED
+    assert result.skip_reason
+    assert ctx.meta[REFLECTION_META_KEY]["status"] == "budget_skipped"
+    assert account.llm_turns == 3
+    snap = account.snapshot()
+    assert snap["used"]["llm_turns"] <= snap["limits"]["max_llm_turns"]
+    assert snapshot_soul_identity() == soul_before
+    assert AGENT_SOUL_HASH == hash_before
+
+
+def test_reflection_skips_when_run_account_already_breached() -> None:
+    account = _run_account(max_llm_turns=2, llm_turns=2)
+    breach = account.record_llm_turn()
+    assert breach is not None
+    assert breach.reason == "budget_turns"
+    turns_after_breach = account.llm_turns
+    ctx = _ctx(episode_id="ep-run-breach", mode_budget_account=account)
+    soul_before = snapshot_soul_identity()
+
+    result = run_reflection_loop(
+        ctx,
+        config=_config(),
+        llm_complete=_boom_llm,
+        budget=LlmCallBudget(total=1),
+    )
+
+    assert result.status == "budget_skipped"
+    assert result.terminate_reason == "budget"
+    assert result.validation_status == BUDGET_SKIPPED
+    assert result.skip_reason
+    assert account.llm_turns == turns_after_breach
+    assert account.breach is not None
+    assert account.breach.reason == "budget_turns"
+    snap = account.snapshot()
+    assert snap["breach"]["reason"] == "budget_turns"
+    assert snapshot_soul_identity() == soul_before
+    assert AGENT_SOUL_HASH == soul_before.content_hash
+
+
+def test_reflection_records_last_remaining_run_account_turn() -> None:
+    """End-of-run reflection does not reserve a Decision turn."""
+    account = _run_account(max_llm_turns=2, llm_turns=1)
+    ctx = _ctx(episode_id="ep-run-last", mode_budget_account=account)
+    calls: List[str] = []
+
+    def _llm(system: str, user: str) -> str:
+        calls.append(system)
+        return json.dumps({"lessons": [], "revised": False})
+
+    result = run_reflection_loop(
+        ctx,
+        config=_config(),
+        llm_complete=_llm,
+        budget=LlmCallBudget(total=1),
+    )
+
+    assert result.status == "completed"
+    assert len(calls) == 1
+    assert account.llm_turns == 2
+    assert account.breach is None
+
+
+def test_reflection_records_one_run_account_turn_when_room_remains() -> None:
+    account = _run_account(max_llm_turns=4, llm_turns=1)
+    ctx = _ctx(episode_id="ep-run-room", mode_budget_account=account)
+    calls: List[str] = []
+
+    def _llm(system: str, user: str) -> str:
+        calls.append(system)
+        return json.dumps({"lessons": [], "revised": False})
+
+    result = run_reflection_loop(
+        ctx,
+        config=_config(),
+        llm_complete=_llm,
+        budget=LlmCallBudget(total=1),
+    )
+
+    assert result.status == "completed"
+    assert len(calls) == 1
+    assert account.llm_turns == 2
+    assert account.breach is None
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == 2
+
+
+def test_postmortem_updates_ctx_mode_budget_snapshot() -> None:
+    account = _run_account(max_llm_turns=4, llm_turns=1)
+    ctx = _ctx(mode_budget_account=account)
+
+    result = reflect_resolved_forecast(
+        _miss_item(signals=["evidence_gap"]),
+        config=_config(),
+        llm_complete=lambda _s, _u: json.dumps(
+            {
+                "lessons": [
+                    {
+                        "kind": "evidence_gap",
+                        "severity": "high",
+                        "claim_ref": "c1",
+                        "remedy": "Need volume confirmation.",
+                        "source_step": "postmortem",
+                    }
+                ]
+            }
+        ),
+        budget=LlmCallBudget(total=1),
+        ctx=ctx,
+    )
+
+    assert result.status == "completed"
+    assert account.llm_turns == 2
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == 2
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == account.llm_turns
+
+
+def test_postmortem_skips_llm_when_run_account_at_max_llm_turns() -> None:
+    account = _run_account(max_llm_turns=2, llm_turns=2)
+    ctx = _ctx(mode_budget_account=account)
+    soul_before = snapshot_soul_identity()
+
+    result = reflect_resolved_forecast(
+        _miss_item(signals=["evidence_gap"]),
+        config=_config(),
+        llm_complete=_boom_llm,
+        budget=LlmCallBudget(total=1),
+        ctx=ctx,
+    )
+
+    assert result.status == "budget_skipped"
+    assert result.terminate_reason == "budget"
+    assert result.validation_status == BUDGET_SKIPPED
+    assert result.skip_reason
+    assert account.llm_turns == 2
+    assert ctx.meta["mode_budget"]["used"]["llm_turns"] == 2
+    assert any(lesson.kind == "evidence_gap" for lesson in result.lessons)
+    assert snapshot_soul_identity() == soul_before
+    assert AGENT_SOUL_HASH == soul_before.content_hash
+
+
+def test_postmortem_batch_records_run_account_turns_then_skips() -> None:
+    account = _run_account(max_llm_turns=1, llm_turns=0)
+    ctx = _ctx(mode_budget_account=account)
+    items = [
+        _miss_item(episode_id=f"ep-{i}", prediction_id=f"pred-{i}", signals=["evidence_gap"])
+        for i in range(3)
+    ]
+    calls: List[str] = []
+
+    def _llm(system: str, user: str) -> str:
+        calls.append(user)
+        return json.dumps(
+            {
+                "lessons": [
+                    {
+                        "kind": "evidence_gap",
+                        "severity": "high",
+                        "claim_ref": "c1",
+                        "remedy": "Need volume confirmation.",
+                        "source_step": "postmortem",
+                    }
+                ]
+            }
+        )
+
+    batch = run_postmortem_batch(
+        items,
+        config=_config(),
+        llm_complete=_llm,
+        budget=LlmCallBudget(total=8),
+        ctx=ctx,
+    )
+
+    assert len(calls) == 1
+    assert account.llm_turns == 1
+    assert account.breach is None
+    completed = [row for row in batch.results if row.status == "completed"]
+    skipped = [row for row in batch.results if row.status == "budget_skipped"]
+    assert len(completed) == 1
+    assert len(skipped) == 2
+    for row in skipped:
+        assert row.validation_status == BUDGET_SKIPPED
+        assert row.skip_reason
+        assert row.terminate_reason == "budget"

@@ -21,6 +21,7 @@ from src.agent.evolution.budget import (
     DEFAULT_REFLECTION_LLM_BUDGET,
     LlmCallBudget,
     budget_from_config,
+    try_consume_with_run_account,
 )
 from src.agent.evolution.guards import (
     assert_soul_unchanged,
@@ -223,7 +224,9 @@ def run_reflection_loop(
     revised = False
 
     if llm_complete is not None:
-        if not call_budget.try_consume(reason="reflect_critique"):
+        if not try_consume_with_run_account(
+            call_budget, ctx, reason="reflect_critique"
+        ):
             terminate_reason = "budget"
             status = "budget_skipped"
             validation_status = BUDGET_SKIPPED

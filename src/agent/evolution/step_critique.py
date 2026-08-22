@@ -17,8 +17,10 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from src.agent.evolution.budget import (
     BUDGET_SKIPPED,
+    DECISION_LLM_TURN_RESERVE,
     DEFAULT_STEP_CRITIQUE_LLM_BUDGET,
     LlmCallBudget,
+    try_consume_with_run_account,
 )
 from src.agent.evolution.guards import (
     assert_soul_unchanged,
@@ -371,7 +373,12 @@ def critique_step_observations(
     strategy_note: Optional[str] = None
 
     if llm_complete is not None:
-        if not call_budget.try_consume(reason="step_critique"):
+        if not try_consume_with_run_account(
+            call_budget,
+            ctx,
+            reason="step_critique",
+            reserve_llm_turns=DECISION_LLM_TURN_RESERVE,
+        ):
             if not lessons:
                 terminate_reason = "budget"
                 status = "budget_skipped"

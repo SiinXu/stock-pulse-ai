@@ -51,7 +51,7 @@ EXPECTED_LOOP_METHODS = (
 
 EXPECTED_AST_HASHES = {
     '_ChatMethods': '251e864cddab46b625bfa95d33f32d998150c515eeb91519c3ff6039616336e5',
-    '_LoopMethods': 'd610a05714f6760d64ce3225470643cd587ede72578eaa1b1aca73f4fd047557',
+    '_LoopMethods': 'a9268921dc6f084c0edc22b22a4121ecee760124648eccf57fcbabe8be256ee0',
     '_RunMethods': 'cb60b06a89fe2b9366ea7886f06fe6d065dbb10715649ee3b3d1ea41c73255ba',
 }
 

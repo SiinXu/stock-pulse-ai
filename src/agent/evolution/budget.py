@@ -9,8 +9,13 @@ the optional work completed.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Optional
+
+from src.utils.sanitize import log_safe_exception
+
+logger = logging.getLogger(__name__)
 
 
 BUDGET_SKIPPED = "budget_skipped"
@@ -18,6 +23,7 @@ DEFAULT_STEP_CRITIQUE_LLM_BUDGET = 0
 DEFAULT_REFLECTION_LLM_BUDGET = 1
 DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET = 8
 DEFAULT_META_REVIEW_LLM_BUDGET = 0
+DECISION_LLM_TURN_RESERVE = 1
 MAX_REFLECTION_LLM_CALL_BUDGET = 64
 MAX_BUDGET_SKIP_REASONS = 32
 
@@ -111,8 +117,154 @@ def budget_from_config(
     return LlmCallBudget(total=total)
 
 
+def _mode_budget_account_from_ctx(ctx: Any) -> Any:
+    meta = getattr(ctx, "meta", None) if ctx is not None else None
+    if not isinstance(meta, dict):
+        return None
+    return meta.get("mode_budget_account")
+
+
+def _refresh_mode_budget_snapshot(ctx: Any, account: Any) -> None:
+    snapshot = getattr(account, "snapshot", None)
+    if not callable(snapshot):
+        return
+    meta = getattr(ctx, "meta", None)
+    if not isinstance(meta, dict):
+        return
+    try:
+        meta["mode_budget"] = snapshot()
+    except Exception as exc:  # broad-exception: fallback_recorded - snapshot refresh is diagnostic only
+        log_safe_exception(
+            logger,
+            "Mode-budget snapshot refresh failed",
+            exc,
+            error_code="agent_reflection_mode_budget_snapshot_failed",
+            level=logging.INFO,
+        )
+
+
+def mode_budget_turn_block_reason(
+    ctx: Any,
+    *,
+    required_llm_turns: int = 1,
+    reserve_llm_turns: int = 0,
+) -> Optional[str]:
+    """Return a run-account reason that forbids another LLM call.
+
+    Does not increment counters. ``None`` means there is no run account, the
+    account is disabled, or the requested turns plus reserve still fit.
+    In-loop optional work must pass ``reserve_llm_turns`` so required
+    downstream stages (Decision) keep a turn. End-of-run reflection keeps the
+    default reserve of 0.
+    """
+    account = _mode_budget_account_from_ctx(ctx)
+    if account is None:
+        return None
+    check = getattr(account, "check", None)
+    snapshot = getattr(account, "snapshot", None)
+    try:
+        breach = check() if callable(check) else getattr(account, "breach", None)
+        if breach is not None:
+            return str(getattr(breach, "reason", None) or "budget_turns")
+        if not callable(snapshot):
+            return None
+        payload = snapshot()
+    except Exception as exc:  # broad-exception: fallback_recorded - unreadable run account must skip optional LLM
+        log_safe_exception(
+            logger,
+            "Mode-budget account probe failed",
+            exc,
+            error_code="agent_reflection_mode_budget_probe_failed",
+            level=logging.INFO,
+        )
+        return "budget_turns"
+    if not isinstance(payload, dict):
+        return "budget_turns"
+    limits = payload.get("limits")
+    used = payload.get("used")
+    if not isinstance(limits, dict) or not isinstance(used, dict):
+        return "budget_turns"
+    if limits.get("enabled") is False:
+        return None
+    try:
+        max_turns = max(0, int(limits.get("max_llm_turns") or 0))
+        used_turns = max(0, int(used.get("llm_turns") or 0))
+        required = max(1, int(required_llm_turns))
+        reserve = max(0, int(reserve_llm_turns))
+    except (TypeError, ValueError):
+        return "budget_turns"
+    if max_turns > 0 and used_turns + required + reserve > max_turns:
+        return "budget_turns"
+    return None
+
+
+def record_mode_budget_llm_turn(ctx: Any) -> Optional[str]:
+    """Record one LLM turn on the run account after nested ``try_consume``.
+
+    Returns a breach reason when the call must be skipped. Missing accounts
+    are a no-op so nested ``LlmCallBudget`` remains the only cap.
+    """
+    account = _mode_budget_account_from_ctx(ctx)
+    if account is None:
+        return None
+    record = getattr(account, "record_llm_turn", None)
+    if not callable(record):
+        return "budget_turns"
+    try:
+        breach = record()
+    except Exception as exc:  # broad-exception: fallback_recorded - failed accounting must skip the optional LLM
+        log_safe_exception(
+            logger,
+            "Mode-budget record_llm_turn failed",
+            exc,
+            error_code="agent_reflection_mode_budget_record_failed",
+            level=logging.INFO,
+        )
+        return "budget_turns"
+    _refresh_mode_budget_snapshot(ctx, account)
+    if breach is not None:
+        return str(getattr(breach, "reason", None) or "budget_turns")
+    return None
+
+
+def try_consume_with_run_account(
+    call_budget: LlmCallBudget,
+    ctx: Any,
+    *,
+    reason: str,
+    required_llm_turns: int = 1,
+    reserve_llm_turns: int = 0,
+) -> bool:
+    """Consume one nested slot and one run-account turn when both allow it.
+
+    Callers must record ``budget_skipped`` when this returns False. The nested
+    ``LlmCallBudget`` is unchanged in meaning; the run account is charged only
+    for calls that do not already go through ``run_agent_loop``. In-loop
+    optional work must pass ``reserve_llm_turns`` so later required stages
+    keep capacity.
+    """
+    block = mode_budget_turn_block_reason(
+        ctx,
+        required_llm_turns=required_llm_turns,
+        reserve_llm_turns=reserve_llm_turns,
+    )
+    if block is not None:
+        call_budget.record_skip(reason=f"budget_exhausted:{reason}")
+        account = _mode_budget_account_from_ctx(ctx)
+        if account is not None:
+            _refresh_mode_budget_snapshot(ctx, account)
+        return False
+    if not call_budget.try_consume(reason=reason):
+        return False
+    recorded = record_mode_budget_llm_turn(ctx)
+    if recorded is not None:
+        return False
+    return True
+
+
 __all__ = [
     "BUDGET_SKIPPED",
+    "DECISION_LLM_TURN_RESERVE",
     "DEFAULT_META_REVIEW_LLM_BUDGET",
     "DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET",
     "DEFAULT_REFLECTION_LLM_BUDGET",
@@ -120,4 +272,7 @@ __all__ = [
     "LlmCallBudget",
     "MAX_REFLECTION_LLM_CALL_BUDGET",
     "budget_from_config",
+    "mode_budget_turn_block_reason",
+    "record_mode_budget_llm_turn",
+    "try_consume_with_run_account",
 ]

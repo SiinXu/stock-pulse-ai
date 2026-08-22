@@ -11,6 +11,7 @@ the prediction post-mortem / reflection track (**#1196**, kinds in
 - **No runtime mutation** of ToolSurface denials / allow boundaries.
 - Non-parseable prose does **not** become a fake verifiable claim or new lesson kind.
 - All optional LLM work is **budgeted**; exhaustion is explicit (`budget_skipped`), never silent success.
+- Trajectory / optional immediate LLM calls also charge `ctx.meta["mode_budget_account"]` when the run has one. The production Chat/single-agent loop persists that account on the executor so end-of-run reflection can find it. In-loop optional critique also reserves one Decision turn; end-of-run reflection does not. They do **not** go through `run_agent_loop`, so they are counted once. Cross-run meta-review stays offline and has no run account.
 
 ## Three layers
 

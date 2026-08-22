@@ -24,6 +24,7 @@ from src.agent.evolution.budget import (
     DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET,
     LlmCallBudget,
     budget_from_config,
+    try_consume_with_run_account,
 )
 from src.agent.evolution.guards import (
     assert_soul_unchanged,
@@ -356,6 +357,7 @@ def reflect_resolved_forecast(
     tool_surface: Any = None,
     denied_tools: Optional[Sequence[str]] = None,
     denial_codes: Optional[Sequence[str]] = None,
+    ctx: Any = None,
 ) -> ReflectionResult:
     """Produce lessons for one resolved prediction under a hard LLM budget."""
     soul_before = snapshot_soul_identity()
@@ -451,7 +453,9 @@ def reflect_resolved_forecast(
         lessons = build_deterministic_lessons(item)
 
     if llm_complete is not None and overall in {"miss", "partial"}:
-        if not call_budget.try_consume(reason=f"postmortem:{item.prediction_id}"):
+        if not try_consume_with_run_account(
+            call_budget, ctx, reason=f"postmortem:{item.prediction_id}"
+        ):
             terminate_reason = "budget"
             status = "budget_skipped"
             validation_status = BUDGET_SKIPPED
@@ -525,6 +529,7 @@ def run_postmortem_batch(
     tool_surface: Any = None,
     denied_tools: Optional[Sequence[str]] = None,
     denial_codes: Optional[Sequence[str]] = None,
+    ctx: Any = None,
 ) -> PostMortemBatchResult:
     """Run post-mortem over a resolution batch under one shared LLM budget."""
     call_budget = budget or budget_from_config(
@@ -546,6 +551,7 @@ def run_postmortem_batch(
             tool_surface=tool_surface,
             denied_tools=denied_tools,
             denial_codes=denial_codes,
+            ctx=ctx,
         )
         results.append(result)
         if result.lessons:

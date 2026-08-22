@@ -63,7 +63,11 @@ def run_immediate_layer(
     sink: Optional[EpisodeLessonSink] = None,
     force: bool = False,
 ) -> MultiLevelReflectionResult:
-    """Layer 1: step critique after tool failure / contradiction."""
+    """Layer 1: step critique after tool failure / contradiction.
+
+    Optional LLM enrichment charges ``ctx.meta["mode_budget_account"]`` when
+    present. Production planning does not inject ``llm_complete``.
+    """
     result = critique_step_observations(
         observations,
         config=config,
@@ -104,7 +108,12 @@ def run_trajectory_layer(
     sink: Optional[EpisodeLessonSink] = None,
     seed_from_immediate: bool = True,
 ) -> MultiLevelReflectionResult:
-    """Layer 2: end-of-run reflection producing full ReflectionResult."""
+    """Layer 2: end-of-run reflection producing full ReflectionResult.
+
+    LLM calls go through ``llm_complete`` (not ``run_agent_loop``). When
+    ``ctx.meta["mode_budget_account"]`` is present they charge that shared
+    run account once; a run-account skip uses ``budget_skipped``.
+    """
     seed = None
     meta = getattr(ctx, "meta", None) if ctx is not None else None
     if seed_from_immediate and isinstance(meta, dict):

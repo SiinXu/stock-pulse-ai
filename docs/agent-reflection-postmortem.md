@@ -10,6 +10,7 @@
 - 非结构化散文不得变成假的可验证声明。
 - Provider / 真值取数失败记为 `data_unavailable`（可重试），永不伪造命中。
 - LLM 预算耗尽必须显式记录 `budget_skipped` / `terminate_reason=budget`，语义对齐 Critic 的 `record_critic_budget_skip`，禁止静默降级。
+- 若运行上下文带有 `ctx.meta["mode_budget_account"]`，反思 / 后验 LLM 调用会计入该 run 账户；跳过仍使用 `budget_skipped`，不得越过 `max_llm_turns`。生产 Chat/单 Agent 循环会把该账户挂到 executor 上，供运行结束规划反思读取。规划产品路径会在反思后把 `AgentResult.budget_snapshot` 重写为该账户的最终快照。后验没有 `AgentResult`，诊断看 `ctx.meta["mode_budget"]`。这些调用走 `llm_complete`，不经过 `run_agent_loop`，因此不会重复计次。运行结束反思不预留 Decision 轮次；循环内可选步骤批评会预留。运行级 LLM 轮次上限是 `AGENT_MODE_BUDGET_MAX_LLM_TURNS`（没有 `AGENT_MAX_RUN_LLM_CALLS` 键）。
 
 ## 入口
 
