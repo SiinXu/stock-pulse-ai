@@ -99,6 +99,7 @@ jobs:
               - 'tests/config/test_ocr_config.py'
               - 'tests/plugins/test_ocr_agent_tool.py'
               - 'tests/fixtures/ocr/**'
+              - 'tests/fixtures/multimodal/sample_financial_report.pdf'
               - 'requirements-ocr.txt'
               - '.github/workflows/ci.yml'
             # desktop-gate: Electron unit tests (not packaging / network download)
@@ -109,8 +110,12 @@ jobs:
               - 'scripts/build-desktop*.sh'
               - 'scripts/build-all.ps1'
               - 'scripts/build-all-macos.sh'
+              - 'scripts/build-backend.ps1'
+              - 'scripts/build-backend-macos.sh'
+              - 'scripts/verify-desktop-updater-artifacts.ps1'
               - 'scripts/prepare-embedded-ollama.js'
               - 'requirements-desktop.txt'
+              - 'THIRD_PARTY_NOTICES'
               - '.github/workflows/desktop-release.yml'
               - '.github/workflows/ci.yml'
       - name: 🧭 Filter backend-safe frontend paths

@@ -1,6 +1,7 @@
 """Guard the hosted CI contract for two-tier and minimum Python gates."""
 
 import re
+from fnmatch import fnmatch
 from pathlib import Path
 
 import yaml
@@ -31,6 +32,48 @@ OCR_EXTRACTOR_TEST_FILES = (
     "tests/agent/tools/test_ocr_tool_surface_runtime.py",
     "tests/config/test_ocr_config.py",
     "tests/plugins/test_ocr_agent_tool.py",
+)
+OCR_EXTRACTOR_SOURCE_FILES = (
+    "src/services/image_stock_extractor.py",
+    "src/services/ocr_extraction_service.py",
+    "src/agent/tools/ocr_tools.py",
+    "src/plugins/builtin/ocr.py",
+    "src/api/v1/endpoints/stocks.py",
+)
+OCR_EXTRACTOR_FIXTURE_PATHS = (
+    "tests/fixtures/ocr/**",
+    "tests/fixtures/multimodal/sample_financial_report.pdf",
+)
+OCR_EXTRACTOR_PATH_FILTER = (
+    *OCR_EXTRACTOR_SOURCE_FILES,
+    *OCR_EXTRACTOR_TEST_FILES,
+    *OCR_EXTRACTOR_FIXTURE_PATHS,
+    "requirements-ocr.txt",
+    ".github/workflows/ci.yml",
+)
+DESKTOP_PATH_FILTER = (
+    "apps/dsa-desktop/**",
+    "scripts/run-desktop.ps1",
+    "scripts/build-desktop*.ps1",
+    "scripts/build-desktop*.sh",
+    "scripts/build-all.ps1",
+    "scripts/build-all-macos.sh",
+    "scripts/build-backend.ps1",
+    "scripts/build-backend-macos.sh",
+    "scripts/verify-desktop-updater-artifacts.ps1",
+    "scripts/prepare-embedded-ollama.js",
+    "requirements-desktop.txt",
+    "THIRD_PARTY_NOTICES",
+    ".github/workflows/desktop-release.yml",
+    ".github/workflows/ci.yml",
+)
+DESKTOP_TEST_PINNED_REPO_FILES = (
+    "scripts/verify-desktop-updater-artifacts.ps1",
+    "scripts/build-backend-macos.sh",
+    "scripts/build-desktop-macos.sh",
+    "scripts/prepare-embedded-ollama.js",
+    "THIRD_PARTY_NOTICES",
+    ".github/workflows/desktop-release.yml",
 )
 
 
@@ -800,6 +843,30 @@ def _path_filters() -> dict:
     return yaml.safe_load(filter_step["with"]["filters"])
 
 
+def _assert_path_filter_entry_exists(relative: str) -> None:
+    if relative.endswith("/**"):
+        directory = REPOSITORY_ROOT / relative[:-3]
+        assert directory.is_dir(), relative
+        return
+    if "*" in relative:
+        matches = list(REPOSITORY_ROOT.glob(relative))
+        assert matches, relative
+        return
+    assert (REPOSITORY_ROOT / relative).is_file(), relative
+
+
+def _path_filter_covers(relative: str, filters: set[str]) -> bool:
+    for entry in filters:
+        if entry.endswith("/**"):
+            prefix = entry[:-2]  # keep the trailing slash
+            if relative.startswith(prefix):
+                return True
+            continue
+        if fnmatch(relative, entry):
+            return True
+    return False
+
+
 def test_changes_job_exposes_ocr_and_desktop_path_filters() -> None:
     workflow = _workflow()
     changes = workflow["jobs"]["changes"]
@@ -809,17 +876,76 @@ def test_changes_job_exposes_ocr_and_desktop_path_filters() -> None:
         "${{ steps.filter.outputs.ocr_extractor }}"
     )
     assert changes["outputs"]["desktop"] == "${{ steps.filter.outputs.desktop }}"
-    assert "src/services/image_stock_extractor.py" in filters["ocr_extractor"]
-    assert "src/services/ocr_extraction_service.py" in filters["ocr_extractor"]
-    assert "requirements-ocr.txt" in filters["ocr_extractor"]
-    assert ".github/workflows/ci.yml" in filters["ocr_extractor"]
-    assert "apps/dsa-desktop/**" in filters["desktop"]
-    assert "scripts/run-desktop.ps1" in filters["desktop"]
-    assert ".github/workflows/desktop-release.yml" in filters["desktop"]
-    assert ".github/workflows/ci.yml" in filters["desktop"]
+    assert set(filters["ocr_extractor"]) == set(OCR_EXTRACTOR_PATH_FILTER)
+    assert set(filters["desktop"]) == set(DESKTOP_PATH_FILTER)
+    for relative in (*OCR_EXTRACTOR_PATH_FILTER, *DESKTOP_PATH_FILTER):
+        _assert_path_filter_entry_exists(relative)
+
+
+def test_desktop_path_filter_covers_files_pinned_by_desktop_unit_tests() -> None:
+    """Changing repo-root files that npm test reads must not skip desktop-gate."""
+
+    filters = set(_path_filters()["desktop"])
+    main_test = (
+        REPOSITORY_ROOT / "apps" / "dsa-desktop" / "tests" / "main.test.js"
+    ).read_text(encoding="utf-8")
+    macos_test = (
+        REPOSITORY_ROOT / "apps" / "dsa-desktop" / "tests" / "macos-packaging.test.js"
+    ).read_text(encoding="utf-8")
+    ollama_test = (
+        REPOSITORY_ROOT
+        / "apps"
+        / "dsa-desktop"
+        / "tests"
+        / "embedded-ollama-build.test.js"
+    ).read_text(encoding="utf-8")
+
+    assert "verify-desktop-updater-artifacts.ps1" in main_test
+    assert "build-backend-macos.sh" in macos_test
+    assert "build-desktop-macos.sh" in macos_test
+    assert "prepare-embedded-ollama" in ollama_test
+    assert "THIRD_PARTY_NOTICES" in ollama_test
+    assert "desktop-release.yml" in main_test
+
+    for relative in DESKTOP_TEST_PINNED_REPO_FILES:
+        _assert_path_filter_entry_exists(relative)
+        assert _path_filter_covers(relative, filters), relative
+
+    build_all_macos = (REPOSITORY_ROOT / "scripts" / "build-all-macos.sh").read_text(
+        encoding="utf-8"
+    )
+    build_all_windows = (REPOSITORY_ROOT / "scripts" / "build-all.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "build-backend-macos.sh" in build_all_macos
+    assert "build-backend.ps1" in build_all_windows
+    assert _path_filter_covers("scripts/build-backend-macos.sh", filters)
+    assert _path_filter_covers("scripts/build-backend.ps1", filters)
+
+
+def test_ocr_path_filter_covers_files_executed_by_ocr_job() -> None:
+    """OCR job pytest files, sources, and fixtures must all trigger the matrix."""
+
+    filters = set(_path_filters()["ocr_extractor"])
+    ocr_job = _ocr_stock_extractor_job()
+    test_step = next(
+        step
+        for step in ocr_job["steps"]
+        if step.get("name")
+        == "✅ OCR stock-extractor tests (dependency skips are failures)"
+    )
     for relative in OCR_EXTRACTOR_TEST_FILES:
-        assert relative in filters["ocr_extractor"]
-        assert (REPOSITORY_ROOT / relative).is_file()
+        assert relative in test_step["run"]
+        assert relative in filters
+    for relative in OCR_EXTRACTOR_SOURCE_FILES:
+        assert relative in filters
+    extraction_test = (
+        REPOSITORY_ROOT / "tests" / "services" / "test_ocr_extraction_service.py"
+    ).read_text(encoding="utf-8")
+    assert "fixtures" in extraction_test and "multimodal" in extraction_test
+    assert "sample_financial_report.pdf" in extraction_test
+    assert "tests/fixtures/ocr/**" in filters
+    assert "tests/fixtures/multimodal/sample_financial_report.pdf" in filters
 
 
 def test_ocr_stock_extractor_is_path_triggered_fail_closed_and_offline() -> None:
