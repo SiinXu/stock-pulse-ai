@@ -9,8 +9,12 @@ from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends
 
-from src.api.deps import get_config_profile_service
+from src.api.deps import get_config_profile_service, get_security_audit_service
 from src.api.v1.errors import api_error
+from src.api.v1.services.system_config_write_audit import (
+    map_system_config_write_audit_exception,
+    raise_system_config_write_audit_unavailable,
+)
 from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.config_profiles import (
     ConfigPresetApplyRequest,
@@ -28,7 +32,11 @@ from src.services.config_profile_service import (
     ConfigProfileService,
     ConfigProfileValidationError,
 )
-from src.services.system_config_service import ConfigConflictError
+from src.services.security_audit_service import SecurityAuditUnavailable
+from src.services.system_config_service import (
+    ConfigConflictError,
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -137,17 +145,22 @@ def preview_config_preset(
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
+        503: {"model": ErrorResponse, "description": "Security audit unavailable (operation_completed)"},
     },
     summary="Apply a configuration preset",
     description=(
         "Apply non-secret keys from an official preset through SystemConfigService. "
-        "Never writes secrets. Callers should preview first and confirm."
+        "Never writes secrets. Callers should preview first and confirm. "
+        "Attempt-store failure returns 503 operation_completed=false. After persist, "
+        "completion-store failure returns 503 operation_completed=true with "
+        "config_version, applied_count, and reload_triggered."
     ),
 )
 def apply_config_preset(
     preset_id: str,
     request: ConfigPresetApplyRequest,
     service: ConfigProfileService = Depends(get_config_profile_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> ConfigPresetApplyResponse:
     try:
         payload = service.apply_preset(
@@ -155,6 +168,7 @@ def apply_config_preset(
             config_version=request.config_version,
             reload_now=request.reload_now,
             actor="config_profile_api",
+            security_audit=security_audit,
         )
         payload["changes"] = _normalize_changes(payload.get("changes") or [])
         return ConfigPresetApplyResponse.model_validate(payload)
@@ -167,7 +181,10 @@ def apply_config_preset(
             "Configuration has changed, please reload and retry",
             details={"current_config_version": exc.current_version},
         )
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary returns stable envelope
+        map_system_config_write_audit_exception(exc)
         log_safe_exception(
             logger,
             "Apply config preset failed",
@@ -255,16 +272,21 @@ def preview_config_profile_import(
         400: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
+        503: {"model": ErrorResponse, "description": "Security audit unavailable (operation_completed)"},
     },
     summary="Apply stockpulse-profile YAML import",
     description=(
         "Validate and apply a stockpulse-profile YAML through SystemConfigService. "
-        "Secret-bearing profiles are rejected. Prefer /import/preview before apply."
+        "Secret-bearing profiles are rejected. Prefer /import/preview before apply. "
+        "Attempt-store failure returns 503 operation_completed=false. After persist, "
+        "completion-store failure returns 503 operation_completed=true with "
+        "config_version, applied_count, and reload_triggered."
     ),
 )
 def apply_config_profile_import(
     request: ConfigProfileImportRequest,
     service: ConfigProfileService = Depends(get_config_profile_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> ConfigProfileImportApplyResponse:
     try:
         payload = service.apply_import(
@@ -272,6 +294,7 @@ def apply_config_profile_import(
             config_version=request.config_version,
             reload_now=request.reload_now,
             actor="config_profile_api",
+            security_audit=security_audit,
         )
         payload["changes"] = _normalize_changes(payload.get("changes") or [])
         return ConfigProfileImportApplyResponse.model_validate(payload)
@@ -284,7 +307,10 @@ def apply_config_profile_import(
             "Configuration has changed, please reload and retry",
             details={"current_config_version": exc.current_version},
         )
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - API boundary returns stable envelope
+        map_system_config_write_audit_exception(exc)
         log_safe_exception(
             logger,
             "Apply config profile import failed",

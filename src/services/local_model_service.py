@@ -20,10 +20,12 @@ from src.llm.provider_catalog import get_provider
 from src.model_pack.errors import ModelPackError
 from src.model_pack.manifest import MAX_MODEL_ID_LENGTH, normalize_manifest_text
 from src.security.http_bind import is_local_only_bind
+from src.services.security_audit_service import SecurityAuditUnavailable
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
 )
 from src.services.task_queue import AnalysisTaskQueue, TaskInfo
 from src.task_execution import TaskCommand, TaskRunContext, TaskStatusEnum
@@ -1040,9 +1042,7 @@ class LocalModelService:
             and not had_channels
             and has_legacy
         ):
-            # Adding the first channel would otherwise make auto mode silently
-            # supersede an existing legacy primary model.
-            updates.append({"key": "LLM_CONFIG_MODE", "value": "legacy"})
+            updates.append({"key": "LLM_CONFIG_MODE", "value": "legacy"})  # keep auto from replacing an existing legacy primary
 
         return updates, selected_primary
 
@@ -1377,11 +1377,11 @@ class LocalModelService:
                             "activated": False,
                             "selected_primary": False,
                         }
+                except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable):
+                    raise
                 except Exception as exc:  # broad-exception: fallback_recorded - download already succeeded
                     log_safe_exception(
-                        logger,
-                        "Local model activation failed after download",
-                        exc,
+                        logger, "Local model activation failed after download", exc,
                         error_code="local_model_activation_failed",
                         context={"model_id": normalized},
                     )
@@ -1528,11 +1528,11 @@ class LocalModelService:
                             validate_connectivity=False,
                             actor="local_model_delete_rollback",
                         )
+                    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable):
+                        raise
                     except Exception as rollback_exc:  # broad-exception: fallback_recorded - preserve original boundary
                         log_safe_exception(
-                            logger,
-                            "Local model registration recovery failed",
-                            rollback_exc,
+                            logger, "Local model registration recovery failed", rollback_exc,
                             error_code="local_model_delete_rollback_failed",
                             context={"model_id": normalized},
                         )

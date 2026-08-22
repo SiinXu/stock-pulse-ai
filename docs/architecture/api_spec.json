@@ -449,23 +449,26 @@
         "tags": [
           "SystemConfig"
         ],
-        "summary": "获取系统配置",
-        "description": "读取当前系统配置并返回分类后的显示值。服务端掩码的敏感字段可能返回 mask_token；客户端应结合 raw_value_exists 与 is_masked 判断。",
-        "operationId": "getSystemConfig",
+        "summary": "Get system configuration",
+        "description": "Read current configuration and return display values. Server-masked sensitive fields may return the mask token; clients should use raw_value_exists and is_masked to interpret values. configured_notification_channels is computed from the current live Config snapshot with the runtime notification detector.",
+        "operationId": "get_system_config_api_v1_system_config_get",
         "parameters": [
           {
             "name": "include_schema",
             "in": "query",
-            "description": "是否携带字段元数据（默认 true）",
+            "required": false,
             "schema": {
               "type": "boolean",
-              "default": true
-            }
+              "description": "Whether to include schema metadata",
+              "default": true,
+              "title": "Include Schema"
+            },
+            "description": "Whether to include schema metadata"
           }
         ],
         "responses": {
           "200": {
-            "description": "配置读取成功",
+            "description": "Configuration loaded",
             "content": {
               "application/json": {
                 "schema": {
@@ -475,7 +478,7 @@
             }
           },
           "401": {
-            "description": "未认证",
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
@@ -485,11 +488,21 @@
             }
           },
           "500": {
-            "description": "读取失败",
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -500,9 +513,9 @@
         "tags": [
           "SystemConfig"
         ],
-        "summary": "更新系统配置",
-        "description": "按键更新系统配置。若字段值为掩码（如 ******），则保留原值不覆盖。",
-        "operationId": "updateSystemConfig",
+        "summary": "Update system configuration",
+        "description": "Update key-value pairs in .env. Mask token preserves existing secret values. Attempt-store failure returns 503 operation_completed=false and does not persist. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
+        "operationId": "update_system_config_api_v1_system_config_put",
         "requestBody": {
           "required": true,
           "content": {
@@ -515,7 +528,7 @@
         },
         "responses": {
           "200": {
-            "description": "更新成功",
+            "description": "Configuration updated",
             "content": {
               "application/json": {
                 "schema": {
@@ -525,7 +538,7 @@
             }
           },
           "400": {
-            "description": "参数校验失败",
+            "description": "Validation failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -535,7 +548,7 @@
             }
           },
           "409": {
-            "description": "配置版本冲突",
+            "description": "Version conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -545,11 +558,31 @@
             }
           },
           "500": {
-            "description": "更新失败",
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2814,6 +2847,9 @@
               }
             }
           },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2878,6 +2914,9 @@
               }
             }
           },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2919,6 +2958,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
           },
           "422": {
             "description": "Validation Error",
@@ -3047,6 +3089,9 @@
               }
             }
           },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3086,6 +3131,9 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
           },
           "422": {
             "description": "Validation Error",
@@ -4308,6 +4356,16 @@
               }
             }
           },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -4843,6 +4901,603 @@
               }
             },
             "description": "Service Unavailable"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/system/config/llm/legacy-migration/apply": {
+      "post": {
+        "tags": [
+          "SystemConfig"
+        ],
+        "summary": "Apply Legacy -> Channels migration",
+        "description": "Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels. Attempt-store failure returns 503 operation_completed=false and does not persist. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
+        "operationId": "apply_legacy_channels_migration_api_v1_system_config_llm_legacy_migration_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSystemConfigRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Legacy migration applied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Apply Legacy Channels Migration Api V1 System Config Llm Legacy Migration Apply Post"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemConfigValidationErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Config version conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemConfigConflictResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-profiles/presets/{preset_id}/apply": {
+      "post": {
+        "tags": [
+          "ConfigProfiles"
+        ],
+        "summary": "Apply a configuration preset",
+        "description": "Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
+        "operationId": "apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post",
+        "parameters": [
+          {
+            "name": "preset_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Preset Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigPresetApplyRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigPresetApplyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/config-profiles/import/apply": {
+      "post": {
+        "tags": [
+          "ConfigProfiles"
+        ],
+        "summary": "Apply stockpulse-profile YAML import",
+        "description": "Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
+        "operationId": "apply_config_profile_import_api_v1_config_profiles_import_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigProfileImportRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigProfileImportApplyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/onboarding/apply": {
+      "post": {
+        "tags": [
+          "Onboarding"
+        ],
+        "summary": "Apply non-secret onboarding config recommendations",
+        "description": "Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
+        "operationId": "apply_onboarding_plan_api_v1_onboarding_apply_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OnboardingApplyRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OnboardingApplyResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Conflict",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stocks/watchlist/add": {
+      "post": {
+        "tags": [
+          "Stocks"
+        ],
+        "summary": "加入自选队列",
+        "description": "将指定股票代码加入 STOCK_LIST。Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
+        "operationId": "add_to_watchlist_api_v1_stocks_watchlist_add_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "已加入自选",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stocks/watchlist/remove": {
+      "post": {
+        "tags": [
+          "Stocks"
+        ],
+        "summary": "从自选队列删除",
+        "description": "从 STOCK_LIST 中移除指定股票代码。Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
+        "operationId": "remove_from_watchlist_api_v1_stocks_watchlist_remove_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "已从自选删除",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "参数错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "服务器错误",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/stocks/watchlist/groups/{group_id}/members": {
+      "post": {
+        "tags": [
+          "Stocks"
+        ],
+        "summary": "Add an authoritative symbol to a group",
+        "operationId": "add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post",
+        "parameters": [
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Group Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WatchlistGroupMemberAddRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistGroupsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
           },
           "422": {
             "description": "Validation Error",

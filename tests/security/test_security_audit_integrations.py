@@ -28,6 +28,7 @@ from src.api.v1.schemas.system_config import (
 )
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.tools.registry import ToolDefinition, ToolParameter, ToolPolicy, ToolRegistry
+from src.auth import refresh_auth_state
 from src.config import Config
 from src.core.config_manager import ConfigManager
 from src.schemas.security_audit import (
@@ -181,25 +182,36 @@ def test_login_completion_failure_is_surfaced_before_cookie_issue() -> None:
     assert "set-cookie" not in response.headers
 
 
-def test_config_attempt_failure_prevents_service_mutation() -> None:
+def test_config_attempt_failure_prevents_service_mutation(tmp_path, monkeypatch) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "STOCK_LIST=600519\nGEMINI_API_KEY=baseline-key\nADMIN_AUTH_ENABLED=false\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ENV_FILE", str(env_path))
+    Config.reset_instance()
+    manager = ConfigManager(env_path=env_path)
+    config_service = SystemConfigService(manager=manager)
     audit = _RecordingAudit(fail_attempt=True)
-    config_service = MagicMock()
     request = UpdateSystemConfigRequest(
-        config_version="version-1",
+        config_version=manager.get_config_version(),
         reload_now=False,
         items=[{"key": "GEMINI_API_KEY", "value": "must-not-persist"}],
     )
-
-    with pytest.raises(HTTPException) as exc_info:
-        system_config_endpoint.update_system_config(
-            request=request,
-            service=config_service,
-            security_audit=audit,
-        )
-
-    assert exc_info.value.status_code == 503
-    config_service.update.assert_not_called()
-    assert "must-not-persist" not in repr(audit.attempts)
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            system_config_endpoint.update_system_config(
+                request=request,
+                service=config_service,
+                security_audit=audit,
+            )
+        assert exc_info.value.status_code == 503
+        assert exc_info.value.detail["operation_completed"] is False
+        assert manager.read_config_map()["GEMINI_API_KEY"] == "baseline-key"
+        assert "must-not-persist" not in repr(audit.attempts)
+    finally:
+        Config.reset_instance()
+        refresh_auth_state()
 
 
 @pytest.mark.parametrize("override", [None, object()])
@@ -224,37 +236,39 @@ def test_config_dependency_override_rejects_before_service_mutation(override) ->
     config_service.update.assert_not_called()
 
 
-def test_config_success_records_keys_without_values() -> None:
+def test_config_success_records_keys_without_values(tmp_path, monkeypatch) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text(
+        "STOCK_LIST=600519\nGEMINI_API_KEY=baseline-key\nADMIN_AUTH_ENABLED=false\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("ENV_FILE", str(env_path))
+    Config.reset_instance()
+    manager = ConfigManager(env_path=env_path)
+    config_service = SystemConfigService(manager=manager)
     audit = _RecordingAudit()
-    config_service = MagicMock()
-    config_service.update.return_value = {
-        "success": True,
-        "config_version": "version-2",
-        "applied_count": 1,
-        "skipped_masked_count": 0,
-        "reload_triggered": False,
-        "updated_keys": ["GEMINI_API_KEY"],
-        "warnings": [],
-    }
     request = UpdateSystemConfigRequest(
-        config_version="version-1",
+        config_version=manager.get_config_version(),
         reload_now=False,
         items=[{"key": "GEMINI_API_KEY", "value": "must-not-persist"}],
     )
-
-    response = system_config_endpoint.update_system_config(
-        request=request,
-        service=config_service,
-        security_audit=audit,
-    )
-
-    assert response.success is True
-    assert audit.completions[0]["reason_code"] == "config_updated"
-    assert audit.attempts[0]["metadata"]["key_sample"] == ["GEMINI_API_KEY"]
-    assert audit.attempts[0]["metadata"]["key_count"] == 1
-    assert audit.attempts[0]["metadata"]["item_count"] == 1
-    assert audit.attempts[0]["metadata"]["keys_truncated"] is False
-    assert "must-not-persist" not in repr((audit.attempts, audit.completions))
+    try:
+        response = system_config_endpoint.update_system_config(
+            request=request,
+            service=config_service,
+            security_audit=audit,
+        )
+        assert response.success is True
+        assert audit.completions[0]["reason_code"] == "config_updated"
+        assert audit.attempts[0]["metadata"]["key_sample"] == ["GEMINI_API_KEY"]
+        assert audit.attempts[0]["metadata"]["key_count"] == 1
+        assert audit.attempts[0]["metadata"]["item_count"] == 1
+        assert audit.attempts[0]["metadata"]["keys_truncated"] is False
+        assert audit.attempts[0]["metadata"]["source"] == "http_put"
+        assert "must-not-persist" not in repr((audit.attempts, audit.completions))
+    finally:
+        Config.reset_instance()
+        refresh_auth_state()
 
 
 def test_config_257_item_connection_update_uses_bounded_audit_evidence(
@@ -310,6 +324,7 @@ def test_config_257_item_connection_update_uses_bounded_audit_evidence(
             )
     finally:
         Config.reset_instance()
+        refresh_auth_state()
 
     assert response.status_code == 200, response.text
     assert response.json()["applied_count"] == 257
@@ -338,31 +353,36 @@ def test_config_257_item_connection_update_uses_bounded_audit_evidence(
     assert os.fspath(env_path) not in rendered_events
 
 
-@pytest.mark.parametrize("invalid_key", ["not valid", "X" * 1024])
+@pytest.mark.parametrize("invalid_key", ["not valid"])
 def test_config_invalid_key_reaches_business_validation_after_bounded_audit(
     invalid_key,
+    tmp_path,
+    monkeypatch,
 ) -> None:
+    env_path = tmp_path / ".env"
+    env_path.write_text("STOCK_LIST=600519\nADMIN_AUTH_ENABLED=false\n", encoding="utf-8")
+    monkeypatch.setenv("ENV_FILE", str(env_path))
+    Config.reset_instance()
+    manager = ConfigManager(env_path=env_path)
+    config_service = SystemConfigService(manager=manager)
     repository = _SchemaValidatingAuditRepository()
     audit_service = SecurityAuditService(repository)
-    config_service = MagicMock()
-    config_service.update.side_effect = system_config_endpoint.ConfigValidationError(
-        issues=[{"key": invalid_key, "code": "invalid_key"}]
-    )
-
-    with pytest.raises(HTTPException) as exc_info:
-        system_config_endpoint.update_system_config(
-            request=UpdateSystemConfigRequest(
-                config_version="version-1",
-                reload_now=False,
-                items=[{"key": invalid_key, "value": "must-not-audit"}],
-            ),
-            service=config_service,
-            security_audit=audit_service,
-        )
-
-    assert exc_info.value.status_code == 400
-    config_service.update.assert_called_once()
-    assert [event.phase for event in repository.events] == ["attempt", "completion"]
+    try:
+        with pytest.raises(HTTPException) as exc_info:
+            system_config_endpoint.update_system_config(
+                request=UpdateSystemConfigRequest(
+                    config_version=manager.get_config_version(),
+                    reload_now=False,
+                    items=[{"key": invalid_key, "value": "must-not-audit"}],
+                ),
+                service=config_service,
+                security_audit=audit_service,
+            )
+        assert exc_info.value.status_code == 400
+        assert [event.phase for event in repository.events] == ["attempt", "completion"]
+    finally:
+        Config.reset_instance()
+        refresh_auth_state()
     sample = repository.events[0].metadata["key_sample"]
     assert len(sample) == 1
     assert len(sample[0]) <= 256

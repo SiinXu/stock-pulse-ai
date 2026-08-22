@@ -18,7 +18,11 @@ from typing import Optional
 
 from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile, Depends
 
-from src.api.deps import get_system_config_service
+from src.api.deps import get_security_audit_service, get_system_config_service
+from src.api.v1.services.system_config_write_audit import (
+    map_system_config_write_audit_exception,
+    raise_system_config_write_audit_unavailable,
+)
 
 from src.api.v1.schemas.stocks import (
     ExtractFromImageResponse,
@@ -52,7 +56,11 @@ from src.services.import_parser import (
 )
 from src.services.stock_service import StockService
 from src.services.stock_list_parser import split_stock_list
-from src.services.system_config_service import SystemConfigService
+from src.services.security_audit_service import SecurityAuditUnavailable
+from src.services.system_config_service import (
+    SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.services.stock_code_utils import canonicalize_analysis_stock_code
 from src.application_services import get_application_services
 from src.services.smartmoney_flow_service import build_money_flow_view
@@ -85,7 +93,12 @@ def _read_watchlist_codes(service: SystemConfigService) -> list:
     return _read_watchlist_snapshot(service)[0]
 
 
-def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
+def _write_watchlist_codes(
+    service: SystemConfigService,
+    codes: list,
+    *,
+    security_audit=None,
+) -> None:
     """Persist stock codes to STOCK_LIST as-is (no normalization)."""
     config_data = service.get_config(include_schema=False)
     config_version = config_data.get("config_version", "")
@@ -94,6 +107,8 @@ def _write_watchlist_codes(service: SystemConfigService, codes: list) -> None:
         items=[{"key": "STOCK_LIST", "value": ",".join(codes)}],
         mask_token="******",
         reload_now=True,
+        security_audit=security_audit,
+        source="watchlist",
     )
 
 
@@ -380,13 +395,20 @@ def get_watchlist(
         200: {"description": "已加入自选"},
         400: {"description": "参数错误", "model": ErrorResponse},
         500: {"description": "服务器错误", "model": ErrorResponse},
+        503: {"description": "Security audit unavailable (operation_completed)", "model": ErrorResponse},
     },
     summary="加入自选队列",
-    description="将指定股票代码加入 STOCK_LIST。",
+    description=(
+        "将指定股票代码加入 STOCK_LIST。Attempt-store failure returns 503 "
+        "operation_completed=false. After persist, completion-store failure "
+        "returns 503 operation_completed=true with config_version, applied_count, "
+        "and reload_triggered."
+    ),
 )
 def add_to_watchlist(
     request: WatchlistRequest,
     service: SystemConfigService = Depends(get_system_config_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> WatchlistResponse:
     try:
         validated = _validate_and_normalize_stock_code(request.stock_code)
@@ -395,11 +417,14 @@ def add_to_watchlist(
         display_code = validated
         if _watchlist_match_key(validated) not in existing_keys:
             codes.append(display_code)
-            _write_watchlist_codes(service, codes)
+            _write_watchlist_codes(service, codes, security_audit=security_audit)
         return WatchlistResponse(stock_codes=codes, message=f"已加入 {display_code}")
     except HTTPException:
         raise
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as e:
+        map_system_config_write_audit_exception(e)
         log_safe_exception(
             logger,
             "Watchlist add failed",
@@ -420,13 +445,20 @@ def add_to_watchlist(
         200: {"description": "已从自选删除"},
         400: {"description": "参数错误", "model": ErrorResponse},
         500: {"description": "服务器错误", "model": ErrorResponse},
+        503: {"description": "Security audit unavailable (operation_completed)", "model": ErrorResponse},
     },
     summary="从自选队列删除",
-    description="从 STOCK_LIST 中移除指定股票代码。",
+    description=(
+        "从 STOCK_LIST 中移除指定股票代码。Attempt-store failure returns 503 "
+        "operation_completed=false. After persist, completion-store failure "
+        "returns 503 operation_completed=true with config_version, applied_count, "
+        "and reload_triggered."
+    ),
 )
 def remove_from_watchlist(
     request: WatchlistRequest,
     service: SystemConfigService = Depends(get_system_config_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> WatchlistResponse:
     try:
         validated = _validate_and_normalize_stock_code(request.stock_code)
@@ -436,11 +468,14 @@ def remove_from_watchlist(
         if requested_key in existing_keys:
             idx = existing_keys.index(requested_key)
             codes.pop(idx)
-            _write_watchlist_codes(service, codes)
+            _write_watchlist_codes(service, codes, security_audit=security_audit)
         return WatchlistResponse(stock_codes=codes, message=f"已移除 {request.stock_code.strip()}")
     except HTTPException:
         raise
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as e:
+        map_system_config_write_audit_exception(e)
         log_safe_exception(
             logger,
             "Watchlist removal failed",
@@ -452,7 +487,6 @@ def remove_from_watchlist(
             status_code=500,
             detail={"error": "internal_error", "message": f"从自选删除失败: {str(e)}"},
         )
-
 
 
 @router.get(

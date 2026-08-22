@@ -163,6 +163,12 @@ def import_model_pack(
 @router.post(
     "/desktop-activations",
     response_model=LocalModelMutationResponse,
+    responses={
+        503: {
+            "description": "Security audit unavailable (operation_completed)",
+            "model": ErrorResponse,
+        },
+    },
     summary="Activate a Desktop-validated Model Pack",
     description=(
         "Register a model created by the isolated Desktop importer against an "

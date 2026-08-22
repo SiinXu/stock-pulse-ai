@@ -122,6 +122,7 @@ class ConfigProfileService:
         config_version: str,
         reload_now: bool = True,
         actor: str = "config_profile_service",
+        security_audit: Any = None,
     ) -> Dict[str, Any]:
         """Apply one official preset through SystemConfigService.update."""
         preset = get_official_preset(preset_id)
@@ -156,6 +157,8 @@ class ConfigProfileService:
                 reload_now=reload_now,
                 validate_connectivity=False,
                 actor=actor,
+                security_audit=security_audit,
+                source="config_profile_preset",
             )
         except ConfigValidationError as exc:
             raise ConfigProfileValidationError(
@@ -260,6 +263,7 @@ class ConfigProfileService:
         config_version: str,
         reload_now: bool = True,
         actor: str = "config_profile_service",
+        security_audit: Any = None,
     ) -> Dict[str, Any]:
         """Validate and apply a stockpulse-profile YAML via SystemConfigService."""
         document = self._parse_and_validate_profile(content)
@@ -287,6 +291,8 @@ class ConfigProfileService:
                 reload_now=reload_now,
                 validate_connectivity=False,
                 actor=actor,
+                security_audit=security_audit,
+                source="config_profile_import",
             )
         except ConfigValidationError as exc:
             raise ConfigProfileValidationError(

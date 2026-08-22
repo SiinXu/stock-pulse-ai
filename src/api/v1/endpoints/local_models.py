@@ -9,6 +9,9 @@ from typing import NoReturn, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from src.api.deps import get_local_model_service
+from src.api.v1.services.system_config_write_audit import (
+    raise_system_config_write_audit_unavailable,
+)
 from src.api.v1.schemas.local_models import (
     LocalModelAssignmentRequest,
     LocalModelConfigurationResponse,
@@ -33,7 +36,12 @@ from src.services.local_model_service import (
     LocalModelValidationError,
 )
 from src.security.http_bind import is_local_only_bind
-from src.services.system_config_service import ConfigConflictError, ConfigValidationError
+from src.services.security_audit_service import SecurityAuditUnavailable
+from src.services.system_config_service import (
+    ConfigConflictError,
+    ConfigValidationError,
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.task_execution import TaskStatusEnum
 from src.utils.sanitize import log_safe_exception
 
@@ -53,6 +61,11 @@ def _native_local_install_platform() -> Optional[str]:
 
 def _raise_local_model_error(exc: Exception, *, model_id: str = "") -> NoReturn:
     """Map internal local-model failures to stable caller-safe API errors."""
+    if isinstance(
+        exc,
+        (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable),
+    ):
+        raise_system_config_write_audit_unavailable(exc)
     if isinstance(exc, LocalModelValidationError):
         status_code = status.HTTP_400_BAD_REQUEST
     elif isinstance(
@@ -166,7 +179,13 @@ def get_local_model_pull(
     return LocalModelPullStatus.model_validate(payload)
 
 
-@router.post("/assignments", response_model=LocalModelMutationResponse)
+@router.post(
+    "/assignments",
+    response_model=LocalModelMutationResponse,
+    responses={
+        503: {"description": "Security audit unavailable (operation_completed)"},
+    },
+)
 def assign_local_model(
     request: LocalModelAssignmentRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -183,7 +202,13 @@ def assign_local_model(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.post("/desktop-activations", response_model=LocalModelMutationResponse)
+@router.post(
+    "/desktop-activations",
+    response_model=LocalModelMutationResponse,
+    responses={
+        503: {"description": "Security audit unavailable (operation_completed)"},
+    },
+)
 def activate_desktop_local_model(
     request: LocalModelDesktopActivationRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -209,7 +234,13 @@ def activate_desktop_local_model(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.delete("/models", response_model=LocalModelMutationResponse)
+@router.delete(
+    "/models",
+    response_model=LocalModelMutationResponse,
+    responses={
+        503: {"description": "Security audit unavailable (operation_completed)"},
+    },
+)
 def delete_local_model(
     request: LocalModelRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -226,7 +257,13 @@ def delete_local_model(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.delete("/registrations", response_model=LocalModelUnregistrationResponse)
+@router.delete(
+    "/registrations",
+    response_model=LocalModelUnregistrationResponse,
+    responses={
+        503: {"description": "Security audit unavailable (operation_completed)"},
+    },
+)
 def unregister_local_model(
     request: LocalModelDesktopUnregistrationRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -272,7 +309,13 @@ def finalize_local_model_unregistration(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.post("/registrations", response_model=LocalModelMutationResponse)
+@router.post(
+    "/registrations",
+    response_model=LocalModelMutationResponse,
+    responses={
+        503: {"description": "Security audit unavailable (operation_completed)"},
+    },
+)
 def restore_local_model_registration(
     request: LocalModelRegistrationRestoreRequest,
     service: LocalModelService = Depends(get_local_model_service),

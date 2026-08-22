@@ -89,12 +89,18 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.manager = ConfigManager(env_path=self.env_path)
         self.service = SystemConfigService(manager=self.manager)
         self.security_audit = SecurityAuditRecorderStub()
+        self._audit_factory_patch = patch(
+            "src.services.security_audit_service.get_security_audit_service",
+            return_value=self.security_audit,
+        )
+        self._audit_factory_patch.start()
         self._verify_session_patch = patch.object(system_config, "verify_session", return_value=True)
         self._verify_session_patch.start()
 
     def tearDown(self) -> None:
         Config.reset_instance()
         self._verify_session_patch.stop()
+        self._audit_factory_patch.stop()
         auth._auth_enabled = None
         auth._session_secret = None
         auth._password_hash_salt = None
@@ -117,6 +123,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         os.environ.update(self._saved_notification_env)
         restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
+        auth.refresh_auth_state()
 
     @staticmethod
     def _build_request(cookies: dict[str, str] | None = None) -> SimpleNamespace:

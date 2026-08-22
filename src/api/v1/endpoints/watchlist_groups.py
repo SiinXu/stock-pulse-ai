@@ -9,7 +9,11 @@ from typing import Callable, TypeVar
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from src.api.deps import get_system_config_service
+from src.api.deps import get_security_audit_service, get_system_config_service
+from src.api.v1.services.system_config_write_audit import (
+    map_system_config_write_audit_exception,
+    raise_system_config_write_audit_unavailable,
+)
 from src.api.v1.endpoints.stocks import (
     _read_watchlist_codes,
     _read_watchlist_snapshot,
@@ -29,7 +33,11 @@ from src.api.v1.schemas.watchlist_groups import (
     WatchlistGroupReorderRequest,
     WatchlistGroupsResponse,
 )
-from src.services.system_config_service import SystemConfigService
+from src.services.security_audit_service import SecurityAuditUnavailable
+from src.services.system_config_service import (
+    SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.services.watchlist_group_service import (
     WatchlistGroupAuthorityChangedError,
     WatchlistGroupConflictError,
@@ -50,6 +58,7 @@ _ERROR_RESPONSES = {
     404: {"model": ErrorResponse},
     409: {"model": ErrorResponse},
     500: {"model": ErrorResponse},
+    503: {"model": ErrorResponse, "description": "Security audit unavailable (operation_completed)"},
 }
 _AUTHORITY_RECONCILE_ATTEMPTS = 3
 
@@ -81,7 +90,10 @@ def _execute(operation: Callable[[], T], *, log_message: str) -> T:
         raise api_error(400, exc.error_code, str(exc)) from exc
     except HTTPException:
         raise
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - stable public envelope; diagnostics stay in logs.
+        map_system_config_write_audit_exception(exc)
         log_safe_exception(logger, log_message, exc, error_code="watchlist_group_internal_error")
         raise api_error(500, "internal_error", "Watchlist group operation failed") from exc
 
@@ -253,6 +265,7 @@ def add_watchlist_group_member(
     request: WatchlistGroupMemberAddRequest,
     service: SystemConfigService = Depends(get_system_config_service),
     group_service: WatchlistGroupService = Depends(get_watchlist_group_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> WatchlistGroupsResponse:
     def operation() -> WatchlistGroupsResponse:
         validated = _validate_and_normalize_stock_code(request.stock_code)
@@ -262,7 +275,7 @@ def add_watchlist_group_member(
             # Authority commits first. A later group failure is repaired deterministically
             # into Default by the next reconciliation and remains visible as an error.
             codes.append(identity)
-            _write_watchlist_codes(service, codes)
+            _write_watchlist_codes(service, codes, security_audit=security_audit)
         return _response(
             group_service.add_member(
                 group_id=group_id,
