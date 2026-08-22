@@ -43,6 +43,10 @@ def upgrade(execution: MigrationExecution) -> None:
             "actor_id",
             "ALTER TABLE decision_signal_feedback ADD COLUMN actor_id VARCHAR(128)",
         )
+        execution.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_decision_signal_feedback_provenance_source "
+            "ON decision_signal_feedback (provenance_source)"
+        )
     outcomes = _column_names(
         execution, "PRAGMA table_info(decision_signal_outcomes)"
     )
@@ -60,6 +64,10 @@ def upgrade(execution: MigrationExecution) -> None:
             "actor_id",
             "ALTER TABLE decision_signal_outcomes ADD COLUMN actor_id VARCHAR(128)",
         )
+        execution.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_decision_signal_outcomes_provenance_source "
+            "ON decision_signal_outcomes (provenance_source)"
+        )
     predictions = _column_names(execution, "PRAGMA table_info(agent_predictions)")
     if predictions:
         _add_if_missing(
@@ -73,6 +81,10 @@ def upgrade(execution: MigrationExecution) -> None:
             predictions,
             "actor_id",
             "ALTER TABLE agent_predictions ADD COLUMN actor_id VARCHAR(128)",
+        )
+        execution.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_predictions_provenance_source "
+            "ON agent_predictions (provenance_source)"
         )
     episodes = _column_names(execution, "PRAGMA table_info(agent_episodes)")
     if episodes:
@@ -88,22 +100,10 @@ def upgrade(execution: MigrationExecution) -> None:
             "actor_id",
             "ALTER TABLE agent_episodes ADD COLUMN actor_id VARCHAR(128)",
         )
-    execution.exec_driver_sql(
-        "CREATE INDEX IF NOT EXISTS ix_decision_signal_feedback_provenance_source "
-        "ON decision_signal_feedback (provenance_source)"
-    )
-    execution.exec_driver_sql(
-        "CREATE INDEX IF NOT EXISTS ix_decision_signal_outcomes_provenance_source "
-        "ON decision_signal_outcomes (provenance_source)"
-    )
-    execution.exec_driver_sql(
-        "CREATE INDEX IF NOT EXISTS ix_agent_predictions_provenance_source "
-        "ON agent_predictions (provenance_source)"
-    )
-    execution.exec_driver_sql(
-        "CREATE INDEX IF NOT EXISTS ix_agent_episodes_provenance_source "
-        "ON agent_episodes (provenance_source)"
-    )
+        execution.exec_driver_sql(
+            "CREATE INDEX IF NOT EXISTS ix_agent_episodes_provenance_source "
+            "ON agent_episodes (provenance_source)"
+        )
     if "provenance_source" in _column_names(
         execution, "PRAGMA table_info(decision_signal_feedback)"
     ):
