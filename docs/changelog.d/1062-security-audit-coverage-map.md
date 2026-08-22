@@ -1,0 +1,1 @@
+- [Docs] Published the privileged security-audit coverage map (landed/partial/missing/deferred), remaining DAG-1..5 order, #1466 cancel dependency, and stale HITL/#1062 checkbox notes (Refs #1062).

@@ -45,7 +45,7 @@ This is the entry point for project documentation. The README covers the project
 | [Futu OpenD Portfolio Import](futu-opend-portfolio-import_EN.md) | OpenD setup, FUTU_* settings, live position import API, degradation, and local-gateway network policy |
 | [Financial reports in fundamental analysis](financial-reports-integration_EN.md) | A-share-first multi-period statement normalization, metric formulas, sufficiency (insufficient fundamentals), and extension of existing fundamental_context |
 | [Sensitive-Data Redaction](security-sensitive-data-redaction.md) | Redaction coverage, Agent trace behavior, debug guarantees, limits, incident response, and rollback |
-| [Durable Security Audit](security-audit.md) / [中文](security-audit_zh.md) | Event schema, privileged-path coverage, administrator query, retention and capacity, failure semantics, and rollback |
+| [Durable Security Audit](security-audit.md) / [中文](security-audit_zh.md) | Event schema, privileged-path coverage map (landed/partial/missing/deferred), remaining DAG, administrator query, retention, capacity, tamper limits, failure semantics, and rollback |
 | [Changelog](CHANGELOG.md) | Release notes, capability changes, and migration notes |
 
 ## Configuration
