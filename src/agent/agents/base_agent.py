@@ -17,14 +17,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.memory import AgentMemory
-from src.agent.memory_isolation import isolate_untrusted_memory_body
 from src.agent.protocols import (
     AgentContext,
     AgentOpinion,
     StageFailureReason,
     StageResult,
     StageStatus,
-    normalize_decision_signal,
 )
 from src.agent.public_contract import (
     AGENT_EXECUTION_FAILURE_MESSAGE,
@@ -347,6 +345,9 @@ class BaseAgent(ABC):
         entries = self.memory.get_stock_history(ctx.stock_code, limit=3)
         if not entries:
             return ""
+
+        from src.agent.memory_isolation import isolate_untrusted_memory_body
+        from src.agent.protocols import normalize_decision_signal
 
         data_lines: List[str] = []
         for entry in entries:

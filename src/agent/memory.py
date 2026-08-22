@@ -26,7 +26,6 @@ import logging
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
-from src.agent.protocols import normalize_decision_signal
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -107,6 +106,7 @@ class AgentMemory:
             return []
 
         try:
+            from src.agent.protocols import normalize_decision_signal
             from src.storage import get_db
             db = get_db()
             records = db.get_analysis_history(code=stock_code, limit=limit)

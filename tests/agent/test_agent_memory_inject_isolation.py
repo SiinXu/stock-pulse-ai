@@ -156,7 +156,7 @@ def test_build_memory_context_uses_shared_isolate_helper() -> None:
     record = _history_record(decision_type="buy")
     with _history_with_records(record):
         with patch(
-            "src.agent.agents.base_agent.isolate_untrusted_memory_body",
+            "src.agent.memory_isolation.isolate_untrusted_memory_body",
             wraps=isolate_untrusted_memory_body,
         ) as wrapped:
             injected = _make_agent(memory)._build_memory_context(
