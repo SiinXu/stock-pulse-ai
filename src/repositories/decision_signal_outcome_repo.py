@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from sqlalchemy import and_, desc, func, select
 
 from src.schemas.memory_fact_opinion import lock_fact_payload, lock_opinion_payload
+from src.schemas.memory_write_guard import reject_feedback_write_fields
 from src.storage import (
     DatabaseManager,
     DecisionSignalFeedbackRecord,
@@ -221,6 +222,7 @@ class DecisionSignalOutcomeRepository:
 
     def upsert_feedback(self, fields: Dict[str, Any]) -> DecisionSignalFeedbackRecord:
         lock_opinion_payload(fields)
+        reject_feedback_write_fields(fields)
         now = utc_naive_now()
         with self.db.get_session() as session:
             existing = session.execute(
