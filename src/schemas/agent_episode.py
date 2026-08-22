@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from src.schemas.memory_fact_opinion import FACT_FIELD_NAMES
+
 AGENT_EPISODE_SCHEMA_VERSION: Literal["agent-episode-v1"] = "agent-episode-v1"
 
 AGENT_EPISODE_DEFAULT_RETENTION_DAYS = 90
@@ -89,6 +91,10 @@ class EpisodeOutcomeLabels(_StrictEpisodeModel):
         for key, item in value.items():
             if not isinstance(key, str) or not key or len(key) > 64:
                 raise ValueError("outcome labels extra key is invalid")
+            if key in FACT_FIELD_NAMES:
+                raise ValueError(
+                    "outcome labels extra cannot carry PredictionOutcome actuals fields"
+                )
             if not isinstance(item, str) or len(item) > AGENT_EPISODE_MAX_STRING:
                 raise ValueError("outcome labels extra value is invalid")
         return value

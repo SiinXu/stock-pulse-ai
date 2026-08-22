@@ -80,7 +80,7 @@ Short Agent-safety baseline for shared/long-term memory. This is a scope map, no
 | Threat | Current contract | Gap |
 | --- | --- | --- |
 | **Poisoning** | Production decision-memory admits only size-capped structured completed outcomes with `signal_id` and wraps the prompt block as untrusted data. Layered projected fields reject free-form prose. | User notes and free-form feedback are opinions, not market facts. Optional `AGENT_MEMORY_ENABLED` calibration inject is default-off and currently unisolated. |
-| **Actuals vs opinion** | System market actuals live on `decision_signal_outcomes` and `agent_predictions.outcome_json` (resolved rows are immutable). User feedback is a sidecar opinion table and must not mutate those actuals. | Transport channel `source` (`web` / `api`) is **not** provenance. Server-stamped `source` ∈ `system_resolve` / `user_feedback` / `operator` plus optional session `actor_id` are still required on persisted memory writes. |
+| **Actuals vs opinion** | System market actuals live on `decision_signal_outcomes` and `agent_predictions.outcome_json` (resolved rows are immutable). User feedback is a sidecar opinion table. DAG-1 locks fact versus opinion write keys in `src/schemas/memory_fact_opinion.py`: mixed payloads are **rejected** at prediction resolve, decision-signal outcome/feedback upsert, and `PUT /api/v1/decision-signals/{signal_id}/feedback`. Feedback cannot mutate PredictionOutcome actuals. | Transport channel `source` (`web` / `api`) is **not** provenance. Server-stamped `source` ∈ `system_resolve` / `user_feedback` / `operator` plus optional session `actor_id` are still required on persisted memory writes (DAG-3). |
 | **Soul spoof** | Soul/persona composition rejects Soul-boundary markers. Feedback notes are size-capped and secret-redacted. | User-writable memory text does not yet reject Soul-boundary markers or marker-injected payloads. |
 | **Tenant / actor** | Product is single-administrator (`AUTH-05`). Foundation `principal_id` rejection is in-process only. | Foundation principal tests are not production isolation. Optional `actor_id` is an admin/session identifier, not multi-tenant authorization. Cross-user isolation remains [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) / [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). |
 
@@ -92,7 +92,7 @@ Write-path illegal, oversized, or marker-injected payloads must be **rejected**,
 - Durable DB-backed lifecycle store and user-facing UI controls: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118) (absorbs closed [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) and [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)).
 - Security-reviewed production prompt consumption.
 - Preference-profile layer: [#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117) (absorbs closed [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)).
-- Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124).
+- Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). DAG-1 (this lock + tests) has landed. Remaining: DAG-2 Soul/oversize reject; DAG-3 server-stamped provenance. Do not fold in #1118 store/UX, #1119 forgetting, or #1105 product feedback APIs.
 
 Do not reopen #250, #198, or #150.
 

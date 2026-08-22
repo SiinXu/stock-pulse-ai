@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, func, select
 
+from src.schemas.memory_fact_opinion import lock_fact_payload, lock_opinion_payload
 from src.storage import (
     DatabaseManager,
     DecisionSignalFeedbackRecord,
@@ -107,6 +108,7 @@ class DecisionSignalOutcomeRepository:
             ).scalar_one_or_none()
 
     def upsert_outcome(self, fields: Dict[str, Any]) -> Tuple[DecisionSignalOutcomeRecord, bool]:
+        lock_fact_payload(fields)
         now = utc_naive_now()
         with self.db.get_session() as session:
             existing = session.execute(
@@ -218,6 +220,7 @@ class DecisionSignalOutcomeRepository:
             ).scalar_one_or_none()
 
     def upsert_feedback(self, fields: Dict[str, Any]) -> DecisionSignalFeedbackRecord:
+        lock_opinion_payload(fields)
         now = utc_naive_now()
         with self.db.get_session() as session:
             existing = session.execute(

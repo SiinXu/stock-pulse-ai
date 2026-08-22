@@ -20,6 +20,7 @@ from src.services.decision_profile_calibration_service import (
     is_decision_profile_calibration_enabled,
 )
 from src.services.decision_signal_data_quality import normalize_decision_signal_data_quality
+from src.schemas.memory_fact_opinion import lock_opinion_payload
 from src.services.decision_signal_service import (
     HORIZONS,
     SIGNAL_STATUSES,
@@ -394,6 +395,7 @@ class DecisionSignalOutcomeService:
             "note": self._optional_public_text(note, "note", max_length=1000),
             "source": self._normalize_enum(source or "api", FEEDBACK_SOURCES, "source"),
         }
+        lock_opinion_payload(fields)
         row = self.repo.upsert_feedback(fields)
         return self._serialize_feedback(row)
 

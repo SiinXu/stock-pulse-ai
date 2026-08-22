@@ -40,6 +40,7 @@ from src.schemas.agent_prediction import (
     AgentPredictionInsert,
     AgentPredictionRecord,
 )
+from src.schemas.memory_fact_opinion import lock_prediction_outcome_actuals
 from src.schemas.prediction_record import (
     NoVerifiableReason,
     PREDICTION_HORIZON_TOKENS,
@@ -512,6 +513,7 @@ class AgentPredictionRepository(BaseRepository):
             raise ValueError("prediction_id is required")
         if not isinstance(outcome, Mapping):
             raise ValueError("outcome must be a mapping")
+        lock_prediction_outcome_actuals(outcome)
         now = as_of or self._clock()
         token = str(expected_lease_token or "").strip() or None
         if token is not None and len(token) > 64:
@@ -597,6 +599,7 @@ class AgentPredictionRepository(BaseRepository):
                 "reason": str(reason or "data_unavailable"),
             }
         )
+        lock_prediction_outcome_actuals(payload)
         conditions = [
             agent_predictions_table.c.prediction_id == canonical,
             agent_predictions_table.c.status == STATUS_RESOLVING,

@@ -1,0 +1,1 @@
+- [Changed] Lock fact versus opinion write keys so user feedback cannot mutate PredictionOutcome actuals; mixed payloads are rejected at resolve and decision-signal feedback paths (Refs #1124).
