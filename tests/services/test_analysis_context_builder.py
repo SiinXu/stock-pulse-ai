@@ -732,6 +732,45 @@ def test_quote_block_degrades_missing_field_trust_instead_of_high_available() ->
     assert block.items["price"].value == 1880.0
 
 
+def test_quote_block_does_not_copy_top_level_analysis_input_into_items() -> None:
+    analysis_input = {
+        "schema_version": "field_trust_analysis_input/1.0",
+        "confidence": "low",
+        "gaps": [
+            {
+                "code": "conflict",
+                "field": "price",
+                "detail": "efinance=1880.0 disagrees with akshare_em=2100.0",
+            }
+        ],
+        "conflict_count": 1,
+        "failed_provider_count": 0,
+    }
+    pack = AnalysisContextBuilder.build(
+        _artifacts(
+            realtime_quote={
+                "source": "efinance",
+                "price": 1880.0,
+                "analysis_input": analysis_input,
+            }
+        )
+    )
+    block = pack.blocks["quote"]
+
+    assert "analysis_input" not in block.items
+    assert "field_trust" not in block.items
+    assert block.status == ContextFieldStatus.PARTIAL
+    assert block.metadata["analysis_input"] == {
+        "confidence": "low",
+        "conflict_count": 1,
+        "gap_codes": ["conflict"],
+        "failed_provider_count": 0,
+    }
+    dumped = json.dumps(pack.to_safe_dict(), ensure_ascii=False)
+    assert "efinance=1880.0" not in dumped
+    assert "akshare_em" not in dumped
+
+
 def test_quote_block_rebuilds_legacy_field_trust_without_analysis_input() -> None:
     block = AnalysisContextBuilder.build(
         _artifacts(

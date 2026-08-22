@@ -25,7 +25,7 @@ CONFIDENCE_HIGH = "high"
 CONFIDENCE_LOW = "low"
 METADATA_ABSENT_GAP = "metadata_absent"
 
-QUOTE_TRUST_ITEM_SKIP_KEYS = frozenset({"field_trust"})
+QUOTE_TRUST_ITEM_SKIP_KEYS = frozenset({"field_trust", "analysis_input"})
 
 _WARNING_PREFIX = "quote_trust_"
 
