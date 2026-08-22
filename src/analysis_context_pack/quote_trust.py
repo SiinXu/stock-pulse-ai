@@ -24,6 +24,7 @@ ANALYSIS_INPUT_SCHEMA_VERSION = "field_trust_analysis_input/1.0"
 CONFIDENCE_HIGH = "high"
 CONFIDENCE_LOW = "low"
 METADATA_ABSENT_GAP = "metadata_absent"
+QUOTE_UNAVAILABLE_GAP = "quote_unavailable"
 
 QUOTE_TRUST_ITEM_SKIP_KEYS = frozenset({"field_trust", "analysis_input"})
 
@@ -40,6 +41,23 @@ def missing_analysis_input() -> Dict[str, Any]:
                 "code": METADATA_ABSENT_GAP,
                 "field": None,
                 "detail": "quote carried no field-level trust metadata",
+            }
+        ],
+        "conflict_count": 0,
+        "failed_provider_count": 0,
+    }
+
+
+def unavailable_quote_analysis_input() -> Dict[str, Any]:
+    """Fail-closed projection when realtime quote data never arrived."""
+    return {
+        "schema_version": ANALYSIS_INPUT_SCHEMA_VERSION,
+        "confidence": CONFIDENCE_LOW,
+        "gaps": [
+            {
+                "code": QUOTE_UNAVAILABLE_GAP,
+                "field": None,
+                "detail": "No realtime quote available from any provider",
             }
         ],
         "conflict_count": 0,
@@ -207,7 +225,12 @@ def report_summary_from_pack(pack: Any) -> Optional[Dict[str, Any]]:
         return None
     source, status, analysis = quote
     if not isinstance(analysis, Mapping):
-        analysis = missing_analysis_input()
+        status_text = str(status or "").strip().lower()
+        analysis = (
+            unavailable_quote_analysis_input()
+            if status_text == "missing"
+            else missing_analysis_input()
+        )
     return report_summary_from_analysis_input(
         analysis,
         source=source,
@@ -251,6 +274,8 @@ def report_summary_from_overview(overview: Any) -> Optional[Dict[str, Any]]:
     high_eligible = not gap_codes and status in ("", "available")
     if status == "stale" and "stale" not in gap_codes:
         gap_codes = [*gap_codes, "stale"]
+    if status == "missing" and QUOTE_UNAVAILABLE_GAP not in gap_codes:
+        gap_codes = [*gap_codes, QUOTE_UNAVAILABLE_GAP]
     confidence = CONFIDENCE_HIGH if high_eligible else CONFIDENCE_LOW
     return {
         "source": _optional_text(quote.get("source")),

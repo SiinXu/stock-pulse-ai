@@ -364,6 +364,55 @@ def test_fresh_non_conflict_report_does_not_false_degrade(
     _assert_no_sensitive_leak(markdown, wechat, brief)
 
 
+@patch("src.config.get_config")
+@patch("src.services.report_renderer.get_config")
+def test_missing_quote_report_shows_quote_unavailable_gap(
+    mock_renderer_config, mock_get_config
+):
+    mock_get_config.return_value = _mock_config()
+    mock_renderer_config.return_value = _mock_config()
+    pack = AnalysisContextBuilder.build(_artifacts(None))
+    overview = render_analysis_context_pack_overview(pack, report_language="en")
+    summary = report_summary_from_pack(pack)
+    overview_summary = report_summary_from_overview(overview)
+    reconstructed = report_summary_from_overview(
+        {
+            "blocks": [
+                {
+                    "key": "quote",
+                    "status": "missing",
+                    "source": None,
+                    "warnings": [],
+                }
+            ]
+        }
+    )
+
+    assert pack.blocks["quote"].status.value == "missing"
+    assert summary is not None
+    assert summary["confidence"] != "high"
+    assert "quote_unavailable" in summary["gap_codes"]
+    assert overview_summary is not None
+    assert "quote_unavailable" in overview_summary["gap_codes"]
+    assert overview_summary["confidence"] == "low"
+    assert overview_summary["degraded"] is True
+    assert reconstructed is not None
+    assert reconstructed["gap_codes"] == ["quote_unavailable"]
+    assert reconstructed["confidence"] == "low"
+
+    markdown, wechat, brief = _render_reports(
+        _result_with_overview(overview), mock_renderer_config
+    )
+    for text in (markdown, wechat, brief):
+        assert "Quote trust" in text
+        assert "quote_unavailable" in text
+        assert "Analysis confidence**: `high`" not in text
+        assert "Analysis confidence=high" not in text
+        assert "Gaps**: none" not in text
+        assert "gaps=none" not in text.lower()
+    _assert_no_sensitive_leak(markdown, wechat, brief)
+
+
 @patch("src.services.report_renderer.get_config")
 def test_missing_overview_does_not_invent_degradation(mock_renderer_config):
     mock_renderer_config.return_value = _mock_config()

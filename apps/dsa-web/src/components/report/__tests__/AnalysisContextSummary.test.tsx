@@ -451,6 +451,36 @@ describe('AnalysisContextSummary', () => {
     }
   });
 
+  it('shows quote_unavailable when the overview quote block is missing', () => {
+    const missingQuoteOverview: AnalysisContextPackOverview = {
+      ...overview,
+      blocks: [
+        {
+          key: 'quote',
+          label: 'Quote',
+          status: 'missing',
+          source: null,
+          warnings: [],
+          missingReasons: ['realtime_quote_missing'],
+        },
+      ],
+      counts: {
+        ...overview.counts,
+        available: 0,
+        missing: 1,
+        fetchFailed: 0,
+      },
+    };
+
+    render(<AnalysisContextSummary overview={missingQuoteOverview} language="en" />);
+    fireEvent.click(screen.getAllByText('Input Blocks')[0]);
+
+    const quoteTrust = screen.getByTestId('analysis-context-quote-trust');
+    expect(quoteTrust).toHaveTextContent('Analysis confidence Low');
+    expect(quoteTrust).toHaveTextContent('No realtime quote available from any provider');
+    expect(quoteTrust).toHaveTextContent('Field trust');
+  });
+
   it('does not false-degrade a fresh non-conflict quote-trust summary', () => {
     render(<AnalysisContextSummary overview={overview} language="en" />);
     fireEvent.click(screen.getAllByText('Input Blocks')[0]);

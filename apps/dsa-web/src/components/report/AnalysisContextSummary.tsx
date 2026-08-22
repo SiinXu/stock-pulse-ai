@@ -62,13 +62,19 @@ const toUiLanguage = (language: ReportLanguage): UiLanguage => {
   return 'en';
 };
 
-const quoteTrustGapCodes = (warnings: string[] | undefined): string[] => {
+const quoteTrustGapCodes = (
+  warnings: string[] | undefined,
+  status?: AnalysisContextPackBlockStatus,
+): string[] => {
   const codes: string[] = [];
   for (const warning of warnings || []) {
     const token = warning.trim().toLowerCase();
     if (!token.startsWith(QUOTE_TRUST_WARNING_PREFIX)) continue;
     const code = token.slice(QUOTE_TRUST_WARNING_PREFIX.length).replace(/^_+|_+$/g, '');
     if (code && !codes.includes(code)) codes.push(code);
+  }
+  if (status === 'missing' && !codes.includes('quote_unavailable')) {
+    codes.push('quote_unavailable');
   }
   return codes;
 };
@@ -255,7 +261,7 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
                   .join('; ')
                 : text.statusGuidance[block.status];
               const trustText = FIELD_TRUST_TEXT[toUiLanguage(reportLanguage)] ?? FIELD_TRUST_TEXT.en;
-              const quoteGaps = block.key === 'quote' ? quoteTrustGapCodes(block.warnings) : [];
+              const quoteGaps = block.key === 'quote' ? quoteTrustGapCodes(block.warnings, block.status) : [];
               const quoteConfidence = block.key === 'quote' && quoteGaps.length === 0 && block.status === 'available'
                 ? 'high'
                 : block.key === 'quote'
