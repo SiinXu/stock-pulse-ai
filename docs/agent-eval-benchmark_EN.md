@@ -48,6 +48,8 @@ python -m pytest -m benchmark tests/agent/benchmark -q
 
 The blocking backend gate uses `pytest -m "not network and not benchmark"`, so this suite is **non-blocking** by design (V0).
 
+A focused unmarked test in `tests/agent/test_agent_trajectory_eval.py` feeds a real `observe_case` tool log into `evaluate_agent_trajectory` and asserts `sample_size > 0` with a non-null `tool_selection_precision`, so that producer join stays visible to the blocking offline gate. The rest of the panel remains behind the `benchmark` marker.
+
 The CLI itself is the explicit opt-in boundary. There is no runtime
 `AGENT_TRAJECTORY_EVAL_ENABLED` setting: the production analysis path does not
 invoke this evaluator, so advertising an environment gate would be inert and

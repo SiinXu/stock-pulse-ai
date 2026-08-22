@@ -54,6 +54,8 @@ python -m pytest -m benchmark tests/agent/benchmark -q
 
 阻塞性 backend gate 使用 `pytest -m "not network and not benchmark"`，因此本套件在 V0 默认**不阻塞合入**。
 
+`tests/agent/test_agent_trajectory_eval.py` 中有一条未标记 `benchmark` 的契约测试：把真实 `observe_case` 工具日志送入 `evaluate_agent_trajectory`，并断言 `sample_size > 0` 且 `tool_selection_precision` 非空，使这条生产者衔接对阻塞性 offline gate 可见。其余面板仍留在 `benchmark` 标记之后。
+
 CLI 本身就是显式选择加入的边界。不存在运行时
 `AGENT_TRAJECTORY_EVAL_ENABLED` 配置：生产分析路径并不调用本评估器，发布
 一个无消费者的环境变量只会形成第二套配置所有者。
