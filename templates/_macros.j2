@@ -246,6 +246,26 @@
 {%- endmacro %}
 
 
+{% macro quote_trust_summary_section(summary, compact=false) -%}
+{% if summary %}
+{%- set gaps = summary.get('gap_codes') or [] -%}
+{%- set gap_text = gaps|join(', ') if gaps else labels.quote_trust_no_gaps_label -%}
+{%- set conflict_count = summary.get('conflict_count') or 0 -%}
+{%- if compact -%}
+🛰️ {{ labels.quote_trust_heading }}: {{ labels.source_label }}={{ summary.get('source') or '—' }} · {{ labels.quote_trust_confidence_label }}={{ summary.get('confidence') or 'low' }} · {{ labels.quote_trust_gaps_label }}={{ gap_text }}{% if conflict_count %} · {{ labels.quote_trust_conflicts_label }}={{ conflict_count }}{% endif %}
+{% else %}
+### 🛰️ {{ labels.quote_trust_heading }}
+
+- **{{ labels.source_label }}**: {{ summary.get('source') or '—' }}
+- **{{ labels.quote_trust_confidence_label }}**: `{{ summary.get('confidence') or 'low' }}`
+- **{{ labels.quote_trust_gaps_label }}**: {{ gap_text }}
+{% if conflict_count %}- **{{ labels.quote_trust_conflicts_label }}**: {{ conflict_count }}
+{% endif %}
+{% endif %}
+{% endif %}
+{%- endmacro %}
+
+
 {% macro market_snapshot(result) %}
 {% set snapshot = result.market_snapshot if result.market_snapshot else {} %}
 {% if snapshot %}

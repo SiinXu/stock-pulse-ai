@@ -24,6 +24,7 @@ ANALYSIS_INPUT_SCHEMA_VERSION = "field_trust_analysis_input/1.0"
 CONFIDENCE_HIGH = "high"
 CONFIDENCE_LOW = "low"
 METADATA_ABSENT_GAP = "metadata_absent"
+QUOTE_UNAVAILABLE_GAP = "quote_unavailable"
 
 QUOTE_TRUST_ITEM_SKIP_KEYS = frozenset({"field_trust", "analysis_input"})
 
@@ -40,6 +41,23 @@ def missing_analysis_input() -> Dict[str, Any]:
                 "code": METADATA_ABSENT_GAP,
                 "field": None,
                 "detail": "quote carried no field-level trust metadata",
+            }
+        ],
+        "conflict_count": 0,
+        "failed_provider_count": 0,
+    }
+
+
+def unavailable_quote_analysis_input() -> Dict[str, Any]:
+    """Fail-closed projection when realtime quote data never arrived."""
+    return {
+        "schema_version": ANALYSIS_INPUT_SCHEMA_VERSION,
+        "confidence": CONFIDENCE_LOW,
+        "gaps": [
+            {
+                "code": QUOTE_UNAVAILABLE_GAP,
+                "field": None,
+                "detail": "No realtime quote available from any provider",
             }
         ],
         "conflict_count": 0,
@@ -148,6 +166,161 @@ def quote_trust_warning_codes(analysis: Mapping[str, Any]) -> List[str]:
     if not warnings:
         warnings.append("quote_trust_confidence_not_high")
     return warnings
+
+
+def gap_codes_from_trust_warnings(warnings: Any) -> List[str]:
+    """Recover bounded gap codes from public ``quote_trust_*`` warning tokens."""
+    codes: List[str] = []
+    if not isinstance(warnings, list):
+        return codes
+    for warning in warnings:
+        token = str(warning or "").strip().lower()
+        if not token.startswith(_WARNING_PREFIX):
+            continue
+        code = token[len(_WARNING_PREFIX) :].strip("_")
+        if code and code not in codes:
+            codes.append(code)
+    return codes
+
+
+def report_summary_from_analysis_input(
+    analysis: Mapping[str, Any],
+    *,
+    source: Optional[str] = None,
+    status: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Low-sensitivity report summary. Never includes provider/circuit blobs.
+
+    Accepts either the producer ``analysis_input`` (``gaps[]``) or the bounded
+    pack metadata already stored on the quote block (``gap_codes``).
+    """
+    metadata = bound_analysis_input_metadata(analysis)
+    gap_codes = list(metadata.get("gap_codes") or [])
+    existing_codes = analysis.get("gap_codes")
+    if not gap_codes and isinstance(existing_codes, list):
+        for code in existing_codes:
+            text = str(code or "").strip()
+            if text and text not in gap_codes:
+                gap_codes.append(text)
+        metadata = dict(metadata)
+        metadata["gap_codes"] = gap_codes
+    confidence = str(metadata.get("confidence") or CONFIDENCE_LOW).strip().lower()
+    return {
+        "source": _optional_text(source),
+        "status": _optional_text(status),
+        "confidence": confidence or CONFIDENCE_LOW,
+        "gap_codes": gap_codes,
+        "conflict_count": _non_negative_int(metadata.get("conflict_count")),
+        "failed_provider_count": _non_negative_int(
+            metadata.get("failed_provider_count")
+        ),
+        "degraded": (confidence != CONFIDENCE_HIGH) or bool(gap_codes),
+    }
+
+
+def report_summary_from_pack(pack: Any) -> Optional[Dict[str, Any]]:
+    """Build a report summary from pack quote metadata ``analysis_input``."""
+    quote = _quote_block_from_pack(pack)
+    if quote is None:
+        return None
+    source, status, analysis = quote
+    if not isinstance(analysis, Mapping):
+        status_text = str(status or "").strip().lower()
+        analysis = (
+            unavailable_quote_analysis_input()
+            if status_text == "missing"
+            else missing_analysis_input()
+        )
+    return report_summary_from_analysis_input(
+        analysis,
+        source=source,
+        status=status,
+    )
+
+
+def report_summary_from_overview(overview: Any) -> Optional[Dict[str, Any]]:
+    """Build a report summary from the public overview quote block.
+
+    Prefers bounded ``metadata.analysis_input`` when a pack block leaked it
+    into a test double. Production overview only carries source, status, and
+    ``quote_trust_*`` warnings, which reconstruct the same gap codes without
+    exposing ``field_trust`` or provider/circuit blobs.
+    """
+    snapshot = overview if isinstance(overview, Mapping) else None
+    if snapshot is None:
+        return None
+    blocks = snapshot.get("blocks")
+    if not isinstance(blocks, list):
+        return None
+    quote = None
+    for block in blocks:
+        if isinstance(block, Mapping) and str(block.get("key") or "") == "quote":
+            quote = block
+            break
+    if quote is None:
+        return None
+
+    metadata = quote.get("metadata") if isinstance(quote.get("metadata"), Mapping) else {}
+    analysis = metadata.get("analysis_input") if isinstance(metadata, Mapping) else None
+    if isinstance(analysis, Mapping) and str(analysis.get("confidence") or "").strip():
+        return report_summary_from_analysis_input(
+            analysis,
+            source=quote.get("source"),
+            status=quote.get("status"),
+        )
+
+    gap_codes = gap_codes_from_trust_warnings(quote.get("warnings"))
+    status = str(quote.get("status") or "").strip().lower()
+    high_eligible = not gap_codes and status in ("", "available")
+    if status == "stale" and "stale" not in gap_codes:
+        gap_codes = [*gap_codes, "stale"]
+    if status == "missing" and QUOTE_UNAVAILABLE_GAP not in gap_codes:
+        gap_codes = [*gap_codes, QUOTE_UNAVAILABLE_GAP]
+    confidence = CONFIDENCE_HIGH if high_eligible else CONFIDENCE_LOW
+    return {
+        "source": _optional_text(quote.get("source")),
+        "status": _optional_text(quote.get("status")),
+        "confidence": confidence,
+        "gap_codes": gap_codes,
+        "conflict_count": 1 if "conflict" in gap_codes else 0,
+        "failed_provider_count": 1 if "provider_failed" in gap_codes else 0,
+        "degraded": (confidence != CONFIDENCE_HIGH) or bool(gap_codes),
+    }
+
+
+def _optional_text(value: Any) -> Optional[str]:
+    text = str(value or "").strip()
+    return text or None
+
+
+def _quote_block_from_pack(
+    pack: Any,
+) -> Optional[tuple[Optional[str], Optional[str], Optional[Mapping[str, Any]]]]:
+    blocks = getattr(pack, "blocks", None)
+    if isinstance(pack, Mapping):
+        blocks = pack.get("blocks")
+    if not isinstance(blocks, Mapping):
+        return None
+    quote = blocks.get("quote")
+    if quote is None:
+        return None
+    if isinstance(quote, Mapping):
+        metadata = quote.get("metadata") if isinstance(quote.get("metadata"), Mapping) else {}
+        analysis = metadata.get("analysis_input") if isinstance(metadata, Mapping) else None
+        status = quote.get("status")
+        return (
+            _optional_text(quote.get("source")),
+            _optional_text(getattr(status, "value", status)),
+            analysis if isinstance(analysis, Mapping) else None,
+        )
+    metadata = getattr(quote, "metadata", None)
+    analysis = metadata.get("analysis_input") if isinstance(metadata, Mapping) else None
+    status = getattr(quote, "status", None)
+    return (
+        _optional_text(getattr(quote, "source", None)),
+        _optional_text(getattr(status, "value", status)),
+        analysis if isinstance(analysis, Mapping) else None,
+    )
 
 
 def _warning_token(code: str) -> str:

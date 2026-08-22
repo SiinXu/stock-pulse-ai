@@ -1,4 +1,4 @@
-{% from '_macros.j2' import report_strata_section, report_disclaimer_line, decision_card, valuation_section with context %}
+{% from '_macros.j2' import report_strata_section, report_disclaimer_line, decision_card, valuation_section, quote_trust_summary_section with context %}
 # 🎯 {{ report_date }} {{ labels.brief_title }}
 
 > {{ results|length }} {{ labels.stock_unit_compact }} | 🟢{{ buy_count }} 🟡{{ hold_count }} 🔴{{ sell_count }}
@@ -14,6 +14,9 @@
 {% endif %}
 {% for e in enriched %}
 {{ decision_card(e, compact='brief') }}
+{% if e.quote_trust_summary and e.quote_trust_summary.get('degraded') %}
+{{ quote_trust_summary_section(e.quote_trust_summary, compact=true) }}
+{% endif %}
 {# Layered reading: optional compact/full strata immediately under the card when
    REPORT_MODE is standard/research. Notification ReportType.BRIEF forces brief
    mode so push stays on the Decision Card budget (see generate_brief_report). #}
