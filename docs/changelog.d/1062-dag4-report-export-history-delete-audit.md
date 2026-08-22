@@ -1,0 +1,3 @@
+- [Added] Emit fail-closed `report.export` and `history.delete` security-audit events for HTTP history report export and history deletion, with attempt-before-operation and additive 503 `operation_completed` semantics. Existing export 200/400/404/413/429/503 and delete 200/400/500 protocol is unchanged (Refs #1062).
+- [Tests] Cover report-export and history-delete audit happy paths, attempt fail-closed, persist-vs-block 503, preserved domain statuses, bounded metadata, durable query, redaction, capabilities/markdown/internal-delete non-emission, and auth overlay (Refs #1062).
+- [Docs] Mark report export and history delete as Landed on the privileged coverage map; remaining #1062 DAG is DAG-5 (Refs #1062).

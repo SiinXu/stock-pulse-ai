@@ -9,13 +9,17 @@
 2. 提供 GET /api/v1/history/{query_id} 历史详情查询接口
 """
 
+import hashlib
 import logging
-from typing import Any, Mapping, Optional
+import os
+import re
+from typing import Any, Mapping, Optional, Sequence
 
 from fastapi import APIRouter, HTTPException, Query, Depends, Body
 from fastapi.responses import Response
 
-from src.api.deps import get_database_manager
+from src.api.deps import get_database_manager, require_security_audit_service
+from src.auth import is_auth_enabled
 from src.api.v1.schemas.history import (
     HistoryListResponse,
     HistorySearchResponse,
@@ -51,6 +55,12 @@ from src.schemas.decision_action import build_action_fields
 from src.utils.data_processing import (
     normalize_model_used,
 )
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditService,
+    SecurityAuditUnavailable,
+    require_security_audit_recorder,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -60,6 +70,173 @@ router = APIRouter()
 # Dedicated share-image input bound. Keeps the IM notification cap
 # (MARKDOWN_TO_IMAGE_MAX_CHARS=15000) unchanged while allowing full history reports.
 _DEFAULT_SHARE_IMAGE_MAX_CHARS = 100_000
+
+HISTORY_DELETE_EVENT_TYPE = "history.delete"
+HISTORY_DELETE_TARGET_TYPE = "analysis_history"
+_IDENTITY_PATTERN = re.compile(r"[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,119}")
+_MAX_DELETE_ID_SAMPLE = 64
+
+
+class HistoryDeleteAuditCompletionUnavailable(RuntimeError):
+    """Raised when history rows were deleted but audit completion could not be stored."""
+
+    def __init__(self, *, scope: str, deleted: int) -> None:
+        super().__init__("security_audit_unavailable")
+        self.scope = scope
+        self.deleted = deleted
+
+
+def _audit_target_id(record_id: str) -> str:
+    """Return a bounded audit identity without persisting arbitrary route text."""
+    if _IDENTITY_PATTERN.fullmatch(record_id):
+        return record_id
+    return f"sha256:{hashlib.sha256(record_id.encode('utf-8')).hexdigest()[:24]}"
+
+
+def _history_delete_audit_actor() -> str:
+    """Return the attributable operator class for the single-admin model."""
+    if os.getenv("DSA_DESKTOP_MODE") == "true":
+        return "desktop_operator"
+    if is_auth_enabled():
+        return "authenticated_admin"
+    return "local_operator"
+
+
+def _history_delete_audit_unavailable(
+    *,
+    operation_completed: bool = False,
+    scope: str | None = None,
+    deleted: int | None = None,
+) -> HTTPException:
+    detail = {
+        "error": "security_audit_unavailable",
+        "message": (
+            "History records were deleted, but audit completion could not be persisted"
+            if operation_completed
+            else "Security audit storage is unavailable"
+        ),
+        "operation_completed": operation_completed,
+    }
+    if scope is not None:
+        detail["scope"] = scope
+    if deleted is not None:
+        detail["deleted"] = deleted
+    return HTTPException(status_code=503, detail=detail)
+
+
+def _bounded_delete_ids(record_ids: Sequence[Any]) -> tuple[list[str], bool]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for raw in record_ids:
+        if raw is None:
+            continue
+        bounded = _audit_target_id(str(raw))
+        if bounded in seen:
+            continue
+        seen.add(bounded)
+        unique.append(bounded)
+    truncated = len(unique) > _MAX_DELETE_ID_SAMPLE
+    return unique[:_MAX_DELETE_ID_SAMPLE], truncated
+
+
+def _history_delete_target_id(record_ids: Sequence[Any]) -> str:
+    unique = [
+        _audit_target_id(str(raw))
+        for raw in record_ids
+        if raw is not None
+    ]
+    distinct = list(dict.fromkeys(unique))
+    if len(distinct) == 1:
+        return distinct[0]
+    return "batch"
+
+
+def _record_history_delete_audit(
+    security_audit: SecurityAuditRecorder,
+    *,
+    phase: str,
+    correlation_id: str,
+    target_id: str,
+    metadata: Mapping[str, Any],
+    outcome: str = "success",
+    reason_code: str = "delete_completed",
+) -> None:
+    service = require_security_audit_recorder(security_audit)
+    common = {
+        "event_type": HISTORY_DELETE_EVENT_TYPE,
+        "actor_type": "administrator",
+        "actor_id": _history_delete_audit_actor(),
+        "execution_id": correlation_id,
+        "action": HISTORY_DELETE_EVENT_TYPE,
+        "target_type": HISTORY_DELETE_TARGET_TYPE,
+        "target_id": _audit_target_id(target_id),
+        "correlation_id": correlation_id,
+        "metadata": dict(metadata),
+    }
+    if phase == "attempt":
+        service.record_attempt(**common)
+        return
+    service.record_completion(
+        **common,
+        outcome=outcome,
+        reason_code=reason_code,
+    )
+
+
+def _record_history_delete_completion_best_effort(
+    security_audit: SecurityAuditRecorder,
+    *,
+    correlation_id: str,
+    target_id: str,
+    metadata: Mapping[str, Any],
+    outcome: str,
+    reason_code: str,
+) -> None:
+    try:
+        _record_history_delete_audit(
+            security_audit,
+            phase="completion",
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=metadata,
+            outcome=outcome,
+            reason_code=reason_code,
+        )
+    except SecurityAuditUnavailable:
+        return
+
+
+def _complete_history_delete_audit(
+    security_audit: SecurityAuditRecorder,
+    *,
+    correlation_id: str,
+    target_id: str,
+    metadata: Mapping[str, Any],
+    deleted: int,
+    scope: str,
+) -> None:
+    completion_metadata = dict(metadata)
+    completion_metadata["deleted_count"] = int(deleted)
+    try:
+        _record_history_delete_audit(
+            security_audit,
+            phase="completion",
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=completion_metadata,
+            outcome="success",
+            reason_code="delete_completed",
+        )
+    except SecurityAuditUnavailable:
+        completion_error = HistoryDeleteAuditCompletionUnavailable(
+            scope=scope,
+            deleted=deleted,
+        )
+        raise _history_delete_audit_unavailable(
+            operation_completed=True,
+            scope=completion_error.scope,
+            deleted=completion_error.deleted,
+        ) from completion_error
 
 
 def _http_repository_error(
@@ -342,28 +519,89 @@ def search_history(
         400: {"description": "股票代码不能为空", "model": ErrorResponse},
         404: {"description": "未找到记录", "model": ErrorResponse},
         500: {"description": "服务器错误", "model": ErrorResponse},
+        503: {
+            "description": "Security audit unavailable (operation_completed)",
+            "model": ErrorResponse,
+        },
     },
     summary="按股票代码删除历史分析记录",
-    description="删除指定股票代码的所有分析历史记录（支持代码变体归一化匹配）",
+    description=(
+        "删除指定股票代码的所有分析历史记录（支持代码变体归一化匹配）。"
+        "Blank stock_code is rejected before audit. Attempt is persisted "
+        "before delete; attempt-store failure returns 503 "
+        "operation_completed=false and does not delete. After rows are "
+        "deleted, completion-store failure returns 503 "
+        "operation_completed=true with scope and deleted. Zero deletes "
+        "remain HTTP 200. Internal HistoryService delete is not this event."
+    ),
 )
 def delete_history_by_code(
     stock_code: str,
     db_manager: DatabaseManager = Depends(get_database_manager),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> DeleteHistoryResponse:
+    if not str(stock_code or "").strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_request", "message": "stock_code 不能为空"},
+        )
+
+    correlation_id = SecurityAuditService.new_correlation_id()
+    target_id = _audit_target_id(stock_code.strip())
+    metadata = {
+        "scope": "by_code",
+        "stock_code": target_id,
+    }
+    try:
+        _record_history_delete_audit(
+            security_audit,
+            phase="attempt",
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=metadata,
+        )
+    except SecurityAuditUnavailable:
+        raise _history_delete_audit_unavailable(operation_completed=False) from None
+
     try:
         deleted = HistoryService(db_manager).delete_history_by_code(stock_code)
-        return DeleteHistoryResponse(deleted=deleted)
     except HistoryValidationError as exc:
+        _record_history_delete_completion_best_effort(
+            security_audit,
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=metadata,
+            outcome="rejected",
+            reason_code="invalid_request",
+        )
         raise HTTPException(
             status_code=400,
             detail={"error": "invalid_request", "message": str(exc)},
         )
     except RepositoryError as exc:
+        _record_history_delete_completion_best_effort(
+            security_audit,
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=metadata,
+            outcome="failure",
+            reason_code="internal_error",
+        )
         raise _http_repository_error(
             exc,
             event="History deletion by stock code failed",
             context={"stock_code": stock_code},
         ) from exc
+    except HTTPException:
+        raise
+    except SecurityAuditUnavailable:
+        raise _history_delete_audit_unavailable(operation_completed=False) from None
+    except HistoryDeleteAuditCompletionUnavailable as exc:
+        raise _history_delete_audit_unavailable(
+            operation_completed=True,
+            scope=exc.scope,
+            deleted=exc.deleted,
+        ) from None
     except Exception as e:
         log_safe_exception(
             logger,
@@ -372,10 +610,28 @@ def delete_history_by_code(
             error_code="internal_error",
             context={"stock_code": stock_code},
         )
+        _record_history_delete_completion_best_effort(
+            security_audit,
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=metadata,
+            outcome="failure",
+            reason_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={"error": "internal_error", "message": f"删除失败: {str(e)}"},
         )
+
+    _complete_history_delete_audit(
+        security_audit,
+        correlation_id=correlation_id,
+        target_id=target_id,
+        metadata=metadata,
+        deleted=deleted,
+        scope="by_code",
+    )
+    return DeleteHistoryResponse(deleted=deleted)
 
 
 @router.delete(
@@ -385,13 +641,26 @@ def delete_history_by_code(
         200: {"description": "删除成功"},
         400: {"description": "请求参数错误", "model": ErrorResponse},
         500: {"description": "服务器错误", "model": ErrorResponse},
+        503: {
+            "description": "Security audit unavailable (operation_completed)",
+            "model": ErrorResponse,
+        },
     },
     summary="删除历史分析记录",
-    description="按历史记录主键 ID 批量删除分析历史"
+    description=(
+        "按历史记录主键 ID 批量删除分析历史。"
+        "Empty record_ids is rejected before audit. Attempt is persisted "
+        "before delete; attempt-store failure returns 503 "
+        "operation_completed=false and does not delete. After rows are "
+        "deleted, completion-store failure returns 503 "
+        "operation_completed=true with scope and deleted. Zero deletes "
+        "remain HTTP 200. Internal HistoryService delete is not this event."
+    )
 )
 def delete_history_records(
     request: DeleteHistoryRequest = Body(...),
-    db_manager: DatabaseManager = Depends(get_database_manager)
+    db_manager: DatabaseManager = Depends(get_database_manager),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> DeleteHistoryResponse:
     """
     按主键 ID 批量删除历史分析记录。
@@ -406,12 +675,40 @@ def delete_history_records(
             }
         )
 
+    correlation_id = SecurityAuditService.new_correlation_id()
+    id_sample, ids_truncated = _bounded_delete_ids(record_ids)
+    target_id = _history_delete_target_id(record_ids)
+    metadata: dict[str, Any] = {
+        "scope": "by_ids",
+        "id_count": len(record_ids),
+        "id_sample": id_sample,
+    }
+    if ids_truncated:
+        metadata["ids_truncated"] = True
+    try:
+        _record_history_delete_audit(
+            security_audit,
+            phase="attempt",
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=metadata,
+        )
+    except SecurityAuditUnavailable:
+        raise _history_delete_audit_unavailable(operation_completed=False) from None
+
     try:
         service = HistoryService(db_manager)
         deleted = service.delete_history_records(record_ids)
-        return DeleteHistoryResponse(deleted=deleted)
     except HTTPException:
         raise
+    except SecurityAuditUnavailable:
+        raise _history_delete_audit_unavailable(operation_completed=False) from None
+    except HistoryDeleteAuditCompletionUnavailable as exc:
+        raise _history_delete_audit_unavailable(
+            operation_completed=True,
+            scope=exc.scope,
+            deleted=exc.deleted,
+        ) from None
     except Exception as e:
         log_safe_exception(
             logger,
@@ -420,6 +717,14 @@ def delete_history_records(
             error_code="internal_error",
             context={"record_count": len(record_ids)},
         )
+        _record_history_delete_completion_best_effort(
+            security_audit,
+            correlation_id=correlation_id,
+            target_id=target_id,
+            metadata=metadata,
+            outcome="failure",
+            reason_code="internal_error",
+        )
         raise HTTPException(
             status_code=500,
             detail={
@@ -427,6 +732,16 @@ def delete_history_records(
                 "message": f"删除历史记录失败: {str(e)}"
             }
         )
+
+    _complete_history_delete_audit(
+        security_audit,
+        correlation_id=correlation_id,
+        target_id=target_id,
+        metadata=metadata,
+        deleted=deleted,
+        scope="by_ids",
+    )
+    return DeleteHistoryResponse(deleted=deleted)
 
 
 @router.get(
