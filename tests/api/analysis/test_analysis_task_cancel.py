@@ -15,6 +15,11 @@ from src.api.middlewares.auth import EXEMPT_PATHS, _path_exempt
 from src.api.v1.endpoints import analysis as endpoint
 from src.api.v1.services.analysis_api_service import STOCK_ANALYSIS_TASK_KIND
 from src.task_execution import TaskCommand, TaskNotFoundError, TaskRunContext, TaskStatusEnum
+from tests.security.test_security_audit_integrations import _RecordingAudit
+
+
+def _call_cancel(task_id: str):
+    return endpoint.cancel_analysis_task(task_id, security_audit=_RecordingAudit())
 
 
 def _stock_analysis_task(**overrides: object) -> SimpleNamespace:
@@ -62,7 +67,7 @@ class AnalysisTaskCancelHttpTests(unittest.TestCase):
         fake_queue.get_task.return_value = None
         with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=fake_queue):
             with self.assertRaises(HTTPException) as caught:
-                endpoint.cancel_analysis_task("missing-1")
+                _call_cancel("missing-1")
         self.assertEqual(caught.exception.status_code, 404)
         fake_queue.cancel.assert_not_called()
 
@@ -85,7 +90,7 @@ class AnalysisTaskCancelHttpTests(unittest.TestCase):
                     return_value=fake_queue,
                 ):
                     with self.assertRaises(HTTPException) as caught:
-                        endpoint.cancel_analysis_task(f"other-{kind}")
+                        _call_cancel(f"other-{kind}")
                 self.assertEqual(caught.exception.status_code, 404)
                 fake_queue.cancel.assert_not_called()
 
@@ -107,7 +112,7 @@ class AnalysisTaskCancelHttpTests(unittest.TestCase):
         fake_queue.get_task.return_value = task
         fake_queue.cancel.side_effect = fake_cancel
         with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=fake_queue):
-            payload = endpoint.cancel_analysis_task("task-analysis-1")
+            payload = _call_cancel("task-analysis-1")
         fake_queue.cancel.assert_called_once_with("task-analysis-1")
         self.assertEqual(payload.status, "cancel_requested")
         self.assertEqual(payload.task_id, "task-analysis-1")
@@ -119,7 +124,7 @@ class AnalysisTaskCancelHttpTests(unittest.TestCase):
         fake_queue.cancel.side_effect = TaskNotFoundError("task-analysis-1")
         with patch("src.api.v1.endpoints.analysis.get_task_queue", return_value=fake_queue):
             with self.assertRaises(HTTPException) as caught:
-                endpoint.cancel_analysis_task("task-analysis-1")
+                _call_cancel("task-analysis-1")
         self.assertEqual(caught.exception.status_code, 404)
 
 
@@ -184,9 +189,9 @@ class AnalysisTaskCancelQueueTests(unittest.TestCase):
         ):
             pending = self.queue.submit_task("600519")
             self.assertEqual(pending.status, TaskStatus.PENDING)
-            payload = endpoint.cancel_analysis_task(pending.task_id)
+            payload = _call_cancel(pending.task_id)
             self.assertEqual(payload.status, "cancelled")
-            repeated = endpoint.cancel_analysis_task(pending.task_id)
+            repeated = _call_cancel(pending.task_id)
             self.assertEqual(repeated.status, "cancelled")
 
         blocker_release.set()
@@ -225,9 +230,9 @@ class AnalysisTaskCancelQueueTests(unittest.TestCase):
         ):
             accepted = self.queue.submit_task("600519")
             self.assertTrue(started.wait(timeout=2))
-            first = endpoint.cancel_analysis_task(accepted.task_id)
+            first = _call_cancel(accepted.task_id)
             self.assertIn(first.status, {"cancel_requested", "cancelled"})
-            second = endpoint.cancel_analysis_task(accepted.task_id)
+            second = _call_cancel(accepted.task_id)
             self.assertIn(second.status, {"cancel_requested", "cancelled"})
             release.set()
             future = self.queue._futures.get(accepted.task_id)
@@ -261,9 +266,9 @@ class AnalysisTaskCancelQueueTests(unittest.TestCase):
             done = self._wait_status(accepted.task_id, TaskStatus.COMPLETED)
             self.assertIsNotNone(done)
             self.assertEqual(done.status, TaskStatus.COMPLETED)
-            payload = endpoint.cancel_analysis_task(accepted.task_id)
+            payload = _call_cancel(accepted.task_id)
             self.assertEqual(payload.status, "completed")
-            again = endpoint.cancel_analysis_task(accepted.task_id)
+            again = _call_cancel(accepted.task_id)
             self.assertEqual(again.status, "completed")
 
     def test_wrong_kind_on_real_queue_does_not_cancel(self) -> None:
@@ -285,7 +290,7 @@ class AnalysisTaskCancelQueueTests(unittest.TestCase):
             )
             self.assertTrue(started.wait(timeout=2))
             with self.assertRaises(HTTPException) as caught:
-                endpoint.cancel_analysis_task(background.task_id)
+                _call_cancel(background.task_id)
             self.assertEqual(caught.exception.status_code, 404)
             live = self.queue.get_task(background.task_id)
             self.assertIsNotNone(live)

@@ -20,7 +20,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Optional, Union
 
-from fastapi import APIRouter, Depends, Query, Body
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from src.api.deps import (
@@ -55,8 +55,14 @@ from src.core.market_review_runtime import (
 from src.services.stock_code_utils import resolve_index_stock_code_for_analysis
 from src.services.name_to_code_resolver import resolve_name_to_code
 from src.services.task_queue import get_task_queue
-from src.task_execution import TaskEventType, TaskStatusEnum, deep_thaw
-from src.services.security_audit_service import SecurityAuditRecorder
+from src.task_execution import TaskEventType, deep_thaw
+from src.api.v1.services.analysis_cancel_audit import (
+    AnalysisCancelAuditCompletionUnavailable,
+)
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -445,12 +451,36 @@ def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
     return _analysis_api_service().get_task_run_flow(task_id)
 
 
+def _cancel_audit_unavailable(
+    *,
+    operation_completed: bool = False,
+    task_id: str | None = None,
+    status: str | None = None,
+) -> HTTPException:
+    detail = {
+        "error": "security_audit_unavailable",
+        "message": (
+            "Analysis task cancel was requested, but audit completion "
+            "could not be persisted"
+            if operation_completed
+            else "Security audit storage is unavailable"
+        ),
+        "operation_completed": operation_completed,
+    }
+    if task_id is not None:
+        detail["task_id"] = task_id
+    if status is not None:
+        detail["status"] = status
+    return HTTPException(status_code=503, detail=detail)
+
+
 @router.post(
     "/tasks/{task_id}/cancel",
     response_model=TaskStatus,
     responses={
         200: {"description": "任务取消快照"},
         404: {"description": "任务不存在或不是个股分析任务", "model": ErrorResponse},
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
     },
     summary="取消正在运行的个股分析任务",
     description=(
@@ -461,13 +491,31 @@ def get_task_run_flow(task_id: str) -> RunFlowSnapshot:
         "failed terminal state. Processing cancel is cooperative — the snapshot "
         "becomes cancel_requested immediately and cancelled when the runner "
         "returns. Reports or notifications that already persisted are not rolled "
-        "back."
+        "back. Existing 200/404 cancel protocol is unchanged. Attempt is persisted "
+        "before cancel; attempt-store failure returns 503 operation_completed=false "
+        "without calling cancel. After cancel has run, completion-store failure "
+        "returns 503 operation_completed=true with task_id and status."
     ),
     operation_id="cancelAnalysisTask",
 )
-def cancel_analysis_task(task_id: str) -> TaskStatus:
+def cancel_analysis_task(
+    task_id: str,
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
+) -> TaskStatus:
     """Request cancellation of a stock analysis task."""
-    return _analysis_api_service().cancel_analysis_task(task_id)
+    try:
+        return _analysis_api_service().cancel_analysis_task(
+            task_id,
+            security_audit=security_audit,
+        )
+    except AnalysisCancelAuditCompletionUnavailable as exc:
+        raise _cancel_audit_unavailable(
+            operation_completed=True,
+            task_id=exc.task_id,
+            status=exc.status,
+        ) from None
+    except SecurityAuditUnavailable:
+        raise _cancel_audit_unavailable(operation_completed=False) from None
 
 
 @router.get(

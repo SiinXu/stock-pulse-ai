@@ -624,7 +624,7 @@ export interface paths {
         put?: never;
         /**
          * 取消正在运行的个股分析任务
-         * @description Kind-scoped adapter over the process-local queue cancel port. Only stock_analysis tasks are accepted; discovery, market review, and other kinds return 404 without cancelling. The request is idempotent: a later POST returns the current snapshot, including a competing completed or failed terminal state. Processing cancel is cooperative — the snapshot becomes cancel_requested immediately and cancelled when the runner returns. Reports or notifications that already persisted are not rolled back.
+         * @description Kind-scoped adapter over the process-local queue cancel port. Only stock_analysis tasks are accepted; discovery, market review, and other kinds return 404 without cancelling. The request is idempotent: a later POST returns the current snapshot, including a competing completed or failed terminal state. Processing cancel is cooperative — the snapshot becomes cancel_requested immediately and cancelled when the runner returns. Reports or notifications that already persisted are not rolled back. Existing 200/404 cancel protocol is unchanged. Attempt is persisted before cancel; attempt-store failure returns 503 operation_completed=false without calling cancel. After cancel has run, completion-store failure returns 503 operation_completed=true with task_id and status.
          */
         post: operations["cancelAnalysisTask"];
         delete?: never;
@@ -21046,6 +21046,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

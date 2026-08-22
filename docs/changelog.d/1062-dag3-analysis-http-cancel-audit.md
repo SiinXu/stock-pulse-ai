@@ -1,0 +1,3 @@
+- [Added] Emit fail-closed `analysis.cancel` security-audit events for HTTP analysis task cancel, with attempt-before-cancel and additive 503 `operation_completed` semantics. Existing 200 and 404 cancel protocol is unchanged (Refs #1062).
+- [Tests] Cover HTTP cancel audit happy path, attempt fail-closed, idempotent completion, persist-vs-block 503, preserved 404, durable query, redaction, and admission isolation (Refs #1062).
+- [Docs] Mark analysis HTTP cancel as Landed on the privileged coverage map; remaining #1062 DAG is DAG-4/5 (Refs #1062).

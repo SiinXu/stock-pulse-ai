@@ -88,7 +88,7 @@ Legend:
 | HITL proposal / transition / consume / rule | `approval_proposal`, `approval_transition`, `approval_consume`, `approval_rule`, `approval_completion` | **Landed** | [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) closed 2026-07-25. `src/services/approval_service.py`. Default-off; see [human-approvals_EN.md](human-approvals_EN.md) |
 | Plugin load/enable/disable/reload | `plugin.lifecycle` | **Landed** | Administrator mutations fail closed; **startup** load is best-effort so one recorder outage does not block unrelated plugins |
 | MCP auth | `mcp.auth` | **Landed** | `src/mcp_server/auth_gate.py`, `src/mcp_server/server.py` |
-| MCP tool list / call / cancel | `mcp.request` | **Landed** | Includes `action=mcp.request.cancel`. HTTP analysis cancel is a different privileged stop (DAG-3) |
+| MCP tool list / call / cancel | `mcp.request` | **Landed** | Includes `action=mcp.request.cancel`. HTTP analysis cancel is a different privileged stop (`analysis.cancel`, DAG-3 landed) |
 | Local OCR / CLI process | `local_process.execute` | **Landed** | Targets `local_process.ocr` / `local_process.cli` |
 | Capability register/update/retire and unauthenticated deny | `capability.write` | **Landed** | `src/capability_registry/write_audit.py`; capability writes are **not** auth-exempt |
 | Research API conclusions | `research_api.request` | **Landed** | `src/api/v1/endpoints/research.py` |
@@ -104,7 +104,7 @@ Legend:
 | Portfolio position analysis | `src/api/v1/endpoints/portfolio.py` `analyze_position` (`query_source="portfolio"`, actor `api_client`/`portfolio_submitter`) | **Landed** | HTTP analysis admission; holding quantity/cost/account are queue kwargs only | DAG-1 |
 | HTTP sync `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **Landed** | Same `analysis.submit` contract as async; attempt before `analyze_stock`, completion `success`/`failure` | DAG-1 |
 | Scheduled-task create/enable/disable | `src/api/v1/endpoints/scheduled_tasks.py` → `ScheduledTaskService.create_task` / `set_enabled` | **Landed** | `scheduled_task.write` attempt-before-persist; HTTP actor `administrator`/`authenticated_admin`/`local_operator`/`desktop_operator`. Attempt-store `503` uses `operation_completed=false`; post-write completion-store `503` uses `operation_completed=true` plus `task_id`/`enabled`. Reject/failure completion is best-effort so domain `400`/`404`/`500` is preserved. Internal quarantine uses `repository.set_enabled` and is not this event. No PUT/PATCH/DELETE definition routes exist | DAG-2 |
-| Analysis HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task` (route on `main` via [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466)) | **Missing** | Privileged stop of running analysis. #1466 landed the route **without** security-audit. DAG-3 is audit-only and must not change cancel wire behavior | DAG-3 |
+| Analysis HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task` → `AnalysisApiService.cancel_analysis_task` | **Landed** | `analysis.cancel` attempt-before-cancel at the HTTP adapter only. Actor `api_client` / `analysis_canceller`. Existing 200/404 protocol is unchanged. Attempt-store `503` uses `operation_completed=false` and does not call `cancel`. Post-cancel completion-store `503` uses `operation_completed=true` plus `task_id`/`status`. Reject/failure completion is best-effort so domain `404` is preserved. Internal queue cancel, discovery cancel, worker polls, and MCP `mcp.request.cancel` are not this event | DAG-3 |
 | Report Markdown/HTML/PDF export | `src/api/v1/endpoints/report_export.py` | **Missing** | AUDIT-02 export / protected-data. Optional follow-on | DAG-4 |
 | History delete (by code / by ids) | `src/api/v1/endpoints/history.py` | **Missing** | Protected-data destruction. Optional follow-on | DAG-4 |
 | Config profiles apply/save | `src/services/config_profile_service.py` → `SystemConfigService.update` | **Missing** | Same privileged config mutation as HTTP `system_config.write` | DAG-5 |
@@ -131,6 +131,18 @@ completion recording is best-effort and must not replace those statuses.
 Scheduler quarantine still uses `repository.set_enabled` and does not emit this
 event.
 
+DAG-3 records `analysis.cancel` at HTTP
+`POST /api/v1/analysis/tasks/{task_id}/cancel` only. Attempt is committed
+before `task_queue.cancel`. Metadata is limited to kind, status_before,
+status_after, report_type, stock_code, and idempotent — never query text,
+skills, request_context, cookies, or secrets. HTTP `503`
+`security_audit_unavailable` includes `operation_completed`: `false` when the
+attempt could not be written (cancel not called) and `true` when cancel
+already ran but completion could not be written (`task_id` and `status` are
+included). Unknown id and wrong kind keep `404`. Internal
+`TaskExecutionPort.cancel` / queue cancel, candidate-discovery cancel, worker
+cooperative polls, and MCP `mcp.request.cancel` do not emit this event.
+
 DAG-5 should audit `SystemConfigService.update` once rather than patching each caller. The already-audited HTTP `system_config.write` path must not double-emit.
 
 ### Deferred (not in this DAG)
@@ -154,7 +166,7 @@ or size evidence—never image bytes, prompts, stdout, or secrets.
 
 ## Remaining Coverage DAG
 
-Do not stack remaining DAG-3 through DAG-5 into one PR. Do not include
+Do not stack remaining DAG-4 through DAG-5 into one PR. Do not include
 watchlist, portfolio CRUD, or alerts. Do not fold market-review, candidate
 discovery, or AlphaSift into DAG-1.
 
@@ -170,9 +182,10 @@ DAG-0  this coverage map (docs only; no runtime behavior)
   │            HTTP create/enable/disable; not dispatch, not quarantine
   │            independent of DAG-1
   │
-  ├── DAG-3  analysis HTTP cancel audit
+  ├── DAG-3  analysis HTTP cancel audit (landed)
   │            route already on main via #1466;
-  │            add durable audit without changing cancel wire behavior
+  │            durable audit added; 200/404 protocol unchanged;
+  │            additive fail-closed 503 operation_completed
   │
   └── DAG-4  report export + history delete
                optional AUDIT-02; independent
@@ -189,7 +202,7 @@ Suggested later titles (English, no tool prefix):
 1. `docs: publish privileged security-audit coverage map for #1062` (DAG-0, landed)
 2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths` (DAG-1, landed)
 3. `feat: emit security-audit events for scheduled-task mutations` (DAG-2, landed)
-4. `feat: audit analysis task cancel at the HTTP boundary` (route already on main via #1466)
+4. `feat: audit analysis task cancel at the HTTP boundary` (DAG-3, landed)
 5. `feat: audit report export and history deletion`
 
 Keep #1062 open until remaining in-scope rows are **Landed** or explicitly
@@ -202,7 +215,7 @@ These are documentation facts, not GitHub mutations performed by this page:
 - #1062 Workstream A–D and acceptance checkboxes are still unchecked on the
   live issue. The original A-list HTTP/MCP/tool/HITL/plugin/local-process
   paths and evidence-package export are already **Landed** or **Partial**.
-  Remaining boxes should later list DAG-3..5 only.
+  Remaining boxes should later list DAG-4..5 only.
 - [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) HITL gates are
   closed and emitting `approval_*` events. A Current Gaps row that still says
   gates are missing is stale; see [security-baseline.md](security-baseline.md).
@@ -255,7 +268,7 @@ Auth middleware exemptions are login, status, health, scorecard, docs, and
 OpenAPI only. Capability writes are **not** exempt; an unauthenticated deny
 emits `capability.write` or fails closed with `503`. Actor ids are bounded
 tokens (`admin_session`, `unauthenticated`, `capability_registry`,
-`analysis_submitter`, `bot`, `scheduled_task`, `portfolio_submitter`,
+`analysis_submitter`, `analysis_canceller`, `bot`, `scheduled_task`, `portfolio_submitter`,
 `authenticated_admin`, `local_operator`, `desktop_operator`), not emails. MCP capability `security_audit_admin` is
 `not_exposed`.
 
@@ -283,7 +296,8 @@ not call the mutation service, auth policy/session/password changes do not
 proceed, config export/import/rollback do not run, a tool handler is not
 invoked, analysis work is not enqueued, MCP discovery/tool calls are rejected,
 administrator plugin mutations stop, local OCR/CLI process starts do not
-proceed, and scheduled-task create/enable/disable do not persist. Completion-write failures are also surfaced rather than swallowed.
+proceed, scheduled-task create/enable/disable do not persist, and HTTP analysis
+cancel does not call `task_queue.cancel`. Completion-write failures are also surfaced rather than swallowed. After a cancel has already been requested, a completion-store failure is HTTP `503` with `operation_completed=true`.
 
 Audit write failures are never silent: the service logs a redacted
 `security_audit_append_failed` / related error via `log_safe_exception`, and

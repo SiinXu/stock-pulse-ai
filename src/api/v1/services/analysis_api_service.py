@@ -57,6 +57,16 @@ from src.services._analysis_report_projection import (
     project_analysis_report,
     project_persisted_analysis_report,
 )
+from src.api.v1.services.analysis_cancel_audit import (
+    AnalysisCancelAuditCompletionUnavailable,
+    cancel_metadata,
+    is_idempotent_status,
+    record_analysis_cancel_audit,
+    record_analysis_cancel_audit_best_effort,
+    record_analysis_cancel_completion_best_effort,
+    status_text,
+    success_reason_code,
+)
 from src.services.analysis_submission_service import (
     AnalysisSubmissionService,
     build_submission_command,
@@ -1179,22 +1189,89 @@ class AnalysisApiService:
     def _analysis_task_not_found(self, task_id: str):
         return api_error(404, "not_found", f"任务 {task_id} 不存在或已过期")
 
-    def cancel_analysis_task(self, task_id: str) -> TaskStatus:
+    def cancel_analysis_task(
+        self,
+        task_id: str,
+        *,
+        security_audit: SecurityAuditRecorder,
+    ) -> TaskStatus:
         """Request cancel for a kind-scoped stock analysis task.
 
         Ownership is the same session that can list/status the task: the
         process-local queue has no per-user ACL. Wrong-kind tasks (discovery,
         market review, local model) 404 without calling ``cancel``.
+        Attempt is persisted before cancel; completion is persisted after.
         """
+        recorder = require_security_audit_recorder(security_audit)
+        correlation_id = SecurityAuditService.new_correlation_id()
         task_queue = self.get_task_queue()
         existing = task_queue.get_task(task_id)
-        if existing is None or getattr(existing, "kind", None) != STOCK_ANALYSIS_TASK_KIND:
+        kind = getattr(existing, "kind", None) if existing is not None else None
+        status_before = (
+            status_text(getattr(existing, "status", None))
+            if existing is not None
+            else None
+        )
+        if existing is None or kind != STOCK_ANALYSIS_TASK_KIND:
+            record_analysis_cancel_audit_best_effort(
+                recorder,
+                task_id=task_id,
+                correlation_id=correlation_id,
+                metadata=cancel_metadata(existing, status_before=status_before),
+                outcome="rejected",
+                reason_code="not_found" if existing is None else "wrong_kind",
+            )
             raise self._analysis_task_not_found(task_id)
+
+        metadata = cancel_metadata(
+            existing,
+            status_before=status_before,
+            idempotent=is_idempotent_status(status_before),
+        )
+        record_analysis_cancel_audit(
+            recorder,
+            phase="attempt",
+            task_id=task_id,
+            correlation_id=correlation_id,
+            metadata=metadata,
+        )
         try:
             task_queue.cancel(task_id)
         except TaskNotFoundError as exc:
+            record_analysis_cancel_completion_best_effort(
+                recorder,
+                task_id=task_id,
+                correlation_id=correlation_id,
+                metadata=metadata,
+                outcome="rejected",
+                reason_code="not_found",
+            )
             raise self._analysis_task_not_found(task_id) from exc
-        return self.get_analysis_status(task_id)
+
+        snapshot = self.get_analysis_status(task_id)
+        status_after = status_text(snapshot.status)
+        completion_metadata = cancel_metadata(
+            existing,
+            status_before=status_before,
+            status_after=status_after,
+            idempotent=is_idempotent_status(status_before),
+        )
+        try:
+            record_analysis_cancel_audit(
+                recorder,
+                phase="completion",
+                task_id=task_id,
+                correlation_id=correlation_id,
+                metadata=completion_metadata,
+                outcome="success",
+                reason_code=success_reason_code(status_after),
+            )
+        except SecurityAuditUnavailable:
+            raise AnalysisCancelAuditCompletionUnavailable(
+                task_id=str(snapshot.task_id),
+                status=status_after,
+            ) from None
+        return snapshot
 
     def load_sync_fundamental_sources(self, 
         query_id: str,
