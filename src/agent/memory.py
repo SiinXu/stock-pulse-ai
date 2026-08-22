@@ -139,7 +139,7 @@ class AgentMemory:
                     was_correct=None,
                 ))
             return entries
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - history lookup failures are safely logged and return no entries
             log_safe_exception(
                 logger,
                 "Agent memory stock history lookup failed",
