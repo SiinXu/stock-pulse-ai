@@ -66,7 +66,7 @@ English version: [Durable Security Audit](security-audit.md).
 | 配置导入 | `system_config.import` | **已落地** | 同上边界 |
 | 配置回滚 | `system_config.rollback` | **已落地** | attempt 失败则阻止恢复 |
 | 工具允许/拒绝 | `tool.execute` | **已落地** | `src/agent/runtime/tool_session.py`；completion 写失败为 `retriable=false` |
-| 分析策略接受/拒绝 | `analysis.submit` | **部分** | 仅 `AnalysisSubmissionService`（HTTP 异步 `/analyze`、MCP `trigger_analysis`、事件触发告警）。Bot、定时任务派发、组合 `analyze_position`、HTTP **同步** `/analyze` 会旁路。负责人：DAG-1 |
+| 分析策略接受/拒绝 | `analysis.submit` | **已落地** | `AnalysisSubmissionService` 与共享 `record_audit`：HTTP 异步 `/analyze`、HTTP **同步** `/analyze`、MCP `trigger_analysis`、事件触发告警、bot `/analyze`、定时任务派发、组合 `analyze_position`。市场复盘 / 候选发现 / AlphaSift 仍是另一套队列 API（不是本事件）。 |
 | 审计包 / 证据链导出 | `audit_package.export` / `evidence_chain.export` | **已落地** | `src/api/v1/endpoints/evidence_pack.py`。产品包完整性仍属 [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127)；这不是第二条安全审计落点。见 [证据链审计包](evidence-chain-audit-package_EN.md) |
 
 中文旧表把证据包导出写成“不在范围”，与英文 Connected 表及当前代码不一致；以上行以代码为准。
@@ -89,12 +89,12 @@ English version: [Durable Security Audit](security-audit.md).
 
 | 操作 | 入口 | 状态 | 为何属于 #1062 | 负责人 |
 | --- | --- | --- | --- | --- |
-| Bot `/analyze` | `src/bot/commands/analyze.py` → `get_task_queue().submit_task`（`query_source="bot"`） | **缺失** | 分析执行被接受但没有 `analysis.submit` | DAG-1 |
-| 定时任务派发 | `src/services/scheduled_task_service.py` → `submit_tasks_batch`（`query_source="scheduled_task"`） | **缺失** | 自主分析入队 | DAG-1 |
-| 组合持仓分析 | `src/api/v1/endpoints/portfolio.py` `analyze_position`（`query_source="portfolio"`） | **缺失** | HTTP 分析入队旁路 | DAG-1 |
-| HTTP 同步 `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **缺失** | 与异步共用 `analysis.submit` 合同；直接调用 `AnalysisService.analyze_stock` 且无 recorder | DAG-1 |
+| Bot `/analyze` | `src/bot/commands/analyze.py` → `AnalysisSubmissionService.submit`（`query_source="bot"`，actor `bot`/`bot`） | **已落地** | 先 attempt 再入队；request_context 留在任务上，不进入审计 metadata | DAG-1 |
+| 定时任务派发 | `src/services/scheduled_task_service.py` → `submit_tasks_batch`（`query_source="scheduled_task"`，actor `scheduler`/`scheduled_task`） | **已落地** | attempt 在入队 fence 前单独提交，避免 SQLite 双重写锁；已拥有执行的 retry 不是新的 `analysis.submit` | DAG-1 |
+| 组合持仓分析 | `src/api/v1/endpoints/portfolio.py` `analyze_position`（`query_source="portfolio"`，actor `api_client`/`portfolio_submitter`） | **已落地** | HTTP 分析入队；持仓数量/成本/账户只作为队列 kwargs | DAG-1 |
+| HTTP 同步 `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **已落地** | 与异步共用 `analysis.submit` 合同；`analyze_stock` 前写 attempt，completion 为 `success`/`failure` | DAG-1 |
 | 定时任务创建/启用/禁用 | `src/api/v1/endpoints/scheduled_tasks.py` | **缺失** | 特权自动化控制面。不存在 PUT/PATCH/DELETE 定义路由 | DAG-2 |
-| 分析 HTTP cancel | 开放 PR [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466)；不在 `main` | **缺失（即将进入）** | 停止运行中分析的特权控制。#1466 增加路由但**不含**安全审计。不要把审计叠进该 PR | DAG-3，待 #1466 合并后 rebase |
+| 分析 HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task`（路由已随 [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466) 进入 `main`） | **缺失** | 停止运行中分析的特权控制。#1466 已落地路由但**不含**安全审计。DAG-3 只补审计，不得改 cancel 线协议 | DAG-3 |
 | 报告 Markdown/HTML/PDF 导出 | `src/api/v1/endpoints/report_export.py` | **缺失** | AUDIT-02 导出/受保护数据。可选后续 | DAG-4 |
 | 历史删除（按代码 / 按 id） | `src/api/v1/endpoints/history.py` | **缺失** | 受保护数据销毁。可选后续 | DAG-4 |
 | 配置预设应用/保存 | `src/services/config_profile_service.py` → `SystemConfigService.update` | **缺失** | 与 HTTP `system_config.write` 同一特权配置变更 | DAG-5 |
@@ -104,11 +104,11 @@ English version: [Durable Security Audit](security-audit.md).
 | HTTP 市场复盘 / 候选发现 / AlphaSift | analysis API、`candidate_discovery.py`、`alphasift.py` 的 `submit_background_task` | **缺失** | 另一套队列 API 上的特权后台执行。**不是** DAG-1 | 覆盖图具名行；后续负责人 |
 | 投资框架变更 | `src/services/investment_framework_service.py` | **缺失** | 分析策略内容；除非明确视为策略控制，否则延期 | 延期，除非重新归类 |
 
-DAG-1 **不能**把上述调用方原样包进今天的 `AnalysisSubmissionService.submit`。
-该服务不传递 `query_source`、`request_context`、`portfolio_context`、
-`strict_skill_selection`，并把 actor 写死为 `api_client` /
-`analysis_submitter`。应扩展 command 与 actor 身份，或共享 `record_audit`
-以及相同的“先 attempt 再入队” fail-closed 顺序。
+DAG-1 已扩展 `AnalysisSubmissionCommand`（`query_source`、`request_context`、
+`portfolio_context`、`strict_skill_selection` 与 actor 身份），并共享
+`record_audit` 以及“先 attempt 再执行受保护操作”的 fail-closed 顺序。HTTP 异步 /
+MCP / 事件触发仍使用 `api_client` / `analysis_submitter`。不要把市场复盘、候选
+发现或 AlphaSift 折进本事件。
 
 DAG-5 应在 `SystemConfigService.update` 上审计一次，而不是逐入口打补丁。
 已经审计的 HTTP `system_config.write` 路径不得重复写入。
@@ -138,7 +138,7 @@ prompt、stdout 或密钥。
 ```text
 DAG-0  本覆盖图（仅文档；无运行时行为）
   │
-  ├── DAG-1  分析入队
+  ├── DAG-1  分析入队（已落地）
   │            bot + 定时任务派发 + 组合 analyze_position
   │            + HTTP 同步 /analyze
   │            保留 query_source / 上下文 kwargs / actor 身份
@@ -147,8 +147,8 @@ DAG-0  本覆盖图（仅文档；无运行时行为）
   │            独立于 DAG-1
   │
   ├── DAG-3  分析 HTTP cancel 审计
-  │            阻塞于 PR #1466 合并；rebase 到该 head；
-  │            不要叠进进行中的 cancel PR
+  │            路由已随 #1466 进入 main；
+  │            只补持久审计，不得改 cancel 线协议
   │
   └── DAG-4  报告导出 + 历史删除
                可选 AUDIT-02；独立
@@ -162,10 +162,10 @@ DAG-5  SystemConfigService.update 旁路
 
 后续建议标题（英文，无工具前缀）：
 
-1. `docs: publish privileged security-audit coverage map for #1062`（本切片）
-2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths`
+1. `docs: publish privileged security-audit coverage map for #1062`（DAG-0，已落地）
+2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths`（DAG-1，已落地）
 3. `feat: emit security-audit events for scheduled-task mutations`
-4. `feat: audit analysis task cancel at the HTTP boundary`（#1466 之后）
+4. `feat: audit analysis task cancel at the HTTP boundary`（路由已随 #1466 进入 main）
 5. `feat: audit report export and history deletion`
 
 在范围内剩余行变为 **已落地** 或带负责人的 **延期** 之前，保持 #1062 开放。
@@ -218,7 +218,7 @@ correlation / UTC 时间过滤，需要有效的单管理员会话。认证关�
 鉴权中间件豁免仅限 login、status、health、scorecard、docs 与 OpenAPI。能力
 写入**不**在豁免名单；未认证拒绝会写入 `capability.write` 或 fail-closed
 `503`。Actor id 是有界 token（`admin_session`、`unauthenticated`、
-`capability_registry`、`analysis_submitter`），不是邮箱。MCP 能力
+`capability_registry`、`analysis_submitter`、`bot`、`scheduled_task`、`portfolio_submitter`），不是邮箱。MCP 能力
 `security_audit_admin` 为 `not_exposed`。
 
 内存 outbound-activity 环形缓冲（`GET /api/v1/security/outbound-activity`）

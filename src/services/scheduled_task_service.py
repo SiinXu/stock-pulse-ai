@@ -179,6 +179,7 @@ class ScheduledTaskService:
         clock=_utc_now,
         market_session_provider=classify_market_session,
         agent_skill_ids_provider=_available_agent_skill_ids,
+        security_audit_factory: Optional[Callable[[], Any]] = None,
     ) -> None:
         self._repository = repository
         self._repository_factory = repository_factory
@@ -188,6 +189,7 @@ class ScheduledTaskService:
         self._market_session_provider = market_session_provider
         self._agent_skill_ids_provider = agent_skill_ids_provider
         self._tick_lock = threading.Lock()
+        self._security_audit_factory = security_audit_factory
 
     @property
     def repository(self) -> ScheduledTaskRepository:
@@ -1408,6 +1410,7 @@ class ScheduledTaskService:
             )
             return
         queue = self._queue()
+        admission_audit = self._begin_analysis_admission_audit(run)
 
         def update_factory(
             task: ScheduledTaskRecord,
@@ -1584,24 +1587,15 @@ class ScheduledTaskService:
                             "scheduled_task_research_capability_unavailable"
                         ),
                     )
-            try:
-                accepted, duplicates = queue.submit_tasks_batch(**submission)
-            except Exception as exc:  # broad-exception: fallback_recorded - canonical batch submission rolls back rejected queue state.
-                log_safe_exception(
-                    logger,
-                    "Scheduled task dispatch admission failed",
-                    exc,
-                    error_code="scheduled_task_dispatch_failed",
-                    context={
-                        "run_id": current_run.id,
-                        "task_id": current_run.task_id,
-                    },
-                )
-                return self._dispatch_failure_fields(
-                    current_run,
-                    now,
-                    error_code="scheduled_task_dispatch_failed",
-                )
+            accepted, duplicates, blocked = self._submit_analysis_batch_with_audit(
+                queue,
+                submission,
+                current_run,
+                now,
+                admission_audit,
+            )
+            if blocked is not None:
+                return blocked
 
             accepted = list(accepted or [])
             duplicates = list(duplicates or [])
@@ -1630,6 +1624,7 @@ class ScheduledTaskService:
                     now,
                     error_code="scheduled_task_dispatch_state_lost",
                 )
+            admission_audit["accepted" if owned else "duplicate"] = True
             return self._running_admission_fields(
                 current_run,
                 now,
@@ -1637,25 +1632,12 @@ class ScheduledTaskService:
                 owned=owned,
             )
 
-        try:
-            result = self.repository.update_run_under_definition_fence(
-                run_id=run.id,
-                expected_schema_version=run.definition_schema_version,
-                expected_dispatch_token=dispatch_token,
-                allowed_run_statuses=[ScheduledRunStatus.DISPATCHING.value],
-                now=now,
-                update_factory=update_factory,
-            )
-        except Exception as exc:  # broad-exception: fallback_recorded - a durable dispatch reservation prevents blind replay after an uncertain commit.
-            log_safe_exception(
-                logger,
-                "Scheduled task admission transaction failed closed",
-                exc,
-                error_code="scheduled_task_admission_state_uncertain",
-                context={"run_id": run.id, "task_id": run.task_id},
-            )
+        result = self._run_admission_fence_with_audit(
+            run, dispatch_token=dispatch_token, now=now,
+            update_factory=update_factory, admission_audit=admission_audit,
+        )
+        if result is None:
             return
-
         if result.outcome == "applied":
             if (
                 result.run is not None
@@ -1986,10 +1968,14 @@ class ScheduledTaskService:
 
 _ADMISSION_FIELDS_MODULE_NAME = "src.services.scheduled_task_parts.admission_fields"
 _admission_fields_module = importlib.import_module(_ADMISSION_FIELDS_MODULE_NAME)
+_analysis_admission_audit_module = importlib.import_module(
+    "src.services.scheduled_task_parts.analysis_admission_audit"
+)
 
 
 def _assemble_admission_fields_facade(
     fields_module=_admission_fields_module,
+    audit_module=_analysis_admission_audit_module,
 ) -> None:
     """Rebind admission field builders onto ScheduledTaskService."""
     bound_method_names = fields_module.bind_admission_fields_facade(
@@ -2001,16 +1987,29 @@ def _assemble_admission_fields_facade(
             "Unexpected ScheduledTaskService admission field methods: "
             f"{bound_method_names!r}"
         )
+    audit_names = audit_module.bind_analysis_admission_audit_facade(
+        ScheduledTaskService,
+        globals(),
+    )
+    if audit_names != audit_module.EXPECTED_ANALYSIS_ADMISSION_AUDIT_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected ScheduledTaskService analysis admission audit methods: "
+            f"{audit_names!r}"
+        )
 
 
 _assemble_admission_fields_facade()
 _admission_fields_module._install_facade_reload_hook(
     _assemble_admission_fields_facade
 )
+_analysis_admission_audit_module._install_facade_reload_hook(
+    _assemble_admission_fields_facade
+)
 del (
     _ADMISSION_FIELDS_MODULE_NAME,
     _assemble_admission_fields_facade,
     _admission_fields_module,
+    _analysis_admission_audit_module,
 )
 
 

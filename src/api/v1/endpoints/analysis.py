@@ -102,6 +102,8 @@ def _record_analysis_submission_audit(
     outcome: str = "pending",
     reason_code: str = "attempt_started",
     metadata: dict[str, Any] | None = None,
+    actor_type: str | None = None,
+    actor_id: str | None = None,
 ) -> None:
     return _analysis_api_service_cls().record_analysis_submission_audit(
         service,
@@ -111,6 +113,8 @@ def _record_analysis_submission_audit(
         outcome=outcome,
         reason_code=reason_code,
         metadata=metadata,
+        actor_type=actor_type,
+        actor_id=actor_id,
     )
 
 
@@ -192,8 +196,14 @@ def _handle_async_analysis_batch(
 def _handle_sync_analysis(
     stock_code: str,
     request: AnalyzeRequest,
+    *,
+    security_audit: SecurityAuditRecorder,
 ) -> AnalysisResultResponse:
-    return _analysis_api_service().handle_sync_analysis(stock_code, request)
+    return _analysis_api_service().handle_sync_analysis(
+        stock_code,
+        request,
+        security_audit=security_audit,
+    )
 
 
 def _format_sse_event(event_type: str, data: Dict[str, Any]) -> str:

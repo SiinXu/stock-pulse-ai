@@ -92,23 +92,48 @@ class AnalyzeCommand(BotCommand):
         try:
             # Submit to the unified task execution authority: same queue, Task ID with API/Web
             # Deduplication keys, status enumeration and error classification, Bot no longer maintains parallel task lifecycles.
-            from src.services.task_queue import get_task_queue, DuplicateTaskError
             from src.enums import ReportType
+            from src.services.analysis_submission_service import (
+                AnalysisSubmissionService,
+                build_submission_command,
+            )
+            from src.services.security_audit_service import (
+                SecurityAuditUnavailable,
+                get_security_audit_service,
+                require_security_audit_recorder,
+            )
+            from src.services.task_queue import DuplicateTaskError, get_task_queue
 
-            task = get_task_queue().submit_task(
-                stock_code=code,
+            command = build_submission_command(
+                stock_codes=[code],
                 report_type=report_type,
                 query_source="bot",
                 request_context=to_analysis_request_context(message),
+                actor_type="bot",
+                actor_id="bot",
+            )
+            submission = AnalysisSubmissionService(get_task_queue=get_task_queue).submit(
+                command,
+                security_audit=require_security_audit_recorder(
+                    get_security_audit_service()
+                ),
             )
         except DuplicateTaskError:
             # Unified authoritative deduplication by normalized stock code; old path without deduplication will trigger concurrent analysis.
-            return BotResponse.markdown_response(
-                f"⏳ **该股票正在分析中**\n\n"
-                f"• 股票代码: `{code}`\n\n"
-                f"• 市场 / Market: {symbol.market_display_name}\n\n"
-                f"请等待当前分析完成后再试。"
+            return self._duplicate_response(code, symbol.market_display_name)
+        except SecurityAuditUnavailable as exc:
+            log_safe_exception(
+                logger,
+                "[AnalyzeCommand] Security audit unavailable",
+                exc,
+                error_code="security_audit_unavailable",
+                context={
+                    "stock_code": code,
+                    "market": symbol.market,
+                    "report_type": report_type,
+                },
             )
+            return BotResponse.error_response("分析失败，请稍后重试")
         except Exception as exc:
             # broad-exception: fallback_recorded - bot command boundary must not leak a traceback; the failure is safe-logged and mapped to a stable public reply.
             log_safe_exception(
@@ -124,6 +149,11 @@ class AnalyzeCommand(BotCommand):
             )
             return BotResponse.error_response("分析失败，请稍后重试")
 
+        if submission.duplicate_errors:
+            return self._duplicate_response(code, symbol.market_display_name)
+        if not submission.accepted_tasks:
+            return BotResponse.error_response("分析失败，请稍后重试")
+        task = submission.accepted_tasks[0]
         task_id = task.task_id or ""
         return BotResponse.markdown_response(
             f"✅ **分析任务已提交**\n\n"
@@ -132,4 +162,13 @@ class AnalyzeCommand(BotCommand):
             f"• 报告类型: {ReportType.from_str(report_type).display_name}\n"
             f"• 任务 ID: `{task_id[:20]}...`\n\n"
             f"分析完成后将自动推送结果。"
+        )
+
+    @staticmethod
+    def _duplicate_response(code: str, market_display_name: str) -> BotResponse:
+        return BotResponse.markdown_response(
+            f"⏳ **该股票正在分析中**\n\n"
+            f"• 股票代码: `{code}`\n\n"
+            f"• 市场 / Market: {market_display_name}\n\n"
+            f"请等待当前分析完成后再试。"
         )

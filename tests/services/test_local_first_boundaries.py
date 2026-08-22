@@ -11,6 +11,7 @@ import pytest
 from fastapi import HTTPException
 
 from src.api.v1.endpoints.analysis import _handle_sync_analysis
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 from src.api.v1.endpoints.stocks import get_stock_history
 from src.api.v1.schemas.analysis import AnalyzeRequest
 from src.data_provider.base import DataFetcherManager
@@ -368,6 +369,7 @@ def test_sync_analysis_api_returns_structured_409() -> None:
             _handle_sync_analysis(
                 "600519",
                 AnalyzeRequest(stock_code="600519", async_mode=False),
+                security_audit=SecurityAuditRecorderStub(),
             )
 
     assert exc_info.value.status_code == 409

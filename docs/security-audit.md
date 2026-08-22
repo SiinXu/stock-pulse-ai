@@ -78,7 +78,7 @@ Legend:
 | Config import (env restore) | `system_config.import` | **Landed** | Same bound |
 | Config last-good rollback | `system_config.rollback` | **Landed** | Attempt failure blocks restore |
 | Tool allow/deny | `tool.execute` | **Landed** | `src/agent/runtime/tool_session.py`; completion-write failure is `retriable=false` |
-| Analysis policy accept/reject | `analysis.submit` | **Partial** | Emitted only by `AnalysisSubmissionService` (HTTP async `/analyze`, MCP `trigger_analysis`, event-triggered alerts). Bot, scheduled-task dispatch, portfolio `analyze_position`, and HTTP **sync** `/analyze` bypass. Owner: DAG-1 |
+| Analysis policy accept/reject | `analysis.submit` | **Landed** | `AnalysisSubmissionService` plus shared `record_audit`: HTTP async `/analyze`, HTTP **sync** `/analyze`, MCP `trigger_analysis`, event-triggered alerts, bot `/analyze`, scheduled-task dispatch, and portfolio `analyze_position`. Market-review / candidate discovery / AlphaSift remain a different queue API (not this event). |
 | Audit-package / evidence-chain export | `audit_package.export` / `evidence_chain.export` | **Landed** | `src/api/v1/endpoints/evidence_pack.py`. Product package completeness remains [#127](https://github.com/SiinXu/stock-pulse-ai/issues/127); this is not a second security sink. See [Evidence chain audit package](evidence-chain-audit-package_EN.md) |
 
 ### Additional landed types (do not re-implement)
@@ -99,12 +99,12 @@ Legend:
 
 | Operation | Surface | Status | Why it is in scope | Owner |
 | --- | --- | --- | --- | --- |
-| Bot `/analyze` | `src/bot/commands/analyze.py` → `get_task_queue().submit_task` (`query_source="bot"`) | **Missing** | Analysis execution accepted without `analysis.submit` | DAG-1 |
-| Scheduled-task dispatch | `src/services/scheduled_task_service.py` → `submit_tasks_batch` (`query_source="scheduled_task"`) | **Missing** | Autonomous analysis admission | DAG-1 |
-| Portfolio position analysis | `src/api/v1/endpoints/portfolio.py` `analyze_position` (`query_source="portfolio"`) | **Missing** | HTTP analysis admission bypass | DAG-1 |
-| HTTP sync `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **Missing** | Same `analysis.submit` contract as async; calls `AnalysisService.analyze_stock` with no recorder | DAG-1 |
+| Bot `/analyze` | `src/bot/commands/analyze.py` → `AnalysisSubmissionService.submit` (`query_source="bot"`, actor `bot`/`bot`) | **Landed** | Attempt-before-queue; request_context stays on the task, not in audit metadata | DAG-1 |
+| Scheduled-task dispatch | `src/services/scheduled_task_service.py` → `submit_tasks_batch` (`query_source="scheduled_task"`, actor `scheduler`/`scheduled_task`) | **Landed** | Attempt is committed before the admission fence so SQLite is not double-locked; retry of an owned execution is not a new `analysis.submit` | DAG-1 |
+| Portfolio position analysis | `src/api/v1/endpoints/portfolio.py` `analyze_position` (`query_source="portfolio"`, actor `api_client`/`portfolio_submitter`) | **Landed** | HTTP analysis admission; holding quantity/cost/account are queue kwargs only | DAG-1 |
+| HTTP sync `/analyze` | `src/api/v1/services/analysis_api_service.py` `handle_sync_analysis` | **Landed** | Same `analysis.submit` contract as async; attempt before `analyze_stock`, completion `success`/`failure` | DAG-1 |
 | Scheduled-task create/enable/disable | `src/api/v1/endpoints/scheduled_tasks.py` | **Missing** | Privileged automation control plane. No PUT/PATCH/DELETE definition routes exist | DAG-2 |
-| Analysis HTTP cancel | Open PR [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466); not on `main` | **Missing (incoming)** | Privileged stop of running analysis. #1466 adds the route **without** security-audit. Do not stack audit onto that PR | DAG-3 after #1466 merges |
+| Analysis HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task` (route on `main` via [#1466](https://github.com/SiinXu/stock-pulse-ai/pull/1466)) | **Missing** | Privileged stop of running analysis. #1466 landed the route **without** security-audit. DAG-3 is audit-only and must not change cancel wire behavior | DAG-3 |
 | Report Markdown/HTML/PDF export | `src/api/v1/endpoints/report_export.py` | **Missing** | AUDIT-02 export / protected-data. Optional follow-on | DAG-4 |
 | History delete (by code / by ids) | `src/api/v1/endpoints/history.py` | **Missing** | Protected-data destruction. Optional follow-on | DAG-4 |
 | Config profiles apply/save | `src/services/config_profile_service.py` → `SystemConfigService.update` | **Missing** | Same privileged config mutation as HTTP `system_config.write` | DAG-5 |
@@ -114,7 +114,7 @@ Legend:
 | HTTP market-review / candidate discovery / AlphaSift | `submit_background_task` in analysis API, `candidate_discovery.py`, `alphasift.py` | **Missing** | Privileged background execution on a different queue API. **Not** DAG-1 | Named coverage-map row; later owner |
 | Investment-framework mutations | `src/services/investment_framework_service.py` | **Missing** | Analysis-policy content; defer unless framed as policy | Deferred unless reclassified |
 
-DAG-1 must not wrap those callers through today's `AnalysisSubmissionService.submit` unchanged. That service omits `query_source`, `request_context`, `portfolio_context`, and `strict_skill_selection`, and hard-codes `actor_type="api_client"` / `actor_id="analysis_submitter"`. Extend the command and actor identity, or share `record_audit` plus the same attempt-before-queue fail-closed order.
+DAG-1 extended `AnalysisSubmissionCommand` with `query_source`, `request_context`, `portfolio_context`, `strict_skill_selection`, and actor identity, and shares `record_audit` plus attempt-before-protected-operation fail-closed order. HTTP async / MCP / event-trigger keep `api_client` / `analysis_submitter`. Do not fold market-review, candidate discovery, or AlphaSift into this event.
 
 DAG-5 should audit `SystemConfigService.update` once rather than patching each caller. The already-audited HTTP `system_config.write` path must not double-emit.
 
@@ -146,7 +146,7 @@ DAG-1.
 ```text
 DAG-0  this coverage map (docs only; no runtime behavior)
   │
-  ├── DAG-1  analysis admission
+  ├── DAG-1  analysis admission (landed)
   │            bot + scheduled dispatch + portfolio analyze_position
   │            + HTTP sync /analyze
   │            preserve query_source / context kwargs / actor identity
@@ -155,8 +155,8 @@ DAG-0  this coverage map (docs only; no runtime behavior)
   │            independent of DAG-1
   │
   ├── DAG-3  analysis HTTP cancel audit
-  │            blocked on PR #1466 merge; rebase onto that head;
-  │            do not stack onto the in-flight cancel PR
+  │            route already on main via #1466;
+  │            add durable audit without changing cancel wire behavior
   │
   └── DAG-4  report export + history delete
                optional AUDIT-02; independent
@@ -170,10 +170,10 @@ DAG-5  SystemConfigService.update bypasses
 
 Suggested later titles (English, no tool prefix):
 
-1. `docs: publish privileged security-audit coverage map for #1062` (this slice)
-2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths`
+1. `docs: publish privileged security-audit coverage map for #1062` (DAG-0, landed)
+2. `fix: audit analysis admission on bot scheduler portfolio and sync HTTP paths` (DAG-1, landed)
 3. `feat: emit security-audit events for scheduled-task mutations`
-4. `feat: audit analysis task cancel at the HTTP boundary` (after #1466)
+4. `feat: audit analysis task cancel at the HTTP boundary` (route already on main via #1466)
 5. `feat: audit report export and history deletion`
 
 Keep #1062 open until remaining in-scope rows are **Landed** or explicitly
@@ -239,7 +239,7 @@ Auth middleware exemptions are login, status, health, scorecard, docs, and
 OpenAPI only. Capability writes are **not** exempt; an unauthenticated deny
 emits `capability.write` or fails closed with `503`. Actor ids are bounded
 tokens (`admin_session`, `unauthenticated`, `capability_registry`,
-`analysis_submitter`), not emails. MCP capability `security_audit_admin` is
+`analysis_submitter`, `bot`, `scheduled_task`, `portfolio_submitter`), not emails. MCP capability `security_audit_admin` is
 `not_exposed`.
 
 The in-memory outbound-activity ring (`GET /api/v1/security/outbound-activity`)

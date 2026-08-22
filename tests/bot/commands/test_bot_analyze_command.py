@@ -30,6 +30,7 @@ from src.bot.application_context import to_analysis_request_context
 from src.bot.commands.analyze import AnalyzeCommand
 from src.bot.models import BotMessage, ChatType
 from src.services.task_queue import AnalysisTaskQueue, DuplicateTaskError, TaskStatus
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class _SyncExecutor:
@@ -82,6 +83,9 @@ def _run_execute_with_real_queue(message: BotMessage, args, analyze_result):
         ), patch(
             "src.services.analysis_service.AnalysisService",
             return_value=service_instance,
+        ), patch(
+            "src.services.security_audit_service.get_security_audit_service",
+            return_value=SecurityAuditRecorderStub(),
         ):
             response = AnalyzeCommand().execute(message, args)
         return response, queue, service_instance.analyze_stock
@@ -143,9 +147,15 @@ def test_execute_full_report_type_reaches_runner() -> None:
 def test_execute_duplicate_stock_returns_friendly_message() -> None:
     message = _feishu_message("/analyze 600519")
     queue = MagicMock()
-    queue.submit_task.side_effect = DuplicateTaskError("600519", "existing-task-id")
+    queue.submit_tasks_batch.return_value = (
+        [],
+        [DuplicateTaskError("600519", "existing-task-id")],
+    )
 
-    with patch("src.services.task_queue.get_task_queue", return_value=queue):
+    with patch("src.services.task_queue.get_task_queue", return_value=queue), patch(
+        "src.services.security_audit_service.get_security_audit_service",
+        return_value=SecurityAuditRecorderStub(),
+    ):
         response = AnalyzeCommand().execute(message, ["600519"])
 
     assert response.markdown is True
@@ -160,9 +170,12 @@ def test_execute_duplicate_stock_returns_friendly_message() -> None:
 def test_execute_generic_failure_returns_stable_error() -> None:
     message = _feishu_message("/analyze 600519")
     queue = MagicMock()
-    queue.submit_task.side_effect = RuntimeError("boom")
+    queue.submit_tasks_batch.side_effect = RuntimeError("boom")
 
-    with patch("src.services.task_queue.get_task_queue", return_value=queue):
+    with patch("src.services.task_queue.get_task_queue", return_value=queue), patch(
+        "src.services.security_audit_service.get_security_audit_service",
+        return_value=SecurityAuditRecorderStub(),
+    ):
         response = AnalyzeCommand().execute(message, ["600519"])
 
     assert response.text == "❌ 错误：分析失败，请稍后重试"

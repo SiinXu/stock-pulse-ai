@@ -456,7 +456,7 @@ class PortfolioApiTestCase(unittest.TestCase):
         self.assertNotIn("portfolio_context", str(payload))
 
         args, kwargs = queue.submit_tasks_batch.call_args
-        self.assertEqual(args[0], ["600519"])
+        self.assertEqual(kwargs["stock_codes"], ["600519"])
         self.assertEqual(kwargs["selection_source"], "manual")
         self.assertEqual(kwargs["query_source"], "portfolio")
         self.assertEqual(kwargs["analysis_phase"], "intraday")
@@ -487,7 +487,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 202, resp.text)
         args, kwargs = queue.submit_tasks_batch.call_args
-        self.assertEqual(args[0], ["SH600519"])
+        self.assertEqual(kwargs["stock_codes"], ["SH600519"])
         self.assertEqual(kwargs["portfolio_context"]["symbol"], "SH600519")
 
     def test_position_analysis_matches_hk_suffix_position_symbol(self) -> None:
@@ -517,7 +517,7 @@ class PortfolioApiTestCase(unittest.TestCase):
 
         self.assertEqual(resp.status_code, 202, resp.text)
         args, kwargs = queue.submit_tasks_batch.call_args
-        self.assertEqual(args[0], ["HK01810"])
+        self.assertEqual(kwargs["stock_codes"], ["HK01810"])
         self.assertEqual(kwargs["portfolio_context"]["symbol"], "HK01810")
         self.assertEqual(kwargs["portfolio_context"]["market"], "hk")
         self.assertEqual(kwargs["portfolio_context"]["currency"], "HKD")

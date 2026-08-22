@@ -52510,6 +52510,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable"
           }
         },
         "summary": "Submit manual analysis for a held portfolio position",
