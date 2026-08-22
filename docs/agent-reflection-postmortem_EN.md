@@ -42,10 +42,13 @@ Entry: `src/agent/evolution/reflection.py` (`run_reflection_loop`, etc.).
 2. When enabled, emits typed lessons onto `ctx.meta["reflection_result"]`.
 3. Optional LLM critique limited by `AGENT_REFLECTION_LLM_BUDGET` (default 1, max 64).
 4. When `ctx.meta["mode_budget_account"]` is present, each reflection LLM call
-   also consumes one run-account turn. A run-account skip uses the existing
-   `budget_skipped` / `terminate_reason=budget` vocabulary and does not
-   increment past `max_llm_turns`. These calls use `llm_complete`, not
-   `run_agent_loop`, so they are not double-counted.
+   also consumes one run-account turn. The production Chat/single-agent loop
+   persists that account on the executor so end-of-run planning reflection can
+   find it. A run-account skip uses the existing `budget_skipped` /
+   `terminate_reason=budget` vocabulary and does not increment past
+   `max_llm_turns`. These calls use `llm_complete`, not `run_agent_loop`, so
+   they are not double-counted. End-of-run reflection does not reserve a
+   Decision turn; optional in-loop step-critique enrichment does.
 5. Optional in-run revise limited by `AGENT_REFLECTION_MAX_REVISE` (default 1).
 6. Soul / ToolSurface identity is snapshotted and re-asserted after the path.
 
