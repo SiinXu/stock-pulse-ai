@@ -31,7 +31,9 @@ from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
 )
+from src.services.security_audit_service import SecurityAuditUnavailable
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -122,6 +124,7 @@ class ConfigProfileService:
         config_version: str,
         reload_now: bool = True,
         actor: str = "config_profile_service",
+        security_audit: Any = None,
     ) -> Dict[str, Any]:
         """Apply one official preset through SystemConfigService.update."""
         preset = get_official_preset(preset_id)
@@ -156,7 +159,11 @@ class ConfigProfileService:
                 reload_now=reload_now,
                 validate_connectivity=False,
                 actor=actor,
+                security_audit=security_audit,
+                source="config_profile_preset",
             )
+        except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable):
+            raise
         except ConfigValidationError as exc:
             raise ConfigProfileValidationError(
                 "Preset apply failed validation",
@@ -260,6 +267,7 @@ class ConfigProfileService:
         config_version: str,
         reload_now: bool = True,
         actor: str = "config_profile_service",
+        security_audit: Any = None,
     ) -> Dict[str, Any]:
         """Validate and apply a stockpulse-profile YAML via SystemConfigService."""
         document = self._parse_and_validate_profile(content)
@@ -287,7 +295,11 @@ class ConfigProfileService:
                 reload_now=reload_now,
                 validate_connectivity=False,
                 actor=actor,
+                security_audit=security_audit,
+                source="config_profile_import",
             )
+        except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable):
+            raise
         except ConfigValidationError as exc:
             raise ConfigProfileValidationError(
                 "Profile import failed validation",

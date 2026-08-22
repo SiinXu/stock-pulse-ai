@@ -23,6 +23,7 @@ from src.config import ANSPIRE_LLM_MODEL_DEFAULT, DEFAULT_ALPHASIFT_INSTALL_SPEC
 from src.core.config_manager import ConfigManager
 from src.llm.backend_registry import GENERATION_ONLY_BACKEND_IDS
 from src.services.system_config_service import ConfigConflictError, ConfigImportError, ConfigValidationError, SystemConfigService
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class _SystemConfigServiceTestCaseBase(unittest.TestCase):
@@ -66,10 +67,17 @@ class _SystemConfigServiceTestCaseBase(unittest.TestCase):
         os.environ["ENV_FILE"] = str(self.env_path)
         Config.reset_instance()
 
+        self.write_audit_recorder = SecurityAuditRecorderStub()
+        self._write_audit_patcher = patch(
+            "src.services.security_audit_service.get_security_audit_service",
+            return_value=self.write_audit_recorder,
+        )
+        self._write_audit_patcher.start()
         self.manager = ConfigManager(env_path=self.env_path)
         self.service = SystemConfigService(manager=self.manager)
 
     def tearDown(self) -> None:
+        self._write_audit_patcher.stop()
         Config.reset_instance()
         if self._original_outbound_allowlist is None:
             os.environ.pop("OUTBOUND_HTTP_ALLOWLIST", None)

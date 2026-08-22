@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 
 
 class _SystemConfigUpdateMethods:
-    def update(
+    def _update_validated(
         self,
         config_version: str,
         items: Sequence[Dict[str, str]],

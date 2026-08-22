@@ -103,6 +103,9 @@ from src.services.system_config_service_parts.runtime_reliability import (
     build_connectivity_failure_issue as _build_connectivity_failure_issue,
     log_config_audit as _log_config_audit,
 )
+from src.services.system_config_service_parts.write_audit import (
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.utils.sanitize import (
     log_safe_exception,
     sanitize_diagnostic_text,
@@ -347,6 +350,7 @@ for _service_part_module_name, _service_part_class_name in (
     ("src.services.system_config_service_parts.core", "_SystemConfigCoreMethods"),
     ("src.services.system_config_service_parts.llm_operations", "_SystemConfigLLMOperationsMethods"),
     ("src.services.system_config_service_parts.updates_validation", "_SystemConfigUpdateMethods"),
+    ("src.services.system_config_service_parts.write_audit", "_SystemConfigWriteAuditMethods"),
     ("src.services.system_config_service_parts.notifications", "_SystemConfigNotificationMethods"),
     ("src.services.system_config_service_parts.setup", "_SystemConfigSetupMethods"),
     ("src.services.system_config_service_parts.llm_validation", "_SystemConfigLLMValidationMethods"),

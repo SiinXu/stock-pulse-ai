@@ -7,9 +7,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_config_profile_service
+from src.api.deps import get_config_profile_service, require_security_audit_service
 from src.api.v1.errors import api_error
 from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.config_profiles import (
@@ -28,7 +28,14 @@ from src.services.config_profile_service import (
     ConfigProfileService,
     ConfigProfileValidationError,
 )
-from src.services.system_config_service import ConfigConflictError
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+)
+from src.services.system_config_service import (
+    ConfigConflictError,
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -47,6 +54,30 @@ def _normalize_changes(changes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             }
         )
     return normalized
+
+
+def _config_profile_write_audit_unavailable(
+    *,
+    operation_completed: bool = False,
+    item: Dict[str, Any] | None = None,
+) -> HTTPException:
+    detail: Dict[str, Any] = {
+        "error": "security_audit_unavailable",
+        "message": (
+            "Configuration was persisted, but audit completion could not be persisted"
+            if operation_completed
+            else "Security audit storage is unavailable"
+        ),
+        "operation_completed": operation_completed,
+    }
+    if item is not None:
+        config_version = item.get("config_version")
+        if type(config_version) is str:
+            detail["config_version"] = config_version
+        applied_count = item.get("applied_count")
+        if type(applied_count) is int:
+            detail["applied_count"] = applied_count
+    return HTTPException(status_code=503, detail=detail)
 
 
 def _service_error(exc: ConfigProfileError):
@@ -137,6 +168,7 @@ def preview_config_preset(
         404: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
     },
     summary="Apply a configuration preset",
     description=(
@@ -148,6 +180,7 @@ def apply_config_preset(
     preset_id: str,
     request: ConfigPresetApplyRequest,
     service: ConfigProfileService = Depends(get_config_profile_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> ConfigPresetApplyResponse:
     try:
         payload = service.apply_preset(
@@ -155,9 +188,17 @@ def apply_config_preset(
             config_version=request.config_version,
             reload_now=request.reload_now,
             actor="config_profile_api",
+            security_audit=security_audit,
         )
         payload["changes"] = _normalize_changes(payload.get("changes") or [])
         return ConfigPresetApplyResponse.model_validate(payload)
+    except SystemConfigWriteAuditCompletionUnavailable as exc:
+        raise _config_profile_write_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
+    except SecurityAuditUnavailable:
+        raise _config_profile_write_audit_unavailable() from None
     except ConfigProfileError as exc:
         raise _service_error(exc)
     except ConfigConflictError as exc:
@@ -255,6 +296,7 @@ def preview_config_profile_import(
         400: {"model": ErrorResponse},
         409: {"model": ErrorResponse},
         500: {"model": ErrorResponse},
+        503: {"model": ErrorResponse},
     },
     summary="Apply stockpulse-profile YAML import",
     description=(
@@ -265,6 +307,7 @@ def preview_config_profile_import(
 def apply_config_profile_import(
     request: ConfigProfileImportRequest,
     service: ConfigProfileService = Depends(get_config_profile_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> ConfigProfileImportApplyResponse:
     try:
         payload = service.apply_import(
@@ -272,9 +315,17 @@ def apply_config_profile_import(
             config_version=request.config_version,
             reload_now=request.reload_now,
             actor="config_profile_api",
+            security_audit=security_audit,
         )
         payload["changes"] = _normalize_changes(payload.get("changes") or [])
         return ConfigProfileImportApplyResponse.model_validate(payload)
+    except SystemConfigWriteAuditCompletionUnavailable as exc:
+        raise _config_profile_write_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
+    except SecurityAuditUnavailable:
+        raise _config_profile_write_audit_unavailable() from None
     except ConfigProfileError as exc:
         raise _service_error(exc)
     except ConfigConflictError as exc:

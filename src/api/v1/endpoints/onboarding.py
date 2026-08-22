@@ -7,9 +7,9 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Literal
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 
-from src.api.deps import get_system_config_service
+from src.api.deps import get_system_config_service, require_security_audit_service
 from src.api.v1.errors import api_error
 from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.onboarding import (
@@ -28,10 +28,15 @@ from src.services.onboarding_plan_service import (
     OnboardingProfileValidationError,
     OnboardingSecretRejectedError,
 )
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+)
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
 )
 from src.utils.sanitize import log_safe_exception
 
@@ -43,6 +48,35 @@ _ERROR_RESPONSES = {
     409: {"model": ErrorResponse},
     500: {"model": ErrorResponse},
 }
+
+_APPLY_ERROR_RESPONSES = {
+    **_ERROR_RESPONSES,
+    503: {"model": ErrorResponse},
+}
+
+
+def _onboarding_write_audit_unavailable(
+    *,
+    operation_completed: bool = False,
+    item: Dict[str, Any] | None = None,
+) -> HTTPException:
+    detail: Dict[str, Any] = {
+        "error": "security_audit_unavailable",
+        "message": (
+            "Configuration was persisted, but audit completion could not be persisted"
+            if operation_completed
+            else "Security audit storage is unavailable"
+        ),
+        "operation_completed": operation_completed,
+    }
+    if item is not None:
+        config_version = item.get("config_version")
+        if type(config_version) is str:
+            detail["config_version"] = config_version
+        applied_count = item.get("applied_count")
+        if type(applied_count) is int:
+            detail["applied_count"] = applied_count
+    return HTTPException(status_code=503, detail=detail)
 
 
 def _plan_service(system_config: SystemConfigService) -> OnboardingPlanService:
@@ -98,7 +132,7 @@ def generate_onboarding_plan(
 @router.post(
     "/apply",
     response_model=OnboardingApplyResponse,
-    responses=_ERROR_RESPONSES,
+    responses=_APPLY_ERROR_RESPONSES,
     summary="Apply non-secret onboarding config recommendations",
     description=(
         "Writes only non-secret config keys through SystemConfigService. "
@@ -108,6 +142,7 @@ def generate_onboarding_plan(
 def apply_onboarding_plan(
     request: OnboardingApplyRequest,
     system_config: SystemConfigService = Depends(get_system_config_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> OnboardingApplyResponse:
     service = _plan_service(system_config)
     try:
@@ -117,11 +152,19 @@ def apply_onboarding_plan(
             model_available=request.model_available,
             prefer_llm=request.prefer_llm,
             confirm=request.confirm,
+            security_audit=security_audit,
         )
         return OnboardingApplyResponse.model_validate({
             **payload,
             "plan": payload["plan"],
         })
+    except SystemConfigWriteAuditCompletionUnavailable as exc:
+        raise _onboarding_write_audit_unavailable(
+            operation_completed=True,
+            item=exc.item,
+        ) from None
+    except SecurityAuditUnavailable:
+        raise _onboarding_write_audit_unavailable() from None
     except OnboardingProfileValidationError as exc:
         raise api_error(
             400,

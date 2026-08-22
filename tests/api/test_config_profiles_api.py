@@ -11,10 +11,12 @@ from fastapi.testclient import TestClient
 import pytest
 import yaml
 
+from src.api import deps as api_deps
 from src.api.v1.endpoints import config_profiles
 from src.services.config_presets import PROFILE_API_VERSION, PROFILE_KIND, is_secret_config_key
 from src.services.config_profile_service import ConfigProfileService
 from src.services.system_config_service import ConfigConflictError
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class FakeSystemConfigService:
@@ -72,6 +74,9 @@ def client():
     app = FastAPI()
     app.include_router(config_profiles.router, prefix="/api/v1/config-profiles")
     app.state.config_profile_service = service
+    app.dependency_overrides[api_deps.require_security_audit_service] = (
+        lambda: SecurityAuditRecorderStub()
+    )
     with TestClient(app) as test_client:
         yield test_client, fake_config
 

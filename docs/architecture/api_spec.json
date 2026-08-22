@@ -449,23 +449,26 @@
         "tags": [
           "SystemConfig"
         ],
-        "summary": "获取系统配置",
-        "description": "读取当前系统配置并返回分类后的显示值。服务端掩码的敏感字段可能返回 mask_token；客户端应结合 raw_value_exists 与 is_masked 判断。",
-        "operationId": "getSystemConfig",
+        "summary": "Get system configuration",
+        "description": "Read current configuration and return display values. Server-masked sensitive fields may return the mask token; clients should use raw_value_exists and is_masked to interpret values. configured_notification_channels is computed from the current live Config snapshot with the runtime notification detector.",
+        "operationId": "get_system_config_api_v1_system_config_get",
         "parameters": [
           {
             "name": "include_schema",
             "in": "query",
-            "description": "是否携带字段元数据（默认 true）",
+            "required": false,
             "schema": {
               "type": "boolean",
-              "default": true
-            }
+              "description": "Whether to include schema metadata",
+              "default": true,
+              "title": "Include Schema"
+            },
+            "description": "Whether to include schema metadata"
           }
         ],
         "responses": {
           "200": {
-            "description": "配置读取成功",
+            "description": "Configuration loaded",
             "content": {
               "application/json": {
                 "schema": {
@@ -475,7 +478,7 @@
             }
           },
           "401": {
-            "description": "未认证",
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
@@ -485,11 +488,21 @@
             }
           },
           "500": {
-            "description": "读取失败",
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -500,9 +513,9 @@
         "tags": [
           "SystemConfig"
         ],
-        "summary": "更新系统配置",
-        "description": "按键更新系统配置。若字段值为掩码（如 ******），则保留原值不覆盖。",
-        "operationId": "updateSystemConfig",
+        "summary": "Update system configuration",
+        "description": "Update key-value pairs in .env. Mask token preserves existing secret values.",
+        "operationId": "update_system_config_api_v1_system_config_put",
         "requestBody": {
           "required": true,
           "content": {
@@ -515,7 +528,7 @@
         },
         "responses": {
           "200": {
-            "description": "更新成功",
+            "description": "Configuration updated",
             "content": {
               "application/json": {
                 "schema": {
@@ -525,7 +538,7 @@
             }
           },
           "400": {
-            "description": "参数校验失败",
+            "description": "Validation failed",
             "content": {
               "application/json": {
                 "schema": {
@@ -535,7 +548,7 @@
             }
           },
           "409": {
-            "description": "配置版本冲突",
+            "description": "Version conflict",
             "content": {
               "application/json": {
                 "schema": {
@@ -545,11 +558,31 @@
             }
           },
           "500": {
-            "description": "更新失败",
+            "description": "Internal server error",
             "content": {
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
                 }
               }
             }
@@ -2814,6 +2847,16 @@
               }
             }
           },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2878,6 +2921,16 @@
               }
             }
           },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -2916,6 +2969,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3047,6 +3110,16 @@
               }
             }
           },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "422": {
             "description": "Validation Error",
             "content": {
@@ -3083,6 +3156,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LocalModelUnregistrationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -3125,6 +3208,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -4304,6 +4397,16 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/LocalModelMutationResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Security audit unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }

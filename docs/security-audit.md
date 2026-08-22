@@ -73,7 +73,7 @@ Legend:
 | Auth enable/disable | `auth.policy` | **Landed** | Same; AUTH-04 reauth remains; password is not stored |
 | Logout / session invalidation | `auth.logout` | **Landed** | Session-secret rotation stays nested in this path |
 | Password change | `auth.password_change` | **Landed** | Success and denial audited |
-| Sensitive config create/update | `system_config.write` | **Partial** | HTTP `src/api/v1/endpoints/system_config.py` only. `SystemConfigService.update` itself has no recorder; config profiles, onboarding apply, and local-model config writes bypass. Owner: DAG-5 |
+| Sensitive config create/update | `system_config.write` | **Landed** | `SystemConfigService.update` (`src/services/system_config_service_parts/write_audit.py` rebound onto the facade). HTTP PUT `/config` injects the recorder and does not double-emit. Nested `.env` import uses `_update_validated` and keeps `system_config.import` only |
 | Config export (env backup) | `system_config.export` | **Landed** | Byte length / version only; no `.env` body |
 | Config import (env restore) | `system_config.import` | **Landed** | Same bound |
 | Config last-good rollback | `system_config.rollback` | **Landed** | Attempt failure blocks restore |
@@ -107,10 +107,10 @@ Legend:
 | Analysis HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task` → `AnalysisApiService.cancel_analysis_task` | **Landed** | `analysis.cancel` attempt-before-cancel at the HTTP adapter only. Actor `api_client` / `analysis_canceller`. Existing 200/404 protocol is unchanged. Attempt-store `503` uses `operation_completed=false` and does not call `cancel`. Post-cancel completion-store `503` uses `operation_completed=true` plus `task_id`/`status`. Reject/failure completion is best-effort so domain `404` is preserved. Internal queue cancel, discovery cancel, worker polls, and MCP `mcp.request.cancel` are not this event | DAG-3 |
 | Report Markdown/HTML/PDF export | `src/api/v1/endpoints/report_export.py` `export_history_report` | **Landed** | `report.export` attempt-before-bytes at the HTTP adapter only. Actor `administrator` / `authenticated_admin`/`local_operator`/`desktop_operator`. Invalid format stays 400 before attempt. Attempt-store `503` uses `operation_completed=false` and does not load markdown or generate bytes. Post-generation completion-store `503` uses `operation_completed=true` plus `record_id`/`format` and does not return the file. Domain `404`/`413`/`429`/`500`/`503` export codes stay those codes; reject/failure completion is best-effort. Completion names the resolved history PK when a numeric lookup key resolved through `query_id`. `GET /history/export/capabilities` and `GET /history/{id}/markdown` are not this event | DAG-4 |
 | History delete (by code / by ids) | `src/api/v1/endpoints/history.py` `delete_history_by_code` / `delete_history_records` | **Landed** | `history.delete` attempt-before-delete at the HTTP adapter only. Same administrator actor tokens as report export. Blank code and empty `record_ids` stay 400 before attempt. Attempt-store `503` uses `operation_completed=false` and does not delete. Post-delete completion-store `503` uses `operation_completed=true` plus `scope`/`deleted`. Zero deletes remain HTTP 200 with `delete_completed`. Id lists are bounded (`id_sample` ≤64, `ids_truncated`). Internal `HistoryService.delete_history_*` is not this event | DAG-4 |
-| Config profiles apply/save | `src/services/config_profile_service.py` → `SystemConfigService.update` | **Missing** | Same privileged config mutation as HTTP `system_config.write` | DAG-5 |
-| Onboarding apply | `src/services/onboarding_plan_service.py` → `SystemConfigService.update` | **Missing** | Same unaudited config writer | DAG-5 |
-| Local model register/assign/delete that writes config | `src/services/local_model_service.py` → `SystemConfigService.update` | **Missing** | Runtime model control plane via the same unaudited updater | DAG-5 |
-| Model pack import / desktop activation | `src/api/v1/endpoints/model_packs.py` | **Missing** | Trusted artifact install | DAG-5 / defer with owner |
+| Config profiles apply/save | `src/services/config_profile_service.py` → `SystemConfigService.update` | **Landed** | Same `system_config.write` event; `source=config_profile_preset` / `config_profile_import`. Empty no-ops do not emit | DAG-5 |
+| Onboarding apply | `src/services/onboarding_plan_service.py` → `SystemConfigService.update` | **Landed** | Same write event; `source=onboarding_apply`. `confirm=false` and empty items skip `update()` | DAG-5 |
+| Local model register/assign/delete that writes config | `src/services/local_model_service.py` → `SystemConfigService.update` | **Landed** | Same write event; `source=local_model`. HTTP maps audit unavailability to 503 | DAG-5 |
+| Model pack import / desktop activation | `src/api/v1/endpoints/model_packs.py` | **Deferred with owner** | Trusted artifact install (upload/stage/extract) is a different privileged operation. Config writes through `update()` during desktop activation are Landed as `system_config.write` | Deferred with owner |
 | HTTP market-review / candidate discovery / AlphaSift | `submit_background_task` in analysis API, `candidate_discovery.py`, `alphasift.py` | **Missing** | Privileged background execution on a different queue API. **Not** DAG-1 | Named coverage-map row; later owner |
 | Investment-framework mutations | `src/services/investment_framework_service.py` | **Missing** | Analysis-policy content; defer unless framed as policy | Deferred unless reclassified |
 
@@ -160,7 +160,7 @@ disabled (`local_operator`); they do not copy research-pack `admin_session`
 `403`. Capability probes, markdown GET, and internal HistoryService deletes
 do not emit these events.
 
-DAG-5 should audit `SystemConfigService.update` once rather than patching each caller. The already-audited HTTP `system_config.write` path must not double-emit.
+DAG-5 records `system_config.write` once at `SystemConfigService.update`. HTTP PUT `/config` no longer emits at the adapter. Nested `.env` import/export/rollback keep their existing event types. Attempt is committed before `apply_updates`. HTTP `503` `security_audit_unavailable` includes `operation_completed`: `false` when the attempt could not be written (mutation not persisted) and `true` when persist already ran but completion could not be written (`config_version` / `applied_count` / `reload_triggered` are included). Domain 400/409 stay those codes; reject/failure completion is best-effort. Config-profile preview, onboarding `confirm=false`, and `apply_simple_updates` are not this event.
 
 ### Deferred (not in this DAG)
 
@@ -183,9 +183,9 @@ or size evidence—never image bytes, prompts, stdout, or secrets.
 
 ## Remaining Coverage DAG
 
-Do not stack remaining DAG-5 into an earlier slice. Do not include
-watchlist, portfolio CRUD, or alerts. Do not fold market-review, candidate
-discovery, or AlphaSift into DAG-1.
+Do not stack remaining named later-owner or deferred rows into an earlier
+slice. Do not include watchlist, portfolio CRUD, or alerts. Do not fold
+market-review, candidate discovery, or AlphaSift into DAG-1.
 
 ```text
 DAG-0  this coverage map (docs only; no runtime behavior)
@@ -204,15 +204,20 @@ DAG-0  this coverage map (docs only; no runtime behavior)
   │            durable audit added; 200/404 protocol unchanged;
   │            additive fail-closed 503 operation_completed
   │
-  └── DAG-4  report export + history delete (landed)
-               optional AUDIT-02; HTTP adapter only;
-               independent of DAG-3 in the map
+  ├── DAG-4  report export + history delete (landed)
+  │            optional AUDIT-02; HTTP adapter only;
+  │            independent of DAG-3 in the map
+  │
+  └── DAG-5  SystemConfigService.update writes (landed)
+               HTTP PUT / config-profile apply/import / onboarding apply /
+               local-model config writes / legacy migration;
+               nested import skip; no HTTP double-emit
 
-DAG-5  SystemConfigService.update bypasses
-         (profiles / onboarding / local-model config writes)
-         + model packs if still marked privileged
-         coverage-map Missing now; implement after DAG-1;
-         one service-level audit, no HTTP double-emit
+Remaining named later-owner / deferred rows (not this PR):
+  HTTP market-review / candidate discovery / AlphaSift
+  Investment-framework mutations (Deferred unless reclassified)
+  Model-pack trusted artifact install (Deferred with owner;
+  config writes through update() are Landed)
 ```
 
 Suggested later titles (English, no tool prefix):
@@ -222,6 +227,7 @@ Suggested later titles (English, no tool prefix):
 3. `feat: emit security-audit events for scheduled-task mutations` (DAG-2, landed)
 4. `feat: audit analysis task cancel at the HTTP boundary` (DAG-3, landed)
 5. `feat: audit report export and history deletion` (DAG-4, landed)
+6. `feat: audit SystemConfigService.update config writes` (DAG-5, landed)
 
 Keep #1062 open until remaining in-scope rows are **Landed** or explicitly
 **Deferred** with an owner. Do not close #535 as a substitute for this map.
@@ -232,8 +238,8 @@ These are documentation facts, not GitHub mutations performed by this page:
 
 - #1062 Workstream A–D and acceptance checkboxes are still unchecked on the
   live issue. The original A-list HTTP/MCP/tool/HITL/plugin/local-process
-  paths and evidence-package export are already **Landed** or **Partial**.
-  Remaining boxes should later list DAG-5 only.
+  paths and evidence-package export are already **Landed**. Remaining
+  boxes should later list named later-owner and deferred rows, not DAG-5.
 - [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) HITL gates are
   closed and emitting `approval_*` events. A Current Gaps row that still says
   gates are missing is stale; see [security-baseline.md](security-baseline.md).
@@ -310,13 +316,13 @@ limitation, not a hidden bug of this issue.
 Protected paths persist the attempt before executing the protected operation.
 If that write fails, the operation fails closed with
 `security_audit_unavailable`: login does not issue a cookie, configuration does
-not call the mutation service, auth policy/session/password changes do not
+not call `apply_updates`, auth policy/session/password changes do not
 proceed, config export/import/rollback do not run, a tool handler is not
 invoked, analysis work is not enqueued, MCP discovery/tool calls are rejected,
 administrator plugin mutations stop, local OCR/CLI process starts do not
 proceed, scheduled-task create/enable/disable do not persist, HTTP analysis
 cancel does not call `task_queue.cancel`, report export does not load markdown
-or generate bytes, and history delete does not remove rows. Completion-write failures are also surfaced rather than swallowed. After a cancel has already been requested, a report has already been generated, or history rows have already been deleted, a completion-store failure is HTTP `503` with `operation_completed=true`.
+or generate bytes, and history delete does not remove rows. Completion-write failures are also surfaced rather than swallowed. After a cancel has already been requested, a report has already been generated, history rows have already been deleted, or configuration has already been persisted, a completion-store failure is HTTP `503` with `operation_completed=true`.
 
 Audit write failures are never silent: the service logs a redacted
 `security_audit_append_failed` / related error via `log_safe_exception`, and

@@ -25,7 +25,12 @@ from src.api.v1.schemas.model_packs import (
 from src.api.v1.schemas.local_models import LocalModelMutationResponse
 from src.services.local_model_service import LocalModelError, LocalModelService
 from src.services.model_pack_import_service import ModelPackImportService
-from src.services.system_config_service import ConfigConflictError, ConfigValidationError
+from src.services.security_audit_service import SecurityAuditUnavailable
+from src.services.system_config_service import (
+    ConfigConflictError,
+    ConfigValidationError,
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.model_pack import (
     ModelPackError,
     consume_desktop_model_pack_attestation,
@@ -168,6 +173,9 @@ def import_model_pack(
         "Register a model created by the isolated Desktop importer against an "
         "immutable server-owned configuration and runtime snapshot."
     ),
+    responses={
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
+    },
 )
 def activate_desktop_model_pack(
     request: ModelPackDesktopActivationRequest,
@@ -196,7 +204,13 @@ def activate_desktop_model_pack(
         )
         payload["success"] = True
         return LocalModelMutationResponse.model_validate(payload)
-    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+    except (
+        LocalModelError,
+        ConfigValidationError,
+        ConfigConflictError,
+        SecurityAuditUnavailable,
+        SystemConfigWriteAuditCompletionUnavailable,
+    ) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except ModelPackError as exc:
         raise HTTPException(

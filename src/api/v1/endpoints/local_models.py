@@ -9,6 +9,7 @@ from typing import NoReturn, Optional
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from src.api.deps import get_local_model_service
+from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.local_models import (
     LocalModelAssignmentRequest,
     LocalModelConfigurationResponse,
@@ -33,13 +34,21 @@ from src.services.local_model_service import (
     LocalModelValidationError,
 )
 from src.security.http_bind import is_local_only_bind
-from src.services.system_config_service import ConfigConflictError, ConfigValidationError
+from src.services.security_audit_service import SecurityAuditUnavailable
+from src.services.system_config_service import (
+    ConfigConflictError,
+    ConfigValidationError,
+    SystemConfigWriteAuditCompletionUnavailable,
+)
 from src.task_execution import TaskStatusEnum
 from src.utils.sanitize import log_safe_exception
 
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+_WRITE_AUDIT_RESPONSES = {
+    503: {"description": "Security audit unavailable", "model": ErrorResponse},
+}
 
 
 def _native_local_install_platform() -> Optional[str]:
@@ -53,6 +62,29 @@ def _native_local_install_platform() -> Optional[str]:
 
 def _raise_local_model_error(exc: Exception, *, model_id: str = "") -> NoReturn:
     """Map internal local-model failures to stable caller-safe API errors."""
+    if isinstance(exc, SystemConfigWriteAuditCompletionUnavailable):
+        detail = {
+            "error": "security_audit_unavailable",
+            "message": (
+                "Configuration was persisted, but audit completion could not be persisted"
+            ),
+            "operation_completed": True,
+        }
+        item = getattr(exc, "item", None) or {}
+        if type(item.get("config_version")) is str:
+            detail["config_version"] = item["config_version"]
+        if type(item.get("applied_count")) is int:
+            detail["applied_count"] = item["applied_count"]
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=detail)
+    if isinstance(exc, SecurityAuditUnavailable):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "error": "security_audit_unavailable",
+                "message": "Security audit storage is unavailable",
+                "operation_completed": False,
+            },
+        )
     if isinstance(exc, LocalModelValidationError):
         status_code = status.HTTP_400_BAD_REQUEST
     elif isinstance(
@@ -166,7 +198,11 @@ def get_local_model_pull(
     return LocalModelPullStatus.model_validate(payload)
 
 
-@router.post("/assignments", response_model=LocalModelMutationResponse)
+@router.post(
+    "/assignments",
+    response_model=LocalModelMutationResponse,
+    responses=_WRITE_AUDIT_RESPONSES,
+)
 def assign_local_model(
     request: LocalModelAssignmentRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -176,14 +212,24 @@ def assign_local_model(
         payload = service.configure_model(request.model_id, assignment=request.assignment)
         payload["success"] = True
         return LocalModelMutationResponse.model_validate(payload)
-    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+    except (
+        LocalModelError,
+        ConfigValidationError,
+        ConfigConflictError,
+        SecurityAuditUnavailable,
+        SystemConfigWriteAuditCompletionUnavailable,
+    ) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(logger, "Local model assignment failed", exc, error_code="local_model_assignment_failed")
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.post("/desktop-activations", response_model=LocalModelMutationResponse)
+@router.post(
+    "/desktop-activations",
+    response_model=LocalModelMutationResponse,
+    responses=_WRITE_AUDIT_RESPONSES,
+)
 def activate_desktop_local_model(
     request: LocalModelDesktopActivationRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -197,7 +243,13 @@ def activate_desktop_local_model(
         )
         payload["success"] = True
         return LocalModelMutationResponse.model_validate(payload)
-    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+    except (
+        LocalModelError,
+        ConfigValidationError,
+        ConfigConflictError,
+        SecurityAuditUnavailable,
+        SystemConfigWriteAuditCompletionUnavailable,
+    ) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(
@@ -209,7 +261,11 @@ def activate_desktop_local_model(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.delete("/models", response_model=LocalModelMutationResponse)
+@router.delete(
+    "/models",
+    response_model=LocalModelMutationResponse,
+    responses=_WRITE_AUDIT_RESPONSES,
+)
 def delete_local_model(
     request: LocalModelRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -219,14 +275,24 @@ def delete_local_model(
         payload = service.delete_model(request.model_id)
         payload["success"] = True
         return LocalModelMutationResponse.model_validate(payload)
-    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+    except (
+        LocalModelError,
+        ConfigValidationError,
+        ConfigConflictError,
+        SecurityAuditUnavailable,
+        SystemConfigWriteAuditCompletionUnavailable,
+    ) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(logger, "Local model deletion failed", exc, error_code="local_model_delete_failed")
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.delete("/registrations", response_model=LocalModelUnregistrationResponse)
+@router.delete(
+    "/registrations",
+    response_model=LocalModelUnregistrationResponse,
+    responses=_WRITE_AUDIT_RESPONSES,
+)
 def unregister_local_model(
     request: LocalModelDesktopUnregistrationRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -241,14 +307,24 @@ def unregister_local_model(
         payload["success"] = True
         payload["deleted"] = False
         return LocalModelUnregistrationResponse.model_validate(payload)
-    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+    except (
+        LocalModelError,
+        ConfigValidationError,
+        ConfigConflictError,
+        SecurityAuditUnavailable,
+        SystemConfigWriteAuditCompletionUnavailable,
+    ) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(logger, "Local model unregister failed", exc, error_code="local_model_unregister_failed")
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.post("/registration-recoveries/finalize", response_model=LocalModelMutationResponse)
+@router.post(
+    "/registration-recoveries/finalize",
+    response_model=LocalModelMutationResponse,
+    responses=_WRITE_AUDIT_RESPONSES,
+)
 def finalize_local_model_unregistration(
     request: LocalModelRegistrationRestoreRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -260,7 +336,13 @@ def finalize_local_model_unregistration(
             recovery_token=request.recovery_token,
         )
         return LocalModelMutationResponse.model_validate(payload)
-    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+    except (
+        LocalModelError,
+        ConfigValidationError,
+        ConfigConflictError,
+        SecurityAuditUnavailable,
+        SystemConfigWriteAuditCompletionUnavailable,
+    ) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(
@@ -272,7 +354,11 @@ def finalize_local_model_unregistration(
         _raise_local_model_error(exc, model_id=request.model_id)
 
 
-@router.post("/registrations", response_model=LocalModelMutationResponse)
+@router.post(
+    "/registrations",
+    response_model=LocalModelMutationResponse,
+    responses=_WRITE_AUDIT_RESPONSES,
+)
 def restore_local_model_registration(
     request: LocalModelRegistrationRestoreRequest,
     service: LocalModelService = Depends(get_local_model_service),
@@ -285,7 +371,13 @@ def restore_local_model_registration(
         )
         payload["success"] = True
         return LocalModelMutationResponse.model_validate(payload)
-    except (LocalModelError, ConfigValidationError, ConfigConflictError) as exc:
+    except (
+        LocalModelError,
+        ConfigValidationError,
+        ConfigConflictError,
+        SecurityAuditUnavailable,
+        SystemConfigWriteAuditCompletionUnavailable,
+    ) as exc:
         _raise_local_model_error(exc, model_id=request.model_id)
     except Exception as exc:  # broad-exception: fallback_recorded - sanitized API boundary
         log_safe_exception(
