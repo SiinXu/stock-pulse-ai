@@ -213,6 +213,8 @@ class AgentEpisode(AgentEpisodeCreate):
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc)
     )
+    provenance_source: Optional[str] = None
+    actor_id: Optional[str] = None
 
 
 class AgentEpisodePage(_StrictEpisodeModel):

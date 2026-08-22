@@ -100,7 +100,7 @@ EXPECTED_SCHEMA_DEFINITIONS = (
     "NotificationInboxReadStateRecord",
 )
 EXPECTED_SCHEMA_AST_HASH = (
-    "4310d640ecc98572e1bba4f56abeee286bd394dc1db07a8d6bc4912238c7ef3a"
+    "775f4f5b39d00a8f3f65e85ee258303e8273004547cacf5d0703a1a1891a6db8"
 )
 EXPECTED_SCHEMA_MODELS = (
     "DatabaseSchemaMigration",

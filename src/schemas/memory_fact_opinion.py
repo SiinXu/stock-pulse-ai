@@ -7,8 +7,8 @@ opinion (feedback sidecars, episode labels) must not share write keys. Mixed
 payloads are rejected, not stripped and stored as facts.
 
 This module is the DAG-1 contract only. Soul-marker and oversize reject lives
-in ``memory_write_guard`` (DAG-2). It does not stamp provenance (DAG-3) or add
-product feedback APIs (#1105).
+in ``memory_write_guard`` (DAG-2). Server-stamped provenance lives in
+``memory_provenance`` (DAG-3). It does not add product feedback APIs (#1105).
 """
 
 from __future__ import annotations

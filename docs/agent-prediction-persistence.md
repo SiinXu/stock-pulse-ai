@@ -53,6 +53,7 @@ Migration id: `202608130001_agent_prediction_schema`.
 | `outcome_json` | Score / label payload after resolution attempts |
 | `model_meta_json` | Optional provenance (mode, soul_version, skill ids) |
 | `source_decision_id`, `no_verifiable_reason`, `notes` | A1 decision linkage, explicit non-verifiable reason, and bounded research notes |
+| `provenance_source`, `actor_id` | Server-stamped write provenance (`system_resolve` on resolve / `data_unavailable`; NULL on historical and still-pending rows). Not the transport `source` field. |
 | `attempts` | Claim/resolve attempt counter |
 | `created_at`, `updated_at`, `resolved_at` | Timestamps |
 
@@ -77,7 +78,7 @@ Also accepted in the CHECK constraint for forward compatibility with the A1 cont
 
 ### Fact versus opinion (#1124 DAG-1)
 
-`outcome_json` is the PredictionOutcome actuals payload. Resolve and `data_unavailable` writes call `lock_prediction_outcome_actuals()` so user-opinion keys (`feedback_value`, `note`, `user_feedback`, transport `source`, …) cannot enter that JSON. Decision-signal user feedback remains a sidecar table and uses `lock_opinion_payload()` so market-actuals keys cannot ride along. Mixed payloads are rejected, not stripped and stored as facts. Feedback `note`/`reason_code` and episode free-text (`user_feedback`, `extra` values, `remedy`) also reject Soul-boundary markers, oversize, and illegal C0 controls at the write boundary (`src/schemas/memory_write_guard.py`, #1124 DAG-2). This slice does not add #1105 product feedback APIs or server-stamped provenance.
+`outcome_json` is the PredictionOutcome actuals payload. Resolve and `data_unavailable` writes call `lock_prediction_outcome_actuals()` so user-opinion keys (`feedback_value`, `note`, `user_feedback`, transport `source`, …) cannot enter that JSON. Decision-signal user feedback remains a sidecar table and uses `lock_opinion_payload()` so market-actuals keys cannot ride along. Mixed payloads are rejected, not stripped and stored as facts. Feedback `note`/`reason_code` and episode free-text (`user_feedback`, `extra` values, `remedy`) also reject Soul-boundary markers, oversize, and illegal C0 controls at the write boundary (`src/schemas/memory_write_guard.py`, #1124 DAG-2). Resolve and episode append stamp server-owned `provenance_source=system_resolve` on the row (not inside `outcome_json`). Client-supplied provenance keys are rejected (`src/schemas/memory_provenance.py`, #1124 DAG-3). This slice does not add #1105 product feedback APIs. Do not `UPDATE` historical `resolved` prediction rows or append-only episodes to backfill stamps.
 
 ## Concurrency
 

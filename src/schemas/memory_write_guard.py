@@ -7,8 +7,9 @@ it carries Soul-boundary tokens, exceeds the field cap, or hides markers with
 C0 control characters. This is the write-path contract. Prompt isolation still
 truncates on inject and is not a substitute for reject-on-write.
 
-This module does not stamp provenance (DAG-3) or add product feedback APIs
-(#1105). Soul charter bytes, version, and hash are unchanged.
+Provenance stamping lives in ``memory_provenance`` (DAG-3). This module does
+not add product feedback APIs (#1105). Soul charter bytes, version, and hash
+are unchanged.
 """
 
 from __future__ import annotations

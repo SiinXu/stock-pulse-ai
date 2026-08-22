@@ -8732,6 +8732,33 @@
             ],
             "title": "Source"
           },
+          "provenance_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "system_resolve",
+                  "user_feedback",
+                  "operator"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provenance Source"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Actor Id"
+          },
           "created_at": {
             "anyOf": [
               {
@@ -8805,6 +8832,7 @@
             "default": "api"
           }
         },
+        "additionalProperties": false,
         "type": "object",
         "required": [
           "feedback_value"

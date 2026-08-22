@@ -35,6 +35,8 @@ agent_episodes_table = Table(
     Column("trajectory_summary_json", Text, nullable=False, default="[]"),
     Column("lessons_json", Text, nullable=False, default="[]"),
     Column("outcome_labels_json", Text),
+    Column("provenance_source", String(32)),
+    Column("actor_id", String(128)),
     Column("created_at", DateTime, nullable=False),
     Index("ix_agent_episodes_run_id", "run_id"),
     Index("ix_agent_episodes_symbol_created", "symbol", "created_at"),

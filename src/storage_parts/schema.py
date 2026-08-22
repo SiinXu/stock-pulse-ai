@@ -1133,6 +1133,8 @@ class DecisionSignalOutcomeRecord(Base):
     plan_quality = Column(String(16), index=True)
     data_quality_level = Column(String(24), index=True)
     holding_state = Column(String(16), nullable=False, default='unknown', index=True)
+    provenance_source = Column(String(32), index=True)
+    actor_id = Column(String(128))
 
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
@@ -1155,6 +1157,8 @@ class DecisionSignalFeedbackRecord(Base):
     reason_code = Column(String(64), index=True)
     note = Column(Text)
     source = Column(String(16), nullable=False, default='api', index=True)
+    provenance_source = Column(String(32), index=True)
+    actor_id = Column(String(128))
     created_at = Column(DateTime, default=utc_naive_now, index=True)
     updated_at = Column(DateTime, default=utc_naive_now, onupdate=utc_naive_now, index=True)
 
