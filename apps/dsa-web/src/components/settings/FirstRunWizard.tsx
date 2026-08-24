@@ -781,29 +781,31 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
 
   if (savedSummary) {
     const isLocalAnalysis = savedSummary.mode === 'local_model';
-    const smokeAccepted = smokeOutcome?.status === 'accepted';
-    const smokeFailed = smokeOutcome?.status === 'failed' || smokeOutcome?.status === 'blocked';
-    const displayedSmokeError = smokeFailed
-      ? localizeParsedApiError(smokeOutcome.error, language)
+    const acceptedSmoke = smokeOutcome?.status === 'accepted' ? smokeOutcome : null;
+    const failedSmoke = smokeOutcome?.status === 'failed' || smokeOutcome?.status === 'blocked'
+      ? smokeOutcome
       : null;
-    const localStatusVariant = smokeAccepted
+    const displayedSmokeError = failedSmoke
+      ? localizeParsedApiError(failedSmoke.error, language)
+      : null;
+    const localStatusVariant = acceptedSmoke
       ? 'success'
-      : smokeFailed
+      : failedSmoke
         ? 'danger'
         : 'info';
-    const localStatusTitle = smokeAccepted
+    const localStatusTitle = acceptedSmoke
       ? text.savedTitle
       : displayedSmokeError?.title;
-    const localStatusMessage = smokeAccepted
-      ? smokeOutcome.successMessage
+    const localStatusMessage = acceptedSmoke
+      ? acceptedSmoke.successMessage
       : displayedSmokeError
         ? [
           displayedSmokeError.message,
-          smokeOutcome.error.rawMessage,
+          failedSmoke?.error.rawMessage,
         ].filter((part, index, parts) => Boolean(part) && parts.indexOf(part) === index).join(' ')
         : translateUi('settings.setupGuideSmokeRunning');
     const showLocalAnalysisAction = isLocalAnalysis
-      && (isRunningSmoke || smokeFailed || Boolean(onStartFirstAnalysis));
+      && (isRunningSmoke || Boolean(failedSmoke) || Boolean(onStartFirstAnalysis));
     return (
       <Modal isOpen onClose={onClose} title={text.title} showHeaderDivider={false}>
         <div data-testid="first-run-wizard" className="space-y-5">
@@ -896,16 +898,16 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 isLoading={isRunningSmoke}
                 loadingText={translateUi('settings.setupGuideSmokeRunning')}
                 onClick={() => {
-                  if (smokeFailed) {
+                  if (failedSmoke) {
                     void runFirstLocalAnalysis();
                     return;
                   }
-                  if (smokeAccepted) {
-                    onStartFirstAnalysis?.(smokeOutcome.tasksHref);
+                  if (acceptedSmoke) {
+                    onStartFirstAnalysis?.(acceptedSmoke.tasksHref);
                   }
                 }}
               >
-                {smokeAccepted
+                {acceptedSmoke
                   ? translateUi('analysisWorkbench.tasks')
                   : text.startFirstAnalysis}
               </Button>
