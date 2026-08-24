@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "5418d7f1ee8159aa7f9a21ceeab5c568471ea436ce2adbbfc660b25a30bbed53"
+    "05f9db232a9675cfd3e357252de1727250e5e93dcb009bf254203da9475f66fb"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "2b0cc9385e1c1300fd3f64d400e8f1d8abb6666d9721d30f2c913fe2a22621a6"
+    "edb0929cbb2c5f0208120fddd4677648663daacab7f8855ce4cb96e2233b5738"
 )
 
 
@@ -104,8 +104,8 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for PREDICTION_EXTRACT_ENABLED: one analysis maps to
-    # one pending agent_predictions row per symbol. Registered keys are unchanged.
+    # Snapshot refresh for AGENT_ONLINE_ADAPTERS_ENABLED and
+    # AGENT_ONLINE_ADAPTERS_MIN_SAMPLES (Issue #1091 gated adapters).
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

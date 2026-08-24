@@ -16,6 +16,17 @@
 
 既有 `AgentMemory` / `BaseAgent` 数值校准行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 历史注入默认关闭；开启时 `BaseAgent._build_memory_context` 用 `isolate_untrusted_memory_body` 包裹历史行，并将 `signal` 规范为 `buy|hold|sell`（见[威胁注释](#threat-notes)）。
 
+## 在线进化适配器（默认关闭）
+
+仅库层切片，位于 `src/agent/evolution/adapters.py`。生产路径上的 `BaseAgent` 校准不变，本切片不得二次相乘。
+
+| 控制项 | 默认值 | 行为 |
+| --- | --- | --- |
+| `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | 总开关。关闭时适配器为恒等：原始置信度、输入工具顺序、原路由，且不在 `AgentContext.meta` 写入 `adapter_influence`。 |
+| `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | 置信度校准生效所需的最少 `AgentMemory` 样本。低于阈值时因子为 `1.0`，`applied=false`。 |
+
+开启后，`calibrate_confidence` 包装 `AgentMemory.get_calibration`，钳制与现网一致（因子 `0.5..1.5`，再将置信度限制在 `[0,1]`）。样本来源仍是既有 `AGENT_MEMORY_ENABLED` / `AgentMemory`，本切片不新增存储。工具有效性与路由偏好是显式恒等桩：不会解锁已拒绝的 ToolSurface 工具，也不会写入 `AGENT_ORCHESTRATOR_MODE`。影响只记录在运行期 `AgentContext.meta["adapter_influence"]`（不写入 episode）。
+
 ## 诚实命名
 
 第二层是 **outcome-pattern（结果模式）记忆**，不是自由文本「语义知识库」。Payload 使用 `outcome_patterns`；`semantic` 为弃用别名。
