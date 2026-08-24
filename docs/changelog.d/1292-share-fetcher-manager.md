@@ -1,0 +1,2 @@
+- [Changed] Share one DataFetcherManager between the analysis pipeline and agent data/market tools (Refs #1292).
+- [Tests] Cover composition-root identity, auto-bind-off singleton fallback, and market-tools reuse.
