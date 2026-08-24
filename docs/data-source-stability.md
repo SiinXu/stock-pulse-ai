@@ -330,6 +330,9 @@ CN 与 offshore 走同一套 lookup / inflight / store。只写入
 `_should_cache_fundamental_context` 为真的结果；`status=failed`、异常和 TTL=0 不会当
 成功缓存。缓存命中与 waiter 返回 deepcopy，避免调用方改到内部条目。它不是 5 秒实时/筹码
 进程内 helper，也不会绕过 fail-open、重试或 adapter 行为。没有新增环境变量。
+分析 pipeline 与 agent data/market tools 共享同一进程 `DataFetcherManager`（组合根
+auto-bind 拥有的实例，否则是 `data_tools` 回退单例），因此这条实例级缓存与熔断状态在
+这些路径之间共享；其余 ad-hoc 构造仍各自持有独立实例。
 
 运维或测试代码可以显式查询和失效：
 

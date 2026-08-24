@@ -13,11 +13,14 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import ANY, MagicMock, patch
 
-_ORIGINAL_ENVIRON = dict(os.environ)
 _MODULE_TEMP_DIR = tempfile.TemporaryDirectory()
 _MODULE_ENV_FILE = Path(_MODULE_TEMP_DIR.name) / ".env"
 _MODULE_ENV_FILE.write_text("STOCK_LIST=600519,000001\n", encoding="utf-8")
 os.environ["ENV_FILE"] = str(_MODULE_ENV_FILE)
+# Snapshot after assigning the collection ENV_FILE so module teardown restores
+# that path instead of popping it. Later is_auth_enabled() can then ignore a
+# leftover process ADMIN_AUTH_ENABLED while this STOCK_LIST-only file exists.
+_ORIGINAL_ENVIRON = dict(os.environ)
 
 from tests.litellm_stub import ensure_litellm_stub
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
@@ -111,6 +114,7 @@ def restore_test_environment() -> None:
         if key not in _ORIGINAL_ENVIRON:
             os.environ.pop(key, None)
     os.environ.update(_ORIGINAL_ENVIRON)
+    os.environ["ENV_FILE"] = str(_MODULE_ENV_FILE)
     if current_test is not None:
         os.environ["PYTEST_CURRENT_TEST"] = current_test
 

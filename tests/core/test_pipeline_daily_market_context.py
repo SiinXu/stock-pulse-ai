@@ -60,6 +60,7 @@ def _build_initialized_pipeline(
          patch("src.core.pipeline.NotificationService", return_value=MagicMock()), \
          patch("src.core.pipeline.SearchService", return_value=search_service), \
          patch("src.core.pipeline.SocialSentimentService", return_value=social_sentiment_service):
+        kwargs.setdefault("data_fetcher_manager", MagicMock())
         return StockAnalysisPipeline(config=config, **kwargs)
 
 
