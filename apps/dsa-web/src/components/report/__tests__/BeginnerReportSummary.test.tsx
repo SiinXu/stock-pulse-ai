@@ -44,5 +44,6 @@ describe('BeginnerReportSummary', () => {
     expect(explanation).toHaveTextContent(/smaller size|clearer stops|calmer setup/i);
     fireEvent.click(screen.getByRole('button', { name: 'View professional details' }));
     expect(onShowProfessional).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId('report-run-feedback')).not.toBeInTheDocument();
   });
 });

@@ -89,7 +89,7 @@
 | [A 股特化角色](ashare-specialist-roles.md) | 默认关闭的政策 / 资金流 / 微观结构 Skill，缺数据显式降级（#192） |
 | [预测抽取](prediction-extraction.md) | 结构化决策 → PredictionRecord 草稿；散文反例；默认关闭的 finalize 钩子（[EN](prediction-extraction_EN.md)） |
 | [Skill Opinion 后验评估（英文）](skill-opinion-outcome-evaluation.md) | 个体策略样本、离线行情后验评估、样本充足度统计、迁移与 V0 边界 |
-| [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema / CAS store (Issue #1112)；#1105 可选 run/prediction 反馈 sidecar API |
+| [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema / CAS store (Issue #1112)；#1105 可选 run/prediction 反馈 sidecar API；Web 专业报告提供 run 反馈控件 |
 | [预测打分 ActualsFetcher（英文）](prediction-actuals-fetcher.md) | 预测验证取真实行情：DataFetcherManager 路径、短 TTL 合并取数、provider_down/data_unavailable 与非有限数值拒绝（#1110 / #1107） |
 | [确定性预测声明打分器](prediction-claim-scorer.md) | 纯函数 `ClaimScorer`：A1 声明类型 → hit·partial·miss·data_unavailable，含置信度校准（#1111 / #1107；[EN](prediction-claim-scorer_EN.md)） |
 | [资讯 / 情报源](intelligence-sources.md) | RSS/Atom 合规资讯源配置、测试、拉取、去重、存储、查询与安全边界 |

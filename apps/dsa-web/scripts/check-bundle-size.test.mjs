@@ -655,4 +655,199 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(budget.aggregateRules[budget.aggregateRules.length - 1].id).toBe('criticalPath');
     expect(budget.rules.some((rule) => rule.id === 'criticalPath')).toBe(false);
   });
+
+  it('reseeds only overflowed locale gzip budgets after reportRunFeedback keys (Refs #1105)', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const affectedAssets = {
+      'locale-fr': { match: 'assets/fr-*.js', measuredGzipBytes: 157363 },
+      'locale-es': { match: 'assets/es-*.js', measuredGzipBytes: 153001 },
+      'locale-id': { match: 'assets/id-*.js', measuredGzipBytes: 143073 },
+      'locale-ms': { match: 'assets/ms-*.js', measuredGzipBytes: 142875 },
+    };
+    const affectedFamilies = {
+      'locale-ja-family': { match: ['assets/ja-*.js'], measuredGzipBytes: 171571 },
+      'locale-de-family': { match: ['assets/de-*.js'], measuredGzipBytes: 163842 },
+      'locale-ko-family': { match: ['assets/ko-*.js'], measuredGzipBytes: 164166 },
+      'locale-fr-family': { match: ['assets/fr-*.js'], measuredGzipBytes: 163520 },
+      'locale-es-family': { match: ['assets/es-*.js'], measuredGzipBytes: 158907 },
+      'locale-zh-TW-family': { match: ['assets/zh-TW-*.js'], measuredGzipBytes: 158702 },
+      'locale-ms-family': { match: ['assets/ms-*.js'], measuredGzipBytes: 148470 },
+      'locale-id-family': { match: ['assets/id-*.js'], measuredGzipBytes: 148662 },
+    };
+    const unchangedAssetCaps = {
+      'js-entry': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
+      'ui-text-en': { measuredGzipBytes: 34893, maxGzipBytes: 38383 },
+      'locale-ja': { measuredGzipBytes: 164341, maxGzipBytes: 164741 },
+      'locale-de': { measuredGzipBytes: 157314, maxGzipBytes: 157714 },
+      'locale-ko': { measuredGzipBytes: 157191, maxGzipBytes: 157591 },
+      'locale-zh-TW': { measuredGzipBytes: 149591, maxGzipBytes: 149991 },
+      'locale-extra': { measuredGzipBytes: 3087, maxGzipBytes: 3487 },
+      'vendor-charts': { measuredGzipBytes: 111229, maxGzipBytes: 122352 },
+      'vendor-react': { measuredGzipBytes: 60605, maxGzipBytes: 66666 },
+      'vendor-markdown': { measuredGzipBytes: 44198, maxGzipBytes: 48618 },
+      'vendor-motion': { measuredGzipBytes: 39430, maxGzipBytes: 43373 },
+      'vendor-router': { measuredGzipBytes: 30183, maxGzipBytes: 33202 },
+      'vendor-icons': { measuredGzipBytes: 10461, maxGzipBytes: 10861 },
+      'vendor-misc': { measuredGzipBytes: 78692, maxGzipBytes: 86562 },
+      'RunFlowPanel': { measuredGzipBytes: 73118, maxGzipBytes: 73318 },
+      'SettingsPage': { measuredGzipBytes: 295943, maxGzipBytes: 296343 },
+      'PortfolioRiskMetricsPanel': { measuredGzipBytes: 9685, maxGzipBytes: 10654 },
+      'PortfolioPage': { measuredGzipBytes: 26401, maxGzipBytes: 26601 },
+      'DecisionSignalsPage': { measuredGzipBytes: 67448, maxGzipBytes: 67848 },
+      'ChatPage': { measuredGzipBytes: 23427, maxGzipBytes: 23827 },
+      'StockDetailsPage': { measuredGzipBytes: 26891, maxGzipBytes: 27291 },
+      'StockScreeningPage': { measuredGzipBytes: 27717, maxGzipBytes: 28117 },
+      'HomePage': { measuredGzipBytes: 26813, maxGzipBytes: 27213 },
+      'BacktestPage': { measuredGzipBytes: 13970, maxGzipBytes: 15368 },
+      'css-entry': { measuredGzipBytes: 26173, maxGzipBytes: 28791 },
+      'css-vendor': { measuredGzipBytes: 523, maxGzipBytes: 576 },
+    };
+    const unchangedFamilyCaps = {
+      'js-entry-family': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
+      'ui-text-en-family': { measuredGzipBytes: 34893, maxGzipBytes: 38383 },
+      'locale-extra-family': { measuredGzipBytes: 22228, maxGzipBytes: 22628 },
+      'vendor-charts-family': { measuredGzipBytes: 111230, maxGzipBytes: 122352 },
+      'vendor-react-family': { measuredGzipBytes: 60564, maxGzipBytes: 66666 },
+      'vendor-markdown-family': { measuredGzipBytes: 44198, maxGzipBytes: 48618 },
+      'vendor-motion-family': { measuredGzipBytes: 39431, maxGzipBytes: 43373 },
+      'vendor-router-family': { measuredGzipBytes: 30183, maxGzipBytes: 33202 },
+      'vendor-icons-family': { measuredGzipBytes: 10753, maxGzipBytes: 10861 },
+      'RunFlowPanel-family': { measuredGzipBytes: 66718, maxGzipBytes: 73318 },
+      'SettingsPage-family': { measuredGzipBytes: 295943, maxGzipBytes: 296343 },
+      'PortfolioRiskMetricsPanel-family': { measuredGzipBytes: 8167, maxGzipBytes: 10654 },
+      'PortfolioPage-family': { measuredGzipBytes: 24381, maxGzipBytes: 26601 },
+      'DecisionSignalsPage-family': { measuredGzipBytes: 67448, maxGzipBytes: 67848 },
+      'ChatPage-family': { measuredGzipBytes: 23427, maxGzipBytes: 23827 },
+      'HomePage-family': { measuredGzipBytes: 26813, maxGzipBytes: 27213 },
+      'StockScreeningPage-family': { measuredGzipBytes: 27717, maxGzipBytes: 28117 },
+      'StockDetailsPage-family': { measuredGzipBytes: 26891, maxGzipBytes: 27291 },
+      'BacktestPage-family': { measuredGzipBytes: 15216, maxGzipBytes: 15368 },
+      'css-entry-family': { measuredGzipBytes: 26954, maxGzipBytes: 28791 },
+      'css-vendor-family': { measuredGzipBytes: 523, maxGzipBytes: 576 },
+      'settings-route': { measuredGzipBytes: 337935, maxGzipBytes: 338335 },
+      'portfolio-route': { measuredGzipBytes: 93896, maxGzipBytes: 94296 },
+      'screening-route': { measuredGzipBytes: 31626, maxGzipBytes: 32026 },
+      'home-watchlist-route': { measuredGzipBytes: 21293, maxGzipBytes: 21693 },
+      'backtest-route': { measuredGzipBytes: 21203, maxGzipBytes: 21603 },
+      'criticalPath': { measuredGzipBytes: 338951, maxGzipBytes: 339351 },
+    };
+
+    expect(budget.gzipLevel).toBe(9);
+    expect(budget.defaults).toEqual({
+      jsMaxGzipBytes: 13436,
+      cssMaxGzipBytes: 28791,
+    });
+    expect(budget.baselineNote).toContain('reportRunFeedback.*');
+    expect(budget.baselineNote).toContain('400 B');
+
+    for (const [id, expected] of Object.entries(affectedAssets)) {
+      const rule = budget.rules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        match: expected.match,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.measuredGzipBytes + 400,
+      }));
+      expect(rule.note).toContain('reportRunFeedback.*');
+    }
+
+    for (const [id, expected] of Object.entries(affectedFamilies)) {
+      const rule = budget.aggregateRules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        match: expected.match,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.measuredGzipBytes + 400,
+      }));
+      expect(rule.note).toContain('reportRunFeedback.*');
+    }
+
+    for (const [id, expected] of Object.entries(unchangedAssetCaps)) {
+      const rule = budget.rules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.maxGzipBytes,
+      }));
+    }
+
+    for (const [id, expected] of Object.entries(unchangedFamilyCaps)) {
+      const rule = budget.aggregateRules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.maxGzipBytes,
+      }));
+    }
+
+    expect(budget.rules.map((rule) => rule.id)).toEqual([
+      'js-entry',
+      'ui-text-en',
+      'locale-ja',
+      'locale-de',
+      'locale-ko',
+      'locale-fr',
+      'locale-es',
+      'locale-zh-TW',
+      'locale-ms',
+      'locale-id',
+      'locale-extra',
+      'vendor-charts',
+      'vendor-react',
+      'vendor-markdown',
+      'vendor-motion',
+      'vendor-router',
+      'vendor-icons',
+      'vendor-misc',
+      'RunFlowPanel',
+      'SettingsPage',
+      'PortfolioRiskMetricsPanel',
+      'PortfolioPage',
+      'DecisionSignalsPage',
+      'ChatPage',
+      'StockDetailsPage',
+      'StockScreeningPage',
+      'HomePage',
+      'BacktestPage',
+      'css-entry',
+      'css-vendor',
+    ]);
+    expect(budget.aggregateRules.map((rule) => rule.id)).toEqual([
+      'js-entry-family',
+      'ui-text-en-family',
+      'locale-ja-family',
+      'locale-de-family',
+      'locale-ko-family',
+      'locale-fr-family',
+      'locale-es-family',
+      'locale-zh-TW-family',
+      'locale-ms-family',
+      'locale-id-family',
+      'locale-extra-family',
+      'vendor-charts-family',
+      'vendor-react-family',
+      'vendor-markdown-family',
+      'vendor-motion-family',
+      'vendor-router-family',
+      'vendor-icons-family',
+      'RunFlowPanel-family',
+      'SettingsPage-family',
+      'PortfolioRiskMetricsPanel-family',
+      'PortfolioPage-family',
+      'DecisionSignalsPage-family',
+      'ChatPage-family',
+      'HomePage-family',
+      'StockScreeningPage-family',
+      'StockDetailsPage-family',
+      'BacktestPage-family',
+      'css-entry-family',
+      'css-vendor-family',
+      'settings-route',
+      'portfolio-route',
+      'screening-route',
+      'home-watchlist-route',
+      'backtest-route',
+      'criticalPath',
+    ]);
+  });
 });
