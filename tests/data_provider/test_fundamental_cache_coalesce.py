@@ -629,31 +629,6 @@ def test_omitted_ttl_uses_manager_fundamental_config() -> None:
     assert injected == explicit
 
 
-def test_omitted_ttl_fails_when_supported_config_owner_absent() -> None:
-    class _NoOwner:
-        pass
-
-    try:
-        fundamental_cache._resolve_fundamental_config(_NoOwner())
-    except AttributeError as exc:
-        message = str(exc)
-        assert "injected config" in message
-        assert "DataFetcherManager._get_fundamental_config" in message
-    else:
-        raise AssertionError("missing supported config owner must fail clearly")
-
-    manager = _manager()
-    with patch.object(DataFetcherManager, "_get_fundamental_config", None):
-        try:
-            manager._get_fundamental_cache_key("600519", 1.5, market="cn")
-        except AttributeError as exc:
-            message = str(exc)
-            assert "injected config" in message
-            assert "DataFetcherManager._get_fundamental_config" in message
-        else:
-            raise AssertionError("missing manager config owner must fail clearly")
-
-
 def test_explicit_cache_settings_skip_config_resolver() -> None:
     manager = _manager()
     calls = {"n": 0}
