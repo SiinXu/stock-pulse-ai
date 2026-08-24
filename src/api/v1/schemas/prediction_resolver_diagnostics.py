@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -34,6 +34,16 @@ class PredictionResolverResolvedUtcDayCounts(BaseModel):
     unlabeled: int = Field(ge=0)
 
 
+class PredictionResolverClaimableDueLag(BaseModel):
+    """Nearest-rank lag quantiles over the claimable-due probe window."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    p50: Optional[float] = Field(ge=0)
+    p95: Optional[float] = Field(ge=0)
+    max: Optional[float] = Field(ge=0)
+
+
 class PredictionResolverDiagnosticsResponse(BaseModel):
     """Read-only claimable-due diagnostics for this API process."""
 
@@ -50,3 +60,4 @@ class PredictionResolverDiagnosticsResponse(BaseModel):
     resolved_utc_day_start: str
     resolved_utc_day_end: str
     resolved_utc_day_counts: PredictionResolverResolvedUtcDayCounts
+    claimable_due_lag_seconds: PredictionResolverClaimableDueLag

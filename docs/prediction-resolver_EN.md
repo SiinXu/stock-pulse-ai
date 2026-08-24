@@ -93,11 +93,12 @@ The response is a constructed allowlist (`extra=forbid`):
 | `claimable_due_truncated` | `true` when the probe length reached its bound |
 | `claimable_due_probe_limit` | Probe cap (`max(1000, max_per_tick + 1)`, hard ceiling 10000; store `list_due` still caps at 1000) |
 | `oldest_due` | Up to 10 allowlisted rows, already oldest `resolve_after` first: `prediction_id`, `symbol`, `market`, `status` (`pending` or expired-lease `resolving`), `resolve_after`, `lag_seconds` |
+| `claimable_due_lag_seconds` | Nested `extra=forbid` object: nearest-rank `p50` / `p95` / `max` lag seconds over **all** rows in this claimable-due probe (not only `oldest_due`). Each value is JSON `null` when `claimable_due_count` is 0 — lag is undefined on an empty queue, not zero. Quantiles are over the probe window; reuse `claimable_due_truncated`. Missing `resolve_after` uses the same rule as `oldest_due` (`0.0`). When count ≥ 1, `max` equals `oldest_due[0].lag_seconds`. |
 | `resolved_utc_day_start` | Inclusive ISO-8601 UTC start of the civil UTC day that contains `observed_at` |
 | `resolved_utc_day_end` | Exclusive ISO-8601 UTC end of that civil day (`[start, end)`) |
 | `resolved_utc_day_counts` | Store-backed durable mix: `hit`, `miss`, `partial`, exhausted `unavailable`, and `unlabeled`. An empty day is all zeros. |
 
-The GET is read-only. It never ticks, claims, requeues, starts, or constructs a resolver worker. If either the claimable-due probe or the UTC-day aggregate fails, the GET returns **503** and omits both the due snapshot and the UTC-day fields. It does not fake zeros. Disabled / empty / API-without-worker states return **200** with the fields above (counts may be non-zero if another worker, such as cron, already resolved rows).
+The GET is read-only. It never ticks, claims, requeues, starts, or constructs a resolver worker. If either the claimable-due probe or the UTC-day aggregate fails, the GET returns **503** and omits the due snapshot, the UTC-day fields, and the lag quantiles. It does not fake zeros. Disabled / empty / API-without-worker states return **200** with the fields above (counts may be non-zero if another worker, such as cron, already resolved rows; lag fields are `null` when due count is 0).
 
 `hit` / `miss` / `partial` count `status=resolved` rows whose `resolved_at` is in the UTC day and whose `outcome_json.label` is that token. `unavailable` counts `status=data_unavailable` rows whose `updated_at` is in the window and `outcome_json.retry_exhausted` is true; retryable unavailable is **not** a result. `unlabeled` counts resolved rows in the window whose label is missing or not in `{hit,miss,partial}`. Counts use SQL `json_extract` only and never return outcome payloads, claims, notes, or prediction ids of resolved rows. The response does not include `today_resolve_counts` or process-local `last_tick`.
 
@@ -106,9 +107,9 @@ Claimable due is pending rows plus expired `resolving` leases. Ready `data_unava
 ## Remaining epic boundaries
 
 - Prediction query list / get-by-id HTTP API (remaining #1102)
-- p50/p95 resolve-lag histograms, recent fetch-error recency, Prometheus / OTel, and a durable worker heartbeat
+- Fetch-error recency HTTP, postmortem-queue depth HTTP, Prometheus / OTel, and a durable worker heartbeat
 - Trading-calendar `resolve_after` policy (#1109)
-- Postmortem lesson writer and adapter wiring (#1103 / #1106); this resolver provides only the bounded queue boundary
+- Adapter wiring / `adapter_updates_total` (#1106). Worker/CLI already drains the injected postmortem queue after a non-overlap tick (#1499); this HTTP surface still does not expose process-local queue depth.
 
 
 ## Related

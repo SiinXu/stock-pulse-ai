@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import sys
 from datetime import datetime, timedelta, timezone
@@ -14,6 +15,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
+from pydantic import ValidationError
 
 try:
     import litellm  # noqa: F401
@@ -23,6 +25,10 @@ except ModuleNotFoundError:
 import src.auth as auth
 from src.api.app import create_app
 from src.api.v1.endpoints import prediction_resolver_diagnostics as diagnostics_endpoint
+from src.api.v1.schemas.prediction_resolver_diagnostics import (
+    PredictionResolverClaimableDueLag,
+    PredictionResolverDiagnosticsResponse,
+)
 from src.application_services import (
     get_application_services,
     get_installed_application_services,
@@ -66,6 +72,9 @@ FORBIDDEN_KEYS = frozenset(
         "stuck",
         "never_ticked",
         "resolver_state",
+        "postmortem_queue_depth",
+        "adapter_updates_total",
+        "actuals_fetch_errors",
     }
 )
 OLDEST_DUE_ALLOWLIST = {
@@ -76,6 +85,7 @@ OLDEST_DUE_ALLOWLIST = {
     "resolve_after",
     "lag_seconds",
 }
+LAG_SECONDS_ALLOWLIST = {"p50", "p95", "max"}
 
 
 def _reset_auth_globals() -> None:
@@ -206,6 +216,12 @@ def test_disabled_empty_store_returns_honest_200(client_and_db) -> None:
     }
     assert payload["resolved_utc_day_start"].endswith("+00:00")
     assert payload["resolved_utc_day_end"].endswith("+00:00")
+    assert payload["claimable_due_lag_seconds"] == {
+        "p50": None,
+        "p95": None,
+        "max": None,
+    }
+    assert set(payload["claimable_due_lag_seconds"]) == LAG_SECONDS_ALLOWLIST
     _assert_no_forbidden_keys(payload)
 
 
@@ -245,6 +261,12 @@ def test_disabled_pending_due_is_listed_without_mutation(client_and_db, monkeypa
         "tick",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("diagnostics must not tick")
+        ),
+    )
+    monkeypatch.setattr(
+        "src.services.prediction_resolver.postmortem_drain.drain_postmortem_queue",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("diagnostics must not drain")
         ),
     )
 
@@ -434,6 +456,26 @@ def test_oldest_due_cap_ordering_and_allowlist(client_and_db) -> None:
     assert ids == [f"pred-{index:02d}" for index in range(10)]
     for item in payload["oldest_due"]:
         assert set(item) == OLDEST_DUE_ALLOWLIST
+    observed = datetime.fromisoformat(
+        payload["observed_at"].replace("Z", "+00:00")
+    )
+    if observed.tzinfo is not None:
+        observed = observed.astimezone(timezone.utc).replace(tzinfo=None)
+    lags = sorted(
+        max(0.0, (observed - (base - timedelta(hours=12 - index))).total_seconds())
+        for index in range(12)
+    )
+    probe_p50_rank = min(12, max(1, math.ceil(50 / 100.0 * 12)))
+    probe_p95_rank = min(12, max(1, math.ceil(95 / 100.0 * 12)))
+    oldest_only = sorted(item["lag_seconds"] for item in payload["oldest_due"])
+    oldest_p50_rank = min(10, max(1, math.ceil(50 / 100.0 * 10)))
+    lag = payload["claimable_due_lag_seconds"]
+    assert set(lag) == LAG_SECONDS_ALLOWLIST
+    assert lag["p50"] == lags[probe_p50_rank - 1]
+    assert lag["p95"] == lags[probe_p95_rank - 1]
+    assert lag["max"] == lags[-1]
+    assert lag["max"] == payload["oldest_due"][0]["lag_seconds"]
+    assert lag["p50"] != oldest_only[oldest_p50_rank - 1]
     _assert_no_forbidden_keys(payload)
 
 
@@ -454,6 +496,7 @@ def test_store_read_failure_returns_503_not_empty_backlog(
     assert "oldest_due" not in payload
     assert "resolved_utc_day_counts" not in payload
     assert "resolved_utc_day_start" not in payload
+    assert "claimable_due_lag_seconds" not in payload
     _assert_no_forbidden_keys(payload)
 
 
@@ -474,6 +517,7 @@ def test_count_query_failure_returns_503_without_partial_snapshot(
     assert "claimable_due_count" not in payload
     assert "oldest_due" not in payload
     assert "resolved_utc_day_counts" not in payload
+    assert "claimable_due_lag_seconds" not in payload
     assert "pred-due-count-fail" not in response.text
     _assert_no_forbidden_keys(payload)
 
@@ -526,9 +570,11 @@ def test_admin_auth_enabled_rejects_missing_and_invalid_session(
             assert "oldest_due" not in missing.json()
             assert "resolved_utc_day_counts" not in missing.json()
             assert "resolved_utc_day_start" not in missing.json()
+            assert "claimable_due_lag_seconds" not in missing.json()
             assert invalid.status_code == 401
             assert invalid.json()["error"] == "unauthorized"
             assert "resolved_utc_day_counts" not in invalid.json()
+            assert "claimable_due_lag_seconds" not in invalid.json()
             assert allowed.status_code == 200, allowed.text
             assert allowed.json()["oldest_due"][0]["prediction_id"] == "pred-secret"
             assert allowed.status_code != 403
@@ -560,13 +606,19 @@ def test_openapi_contract_uses_resolver_scoped_path(client_and_db) -> None:
     assert "503" in operation["responses"]
     parent = schema["components"]["schemas"]["PredictionResolverDiagnosticsResponse"]
     counts = schema["components"]["schemas"]["PredictionResolverResolvedUtcDayCounts"]
+    lag = schema["components"]["schemas"]["PredictionResolverClaimableDueLag"]
     assert parent["additionalProperties"] is False
     assert counts["additionalProperties"] is False
+    assert lag["additionalProperties"] is False
     assert "resolved_utc_day_start" in parent["properties"]
     assert "resolved_utc_day_end" in parent["properties"]
     assert "resolved_utc_day_counts" in parent["properties"]
+    assert "claimable_due_lag_seconds" in parent["properties"]
+    assert "claimable_due_lag_seconds" in parent["required"]
     assert "today_resolve_counts" not in parent["properties"]
     assert "last_tick" not in parent["properties"]
+    assert "postmortem_queue_depth" not in parent["properties"]
+    assert "adapter_updates_total" not in parent["properties"]
     assert set(counts["required"]) == {
         "hit",
         "miss",
@@ -574,6 +626,14 @@ def test_openapi_contract_uses_resolver_scoped_path(client_and_db) -> None:
         "unavailable",
         "unlabeled",
     }
+    assert set(lag["required"]) == {"p50", "p95", "max"}
+    for key in ("p50", "p95", "max"):
+        field = lag["properties"][key]
+        any_of = field.get("anyOf") or field.get("oneOf") or []
+        types = {item.get("type") for item in any_of}
+        nullable_number = "null" in types and "number" in types
+        legacy_nullable = field.get("type") == "number" and field.get("nullable") is True
+        assert nullable_number or legacy_nullable, field
     collision = client.get(COLLISION_PATH)
     assert collision.status_code != 200
     feedback_path = "/api/v1/agent/predictions/{prediction_id}/feedback"
@@ -771,3 +831,63 @@ def test_utc_day_counts_mix_and_exclusions(client_and_db, monkeypatch) -> None:
     assert "today_resolve_counts" not in found
     assert "outcome_json" not in found
     assert "pred-hit" not in str(payload.get("resolved_utc_day_counts"))
+    assert "postmortem_queue_depth" not in found
+    assert "adapter_updates_total" not in found
+
+
+def test_mixed_lags_http_quantiles_use_real_due_probe(client_and_db, monkeypatch) -> None:
+    client, db = client_and_db
+    frozen = datetime(2026, 8, 24, 12, 0, 0, tzinfo=timezone.utc)
+    naive = frozen.replace(tzinfo=None)
+    monkeypatch.setattr(
+        "src.services.prediction_resolver_diagnostics._utc_now",
+        lambda: frozen,
+    )
+    for lag_seconds in (10, 20, 30, 40, 50):
+        _insert_prediction(
+            db,
+            prediction_id=f"pred-lag-{lag_seconds}",
+            resolve_after=naive - timedelta(seconds=lag_seconds),
+            clock=lambda: naive,
+        )
+    original_claim = AgentPredictionRepository.claim_for_resolve
+    claim_calls: List[str] = []
+
+    def _claim(self, *args, **kwargs):
+        claim_calls.append("claim")
+        return original_claim(self, *args, **kwargs)
+
+    monkeypatch.setattr(AgentPredictionRepository, "claim_for_resolve", _claim)
+    response = client.get(DIAGNOSTICS_PATH)
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    lag = payload["claimable_due_lag_seconds"]
+    assert payload["claimable_due_count"] == 5
+    assert lag == {"p50": 30.0, "p95": 50.0, "max": 50.0}
+    assert lag["max"] == payload["oldest_due"][0]["lag_seconds"]
+    assert claim_calls == []
+    _assert_no_forbidden_keys(payload)
+
+
+def test_collector_payload_validates_forbid_schema() -> None:
+    from src.services.prediction_resolver.memory_store import InMemoryPredictionStore
+
+    store = InMemoryPredictionStore()
+    store._clock = lambda: datetime(2026, 8, 12, 12, 0, 0)
+    payload = collect_prediction_resolver_diagnostics(
+        config=SimpleNamespace(
+            prediction_resolve_enabled=False,
+            prediction_resolve_interval_seconds=60,
+            prediction_resolve_max_per_tick=50,
+        ),
+        store=store,
+        now=datetime(2026, 8, 12, 12, 0, 0),
+    )
+    model = PredictionResolverDiagnosticsResponse(**payload)
+    assert model.claimable_due_lag_seconds.p50 is None
+    with pytest.raises(ValidationError):
+        PredictionResolverDiagnosticsResponse(
+            **{**payload, "today_resolve_counts": {"hit": 0}}
+        )
+    with pytest.raises(ValidationError):
+        PredictionResolverClaimableDueLag(p50=1.0, p95=1.0, max=1.0, stuck=True)

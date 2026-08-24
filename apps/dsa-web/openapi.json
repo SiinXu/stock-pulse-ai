@@ -25758,6 +25758,55 @@
         "title": "PortfolioTradeListResponse",
         "type": "object"
       },
+      "PredictionResolverClaimableDueLag": {
+        "additionalProperties": false,
+        "description": "Nearest-rank lag quantiles over the claimable-due probe window.",
+        "properties": {
+          "max": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "p50": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P50"
+          },
+          "p95": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "P95"
+          }
+        },
+        "required": [
+          "p50",
+          "p95",
+          "max"
+        ],
+        "title": "PredictionResolverClaimableDueLag",
+        "type": "object"
+      },
       "PredictionResolverDiagnosticsResponse": {
         "additionalProperties": false,
         "description": "Read-only claimable-due diagnostics for this API process.",
@@ -25766,6 +25815,9 @@
             "minimum": 0.0,
             "title": "Claimable Due Count",
             "type": "integer"
+          },
+          "claimable_due_lag_seconds": {
+            "$ref": "#/components/schemas/PredictionResolverClaimableDueLag"
           },
           "claimable_due_probe_limit": {
             "minimum": 1.0,
@@ -25822,7 +25874,8 @@
           "oldest_due",
           "resolved_utc_day_start",
           "resolved_utc_day_end",
-          "resolved_utc_day_counts"
+          "resolved_utc_day_counts",
+          "claimable_due_lag_seconds"
         ],
         "title": "PredictionResolverDiagnosticsResponse",
         "type": "object"
@@ -40339,7 +40392,7 @@
     },
     "/api/v1/agent/prediction-resolver/diagnostics": {
       "get": {
-        "description": "只读返回当前可认领的到期预测（pending 与已过期 resolving 租约），以及 observed_at 所在 UTC 自然日的持久化结果计数。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。",
+        "description": "只读返回当前可认领的到期预测（pending 与已过期 resolving 租约），observed_at 所在 UTC 自然日的持久化结果计数，以及 claimable-due 探测窗口上的滞后 p50/p95/max。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。",
         "operationId": "getPredictionResolverDiagnostics",
         "responses": {
           "200": {
