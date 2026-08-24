@@ -12,8 +12,8 @@ from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.prediction_resolver_diagnostics import (
     PredictionResolverDiagnosticsResponse,
 )
+from src.application_services import get_application_services
 from src.auth import COOKIE_NAME
-from src.config import get_config
 from src.repositories.agent_prediction_repo import AgentPredictionRepository
 from src.services.prediction_resolver_diagnostics import (
     PredictionResolverDiagnosticsStoreError,
@@ -62,7 +62,7 @@ def get_prediction_resolver_diagnostics(
     store = AgentPredictionRepository()
     try:
         payload = collect_prediction_resolver_diagnostics(
-            config=get_config(),
+            config=get_application_services().config,
             store=store,
             scheduler=scheduler,
         )

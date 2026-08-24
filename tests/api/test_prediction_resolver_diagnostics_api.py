@@ -8,6 +8,7 @@ import os
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any, List, Optional, Set
 from unittest.mock import MagicMock
 
@@ -21,6 +22,11 @@ except ModuleNotFoundError:
 
 import src.auth as auth
 from src.api.app import create_app
+from src.api.v1.endpoints import prediction_resolver_diagnostics as diagnostics_endpoint
+from src.application_services import (
+    get_application_services,
+    get_installed_application_services,
+)
 from src.config import Config
 from src.repositories.agent_prediction_repo import AgentPredictionRepository
 from src.schemas.agent_prediction import (
@@ -30,6 +36,9 @@ from src.schemas.agent_prediction import (
     AgentPredictionInsert,
 )
 from src.services.prediction_resolver.resolver import PredictionResolver
+from src.services.prediction_resolver_diagnostics import (
+    collect_prediction_resolver_diagnostics,
+)
 from src.storage import DatabaseManager
 
 
@@ -529,3 +538,46 @@ def test_build_helpers_are_not_used_for_diagnostics(client_and_db, monkeypatch) 
     response = client.get(DIAGNOSTICS_PATH)
     assert response.status_code == 200, response.text
     assert response.json()["oldest_due"][0]["prediction_id"] == "pred-no-build"
+
+
+def test_endpoint_reads_installed_application_services_config(
+    client_and_db, monkeypatch
+) -> None:
+    client, _db = client_and_db
+    assert "get_config" not in vars(diagnostics_endpoint)
+    assert diagnostics_endpoint.get_application_services is get_application_services
+
+    installed = get_application_services()
+    assert get_installed_application_services() is installed
+    process_config = Config.get_instance()
+    assert bool(getattr(process_config, "prediction_resolve_enabled", False)) is False
+    sentinel = SimpleNamespace(
+        prediction_resolve_enabled=True,
+        prediction_resolve_interval_seconds=77,
+        prediction_resolve_max_per_tick=50,
+    )
+    monkeypatch.setattr(installed, "_config", sentinel)
+
+    captured: List[Any] = []
+    original = collect_prediction_resolver_diagnostics
+
+    def _capture(*, config: Any, store: Any, scheduler: Any = None, now: Any = None):
+        captured.append(config)
+        return original(config=config, store=store, scheduler=scheduler, now=now)
+
+    monkeypatch.setattr(
+        diagnostics_endpoint,
+        "collect_prediction_resolver_diagnostics",
+        _capture,
+    )
+
+    response = client.get(DIAGNOSTICS_PATH)
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["enabled"] is True
+    assert payload["interval_seconds"] == 77
+    assert captured == [sentinel]
+    assert captured[0] is not process_config
+    assert get_installed_application_services() is installed
+    assert installed.config is sentinel
+    _assert_no_forbidden_keys(payload)
