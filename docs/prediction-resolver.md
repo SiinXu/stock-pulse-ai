@@ -87,11 +87,12 @@ GET /api/v1/agent/prediction-resolver/diagnostics
 | `claimable_due_truncated` | 探测长度达到上限时为 `true` |
 | `claimable_due_probe_limit` | 探测上限（`max(1000, max_per_tick + 1)`，硬顶 10000；存储层 `list_due` 仍硬顶 1000） |
 | `oldest_due` | 最多 10 条允许字段，已按最老 `resolve_after` 排序：`prediction_id`、`symbol`、`market`、`status`（`pending` 或租约过期的 `resolving`）、`resolve_after`、`lag_seconds` |
+| `claimable_due_lag_seconds` | 嵌套 `extra=forbid` 对象：在本 claimable-due **整次探测**（不只是 `oldest_due`）上按 nearest-rank 计算的 `p50` / `p95` / `max` 滞后秒数。当 `claimable_due_count` 为 0 时三项均为 JSON `null`——空队列的滞后未定义，不是 0。分位数只覆盖探测窗口，截断标志仍用 `claimable_due_truncated`。缺失 `resolve_after` 的行与 `oldest_due` 相同记为 `0.0`。当 count ≥ 1 时，`max` 等于 `oldest_due[0].lag_seconds`。 |
 | `resolved_utc_day_start` | `observed_at` 所在 UTC 自然日的闭区间起点（ISO-8601 UTC） |
 | `resolved_utc_day_end` | 该自然日的开区间终点（`[start, end)`，ISO-8601 UTC） |
 | `resolved_utc_day_counts` | 存储层持久化结果计数：`hit`、`miss`、`partial`、已耗尽重试的 `unavailable`，以及 `unlabeled`。当日无结果时全部为 0。 |
 
-该 GET 只读。它不会 tick、认领、重新排队、启动或构造 resolver worker。若可认领探测或 UTC 日聚合任一失败，返回 **503**，并同时省略 due 快照与 UTC 日字段，不会伪装成全 0。开关关闭 / 空队列 / API 进程未挂 worker 时仍返回 **200** 并带上上述字段（若 cron 等其他 worker 已写回结果，计数可以大于 0）。
+该 GET 只读。它不会 tick、认领、重新排队、启动或构造 resolver worker。若可认领探测或 UTC 日聚合任一失败，返回 **503**，并同时省略 due 快照、UTC 日字段与滞后分位数，不会伪装成全 0。开关关闭 / 空队列 / API 进程未挂 worker 时仍返回 **200** 并带上上述字段（若 cron 等其他 worker 已写回结果，计数可以大于 0；due 计数为 0 时滞后字段为 `null`）。
 
 `hit` / `miss` / `partial` 统计 `status=resolved` 且 `resolved_at` 落在该 UTC 日、`outcome_json.label` 等于对应 token 的行。`unavailable` 统计 `status=data_unavailable`、`updated_at` 落在窗口内且 `outcome_json.retry_exhausted` 为 true 的行；仍可重试的 unavailable **不算**结果。`unlabeled` 统计窗口内 label 缺失或不在 `{hit,miss,partial}` 的 resolved 行。计数只使用 SQL `json_extract`，不会返回 outcome 载荷、claims、notes 或已解析行的 prediction id。响应不含 `today_resolve_counts` 或进程内 `last_tick`。
 
@@ -100,6 +101,6 @@ GET /api/v1/agent/prediction-resolver/diagnostics
 ## Epic 剩余边界
 
 - 预测查询列表 / 按 id 查询 HTTP API（剩余 #1102）
-- p50/p95 解析延迟直方图、最近拉取错误、Prometheus / OTel，以及可跨进程证明 cron 健康的 worker 心跳
+- 拉取错误 recency HTTP、复盘队列深度 HTTP、Prometheus / OTel，以及可跨进程证明 cron 健康的 worker 心跳
 - 交易日历 `resolve_after`（#1109）
-- 复盘 lesson writer / adapter（#1103 / #1106）；resolver 只提供有界队列边界
+- Adapter 接线 / `adapter_updates_total`（#1106）。worker/CLI 在注入队列 adapter 后已会在非重叠 tick 后 drain 复盘队列（#1499）；本 HTTP 面仍不暴露进程内队列深度

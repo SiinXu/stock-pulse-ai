@@ -1,12 +1,13 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Read-only prediction-resolver claimable-due and UTC-day diagnostics (#1114)."""
+"""Read-only prediction-resolver claimable-due, UTC-day, and lag diagnostics (#1114)."""
 
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 from src.services.prediction_resolver.resolver import (
     PREDICTION_RESOLVER_BACKLOG_PROBE_LIMIT,
@@ -80,16 +81,40 @@ def _normalize_resolved_utc_day_counts(raw: Any) -> Dict[str, int]:
     return counts
 
 
+def _row_lag_seconds(row: Any, *, as_of: datetime) -> float:
+    resolve_after = _to_datetime(_attr(row, "resolve_after"))
+    if resolve_after is None:
+        return 0.0
+    return max(0.0, (as_of - resolve_after).total_seconds())
+
+
+def _nearest_rank_quantile(sorted_values: Sequence[float], percentile: float) -> float:
+    n = len(sorted_values)
+    rank = min(n, max(1, math.ceil(percentile / 100.0 * n)))
+    return float(sorted_values[rank - 1])
+
+
+def _claimable_due_lag_seconds(
+    rows: List[Any], *, as_of: datetime
+) -> Dict[str, Optional[float]]:
+    if not rows:
+        return {"p50": None, "p95": None, "max": None}
+    lags = sorted(_row_lag_seconds(row, as_of=as_of) for row in rows)
+    return {
+        "p50": _nearest_rank_quantile(lags, 50),
+        "p95": _nearest_rank_quantile(lags, 95),
+        "max": lags[-1],
+    }
+
+
 def _oldest_due_items(rows: List[Any], *, as_of: datetime) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     for row in rows[:OLDEST_DUE_LIMIT]:
         resolve_after = _to_datetime(_attr(row, "resolve_after"))
         if resolve_after is None:
             resolve_after_iso = _to_utc_iso(as_of)
-            lag_seconds = 0.0
         else:
             resolve_after_iso = _to_utc_iso(resolve_after)
-            lag_seconds = max(0.0, (as_of - resolve_after).total_seconds())
         items.append(
             {
                 "prediction_id": str(_attr(row, "prediction_id") or ""),
@@ -97,7 +122,7 @@ def _oldest_due_items(rows: List[Any], *, as_of: datetime) -> List[Dict[str, Any
                 "market": str(_attr(row, "market") or ""),
                 "status": str(_attr(row, "status") or ""),
                 "resolve_after": resolve_after_iso,
-                "lag_seconds": lag_seconds,
+                "lag_seconds": _row_lag_seconds(row, as_of=as_of),
             }
         )
     return items
@@ -149,4 +174,5 @@ def collect_prediction_resolver_diagnostics(
         "resolved_utc_day_start": _to_utc_iso(day_start),
         "resolved_utc_day_end": _to_utc_iso(day_end),
         "resolved_utc_day_counts": counts,
+        "claimable_due_lag_seconds": _claimable_due_lag_seconds(rows, as_of=as_of),
     }

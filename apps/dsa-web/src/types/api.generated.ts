@@ -179,7 +179,7 @@ export interface paths {
         };
         /**
          * 读取预测解析器到期诊断
-         * @description 只读返回当前可认领的到期预测（pending 与已过期 resolving 租约），以及 observed_at 所在 UTC 自然日的持久化结果计数。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。
+         * @description 只读返回当前可认领的到期预测（pending 与已过期 resolving 租约），observed_at 所在 UTC 自然日的持久化结果计数，以及 claimable-due 探测窗口上的滞后 p50/p95/max。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。
          */
         get: operations["getPredictionResolverDiagnostics"];
         put?: never;
@@ -14145,12 +14145,25 @@ export interface components {
             total: number;
         };
         /**
+         * PredictionResolverClaimableDueLag
+         * @description Nearest-rank lag quantiles over the claimable-due probe window.
+         */
+        PredictionResolverClaimableDueLag: {
+            /** Max */
+            max: number | null;
+            /** P50 */
+            p50: number | null;
+            /** P95 */
+            p95: number | null;
+        };
+        /**
          * PredictionResolverDiagnosticsResponse
          * @description Read-only claimable-due diagnostics for this API process.
          */
         PredictionResolverDiagnosticsResponse: {
             /** Claimable Due Count */
             claimable_due_count: number;
+            claimable_due_lag_seconds: components["schemas"]["PredictionResolverClaimableDueLag"];
             /** Claimable Due Probe Limit */
             claimable_due_probe_limit: number;
             /** Claimable Due Truncated */

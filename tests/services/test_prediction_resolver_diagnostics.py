@@ -39,6 +39,7 @@ def _insert(
     *,
     prediction_id: str,
     resolve_after_hours: int = 1,
+    resolve_after: Any = None,
     status: str = STATUS_PENDING,
     **kwargs: Any,
 ) -> None:
@@ -49,7 +50,11 @@ def _insert(
         symbol="600519",
         market="cn",
         horizon="1d",
-        resolve_after=now - timedelta(hours=resolve_after_hours),
+        resolve_after=(
+            resolve_after
+            if resolve_after is not None
+            else now - timedelta(hours=resolve_after_hours)
+        ),
         created_at=now - timedelta(days=1),
         claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
         status=status,
@@ -82,6 +87,11 @@ def test_collect_disabled_empty_store_is_honest() -> None:
         "partial": 0,
         "unavailable": 0,
         "unlabeled": 0,
+    }
+    assert payload["claimable_due_lag_seconds"] == {
+        "p50": None,
+        "p95": None,
+        "max": None,
     }
 
 
@@ -155,6 +165,11 @@ def test_collect_oldest_due_caps_at_ten_and_keep_oldest_first() -> None:
     assert ids == [f"pred-{index:02d}" for index in range(10)]
     assert payload["oldest_due"][0]["lag_seconds"] >= payload["oldest_due"][-1]["lag_seconds"]
     assert payload["claimable_due_truncated"] is False
+    lag = payload["claimable_due_lag_seconds"]
+    assert lag["p50"] == 6 * 3600
+    assert lag["p95"] == 12 * 3600
+    assert lag["max"] == 12 * 3600
+    assert lag["max"] == payload["oldest_due"][0]["lag_seconds"]
 
 
 def test_collect_truncated_when_probe_hits_cap(monkeypatch) -> None:
@@ -174,6 +189,11 @@ def test_collect_truncated_when_probe_hits_cap(monkeypatch) -> None:
     assert payload["claimable_due_count"] == 2
     assert payload["claimable_due_truncated"] is True
     assert [item["prediction_id"] for item in payload["oldest_due"]] == ["pred-0", "pred-1"]
+    lag = payload["claimable_due_lag_seconds"]
+    assert lag["p50"] == 2 * 3600
+    assert lag["p95"] == 3 * 3600
+    assert lag["max"] == 3 * 3600
+    assert lag["max"] == payload["oldest_due"][0]["lag_seconds"]
 
 
 def test_collect_store_failure_is_explicit() -> None:
@@ -300,3 +320,111 @@ def test_collect_registration_bit_is_this_process_cache_only() -> None:
         now=_now(),
     )
     assert missing["this_process_worker_registered"] is False
+
+
+def test_collect_single_due_row_sets_all_lag_quantiles_equal() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    _insert(store, prediction_id="pred-one", resolve_after=now - timedelta(seconds=42))
+    payload = collect_prediction_resolver_diagnostics(
+        config=_config(),
+        store=store,
+        now=now,
+    )
+    lag = payload["claimable_due_lag_seconds"]
+    assert payload["claimable_due_count"] == 1
+    assert lag["p50"] == 42.0
+    assert lag["p95"] == 42.0
+    assert lag["max"] == 42.0
+    assert lag["max"] == payload["oldest_due"][0]["lag_seconds"]
+
+
+def test_collect_mixed_lags_use_nearest_rank_over_probe() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    for lag_seconds in (10, 20, 30, 40, 50):
+        _insert(
+            store,
+            prediction_id=f"pred-{lag_seconds}",
+            resolve_after=now - timedelta(seconds=lag_seconds),
+        )
+    payload = collect_prediction_resolver_diagnostics(
+        config=_config(),
+        store=store,
+        now=now,
+    )
+    lag = payload["claimable_due_lag_seconds"]
+    assert payload["claimable_due_count"] == 5
+    assert lag["p50"] == 30.0
+    assert lag["p95"] == 50.0
+    assert lag["max"] == 50.0
+    assert lag["max"] == payload["oldest_due"][0]["lag_seconds"]
+
+
+def test_collect_truncated_quantiles_ignore_rows_beyond_probe(monkeypatch) -> None:
+    import src.services.prediction_resolver_diagnostics as diagnostics
+
+    monkeypatch.setattr(diagnostics, "PREDICTION_RESOLVER_BACKLOG_PROBE_LIMIT", 3)
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    for lag_seconds in (10, 20, 30, 100):
+        _insert(
+            store,
+            prediction_id=f"pred-{lag_seconds}",
+            resolve_after=now - timedelta(seconds=lag_seconds),
+        )
+    payload = collect_prediction_resolver_diagnostics(
+        config=_config(prediction_resolve_max_per_tick=1),
+        store=store,
+        now=now,
+    )
+    lag = payload["claimable_due_lag_seconds"]
+    assert payload["claimable_due_probe_limit"] == 3
+    assert payload["claimable_due_count"] == 3
+    assert payload["claimable_due_truncated"] is True
+    assert lag["p50"] == 30.0
+    assert lag["p95"] == 100.0
+    assert lag["max"] == 100.0
+    assert lag["max"] == payload["oldest_due"][0]["lag_seconds"]
+
+
+def test_collect_missing_resolve_after_uses_zero_lag() -> None:
+    class _MissingResolveAfterStore:
+        def list_due(self, *, as_of, limit, statuses=None):
+            if statuses == ("pending",):
+                return [
+                    SimpleNamespace(
+                        prediction_id="pred-missing",
+                        symbol="600519",
+                        market="cn",
+                        status=STATUS_PENDING,
+                        resolve_after=None,
+                        lease_expires_at=None,
+                    )
+                ]
+            return []
+
+        def count_resolved_utc_day(self, *, as_of):
+            return {
+                "hit": 0,
+                "miss": 0,
+                "partial": 0,
+                "unavailable": 0,
+                "unlabeled": 0,
+            }
+
+    payload = collect_prediction_resolver_diagnostics(
+        config=_config(),
+        store=_MissingResolveAfterStore(),
+        now=_now(),
+    )
+    assert payload["claimable_due_count"] == 1
+    assert payload["oldest_due"][0]["lag_seconds"] == 0.0
+    assert payload["claimable_due_lag_seconds"] == {
+        "p50": 0.0,
+        "p95": 0.0,
+        "max": 0.0,
+    }
