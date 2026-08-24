@@ -202,6 +202,69 @@ def test_cost_budget_breach_terminates_with_budget_cost(monkeypatch):
     assert result.budget_snapshot["breach"]["reason"] == "budget_cost"
 
 
+def test_token_budget_breach_terminates_with_budget_tokens():
+    """Counterexample: exceeding the optional token ceiling terminates with budget_tokens."""
+    adapter = _adapter([
+        _FakeResponse(
+            content="done",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        ),
+    ])
+    account = create_mode_budget_account(
+        limits=ModeBudgetLimits(
+            mode="quick",
+            enabled=True,
+            max_llm_turns=10,
+            max_tool_calls=50,
+            max_cost_usd=0,
+            max_tokens=10,
+        )
+    )
+    result = run_agent_loop(
+        messages=[{"role": "user", "content": "hi"}],
+        tool_registry=_echo_registry(),
+        llm_adapter=adapter,
+        max_steps=5,
+        mode_budget_account=account,
+    )
+    assert result.success is False
+    assert result.failure_reason == StageFailureReason.BUDGET_TOKENS
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["breach"]["reason"] == "budget_tokens"
+    assert result.budget_snapshot["used"]["tokens"] > 10
+
+
+def test_zero_token_ceiling_does_not_breach():
+    """max_tokens=0 remains 'optional ceiling off', not an implicit 0-token hard fail."""
+    adapter = _adapter([
+        _FakeResponse(
+            content="done",
+            usage={"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+        ),
+    ])
+    account = create_mode_budget_account(
+        limits=ModeBudgetLimits(
+            mode="quick",
+            enabled=True,
+            max_llm_turns=10,
+            max_tool_calls=50,
+            max_cost_usd=0,
+            max_tokens=0,
+        )
+    )
+    result = run_agent_loop(
+        messages=[{"role": "user", "content": "hi"}],
+        tool_registry=_echo_registry(),
+        llm_adapter=adapter,
+        max_steps=5,
+        mode_budget_account=account,
+    )
+    assert result.success is True
+    assert result.budget_snapshot is not None
+    assert result.budget_snapshot["breach"] is None
+    assert result.budget_snapshot["limits"]["max_tokens"] == 0
+
+
 def test_cancel_outranks_budget_when_cancelled_before_step():
     adapter = _adapter([_FakeResponse(content="should not run")])
     account = create_mode_budget_account(
