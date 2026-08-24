@@ -1272,6 +1272,69 @@ export function installPlaygroundApiMock(
     pageSize: 20,
   }, { items: [], total: 0, page: 1, pageSize: 20 }));
 
+  const agentRunFeedbackPath = /\/api\/v1\/agent\/runs\/[^/]+\/feedback$/;
+  const parseAgentRunId = (url?: string): string => {
+    const match = String(url || '').match(/\/agent\/runs\/([^/]+)\/feedback\/?$/);
+    return match ? decodeURIComponent(match[1]) : '';
+  };
+  const emptyRunFeedback = (runId: string) => ({
+    run_id: runId,
+    feedback_value: null,
+    note: null,
+    source: null,
+    provenance_source: null,
+    actor_id: null,
+    created_at: null,
+    updated_at: null,
+  });
+  const savedRunFeedback = (runId: string) => ({
+    run_id: runId,
+    feedback_value: 'useful',
+    note: 'Looks consistent with the tape.',
+    source: 'web',
+    provenance_source: 'user_feedback',
+    actor_id: 'local_admin',
+    created_at: FIXTURE_TIMESTAMP,
+    updated_at: FIXTURE_TIMESTAMP,
+  });
+  mock.onGet(agentRunFeedbackPath).reply((config) => {
+    const runId = parseAgentRunId(config.url);
+    if (/(?:^|-)(?:404|missing|not-found)(?:-|$)/i.test(runId)) {
+      return [404, { error: 'not_found', message: 'Analysis run not found.' }];
+    }
+    if (runId === 'fixture-query-101' || /saved/i.test(runId)) {
+      return [200, savedRunFeedback(runId)];
+    }
+    return [200, emptyRunFeedback(runId)];
+  });
+  mock.onPut(agentRunFeedbackPath).reply((config) => {
+    const runId = parseAgentRunId(config.url);
+    if (/(?:^|-)(?:404|missing|not-found)(?:-|$)/i.test(runId)) {
+      return [404, { error: 'not_found', message: 'Analysis run not found.' }];
+    }
+    const body = typeof config.data === 'string'
+      ? JSON.parse(config.data) as Record<string, unknown>
+      : {};
+    const note = typeof body.note === 'string' ? body.note : '';
+    if (
+      /400/i.test(runId)
+      || note.toLowerCase().includes('stockpulse-agent-soul')
+      || note.length > 1000
+    ) {
+      return [400, { error: 'invalid_request', message: 'Feedback note was rejected.' }];
+    }
+    return [200, {
+      run_id: runId,
+      feedback_value: body.feedback_value ?? null,
+      note: note === '' ? null : note,
+      source: body.source ?? 'web',
+      provenance_source: 'user_feedback',
+      actor_id: 'local_admin',
+      created_at: FIXTURE_TIMESTAMP,
+      updated_at: FIXTURE_TIMESTAMP,
+    }];
+  });
+
   mock.onAny().reply((config) => [501, {
     error: 'playground_mock_not_registered',
     message: `No playground mock is registered for ${(config.method || 'get').toUpperCase()} ${requestPath(config as InternalAxiosRequestConfig)}.`,

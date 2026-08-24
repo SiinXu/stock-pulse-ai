@@ -1,4 +1,6 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { cleanup, fireEvent, render as rtlRender, screen, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   AnalysisReport,
@@ -13,6 +15,35 @@ vi.mock('../../../api/history', () => ({
     getMarkdown: vi.fn(),
   },
 }));
+
+vi.mock('../../../api/agentFeedback', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../api/agentFeedback')>();
+  return {
+    ...actual,
+    agentFeedbackApi: {
+      getRunFeedback: vi.fn().mockResolvedValue({
+        runId: 'market-review-q-1',
+        feedbackValue: null,
+        note: null,
+        source: null,
+        provenanceSource: null,
+        actorId: null,
+        createdAt: null,
+        updatedAt: null,
+      }),
+      putRunFeedback: vi.fn(),
+    },
+  };
+});
+
+function render(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  });
+  return rtlRender(
+    <QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+  );
+}
 
 const englishMarketReviewReport: AnalysisReport = {
   meta: {
@@ -614,5 +645,33 @@ describe('MarketReviewReportView', () => {
     }
     expect(screen.queryByText('Infinity%')).not.toBeInTheDocument();
     expect(screen.queryByText('NaN%')).not.toBeInTheDocument();
+  });
+
+  it('mounts run feedback after market structure and before the markdown body', async () => {
+    render(
+      <MarketReviewReportView
+        report={marketReviewReportWithStructure}
+        content="# Market Review"
+        reportLanguage="en"
+      />,
+    );
+    const panel = await screen.findByTestId('report-run-feedback');
+    const markdown = screen.getByTestId('market-review-report');
+    expect(panel.compareDocumentPosition(markdown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: '有用' })).toHaveAttribute(
+      'data-control',
+      'selection-chip',
+    );
+  });
+
+  it('hides run feedback when queryId is missing', () => {
+    render(
+      <MarketReviewReportView
+        recordId={12}
+        content="# Market Review"
+        reportLanguage="en"
+      />,
+    );
+    expect(screen.queryByTestId('report-run-feedback')).not.toBeInTheDocument();
   });
 });

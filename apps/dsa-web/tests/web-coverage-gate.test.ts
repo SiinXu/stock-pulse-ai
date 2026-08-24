@@ -165,12 +165,22 @@ describe('web unit coverage gate', () => {
   });
 
   it('waits for lazy report diagnostics together with news before asserting order', () => {
-    expect(placementTest).toContain('render(<ReportSummary data={result} />)');
+    expect(placementTest).toContain('function renderWithClient(ui: ReactElement)');
+    expect(placementTest).toContain('QueryClientProvider');
+    expect(placementTest).toContain('renderWithClient(<ReportSummary data={result} />)');
+    expect(placementTest).toContain("queryId: 'q1'");
+    expect(placementTest).toContain("getRunFeedback).toHaveBeenCalledWith('q1')");
+    expect(placementTest).toContain("expect(screen.getByText('暂无相关资讯')).toBeInTheDocument()");
     expect(placementTest).toContain("expect(screen.getByTestId('run-diagnostics')).toBeInTheDocument()");
+    expect(placementTest).toContain("expect(screen.getByTestId('report-run-feedback')).toBeInTheDocument()");
     expect(placementTest).toContain('const diagnostics = screen.getByTestId(\'run-diagnostics\')');
+    expect(placementTest).toContain('const feedback = screen.getByTestId(\'report-run-feedback\')');
+    expect(placementTest).toContain('contextSummary.compareDocumentPosition(feedback)');
+    expect(placementTest).toContain('feedback.compareDocumentPosition(diagnostics)');
     expect(placementTest).not.toMatch(/await screen\.findByTestId\('run-diagnostics'\)/);
     expect(placementTest).toContain('ReportDiagnostics is React.lazy');
     expect(placementTest).not.toMatch(/vi\.mock\([^)]*ReportDiagnostics/);
+    expect(placementTest).not.toMatch(/vi\.mock\([^)]*ReportSummary/);
     expect(placementTest).not.toMatch(/waitFor\([\s\S]*?,\s*\{\s*timeout:/);
   });
 

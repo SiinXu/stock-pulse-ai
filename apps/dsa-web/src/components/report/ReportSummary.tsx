@@ -6,12 +6,34 @@ import { ReportStructuredInsights } from './ReportStructuredInsights';
 import { ReportStrata } from './ReportStrata';
 import { ReportNews } from './ReportNews';
 import { ReportDetails } from './ReportDetails';
+import { useAgentRunFeedback } from '../../hooks/useAgentRunFeedback';
 import { AnalysisContextSummary } from './AnalysisContextSummary';
 import { MarketReviewReportView } from './MarketReviewReportView';
+import { ReportRunFeedback } from './ReportRunFeedback';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
 
 const ReportDiagnostics = React.lazy(() => import('./ReportDiagnostics'));
 const ReportProcessTimeline = React.lazy(() => import('./ReportProcessTimeline'));
+
+function AnalysisRunFeedback({ queryId }: { queryId?: string | null }) {
+  const view = useAgentRunFeedback(queryId);
+  if (view.hidden) {
+    return null;
+  }
+  return (
+    <ReportRunFeedback
+      feedbackValue={view.feedbackValue}
+      draftNote={view.draftNote}
+      isLoading={view.isLoading}
+      isSaving={view.isSaving}
+      errorMessage={view.errorMessage}
+      onDraftNoteChange={view.setDraftNote}
+      onSubmitValue={(value) => {
+        void view.submitValue(value);
+      }}
+    />
+  );
+}
 
 interface ReportSummaryProps {
   data: AnalysisResult | AnalysisReport;
@@ -93,6 +115,8 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
         overview={details?.analysisContextPackOverview}
         language={reportLanguage}
       />
+
+      <AnalysisRunFeedback queryId={meta.queryId} />
 
       {/* Analysis process timeline from real run-flow agent events (#124/#219). */}
       <React.Suspense fallback={false}>

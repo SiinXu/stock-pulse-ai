@@ -37,11 +37,14 @@ describe('playground catalog', () => {
   it('uses stable, unique ids and valid source paths', () => {
     const ids = PLAYGROUND_CATALOG.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(PLAYGROUND_CATALOG).toHaveLength(224);
+    expect(PLAYGROUND_CATALOG).toHaveLength(225);
     for (const entry of PLAYGROUND_CATALOG) {
       expect(fs.existsSync(path.join(sourceRoot, entry.sourcePath))).toBe(true);
       expect(entry.scenarios.length).toBeGreaterThan(0);
+      expect(entry.scenarios.map((item) => item.id)).not.toContain('saved');
     }
+    const runFeedback = PLAYGROUND_CATALOG.find((entry) => entry.id === 'report-run-feedback');
+    expect(runFeedback?.scenarios.map((item) => item.id)).toEqual(['default', 'loading', 'empty', 'error']);
   });
 
   it('covers every exported visual component without duplicate aliases', () => {

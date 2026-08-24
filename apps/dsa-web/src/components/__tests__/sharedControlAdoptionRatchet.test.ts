@@ -250,4 +250,17 @@ describe('shared-control adoption ratchet production inventory', () => {
       expect(exemption.reason.length).toBeGreaterThan(12);
     }
   });
+
+  it('keeps new report run-feedback ratings on SelectionChip instead of native-button debt', () => {
+    const file = '../report/ReportRunFeedback.tsx';
+    const source = productionTypeScriptSources[file];
+    expect(source, `${file} must remain in the production inventory`).toBeDefined();
+    expect(scanSharedControlAdoption(file, source)).toEqual([]);
+    expect(source).toContain('SelectionChip');
+    expect(source).not.toMatch(/<button\b/);
+    expect(loadBaseline().files[file]).toBeUndefined();
+    expect(
+      SHARED_CONTROL_A11Y_EXEMPTIONS.some((entry) => entry.file === file),
+    ).toBe(false);
+  });
 });

@@ -186,6 +186,13 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('reports', 'report-summary', 'ReportSummary', 'components/report/ReportSummary.tsx', ['default', 'loading', 'error']),
   entry(
     'reports',
+    'report-run-feedback',
+    'ReportRunFeedback',
+    'components/report/ReportRunFeedback.tsx',
+    ['default', 'loading', 'empty', 'error'],
+  ),
+  entry(
+    'reports',
     'report-version-compare-view',
     'ReportVersionCompareView',
     'components/report-version-compare/ReportVersionCompareView.tsx',

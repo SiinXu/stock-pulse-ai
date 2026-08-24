@@ -1,5 +1,8 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { agentFeedbackApi } from '../../../api/agentFeedback';
 import { historyApi } from '../../../api/history';
 import type {
   AnalysisContextPackOverview,
@@ -17,6 +20,33 @@ vi.mock('../../../api/history', () => ({
     getRecordFlow: vi.fn().mockResolvedValue(null),
   },
 }));
+
+vi.mock('../../../api/agentFeedback', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../api/agentFeedback')>();
+  return {
+    ...actual,
+    agentFeedbackApi: {
+      getRunFeedback: vi.fn().mockResolvedValue({
+        runId: 'q1',
+        feedbackValue: null,
+        note: null,
+        source: null,
+        provenanceSource: null,
+        actorId: null,
+        createdAt: null,
+        updatedAt: null,
+      }),
+      putRunFeedback: vi.fn(),
+    },
+  };
+});
+
+function renderWithClient(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const overview: AnalysisContextPackOverview = {
   packVersion: '1.0',
@@ -595,15 +625,18 @@ describe('ReportSummary analysis context placement', () => {
       createdAt: '2026-04-10T12:00:00',
     };
 
-    render(<ReportSummary data={result} />);
+    renderWithClient(<ReportSummary data={result} />);
 
     // News is eager+async. ReportDiagnostics is React.lazy behind Suspense
     // with no fallback, so the panel is absent until the chunk resolves.
     // Ready means both surfaces exist — news alone is not enough.
+    // Feedback mounts on canonical report.meta.queryId in the same tree.
     await waitFor(() => {
       expect(screen.getByText('暂无相关资讯')).toBeInTheDocument();
       expect(screen.getByTestId('run-diagnostics')).toBeInTheDocument();
+      expect(screen.getByTestId('report-run-feedback')).toBeInTheDocument();
     });
+    expect(agentFeedbackApi.getRunFeedback).toHaveBeenCalledWith('q1');
 
     expect(screen.getByText('市场阶段: CN · 盘中')).toBeInTheDocument();
     expect(screen.getByText('日线未完成')).toBeInTheDocument();
@@ -619,13 +652,15 @@ describe('ReportSummary analysis context placement', () => {
     const news = screen.getByText('相关资讯');
     const diagnostics = screen.getByTestId('run-diagnostics');
     const contextSummary = screen.getByTestId('analysis-context-summary');
+    const feedback = screen.getByTestId('report-run-feedback');
     expect(contextSummary).not.toHaveAttribute('open');
     expect(diagnostics).not.toHaveAttribute('open');
     const traceability = screen.getByText('数据追溯');
 
     expect(strategy.compareDocumentPosition(news) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(news.compareDocumentPosition(contextSummary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(contextSummary.compareDocumentPosition(diagnostics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(contextSummary.compareDocumentPosition(feedback) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(feedback.compareDocumentPosition(diagnostics) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(diagnostics.compareDocumentPosition(traceability) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     fireEvent.click(within(contextSummary).getAllByText('输入数据块')[0]);
     expect(within(contextSummary).getByText(/说明: 新闻未进入本次 LLM 分析/)).toBeInTheDocument();
