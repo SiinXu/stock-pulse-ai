@@ -3303,7 +3303,7 @@ class DataFetcherManager:
 
                         fetcher = TwInstitutionalFetcher()
                         self._tw_institutional_fetcher = fetcher
-                    except Exception as exc:  # noqa: BLE001 - wiring failure: loud but fail-open
+                    except Exception as exc:  # broad-exception: fallback_recorded - wiring failure is logged then fail-open
                         log_safe_exception(
                             logger,
                             "Taiwan institutional data fetcher initialization failed",
