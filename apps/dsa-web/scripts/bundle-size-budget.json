@@ -141,9 +141,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 295635,
-      "measuredGzipBytes": 295235,
-      "note": "Reseeded after AGENT_MODE_BUDGET_MAX_LLM_TURNS Settings help named optional reflection/post-mortem run-cap consumption (Refs #1121). GitHub Actions Linux zlib-9 295235 B (local macOS zlib-9 295233 B) + 400 B headroom."
+      "maxGzipBytes": 296343,
+      "measuredGzipBytes": 295943,
+      "note": "Reseeded after first-run wizard starts a real local-model analysis (Refs #798). GitHub Actions Linux zlib-9 295943 B on 208f4c9e (local macOS zlib-9 295945–295946 B across two production builds; node 22.13.0, vite 7.3.1) + 400 B headroom. FirstRunWizard stays in the SettingsPage chunk: a new FirstRunWizard-* split would miss settings-route globs and hide growth; adding it to the family would not shrink the aggregate."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -381,9 +381,9 @@
       "match": [
         "assets/SettingsPage-*.js"
       ],
-      "maxGzipBytes": 295635,
-      "measuredGzipBytes": 295235,
-      "note": "Same-pattern family after AGENT_MODE_BUDGET_MAX_LLM_TURNS Settings help named optional reflection/post-mortem run-cap consumption (Refs #1121). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured GitHub Actions Linux zlib-9 295235 B; local macOS zlib-9 295233 B."
+      "maxGzipBytes": 296343,
+      "measuredGzipBytes": 295943,
+      "note": "Same-pattern family after first-run wizard local analysis (Refs #798). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured GitHub Actions Linux zlib-9 295943 B on 208f4c9e; local macOS zlib-9 295945–295946 B."
     },
     {
       "id": "PortfolioRiskMetricsPanel-family",
@@ -483,9 +483,9 @@
         "assets/settingsPage-*.js",
         "assets/settingsTranslations-*.js"
       ],
-      "maxGzipBytes": 337338,
-      "measuredGzipBytes": 336938,
-      "note": "Already-split Settings route family. Re-measured zlib-9 sum 336938 B on origin/main c86070f5a + 400 B headroom. Per-asset SettingsPage cap is unchanged."
+      "maxGzipBytes": 338335,
+      "measuredGzipBytes": 337935,
+      "note": "Already-split Settings route family. Re-measured after first-run wizard local analysis (Refs #798). GitHub Actions Linux zlib-9 sum 337935 B on 208f4c9e (local macOS zlib-9 337937–337938 B) + 400 B headroom. Per-asset SettingsPage cap is also reseeded."
     },
     {
       "id": "portfolio-route",
