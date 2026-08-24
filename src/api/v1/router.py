@@ -36,6 +36,7 @@ from src.api.v1.endpoints import (
     plugins,
     onboarding,
     paper_decision_quality,
+    prediction_resolver_diagnostics,
     portfolio,
     portfolio_health,
     portfolio_rebalancing,
@@ -78,6 +79,12 @@ router.include_router(
 
 router.include_router(
     agent_feedback.router,
+    prefix="/agent",
+    tags=["Agent"]
+)
+
+router.include_router(
+    prediction_resolver_diagnostics.router,
     prefix="/agent",
     tags=["Agent"]
 )
