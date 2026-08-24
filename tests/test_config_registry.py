@@ -764,6 +764,15 @@ class TestEnvExampleWebSettingsCoverage(unittest.TestCase):
 class TestSettingsFieldTitleContract(unittest.TestCase):
     """The Web field-title catalog must cover the backend registry exactly."""
 
+    # Issue #1091 first slice: library-only adapter flags reuse Agent Memory
+    # help_key and must not add Settings locale strings or OpenAPI/Web files.
+    _LIBRARY_ONLY_KEYS_WITHOUT_WEB_TITLES = frozenset(
+        {
+            "AGENT_ONLINE_ADAPTERS_ENABLED",
+            "AGENT_ONLINE_ADAPTERS_MIN_SAMPLES",
+        }
+    )
+
     _WEB_ROOT = Path(__file__).resolve().parents[1] / "apps/dsa-web/src"
     _FIELD_TITLE_FILES = (
         _WEB_ROOT / "utils/systemConfigI18n.ts",
@@ -839,12 +848,14 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
             key
             for key in get_registered_field_keys()
             if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and key not in self._LIBRARY_ONLY_KEYS_WITHOUT_WEB_TITLES
             and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
         }
         field_title_keys = {
             key
             for key in self._collect_web_field_title_keys()
             if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and key not in self._LIBRARY_ONLY_KEYS_WITHOUT_WEB_TITLES
             and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
         }
 
@@ -863,12 +874,14 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
             key: title
             for key, title in self._collect_web_english_field_titles().items()
             if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and key not in self._LIBRARY_ONLY_KEYS_WITHOUT_WEB_TITLES
             and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
         }
         backend_titles = {
             key: get_field_definition(key)["title"]
             for key in get_registered_field_keys()
             if key not in WEB_SETTINGS_HIDDEN_FROM_UI
+            and key not in self._LIBRARY_ONLY_KEYS_WITHOUT_WEB_TITLES
             and not LLM_CHANNEL_FIELD_KEY_RE.match(key)
         }
 

@@ -1773,6 +1773,74 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         }],
         "warning_codes": [],
     },
+    "AGENT_ONLINE_ADAPTERS_ENABLED": {
+        "title": "Online Evolution Adapters",
+        "description": (
+            "Enable the gated online evolution adapter library wrapping AgentMemory "
+            "confidence calibration. Default off. Tool ranking and route preference "
+            "are identity stubs in this slice. Does not persist episode metadata."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 669,
+        "help_key": "settings.agent.AGENT_MEMORY_ENABLED",
+        "examples": [
+            "AGENT_ONLINE_ADAPTERS_ENABLED=false",
+            "AGENT_ONLINE_ADAPTERS_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Agent memory guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-memory.md",
+            },
+            {
+                "label": "Agent 记忆指南",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-memory_CN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
+    "AGENT_ONLINE_ADAPTERS_MIN_SAMPLES": {
+        "title": "Online Adapters Min Samples",
+        "description": (
+            "Minimum AgentMemory samples before online adapter confidence calibration "
+            "applies. Default 30, matching AgentMemory calibration. Below threshold "
+            "the factor is 1.0 and applied is false."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "30",
+        "options": [],
+        "validation": {"min": 1, "max": 10000},
+        "display_order": 669,
+        "help_key": "settings.agent.AGENT_MEMORY_ENABLED",
+        "examples": [
+            "AGENT_ONLINE_ADAPTERS_MIN_SAMPLES=30",
+            "AGENT_ONLINE_ADAPTERS_MIN_SAMPLES=50",
+        ],
+        "docs": [
+            {
+                "label": "Agent memory guide",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-memory.md",
+            },
+            {
+                "label": "Agent 记忆指南",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-memory_CN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_ERROR_PATTERN_ENABLED": {
         "title": "Error Pattern Encyclopedia",
         "description": (

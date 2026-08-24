@@ -16,6 +16,17 @@
 
 Existing `AgentMemory` / `BaseAgent` numeric calibration behavior is unchanged. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` history inject is default-off; when enabled, `BaseAgent._build_memory_context` wraps history lines with `isolate_untrusted_memory_body` and canonicalizes `signal` to `buy|hold|sell` (see [Threat notes](#threat-notes)).
 
+## Online evolution adapters (gated, default off)
+
+Library-only slice in `src/agent/evolution/adapters.py`. Production `BaseAgent` calibration is unchanged and must not be double-multiplied.
+
+| Control | Default | Behavior |
+| --- | --- | --- |
+| `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | Master gate. When false, adapters are identity: raw confidence, input tool order, the same route, and no `adapter_influence` key on `AgentContext.meta`. |
+| `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | Minimum `AgentMemory` samples before confidence calibration applies. Below threshold: factor `1.0`, `applied=false`. |
+
+When enabled and samples meet the adapter threshold, `calibrate_confidence` applies the stored `CalibrationResult.calibration_factor` from `AgentMemory.get_calibration` (and only when `calibrated` is true). AgentMemory already clamps `historical_accuracy / avg_confidence` to `0.5..1.5`, including a real `historical_accuracy=0.0`; the adapter must not re-derive that ratio with truthy fallbacks such as `accuracy or 0.5`. Confidence is then clamped to `[0,1]`. Sample source is existing `AGENT_MEMORY_ENABLED` / `AgentMemory`; this slice does not add a second store. Tool-effectiveness and route-preference are explicit identity stubs: they do not unlock denied ToolSurface tools and do not write `AGENT_ORCHESTRATOR_MODE`. Influence is recorded only on run-local `AgentContext.meta["adapter_influence"]` (not episodes).
+
 ## Honest layer naming
 
 The second layer is **outcome-pattern memory**, not free-text "semantic knowledge":

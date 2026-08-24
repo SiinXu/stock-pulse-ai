@@ -5,11 +5,21 @@
 - ``budget`` / ``reflection`` / ``postmortem`` — run-local critique and forecast post-mortem
 - ``error_patterns`` — human-editable pattern cards clustered from lessons (#1138)
 - ``guards`` — Soul / ToolSurface immutability proofs
+- ``adapters`` — gated online adapters wrapping AgentMemory (Issue #1091; default off)
 
 These modules do not mutate Agent Soul charter bytes and never expand ToolSurface
 denials. Pattern injection is a read-only, quota-bounded checklist.
 """
 
+from src.agent.evolution.adapters import (
+    ADAPTER_INFLUENCE_META_KEY,
+    DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES,
+    calibrate_confidence,
+    is_online_adapters_enabled,
+    prefer_route,
+    rank_tools,
+    record_adapter_influence,
+)
 from src.agent.evolution.budget import (
     BUDGET_SKIPPED,
     DEFAULT_META_REVIEW_LLM_BUDGET,
@@ -80,7 +90,9 @@ from src.agent.evolution.reflection import (
 )
 
 __all__ = [
+    "ADAPTER_INFLUENCE_META_KEY",
     "BUDGET_SKIPPED",
+    "DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES",
     "DEFAULT_INJECT_CHAR_BUDGET",
     "DEFAULT_INJECT_TOP_K",
     "DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET",
@@ -106,15 +118,20 @@ __all__ = [
     "ResolvedForecastInput",
     "SoulIdentitySnapshot",
     "assert_soul_unchanged",
+    "calibrate_confidence",
     "cluster_lessons_into_cards",
     "format_error_pattern_checklist",
     "inject_error_pattern_checklist",
     "inject_error_patterns_into_analysis_context",
     "is_error_pattern_enabled",
+    "is_online_adapters_enabled",
     "is_reflection_enabled",
     "lessons_from_kinds",
     "parse_lessons_payload",
     "parse_reflection_output",
+    "prefer_route",
+    "rank_tools",
+    "record_adapter_influence",
     "reflect_resolved_forecast",
     "retrieve_error_patterns",
     "resolve_error_pattern_state_path",

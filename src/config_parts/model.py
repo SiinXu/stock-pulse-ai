@@ -397,6 +397,9 @@ class Config:
     agent_deep_research_budget: int = 30000  # Max token budget for deep research
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
+    # Gated online evolution adapters wrapping AgentMemory (Issue #1091). Default off.
+    agent_online_adapters_enabled: bool = False
+    agent_online_adapters_min_samples: int = 30
     # Layered memory lifecycle (principal-scoped; minimize-by-default).
     layered_memory_collection_enabled: bool = False
     layered_memory_retention_days: int = 90

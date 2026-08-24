@@ -1,0 +1,2 @@
+- [Added] Add default-off gated online evolution adapters that wrap AgentMemory confidence calibration, keep tool ranking and route preference as identity stubs, and record bounded run-local adapter_influence metadata (Refs #1091).
+- [Fixed] Apply AgentMemory.calibration_factor in gated online adapters so historical_accuracy=0.0 clamps confidence down instead of inverting via a truthy 0.5 fallback (Refs #1091).

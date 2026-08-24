@@ -143,6 +143,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
 | `AGENT_OBSERVABILITY_ENABLED` | `true` | 是 | 模板中注释; Agent observability L0 (structured run events with trace/span ids) Lightweight events are default-on and persist via ... |
+| `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | 是 | 模板中注释; Gated online evolution adapters wrapping AgentMemory (Issue #1091) |
+| `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | 是 | 模板中注释 |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
 | `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |

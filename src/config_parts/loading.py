@@ -1181,6 +1181,17 @@ class _ConfigLoadingMethods:
                 minimum=30,
             ),
             agent_memory_enabled=os.getenv('AGENT_MEMORY_ENABLED', 'false').lower() == 'true',
+            agent_online_adapters_enabled=parse_env_bool(
+                os.getenv('AGENT_ONLINE_ADAPTERS_ENABLED'),
+                default=False,
+            ),
+            agent_online_adapters_min_samples=parse_env_int(
+                os.getenv('AGENT_ONLINE_ADAPTERS_MIN_SAMPLES'),
+                30,
+                field_name='AGENT_ONLINE_ADAPTERS_MIN_SAMPLES',
+                minimum=1,
+                maximum=10000,
+            ),
             layered_memory_collection_enabled=parse_env_bool(
                 os.getenv('LAYERED_MEMORY_COLLECTION_ENABLED'),
                 default=False,
