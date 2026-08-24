@@ -1,0 +1,2 @@
+- [Changed] Include as_of in the fundamental aggregation cache key and coalesce in-flight same-key loads (Refs #1292).
+- [Tests] Cover fundamental cache TTL hit/expiry, as_of isolation, concurrent coalesce, and failed context not cached.

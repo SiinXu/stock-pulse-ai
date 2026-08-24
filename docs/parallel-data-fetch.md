@@ -34,7 +34,10 @@ cache, circuit breaker, validation, and each fetcher’s own rate limiter).
 Realtime quote and chip-distribution attempts additionally share the
 process-local short-TTL in-flight helper in
 `src/data_provider/pull_coalesce.py`; that helper does not change fallback
-order or skip an open circuit.
+order or skip an open circuit. The `fundamental_context` branch now also
+coalesces same-key in-flight loads in the manager's instance-local
+fundamental cache (`as_of` + budget bucket). That cache is not the 5s
+realtime/chip helper and does not skip fail-open, retry, or governance.
 
 ## Deterministic merge order
 

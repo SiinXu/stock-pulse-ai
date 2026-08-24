@@ -8,7 +8,7 @@
 
 ## 数据流
 
-1. `get_fundamental_context(code)`（manager 缓存 / 超时 / 重试沿用既有配置）
+1. `get_fundamental_context(code)`（manager 缓存 key 含 as_of 与预算分桶并合并 in-flight；超时 / 重试沿用既有配置）
 2. A 股 bundle：`stock_financial_abstract`（及 indicator 候选）→ 多期解析
 3. 若摘要缺多期、经营现金流或资产负债表字段，再 best-effort 拉：
    - 利润表 `stock_profit_sheet_by_report_em`（`SH600519` 形态）

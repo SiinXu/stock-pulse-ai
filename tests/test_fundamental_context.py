@@ -7,6 +7,7 @@ import os
 import sys
 import time
 import unittest
+from datetime import datetime, timezone
 from threading import BoundedSemaphore, Event
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -470,13 +471,27 @@ class TestFundamentalContext(unittest.TestCase):
 
     def test_fundamental_cache_key_isolated_by_budget_bucket(self) -> None:
         manager = DataFetcherManager(fetchers=[])
-        key_default = manager._get_fundamental_cache_key("600519")
-        key_low = manager._get_fundamental_cache_key("600519", 0.4)
-        key_high = manager._get_fundamental_cache_key("600519", 1.5)
+        frozen = datetime(2026, 8, 23, 12, 0, 0, tzinfo=timezone.utc)
+        key_default = manager._get_fundamental_cache_key(
+            "600519", now=frozen, ttl_seconds=120
+        )
+        key_low = manager._get_fundamental_cache_key(
+            "600519", 0.4, now=frozen, ttl_seconds=120
+        )
+        key_high = manager._get_fundamental_cache_key(
+            "600519", 1.5, now=frozen, ttl_seconds=120
+        )
 
         self.assertNotEqual(key_default, key_low)
         self.assertNotEqual(key_low, key_high)
         self.assertIn("budget=", key_low)
+        self.assertIn("as_of=", key_low)
+        self.assertIn("market=", key_low)
+        later = frozen.replace(minute=2)
+        key_later = manager._get_fundamental_cache_key(
+            "600519", 0.4, now=later, ttl_seconds=120
+        )
+        self.assertNotEqual(key_low, key_later)
 
     def test_board_context_empty_rankings_mark_failed(self) -> None:
         manager = DataFetcherManager(fetchers=[])
