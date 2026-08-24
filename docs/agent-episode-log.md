@@ -12,4 +12,6 @@
 
 Issue #1105 的可选用户反馈写入 sidecar（`agent_run_feedback` / `agent_prediction_feedback`），通过读时 join 与 episode 合并；不会 `UPDATE` append-only 的 `agent_episodes`，也不会改写 resolver actuals。无反馈时自动核验与进化仍继续。
 
+Issue #1096 第一片的研究用前向收益分桶（`1d_up` / `1d_down` / `1d_flat` / `5d_up` / `5d_down` / `5d_flat`）写入 sidecar `agent_episode_forward_returns`，按已有 `episode_id` + horizon 做 upsert，并复制 `run_id`。这些标签只用于模型运维质量，不是投资建议，也不承诺交易 alpha。入口是显式 CLI：`python scripts/label_forward_returns.py --as-of YYYY-MM-DD`（可选 `--horizon`、`--run-id`、`--dry-run`）。没有配置注册表键，也没有调度器。价格只走现有 ActualsFetcher / `DataFetcherManager` 路径，绝不编造；缺 bar、日历无法计算窗口、或 episode 没有 symbol 时跳过该行。未知 bucket 会被拒绝。不写 `prediction_outcome`，也不 `UPDATE` `agent_episodes`。缺失标签保持缺席，校准与进化保持中性。
+
 配置、模块与回滚说明见英文版（与实现保持一致）。
