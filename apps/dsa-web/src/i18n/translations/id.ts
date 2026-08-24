@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "Selesai",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "Metode eksekusi",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "Urutan model fallback",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "Analisis pertama ini menggunakan inferensi lokal. Data pasar masih dapat diambil dari jaringan. Ini bukan eksekusi sepenuhnya luring.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "Model Agen, Visi, dan penggantian mewarisi ini secara default. Sesuaikan nanti di Perutean dan Keandalan Tugas.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "Warisi model utama laporan",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "Lokal CLI",

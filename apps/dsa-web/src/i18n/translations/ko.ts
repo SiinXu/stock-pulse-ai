@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "완료",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "실행 방법",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "대체 모델 순서",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "이 첫 분석은 로컬 추론을 사용합니다. 시세 데이터는 네트워크에서 가져올 수 있습니다. 완전 오프라인 실행이 아닙니다.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "에이전트, 비전, 그리고 대체 모델은 기본적으로 이 기능을 상속받습니다. 나중에 작업 라우팅과 신뢰성 항목에서 조정하세요.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "보고서 기본 모델 상속",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "지역 CLI",

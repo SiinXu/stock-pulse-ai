@@ -33,6 +33,7 @@ export type SettingsOnboardingHostsProps = {
   onLocalModelConfigurationChanged: () => void | Promise<void>;
   onAgentApplied: () => void;
   setupStatus: SetupStatusResponse | null;
+  firstAnalysisStockCode?: string;
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
 };
 
@@ -56,6 +57,7 @@ export const SettingsOnboardingHosts: React.FC<SettingsOnboardingHostsProps> = (
   onLocalModelConfigurationChanged,
   onAgentApplied,
   setupStatus,
+  firstAnalysisStockCode,
   t,
 }) => {
   const navigate = useNavigate();
@@ -76,9 +78,10 @@ export const SettingsOnboardingHosts: React.FC<SettingsOnboardingHostsProps> = (
           initialVisionModel={initialVisionModel}
           onViewRouting={onViewRouting}
           onLocalModelConfigurationChanged={onLocalModelConfigurationChanged}
-          onStartFirstAnalysis={() => {
+          firstAnalysisStockCode={firstAnalysisStockCode}
+          onStartFirstAnalysis={(tasksHref) => {
             setIsWizardOpen(false);
-            navigate(buildAnalysisWorkbenchHref());
+            navigate(tasksHref || buildAnalysisWorkbenchHref());
           }}
           onContinueAgentOnboarding={() => {
             setIsWizardOpen(false);

@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "Fertig",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "Ausführungsmethoden",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "Reihenfolge der Fallback-Modelle",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "Diese erste Analyse verwendet lokale Inferenz. Marktdaten können weiterhin aus dem Netzwerk abgerufen werden. Das ist keine vollständig offline ausgeführte Analyse.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "Agenten-, Vision- und Fallback-Modelle übernehmen dies standardmäßig. Passe sie später in Task Routing and Reliability an.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "Primäres Berichtsmodell übernehmen",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "Lokal CLI",

@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "Terminé",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "Méthodes d’exécution",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "Ordre des modèles de secours",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "Cette première analyse utilise l’inférence locale. Les données de marché peuvent encore être récupérées depuis le réseau. Ce n’est pas une exécution entièrement hors ligne.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "Les modèles Agent, Vision et de secours héritent de cela par défaut. Ajustez-les plus tard dans le routage des tâches et la fiabilité.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "Hériter du modèle principal des rapports",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "CLI locale",

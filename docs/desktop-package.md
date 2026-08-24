@@ -256,7 +256,7 @@ Desktop 启动后会在系统 tray / macOS 菜单栏创建 StockPulse 图标。�
 3. 失败返回可操作文案与稳定错误码（如 `ollama_unavailable`、`insufficient_disk_space`、`hash_mismatch`），不把 Python/Node traceback 暴露给 UI。
 4. Catalog 推荐模型的 Ollama pull 仍须用户点选，且仅允许 allowlist 内 pullable 条目；Kronos 权重继续走显式 `scripts/download_kronos_weights.py` / 源码环境，预构建桌面包不包含 PyTorch 或 Kronos 权重（见 [Kronos 本地模型](kronos-local-model.md)）。
 
-与 go-stock / FinRobot Desktop 的定位对齐点：一键安装包 + 清晰首次路径 + 本地模型优先选项 + 诚实标注离线能力边界（云 LLM / 行情 API 仍可能需要）。本仓库**不**在首次打开时消耗云 token。
+与 go-stock / FinRobot Desktop 的定位对齐点：一键安装包 + 清晰首次路径 + 本地模型优先选项 + 诚实标注离线能力边界（云 LLM / 行情 API 仍可能需要）。完成本地模型向导路径会发起一次真实的简短分析，并在向导内展示进行中 / 成功 / 失败；这不是离线 `LOCAL_ONLY_MODE`。本仓库**不**在首次打开时消耗云 token。
 
 ## 桌面本地模型
 

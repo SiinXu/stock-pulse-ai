@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "完了",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "実行方法",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "フォールバックモデルの順序",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "この初回分析はローカル推論を使用します。市場データはネットワークから取得される場合があります。完全オフライン実行ではありません。",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "エージェント、ビジョン、フォールバックモデルはデフォルトでこれを継承します。後でタスクルーティングと信頼性で調整してください。",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "レポートの主要モデルを継承",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "ローカル CLI",

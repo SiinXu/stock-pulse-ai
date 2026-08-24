@@ -1,0 +1,2 @@
+- [Added] Ran a first local analysis from the first-run wizard (Refs #798).
+- [Chore] Reseed SettingsPage and settings-route gzip budgets after first-run wizard local analysis (Refs #798).

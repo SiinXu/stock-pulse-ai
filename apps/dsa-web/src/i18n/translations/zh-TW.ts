@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "完成",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "執行方式",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "備用模型順序",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "本次分析使用本地推理。行情資料仍可能從網路取得。這不是完全離線模式。",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "Agent、Vision 與備用模型預設繼承報告主要模型，可稍後在任務路由與可靠性中單獨調整。",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "繼承報告主要模型",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "本機 CLI",

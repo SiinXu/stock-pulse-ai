@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "Hecho",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "Métodos de ejecución",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "Orden de modelos alternativos",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "Este primer análisis usa inferencia local. Los datos de mercado aún pueden obtenerse de la red. No es una ejecución totalmente sin conexión.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "Los modelos Agent, Vision y de respaldo heredan esto por defecto. Ajústalos más adelante en Enrutamiento de tareas y Fiabilidad.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "Heredar el modelo principal de informes",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "CLI local",

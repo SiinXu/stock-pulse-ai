@@ -2012,6 +2012,7 @@ const SettingsPage: React.FC = () => {
         onLocalModelConfigurationChanged={async () => { await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS); applyPostSaveEffects(); }}
         onAgentApplied={() => { void refreshAfterExternalSave([]); applyPostSaveEffects(); }}
         setupStatus={setupStatus}
+        firstAnalysisStockCode={firstSetupStockCode}
         t={t}
       />
     </AppPage>
