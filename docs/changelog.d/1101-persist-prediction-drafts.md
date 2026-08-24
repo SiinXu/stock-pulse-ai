@@ -1,0 +1,2 @@
+- [Added] Persisted finalized prediction drafts to agent_predictions (Refs #1101).
+- [Fixed] Unified agent finalize and history-save prediction identity so one analysis stores one pending row whose attached prediction_id equals the stored primary key (Refs #1101).

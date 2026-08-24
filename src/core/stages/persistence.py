@@ -447,15 +447,19 @@ class _PersistenceStageMixin:
     ) -> None:
         """Best-effort PredictionRecord extraction after analysis history is saved.
 
-        Default-off via ``PREDICTION_EXTRACT_ENABLED``. Drafts are attached to the
-        in-memory result only; durable persistence is owned by later issues.
-        Failures never block history persistence or user-visible analysis.
+        Default-off via ``PREDICTION_EXTRACT_ENABLED``. Verifiable pending drafts
+        are persisted to ``agent_predictions``; store conflicts reuse the existing
+        row. Failures never block history persistence or user-visible analysis.
         """
         try:
             from src.services.prediction_extractor import (
                 PRESENTATION_CONFIDENCE_FLAG,
                 drop_presentation_confidence,
                 maybe_extract_prediction_on_finalize,
+            )
+            from src.services.prediction_persist import (
+                canonical_run_id,
+                persist_verifiable_prediction_draft,
             )
 
             structured_source = getattr(result, "prediction_source", None)
@@ -468,16 +472,26 @@ class _PersistenceStageMixin:
             if source.pop(PRESENTATION_CONFIDENCE_FLAG, False):
                 source = drop_presentation_confidence(source)
 
+            run_token = canonical_run_id(query_id)
             extraction = maybe_extract_prediction_on_finalize(
                 source,
                 config=getattr(self, "config", None),
-                run_id=str(query_id or ""),
+                run_id=run_token or None,
                 source_decision_id=str(source_report_id),
                 mode=mode,
                 model_id=getattr(result, "model_used", None),
             )
             if extraction is None:
                 return
+            persist_verifiable_prediction_draft(
+                extraction,
+                repo=getattr(self, "agent_prediction_repo", None),
+                error_code="pipeline_prediction_persist_failed",
+                context={
+                    "query_id": query_id,
+                    "stock_code": getattr(result, "code", None),
+                },
+            )
             setattr(result, "prediction_extraction", extraction.to_dict())
         except Exception as exc:  # broad-exception: fallback_recorded - Prediction extraction must never fail history persistence.
             log_safe_exception(

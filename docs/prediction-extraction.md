@@ -1,6 +1,6 @@
 # 预测抽取（结构化决策 → 声明）
 
-**状态**：A2 抽取器（Issue [#1108](https://github.com/SiinXu/stock-pulse-ai/issues/1108)；父 Epic [#1107](https://github.com/SiinXu/stock-pulse-ai/issues/1107)；依赖 A1 契约 [#1101](https://github.com/SiinXu/stock-pulse-ai/issues/1101)）
+**状态**：A2 抽取器 + A3 持久化（Issues [#1108](https://github.com/SiinXu/stock-pulse-ai/issues/1108) / [#1101](https://github.com/SiinXu/stock-pulse-ai/issues/1101)；父 Epic [#1107](https://github.com/SiinXu/stock-pulse-ai/issues/1107)）
 
 **English**: [prediction-extraction_EN.md](prediction-extraction_EN.md)
 
@@ -26,9 +26,11 @@
 | `src/schemas/prediction_record.py` | A1 契约（严格 `PredictionRecord` / claims） |
 | `src/core/prediction_resolve_after.py` | Horizon → UTC `resolve_after`（交易日；失败封闭） |
 | `src/services/prediction_extractor.py` | 纯抽取器 + 特性开关 finalize 辅助 |
+| `src/services/prediction_persist.py` | 通过 `insert_pending` 持久化可验证 pending 草稿 |
 | `src/core/stages/persistence.py` | 历史保存后钩子（尽力而为、开关控制） |
 | `src/agent/orchestrator_parts/dashboard.py` | Agent finalize 后钩子（尽力而为、开关控制） |
 | `tests/services/test_prediction_extractor.py` | 单元覆盖，含散文反例 |
+| `tests/services/test_prediction_persist.py` | Agent/流水线持久化、双入口一行身份、挂载 id 等于存库主键、resolve 后不覆盖 |
 
 ## 会变成声明的来源
 
@@ -58,20 +60,20 @@
 | Agent 模式 | 方向声明需要显式 `action` 或类型化 `prediction_claims`；单独的 `decision_type` 忽略（常被编排层合成） |
 | 分析模式 | 在具备结构化置信度时仍接受精确 `decision_type` buy/hold/sell |
 | 有效/无效声明混合 | 草稿标记为 `status=error` 且不可打分；不会静默丢弃无效声明后把残余子集作为 pending 记录 |
-| 双入口 | Agent finalize（`ctx.meta`）与历史保存（`result.prediction_extraction`）都可能挂草稿；A3 持久化必须去重 |
+| 双入口 | Agent finalize 与历史保存共享同一个规范 `run_id`（流水线把 `query_id` 传入 agent 上下文，否则用 chat `session_id`）。一次用户可见分析每个 symbol 只存一行 pending。持久化把 `prediction_id_for_run(run_id, symbol)` 写回挂载草稿，使 `prediction_extraction.record.prediction_id` 等于存库主键。 |
 
 ## 特性开关
 
 | 键 | 默认 | 效果 |
 | --- | --- | --- |
-| `PREDICTION_EXTRACT_ENABLED` | `false` | 关闭时钩子为空操作；开启时成功 finalize / 历史保存路径附加内存抽取草稿 |
+| `PREDICTION_EXTRACT_ENABLED` | `false` | 关闭时钩子为空操作；开启时成功 finalize / 历史保存路径附加内存抽取草稿，并将可验证 pending 行写入 `agent_predictions` |
 
 草稿挂载位置：
 
 - `AnalysisResult.prediction_extraction`（流水线历史路径）
 - `AgentContext.meta["prediction_extraction"]`（Agent finalize 路径）
 
-耐久 `agent_prediction` 存储**不在** A2 范围（持久化 issue）。
+可验证 pending 草稿通过 `AgentPredictionRepository.insert_pending` 持久化。稳定 `prediction_id` 使用长度前缀（`pred-{len(run_id)}:{run_id}:{symbol}`，超 128 字符时改为哈希），避免连字符拼接碰撞。同一 run/symbol 再次 finalize 复用已有行（主键冲突，不覆盖，含 resolve 之后）。持久化失败只记录日志，不中断分析。调用方在 persist 之后挂载 `prediction_extraction`，因此内存草稿携带存库主键。
 
 ## 相关文档
 

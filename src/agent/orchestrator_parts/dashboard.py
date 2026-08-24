@@ -132,6 +132,12 @@ class _DashboardMethods:
             analysis_context_snapshot_meta = context.get("analysis_context_snapshot")
             if isinstance(analysis_context_snapshot_meta, dict) and analysis_context_snapshot_meta:
                 ctx.meta["analysis_context_snapshot"] = dict(analysis_context_snapshot_meta)
+            query_token = str(context.get("query_id") or "").strip()
+            run_token = str(context.get("run_id") or query_token).strip()
+            if run_token:
+                ctx.meta["run_id"] = run_token
+            if query_token:
+                ctx.meta["query_id"] = query_token
 
             # Pre-populate data fields that the caller already has
             for data_key in ("realtime_quote", "daily_history", "chip_distribution",
@@ -399,12 +405,17 @@ class _DashboardMethods:
     ) -> None:
         """Feature-flagged PredictionRecord extraction after successful finalize.
 
-        Default-off. Attaches a draft extraction summary to ``ctx.meta`` only;
-        does not persist rows (A3) and never fails the agent run.
+        Default-off. Attaches a draft extraction summary to ``ctx.meta`` and
+        persists verifiable pending rows. Store conflicts reuse the existing
+        row. Never fails the agent run.
         """
         try:
             from src.services.prediction_extractor import (
                 maybe_extract_prediction_on_finalize,
+            )
+            from src.services.prediction_persist import (
+                canonical_run_id,
+                persist_verifiable_prediction_draft,
             )
 
             source = dict(dashboard)
@@ -414,7 +425,11 @@ class _DashboardMethods:
                 source["stock_name"] = ctx.stock_name
 
             skill_ids = ctx.meta.get("skills_requested") or ctx.meta.get("skill_ids")
-            run_token = str(ctx.session_id or ctx.meta.get("run_id") or "").strip()
+            run_token = canonical_run_id(
+                ctx.meta.get("run_id"),
+                ctx.meta.get("query_id"),
+                ctx.session_id,
+            )
             base_opinion = self._select_base_opinion(ctx)
             if base_opinion is None:
                 # Dashboard finalization supplies a presentation-only 0.5
@@ -441,6 +456,12 @@ class _DashboardMethods:
             )
             if extraction is None:
                 return
+            persist_verifiable_prediction_draft(
+                extraction,
+                repo=getattr(self, "agent_prediction_repo", None),
+                error_code="agent_prediction_persist_failed",
+                context={"stock_code": getattr(ctx, "stock_code", None)},
+            )
             ctx.meta["prediction_extraction"] = extraction.to_dict()
         except Exception as exc:  # broad-exception: fallback_recorded - never fail finalize
             log_safe_exception(
