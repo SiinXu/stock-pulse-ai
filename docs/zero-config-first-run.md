@@ -30,6 +30,7 @@ English: [zero-config-first-run_EN.md](zero-config-first-run_EN.md)
 - Home 在设置未完成且用户未关闭首启提示时直接挂载该面板，因此无需手输 Playground 或路由地址。
 - Home 根据权威就绪结果跳转：本地 Ollama 路径进入 Settings → AI Models → Local Models；已有模型路径进入 Analysis Workbench；演示路径在面板内打开离线报告。
 - FirstRunWizard 将本地模型路径置顶并作视觉强调，同时保留显式选择；云 API 与本机 CLI 仍可选择。
+- 完成本地模型路径会发起一次真实的简短分析（`notify: false`），并在向导内展示进行中 / 成功 / 失败。推理走本地模型，行情数据仍可能从网络获取，这不是离线 `LOCAL_ONLY_MODE`。
 - 对 `configured` / `local_ollama` 路径，宿主必须提供设置跳转处理器。缺失时主按钮禁用并说明原因，不会静默无响应或替换成演示操作。
 
 没有显式体验偏好时，Analysis Workbench 会在权威 setup status 未完成时使用 beginner 模式；已有显式 professional 偏好的用户不会被覆盖。

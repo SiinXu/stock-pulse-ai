@@ -41,7 +41,7 @@ That reuses `FirstRunWizard` (cloud API / local model / CLI). There is no second
 3. Failures return actionable messages and stable codes (`ollama_unavailable`, disk/hash errors, etc.) without stack traces in the UI.
 4. Catalog Ollama pulls still require explicit user selection and only allowlisted pullable models. Kronos weights stay opt-in via `scripts/download_kronos_weights.py` / source installs; prebuilt desktop packages do not ship PyTorch or Kronos weights (see [kronos-local-model_EN.md](kronos-local-model_EN.md)).
 
-First open does **not** consume cloud LLM tokens. Cloud LLM and market data APIs may still be required depending on the path chosen in the wizard.
+First open does **not** consume cloud LLM tokens. Completing the local-model wizard path starts a real brief analysis and shows running, succeeded, or failed in the wizard. Cloud LLM and market data APIs may still be required depending on the path chosen in the wizard; this is not the offline `LOCAL_ONLY_MODE` path.
 
 ## Local models (desktop)
 

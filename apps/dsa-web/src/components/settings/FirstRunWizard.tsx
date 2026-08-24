@@ -40,9 +40,14 @@ import {
   suggestConnectionName,
   validateConnectionContractValues,
 } from './llmConnectionContract';
-import { formatUiText } from '../../i18n/uiText';
+import { formatUiText, UI_TEXT, type UiTextKey } from '../../i18n/uiText';
 import { SETTINGS_WIZARD_TEXT } from '../../locales/settingsWizard';
+import { getParsedApiError, localizeParsedApiError } from '../../api/error';
 import { decodeModelRef, encodeModelRef } from '../../utils/modelRef';
+import {
+  runSetupSmokeAnalysis,
+  type SetupSmokeOutcome,
+} from '../../utils/setupSmokeTask';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
 import { LocalModelsPanel } from './LocalModelsPanel';
@@ -89,8 +94,10 @@ interface FirstRunWizardProps {
   onViewRouting?: () => void;
   /** Refreshes Settings after the shared local-model panel persists configuration. */
   onLocalModelConfigurationChanged?: () => void | Promise<void>;
-  /** Leaves setup for the canonical first-analysis workspace. */
-  onStartFirstAnalysis?: () => void;
+  /** Leaves setup for the canonical first-analysis workspace, optionally focusing a smoke task. */
+  onStartFirstAnalysis?: (tasksHref?: string) => void;
+  /** First watchlist stock used by the local-model first analysis smoke. */
+  firstAnalysisStockCode?: string;
   /** Opens agent-guided onboarding (profile → plan → apply) after first-run save. */
   onContinueAgentOnboarding?: () => void;
 }
@@ -152,6 +159,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   onLocalModelConfigurationChanged,
   onStartFirstAnalysis,
   onContinueAgentOnboarding,
+  firstAnalysisStockCode = '',
 }) => {
   const text = SETTINGS_WIZARD_TEXT[language];
   const [step, setStep] = useState<StepId>('mode');
@@ -178,8 +186,46 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   const [testResult, setTestResult] = useState<LlmConnectionCheckOutcome | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedSummary, setSavedSummary] = useState<SavedWizardSummary | null>(null);
+  const [smokeOutcome, setSmokeOutcome] = useState<SetupSmokeOutcome | null>(null);
+  const [isRunningSmoke, setIsRunningSmoke] = useState(false);
   const connectionTestVersionRef = useRef(0);
   const discoveryVersionRef = useRef(0);
+  const smokeRequestVersionRef = useRef(0);
+
+  const translateUi = useCallback((key: UiTextKey, params?: Record<string, string | number>) => (
+    formatUiText(UI_TEXT[language][key], params)
+  ), [language]);
+
+  const runFirstLocalAnalysis = useCallback(async () => {
+    const requestVersion = smokeRequestVersionRef.current + 1;
+    smokeRequestVersionRef.current = requestVersion;
+    setSmokeOutcome(null);
+    setIsRunningSmoke(true);
+    try {
+      const outcome = await runSetupSmokeAnalysis({
+        readyForSmoke: Boolean(localModelReady),
+        stockCode: firstAnalysisStockCode.trim(),
+        t: translateUi,
+      });
+      if (smokeRequestVersionRef.current !== requestVersion) {
+        return;
+      }
+      setSmokeOutcome(outcome);
+    } catch (error: unknown) {
+      if (smokeRequestVersionRef.current !== requestVersion) {
+        return;
+      }
+      setSmokeOutcome({
+        status: 'failed',
+        error: getParsedApiError(error, language),
+        tasksHref: null,
+      });
+    } finally {
+      if (smokeRequestVersionRef.current === requestVersion) {
+        setIsRunningSmoke(false);
+      }
+    }
+  }, [firstAnalysisStockCode, language, localModelReady, translateUi]);
 
   // Resolve the selected provider against the backend catalog. If the stored id
   // is stale (catalog re-loaded), fall back to the first available provider.
@@ -597,6 +643,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         fallbackModels: [],
         visionModel: '',
       });
+      void runFirstLocalAnalysis();
       return;
     }
     if (mode === 'cloud' && hasConnectionSchema && !cloudContractReady) {
@@ -733,16 +780,46 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
   };
 
   if (savedSummary) {
+    const isLocalAnalysis = savedSummary.mode === 'local_model';
+    const smokeAccepted = smokeOutcome?.status === 'accepted';
+    const smokeFailed = smokeOutcome?.status === 'failed' || smokeOutcome?.status === 'blocked';
+    const displayedSmokeError = smokeFailed
+      ? localizeParsedApiError(smokeOutcome.error, language)
+      : null;
+    const localStatusVariant = smokeAccepted
+      ? 'success'
+      : smokeFailed
+        ? 'danger'
+        : 'info';
+    const localStatusTitle = smokeAccepted
+      ? text.savedTitle
+      : displayedSmokeError?.title;
+    const localStatusMessage = smokeAccepted
+      ? smokeOutcome.successMessage
+      : displayedSmokeError
+        ? [
+          displayedSmokeError.message,
+          smokeOutcome.error.rawMessage,
+        ].filter((part, index, parts) => Boolean(part) && parts.indexOf(part) === index).join(' ')
+        : translateUi('settings.setupGuideSmokeRunning');
+    const showLocalAnalysisAction = isLocalAnalysis
+      && (isRunningSmoke || smokeFailed || Boolean(onStartFirstAnalysis));
     return (
       <Modal isOpen onClose={onClose} title={text.title} showHeaderDivider={false}>
         <div data-testid="first-run-wizard" className="space-y-5">
           <InlineAlert
-            variant="success"
-            title={text.savedTitle}
-            message={savedSummary.mode === 'local_model'
-              ? text.localSavedDescription
-              : text.savedDescription}
+            variant={isLocalAnalysis ? localStatusVariant : 'success'}
+            title={isLocalAnalysis ? localStatusTitle : text.savedTitle}
+            message={isLocalAnalysis ? localStatusMessage : text.savedDescription}
+            data-testid={isLocalAnalysis ? 'wizard-first-analysis-status' : undefined}
           />
+          {isLocalAnalysis ? (
+            <InlineAlert
+              variant="info"
+              data-testid="wizard-first-analysis-scope"
+              message={text.firstAnalysisScope}
+            />
+          ) : null}
           <dl
             className="space-y-2 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm"
             data-testid="wizard-saved-routing"
@@ -803,15 +880,34 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
             ) : null}
             <Button
               type="button"
-              variant={savedSummary.mode === 'local_model' && onStartFirstAnalysis ? 'secondary' : 'primary'}
+              variant={showLocalAnalysisAction ? 'secondary' : 'primary'}
               size="default"
               onClick={onClose}
             >
               {text.done}
             </Button>
-            {savedSummary.mode === 'local_model' && onStartFirstAnalysis ? (
-              <Button type="button" variant="primary" size="default" onClick={onStartFirstAnalysis}>
-                {text.startFirstAnalysis}
+            {showLocalAnalysisAction ? (
+              <Button
+                type="button"
+                variant="primary"
+                size="default"
+                data-testid="wizard-start-first-analysis"
+                disabled={isRunningSmoke}
+                isLoading={isRunningSmoke}
+                loadingText={translateUi('settings.setupGuideSmokeRunning')}
+                onClick={() => {
+                  if (smokeFailed) {
+                    void runFirstLocalAnalysis();
+                    return;
+                  }
+                  if (smokeAccepted) {
+                    onStartFirstAnalysis?.(smokeOutcome.tasksHref);
+                  }
+                }}
+              >
+                {smokeAccepted
+                  ? translateUi('analysisWorkbench.tasks')
+                  : text.startFirstAnalysis}
               </Button>
             ) : null}
           </div>
@@ -1194,6 +1290,13 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 ? formatUiText(text.localReviewDescription, { model: localModelReady })
                 : text.reviewDescription}
             />
+            {mode === 'local_model' ? (
+              <InlineAlert
+                variant="info"
+                data-testid="wizard-first-analysis-scope"
+                message={text.firstAnalysisScope}
+              />
+            ) : null}
             {mode === 'cli' ? (
               <InlineAlert
                 variant="info"

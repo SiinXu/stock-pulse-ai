@@ -1,0 +1,1 @@
+- [Added] Ran a first local analysis from the first-run wizard (Refs #798).

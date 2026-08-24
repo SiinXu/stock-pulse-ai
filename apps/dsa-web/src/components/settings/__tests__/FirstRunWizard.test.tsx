@@ -3,6 +3,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FirstRunWizard } from '../FirstRunWizard';
+import { analysisApi } from '../../../api/analysis';
 import type { LlmConnectionFieldSchema } from '../../../types/systemConfig';
 import { chooseOption, openListbox } from '../../../test-utils';
 
@@ -17,6 +18,17 @@ vi.mock('../../../api/systemConfig', () => ({
     testLLMChannel: (...args: unknown[]) => testLLMChannel(...args),
   },
 }));
+
+vi.mock('../../../api/analysis', async () => {
+  const actual = await vi.importActual<typeof import('../../../api/analysis')>('../../../api/analysis');
+  return {
+    ...actual,
+    analysisApi: {
+      ...actual.analysisApi,
+      analyzeAsync: vi.fn(),
+    },
+  };
+});
 
 vi.mock('../LocalModelsPanel', () => ({
   LocalModelsPanel: ({
@@ -194,7 +206,37 @@ describe('FirstRunWizard', () => {
     );
   });
 
-  it('reuses the local-model panel and routes a ready setup to first analysis', () => {
+  function walkToLocalModelReview(extraProps: {
+    onComplete?: ReturnType<typeof okComplete>;
+    onLocalModelConfigurationChanged?: () => void;
+    onStartFirstAnalysis?: (href?: string) => void;
+    firstAnalysisStockCode?: string;
+  } = {}) {
+    const onComplete = extraProps.onComplete ?? okComplete();
+    render(
+      <FirstRunWizard
+        onComplete={onComplete}
+        onClose={() => {}}
+        isSaving={false}
+        language="en"
+        providers={BILINGUAL_CATALOG}
+        firstAnalysisStockCode="600519"
+        {...extraProps}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Local model/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'simulate ready local model' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    return onComplete;
+  }
+
+  it('reuses the local-model panel and starts a real brief analysis with notify false', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'wizard-smoke-task',
+      status: 'accepted',
+    } as never);
     const onComplete = okComplete();
     const onConfigurationChanged = vi.fn();
     const onStartFirstAnalysis = vi.fn();
@@ -205,6 +247,7 @@ describe('FirstRunWizard', () => {
         isSaving={false}
         language="en"
         providers={BILINGUAL_CATALOG}
+        firstAnalysisStockCode="600519"
         onLocalModelConfigurationChanged={onConfigurationChanged}
         onStartFirstAnalysis={onStartFirstAnalysis}
       />,
@@ -222,8 +265,47 @@ describe('FirstRunWizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Complete setup' }));
     expect(onComplete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole('button', { name: 'Start first analysis' }));
+    await waitFor(() => expect(analysisApi.analyzeAsync).toHaveBeenCalledWith({
+      stockCode: '600519',
+      reportType: 'brief',
+      asyncMode: true,
+      notify: false,
+      originalQuery: '600519',
+      selectionSource: 'manual',
+    }));
+    expect(await screen.findByText('Submitted a brief analysis for 600519.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Running tasks' }));
     expect(onStartFirstAnalysis).toHaveBeenCalledTimes(1);
+    expect(onStartFirstAnalysis.mock.calls[0][0]).toContain('wizard-smoke-task');
+  });
+
+  it('surfaces a failed first analysis instead of a success state', async () => {
+    vi.mocked(analysisApi.analyzeAsync).mockRejectedValue({
+      response: {
+        status: 422,
+        data: { error: 'validation_error', message: 'Ollama timed out' },
+      },
+    });
+    walkToLocalModelReview({ onStartFirstAnalysis: vi.fn() });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Complete setup' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('wizard-first-analysis-status')).toHaveAttribute('data-alert-tone', 'danger');
+    });
+    const status = screen.getByTestId('wizard-first-analysis-status');
+    expect(status).toHaveTextContent('Ollama timed out');
+    expect(status).not.toHaveTextContent('Configuration saved and applied');
+    expect(screen.queryByText(/Submitted a brief analysis/)).not.toBeInTheDocument();
+    expect(analysisApi.analyzeAsync).toHaveBeenCalledWith(expect.objectContaining({ notify: false }));
+  });
+
+  it('renders honest local-inference scope copy that is not an offline-mode claim', () => {
+    walkToLocalModelReview();
+
+    const scope = screen.getByTestId('wizard-first-analysis-scope');
+    expect(scope).toHaveTextContent('This first analysis uses local inference');
+    expect(scope).toHaveTextContent('Market data may still be fetched from the network');
+    expect(scope).toHaveTextContent('This is not a fully offline run');
   });
 
   it('renders built-in Provider labels in the requested English UI language', () => {

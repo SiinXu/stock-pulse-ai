@@ -4942,6 +4942,7 @@ export const translations = {
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.done": "Selesai",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.execution": "Kaedah pelaksanaan",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.fallbackModels": "Turutan model sandaran",
+  "locales.settingsWizard.SETTINGS_WIZARD_TEXT.firstAnalysisScope": "Analisis pertama ini menggunakan inferens setempat. Data pasaran masih boleh diambil dari rangkaian. Ini bukan larian luar talian sepenuhnya.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritanceHint": "Model ejen, Visi dan sandaran mewarisi ini secara lalai. Laraskannya kemudian dalam Penghalaan dan Kebolehpercayaan Tugas.",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.inheritPrimary": "Warisi model utama laporan",
   "locales.settingsWizard.SETTINGS_WIZARD_TEXT.localCli": "Tempatan CLI",

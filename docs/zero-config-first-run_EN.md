@@ -30,6 +30,7 @@ Local detection reuses `src/services/local_runtime_detect.py`; primary-model rea
 - Home mounts the panel whenever setup is incomplete and the user has not dismissed first-run guidance, so no Playground or manually typed route is required.
 - Home routes from authoritative readiness: local Ollama opens Settings → AI Models → Local Models; a configured model opens Analysis Workbench; the demo path opens the offline report in place.
 - FirstRunWizard lists and visually emphasizes the local-model path first while preserving explicit choice; cloud API and local CLI remain available.
+- Completing the local-model path starts a real brief analysis (`notify: false`) and shows running, succeeded, or failed in the wizard. Inference is local; market data may still be fetched. This is not the offline `LOCAL_ONLY_MODE` path.
 - For `configured` / `local_ollama`, the host must provide a settings-navigation handler. Without it, the primary button is disabled with an explanation; it never becomes a silent no-op or substitutes the demo action.
 
 Without an explicit experience preference, Analysis Workbench uses beginner mode while authoritative setup status is incomplete. An explicit professional preference is never overwritten.

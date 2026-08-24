@@ -61,7 +61,7 @@ English: [beginner-client-setup_EN.md](beginner-client-setup_EN.md). 装好后�
 
 macOS 用户升级前建议先在客户端设置里导出一次配置备份。
 
-**首次**打开桌面端（全新安装）会自动进入引导配置向导：可选云 API、**本地模型**（Ollama / Model Pack 一键探测并启动 runtime 后导入）或本地 CLI。打开应用本身不会调用付费云模型，只有你保存云路径后才会产生 token 消耗。细节见 [桌面端打包说明](desktop-package.md)。
+**首次**打开桌面端（全新安装）会自动进入引导配置向导：可选云 API、**本地模型**（Ollama / Model Pack 一键探测并启动 runtime 后导入）或本地 CLI。完成本地模型路径会发起一次真实的简短分析，并在向导内展示进行中 / 成功 / 失败；推理走本地模型，行情数据仍可能从网络获取。打开应用本身不会调用付费云模型，只有你保存云路径后才会产生 token 消耗。细节见 [桌面端打包说明](desktop-package.md)。
 
 ## 3. 配置 AI 模型
 
