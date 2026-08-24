@@ -1,0 +1,1 @@
+- [Added] Added nearest-rank claimable-due lag p50/p95/max on GET /api/v1/agent/prediction-resolver/diagnostics (Refs #1114).
