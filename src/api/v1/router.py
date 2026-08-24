@@ -14,6 +14,7 @@ from fastapi import APIRouter
 from src.api.v1.endpoints import (
     agent,
     agent_feedback,
+    agent_predictions,
     alerts,
     alphasift,
     analysis,
@@ -79,6 +80,12 @@ router.include_router(
 
 router.include_router(
     agent_feedback.router,
+    prefix="/agent",
+    tags=["Agent"]
+)
+
+router.include_router(
+    agent_predictions.router,
     prefix="/agent",
     tags=["Agent"]
 )
