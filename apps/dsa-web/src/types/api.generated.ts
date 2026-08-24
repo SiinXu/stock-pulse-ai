@@ -170,6 +170,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/prediction-resolver/diagnostics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 读取预测解析器到期诊断
+         * @description 只读返回当前可认领的到期预测（pending 与已过期 resolving 租约）。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。
+         */
+        get: operations["getPredictionResolverDiagnostics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/predictions/{prediction_id}/feedback": {
         parameters: {
             query?: never;
@@ -14124,6 +14144,46 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * PredictionResolverDiagnosticsResponse
+         * @description Read-only claimable-due diagnostics for this API process.
+         */
+        PredictionResolverDiagnosticsResponse: {
+            /** Claimable Due Count */
+            claimable_due_count: number;
+            /** Claimable Due Probe Limit */
+            claimable_due_probe_limit: number;
+            /** Claimable Due Truncated */
+            claimable_due_truncated: boolean;
+            /** Enabled */
+            enabled: boolean;
+            /** Interval Seconds */
+            interval_seconds: number;
+            /** Observed At */
+            observed_at: string;
+            /** Oldest Due */
+            oldest_due: components["schemas"]["PredictionResolverOldestDueItem"][];
+            /** This Process Worker Registered */
+            this_process_worker_registered: boolean;
+        };
+        /**
+         * PredictionResolverOldestDueItem
+         * @description Identity and lag for one currently claimable due prediction.
+         */
+        PredictionResolverOldestDueItem: {
+            /** Lag Seconds */
+            lag_seconds: number;
+            /** Market */
+            market: string;
+            /** Prediction Id */
+            prediction_id: string;
+            /** Resolve After */
+            resolve_after: string;
+            /** Status */
+            status: string;
+            /** Symbol */
+            symbol: string;
+        };
         /** RateStressShock */
         RateStressShock: {
             /**
@@ -20000,6 +20060,44 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentModelsResponse"];
+                };
+            };
+        };
+    };
+    getPredictionResolverDiagnostics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PredictionResolverDiagnosticsResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预测存储不可读，无法探测 claimable due */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

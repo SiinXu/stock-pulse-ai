@@ -20,6 +20,7 @@ from src.services.prediction_resolver import (
     TickSummary,
     build_prediction_resolver_background_tasks,
     derive_aggregate_label,
+    list_claimable_due,
 )
 from src.services.prediction_resolver.memory_store import (
     STATUS_DATA_UNAVAILABLE,
@@ -1017,3 +1018,196 @@ def test_compute_retry_delay_is_bounded() -> None:
         compute_retry_delay_seconds(True)
     with pytest.raises(ValueError):
         compute_retry_delay_seconds(1, base_seconds=float("nan"))
+
+
+def test_list_claimable_due_includes_pending_and_expired_resolving_not_retries() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    store.insert(
+        prediction_id="pred-pending",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=2),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+    )
+    store.insert(
+        prediction_id="pred-expired-lease",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=1),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+        status=STATUS_RESOLVING,
+        lease_owner="dead-worker",
+        lease_token="old-token",
+        lease_expires_at=now - timedelta(minutes=5),
+    )
+    store.insert(
+        prediction_id="pred-active-lease",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=3),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+        status=STATUS_RESOLVING,
+        lease_owner="live-worker",
+        lease_token="live-token",
+        lease_expires_at=now + timedelta(minutes=5),
+    )
+    store.insert(
+        prediction_id="pred-retry",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=4),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+        status=STATUS_DATA_UNAVAILABLE,
+        next_attempt_at=now - timedelta(seconds=1),
+        outcome={
+            "label": STATUS_DATA_UNAVAILABLE,
+            "retryable": True,
+            "next_attempt_at": (now - timedelta(seconds=1)).isoformat(),
+        },
+    )
+    claimable = list_claimable_due(store, as_of=now, limit=10)
+    assert [row.prediction_id for row in claimable] == [
+        "pred-pending",
+        "pred-expired-lease",
+    ]
+    assert all(row.status in {STATUS_PENDING, STATUS_RESOLVING} for row in claimable)
+    pending_only = store.list_due(as_of=now, limit=10, statuses=("pending",))
+    assert [row.prediction_id for row in pending_only] == ["pred-pending"]
+
+
+def test_list_claimable_due_respects_probe_cap_oldest_first_and_truncation() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    for index in range(4):
+        store.insert(
+            prediction_id=f"pred-{index}",
+            run_id="run-1",
+            symbol="600519",
+            market="cn",
+            horizon="1d",
+            resolve_after=now - timedelta(hours=4 - index),
+            created_at=now - timedelta(days=1),
+            claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+        )
+    probe = list_claimable_due(store, as_of=now, limit=2)
+    assert [row.prediction_id for row in probe] == ["pred-0", "pred-1"]
+    assert len(probe) == 2
+    assert len(probe) >= 2
+
+
+def test_tick_requeues_ready_retries_before_listing_claimable() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    store.insert(
+        prediction_id="pred-pending",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=1),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+    )
+    store.insert(
+        prediction_id="pred-retry",
+        run_id="run-1",
+        symbol="600519",
+        market="cn",
+        horizon="1d",
+        resolve_after=now - timedelta(hours=2),
+        created_at=now - timedelta(days=1),
+        claims=[{"claim_id": "c1", "claim_type": "direction", "direction": "up"}],
+        status=STATUS_DATA_UNAVAILABLE,
+        next_attempt_at=now - timedelta(seconds=1),
+        outcome={
+            "label": STATUS_DATA_UNAVAILABLE,
+            "retryable": True,
+            "retry_exhausted": False,
+            "next_attempt_at": (now - timedelta(seconds=1)).isoformat(),
+        },
+    )
+    order: List[str] = []
+    original_list_due = store.list_due
+    original_requeue = store.requeue_pending
+
+    def _list_due(*, as_of, limit, statuses=None):
+        label = "default" if statuses is None else ",".join(statuses)
+        order.append(f"list_due:{label}")
+        return original_list_due(as_of=as_of, limit=limit, statuses=statuses)
+
+    def _requeue_pending(*, prediction_id, as_of=None):
+        order.append(f"requeue_pending:{prediction_id}")
+        return original_requeue(prediction_id=prediction_id, as_of=as_of)
+
+    resolver = PredictionResolver(
+        store=store,
+        actuals_fetcher=_FakeFetcher(
+            _Snapshot(status="ok", as_of_bar=_Bar(100.0), end_bar=_Bar(101.0))
+        ),
+        claim_scorer=_FakeScorer(),
+        clock=_now,
+        max_per_tick=2,
+    )
+    without_requeue = list_claimable_due(store, as_of=now, limit=10)
+    assert [row.prediction_id for row in without_requeue] == ["pred-pending"]
+    store.list_due = _list_due  # type: ignore[method-assign]
+    store.requeue_pending = _requeue_pending  # type: ignore[method-assign]
+    summary = resolver.tick()
+    assert "requeue_pending:pred-retry" in order
+    requeue_at = order.index("requeue_pending:pred-retry")
+    pending_list_at = order.index("list_due:pending")
+    assert requeue_at < pending_list_at
+    assert summary.claimed == 2
+
+
+def test_has_registered_background_task_reads_cache_only() -> None:
+    from src.services.runtime_scheduler import RuntimeSchedulerService
+
+    config = SimpleNamespace(
+        schedule_enabled=False,
+        schedule_time="18:00",
+        schedule_times=["18:00"],
+        prediction_resolve_enabled=True,
+        prediction_resolve_interval_seconds=60,
+        prediction_resolve_lease_seconds=120,
+        prediction_resolve_max_per_tick=50,
+        prediction_resolve_max_attempts=5,
+        agent_event_monitor_enabled=False,
+        daily_brief_enabled=False,
+    )
+    service = RuntimeSchedulerService(
+        config_provider=lambda: config,
+        owns_schedule=False,
+    )
+    calls: List[str] = []
+    original = service._current_prediction_resolver_background_tasks
+
+    def _trap(config_arg):
+        calls.append("constructed")
+        return original(config_arg)
+
+    service._current_prediction_resolver_background_tasks = _trap  # type: ignore[method-assign]
+    assert service.has_registered_background_task("prediction_resolver") is False
+    assert service.has_registered_background_task("") is False
+    assert calls == []
+    service._background_task_registered_names.add("prediction_resolver")
+    assert service.has_registered_background_task("prediction_resolver") is True
+    assert service.has_registered_background_task("daily_brief") is False
+    assert calls == []
+    assert service.status()["attached"] is False

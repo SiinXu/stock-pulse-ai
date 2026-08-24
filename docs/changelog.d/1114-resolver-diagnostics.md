@@ -1,0 +1,1 @@
+- [Added] Added an authenticated read-only GET /api/v1/agent/prediction-resolver/diagnostics endpoint that reports currently claimable due predictions without ticking, claiming, or requeueing (Refs #1114).

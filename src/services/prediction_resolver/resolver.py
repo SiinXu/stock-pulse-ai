@@ -131,6 +131,47 @@ def _attr(obj: Any, name: str, default: Any = None) -> Any:
     return getattr(obj, name, default)
 
 
+def list_claimable_due(store: Any, *, as_of: datetime, limit: int) -> List[Any]:
+    """Return currently claimable due rows without requeue or claim writes.
+
+    Matches resolver tick listing: pending rows plus expired or missing
+    ``resolving`` leases, sorted oldest ``resolve_after`` first, then sliced
+    to ``limit``. Ready ``data_unavailable`` retries are excluded until a
+    tick requeues them; this helper never performs that write.
+    """
+    pending = list(
+        store.list_due(
+            as_of=as_of,
+            limit=limit,
+            statuses=("pending",),
+        )
+    )
+    # A3's generic status scan does not itself filter resolving lease age.
+    # Inspect a bounded recovery window without allowing active leases to
+    # crowd pending work out of the per-tick cap.
+    resolving = store.list_due(
+        as_of=as_of,
+        limit=1000,
+        statuses=("resolving",),
+    )
+    expired = [
+        row
+        for row in resolving
+        if (
+            _to_datetime(_attr(row, "lease_expires_at")) is None
+            or _to_datetime(_attr(row, "lease_expires_at")) <= as_of
+        )
+    ]
+    combined = pending + expired
+    combined.sort(
+        key=lambda row: (
+            _to_datetime(_attr(row, "resolve_after")) or datetime.max,
+            str(_attr(row, "prediction_id") or ""),
+        )
+    )
+    return combined[:limit]
+
+
 def derive_aggregate_label(
     *,
     scored_claims: int,
@@ -649,37 +690,7 @@ class PredictionResolver:
 
     def _list_claimable(self, *, as_of: datetime, limit: int) -> List[Any]:
         """Combine pending rows with only genuinely expired A3 leases."""
-        pending = list(
-            self._store.list_due(
-                as_of=as_of,
-                limit=limit,
-                statuses=("pending",),
-            )
-        )
-        # A3's generic status scan does not itself filter resolving lease age.
-        # Inspect a bounded recovery window without allowing active leases to
-        # crowd pending work out of the per-tick cap.
-        resolving = self._store.list_due(
-            as_of=as_of,
-            limit=1000,
-            statuses=("resolving",),
-        )
-        expired = [
-            row
-            for row in resolving
-            if (
-                _to_datetime(_attr(row, "lease_expires_at")) is None
-                or _to_datetime(_attr(row, "lease_expires_at")) <= as_of
-            )
-        ]
-        combined = pending + expired
-        combined.sort(
-            key=lambda row: (
-                _to_datetime(_attr(row, "resolve_after")) or datetime.max,
-                str(_attr(row, "prediction_id") or ""),
-            )
-        )
-        return combined[:limit]
+        return list_claimable_due(self._store, as_of=as_of, limit=limit)
 
     def _claim_one(
         self,
