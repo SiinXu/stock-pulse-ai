@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+/** Canonical product paths. Capability→route inventory: `./productionReachability` (Refs #1058). */
 export const APP_ROUTE_PATHS = {
   home: '/',
   login: '/login',
