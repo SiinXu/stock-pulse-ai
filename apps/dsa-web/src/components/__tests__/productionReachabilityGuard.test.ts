@@ -190,8 +190,11 @@ describe('production reachability guard', () => {
     const routeByModule = new Map(
       parseAppRouteTable(sources['App.tsx'] ?? '').map((binding) => [binding.module, binding]),
     );
+    const ledgerFiles = new Set(UNREACHABLE_CAPABILITY_LEDGER.map((entry) => entry.file));
     expect(NAMED_BOARD_CAPABILITIES).toHaveLength(19);
     for (const capability of NAMED_BOARD_CAPABILITIES) {
+      expect(ledgerFiles.has(capability.file)).toBe(false);
+      expect(sources[capability.file], capability.file).toBeTruthy();
       const hostSource = sources[capability.host];
       expect(hostSource, capability.host).toBeTruthy();
       assertCapabilityHostMentions(
@@ -206,6 +209,10 @@ describe('production reachability guard', () => {
           ?? resolveProductionRoute(capability.host, consumers, routeByModule);
       expect(routed?.routeKey, capability.id).toBe(capability.routeKey);
       expect(routed?.route).toBe(APP_ROUTE_PATHS[capability.routeKey]);
+      expect(
+        resolveProductionRoute(capability.file, consumers, routeByModule),
+        capability.id,
+      ).toBeDefined();
     }
   });
 });

@@ -42,6 +42,11 @@ describe('production reachability inventory', () => {
 
     expect(unreachable).toEqual(UNREACHABLE_CAPABILITY_LEDGER.map((entry) => entry.file).sort());
     expect(NAMED_BOARD_CAPABILITIES).toHaveLength(19);
+    const ledgerFiles = new Set(UNREACHABLE_CAPABILITY_LEDGER.map((entry) => entry.file));
+    for (const capability of NAMED_BOARD_CAPABILITIES) {
+      expect(ledgerFiles.has(capability.file)).toBe(false);
+      expect(sources[capability.file], capability.file).toBeTruthy();
+    }
     expect(formatReachableMapping(reachable)).toEqual(REACHABLE_SURFACE_ROUTE_SNAPSHOT);
     expect(reachable.length).toBe(REACHABLE_SURFACE_ROUTE_SNAPSHOT.length);
 
