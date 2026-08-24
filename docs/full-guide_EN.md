@@ -1674,6 +1674,10 @@ For this feature, the product behavior is:
 | `/api/v1/decision-signals/{signal_id}/outcomes` | GET | Query one signal's outcomes under the current outcome engine |
 | `/api/v1/decision-signals/{signal_id}/feedback` | GET | Query one signal's user feedback; missing feedback returns `feedback_value=null` |
 | `/api/v1/decision-signals/{signal_id}/feedback` | PUT | Upsert one signal's `useful|not_useful` feedback; mixed PredictionOutcome fields, Soul-boundary markers, and oversized notes are rejected |
+| `/api/v1/agent/runs/{run_id}/feedback` | GET | Read optional analysis-run feedback sidecar; missing feedback returns `feedback_value=null`; unknown run identity is 404. Distinct from decision-signal `useful|not_useful` |
+| `/api/v1/agent/runs/{run_id}/feedback` | PUT | Upsert `useful|partial|wrong|harmful` by canonical `run_id`; does not rewrite `outcome_json` or append-only episodes |
+| `/api/v1/agent/predictions/{prediction_id}/feedback` | GET | Read optional prediction feedback sidecar; missing feedback returns `feedback_value=null`; unknown `prediction_id` is 404 |
+| `/api/v1/agent/predictions/{prediction_id}/feedback` | PUT | Upsert `agree_hit|agree_miss|disagree_score|context_note` by stored `prediction_id`; unresolved parents return 409; mixed actuals, Soul markers, oversized notes, and client provenance are rejected without persist |
 | `/api/v1/decision-signals/{signal_id}` | GET | Fetch one decision signal and apply lazy expiration before reading |
 | `/api/v1/decision-signals/{signal_id}/status` | PATCH | Update a decision signal status and optional metadata |
 | `/api/v1/decision-signals/latest/{stock_code}` | GET | Query the latest active decision signals for a stock |

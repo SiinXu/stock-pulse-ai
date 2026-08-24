@@ -15,6 +15,7 @@ from sqlalchemy.pool import NullPool
 
 from src.config import Config
 from src.migrations.registry import (
+    AGENT_FEEDBACK_SCHEMA_MIGRATION,
     AGENT_PREDICTION_SCHEMA_MIGRATION,
     MEMORY_WRITE_PROVENANCE_MIGRATION,
     get_migrations,
@@ -156,7 +157,7 @@ def test_fresh_database_manager_applies_prediction_schema(isolated_db) -> None:
     assert AGENT_PREDICTION_SCHEMA_MIGRATION.id in {
         migration.id for migration in get_migrations()
     }
-    assert get_migrations()[-1].id == MEMORY_WRITE_PROVENANCE_MIGRATION.id
+    assert get_migrations()[-1].id == AGENT_FEEDBACK_SCHEMA_MIGRATION.id
 
 
 def test_due_query_uses_status_resolve_after_index(isolated_db) -> None:
@@ -213,6 +214,15 @@ def test_migration_applies_on_existing_database_without_predictions(
                 "DELETE FROM schema_migrations WHERE version = :version",
                 {"version": MEMORY_WRITE_PROVENANCE_MIGRATION.id},
             )
+            connection.exec_driver_sql(
+                "DROP INDEX IF EXISTS ix_agent_prediction_feedback_run_id"
+            )
+            connection.exec_driver_sql("DROP TABLE IF EXISTS agent_prediction_feedback")
+            connection.exec_driver_sql("DROP TABLE IF EXISTS agent_run_feedback")
+            connection.exec_driver_sql(
+                "DELETE FROM schema_migrations WHERE version = :version",
+                {"version": AGENT_FEEDBACK_SCHEMA_MIGRATION.id},
+            )
             tables = {
                 row[0]
                 for row in connection.exec_driver_sql(
@@ -226,6 +236,7 @@ def test_migration_applies_on_existing_database_without_predictions(
         assert result.success is True
         assert AGENT_PREDICTION_SCHEMA_MIGRATION.id in result.executed_ids
         assert MEMORY_WRITE_PROVENANCE_MIGRATION.id in result.executed_ids
+        assert AGENT_FEEDBACK_SCHEMA_MIGRATION.id in result.executed_ids
         inspector = inspect(engine)
         assert "agent_predictions" in inspector.get_table_names()
         assert "ix_agent_prediction_status_resolve_after" in _index_names(
@@ -238,7 +249,7 @@ def test_migration_applies_on_existing_database_without_predictions(
         assert count == 1
         verification = MigrationRunner().verify(engine)
         assert verification.success is True
-        assert verification.current_version == MEMORY_WRITE_PROVENANCE_MIGRATION.id
+        assert verification.current_version == AGENT_FEEDBACK_SCHEMA_MIGRATION.id
     finally:
         engine.dispose()
         DatabaseManager.reset_instance()
@@ -482,6 +493,11 @@ def test_due_query_and_symbol_market_list(isolated_db) -> None:
 
     cn_rows = repo.list_by_symbol_market(symbol="600519", market="cn", limit=10)
     assert {row.prediction_id for row in cn_rows} == {"due-1", "future-1"}
+
+    by_run = repo.list_by_run_id("run-1", limit=10)
+    assert {row.prediction_id for row in by_run} == {"due-1", "future-1", "other-1"}
+    assert repo.list_by_run_id("missing-run") == []
+    assert repo.list_by_run_id("  ") == []
 
 
 def test_claim_resolve_and_data_unavailable_state_machine(isolated_db) -> None:

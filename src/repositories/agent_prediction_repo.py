@@ -361,6 +361,29 @@ class AgentPredictionRepository(BaseRepository):
             ).one_or_none()
         return self._row_to_record(row) if row is not None else None
 
+    def list_by_run_id(
+        self,
+        run_id: str,
+        *,
+        limit: int = 50,
+    ) -> List[AgentPredictionRecord]:
+        """List predictions for a canonical run using ``ix_agent_prediction_run_id``."""
+        canonical = str(run_id or "").strip()
+        if not canonical:
+            return []
+        bound = max(1, min(int(limit), 500))
+        with self.db.get_session() as session:
+            rows = session.execute(
+                select(agent_predictions_table)
+                .where(agent_predictions_table.c.run_id == canonical)
+                .order_by(
+                    agent_predictions_table.c.created_at.desc(),
+                    agent_predictions_table.c.prediction_id.desc(),
+                )
+                .limit(bound)
+            ).all()
+        return [self._row_to_record(row) for row in rows]
+
     def list_due(
         self,
         *,

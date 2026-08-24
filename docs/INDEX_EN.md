@@ -95,7 +95,7 @@ This is the entry point for project documentation. The README covers the project
 | [A-share Specialist Roles](ashare-specialist-roles.md) | Default-off policy / capital-flow / microstructure Skills with fail-soft data deps (#192) |
 | [Prediction Extraction](prediction-extraction_EN.md) | Structured decision → PredictionRecord drafts; prose anti-examples; default-off finalize hook ([中文](prediction-extraction.md)) |
 | [Skill Opinion Outcome Evaluation](skill-opinion-outcome-evaluation.md) | Individual skill samples, offline forward outcomes, sample-sufficiency statistics, migration, and V0 boundaries |
-| [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema and CAS store (Issue #1112) |
+| [Agent prediction persistence](agent-prediction-persistence.md) | A3 `agent_predictions` schema and CAS store (Issue #1112); optional #1105 run/prediction feedback sidecar APIs |
 | [Market Regime Detection](market-regime.md) | Explainable rule-based regime labels, evidence artifacts, adaptive analysis focus, and skill routing (Issue #220) |
 | [Prediction ActualsFetcher](prediction-actuals-fetcher.md) | Server-path actuals for prediction scoring: DataFetcherManager, short-TTL coalesce, provider_down/data_unavailable, non-finite rejection (#1110 / #1107) |
 | [Deterministic Prediction Claim Scorer](prediction-claim-scorer_EN.md) | Pure `ClaimScorer` for A1 claim types (direction / return_bucket / level_break / vol_regime / custom) with hit·partial·miss·data_unavailable and confidence calibration (#1111 / #1107; [Chinese](prediction-claim-scorer.md)) |

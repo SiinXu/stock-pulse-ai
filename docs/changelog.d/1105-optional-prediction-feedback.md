@@ -1,0 +1,1 @@
+- [Added] Added auth-consistent upsert APIs for optional analysis-run and resolved-prediction feedback keyed by canonical run_id and stored prediction_id (Refs #1105).
