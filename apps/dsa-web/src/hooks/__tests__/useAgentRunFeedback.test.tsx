@@ -120,6 +120,23 @@ describe('useAgentRunFeedback', () => {
     expect(result.current.draftNote).toBe('');
   });
 
+  it('keeps the panel visible on GET 403 and does not treat forbidden as not_found', async () => {
+    vi.mocked(agentFeedbackApi.getRunFeedback).mockRejectedValueOnce(
+      createApiError(createParsedApiError({
+        title: 'Forbidden',
+        message: 'Not allowed.',
+        status: 403,
+        code: 'forbidden',
+        category: 'http_error',
+      })),
+    );
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useAgentRunFeedback('run-a'), { wrapper: Wrapper });
+    await waitFor(() => expect(result.current.errorMessage).toBeTruthy());
+    expect(result.current.hidden).toBe(false);
+    expect(result.current.errorMessage).not.toBe('Analysis run not found.');
+  });
+
   it('hides on GET 404 and shows an inline error on GET 500', async () => {
     vi.mocked(agentFeedbackApi.getRunFeedback)
       .mockRejectedValueOnce(notFoundError())

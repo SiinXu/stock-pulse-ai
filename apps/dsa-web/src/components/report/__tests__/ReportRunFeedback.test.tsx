@@ -33,9 +33,11 @@ describe('ReportRunFeedback', () => {
     expect(screen.getByText('No feedback yet')).toBeInTheDocument();
     for (const name of ['Useful', 'Partial', 'Wrong', 'Harmful']) {
       const button = screen.getByRole('button', { name });
+      expect(button).toHaveAttribute('type', 'button');
+      expect(button).toHaveAttribute('data-control', 'selection-chip');
       expect(button).toHaveAttribute('aria-pressed', 'false');
       expect(button).toBeEnabled();
-      expect(button).toHaveClass('min-h-11', 'min-w-11');
+      expect(button).toHaveClass('control-hit-target');
     }
     expect(screen.getByLabelText('Note (optional)')).toHaveValue('');
   });
@@ -82,7 +84,11 @@ describe('ReportRunFeedback', () => {
       feedbackValue: 'useful',
       draftNote: 'Edited note',
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Useful' }));
+    const useful = screen.getByRole('button', { name: 'Useful' });
+    expect(useful).toHaveAttribute('aria-pressed', 'true');
+    useful.focus();
+    expect(useful).toHaveFocus();
+    fireEvent.click(useful);
     expect(onSubmitValue).toHaveBeenCalledWith('useful');
   });
 

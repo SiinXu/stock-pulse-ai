@@ -7,8 +7,7 @@ import {
   type AgentRunFeedbackValue,
 } from '../../api/agentFeedback';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import { cn } from '../../utils/cn';
-import { Section, Textarea } from '../common';
+import { Section, SelectionChip, Textarea } from '../common';
 
 export type ReportRunFeedbackProps = {
   feedbackValue: AgentRunFeedbackValue | null;
@@ -68,24 +67,16 @@ export const ReportRunFeedback: React.FC<ReportRunFeedbackProps> = ({
           aria-busy={isSaving || undefined}
           className="flex flex-wrap gap-2"
         >
-          {AGENT_RUN_FEEDBACK_VALUES.map((value) => {
-            const pressed = feedbackValue === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                className={cn(
-                  'btn-secondary min-h-11 min-w-11 !px-3 !py-1.5 !text-xs',
-                  pressed && 'ring-2 ring-primary/40 bg-primary/10 text-foreground',
-                )}
-                aria-pressed={pressed}
-                disabled={controlsDisabled}
-                onClick={() => onSubmitValue(value)}
-              >
-                {t(VALUE_LABEL_KEYS[value])}
-              </button>
-            );
-          })}
+          {AGENT_RUN_FEEDBACK_VALUES.map((value) => (
+            <SelectionChip
+              key={value}
+              label={t(VALUE_LABEL_KEYS[value])}
+              selected={feedbackValue === value}
+              disabled={controlsDisabled}
+              showSelectionIndicator={false}
+              onClick={() => onSubmitValue(value)}
+            />
+          ))}
         </div>
 
         {statusText ? (

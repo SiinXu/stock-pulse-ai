@@ -658,6 +658,10 @@ describe('MarketReviewReportView', () => {
     const panel = await screen.findByTestId('report-run-feedback');
     const markdown = screen.getByTestId('market-review-report');
     expect(panel.compareDocumentPosition(markdown) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(panel).getByRole('button', { name: '有用' })).toHaveAttribute(
+      'data-control',
+      'selection-chip',
+    );
   });
 
   it('hides run feedback when queryId is missing', () => {

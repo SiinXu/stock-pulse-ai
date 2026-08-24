@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentFeedbackApi } from '../../../api/agentFeedback';
@@ -89,6 +89,10 @@ describe('ReportSummary run feedback mount', () => {
     renderWithClient(<ReportSummary data={stockReport} />);
     const panel = await screen.findByTestId('report-run-feedback');
     expect(agentFeedbackApi.getRunFeedback).toHaveBeenCalledWith('q1');
+    expect(within(panel).getByRole('button', { name: 'Useful' })).toHaveAttribute(
+      'data-control',
+      'selection-chip',
+    );
     const context = document.querySelector('[data-testid="analysis-context-summary"]');
     if (context) {
       expect(context.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
