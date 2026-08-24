@@ -99,6 +99,7 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
                 alphasift_endpoint.AlphaSiftScreenRequest(market="cn", strategy="dual_low", max_results=3),
                 http_request=self._request(),
                 config=config,
+                security_audit=MagicMock(),
             )
             run_task = fake_queue.submit_background_task.call_args.args[0]
             result = run_task()

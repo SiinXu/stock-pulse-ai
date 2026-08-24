@@ -67,6 +67,9 @@ from src.api.v1.services.analysis_cancel_audit import (
     status_text,
     success_reason_code,
 )
+from src.api.v1.services.background_submit_audit import (
+    audited_market_review_submit,
+)
 from src.services.analysis_submission_service import (
     AnalysisSubmissionService,
     build_submission_command,
@@ -665,6 +668,7 @@ class AnalysisApiService:
             request: Optional[MarketReviewRequest],
             *,
             config: Config,
+            security_audit: SecurityAuditRecorder,
         ) -> MarketReviewAccepted:
         """Trigger market review from Web/API without blocking the request."""
         request = request or MarketReviewRequest()
@@ -691,22 +695,20 @@ class AnalysisApiService:
                 or "cn"
             )
 
-        lock_token = self.try_acquire_market_review_lock(runtime_config)
-        if lock_token is None:
-            raise api_error(409, "duplicate_market_review", "大盘复盘正在执行中，请稍后再试")
+        send_notification = bool(request.send_notification)
+        task_id = uuid.uuid4().hex
 
-        try:
-            task_id = uuid.uuid4().hex
+        def _submit(lock_token: Any) -> Any:
             logger.info(
                 "[MarketReview] component=market_review action=submit trigger_source=api "
                 "task_id=%s region=%s send_notification=%s",
                 task_id,
                 effective_region,
-                request.send_notification,
+                send_notification,
             )
-            task = self.get_task_queue().submit_background_task(
+            return self.get_task_queue().submit_background_task(
                 lambda: self._run_market_review_background(
-                    request.send_notification,
+                    send_notification,
                     effective_region=effective_region,
                     lock_token=lock_token,
                     config=runtime_config,
@@ -719,16 +721,30 @@ class AnalysisApiService:
                 failure_error_code="analysis_failed",
                 region=effective_region,
             )
-        except Exception:
-            self.release_market_review_lock(lock_token)
-            raise
+
+        task = audited_market_review_submit(
+            security_audit,
+            task_id=task_id,
+            metadata={
+                "region": effective_region,
+                "send_notification": send_notification,
+            },
+            acquire_lock=lambda: self.try_acquire_market_review_lock(runtime_config),
+            submit=_submit,
+            release_lock=self.release_market_review_lock,
+            duplicate_error=lambda: api_error(
+                409,
+                "duplicate_market_review",
+                "大盘复盘正在执行中，请稍后再试",
+            ),
+        )
 
         return MarketReviewAccepted(
             status="accepted",
             message="大盘复盘任务已提交，完成后会保存报告并按配置推送通知",
             message_code="task.market_review.queued",
             message_params={},
-            send_notification=request.send_notification,
+            send_notification=send_notification,
             region=effective_region,
             task_id=task.task_id,
             trace_id=self.get_task_trace_id(task),

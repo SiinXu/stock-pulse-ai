@@ -226,6 +226,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             response = trigger_market_review(
                 request=None,
                 config=config,
+                security_audit=MagicMock(),
             )
 
         self.assertTrue(response.send_notification)

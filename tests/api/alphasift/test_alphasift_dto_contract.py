@@ -217,6 +217,7 @@ def test_background_screen_rejects_coercible_core_types() -> None:
             AlphaSiftScreenRequest(),
             http_request=MagicMock(),
             config=MagicMock(),
+            security_audit=MagicMock(),
         )
         run_screen = queue.submit_background_task.call_args.args[0]
         with pytest.raises(ValidationError):

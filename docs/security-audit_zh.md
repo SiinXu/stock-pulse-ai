@@ -102,7 +102,7 @@ English version: [Durable Security Audit](security-audit.md).
 | 写入配置的本地模型注册/分配/删除 | `src/services/local_model_service.py` → `SystemConfigService.update` | **已落地** | `source=local_model`；HTTP 将 attempt/completion 不可用映射为带 `operation_completed` 的 503 | DAG-5 |
 | 自选 `STOCK_LIST` 增删 | `src/api/v1/endpoints/stocks.py` `_write_watchlist_codes` → `SystemConfigService.update` | **已落地** | 同一写入器，`source=watchlist`，共享 503 映射（`config_version` / `applied_count` / `reload_triggered`）。其余自选分组产品数据仍延期 | DAG-5 |
 | 模型包导入 / 桌面激活 | `src/api/v1/endpoints/model_packs.py` | **具名延期** | 可信制品安装（上传/暂存/解包）仍延期。桌面激活配置写入走 `update()`，已作为 `system_config.write` 落地 | DAG-5 / 具名负责人 |
-| HTTP 市场复盘 / 候选发现 / AlphaSift | analysis API、`candidate_discovery.py`、`alphasift.py` 的 `submit_background_task` | **缺失** | 另一套队列 API 上的特权后台执行。**不是** DAG-1 | 覆盖图具名行；后续负责人 |
+| HTTP 市场复盘 / 候选发现 / AlphaSift | analysis API、`candidate_discovery.py`、`alphasift.py` 的 `submit_background_task` | **已落地** | 另一套队列 API 上的特权后台执行。**不是** DAG-1。仅在 HTTP 适配器写 `background.submit`；TaskQueue 与候选发现 cancel 不是本事件 | DAG-6 |
 | 投资框架变更 | `src/services/investment_framework_service.py` | **缺失** | 分析策略内容；除非明确视为策略控制，否则延期 | 延期，除非重新归类 |
 
 DAG-1 已扩展 `AnalysisSubmissionCommand`（`query_source`、`request_context`、
@@ -149,6 +149,24 @@ HistoryService 删除不写这些事件。
 
 DAG-5 在 `SystemConfigService.update` 上只写一次 `system_config.write`。HTTP PUT 不再双写。嵌套导入仍只写 `system_config.import`。attempt 写入失败不调用 `apply_updates`。持久化后 completion 失败为 HTTP `503` `operation_completed=true`，并在每个可写适配器上带 `config_version` / `applied_count` / `reload_triggered`（PUT、预设、onboarding、本地模型、自选、legacy 迁移）。HTTP 适配器向写入器传入 `audit_actor_id`；写入器逻辑不读取 `ADMIN_AUTH_ENABLED`，也不调用 `is_auth_enabled()`。已回滚的 `runtime_activation_failed` 保持领域 400。
 
+DAG-6 在三条调用 `submit_background_task` 的 HTTP 适配器上写入
+`background.submit`：`POST /api/v1/analysis/market-review`、
+`POST /api/v1/discover/screen/tasks`、`POST /api/v1/alphasift/screen/tasks`。
+单一事件类型，用 `metadata.kind` 区分（`market_review` /
+`candidate_discovery` / `alphasift_screen`）。Actor 为 `api_client` /
+`background_submitter`。Target 为 `background_task` / 入队前已生成的
+`task_id`。attempt 在请求校验之后、拿锁或入队之前提交。现有
+202/409/400/422 协议不变。attempt 写入失败的 `503` 为
+`operation_completed=false` 且不拿锁、不入队。入队已被接受但 completion
+失败的 `503` 为 `operation_completed=true` 并带 `task_id`/`kind`/`status`，
+不回滚队列。重复市场复盘仍返回 409；拒绝 completion 为尽力写入。提交异常
+记录 failure 并释放市场复盘锁。metadata 仅含 kind、report_type、stock_code、
+region、send_notification、universe、page、page_size、max_results、
+max_provider_calls、use_llm、strategy、market，不含 query、codes、criteria、
+keywords、account、cookie、token、URL、prompt 或结果。
+`TaskQueue.submit_background_task`、候选发现 cancel、CLI/GHA 与
+`analysis.submit` 不是本事件。
+
 ### 延期（不在本 DAG）
 
 | 操作 | 状态 | 原因 |
@@ -169,8 +187,8 @@ prompt、stdout 或密钥。
 ## 剩余覆盖 DAG
 
 不要把剩余具名后续行折进更早切片。不要纳入组合 CRUD 或告警。自选
-`STOCK_LIST` 写入已在 DAG-5 落地。不要把市场复盘、候选发现或 AlphaSift
-折进 DAG-1。
+`STOCK_LIST` 写入已在 DAG-5 落地。HTTP 市场复盘 / 候选发现 / AlphaSift
+入队已在 DAG-6 落地；不要把这些适配器折进 DAG-1。
 
 ```text
 DAG-0  本覆盖图（仅文档；无运行时行为）
@@ -198,6 +216,10 @@ DAG-5  SystemConfigService.update 写入（已落地）
          自选 STOCK_LIST、legacy 迁移；
          服务层一次审计，HTTP 路径不得双写；
          模型包可信制品安装仍延期
+
+DAG-6  HTTP background.submit（已落地）
+         市场复盘、候选发现、AlphaSift 入队；
+         仅 HTTP 适配器；不是 TaskQueue，也不是候选发现 cancel
 ```
 
 后续建议标题（英文，无工具前缀）：
@@ -208,6 +230,7 @@ DAG-5  SystemConfigService.update 写入（已落地）
 4. `feat: audit analysis task cancel at the HTTP boundary`（DAG-3，已落地）
 5. `feat: audit report export and history deletion`（DAG-4，已落地）
 6. `feat: audit SystemConfigService.update config writes`（DAG-5，已落地）
+7. `feat: audit HTTP market-review candidate discovery and AlphaSift admission`（DAG-6，已落地）
 
 在范围内剩余行变为 **已落地** 或带负责人的 **延期** 之前，保持 #1062 开放。
 不要用关闭 #535 代替本覆盖图。
@@ -259,7 +282,7 @@ correlation / UTC 时间过滤，需要有效的单管理员会话。认证关�
 鉴权中间件豁免仅限 login、status、health、scorecard、docs 与 OpenAPI。能力
 写入**不**在豁免名单；未认证拒绝会写入 `capability.write` 或 fail-closed
 `503`。Actor id 是有界 token（`admin_session`、`unauthenticated`、
-`capability_registry`、`analysis_submitter`、`analysis_canceller`、`bot`、`scheduled_task`、`portfolio_submitter`、
+`capability_registry`、`analysis_submitter`、`analysis_canceller`、`background_submitter`、`bot`、`scheduled_task`、`portfolio_submitter`、
 `authenticated_admin`、`local_operator`、`desktop_operator`），不是邮箱。MCP 能力
 `security_audit_admin` 为 `not_exposed`。
 

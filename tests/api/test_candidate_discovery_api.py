@@ -114,7 +114,11 @@ class CandidateDiscoveryApiTests(unittest.TestCase):
             patch("src.api.v1.endpoints.candidate_discovery.get_task_queue", return_value=fake_queue),
             patch("src.api.v1.endpoints.candidate_discovery.uuid.uuid4", return_value=SimpleNamespace(hex="disc-1")),
         ):
-            accepted = endpoint.start_candidate_discovery_task(request, config=config)
+            accepted = endpoint.start_candidate_discovery_task(
+                request,
+                config=config,
+                security_audit=MagicMock(),
+            )
 
         self.assertEqual(accepted.task_id, "disc-1")
         self.assertEqual(accepted.universe, "index")
@@ -207,7 +211,11 @@ class CandidateDiscoveryApiTests(unittest.TestCase):
                     side_effect=slow_discover,
                 ),
             ):
-                accepted = endpoint.start_candidate_discovery_task(request, config=config)
+                accepted = endpoint.start_candidate_discovery_task(
+                    request,
+                    config=config,
+                    security_audit=MagicMock(),
+                )
                 self.assertTrue(started.wait(timeout=2))
                 cancel_snapshot = queue.cancel(accepted.task_id)
                 self.assertIn(

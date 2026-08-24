@@ -9,8 +9,18 @@ from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends
 
-from src.api.deps import get_config_dep
+from src.api.deps import get_config_dep, require_security_audit_service
 from src.api.v1.errors import api_error
+from src.api.v1.services.background_submit_audit import (
+    BackgroundSubmitAuditCompletionUnavailable,
+    KIND_CANDIDATE_DISCOVERY,
+    map_background_submit_audit_exception,
+    run_background_submit_with_audit,
+)
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+)
 from src.api.v1.schemas.candidate_discovery import (
     CandidateDiscoveryRequest,
     CandidateDiscoveryResponse,
@@ -172,13 +182,25 @@ def _cancelled_discovery_payload(request: CandidateDiscoveryRequest) -> Dict[str
     status_code=202,
     response_model=CandidateDiscoveryTaskAccepted,
     response_model_exclude_unset=True,
-    responses={400: {"model": ErrorResponse}, 422: {"model": ErrorResponse}},
+    responses={
+        400: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
+    },
     summary="Submit bounded AI candidate discovery task",
+    description=(
+        "Submit a bounded candidate-discovery background task. Existing 202/400/422 "
+        "protocol is unchanged. Attempt is persisted before queue submit; "
+        "attempt-store failure returns 503 operation_completed=false without "
+        "queueing. After the queue accepts, completion-store failure returns 503 "
+        "operation_completed=true with task_id, kind, and status."
+    ),
     operation_id="startCandidateDiscoveryTask",
 )
 def start_candidate_discovery_task(
     request: CandidateDiscoveryRequest,
     config: Config = Depends(get_config_dep),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> CandidateDiscoveryTaskAccepted:
     task_id = uuid.uuid4().hex
     task_queue = get_task_queue()
@@ -210,16 +232,33 @@ def start_candidate_discovery_task(
         )
         return result
 
-    task = task_queue.submit_background_task(
-        run_discovery,
-        stock_code="candidate_discovery",
-        stock_name=f"{request.universe} / page {request.page}",
-        report_type=REPORT_TYPE,
-        message="Candidate discovery task submitted",
-        task_id=task_id,
-        trace_id=task_id,
-        failure_error_code="candidate_discovery_failed",
-    )
+    try:
+        task = run_background_submit_with_audit(
+            security_audit,
+            kind=KIND_CANDIDATE_DISCOVERY,
+            task_id=task_id,
+            metadata={
+                "universe": request.universe,
+                "page": request.page,
+                "page_size": request.page_size,
+                "max_results": request.max_results,
+                "max_provider_calls": request.max_provider_calls,
+                "use_llm": request.use_llm,
+            },
+            submit=lambda: task_queue.submit_background_task(
+                run_discovery,
+                stock_code="candidate_discovery",
+                stock_name=f"{request.universe} / page {request.page}",
+                report_type=REPORT_TYPE,
+                message="Candidate discovery task submitted",
+                task_id=task_id,
+                trace_id=task_id,
+                failure_error_code="candidate_discovery_failed",
+            ),
+        )
+    except (SecurityAuditUnavailable, BackgroundSubmitAuditCompletionUnavailable) as exc:
+        map_background_submit_audit_exception(exc)
+        raise
     return CandidateDiscoveryTaskAccepted(
         task_id=task.task_id,
         trace_id=task.trace_id or task.task_id,

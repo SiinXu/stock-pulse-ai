@@ -49,6 +49,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             response = trigger_market_review(
                 request=request,
                 config=config,
+                security_audit=MagicMock(),
             )
 
         self.assertEqual(response.status, "accepted")
@@ -99,7 +100,11 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "_release_market_review_lock",
             return_value=None,
         ):
-            trigger_market_review(request=request, config=config)
+            trigger_market_review(
+                request=request,
+                config=config,
+                security_audit=MagicMock(),
+            )
             self.assertIn("background_task", task_payload)
             task_payload["background_task"]()
 
@@ -151,7 +156,11 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             "_release_market_review_lock",
             return_value=None,
         ):
-            response = trigger_market_review(request=request, config=config)
+            response = trigger_market_review(
+                request=request,
+                config=config,
+                security_audit=MagicMock(),
+            )
             self.assertEqual(response.status, "accepted")
             self.assertIn("background_task", task_payload)
             task_payload["background_task"]()
@@ -178,6 +187,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 trigger_market_review(
                     request=request,
                     config=config,
+                    security_audit=MagicMock(),
                 )
 
         self.assertEqual(getattr(ctx.exception, "status_code", None), 409)
@@ -209,6 +219,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                         trigger_market_review(
                             request=SimpleNamespace(send_notification=True, report_language=None, region=None),
                             config=config,
+                            security_audit=MagicMock(),
                         )
             finally:
                 release_market_review_lock(lock_token)
@@ -240,6 +251,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             response = trigger_market_review(
                 request=request,
                 config=config,
+                security_audit=MagicMock(),
             )
 
         self.assertEqual(response.status, "accepted")

@@ -61,6 +61,10 @@ from src.task_execution import TaskStatusEnum as _TaskStatusEnum
 from src.api.v1.services.analysis_cancel_audit import (
     AnalysisCancelAuditCompletionUnavailable,
 )
+from src.api.v1.services.background_submit_audit import (
+    BackgroundSubmitAuditCompletionUnavailable,
+    map_background_submit_audit_exception,
+)
 from src.services.security_audit_service import (
     SecurityAuditRecorder,
     SecurityAuditUnavailable,
@@ -352,16 +356,35 @@ def trigger_analysis(
         202: {"description": "大盘复盘任务已接受", "model": MarketReviewAccepted},
         409: {"description": "大盘复盘正在执行", "model": ErrorResponse},
         500: {"description": "提交失败", "model": ErrorResponse},
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
     },
     summary="触发大盘复盘",
-    description="提交一个后台大盘复盘任务，复用 CLI 的大盘复盘运行时装配并保存报告。该人工触发入口不按交易日检查跳过；接口内部仅提供进程内/单机防重，如多实例（多 Worker/多容器）部署，需结合外部幂等机制避免重复触发。",
+    description=(
+        "提交一个后台大盘复盘任务，复用 CLI 的大盘复盘运行时装配并保存报告。"
+        "该人工触发入口不按交易日检查跳过；接口内部仅提供进程内/单机防重，"
+        "如多实例（多 Worker/多容器）部署，需结合外部幂等机制避免重复触发。"
+        "Existing 202/409/422 protocol is unchanged. Attempt is persisted after "
+        "region validation and before the lock; attempt-store failure returns 503 "
+        "operation_completed=false without locking or queueing. After the queue "
+        "accepts, completion-store failure returns 503 operation_completed=true "
+        "with task_id, kind, and status. Duplicate submissions stay 409."
+    ),
 )
 def trigger_market_review(
     request: Optional[MarketReviewRequest] = Body(None),
     config: Config = Depends(get_config_dep),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> MarketReviewAccepted:
     """Trigger market review from Web/API without blocking the request."""
-    return _analysis_api_service().trigger_market_review(request, config=config)
+    try:
+        return _analysis_api_service().trigger_market_review(
+            request,
+            config=config,
+            security_audit=security_audit,
+        )
+    except (SecurityAuditUnavailable, BackgroundSubmitAuditCompletionUnavailable) as exc:
+        map_background_submit_audit_exception(exc)
+        raise
 
 
 @router.get(
