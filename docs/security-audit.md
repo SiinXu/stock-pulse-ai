@@ -112,7 +112,7 @@ Legend:
 | Local model register/assign/delete that writes config | `src/services/local_model_service.py` → `SystemConfigService.update` | **Landed** | `source=local_model`; HTTP maps attempt/completion unavailability to 503 `operation_completed` | DAG-5 |
 | Watchlist `STOCK_LIST` add/remove | `src/api/v1/endpoints/stocks.py` `_write_watchlist_codes` → `SystemConfigService.update` | **Landed** | Same writer with `source=watchlist` and the shared 503 mapper (`config_version` / `applied_count` / `reload_triggered`). Remaining watchlist-group product data stays Deferred | DAG-5 |
 | Model pack import / desktop activation | `src/api/v1/endpoints/model_packs.py` | **Deferred with owner** | Trusted artifact install (upload/stage/extract) remains deferred. Desktop activation config writes through `update()` are Landed as `system_config.write` | DAG-5 / named owner |
-| HTTP market-review / candidate discovery / AlphaSift | `submit_background_task` in analysis API, `candidate_discovery.py`, `alphasift.py` | **Missing** | Privileged background execution on a different queue API. **Not** DAG-1 | Named coverage-map row; later owner |
+| HTTP market-review / candidate discovery / AlphaSift | `submit_background_task` in analysis API, `candidate_discovery.py`, `alphasift.py` | **Landed** | Privileged background execution on a different queue API. **Not** DAG-1. `background.submit` at the HTTP adapters only; TaskQueue and discovery cancel are not this event | DAG-6 |
 | Investment-framework mutations | `src/services/investment_framework_service.py` | **Missing** | Analysis-policy content; defer unless framed as policy | Deferred unless reclassified |
 
 DAG-1 extended `AnalysisSubmissionCommand` with `query_source`, `request_context`, `portfolio_context`, `strict_skill_selection`, and actor identity, and shares `record_audit` plus attempt-before-protected-operation fail-closed order. HTTP async / MCP / event-trigger keep `api_client` / `analysis_submitter`. Do not fold market-review, candidate discovery, or AlphaSift into this event.
@@ -163,6 +163,25 @@ do not emit these events.
 
 DAG-5 records `system_config.write` once at `SystemConfigService.update`. HTTP PUT no longer double-emits. Nested import stays `system_config.import` only. Attempt-store failure does not call `apply_updates`. After persist, completion-store failure is HTTP `503` `operation_completed=true` plus `config_version` / `applied_count` / `reload_triggered` on every write-capable adapter (PUT, profiles, onboarding, local-model, watchlist, legacy migration). HTTP adapters pass `audit_actor_id` into the writer; writer-side logic does not read `ADMIN_AUTH_ENABLED` or call `is_auth_enabled()`. Rolled-back `runtime_activation_failed` keeps domain 400.
 
+DAG-6 records `background.submit` at the three HTTP adapters that call
+`submit_background_task`: `POST /api/v1/analysis/market-review`,
+`POST /api/v1/discover/screen/tasks`, and `POST /api/v1/alphasift/screen/tasks`.
+One event type with `metadata.kind` (`market_review` /
+`candidate_discovery` / `alphasift_screen`). Actor is `api_client` /
+`background_submitter`. Target is `background_task` / the pre-generated
+`task_id`. Attempt is committed after request validation and before lock or
+queue. Existing 202/409/400/422 protocol is unchanged. Attempt-store `503`
+uses `operation_completed=false` and does not lock or queue. After the queue
+accepts, completion-store `503` uses `operation_completed=true` plus
+`task_id`/`kind`/`status` and does not roll back. Duplicate market-review
+stays 409; rejected completion is best-effort. Submit exceptions record
+failure and release the market-review lock. Metadata is limited to kind,
+report_type, stock_code, region, send_notification, universe, page,
+page_size, max_results, max_provider_calls, use_llm, strategy, and market —
+never query, codes, criteria, keywords, account, cookies, tokens, URLs,
+prompts, or results. `TaskQueue.submit_background_task`, discovery cancel,
+CLI/GHA, and `analysis.submit` are not this event.
+
 ### Deferred (not in this DAG)
 
 | Operation | Status | Reason |
@@ -186,8 +205,8 @@ or size evidence—never image bytes, prompts, stdout, or secrets.
 
 Do not stack remaining later-owner rows into an earlier slice. Do not
 include portfolio CRUD or alerts. Watchlist `STOCK_LIST` writes are Landed
-on DAG-5. Do not fold market-review, candidate discovery, or AlphaSift
-into DAG-1.
+on DAG-5. HTTP market-review / candidate discovery / AlphaSift admission
+is Landed on DAG-6; do not fold those adapters into DAG-1.
 
 ```text
 DAG-0  this coverage map (docs only; no runtime behavior)
@@ -215,6 +234,10 @@ DAG-5  SystemConfigService.update writes (landed)
          writes, watchlist STOCK_LIST, legacy migration;
          one service-level audit, no HTTP double-emit;
          model-pack trusted artifact install remains Deferred
+
+DAG-6  HTTP background.submit (landed)
+         market-review, candidate discovery, AlphaSift admission;
+         HTTP adapters only; not TaskQueue, not discovery cancel
 ```
 
 Suggested later titles (English, no tool prefix):
@@ -225,6 +248,7 @@ Suggested later titles (English, no tool prefix):
 4. `feat: audit analysis task cancel at the HTTP boundary` (DAG-3, landed)
 5. `feat: audit report export and history deletion` (DAG-4, landed)
 6. `feat: audit SystemConfigService.update config writes` (DAG-5, landed)
+7. `feat: audit HTTP market-review candidate discovery and AlphaSift admission` (DAG-6, landed)
 
 Keep #1062 open until remaining in-scope rows are **Landed** or explicitly
 **Deferred** with an owner. Do not close #535 as a substitute for this map.
@@ -289,7 +313,7 @@ Auth middleware exemptions are login, status, health, scorecard, docs, and
 OpenAPI only. Capability writes are **not** exempt; an unauthenticated deny
 emits `capability.write` or fails closed with `503`. Actor ids are bounded
 tokens (`admin_session`, `unauthenticated`, `capability_registry`,
-`analysis_submitter`, `analysis_canceller`, `bot`, `scheduled_task`, `portfolio_submitter`,
+`analysis_submitter`, `analysis_canceller`, `background_submitter`, `bot`, `scheduled_task`, `portfolio_submitter`,
 `authenticated_admin`, `local_operator`, `desktop_operator`), not emails. MCP capability `security_audit_admin` is
 `not_exposed`.
 

@@ -9,8 +9,18 @@ from typing import Any, Dict, Type, TypeVar
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from src.api.deps import get_config_dep
+from src.api.deps import get_config_dep, require_security_audit_service
 from src.api.v1.errors import api_error
+from src.api.v1.services.background_submit_audit import (
+    BackgroundSubmitAuditCompletionUnavailable,
+    KIND_ALPHASIFT_SCREEN,
+    map_background_submit_audit_exception,
+    run_background_submit_with_audit,
+)
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
+)
 from src.api.v1.schemas.alphasift import (
     AlphaSiftHotspotDetailResponse,
     AlphaSiftHotspotsResponse,
@@ -166,12 +176,16 @@ def alphasift_install(
     status_code=202,
     response_model=AlphaSiftScreenAccepted,
     response_model_exclude_unset=True,
-    responses={422: {"model": ErrorResponse}},
+    responses={
+        422: {"model": ErrorResponse},
+        503: {"description": "Security audit unavailable", "model": ErrorResponse},
+    },
 )
 def alphasift_start_screen_task(
     request: AlphaSiftScreenRequest,
     http_request: Request,
     config: Config = Depends(get_config_dep),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> AlphaSiftScreenAccepted:
     task_id = uuid.uuid4().hex
     task_queue = get_task_queue()
@@ -197,16 +211,30 @@ def alphasift_start_screen_task(
         )
         return result
 
-    task = task_queue.submit_background_task(
-        run_screen,
-        stock_code="alphasift_screen",
-        stock_name=f"{request.strategy} / {request.market}",
-        report_type="alphasift_screen",
-        message="AlphaSift 选股任务已提交",
-        task_id=task_id,
-        trace_id=task_id,
-        failure_error_code="alphasift_screen_failed",
-    )
+    try:
+        task = run_background_submit_with_audit(
+            security_audit,
+            kind=KIND_ALPHASIFT_SCREEN,
+            task_id=task_id,
+            metadata={
+                "strategy": request.strategy,
+                "market": request.market,
+                "max_results": request.max_results,
+            },
+            submit=lambda: task_queue.submit_background_task(
+                run_screen,
+                stock_code="alphasift_screen",
+                stock_name=f"{request.strategy} / {request.market}",
+                report_type="alphasift_screen",
+                message="AlphaSift 选股任务已提交",
+                task_id=task_id,
+                trace_id=task_id,
+                failure_error_code="alphasift_screen_failed",
+            ),
+        )
+    except (SecurityAuditUnavailable, BackgroundSubmitAuditCompletionUnavailable) as exc:
+        map_background_submit_audit_exception(exc)
+        raise
     return AlphaSiftScreenAccepted(
         task_id=task.task_id,
         trace_id=task.trace_id or task.task_id,

@@ -572,7 +572,7 @@ export interface paths {
         put?: never;
         /**
          * 触发大盘复盘
-         * @description 提交一个后台大盘复盘任务，复用 CLI 的大盘复盘运行时装配并保存报告。该人工触发入口不按交易日检查跳过；接口内部仅提供进程内/单机防重，如多实例（多 Worker/多容器）部署，需结合外部幂等机制避免重复触发。
+         * @description 提交一个后台大盘复盘任务，复用 CLI 的大盘复盘运行时装配并保存报告。该人工触发入口不按交易日检查跳过；接口内部仅提供进程内/单机防重，如多实例（多 Worker/多容器）部署，需结合外部幂等机制避免重复触发。Existing 202/409/422 protocol is unchanged. Attempt is persisted after region validation and before the lock; attempt-store failure returns 503 operation_completed=false without locking or queueing. After the queue accepts, completion-store failure returns 503 operation_completed=true with task_id, kind, and status. Duplicate submissions stay 409.
          */
         post: operations["trigger_market_review_api_v1_analysis_market_review_post"];
         delete?: never;
@@ -1542,7 +1542,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Submit bounded AI candidate discovery task */
+        /**
+         * Submit bounded AI candidate discovery task
+         * @description Submit a bounded candidate-discovery background task. Existing 202/400/422 protocol is unchanged. Attempt is persisted before queue submit; attempt-store failure returns 503 operation_completed=false without queueing. After the queue accepts, completion-store failure returns 503 operation_completed=true with task_id, kind, and status.
+         */
         post: operations["startCandidateDiscoveryTask"];
         delete?: never;
         options?: never;
@@ -21042,6 +21045,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     alphasift_screen_task_status_api_v1_alphasift_screen_tasks__task_id__get: {
@@ -21244,6 +21256,15 @@ export interface operations {
             };
             /** @description 提交失败 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -24521,6 +24542,15 @@ export interface operations {
             };
             /** @description Unprocessable Entity */
             422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

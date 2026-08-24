@@ -1,0 +1,3 @@
+- [Added] Emit fail-closed background.submit security-audit events for HTTP market-review, candidate discovery, and AlphaSift admission (Refs #1062).
+- [Tests] Cover HTTP background.submit happy paths, attempt fail-closed, persist-vs-block 503, preserved 409/422, secret canaries, and proof that direct queue submit and discovery cancel emit nothing (Refs #1062).
+- [Docs] Mark HTTP market-review / candidate discovery / AlphaSift admission as Landed on the privileged coverage map; keep issue #1062 open for remaining deferred rows (Refs #1062).
