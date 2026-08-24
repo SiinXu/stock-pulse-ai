@@ -1,2 +1,3 @@
 - [Changed] Share one DataFetcherManager between the analysis pipeline and agent data/market tools (Refs #1292).
 - [Tests] Cover composition-root identity, auto-bind-off singleton fallback, and market-tools reuse.
+- [Tests] Isolate shared-manager identity tests from process Config, auth cache, and runtime-source env leaks.
