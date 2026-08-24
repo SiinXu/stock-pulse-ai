@@ -592,6 +592,7 @@ class DataFetcherManager:
         self._tickflow_lock = RLock()
         self._fundamental_cache: Dict[str, Dict[str, Any]] = {}
         self._fundamental_cache_lock = RLock()
+        self._fundamental_inflight: Dict[str, Any] = {}
         self._fundamental_timeout_worker_limit = 8
         self._fundamental_timeout_slots = BoundedSemaphore(self._fundamental_timeout_worker_limit)
 
@@ -753,45 +754,6 @@ class DataFetcherManager:
         except Exception:
             # Best-effort cleanup during interpreter shutdown.
             pass
-
-    def _get_fundamental_cache_key(self, stock_code: str, budget_seconds: Optional[float] = None) -> str:
-        """生成基本面缓存 key（包含预算分桶以避免低预算结果污染高预算请求）。"""
-        normalized_code = normalize_stock_code(stock_code)
-        if budget_seconds is None:
-            return f"{normalized_code}|budget=default"
-        try:
-            budget = max(0.0, float(budget_seconds))
-        except (TypeError, ValueError):
-            budget = 0.0
-        # 100ms bucket to balance cache reuse and scenario isolation.
-        budget_bucket = int(round(budget * 10))
-        return f"{normalized_code}|budget={budget_bucket}"
-
-    def _prune_fundamental_cache(self, ttl_seconds: int, max_entries: int) -> None:
-        """Prune expired and overflow fundamental cache items."""
-        with self._fundamental_cache_lock:
-            if not self._fundamental_cache:
-                return
-
-            now_ts = time.time()
-            if ttl_seconds > 0:
-                cache_items = list(self._fundamental_cache.items())
-                expired_keys = [
-                    key
-                    for key, value in cache_items
-                    if now_ts - float(value.get("ts", 0)) > ttl_seconds
-                ]
-                for key in expired_keys:
-                    self._fundamental_cache.pop(key, None)
-
-            if max_entries > 0 and len(self._fundamental_cache) > max_entries:
-                overflow = len(self._fundamental_cache) - max_entries
-                sorted_items = sorted(
-                    list(self._fundamental_cache.items()),
-                    key=lambda item: float(item[1].get("ts", 0)),
-                )
-                for key, _ in sorted_items[:overflow]:
-                    self._fundamental_cache.pop(key, None)
 
     # Rebound from manager_parts.belong_board_methods after the class is built.
     _try_scalar_isna = None
@@ -3004,6 +2966,11 @@ class DataFetcherManager:
         return None, last_error, total_cost_ms
 
     def _get_fundamental_config(self):
+        """Return process Config for fundamental timeouts, retries, and cache TTL.
+
+        CN/offshore aggregation and the rebound cache helper share this owner so
+        tests can keep patching ``src.config.get_config``.
+        """
         from src.config import get_config
         return get_config()
 
@@ -3203,9 +3170,7 @@ class DataFetcherManager:
         Cache, retry and fail-open semantics intentionally match the CN path so
         upstream callers see the same shape regardless of market.
         """
-        from src.config import get_config
-
-        config = get_config()
+        config = self._get_fundamental_config()
         stage_timeout = float(
             budget_seconds if budget_seconds is not None else config.fundamental_stage_timeout_seconds
         )
@@ -3213,250 +3178,240 @@ class DataFetcherManager:
         fetch_timeout = float(config.fundamental_fetch_timeout_seconds)
         fetch_timeout = max(0.0, fetch_timeout)
 
-        cache_ttl = int(config.fundamental_cache_ttl_seconds)
-        cache_max_entries = max(0, int(getattr(config, "fundamental_cache_max_entries", 256)))
-        cache_key = self._get_fundamental_cache_key(stock_code, stage_timeout)
-        if cache_ttl > 0:
-            self._prune_fundamental_cache(cache_ttl, cache_max_entries)
-            with self._fundamental_cache_lock:
-                cache_item = self._fundamental_cache.get(cache_key)
-                if cache_item:
-                    age = time.time() - float(cache_item.get("ts", 0))
-                    if age <= cache_ttl:
-                        return cache_item.get("context", {})
+        def _load() -> Dict[str, Any]:
+            result_ctx: Dict[str, Any] = {
+                "market": market,
+                "provider": "yfinance",
+                "as_of": datetime.now(timezone.utc).isoformat(),
+                "data_quality": "unavailable",
+                "missing_fields": [],
+                "valuation": {},
+                "growth": {},
+                "earnings": {},
+                "institution": {},
+                "capital_flow": {},
+                "dragon_tiger": {},
+                "boards": {},
+                "belong_boards": [],
+                "coverage": {},
+                "source_chain": [],
+                "errors": [],
+            }
+            start_ts = time.time()
 
-        result_ctx: Dict[str, Any] = {
-            "market": market,
-            "provider": "yfinance",
-            "as_of": datetime.now(timezone.utc).isoformat(),
-            "data_quality": "unavailable",
-            "missing_fields": [],
-            "valuation": {},
-            "growth": {},
-            "earnings": {},
-            "institution": {},
-            "capital_flow": {},
-            "dragon_tiger": {},
-            "boards": {},
-            "belong_boards": [],
-            "coverage": {},
-            "source_chain": [],
-            "errors": [],
-        }
-        start_ts = time.time()
-
-        # Valuation: reuse realtime quote payload — yfinance returns pe/pb in the
-        # same shape as AkShare, so the existing block formatter still works.
-        valuation_timeout = min(fetch_timeout, stage_timeout) if stage_timeout > 0 else 0
-        if valuation_timeout > 0:
-            quote_payload, valuation_err, valuation_ms = self._run_with_retry(
-                lambda: self.get_realtime_quote(stock_code),
-                valuation_timeout,
-                "fundamental_valuation",
+            # Valuation: reuse realtime quote payload — yfinance returns pe/pb in the
+            # same shape as AkShare, so the existing block formatter still works.
+            valuation_timeout = min(fetch_timeout, stage_timeout) if stage_timeout > 0 else 0
+            if valuation_timeout > 0:
+                quote_payload, valuation_err, valuation_ms = self._run_with_retry(
+                    lambda: self.get_realtime_quote(stock_code),
+                    valuation_timeout,
+                    "fundamental_valuation",
+                )
+            else:
+                quote_payload, valuation_err, valuation_ms = None, "fundamental stage timeout", 0
+            valuation_payload = {
+                "pe_ratio": getattr(quote_payload, "pe_ratio", None) if quote_payload else None,
+                "pb_ratio": getattr(quote_payload, "pb_ratio", None) if quote_payload else None,
+                "total_mv": getattr(quote_payload, "total_mv", None) if quote_payload else None,
+                "circ_mv": getattr(quote_payload, "circ_mv", None) if quote_payload else None,
+            }
+            valuation_status = self._infer_block_status(
+                valuation_payload,
+                "partial" if quote_payload is not None else "not_supported",
             )
-        else:
-            quote_payload, valuation_err, valuation_ms = None, "fundamental stage timeout", 0
-        valuation_payload = {
-            "pe_ratio": getattr(quote_payload, "pe_ratio", None) if quote_payload else None,
-            "pb_ratio": getattr(quote_payload, "pb_ratio", None) if quote_payload else None,
-            "total_mv": getattr(quote_payload, "total_mv", None) if quote_payload else None,
-            "circ_mv": getattr(quote_payload, "circ_mv", None) if quote_payload else None,
-        }
-        valuation_status = self._infer_block_status(
-            valuation_payload,
-            "partial" if quote_payload is not None else "not_supported",
-        )
-        if valuation_status == "partial" and valuation_err and not self._has_meaningful_payload(valuation_payload):
-            valuation_status = "failed"
-        result_ctx["valuation"] = self._build_fundamental_block(
-            valuation_status,
-            valuation_payload,
-            self._normalize_source_chain(
-                [{"provider": "realtime_quote", "result": valuation_status, "duration_ms": valuation_ms}],
-                "realtime_quote",
+            if valuation_status == "partial" and valuation_err and not self._has_meaningful_payload(valuation_payload):
+                valuation_status = "failed"
+            result_ctx["valuation"] = self._build_fundamental_block(
                 valuation_status,
-                valuation_ms,
-            ),
-            [valuation_err] if valuation_err else [],
-        )
+                valuation_payload,
+                self._normalize_source_chain(
+                    [{"provider": "realtime_quote", "result": valuation_status, "duration_ms": valuation_ms}],
+                    "realtime_quote",
+                    valuation_status,
+                    valuation_ms,
+                ),
+                [valuation_err] if valuation_err else [],
+            )
 
-        # Fundamental bundle via yfinance.
-        bundle_timeout = min(fetch_timeout, max(stage_timeout - (time.time() - start_ts), 0.0))
-        if bundle_timeout <= 0:
-            bundle_payload, bundle_err, bundle_ms = {}, "fundamental stage timeout", 0
-        else:
-            bundle_payload, bundle_err, bundle_ms = self._run_with_retry(
-                lambda: self._yfinance_fundamental_adapter.get_fundamental_bundle(stock_code),
-                bundle_timeout,
+            # Fundamental bundle via yfinance.
+            bundle_timeout = min(fetch_timeout, max(stage_timeout - (time.time() - start_ts), 0.0))
+            if bundle_timeout <= 0:
+                bundle_payload, bundle_err, bundle_ms = {}, "fundamental stage timeout", 0
+            else:
+                bundle_payload, bundle_err, bundle_ms = self._run_with_retry(
+                    lambda: self._yfinance_fundamental_adapter.get_fundamental_bundle(stock_code),
+                    bundle_timeout,
+                    "fundamental_bundle_yfinance",
+                )
+            if not isinstance(bundle_payload, dict):
+                bundle_payload = {}
+
+            bundle_chain = self._normalize_source_chain(
+                bundle_payload.get("source_chain", []),
                 "fundamental_bundle_yfinance",
+                str(bundle_payload.get("status", "not_supported")),
+                bundle_ms,
             )
-        if not isinstance(bundle_payload, dict):
-            bundle_payload = {}
+            adapter_errors = list(bundle_payload.get("errors", []))
+            if bundle_err:
+                adapter_errors.append(bundle_err)
 
-        bundle_chain = self._normalize_source_chain(
-            bundle_payload.get("source_chain", []),
-            "fundamental_bundle_yfinance",
-            str(bundle_payload.get("status", "not_supported")),
-            bundle_ms,
-        )
-        adapter_errors = list(bundle_payload.get("errors", []))
-        if bundle_err:
-            adapter_errors.append(bundle_err)
+            growth_payload = bundle_payload.get("growth", {}) if isinstance(bundle_payload.get("growth"), dict) else {}
+            earnings_payload = bundle_payload.get("earnings", {}) if isinstance(bundle_payload.get("earnings"), dict) else {}
+            belong_boards = bundle_payload.get("belong_boards") if isinstance(bundle_payload.get("belong_boards"), list) else []
 
-        growth_payload = bundle_payload.get("growth", {}) if isinstance(bundle_payload.get("growth"), dict) else {}
-        earnings_payload = bundle_payload.get("earnings", {}) if isinstance(bundle_payload.get("earnings"), dict) else {}
-        belong_boards = bundle_payload.get("belong_boards") if isinstance(bundle_payload.get("belong_boards"), list) else []
+            growth_status = self._infer_block_status(growth_payload, str(bundle_payload.get("status", "not_supported")))
+            earnings_status = self._infer_block_status(earnings_payload, str(bundle_payload.get("status", "not_supported")))
 
-        growth_status = self._infer_block_status(growth_payload, str(bundle_payload.get("status", "not_supported")))
-        earnings_status = self._infer_block_status(earnings_payload, str(bundle_payload.get("status", "not_supported")))
-
-        result_ctx["growth"] = self._build_fundamental_block(
-            growth_status,
-            growth_payload,
-            bundle_chain,
-            list(adapter_errors),
-        )
-        result_ctx["earnings"] = self._build_fundamental_block(
-            earnings_status,
-            earnings_payload,
-            bundle_chain,
-            list(adapter_errors),
-        )
-
-        # capital_flow / dragon_tiger / boards: no offshore data feed today -> not_supported.
-        for block in ("capital_flow", "dragon_tiger", "boards"):
-            result_ctx[block] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported for offshore market"],
+            result_ctx["growth"] = self._build_fundamental_block(
+                growth_status,
+                growth_payload,
+                bundle_chain,
+                list(adapter_errors),
+            )
+            result_ctx["earnings"] = self._build_fundamental_block(
+                earnings_status,
+                earnings_payload,
+                bundle_chain,
+                list(adapter_errors),
             )
 
-        # institution: tw (Taiwan stocks) has a free official institutional investors (institutional net buy/sell)
-        # feed (TWSE T86 / TPEx OpenAPI); every other offshore market keeps not_supported.
-        # tw-only + strictly additive + fail-open: any error or no-data -> not_supported,
-        # which never interrupts the main analysis. Raw net figures only — no derived
-        # signal / score / schema (per the v2 scope confirmed on issue #1777).
-        tw_record = None
-        if market == "tw":
-            fetcher = getattr(self, "_tw_institutional_fetcher", None)
-            if fetcher is None:
-                # Wiring (import + construct) is a one-time op; a failure here is a
-                # programming / deploy bug, so log it LOUD (error). Still fail-open
-                # (never interrupt the main analysis — a hard requirement of #1777).
-                try:
-                    from src.data_provider.tw_institutional_fetcher import TwInstitutionalFetcher
+            # capital_flow / dragon_tiger / boards: no offshore data feed today -> not_supported.
+            for block in ("capital_flow", "dragon_tiger", "boards"):
+                result_ctx[block] = self._build_fundamental_block(
+                    "not_supported",
+                    {},
+                    [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+                    ["not supported for offshore market"],
+                )
 
-                    fetcher = TwInstitutionalFetcher()
-                    self._tw_institutional_fetcher = fetcher
-                except Exception as exc:  # noqa: BLE001 - wiring failure: loud but fail-open
-                    log_safe_exception(
-                        logger,
-                        "Taiwan institutional data fetcher initialization failed",
-                        exc,
-                        error_code="tw_institutional_fetcher_initialization_failed",
-                        level=logging.ERROR,
-                        context={"symbol": stock_code},
-                    )
-                    fetcher = None
-            # fetch_timeout == 0 disables per-fetch fundamental fetches (same as valuation /
-            # bundle above, which gate on fetch_timeout); honour that for institution too so
-            # the FUNDAMENTAL_FETCH_TIMEOUT_SECONDS=0 config semantic is not bypassed.
-            if fetcher is not None and fetch_timeout > 0:
-                # The tw institution block is a WHOLE-MARKET download (~4-5s), far slower
-                # than the per-symbol quote/bundle fetches, and it is the LAST offshore
-                # block. When enabled, give it the full REMAINING stage budget rather than
-                # the ~3s per-fetch cap that starves it and makes the first/only stock of a
-                # run coin-flip between ok and not_supported. Bounded by the stage deadline
-                # via _run_with_retry, so it fails open (never blocks).
-                inst_timeout = max(stage_timeout - (time.time() - start_ts), 0.0)
-                if inst_timeout > 0:
-                    tw_record, inst_err, _inst_ms = self._run_with_retry(
-                        lambda: fetcher.get_institutional_net(stock_code),
-                        inst_timeout,
-                        "fundamental_tw_institution",
-                    )
-                    if inst_err:
-                        logger.warning(
-                            "Taiwan institutional data fetch failed or timed out symbol=%s",
-                            stock_code,
+            # institution: tw (Taiwan stocks) has a free official institutional investors (institutional net buy/sell)
+            # feed (TWSE T86 / TPEx OpenAPI); every other offshore market keeps not_supported.
+            # tw-only + strictly additive + fail-open: any error or no-data -> not_supported,
+            # which never interrupts the main analysis. Raw net figures only — no derived
+            # signal / score / schema (per the v2 scope confirmed on issue #1777).
+            tw_record = None
+            if market == "tw":
+                fetcher = getattr(self, "_tw_institutional_fetcher", None)
+                if fetcher is None:
+                    # Wiring (import + construct) is a one-time op; a failure here is a
+                    # programming / deploy bug, so log it LOUD (error). Still fail-open
+                    # (never interrupt the main analysis — a hard requirement of #1777).
+                    try:
+                        from src.data_provider.tw_institutional_fetcher import TwInstitutionalFetcher
+
+                        fetcher = TwInstitutionalFetcher()
+                        self._tw_institutional_fetcher = fetcher
+                    except Exception as exc:  # broad-exception: fallback_recorded - wiring failure is logged then fail-open
+                        log_safe_exception(
+                            logger,
+                            "Taiwan institutional data fetcher initialization failed",
+                            exc,
+                            error_code="tw_institutional_fetcher_initialization_failed",
+                            level=logging.ERROR,
+                            context={"symbol": stock_code},
                         )
-                else:
-                    tw_record = None
-        # status 'ok' only when the record carries all core net figures (a genuine 0 is
-        # kept — 0 is not None); None / missing core field / fetch failure -> not_supported.
-        _tw_core = ("foreign_net", "trust_net", "dealer_net", "total_net")
-        if tw_record is not None and all(tw_record.get(key) is not None for key in _tw_core):
-            institution_status = "ok"
-            result_ctx["institution"] = self._build_fundamental_block(
-                "ok",
-                {
-                    "foreign_net": tw_record.get("foreign_net"),
-                    "trust_net": tw_record.get("trust_net"),
-                    "dealer_net": tw_record.get("dealer_net"),
-                    "total_net": tw_record.get("total_net"),
-                    "unit": tw_record.get("unit"),
-                    "date": tw_record.get("date"),
-                    "source": tw_record.get("source"),
-                },
-                [{"provider": tw_record.get("source", "tw-institutional"), "result": "ok", "duration_ms": 0}],
-                [],
-            )
-        else:
-            institution_status = "not_supported"
-            result_ctx["institution"] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported for offshore market"],
-            )
+                        fetcher = None
+                # fetch_timeout == 0 disables per-fetch fundamental fetches (same as valuation /
+                # bundle above, which gate on fetch_timeout); honour that for institution too so
+                # the FUNDAMENTAL_FETCH_TIMEOUT_SECONDS=0 config semantic is not bypassed.
+                if fetcher is not None and fetch_timeout > 0:
+                    # The tw institution block is a WHOLE-MARKET download (~4-5s), far slower
+                    # than the per-symbol quote/bundle fetches, and it is the LAST offshore
+                    # block. When enabled, give it the full REMAINING stage budget rather than
+                    # the ~3s per-fetch cap that starves it and makes the first/only stock of a
+                    # run coin-flip between ok and not_supported. Bounded by the stage deadline
+                    # via _run_with_retry, so it fails open (never blocks).
+                    inst_timeout = max(stage_timeout - (time.time() - start_ts), 0.0)
+                    if inst_timeout > 0:
+                        tw_record, inst_err, _inst_ms = self._run_with_retry(
+                            lambda: fetcher.get_institutional_net(stock_code),
+                            inst_timeout,
+                            "fundamental_tw_institution",
+                        )
+                        if inst_err:
+                            logger.warning(
+                                "Taiwan institutional data fetch failed or timed out symbol=%s",
+                                stock_code,
+                            )
+                    else:
+                        tw_record = None
+            # status 'ok' only when the record carries all core net figures (a genuine 0 is
+            # kept — 0 is not None); None / missing core field / fetch failure -> not_supported.
+            _tw_core = ("foreign_net", "trust_net", "dealer_net", "total_net")
+            if tw_record is not None and all(tw_record.get(key) is not None for key in _tw_core):
+                institution_status = "ok"
+                result_ctx["institution"] = self._build_fundamental_block(
+                    "ok",
+                    {
+                        "foreign_net": tw_record.get("foreign_net"),
+                        "trust_net": tw_record.get("trust_net"),
+                        "dealer_net": tw_record.get("dealer_net"),
+                        "total_net": tw_record.get("total_net"),
+                        "unit": tw_record.get("unit"),
+                        "date": tw_record.get("date"),
+                        "source": tw_record.get("source"),
+                    },
+                    [{"provider": tw_record.get("source", "tw-institutional"), "result": "ok", "duration_ms": 0}],
+                    [],
+                )
+            else:
+                institution_status = "not_supported"
+                result_ctx["institution"] = self._build_fundamental_block(
+                    "not_supported",
+                    {},
+                    [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+                    ["not supported for offshore market"],
+                )
 
-        result_ctx["belong_boards"] = belong_boards
+            result_ctx["belong_boards"] = belong_boards
 
-        block_statuses = {
-            "valuation": result_ctx["valuation"].get("status", "not_supported"),
-            "growth": growth_status,
-            "earnings": earnings_status,
-            "institution": institution_status,
-            "capital_flow": "not_supported",
-            "dragon_tiger": "not_supported",
-            "boards": "not_supported",
-        }
-        result_ctx["coverage"] = block_statuses
-        for block in ("valuation", "growth", "earnings", "institution", "capital_flow", "dragon_tiger", "boards"):
-            result_ctx["errors"].extend(result_ctx[block].get("errors", []))
-            result_ctx["source_chain"].extend(result_ctx[block].get("source_chain", []))
+            block_statuses = {
+                "valuation": result_ctx["valuation"].get("status", "not_supported"),
+                "growth": growth_status,
+                "earnings": earnings_status,
+                "institution": institution_status,
+                "capital_flow": "not_supported",
+                "dragon_tiger": "not_supported",
+                "boards": "not_supported",
+            }
+            result_ctx["coverage"] = block_statuses
+            for block in ("valuation", "growth", "earnings", "institution", "capital_flow", "dragon_tiger", "boards"):
+                result_ctx["errors"].extend(result_ctx[block].get("errors", []))
+                result_ctx["source_chain"].extend(result_ctx[block].get("source_chain", []))
 
-        active_statuses = {"valuation": valuation_status, "growth": growth_status, "earnings": earnings_status}
-        # tw institution (when present) counts toward the OVERALL status so a report that
-        # only has institutional investors data still surfaces fundamentals (consumers key off the top-level
-        # status). missing_fields stays the original three blocks, so offshore markets
-        # without institution data are byte-identical (institution is not_supported there).
-        status_values = list(active_statuses.values())
-        if institution_status == "ok":
-            status_values.append("ok")
-        if all(value == "not_supported" for value in status_values):
-            result_ctx["status"] = "not_supported"
-            result_ctx["data_quality"] = "unavailable"
-        elif "failed" in status_values or "partial" in status_values:
-            result_ctx["status"] = "partial"
-            result_ctx["data_quality"] = "partial"
-        else:
-            result_ctx["status"] = "ok"
-            result_ctx["data_quality"] = "ok"
-        result_ctx["missing_fields"] = [
-            block for block, status in active_statuses.items() if status != "ok"
-        ]
+            active_statuses = {"valuation": valuation_status, "growth": growth_status, "earnings": earnings_status}
+            # tw institution (when present) counts toward the OVERALL status so a report that
+            # only has institutional investors data still surfaces fundamentals (consumers key off the top-level
+            # status). missing_fields stays the original three blocks, so offshore markets
+            # without institution data are byte-identical (institution is not_supported there).
+            status_values = list(active_statuses.values())
+            if institution_status == "ok":
+                status_values.append("ok")
+            if all(value == "not_supported" for value in status_values):
+                result_ctx["status"] = "not_supported"
+                result_ctx["data_quality"] = "unavailable"
+            elif "failed" in status_values or "partial" in status_values:
+                result_ctx["status"] = "partial"
+                result_ctx["data_quality"] = "partial"
+            else:
+                result_ctx["status"] = "ok"
+                result_ctx["data_quality"] = "ok"
+            result_ctx["missing_fields"] = [
+                block for block, status in active_statuses.items() if status != "ok"
+            ]
 
-        result_ctx["elapsed_ms"] = int((time.time() - start_ts) * 1000)
-        if cache_ttl > 0 and self._should_cache_fundamental_context(result_ctx):
-            with self._fundamental_cache_lock:
-                self._fundamental_cache[cache_key] = {
-                    "ts": time.time(),
-                    "context": result_ctx,
-                }
-            self._prune_fundamental_cache(cache_ttl, cache_max_entries)
-        return result_ctx
+            result_ctx["elapsed_ms"] = int((time.time() - start_ts) * 1000)
+            return result_ctx
+
+        return self._get_or_load_fundamental_context(
+            stock_code,
+            stage_timeout,
+            _load,
+            market=market,
+            config=config,
+        )
 
     def build_failed_fundamental_context(self, stock_code: str, reason: str) -> Dict[str, Any]:
         """Build a consistent failed-context payload for caller-side fallback."""
@@ -3550,9 +3505,7 @@ class DataFetcherManager:
         """
         Aggregate fundamental blocks with fail-open semantics.
         """
-        from src.config import get_config
-
-        config = get_config()
+        config = self._get_fundamental_config()
         if not config.enable_fundamental_pipeline:
             return self._build_market_not_supported(
                 market=_market_tag(stock_code),
@@ -3581,275 +3534,265 @@ class DataFetcherManager:
         fetch_timeout = float(config.fundamental_fetch_timeout_seconds)
         fetch_timeout = max(0.0, fetch_timeout)
 
-        cache_ttl = int(config.fundamental_cache_ttl_seconds)
-        cache_max_entries = max(0, int(getattr(config, "fundamental_cache_max_entries", 256)))
-        cache_key = self._get_fundamental_cache_key(stock_code, stage_timeout)
-        if cache_ttl > 0:
-            self._prune_fundamental_cache(cache_ttl, cache_max_entries)
-            with self._fundamental_cache_lock:
-                cache_item = self._fundamental_cache.get(cache_key)
-                if cache_item:
-                    age = time.time() - float(cache_item.get("ts", 0))
-                    if age <= cache_ttl:
-                        return cache_item.get("context", {})
+        def _load() -> Dict[str, Any]:
+            remaining_seconds = stage_timeout
+            result_ctx: Dict[str, Any] = {
+                "market": market,
+                "valuation": {},
+                "growth": {},
+                "earnings": {},
+                "institution": {},
+                "capital_flow": {},
+                "dragon_tiger": {},
+                "boards": {},
+                "coverage": {},
+                "source_chain": [],
+                "errors": [],
+            }
 
-        remaining_seconds = stage_timeout
-        result_ctx: Dict[str, Any] = {
-            "market": market,
-            "valuation": {},
-            "growth": {},
-            "earnings": {},
-            "institution": {},
-            "capital_flow": {},
-            "dragon_tiger": {},
-            "boards": {},
-            "coverage": {},
-            "source_chain": [],
-            "errors": [],
-        }
+            start_ts = time.time()
 
-        start_ts = time.time()
+            def _consume_budget(consumed_ms: int) -> None:
+                nonlocal remaining_seconds
+                remaining_seconds = max(0.0, remaining_seconds - consumed_ms / 1000.0)
 
-        def _consume_budget(consumed_ms: int) -> None:
-            nonlocal remaining_seconds
-            remaining_seconds = max(0.0, remaining_seconds - consumed_ms / 1000.0)
+            valuation_timeout = min(fetch_timeout, remaining_seconds)
+            if valuation_timeout > 0:
+                quote_payload, valuation_err, valuation_ms = self._run_with_retry(
+                    lambda: self.get_realtime_quote(stock_code),
+                    valuation_timeout,
+                    "fundamental_valuation",
+                )
+                _consume_budget(valuation_ms)
+            else:
+                quote_payload, valuation_err, valuation_ms = None, "fundamental stage timeout", 0
 
-        valuation_timeout = min(fetch_timeout, remaining_seconds)
-        if valuation_timeout > 0:
-            quote_payload, valuation_err, valuation_ms = self._run_with_retry(
-                lambda: self.get_realtime_quote(stock_code),
-                valuation_timeout,
-                "fundamental_valuation",
+            valuation_payload = {
+                "pe_ratio": getattr(quote_payload, "pe_ratio", None) if quote_payload else None,
+                "pb_ratio": getattr(quote_payload, "pb_ratio", None) if quote_payload else None,
+                "total_mv": getattr(quote_payload, "total_mv", None) if quote_payload else None,
+                "circ_mv": getattr(quote_payload, "circ_mv", None) if quote_payload else None,
+            }
+            valuation_status = self._infer_block_status(
+                valuation_payload,
+                "partial" if quote_payload is not None else "not_supported",
             )
-            _consume_budget(valuation_ms)
-        else:
-            quote_payload, valuation_err, valuation_ms = None, "fundamental stage timeout", 0
-
-        valuation_payload = {
-            "pe_ratio": getattr(quote_payload, "pe_ratio", None) if quote_payload else None,
-            "pb_ratio": getattr(quote_payload, "pb_ratio", None) if quote_payload else None,
-            "total_mv": getattr(quote_payload, "total_mv", None) if quote_payload else None,
-            "circ_mv": getattr(quote_payload, "circ_mv", None) if quote_payload else None,
-        }
-        valuation_status = self._infer_block_status(
-            valuation_payload,
-            "partial" if quote_payload is not None else "not_supported",
-        )
-        if valuation_status == "partial" and valuation_err and not self._has_meaningful_payload(valuation_payload):
-            valuation_status = "failed"
-        result_ctx["valuation"] = self._build_fundamental_block(
-            valuation_status,
-            valuation_payload,
-            self._normalize_source_chain(
-                [{"provider": "realtime_quote", "result": valuation_status, "duration_ms": valuation_ms}],
-                "realtime_quote",
+            if valuation_status == "partial" and valuation_err and not self._has_meaningful_payload(valuation_payload):
+                valuation_status = "failed"
+            result_ctx["valuation"] = self._build_fundamental_block(
                 valuation_status,
-                valuation_ms,
-            ),
-            [valuation_err] if valuation_err else [],
-        )
-
-        # growth / earnings / institution (one AkShare call)
-        if remaining_seconds <= 0:
-            bundle_status = "failed"
-            bundle_payload: Dict[str, Any] = {}
-            bundle_errors = ["fundamental stage timeout"]
-            bundle_ms = 0
-        else:
-            bundle_timeout = min(fetch_timeout, remaining_seconds)
-            bundle_payload, bundle_err_msg, bundle_ms = self._run_with_retry(
-                lambda: self._fundamental_adapter.get_fundamental_bundle(stock_code),
-                bundle_timeout,
-                "fundamental_bundle",
+                valuation_payload,
+                self._normalize_source_chain(
+                    [{"provider": "realtime_quote", "result": valuation_status, "duration_ms": valuation_ms}],
+                    "realtime_quote",
+                    valuation_status,
+                    valuation_ms,
+                ),
+                [valuation_err] if valuation_err else [],
             )
-            _consume_budget(bundle_ms)
-            if not isinstance(bundle_payload, dict):
+
+            # growth / earnings / institution (one AkShare call)
+            if remaining_seconds <= 0:
                 bundle_status = "failed"
-                bundle_payload = {}
-                bundle_errors = ["fundamental_bundle failed"]
-                if bundle_err_msg:
-                    bundle_errors.append(bundle_err_msg)
+                bundle_payload: Dict[str, Any] = {}
+                bundle_errors = ["fundamental stage timeout"]
+                bundle_ms = 0
             else:
-                bundle_status = str(bundle_payload.get("status", "not_supported"))
-                bundle_errors = [bundle_err_msg] if bundle_err_msg else []
-
-        bundle_chain = self._normalize_source_chain(
-            bundle_payload.get("source_chain", []),
-            "fundamental_bundle",
-            bundle_status,
-            bundle_ms,
-        ) if isinstance(bundle_payload, dict) else self._normalize_source_chain(
-            None,
-            "fundamental_bundle",
-            bundle_status,
-            bundle_ms,
-        )
-        growth_payload = bundle_payload.get("growth", {}) if isinstance(bundle_payload, dict) else {}
-        earnings_payload = bundle_payload.get("earnings", {}) if isinstance(bundle_payload, dict) else {}
-        institution_payload = bundle_payload.get("institution", {}) if isinstance(bundle_payload, dict) else {}
-        if not isinstance(growth_payload, dict):
-            growth_payload = {}
-        else:
-            growth_payload = dict(growth_payload)
-        if not isinstance(earnings_payload, dict):
-            earnings_payload = {}
-        else:
-            earnings_payload = dict(earnings_payload)
-        if not isinstance(institution_payload, dict):
-            institution_payload = {}
-        else:
-            institution_payload = dict(institution_payload)
-
-        # Derive TTM dividend yield from already-fetched quote price; avoid extra quote calls.
-        earnings_extra_errors: List[str] = []
-        dividend_payload = earnings_payload.get("dividend")
-        if isinstance(dividend_payload, dict):
-            dividend_payload = dict(dividend_payload)
-            ttm_cash_raw = dividend_payload.get("ttm_cash_dividend_per_share")
-            ttm_cash = None
-            if ttm_cash_raw is not None:
-                try:
-                    ttm_cash = float(ttm_cash_raw)
-                except (TypeError, ValueError):
-                    earnings_extra_errors.append("invalid_ttm_cash_dividend_per_share")
-            if isinstance(quote_payload, dict):
-                latest_price_raw = quote_payload.get("price")
-            else:
-                latest_price_raw = getattr(quote_payload, "price", None) if quote_payload else None
-            latest_price = None
-            if latest_price_raw is not None:
-                try:
-                    latest_price = float(latest_price_raw)
-                except (TypeError, ValueError):
-                    latest_price = None
-            ttm_yield = None
-            if ttm_cash is not None:
-                if latest_price is not None and latest_price > 0:
-                    ttm_yield = round(ttm_cash / latest_price * 100.0, 4)
+                bundle_timeout = min(fetch_timeout, remaining_seconds)
+                bundle_payload, bundle_err_msg, bundle_ms = self._run_with_retry(
+                    lambda: self._fundamental_adapter.get_fundamental_bundle(stock_code),
+                    bundle_timeout,
+                    "fundamental_bundle",
+                )
+                _consume_budget(bundle_ms)
+                if not isinstance(bundle_payload, dict):
+                    bundle_status = "failed"
+                    bundle_payload = {}
+                    bundle_errors = ["fundamental_bundle failed"]
+                    if bundle_err_msg:
+                        bundle_errors.append(bundle_err_msg)
                 else:
-                    earnings_extra_errors.append("invalid_price_for_ttm_dividend_yield")
+                    bundle_status = str(bundle_payload.get("status", "not_supported"))
+                    bundle_errors = [bundle_err_msg] if bundle_err_msg else []
 
-            dividend_payload["ttm_dividend_yield_pct"] = ttm_yield
-            if ttm_yield is not None:
-                dividend_payload["yield_formula"] = "ttm_cash_dividend_per_share / latest_price * 100"
-            earnings_payload["dividend"] = dividend_payload
+            bundle_chain = self._normalize_source_chain(
+                bundle_payload.get("source_chain", []),
+                "fundamental_bundle",
+                bundle_status,
+                bundle_ms,
+            ) if isinstance(bundle_payload, dict) else self._normalize_source_chain(
+                None,
+                "fundamental_bundle",
+                bundle_status,
+                bundle_ms,
+            )
+            growth_payload = bundle_payload.get("growth", {}) if isinstance(bundle_payload, dict) else {}
+            earnings_payload = bundle_payload.get("earnings", {}) if isinstance(bundle_payload, dict) else {}
+            institution_payload = bundle_payload.get("institution", {}) if isinstance(bundle_payload, dict) else {}
+            if not isinstance(growth_payload, dict):
+                growth_payload = {}
+            else:
+                growth_payload = dict(growth_payload)
+            if not isinstance(earnings_payload, dict):
+                earnings_payload = {}
+            else:
+                earnings_payload = dict(earnings_payload)
+            if not isinstance(institution_payload, dict):
+                institution_payload = {}
+            else:
+                institution_payload = dict(institution_payload)
 
-        adapter_errors = list(bundle_payload.get("errors", [])) if isinstance(bundle_payload, dict) else []
-        adapter_errors.extend(bundle_errors)
-        growth_errors = list(adapter_errors)
-        earnings_errors = list(adapter_errors)
-        earnings_errors.extend(earnings_extra_errors)
-        institution_errors = list(adapter_errors)
+            # Derive TTM dividend yield from already-fetched quote price; avoid extra quote calls.
+            earnings_extra_errors: List[str] = []
+            dividend_payload = earnings_payload.get("dividend")
+            if isinstance(dividend_payload, dict):
+                dividend_payload = dict(dividend_payload)
+                ttm_cash_raw = dividend_payload.get("ttm_cash_dividend_per_share")
+                ttm_cash = None
+                if ttm_cash_raw is not None:
+                    try:
+                        ttm_cash = float(ttm_cash_raw)
+                    except (TypeError, ValueError):
+                        earnings_extra_errors.append("invalid_ttm_cash_dividend_per_share")
+                if isinstance(quote_payload, dict):
+                    latest_price_raw = quote_payload.get("price")
+                else:
+                    latest_price_raw = getattr(quote_payload, "price", None) if quote_payload else None
+                latest_price = None
+                if latest_price_raw is not None:
+                    try:
+                        latest_price = float(latest_price_raw)
+                    except (TypeError, ValueError):
+                        latest_price = None
+                ttm_yield = None
+                if ttm_cash is not None:
+                    if latest_price is not None and latest_price > 0:
+                        ttm_yield = round(ttm_cash / latest_price * 100.0, 4)
+                    else:
+                        earnings_extra_errors.append("invalid_price_for_ttm_dividend_yield")
 
-        growth_status = self._infer_block_status(growth_payload, bundle_status)
-        earnings_status = self._infer_block_status(earnings_payload, bundle_status)
-        institution_status = self._infer_block_status(institution_payload, bundle_status)
+                dividend_payload["ttm_dividend_yield_pct"] = ttm_yield
+                if ttm_yield is not None:
+                    dividend_payload["yield_formula"] = "ttm_cash_dividend_per_share / latest_price * 100"
+                earnings_payload["dividend"] = dividend_payload
 
-        result_ctx["growth"] = self._build_fundamental_block(
-            growth_status,
-            growth_payload,
-            bundle_chain,
-            growth_errors,
+            adapter_errors = list(bundle_payload.get("errors", [])) if isinstance(bundle_payload, dict) else []
+            adapter_errors.extend(bundle_errors)
+            growth_errors = list(adapter_errors)
+            earnings_errors = list(adapter_errors)
+            earnings_errors.extend(earnings_extra_errors)
+            institution_errors = list(adapter_errors)
+
+            growth_status = self._infer_block_status(growth_payload, bundle_status)
+            earnings_status = self._infer_block_status(earnings_payload, bundle_status)
+            institution_status = self._infer_block_status(institution_payload, bundle_status)
+
+            result_ctx["growth"] = self._build_fundamental_block(
+                growth_status,
+                growth_payload,
+                bundle_chain,
+                growth_errors,
+            )
+            result_ctx["earnings"] = self._build_fundamental_block(
+                earnings_status,
+                earnings_payload,
+                bundle_chain,
+                earnings_errors,
+            )
+            result_ctx["institution"] = self._build_fundamental_block(
+                institution_status,
+                institution_payload,
+                bundle_chain,
+                institution_errors,
+            )
+
+            # capital flow
+            if is_etf:
+                result_ctx["capital_flow"] = self._build_fundamental_block(
+                    "not_supported",
+                    {},
+                    [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+                    ["etf not fully supported"],
+                )
+                result_ctx["dragon_tiger"] = self._build_fundamental_block(
+                    "not_supported",
+                    {},
+                    [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+                    ["etf not fully supported"],
+                )
+                result_ctx["boards"] = self._build_fundamental_block(
+                    "not_supported",
+                    {},
+                    [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+                    ["etf not fully supported"],
+                )
+                result_ctx["status"] = "partial"
+            else:
+                capital_flow_budget = min(fetch_timeout, remaining_seconds)
+                capital_flow_start = time.time()
+                result_ctx["capital_flow"] = self.get_capital_flow_context(
+                    stock_code,
+                    budget_seconds=capital_flow_budget,
+                )
+                _consume_budget(int((time.time() - capital_flow_start) * 1000))
+
+                dragon_tiger_budget = min(fetch_timeout, remaining_seconds)
+                dragon_tiger_start = time.time()
+                result_ctx["dragon_tiger"] = self.get_dragon_tiger_context(
+                    stock_code,
+                    budget_seconds=dragon_tiger_budget,
+                )
+                _consume_budget(int((time.time() - dragon_tiger_start) * 1000))
+
+                result_ctx["boards"] = self.get_board_context(
+                    stock_code,
+                    budget_seconds=min(fetch_timeout, remaining_seconds),
+                )
+
+            block_statuses = {
+                "valuation": result_ctx["valuation"].get("status", "not_supported"),
+                "growth": result_ctx["growth"].get("status", "not_supported"),
+                "earnings": result_ctx["earnings"].get("status", "not_supported"),
+                "institution": result_ctx["institution"].get("status", "not_supported"),
+                "capital_flow": result_ctx["capital_flow"].get("status", "not_supported"),
+                "dragon_tiger": result_ctx["dragon_tiger"].get("status", "not_supported"),
+                "boards": result_ctx["boards"].get("status", "not_supported"),
+            }
+            result_ctx["coverage"] = block_statuses
+            for block in (
+                "valuation",
+                "growth",
+                "earnings",
+                "institution",
+                "capital_flow",
+                "dragon_tiger",
+                "boards",
+            ):
+                result_ctx["errors"].extend(result_ctx[block].get("errors", []))
+                result_ctx["source_chain"].extend(result_ctx[block].get("source_chain", []))
+
+            if is_etf:
+                # Keep ETF downgrade semantics for overall status even when valuation is available.
+                result_ctx["status"] = (
+                    "not_supported" if all(value == "not_supported" for value in block_statuses.values()) else "partial"
+                )
+            elif all(value == "not_supported" for value in block_statuses.values()):
+                result_ctx["status"] = "not_supported"
+            elif "failed" in block_statuses.values() or "partial" in block_statuses.values():
+                result_ctx["status"] = "partial"
+            else:
+                result_ctx["status"] = "ok"
+
+            result_ctx["elapsed_ms"] = int((time.time() - start_ts) * 1000)
+            return result_ctx
+
+        return self._get_or_load_fundamental_context(
+            stock_code,
+            stage_timeout,
+            _load,
+            market=market,
+            config=config,
         )
-        result_ctx["earnings"] = self._build_fundamental_block(
-            earnings_status,
-            earnings_payload,
-            bundle_chain,
-            earnings_errors,
-        )
-        result_ctx["institution"] = self._build_fundamental_block(
-            institution_status,
-            institution_payload,
-            bundle_chain,
-            institution_errors,
-        )
-
-        # capital flow
-        if is_etf:
-            result_ctx["capital_flow"] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["etf not fully supported"],
-            )
-            result_ctx["dragon_tiger"] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["etf not fully supported"],
-            )
-            result_ctx["boards"] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["etf not fully supported"],
-            )
-            result_ctx["status"] = "partial"
-        else:
-            capital_flow_budget = min(fetch_timeout, remaining_seconds)
-            capital_flow_start = time.time()
-            result_ctx["capital_flow"] = self.get_capital_flow_context(
-                stock_code,
-                budget_seconds=capital_flow_budget,
-            )
-            _consume_budget(int((time.time() - capital_flow_start) * 1000))
-
-            dragon_tiger_budget = min(fetch_timeout, remaining_seconds)
-            dragon_tiger_start = time.time()
-            result_ctx["dragon_tiger"] = self.get_dragon_tiger_context(
-                stock_code,
-                budget_seconds=dragon_tiger_budget,
-            )
-            _consume_budget(int((time.time() - dragon_tiger_start) * 1000))
-
-            result_ctx["boards"] = self.get_board_context(
-                stock_code,
-                budget_seconds=min(fetch_timeout, remaining_seconds),
-            )
-
-        block_statuses = {
-            "valuation": result_ctx["valuation"].get("status", "not_supported"),
-            "growth": result_ctx["growth"].get("status", "not_supported"),
-            "earnings": result_ctx["earnings"].get("status", "not_supported"),
-            "institution": result_ctx["institution"].get("status", "not_supported"),
-            "capital_flow": result_ctx["capital_flow"].get("status", "not_supported"),
-            "dragon_tiger": result_ctx["dragon_tiger"].get("status", "not_supported"),
-            "boards": result_ctx["boards"].get("status", "not_supported"),
-        }
-        result_ctx["coverage"] = block_statuses
-        for block in (
-            "valuation",
-            "growth",
-            "earnings",
-            "institution",
-            "capital_flow",
-            "dragon_tiger",
-            "boards",
-        ):
-            result_ctx["errors"].extend(result_ctx[block].get("errors", []))
-            result_ctx["source_chain"].extend(result_ctx[block].get("source_chain", []))
-
-        if is_etf:
-            # Keep ETF downgrade semantics for overall status even when valuation is available.
-            result_ctx["status"] = (
-                "not_supported" if all(value == "not_supported" for value in block_statuses.values()) else "partial"
-            )
-        elif all(value == "not_supported" for value in block_statuses.values()):
-            result_ctx["status"] = "not_supported"
-        elif "failed" in block_statuses.values() or "partial" in block_statuses.values():
-            result_ctx["status"] = "partial"
-        else:
-            result_ctx["status"] = "ok"
-
-        result_ctx["elapsed_ms"] = int((time.time() - start_ts) * 1000)
-        if cache_ttl > 0 and self._should_cache_fundamental_context(result_ctx):
-            with self._fundamental_cache_lock:
-                self._fundamental_cache[cache_key] = {
-                    "ts": time.time(),
-                    "context": result_ctx,
-                }
-            self._prune_fundamental_cache(cache_ttl, cache_max_entries)
-        return result_ctx
 
     def get_capital_flow_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
         """资金流向块（fail-open）。"""
@@ -4229,14 +4172,16 @@ class DataFetcherManager:
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006
 # compatibility facade while focused parts own inventory/selection, daily
 # health/circuit, daily-cache orchestration, realtime field-trust
-# bookkeeping, money-flow cache lookup/store, and belong-board
-# normalization. Rebinding preserves method globals so existing patches
-# against this module continue to intercept moved implementations.
+# bookkeeping, money-flow cache lookup/store, fundamental cache
+# lookup/inflight, and belong-board normalization. Rebinding preserves
+# method globals so existing patches against this module continue to
+# intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
 from .manager_parts import (  # noqa: E402
     belong_board_methods as _belong_board_methods_module,
+    fundamental_cache_methods as _fundamental_cache_methods_module,
     money_flow_cache_methods as _money_flow_cache_methods_module,
     realtime_field_trust_methods as _realtime_field_trust_methods_module,
 )
@@ -4347,6 +4292,20 @@ def _assemble_money_flow_cache_methods_facade(
         )
 
 
+def _assemble_fundamental_cache_methods_facade(
+    cache_module=_fundamental_cache_methods_module,
+) -> None:
+    bound_method_names = cache_module.bind_fundamental_cache_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != cache_module.EXPECTED_FUNDAMENTAL_CACHE_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager fundamental cache methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_belong_board_methods_facade(
     board_module=_belong_board_methods_module,
 ) -> None:
@@ -4367,6 +4326,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_daily_cache=_assemble_daily_cache_methods_facade,
     assemble_realtime=_assemble_realtime_field_trust_methods_facade,
     assemble_money_flow=_assemble_money_flow_cache_methods_facade,
+    assemble_fundamental=_assemble_fundamental_cache_methods_facade,
     assemble_belong_board=_assemble_belong_board_methods_facade,
 ) -> None:
     # Default args capture the assembler callables so reload hooks keep working
@@ -4376,6 +4336,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_daily_cache()
     assemble_realtime()
     assemble_money_flow()
+    assemble_fundamental()
     assemble_belong_board()
 
 
@@ -4395,6 +4356,9 @@ _realtime_field_trust_methods_module._install_facade_reload_hook(
 _money_flow_cache_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_fundamental_cache_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _belong_board_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -4406,6 +4370,7 @@ del (
     _assemble_daily_cache_methods_facade,
     _assemble_realtime_field_trust_methods_facade,
     _assemble_money_flow_cache_methods_facade,
+    _assemble_fundamental_cache_methods_facade,
     _assemble_belong_board_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
@@ -4413,5 +4378,6 @@ del (
     _daily_cache_methods_module,
     _realtime_field_trust_methods_module,
     _money_flow_cache_methods_module,
+    _fundamental_cache_methods_module,
     _belong_board_methods_module,
 )

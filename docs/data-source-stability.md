@@ -323,6 +323,14 @@ capability`（wait timeout 属于单个 caller，不是 key 的一部分）。�
 fetcher 自己的限流。它不替代日线 L1/L2、AkShare/TickFlow/Longbridge 快照缓存，也不改变
 `REALTIME_CACHE_TTL`（该值仍是陈旧度标注，不是这次进程 TTL）。没有新增环境变量。
 
+`DataFetcherManager` 的基本面聚合缓存仍是**实例级**短 TTL（默认 120 秒，
+`FUNDAMENTAL_CACHE_TTL_SECONDS`），key 现为 `规范化代码 + market + budget 分桶 + as_of`。
+同一 key 的并发 `get_fundamental_context` / offshore 聚合会合并成一次 in-flight 加载；
+CN 与 offshore 走同一套 lookup / inflight / store。只写入
+`_should_cache_fundamental_context` 为真的结果；`status=failed`、异常和 TTL=0 不会当
+成功缓存。缓存命中与 waiter 返回 deepcopy，避免调用方改到内部条目。它不是 5 秒实时/筹码
+进程内 helper，也不会绕过 fail-open、重试或 adapter 行为。没有新增环境变量。
+
 运维或测试代码可以显式查询和失效：
 
 ```python

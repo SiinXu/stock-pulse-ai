@@ -8,7 +8,7 @@
 
 ## Data flow
 
-1. `get_fundamental_context(code)` (manager cache / timeout / retry unchanged)
+1. `get_fundamental_context(code)` (manager cache keys as_of + budget and coalesces in-flight; timeout / retry unchanged)
 2. A-share bundle: `stock_financial_abstract` (plus indicator candidates) → multi-period parse
 3. If abstract lacks multi-period history, OCF, or balance-sheet fields, best-effort:
    - Income: `stock_profit_sheet_by_report_em` (`SH600519` form)

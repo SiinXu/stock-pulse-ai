@@ -133,6 +133,8 @@ Set an individual TTL or stale window to `0` to disable that behavior, or set `P
 
 Realtime quote and chip-distribution provider attempts through `DataFetcherManager` also share a **process-local** short-TTL (5s) in-flight coalesce helper keyed by `provider + normalized symbol + as_of + capability` (wait timeout is per-caller and is not part of the key). Concurrent same-key pulls share one underlying provider call. The helper stores only successful results; failures, empty results, placeholder chip payloads, timeouts, and waiter cancellation never cache as success and do not skip fallback, circuit admission, validation, or per-fetcher rate limits. It does not replace daily L1/L2 cache, AkShare/TickFlow/Longbridge snapshot caches, or `REALTIME_CACHE_TTL` (that value remains a staleness annotation, not this process TTL). There is no new environment key.
 
+The manager fundamental aggregation cache remains **instance-local** with the existing 120s TTL (`FUNDAMENTAL_CACHE_TTL_SECONDS`). The key now includes `normalized symbol + market + budget bucket + as_of`. Concurrent same-key `get_fundamental_context` / offshore loads share one in-flight aggregation; CN and offshore use the same lookup / inflight / store helper. Entries are stored only when `_should_cache_fundamental_context` is true; `status=failed`, exceptions, and TTL=0 never cache as success. Cache hits and waiters receive a deepcopy. This is not the 5s realtime/chip process helper and does not skip fail-open, retry, or adapter behavior. There is no new environment key.
+
 ## Data Provider Plugins
 
 `DataProvider` and `DataProviderRegistration` are now the stable plugin
