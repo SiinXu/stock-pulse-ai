@@ -457,7 +457,10 @@ class _PersistenceStageMixin:
                 drop_presentation_confidence,
                 maybe_extract_prediction_on_finalize,
             )
-            from src.services.prediction_persist import persist_verifiable_prediction_draft
+            from src.services.prediction_persist import (
+                canonical_run_id,
+                persist_verifiable_prediction_draft,
+            )
 
             structured_source = getattr(result, "prediction_source", None)
             source = dict(structured_source) if isinstance(structured_source, dict) else {}
@@ -469,17 +472,17 @@ class _PersistenceStageMixin:
             if source.pop(PRESENTATION_CONFIDENCE_FLAG, False):
                 source = drop_presentation_confidence(source)
 
+            run_token = canonical_run_id(query_id)
             extraction = maybe_extract_prediction_on_finalize(
                 source,
                 config=getattr(self, "config", None),
-                run_id=str(query_id or ""),
+                run_id=run_token or None,
                 source_decision_id=str(source_report_id),
                 mode=mode,
                 model_id=getattr(result, "model_used", None),
             )
             if extraction is None:
                 return
-            setattr(result, "prediction_extraction", extraction.to_dict())
             persist_verifiable_prediction_draft(
                 extraction,
                 repo=getattr(self, "agent_prediction_repo", None),
@@ -489,6 +492,7 @@ class _PersistenceStageMixin:
                     "stock_code": getattr(result, "code", None),
                 },
             )
+            setattr(result, "prediction_extraction", extraction.to_dict())
         except Exception as exc:  # broad-exception: fallback_recorded - Prediction extraction must never fail history persistence.
             log_safe_exception(
                 logger,

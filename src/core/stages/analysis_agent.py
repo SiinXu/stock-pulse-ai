@@ -144,13 +144,17 @@ class _AgentAnalysisStageMixin:
                     requested_skills,
                 )
 
-            # Build initial context to avoid redundant tool calls
+            # Build initial context to avoid redundant tool calls.
+            # query_id is the canonical prediction run_id so agent finalize and
+            # later history-save persist the same pending row per symbol.
             initial_context = {
                 "stock_code": code,
                 "stock_name": stock_name,
                 "report_type": report_type.value,
                 "report_language": report_language,
                 "fundamental_context": fundamental_context,
+                "query_id": query_id,
+                "run_id": query_id,
             }
             if isinstance(portfolio_context, dict):
                 initial_context["portfolio_context"] = dict(portfolio_context)

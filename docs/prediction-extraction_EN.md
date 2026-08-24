@@ -30,7 +30,7 @@ Turn **structured** decision / dashboard fields into a `PredictionRecord` draft 
 | `src/core/stages/persistence.py` | Post-history-save hook (best-effort, flag-gated) |
 | `src/agent/orchestrator_parts/dashboard.py` | Post-agent-finalize hook (best-effort, flag-gated) |
 | `tests/services/test_prediction_extractor.py` | Unit coverage including prose anti-examples |
-| `tests/services/test_prediction_persist.py` | Finalize persist, idempotency, and store-failure isolation |
+| `tests/services/test_prediction_persist.py` | Agent/pipeline persist, dual-hook one-row identity, attached id equals stored PK, no overwrite after resolve |
 
 ## What becomes a claim
 
@@ -60,7 +60,7 @@ Turn **structured** decision / dashboard fields into a `PredictionRecord` draft 
 | Agent mode | Direction requires explicit `action` or typed `prediction_claims`; `decision_type` alone is ignored (often orchestrator-synthesized) |
 | Analysis mode | Exact `decision_type` buy/hold/sell still accepted with structured confidence |
 | Mixed valid/invalid claims | The draft is `status=error` and is not scoreable; invalid declared claims are never silently dropped into a partial pending record |
-| Dual hooks | Agent finalize (`ctx.meta`) and history-save (`result.prediction_extraction`) may both attach drafts; A3 persists a stable `prediction_id` per run/symbol and relies on the store primary key |
+| Dual hooks | Agent finalize and history-save share one canonical `run_id` (pipeline `query_id` threaded into agent context, else chat `session_id`). One user-visible analysis stores one pending row per symbol. Persist stamps `prediction_id_for_run(run_id, symbol)` onto the attached draft so `prediction_extraction.record.prediction_id` equals the stored primary key. |
 
 ## Feature flag
 
@@ -73,7 +73,7 @@ Drafts are attached to:
 - `AnalysisResult.prediction_extraction` (pipeline history path)
 - `AgentContext.meta["prediction_extraction"]` (agent finalize path)
 
-Verifiable pending drafts are persisted through `AgentPredictionRepository.insert_pending`. Re-finalizing the same run/symbol reuses the existing row (primary-key conflict, no overwrite). Persistence failures are logged and never fail analysis.
+Verifiable pending drafts are persisted through `AgentPredictionRepository.insert_pending`. The durable `prediction_id` is length-prefixed (`pred-{len(run_id)}:{run_id}:{symbol}`, or a hash when that encoding exceeds 128 characters) so hyphenated run/symbol pairs cannot collide. Re-finalizing the same run/symbol reuses the existing row (primary-key conflict, no overwrite, including after resolve). Persistence failures are logged and never fail analysis. Callers attach `prediction_extraction` after persist so the in-memory draft carries the stored key.
 
 ## Rollout
 
