@@ -78,7 +78,25 @@ Also accepted in the CHECK constraint for forward compatibility with the A1 cont
 
 ### Fact versus opinion (#1124 DAG-1)
 
-`outcome_json` is the PredictionOutcome actuals payload. Resolve and `data_unavailable` writes call `lock_prediction_outcome_actuals()` so user-opinion keys (`feedback_value`, `note`, `user_feedback`, transport `source`, …) cannot enter that JSON. Decision-signal user feedback remains a sidecar table and uses `lock_opinion_payload()` so market-actuals keys cannot ride along. Mixed payloads are rejected, not stripped and stored as facts. Feedback `note`/`reason_code` and episode free-text (`user_feedback`, `extra` values, `remedy`) also reject Soul-boundary markers, oversize, and illegal C0 controls at the write boundary (`src/schemas/memory_write_guard.py`, #1124 DAG-2). Resolve and episode append stamp server-owned `provenance_source=system_resolve` on the row (not inside `outcome_json`). Client-supplied provenance keys are rejected (`src/schemas/memory_provenance.py`, #1124 DAG-3). This slice does not add #1105 product feedback APIs. Do not `UPDATE` historical `resolved` prediction rows or append-only episodes to backfill stamps.
+`outcome_json` is the PredictionOutcome actuals payload. Resolve and `data_unavailable` writes call `lock_prediction_outcome_actuals()` so user-opinion keys (`feedback_value`, `note`, `user_feedback`, transport `source`, …) cannot enter that JSON. Decision-signal user feedback remains a sidecar table and uses `lock_opinion_payload()` so market-actuals keys cannot ride along. Mixed payloads are rejected, not stripped and stored as facts. Feedback `note`/`reason_code` and episode free-text (`user_feedback`, `extra` values, `remedy`) also reject Soul-boundary markers, oversize, and illegal C0 controls at the write boundary (`src/schemas/memory_write_guard.py`, #1124 DAG-2). Resolve and episode append stamp server-owned `provenance_source=system_resolve` on the row (not inside `outcome_json`). Client-supplied provenance keys are rejected (`src/schemas/memory_provenance.py`, #1124 DAG-3). Do not `UPDATE` historical `resolved` prediction rows or append-only episodes to backfill stamps.
+
+### Optional user feedback (#1105)
+
+Opinion is a separate sidecar, not a rewrite of resolver actuals:
+
+| Surface | Key | Enum | HTTP |
+| --- | --- | --- | --- |
+| Analysis run | canonical `run_id` | `useful` / `partial` / `wrong` / `harmful` | `GET`/`PUT /api/v1/agent/runs/{run_id}/feedback` |
+| Prediction | stored `prediction_id` | `agree_hit` / `agree_miss` / `disagree_score` / `context_note` | `GET`/`PUT /api/v1/agent/predictions/{prediction_id}/feedback` |
+
+- Latest-row upsert in `agent_run_feedback` / `agent_prediction_feedback`. Optional bounded `note`. Transport `source` is `web`/`api`.
+- Auth matches other admin APIs: `ADMIN_AUTH_ENABLED=true` requires a valid admin session cookie and returns 401 otherwise.
+- Unknown `prediction_id` is 404. Unknown run identity is 404 unless a landed token exists on `agent_predictions.run_id` or pipeline `analysis_history.query_id` (`AnalysisRepository.get_by_query_id`). Episode-only `run_id` values are not parents.
+- Prediction PUT requires `status=resolved`; unresolved parents return 409 and do not persist. GET on an existing parent with no sidecar row returns 200 and `feedback_value=null`.
+- Identity keys are path-only. Request bodies may not include `run_id` / `prediction_id`.
+- Writes reuse `lock_opinion_payload`, `reject_memory_write_text`, and `apply_server_provenance` (`provenance_source=user_feedback`, optional `actor_id=local_admin`). Client provenance keys are rejected and not persisted.
+- Feedback never writes `agent_predictions.outcome_json`, never `UPDATE`s append-only `agent_episodes`, and never changes prediction `status` / `resolved_at`. Missing feedback does not keep a row `pending`. Episode merge is a later read-time join; the sidecar is the system of record.
+- This is not decision-signal `useful|not_useful` feedback, not #1096 curator buckets, and not a prediction query/diagnostics API. Web/Desktop UI is later.
 
 ## Concurrency
 

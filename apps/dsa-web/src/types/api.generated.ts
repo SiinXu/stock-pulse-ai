@@ -170,6 +170,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/predictions/{prediction_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询预测用户反馈
+         * @description 按 prediction_id 读取最新 sidecar 意见。没有反馈时返回 feedback_value=null；未知 prediction 返回 404。
+         */
+        get: operations["getAgentPredictionFeedback"];
+        /**
+         * 写入预测用户反馈
+         * @description 按已落地 prediction_id upsert 最新 agree_hit|agree_miss|disagree_score|context_note 反馈。仅 resolved 预测可写入，未 resolved 返回 409。混入行情 actuals、Soul 边界标记、超限备注或客户端 provenance 的载荷会被拒绝且不落库。
+         */
+        put: operations["putAgentPredictionFeedback"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/research": {
         parameters: {
             query?: never;
@@ -186,6 +210,30 @@ export interface paths {
          *     Similar to the ``/research`` bot command but exposed as a REST endpoint.
          */
         post: operations["agent_research_api_v1_agent_research_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/runs/{run_id}/feedback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 查询分析 run 用户反馈
+         * @description 按 canonical run_id 读取最新 sidecar 意见。没有反馈时返回 feedback_value=null；未知 run 身份返回 404。不改写预测 actuals 或 episode。
+         */
+        get: operations["getAgentRunFeedback"];
+        /**
+         * 写入分析 run 用户反馈
+         * @description 按 canonical run_id upsert 最新 useful|partial|wrong|harmful 反馈。意见只写入 sidecar；不会改写 agent_predictions.outcome_json 或 UPDATE append-only agent_episodes。
+         */
+        put: operations["putAgentRunFeedback"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -4406,6 +4454,76 @@ export interface components {
         AgentModelsResponse: {
             /** Models */
             models: components["schemas"]["AgentModelDeployment"][];
+        };
+        /** AgentPredictionFeedbackItem */
+        AgentPredictionFeedbackItem: {
+            /** Actor Id */
+            actor_id?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Feedback Value */
+            feedback_value?: ("agree_hit" | "agree_miss" | "disagree_score" | "context_note") | null;
+            /** Note */
+            note?: string | null;
+            /** Prediction Id */
+            prediction_id: string;
+            /** Provenance Source */
+            provenance_source?: ("system_resolve" | "user_feedback" | "operator") | null;
+            /** Source */
+            source?: ("web" | "api") | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** AgentPredictionFeedbackRequest */
+        AgentPredictionFeedbackRequest: {
+            /**
+             * Feedback Value
+             * @enum {string}
+             */
+            feedback_value: "agree_hit" | "agree_miss" | "disagree_score" | "context_note";
+            /** Note */
+            note?: string | null;
+            /**
+             * Source
+             * @default api
+             * @enum {string}
+             */
+            source: "web" | "api";
+        };
+        /** AgentRunFeedbackItem */
+        AgentRunFeedbackItem: {
+            /** Actor Id */
+            actor_id?: string | null;
+            /** Created At */
+            created_at?: string | null;
+            /** Feedback Value */
+            feedback_value?: ("useful" | "partial" | "wrong" | "harmful") | null;
+            /** Note */
+            note?: string | null;
+            /** Provenance Source */
+            provenance_source?: ("system_resolve" | "user_feedback" | "operator") | null;
+            /** Run Id */
+            run_id: string;
+            /** Source */
+            source?: ("web" | "api") | null;
+            /** Updated At */
+            updated_at?: string | null;
+        };
+        /** AgentRunFeedbackRequest */
+        AgentRunFeedbackRequest: {
+            /**
+             * Feedback Value
+             * @enum {string}
+             */
+            feedback_value: "useful" | "partial" | "wrong" | "harmful";
+            /** Note */
+            note?: string | null;
+            /**
+             * Source
+             * @default api
+             * @enum {string}
+             */
+            source: "web" | "api";
         };
         /** AgentRuntimeMetadata */
         AgentRuntimeMetadata: {
@@ -19883,6 +20001,144 @@ export interface operations {
             };
         };
     };
+    getAgentPredictionFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prediction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPredictionFeedbackItem"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预测不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 路径参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    putAgentPredictionFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prediction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentPredictionFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPredictionFeedbackItem"];
+                };
+            };
+            /** @description 请求字段非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预测不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预测尚未 resolved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求体或路径参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 更新失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
     agent_research_api_v1_agent_research_post: {
         parameters: {
             query?: never;
@@ -19912,6 +20168,135 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    getAgentRunFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRunFeedbackItem"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 分析 run 不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 路径参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    putAgentRunFeedback: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AgentRunFeedbackRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRunFeedbackItem"];
+                };
+            };
+            /** @description 请求字段非法 */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 分析 run 不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 请求体或路径参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 更新失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

@@ -12,6 +12,10 @@ from src.api.v1.schemas.history import HistoryItem
 from src.api.v1.schemas.stocks import StockQuote
 
 
+AGENT_FEEDBACK_PATHS = (
+    "/api/v1/agent/runs/{run_id}/feedback",
+    "/api/v1/agent/predictions/{prediction_id}/feedback",
+)
 DECISION_SIGNAL_PATHS = (
     "/api/v1/decision-signals",
     "/api/v1/decision-signals/reassess",
@@ -249,5 +253,11 @@ def test_v1_prefix_is_applied_at_app_mount_level() -> None:
     assert "/api/v1/history" in runtime_paths
     assert "/api/v1/decision-signals" in runtime_paths
     assert "/api/v1/system/config/llm/local-models" in runtime_paths
+    for path in AGENT_FEEDBACK_PATHS:
+        assert path in runtime_paths
+        for operation in runtime_paths[path].values():
+            assert "401" in operation["responses"]
+            assert operation["security"] == [{"AdminSessionCookie": []}]
+    assert "409" in runtime_paths["/api/v1/agent/predictions/{prediction_id}/feedback"]["put"]["responses"]
     assert "/api/v1/history/" not in runtime_paths
     assert "/api/v1/decision-signals/" not in runtime_paths

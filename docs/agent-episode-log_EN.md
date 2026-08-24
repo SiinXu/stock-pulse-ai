@@ -13,7 +13,7 @@ Persist compact, queryable **episodes** after agent runs so offline eval, post-m
 | `run_id`, `mode`, `symbol`, timestamps | Correlation keys |
 | `trajectory_summary` | Tool names, success flags, optional argument fingerprints — not raw prompts |
 | `lessons` | Typed reflection / post-mortem lessons |
-| `outcome_labels` | Optional feedback / forward-return / prediction outcome labels |
+| `outcome_labels` | Optional feedback / forward-return / prediction outcome labels. Issue #1105 user feedback is **not** written here. |
 | `soul_version` / `soul_hash` | Identity only — **never** full Soul charter text |
 
 ## Modules
@@ -44,6 +44,10 @@ When disabled, the executor does not import the episode writer or initialize its
 Documented hooks: `apply_retention(cutoff)` and `apply_capacity(max_rows)`. Invoked best-effort after successful appends.
 
 Queries and replay lists are bounded to 200 rows/IDs. Persisted JSON corruption is surfaced as `agent_episode_corrupt_json`; it is never converted into an apparently valid empty trajectory or lesson list.
+
+## Optional user feedback (#1105)
+
+Authenticated `PUT`/`GET` APIs store run (`useful|partial|wrong|harmful`) and prediction (`agree_hit|agree_miss|disagree_score|context_note`) opinion in sidecar tables. They do **not** `UPDATE` append-only `agent_episodes`. Consumers that want a merged view must join at read time. Absence of feedback does not block automatic prediction resolve or evolution.
 
 ## Rollback
 

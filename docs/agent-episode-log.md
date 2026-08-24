@@ -10,4 +10,6 @@
 
 关闭功能时不会导入写入器或初始化仓库；开启后，模块加载、数据库初始化、写入与清理失败均不得覆盖 Agent 的成功结果或原始异常。查询与重放输入上限为 200 条，持久化 JSON 损坏会显式报错，绝不伪装成空轨迹。
 
+Issue #1105 的可选用户反馈写入 sidecar（`agent_run_feedback` / `agent_prediction_feedback`），通过读时 join 与 episode 合并；不会 `UPDATE` append-only 的 `agent_episodes`，也不会改写 resolver actuals。无反馈时自动核验与进化仍继续。
+
 配置、模块与回滚说明见英文版（与实现保持一致）。
