@@ -112,15 +112,16 @@ def _budget_bucket(budget_seconds: Optional[float]) -> str:
 
 
 def _resolve_fundamental_config(manager: Any, config: Any = None) -> Any:
-    """Resolve fundamental Config: injected, manager owner, then composition root."""
+    """Resolve fundamental Config from injected config or the manager owner."""
     if config is not None:
         return config
     getter = getattr(manager, "_get_fundamental_config", None)
-    if callable(getter):
-        return getter()
-    from src.application_services import get_application_services
-
-    return get_application_services().config
+    if not callable(getter):
+        raise AttributeError(
+            "fundamental cache TTL requires injected config or "
+            "DataFetcherManager._get_fundamental_config"
+        )
+    return getter()
 
 
 def _begin_fundamental_inflight(
