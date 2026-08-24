@@ -399,13 +399,15 @@ class _DashboardMethods:
     ) -> None:
         """Feature-flagged PredictionRecord extraction after successful finalize.
 
-        Default-off. Attaches a draft extraction summary to ``ctx.meta`` only;
-        does not persist rows (A3) and never fails the agent run.
+        Default-off. Attaches a draft extraction summary to ``ctx.meta`` and
+        persists verifiable pending rows. Store conflicts reuse the existing
+        row. Never fails the agent run.
         """
         try:
             from src.services.prediction_extractor import (
                 maybe_extract_prediction_on_finalize,
             )
+            from src.services.prediction_persist import persist_verifiable_prediction_draft
 
             source = dict(dashboard)
             if ctx.stock_code and not source.get("stock_code") and not source.get("code"):
@@ -442,6 +444,12 @@ class _DashboardMethods:
             if extraction is None:
                 return
             ctx.meta["prediction_extraction"] = extraction.to_dict()
+            persist_verifiable_prediction_draft(
+                extraction,
+                repo=getattr(self, "agent_prediction_repo", None),
+                error_code="agent_prediction_persist_failed",
+                context={"stock_code": getattr(ctx, "stock_code", None)},
+            )
         except Exception as exc:  # broad-exception: fallback_recorded - never fail finalize
             log_safe_exception(
                 logger,

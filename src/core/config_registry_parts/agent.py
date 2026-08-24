@@ -537,8 +537,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "When enabled, map structured decision/dashboard fields into "
             "PredictionRecord drafts after successful finalize (research / "
             "quality-ops only). Default off. Prose is never parsed into claims; "
-            "extraction failures never fail analysis. Persistence of drafts is "
-            "owned by later prediction-verification stages."
+            "extraction failures never fail analysis. Verifiable pending drafts "
+            "are persisted to agent_predictions; re-finalize reuses the existing row."
         ),
         "category": "agent",
         "data_type": "boolean",

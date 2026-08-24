@@ -1,6 +1,6 @@
 # Prediction Extraction (Structured Decision → Claims)
 
-**Status**: A2 extractor (Issue [#1108](https://github.com/SiinXu/stock-pulse-ai/issues/1108); parent Epic [#1107](https://github.com/SiinXu/stock-pulse-ai/issues/1107); depends on A1 contract [#1101](https://github.com/SiinXu/stock-pulse-ai/issues/1101))
+**Status**: A2 extractor + A3 persist (Issues [#1108](https://github.com/SiinXu/stock-pulse-ai/issues/1108) / [#1101](https://github.com/SiinXu/stock-pulse-ai/issues/1101); parent Epic [#1107](https://github.com/SiinXu/stock-pulse-ai/issues/1107))
 
 **Chinese**: [prediction-extraction.md](prediction-extraction.md)
 
@@ -26,9 +26,11 @@ Turn **structured** decision / dashboard fields into a `PredictionRecord` draft 
 | `src/schemas/prediction_record.py` | A1 contract (strict `PredictionRecord` / claims) |
 | `src/core/prediction_resolve_after.py` | Horizon → UTC `resolve_after` (trading sessions; fail closed) |
 | `src/services/prediction_extractor.py` | Pure extractor + feature-flagged finalize helper |
+| `src/services/prediction_persist.py` | Persist verifiable pending drafts via `insert_pending` |
 | `src/core/stages/persistence.py` | Post-history-save hook (best-effort, flag-gated) |
 | `src/agent/orchestrator_parts/dashboard.py` | Post-agent-finalize hook (best-effort, flag-gated) |
 | `tests/services/test_prediction_extractor.py` | Unit coverage including prose anti-examples |
+| `tests/services/test_prediction_persist.py` | Finalize persist, idempotency, and store-failure isolation |
 
 ## What becomes a claim
 
@@ -58,20 +60,20 @@ Turn **structured** decision / dashboard fields into a `PredictionRecord` draft 
 | Agent mode | Direction requires explicit `action` or typed `prediction_claims`; `decision_type` alone is ignored (often orchestrator-synthesized) |
 | Analysis mode | Exact `decision_type` buy/hold/sell still accepted with structured confidence |
 | Mixed valid/invalid claims | The draft is `status=error` and is not scoreable; invalid declared claims are never silently dropped into a partial pending record |
-| Dual hooks | Agent finalize (`ctx.meta`) and history-save (`result.prediction_extraction`) may both attach drafts; A3 persistence must dedupe |
+| Dual hooks | Agent finalize (`ctx.meta`) and history-save (`result.prediction_extraction`) may both attach drafts; A3 persists a stable `prediction_id` per run/symbol and relies on the store primary key |
 
 ## Feature flag
 
 | Key | Default | Effect |
 | --- | --- | --- |
-| `PREDICTION_EXTRACT_ENABLED` | `false` | When off, hooks are no-ops. When on, successful finalize/history-save paths attach an in-memory extraction draft |
+| `PREDICTION_EXTRACT_ENABLED` | `false` | When off, hooks are no-ops. When on, successful finalize/history-save paths attach an in-memory extraction draft and persist verifiable pending rows to `agent_predictions` |
 
 Drafts are attached to:
 
 - `AnalysisResult.prediction_extraction` (pipeline history path)
 - `AgentContext.meta["prediction_extraction"]` (agent finalize path)
 
-Durable `agent_prediction` storage is **out of scope** for A2 (persistence issue).
+Verifiable pending drafts are persisted through `AgentPredictionRepository.insert_pending`. Re-finalizing the same run/symbol reuses the existing row (primary-key conflict, no overwrite). Persistence failures are logged and never fail analysis.
 
 ## Rollout
 

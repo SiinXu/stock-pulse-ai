@@ -447,9 +447,9 @@ class _PersistenceStageMixin:
     ) -> None:
         """Best-effort PredictionRecord extraction after analysis history is saved.
 
-        Default-off via ``PREDICTION_EXTRACT_ENABLED``. Drafts are attached to the
-        in-memory result only; durable persistence is owned by later issues.
-        Failures never block history persistence or user-visible analysis.
+        Default-off via ``PREDICTION_EXTRACT_ENABLED``. Verifiable pending drafts
+        are persisted to ``agent_predictions``; store conflicts reuse the existing
+        row. Failures never block history persistence or user-visible analysis.
         """
         try:
             from src.services.prediction_extractor import (
@@ -457,6 +457,7 @@ class _PersistenceStageMixin:
                 drop_presentation_confidence,
                 maybe_extract_prediction_on_finalize,
             )
+            from src.services.prediction_persist import persist_verifiable_prediction_draft
 
             structured_source = getattr(result, "prediction_source", None)
             source = dict(structured_source) if isinstance(structured_source, dict) else {}
@@ -479,6 +480,15 @@ class _PersistenceStageMixin:
             if extraction is None:
                 return
             setattr(result, "prediction_extraction", extraction.to_dict())
+            persist_verifiable_prediction_draft(
+                extraction,
+                repo=getattr(self, "agent_prediction_repo", None),
+                error_code="pipeline_prediction_persist_failed",
+                context={
+                    "query_id": query_id,
+                    "stock_code": getattr(result, "code", None),
+                },
+            )
         except Exception as exc:  # broad-exception: fallback_recorded - Prediction extraction must never fail history persistence.
             log_safe_exception(
                 logger,

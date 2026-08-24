@@ -553,12 +553,16 @@ class TestReviewConvergence:
             dashboard={},
         )
 
-        pipeline._extract_prediction_after_history_save(
-            result=result,
-            query_id="query-real-confidence",
-            source_report_id=41,
-            mode="agent",
-        )
+        with patch(
+            "src.services.prediction_persist.persist_verifiable_prediction_draft",
+            return_value=None,
+        ):
+            pipeline._extract_prediction_after_history_save(
+                result=result,
+                query_id="query-real-confidence",
+                source_report_id=41,
+                mode="agent",
+            )
 
         extraction = result.prediction_extraction
         assert extraction["verifiable"] is True

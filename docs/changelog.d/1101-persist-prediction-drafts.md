@@ -1,0 +1,1 @@
+- [Added] Persisted finalized prediction drafts to agent_predictions (Refs #1101).
