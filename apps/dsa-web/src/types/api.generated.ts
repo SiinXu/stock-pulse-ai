@@ -190,6 +190,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/predictions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 按 run 或标的查询预测列表
+         * @description 必须且只能使用一种身份过滤：run_id，或同时提供 symbol 与 market。limit 默认 50、上限 50。零行返回 200 空列表。只读，不暴露 list_due。
+         */
+        get: operations["listAgentPredictions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agent/predictions/{prediction_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * 按 id 查询预测
+         * @description 按 prediction_id 返回允许列表中的身份、状态与有界 outcome_label。未知 id 返回 404。不会返回 outcome/claims/leases/model_meta/价格，也不会 tick、认领或写回预测。
+         */
+        get: operations["getAgentPrediction"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/predictions/{prediction_id}/feedback": {
         parameters: {
             query?: never;
@@ -4512,6 +4552,52 @@ export interface components {
              * @enum {string}
              */
             source: "web" | "api";
+        };
+        /**
+         * AgentPredictionItem
+         * @description Public prediction identity, status, and bounded outcome label.
+         */
+        AgentPredictionItem: {
+            /** As Of */
+            as_of: string;
+            /** Created At */
+            created_at: string;
+            /**
+             * Horizon
+             * @enum {string}
+             */
+            horizon: "1d" | "3d" | "5d" | "10d" | "20d";
+            /** Market */
+            market: string;
+            /** Outcome Label */
+            outcome_label: ("hit" | "miss" | "partial" | "data_unavailable") | null;
+            /** Prediction Id */
+            prediction_id: string;
+            /** Resolve After */
+            resolve_after: string;
+            /** Resolved At */
+            resolved_at: string | null;
+            /** Run Id */
+            run_id: string;
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "pending" | "resolving" | "resolved" | "data_unavailable" | "expired" | "error" | "no_verifiable_claim";
+            /** Symbol */
+            symbol: string;
+            /** Updated At */
+            updated_at: string;
+        };
+        /**
+         * AgentPredictionListResponse
+         * @description Identity-filtered prediction page. No total count or cursor in this slice.
+         */
+        AgentPredictionListResponse: {
+            /** Items */
+            items: components["schemas"]["AgentPredictionItem"][];
+            /** Truncated */
+            truncated: boolean;
         };
         /** AgentRunFeedbackItem */
         AgentRunFeedbackItem: {
@@ -20127,6 +20213,116 @@ export interface operations {
             };
             /** @description 预测存储不可读，无法探测 claimable due 或 UTC 日结果计数 */
             503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    listAgentPredictions: {
+        parameters: {
+            query?: {
+                run_id?: string | null;
+                symbol?: string | null;
+                market?: string | null;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPredictionListResponse"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询失败 */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    getAgentPrediction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                prediction_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentPredictionItem"];
+                };
+            };
+            /** @description 未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时） */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 预测不存在 */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 路径参数校验失败 */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description 查询失败 */
+            500: {
                 headers: {
                     [name: string]: unknown;
                 };

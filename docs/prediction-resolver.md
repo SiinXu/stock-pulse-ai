@@ -98,9 +98,50 @@ GET /api/v1/agent/prediction-resolver/diagnostics
 
 可认领集合是 pending 行加上已过期的 `resolving` 租约。到期的 `data_unavailable` 重试在 tick 重新排队之前 **不会** 被计入，因此 `claimable_due_count` 可能低于下一次 tick 的 `due_before`。`claimable_due_count` 增大且 UTC 日结果为 **0** 只是 worker 可能未完成的**提示**；`unavailable` 增大提示 provider / 熔断问题；`hit+miss+partial` 增加且 due 缩小提示 worker 正在推进。这仍不是融合后的 `stuck` 布尔。熔断、重叠跳过和上次 tick 计数仍只在日志中。
 
+## 预测查询 HTTP
+
+已认证运营者可以按 id 读取一条已落地预测，或按身份过滤列出：
+
+```http
+GET /api/v1/agent/predictions/{prediction_id}
+GET /api/v1/agent/predictions?run_id=...
+GET /api/v1/agent/predictions?symbol=...&market=...
+```
+
+鉴权与可选预测反馈、诊断 API 一致：`AuthMiddleware` 加上管理员会话 Cookie。当 `ADMIN_AUTH_ENABLED=true` 时，缺少或无效 Cookie 返回 **401** `unauthorized`（不是 403）。这些路径不在鉴权豁免列表中。
+
+列表必须且只能使用一种身份过滤：
+
+- 提供 `run_id`，且省略 `symbol` / `market`
+- 同时提供 `symbol` 与 `market`，且省略 `run_id`
+
+两种模式同时出现、两种都缺、或只提供 `symbol` / `market` 之一，返回 **422**。额外查询键会被拒绝（`extra=forbid`）。`limit` 默认 50、上限 50（`1..50`）。本切片不提供 `status` 过滤、offset/cursor、无过滤全表列表或 `list_due`。
+
+未知 `prediction_id` 返回 **404** `not_found`。合法身份过滤且零行时返回 **200** `{items: [], truncated: false}`。存储读取失败返回经过消毒的 **500** `internal_error`，不会伪造行。
+
+每条记录是构造出的允许列表（`extra=forbid`）：
+
+| 字段 | 含义 |
+| --- | --- |
+| `prediction_id` | 规范预测身份 |
+| `run_id` | 规范分析 run |
+| `symbol` | 标的代码 |
+| `market` | 小写市场（与存储层一致） |
+| `as_of` | 预测 as-of 日期（ISO date） |
+| `horizon` | `1d` / `3d` / `5d` / `10d` / `20d` |
+| `resolve_after` | ISO-8601 UTC 到期时间 |
+| `status` | 允许列表中的生命周期状态 |
+| `outcome_label` | `hit` / `miss` / `partial` / `data_unavailable`；pending、未标注或未知 token 时为 JSON `null`。未知 token 失败关闭。`status=data_unavailable` 始终投影为 `data_unavailable`。不会返回 `score`、actuals、价格、claims、leases 或 `model_meta`。 |
+| `created_at` / `updated_at` | ISO-8601 UTC |
+| `resolved_at` | ISO-8601 UTC；未 resolved 时为 `null` |
+
+列表响应为 `{items, truncated}`。当本页长度等于请求的 `limit` 时 `truncated` 为 `true`。没有总数。
+
+这些 GET 只读。它们不会 tick、认领、resolve、重新排队或启动 worker。不会返回 `outcome`、`claims`、`notes`、`lease_token`、`lease_owner`、`lease_expires_at`、`model_meta`、价格、`actor_id`、`provenance_source`、`attempts` 或密钥。Sidecar 反馈仍是 `GET/PUT /api/v1/agent/predictions/{prediction_id}/feedback`。诊断仍是 `GET /api/v1/agent/prediction-resolver/diagnostics`。
+
 ## Epic 剩余边界
 
-- 预测查询列表 / 按 id 查询 HTTP API（剩余 #1102）
+- 已认证预测按 id / 列表查询 HTTP API — 见上文（Refs #1102 剩余只读面；父 issue 仍保持开放）
 - 拉取错误 recency HTTP、复盘队列深度 HTTP、Prometheus / OTel，以及可跨进程证明 cron 健康的 worker 心跳
 - 交易日历 `resolve_after`（#1109）
 - Adapter 接线 / `adapter_updates_total`（#1106）。worker/CLI 在注入队列 adapter 后已会在非重叠 tick 后 drain 复盘队列（#1499）；本 HTTP 面仍不暴露进程内队列深度

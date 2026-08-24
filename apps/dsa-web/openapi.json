@@ -267,6 +267,153 @@
         "title": "AgentPredictionFeedbackRequest",
         "type": "object"
       },
+      "AgentPredictionItem": {
+        "additionalProperties": false,
+        "description": "Public prediction identity, status, and bounded outcome label.",
+        "properties": {
+          "as_of": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "As Of",
+            "type": "string"
+          },
+          "created_at": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Created At",
+            "type": "string"
+          },
+          "horizon": {
+            "enum": [
+              "1d",
+              "3d",
+              "5d",
+              "10d",
+              "20d"
+            ],
+            "title": "Horizon",
+            "type": "string"
+          },
+          "market": {
+            "maxLength": 16,
+            "minLength": 1,
+            "title": "Market",
+            "type": "string"
+          },
+          "outcome_label": {
+            "anyOf": [
+              {
+                "enum": [
+                  "hit",
+                  "miss",
+                  "partial",
+                  "data_unavailable"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome Label"
+          },
+          "prediction_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^\\S+$",
+            "title": "Prediction Id",
+            "type": "string"
+          },
+          "resolve_after": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Resolve After",
+            "type": "string"
+          },
+          "resolved_at": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolved At"
+          },
+          "run_id": {
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Run Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "pending",
+              "resolving",
+              "resolved",
+              "data_unavailable",
+              "expired",
+              "error",
+              "no_verifiable_claim"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "maxLength": 32,
+            "minLength": 1,
+            "title": "Symbol",
+            "type": "string"
+          },
+          "updated_at": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prediction_id",
+          "run_id",
+          "symbol",
+          "market",
+          "as_of",
+          "horizon",
+          "resolve_after",
+          "status",
+          "outcome_label",
+          "created_at",
+          "updated_at",
+          "resolved_at"
+        ],
+        "title": "AgentPredictionItem",
+        "type": "object"
+      },
+      "AgentPredictionListResponse": {
+        "additionalProperties": false,
+        "description": "Identity-filtered prediction page. No total count or cursor in this slice.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPredictionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "truncated": {
+            "title": "Truncated",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items",
+          "truncated"
+        ],
+        "title": "AgentPredictionListResponse",
+        "type": "object"
+      },
       "AgentRunFeedbackItem": {
         "properties": {
           "actor_id": {
@@ -40432,6 +40579,215 @@
           }
         ],
         "summary": "读取预测解析器到期诊断",
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agent/predictions": {
+      "get": {
+        "description": "必须且只能使用一种身份过滤：run_id，或同时提供 symbol 与 market。limit 默认 50、上限 50。零行返回 200 空列表。只读，不暴露 list_due。",
+        "operationId": "listAgentPredictions",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 128,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "symbol",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 32,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Symbol"
+            }
+          },
+          {
+            "in": "query",
+            "name": "market",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 16,
+                  "minLength": 1,
+                  "pattern": "^\\S+$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Market"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPredictionListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询参数校验失败"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询失败"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "按 run 或标的查询预测列表",
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agent/predictions/{prediction_id}": {
+      "get": {
+        "description": "按 prediction_id 返回允许列表中的身份、状态与有界 outcome_label。未知 id 返回 404。不会返回 outcome/claims/leases/model_meta/价格，也不会 tick、认领或写回预测。",
+        "operationId": "getAgentPrediction",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "prediction_id",
+            "required": true,
+            "schema": {
+              "maxLength": 128,
+              "minLength": 1,
+              "pattern": "^\\S+$",
+              "title": "Prediction Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentPredictionItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "预测不存在"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "路径参数校验失败"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "查询失败"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "按 id 查询预测",
         "tags": [
           "Agent"
         ]

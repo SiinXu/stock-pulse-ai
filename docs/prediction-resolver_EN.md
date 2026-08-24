@@ -104,9 +104,50 @@ The GET is read-only. It never ticks, claims, requeues, starts, or constructs a 
 
 Claimable due is pending rows plus expired `resolving` leases. Ready `data_unavailable` retries are **not** counted until a tick requeues them, so `claimable_due_count` can be lower than the next tick's `due_before`. Growing `claimable_due_count` plus **zero** UTC-day results is a hint the worker is not completing; growing `unavailable` hints at provider or circuit issues; `hit+miss+partial` increasing while due shrinks is a hint the worker is making progress. This is still not a fused `stuck` boolean. Circuit-open, overlap-skip, and last-tick counters remain log-only.
 
+## Prediction query HTTP
+
+Authenticated operators can read a stored prediction by id, or list by identity filter:
+
+```http
+GET /api/v1/agent/predictions/{prediction_id}
+GET /api/v1/agent/predictions?run_id=...
+GET /api/v1/agent/predictions?symbol=...&market=...
+```
+
+Auth matches the optional prediction-feedback and diagnostics APIs: `AuthMiddleware` plus the admin session cookie. When `ADMIN_AUTH_ENABLED=true`, a missing or invalid cookie returns **401** `unauthorized` (not 403). These paths are not auth-exempt.
+
+Exactly one list identity mode is required:
+
+- `run_id` set, and `symbol` / `market` omitted
+- `symbol` and `market` both set, and `run_id` omitted
+
+Both modes, neither mode, or only one of `symbol` / `market` returns **422**. Extra query keys are rejected (`extra=forbid`). `limit` defaults to 50 and is capped at 50 (`1..50`). This slice does not add `status` filters, offset/cursor, unfiltered list, or `list_due`.
+
+Unknown `prediction_id` returns **404** `not_found`. A valid identity filter with zero rows returns **200** `{items: [], truncated: false}`. Store failures return a sanitized **500** `internal_error` and do not fake rows.
+
+Each item is a constructed allowlist (`extra=forbid`):
+
+| Field | Meaning |
+| --- | --- |
+| `prediction_id` | Canonical prediction identity |
+| `run_id` | Canonical analysis run |
+| `symbol` | Symbol |
+| `market` | Lowercased market (same as the store) |
+| `as_of` | Horizon as-of date (ISO date) |
+| `horizon` | `1d` / `3d` / `5d` / `10d` / `20d` |
+| `resolve_after` | ISO-8601 UTC due time |
+| `status` | Allowlisted lifecycle status |
+| `outcome_label` | `hit` / `miss` / `partial` / `data_unavailable`, or JSON `null` when pending, unlabeled, or unexpected. Fail closed on unknown tokens. `status=data_unavailable` always projects `data_unavailable`. Never returns `score`, actuals, prices, claims, leases, or `model_meta`. |
+| `created_at` / `updated_at` | ISO-8601 UTC |
+| `resolved_at` | ISO-8601 UTC, or `null` until resolved |
+
+List response: `{items, truncated}`. `truncated` is `true` when the page length equals the requested `limit`. There is no total count.
+
+These GETs are read-only. They never tick, claim, resolve, requeue, or start a worker. They do not return `outcome`, `claims`, `notes`, `lease_token`, `lease_owner`, `lease_expires_at`, `model_meta`, prices, `actor_id`, `provenance_source`, `attempts`, or secrets. Sidecar feedback remains `GET/PUT /api/v1/agent/predictions/{prediction_id}/feedback`. Diagnostics remain `GET /api/v1/agent/prediction-resolver/diagnostics`.
+
 ## Remaining epic boundaries
 
-- Prediction query list / get-by-id HTTP API (remaining #1102)
+- Authenticated prediction get-by-id / list HTTP API — documented above (Refs #1102 leftover read surface; parent issue remains open)
 - Fetch-error recency HTTP, postmortem-queue depth HTTP, Prometheus / OTel, and a durable worker heartbeat
 - Trading-calendar `resolve_after` policy (#1109)
 - Adapter wiring / `adapter_updates_total` (#1106). Worker/CLI already drains the injected postmortem queue after a non-overlap tick (#1499); this HTTP surface still does not expose process-local queue depth.

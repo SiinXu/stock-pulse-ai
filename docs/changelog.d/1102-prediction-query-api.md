@@ -1,0 +1,1 @@
+- [Added] Added authenticated GET /api/v1/agent/predictions and GET /api/v1/agent/predictions/{prediction_id} read APIs for allowlisted prediction identity, status, and bounded outcome labels (Refs #1102).
