@@ -58,7 +58,9 @@ Entry: `src/agent/evolution/reflection.py` (`run_reflection_loop`, etc.).
 
 ## Resolved-forecast post-mortem (#1103)
 
-Entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`, `run_postmortem_batch`).
+Library entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`,
+`run_postmortem_batch`). Production drain:
+`src/services/prediction_resolver/postmortem_drain.py`.
 
 1. Default **off** (`AGENT_POSTMORTEM_ENABLED=false`).
 2. Input is an already-scored forecast. Persistence/actuals/scoring remain A1–A5.
@@ -71,6 +73,18 @@ Entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`, `run_po
    Post-mortem is not an `AgentResult` path; callers that need a result snapshot
    must read the account or `ctx.meta["mode_budget"]`. Skip stays
    `budget_skipped`.
+8. Production scheduler/CLI wire: when **both** `PREDICTION_RESOLVE_ENABLED` and
+   `AGENT_POSTMORTEM_ENABLED` are true, the existing `InMemoryPostmortemQueue` is
+   injected and drained after a non-overlap `tick()`, at most
+   `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` jobs. The handler maps stored
+   outcome/score/actuals (plus copied `run_id` / claims). It does not re-fetch
+   market data or invent direction. Hits and `data_unavailable` are not
+   enqueued. Lessons project through `record_reflection_lessons`: if
+   `AGENT_EPISODE_LOG_ENABLED` and an episode exists for `run_id`, that
+   `episode_id` is used; otherwise the process-local sidecar remains the record.
+   A missing episode does not fail resolve. Drain/LLM/episode errors log and
+   requeue; they do not roll back `resolved` rows or fabricate hits. Queue-depth
+   HTTP remains out of scope (#1114 remainder).
 
 ## Configuration
 
@@ -82,6 +96,7 @@ Entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`, `run_po
 | `AGENT_POSTMORTEM_ENABLED` | `false` | Enable resolved-forecast post-mortem |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | Max LLM calls per resolution batch |
 | `AGENT_POSTMORTEM_SKIP_CLEAN_HITS` | `true` | Skip post-mortem LLM on clean hits |
+| `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | Max postmortem jobs drained after a non-overlap tick |
 
 ## Rollback
 

@@ -12,6 +12,11 @@ from src.services.prediction_resolver.ports import (
     PostmortemQueuePort,
     PredictionStorePort,
 )
+from src.services.prediction_resolver.postmortem_drain import (
+    drain_postmortem_queue,
+    map_postmortem_job_to_input,
+    maybe_build_postmortem_queue,
+)
 from src.services.prediction_resolver.postmortem_queue import (
     InMemoryPostmortemQueue,
     PostmortemJob,
@@ -47,5 +52,8 @@ __all__ = [
     "build_prediction_resolver_background_tasks",
     "compute_retry_delay_seconds",
     "derive_aggregate_label",
+    "drain_postmortem_queue",
     "list_claimable_due",
+    "map_postmortem_job_to_input",
+    "maybe_build_postmortem_queue",
 ]

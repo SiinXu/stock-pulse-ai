@@ -16,6 +16,10 @@ import logging
 import sys
 from typing import Optional, Sequence
 
+from src.services.prediction_resolver.postmortem_drain import (
+    drain_postmortem_queue,
+    maybe_build_postmortem_queue,
+)
 from src.services.prediction_resolver.resolver import build_prediction_resolver
 from src.utils.sanitize import log_safe_exception
 
@@ -119,6 +123,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         )
         return 2
 
+    postmortem_queue = maybe_build_postmortem_queue(config)
     try:
         resolver = build_prediction_resolver(
             worker_id=args.worker_id,
@@ -126,6 +131,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             max_per_tick=max_per_tick,
             max_attempts=max_attempts,
             fetch_concurrency=fetch_concurrency,
+            postmortem_queue=postmortem_queue,
             postmortem_max_per_tick=postmortem_max_per_tick,
             provider_error_circuit_threshold=provider_error_circuit_threshold,
             provider_error_circuit_cooldown_seconds=(
@@ -159,6 +165,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             error_code="prediction_resolver_tick_failed",
         )
         return 2
+
+    drain_postmortem_queue(
+        postmortem_queue,
+        skipped_overlap=summary.skipped_overlap,
+        max_items=postmortem_max_per_tick,
+        config=config,
+    )
 
     if args.json:
         print(json.dumps(summary.as_dict(), ensure_ascii=False, sort_keys=True))

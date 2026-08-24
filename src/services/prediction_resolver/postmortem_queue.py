@@ -22,8 +22,8 @@ class PostmortemJob:
 class InMemoryPostmortemQueue:
     """Process-local bounded queue with deterministic priority and deduplication.
 
-    The queue deliberately does not run work on enqueue. A future lesson writer
-    can drain it with a separately capped worker pool via :meth:`drain`.
+    The queue deliberately does not run work on enqueue. Scheduler and CLI
+    drain it after a non-overlap tick with a separately capped worker pool.
     """
 
     def __init__(self, *, max_depth: int = 10_000) -> None:
