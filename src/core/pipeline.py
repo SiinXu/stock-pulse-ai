@@ -314,16 +314,10 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         # Initialize modules
         self.db = get_db()
         if data_fetcher_manager is None:
-            from src.application_services import get_installed_application_services
+            from src.application_services import resolve_process_data_fetcher_manager
 
-            application_services = get_installed_application_services()
-            if application_services is not None:
-                data_fetcher_manager = application_services.data_fetcher_manager
-        self.fetcher_manager = (
-            data_fetcher_manager
-            if data_fetcher_manager is not None
-            else DataFetcherManager()
-        )
+            data_fetcher_manager = resolve_process_data_fetcher_manager()
+        self.fetcher_manager = data_fetcher_manager
         # No longer create akshare_fetcher separately, use fetcher_manager to get enhanced data
         from src.utils.indicator_periods import periods_from_config
 

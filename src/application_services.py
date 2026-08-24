@@ -893,6 +893,24 @@ def get_installed_application_services() -> Optional[ApplicationServices]:
         return _services
 
 
+def resolve_process_data_fetcher_manager() -> Any:
+    """Return the process-serving DataFetcherManager without installing a root.
+
+    Prefer the auto-bind-owned composition-root manager when one exists.
+    Otherwise share the ``data_tools`` fallback singleton. Never construct a
+    third instance for the analysis pipeline or agent tools.
+    """
+
+    services = get_installed_application_services()
+    if services is not None:
+        manager = services.data_fetcher_manager
+        if manager is not None:
+            return manager
+    from src.agent.tools.data_tools import _get_fallback_fetcher_manager
+
+    return _get_fallback_fetcher_manager()
+
+
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
     while True:

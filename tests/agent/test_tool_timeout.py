@@ -578,17 +578,32 @@ def test_mixed_deadlines_keep_long_success_when_short_times_out():
 
 
 def test_mixed_deadlines_reversed_completion_order_still_fences_late_short():
-    short_started = threading.Event()
+    """Fence late short after long succeeds without a 50ms handler-start race.
+
+    The 0.05s data fence includes thread start, ``record_attempt``, and
+    ``claim_dispatch`` (#1450). Gating long success on the short handler
+    starting inside that budget stalled the 2.0s global wait when
+    pre-handler work consumed the cap (hosted backend-tests 2/4, run
+    32775671553). Handshake after dispatch is claimed via ``on_dispatched``:
+    long never waits for handler start, short waits for long, then returns a
+    late payload that must be dropped.
+    """
+    short_dispatched = threading.Event()
     long_finished = threading.Event()
+    late_result_dropped = threading.Event()
+
+    class LateDropAudit(SecurityAuditRecorderStub):
+        def record_completion(self, **fields):
+            super().record_completion(**fields)
+            if fields.get("reason_code") == "late_result_dropped":
+                late_result_dropped.set()
 
     def short_handler(message):
-        short_started.set()
         assert long_finished.wait(timeout=2)
         time.sleep(0.2)
         return {"echo": message, "late": True}
 
     def long_handler(message):
-        assert short_started.wait(timeout=2)
         long_finished.set()
         return {"echo": message}
 
@@ -596,17 +611,51 @@ def test_mixed_deadlines_reversed_completion_order_still_fences_late_short():
     registry.set_category_timeouts({"data": 0.05, "search": 0})
     _register_echo(registry, name="short", category="data", handler=short_handler)
     _register_echo(registry, name="long", category="search", handler=long_handler)
-    result = _run_named_tools(
+    session = make_bound_tool_session(
         registry,
-        [{"name": "long"}, {"name": "short"}],
-        global_timeout=2.0,
+        execution_id="reversed-mixed-deadlines",
+        allowed_tools=["short", "long"],
+        derive_granted_permissions=True,
+        security_audit=LateDropAudit(),
     )
-    logs = {entry["tool"]: entry for entry in result.tool_calls_log}
-    assert logs["long"]["success"] is True
-    assert "timeout" not in logs["long"]
-    assert logs["short"]["timeout"] is True
-    assert logs["short"]["success"] is False
-    assert '"late": true' not in str(result.messages).lower()
+    original_execute = session.execute
+
+    def execute(name, arguments, **kwargs):
+        if name == "short":
+            previous = kwargs.get("on_dispatched")
+
+            def _on_dispatched():
+                short_dispatched.set()
+                if previous is not None:
+                    previous()
+
+            kwargs = dict(kwargs)
+            kwargs["on_dispatched"] = _on_dispatched
+        return original_execute(name, arguments, **kwargs)
+
+    session.execute = execute
+    logs = []
+    results = _execute_tools(
+        [
+            ToolCall(id="call-long", name="long", arguments={"message": "long"}),
+            ToolCall(id="call-short", name="short", arguments={"message": "short"}),
+        ],
+        session,
+        step=1,
+        progress_callback=None,
+        tool_calls_log=logs,
+        tool_wait_timeout_seconds=2.0,
+    )
+    by_tool = {entry["tool"]: entry for entry in logs}
+    assert by_tool["long"]["success"] is True
+    assert "timeout" not in by_tool["long"]
+    assert by_tool["short"]["timeout"] is True
+    assert by_tool["short"]["success"] is False
+    rendered = str(results).lower()
+    assert '"late": true' not in rendered
+    assert "'late': true" not in rendered
+    if short_dispatched.is_set():
+        assert late_result_dropped.is_set()
 
 
 def _in_flight_freeze_session(registry, *, execution_id, security_audit):

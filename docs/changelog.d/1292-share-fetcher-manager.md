@@ -1,0 +1,3 @@
+- [Changed] Share one DataFetcherManager between the analysis pipeline and agent data/market tools (Refs #1292).
+- [Tests] Cover composition-root identity, auto-bind-off singleton fallback, and market-tools reuse.
+- [Tests] Restore leftover OPENAI_API_KEY and ADMIN_AUTH_ENABLED after named test mutators, preserve collection ENV_FILE, and refresh paper auth state after its env write.

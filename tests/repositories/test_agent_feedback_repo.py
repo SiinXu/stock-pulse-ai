@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from src.config import Config
 from src.migrations.registry import (
     AGENT_FEEDBACK_SCHEMA_MIGRATION,
+    AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
     AGENT_PREDICTION_SCHEMA_MIGRATION,
     get_migrations,
 )
@@ -124,7 +125,7 @@ def test_fresh_database_applies_feedback_schema(isolated_db) -> None:
     assert "ck_agent_run_feedback_value" in run_ddl
     assert "ck_agent_prediction_feedback_value" in pred_ddl
     assert "run_id VARCHAR(128) NOT NULL" in pred_ddl
-    assert get_migrations()[-1].id == AGENT_FEEDBACK_SCHEMA_MIGRATION.id
+    assert get_migrations()[-1].id == AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id
     assert AGENT_FEEDBACK_SCHEMA_MIGRATION.id in {
         migration.id for migration in get_migrations()
     }
@@ -462,8 +463,21 @@ def test_apply_pending_repairs_missing_feedback_tables(tmp_path, monkeypatch) ->
     engine = create_engine(f"sqlite:///{db_path}", poolclass=NullPool)
     try:
         with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "DROP INDEX IF EXISTS ix_agent_episode_forward_returns_episode_id"
+            )
+            connection.exec_driver_sql(
+                "DROP INDEX IF EXISTS ix_agent_episode_forward_returns_run_id"
+            )
+            connection.exec_driver_sql(
+                "DROP TABLE IF EXISTS agent_episode_forward_returns"
+            )
             connection.exec_driver_sql("DROP TABLE IF EXISTS agent_prediction_feedback")
             connection.exec_driver_sql("DROP TABLE IF EXISTS agent_run_feedback")
+            connection.exec_driver_sql(
+                "DELETE FROM schema_migrations WHERE version = :version",
+                {"version": AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id},
+            )
             connection.exec_driver_sql(
                 "DELETE FROM schema_migrations WHERE version = :version",
                 {"version": AGENT_FEEDBACK_SCHEMA_MIGRATION.id},
@@ -471,13 +485,15 @@ def test_apply_pending_repairs_missing_feedback_tables(tmp_path, monkeypatch) ->
         result = MigrationRunner().apply_pending(engine)
         assert result.success is True
         assert AGENT_FEEDBACK_SCHEMA_MIGRATION.id in result.executed_ids
+        assert AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id in result.executed_ids
         inspector = inspect(engine)
         assert "agent_run_feedback" in inspector.get_table_names()
         assert "agent_prediction_feedback" in inspector.get_table_names()
+        assert "agent_episode_forward_returns" in inspector.get_table_names()
         assert "agent_predictions" in inspector.get_table_names()
         verification = MigrationRunner().verify(engine)
         assert verification.success is True
-        assert verification.current_version == AGENT_FEEDBACK_SCHEMA_MIGRATION.id
+        assert verification.current_version == AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id
         assert AGENT_PREDICTION_SCHEMA_MIGRATION.id in {
             migration.id for migration in get_migrations()
         }

@@ -55,13 +55,8 @@ _CAPITAL_FLOW_UNAVAILABLE = "Capital flow data is unavailable."
 _CAPITAL_FLOW_PROVIDER_ERROR = "capital_flow_provider_error"
 
 
-def _get_fetcher_manager():
-    """Return a module-level singleton DataFetcherManager.
-
-    Re-creating the manager on every tool call causes Tushare re-init overhead
-    (~2 s each) and prevents circuit-breaker cooldown from taking effect across
-    consecutive tool calls within the same agent run.
-    """
+def _get_fallback_fetcher_manager():
+    """Construct the module-level fallback DataFetcherManager once under lock."""
     from src.data_provider import DataFetcherManager
     global _fetcher_manager_singleton
     if _fetcher_manager_singleton is None:
@@ -69,6 +64,19 @@ def _get_fetcher_manager():
             if _fetcher_manager_singleton is None:
                 _fetcher_manager_singleton = DataFetcherManager()
     return _fetcher_manager_singleton
+
+
+def _get_fetcher_manager():
+    """Return the process-serving DataFetcherManager.
+
+    Prefer the composition-root auto-bind manager when one exists, else the
+    module-level fallback singleton. Re-creating a manager on every tool call
+    causes Tushare re-init overhead (~2 s each) and prevents circuit-breaker
+    cooldown from taking effect across consecutive tool calls.
+    """
+    from src.application_services import resolve_process_data_fetcher_manager
+
+    return resolve_process_data_fetcher_manager()
 
 
 def active_fetcher_manager():
