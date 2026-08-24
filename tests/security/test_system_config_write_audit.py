@@ -50,6 +50,13 @@ def _restore_admin_auth_enabled(original: str | None) -> None:
     refresh_auth_state()
 
 
+def _restore_openai_api_key(original: str | None) -> None:
+    if original is None:
+        os.environ.pop("OPENAI_API_KEY", None)
+    else:
+        os.environ["OPENAI_API_KEY"] = original
+
+
 @pytest.fixture(autouse=True)
 def _restore_auth_cache_after_env_restore():
     original = os.environ.get("ADMIN_AUTH_ENABLED")
@@ -65,6 +72,7 @@ def write_env(tmp_path, monkeypatch):
         encoding="utf-8",
     )
     original_admin_auth = os.environ.get("ADMIN_AUTH_ENABLED")
+    original_openai_api_key = os.environ.get("OPENAI_API_KEY")
     monkeypatch.setenv("ENV_FILE", str(env_path))
     Config.reset_instance()
     manager = ConfigManager(env_path=env_path)
@@ -74,6 +82,7 @@ def write_env(tmp_path, monkeypatch):
     finally:
         Config.reset_instance()
         _restore_admin_auth_enabled(original_admin_auth)
+        _restore_openai_api_key(original_openai_api_key)
 
 
 def _write_events(audit: _RecordingAudit, *, phase: str) -> list[dict]:

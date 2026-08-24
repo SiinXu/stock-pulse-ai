@@ -38,6 +38,9 @@ order or skip an open circuit. The `fundamental_context` branch now also
 coalesces same-key in-flight loads in the manager's instance-local
 fundamental cache (`as_of` + budget bucket). That cache is not the 5s
 realtime/chip helper and does not skip fail-open, retry, or governance.
+The analysis pipeline and agent data/market tools share one process
+`DataFetcherManager` instance; the fundamental cache remains instance-local
+on that shared manager.
 
 ## Deterministic merge order
 

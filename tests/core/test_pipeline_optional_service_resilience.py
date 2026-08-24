@@ -36,7 +36,7 @@ def _build_pipeline(config: SimpleNamespace) -> StockAnalysisPipeline:
          patch("src.core.pipeline.StockTrendAnalyzer", return_value=MagicMock()), \
          patch("src.core.pipeline.GeminiAnalyzer", return_value=MagicMock()), \
          patch("src.core.pipeline.NotificationService", return_value=MagicMock()):
-        return StockAnalysisPipeline(config=config)
+        return StockAnalysisPipeline(config=config, data_fetcher_manager=MagicMock())
 
 
 def test_search_service_init_failure_logs_safe_diagnostic_and_failure_state(caplog):

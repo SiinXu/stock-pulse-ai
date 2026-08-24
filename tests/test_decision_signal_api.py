@@ -126,6 +126,7 @@ def _payload(**overrides):
 def test_decision_signal_api_requires_session_when_admin_auth_enabled(tmp_path) -> None:
     old_env_file = os.environ.get("ENV_FILE")
     old_database_path = os.environ.get("DATABASE_PATH")
+    old_admin_auth = os.environ.get("ADMIN_AUTH_ENABLED")
     env_path = tmp_path / ".env"
     db_path = tmp_path / "decision_signal_auth.db"
     static_dir = tmp_path / "empty-static"
@@ -165,6 +166,10 @@ def test_decision_signal_api_requires_session_when_admin_auth_enabled(tmp_path) 
             os.environ.pop("DATABASE_PATH", None)
         else:
             os.environ["DATABASE_PATH"] = old_database_path
+        if old_admin_auth is None:
+            os.environ.pop("ADMIN_AUTH_ENABLED", None)
+        else:
+            os.environ["ADMIN_AUTH_ENABLED"] = old_admin_auth
 
 
 def test_create_duplicate_list_detail_latest_and_status_update(client_and_db) -> None:
