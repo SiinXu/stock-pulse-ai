@@ -71,9 +71,37 @@ Exit codes: `0` ok (including empty/overlap), `1` deps missing, `2` unexpected f
 - Miss/partial outcomes can be handed to an injected bounded postmortem queue. The queue has its own explicitly capped drain pool; misses receive higher priority. No postmortem LLM call runs in the resolver path.
 - Every tick summary/event includes backlog depth (bounded probe), oldest due lag, resolve rate, fetch calls/errors/coalescing, deferred count, circuit state, and postmortem queue depth.
 
+## Diagnostics HTTP
+
+Authenticated operators can inspect currently **claimable** due work without SQL:
+
+```http
+GET /api/v1/agent/prediction-resolver/diagnostics
+```
+
+Auth matches the optional prediction-feedback APIs: `AuthMiddleware` plus the admin session cookie. When `ADMIN_AUTH_ENABLED=true`, a missing or invalid cookie returns **401** `unauthorized` (not 403). The path is not auth-exempt.
+
+The response is a constructed allowlist (`extra=forbid`):
+
+| Field | Meaning |
+| --- | --- |
+| `enabled` | This API process's `PREDICTION_RESOLVE_ENABLED` |
+| `interval_seconds` | Configured poll interval (floor 30s), even when this process is not the worker |
+| `this_process_worker_registered` | Whether **this API process** registered the `prediction_resolver` background task. It is not global worker health. Default Compose `server` and documented cron leave this `false`. |
+| `observed_at` | ISO-8601 UTC clock used as `as_of` for the due probe |
+| `claimable_due_count` | Length of the same claimable-due probe the next tick uses, **without** requeue writes |
+| `claimable_due_truncated` | `true` when the probe length reached its bound |
+| `claimable_due_probe_limit` | Probe cap (`max(1000, max_per_tick + 1)`, hard ceiling 10000; store `list_due` still caps at 1000) |
+| `oldest_due` | Up to 10 allowlisted rows, already oldest `resolve_after` first: `prediction_id`, `symbol`, `market`, `status` (`pending` or expired-lease `resolving`), `resolve_after`, `lag_seconds` |
+
+The GET is read-only. It never ticks, claims, requeues, starts, or constructs a resolver worker. Store read failure returns **503** and does not fake an empty backlog. Disabled / empty / API-without-worker states return **200** with the fields above.
+
+Claimable due is pending rows plus expired `resolving` leases. Ready `data_unavailable` retries are **not** counted until a tick requeues them, so `claimable_due_count` can be lower than the next tick's `due_before`. Growing `claimable_due_count` / `lag_seconds` is a **hint**, not proof the worker is stuck. Circuit-open, overlap-skip, and last-tick counters remain log-only; this endpoint does not ship process-local `last_tick`.
+
 ## Remaining epic boundaries
 
-- Prediction query / diagnostics HTTP API (outcomes are on the store row + logs)
+- Prediction query list / get-by-id HTTP API (remaining #1102)
+- p50/p95 resolve-lag histograms, durable today hit-rate counters, recent fetch-error recency, Prometheus / OTel, and a durable worker heartbeat
 - Trading-calendar `resolve_after` policy (#1109)
 - Postmortem lesson writer and adapter wiring (#1103 / #1106); this resolver provides only the bounded queue boundary
 

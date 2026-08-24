@@ -25758,6 +25758,102 @@
         "title": "PortfolioTradeListResponse",
         "type": "object"
       },
+      "PredictionResolverDiagnosticsResponse": {
+        "additionalProperties": false,
+        "description": "Read-only claimable-due diagnostics for this API process.",
+        "properties": {
+          "claimable_due_count": {
+            "minimum": 0.0,
+            "title": "Claimable Due Count",
+            "type": "integer"
+          },
+          "claimable_due_probe_limit": {
+            "minimum": 1.0,
+            "title": "Claimable Due Probe Limit",
+            "type": "integer"
+          },
+          "claimable_due_truncated": {
+            "title": "Claimable Due Truncated",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "interval_seconds": {
+            "title": "Interval Seconds",
+            "type": "integer"
+          },
+          "observed_at": {
+            "title": "Observed At",
+            "type": "string"
+          },
+          "oldest_due": {
+            "items": {
+              "$ref": "#/components/schemas/PredictionResolverOldestDueItem"
+            },
+            "title": "Oldest Due",
+            "type": "array"
+          },
+          "this_process_worker_registered": {
+            "title": "This Process Worker Registered",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled",
+          "interval_seconds",
+          "this_process_worker_registered",
+          "observed_at",
+          "claimable_due_count",
+          "claimable_due_truncated",
+          "claimable_due_probe_limit",
+          "oldest_due"
+        ],
+        "title": "PredictionResolverDiagnosticsResponse",
+        "type": "object"
+      },
+      "PredictionResolverOldestDueItem": {
+        "additionalProperties": false,
+        "description": "Identity and lag for one currently claimable due prediction.",
+        "properties": {
+          "lag_seconds": {
+            "minimum": 0.0,
+            "title": "Lag Seconds",
+            "type": "number"
+          },
+          "market": {
+            "title": "Market",
+            "type": "string"
+          },
+          "prediction_id": {
+            "title": "Prediction Id",
+            "type": "string"
+          },
+          "resolve_after": {
+            "title": "Resolve After",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "prediction_id",
+          "symbol",
+          "market",
+          "status",
+          "resolve_after",
+          "lag_seconds"
+        ],
+        "title": "PredictionResolverOldestDueItem",
+        "type": "object"
+      },
       "RateStressShock": {
         "additionalProperties": false,
         "properties": {
@@ -40182,6 +40278,53 @@
           }
         },
         "summary": "List configured Agent model deployments",
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agent/prediction-resolver/diagnostics": {
+      "get": {
+        "description": "只读返回当前可认领的到期预测（pending 与已过期 resolving 租约）。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。",
+        "operationId": "getPredictionResolverDiagnostics",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PredictionResolverDiagnosticsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "未登录或管理员会话无效（ADMIN_AUTH_ENABLED=true 时）"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "预测存储不可读，无法探测 claimable due"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "读取预测解析器到期诊断",
         "tags": [
           "Agent"
         ]

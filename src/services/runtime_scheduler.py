@@ -813,6 +813,19 @@ class RuntimeSchedulerService:
             "started_at": started_at,
         }
 
+    def has_registered_background_task(self, name: str) -> bool:
+        """Return whether this process already registered ``name``.
+
+        Cache-only: never constructs, starts, or reconciles background tasks.
+        A missing name, a never-started scheduler, or an empty registration
+        set all return False. This bit is this API process only and is not
+        global worker health.
+        """
+        canonical = str(name or "").strip()
+        if not canonical:
+            return False
+        return canonical in self._background_task_registered_names
+
     def status(self) -> Dict[str, Any]:
         scheduler = self._scheduler
         jobs = scheduler.schedule.get_jobs() if scheduler is not None else []

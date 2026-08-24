@@ -65,6 +65,36 @@
 - miss/partial outcome 可转交给注入的有界复盘队列。队列使用独立且显式受限的 drain 线程池，miss 优先；resolver 主链不会执行复盘 LLM 调用。
 - 每次 tick 的 summary/event 包含积压深度（有界探测）、最老到期延迟、解析率、拉取/错误/合并数量、延期量、熔断状态和复盘队列深度。
 
+## 诊断 HTTP
+
+已认证运营者可以在不写 SQL 的情况下查看当前**可认领**的到期工作：
+
+```http
+GET /api/v1/agent/prediction-resolver/diagnostics
+```
+
+鉴权与可选预测反馈 API 一致：`AuthMiddleware` 加上管理员会话 Cookie。当 `ADMIN_AUTH_ENABLED=true` 时，缺少或无效 Cookie 返回 **401** `unauthorized`（不是 403）。该路径不在鉴权豁免列表中。
+
+响应是构造出的允许列表（`extra=forbid`）：
+
+| 字段 | 含义 |
+| --- | --- |
+| `enabled` | 本 API 进程的 `PREDICTION_RESOLVE_ENABLED` |
+| `interval_seconds` | 已配置的轮询间隔（下限 30 秒），即使本进程不是 worker |
+| `this_process_worker_registered` | **本 API 进程**是否登记了 `prediction_resolver` 后台任务。这不是全局 worker 健康。默认 Compose `server` 与文档中的 cron 路径下该字段为 `false`。 |
+| `observed_at` | 用作 due 探测 `as_of` 的 ISO-8601 UTC 时钟 |
+| `claimable_due_count` | 与下一次 tick 相同的可认领探测长度，但 **不会** 执行 requeue 写操作 |
+| `claimable_due_truncated` | 探测长度达到上限时为 `true` |
+| `claimable_due_probe_limit` | 探测上限（`max(1000, max_per_tick + 1)`，硬顶 10000；存储层 `list_due` 仍硬顶 1000） |
+| `oldest_due` | 最多 10 条允许字段，已按最老 `resolve_after` 排序：`prediction_id`、`symbol`、`market`、`status`（`pending` 或租约过期的 `resolving`）、`resolve_after`、`lag_seconds` |
+
+该 GET 只读。它不会 tick、认领、重新排队、启动或构造 resolver worker。存储读取失败返回 **503**，不会伪装成空积压。开关关闭 / 空队列 / API 进程未挂 worker 时仍返回 **200** 并带上上述字段。
+
+可认领集合是 pending 行加上已过期的 `resolving` 租约。到期的 `data_unavailable` 重试在 tick 重新排队之前 **不会** 被计入，因此 `claimable_due_count` 可能低于下一次 tick 的 `due_before`。`claimable_due_count` / `lag_seconds` 增大只是**提示**，不能证明 worker 卡住。熔断、重叠跳过和上次 tick 计数仍只在日志中；本接口不提供进程内 `last_tick`。
+
 ## Epic 剩余边界
 
-预测查询 HTTP API、交易日历 `resolve_after`（#1109），以及复盘 lesson writer / adapter（#1103 / #1106）不在本变更中；resolver 只提供有界队列边界。
+- 预测查询列表 / 按 id 查询 HTTP API（剩余 #1102）
+- p50/p95 解析延迟直方图、持久化当日命中率、最近拉取错误、Prometheus / OTel，以及可跨进程证明 cron 健康的 worker 心跳
+- 交易日历 `resolve_after`（#1109）
+- 复盘 lesson writer / adapter（#1103 / #1106）；resolver 只提供有界队列边界

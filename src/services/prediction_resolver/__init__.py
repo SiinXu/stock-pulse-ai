@@ -26,6 +26,7 @@ from src.services.prediction_resolver.resolver import (
     build_prediction_resolver_background_tasks,
     compute_retry_delay_seconds,
     derive_aggregate_label,
+    list_claimable_due,
 )
 
 __all__ = [
@@ -46,4 +47,5 @@ __all__ = [
     "build_prediction_resolver_background_tasks",
     "compute_retry_delay_seconds",
     "derive_aggregate_label",
+    "list_claimable_due",
 ]
