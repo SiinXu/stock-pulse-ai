@@ -45,6 +45,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             key: os.environ.get(key)
             for key in (
                 "ENV_FILE",
+                "ADMIN_AUTH_ENABLED",
                 "STOCK_LIST",
                 "SCHEDULE_TIME",
                 "LOG_LEVEL",
@@ -90,6 +91,12 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
         Config.reset_instance()
         self.manager = ConfigManager(env_path=self.env_path)
         self.service = SystemConfigService(manager=self.manager)
+        self.security_audit = SecurityAuditRecorderStub()
+        self._audit_factory_patch = patch(
+            "src.services.security_audit_service.get_security_audit_service",
+            return_value=self.security_audit,
+        )
+        self._audit_factory_patch.start()
 
     def tearDown(self) -> None:
         queue = AnalysisTaskQueue._instance
@@ -109,6 +116,10 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
         os.environ.update(self._saved_notification_env)
         restore_ambient_llm_env(self._saved_llm_env)
         self.temp_dir.cleanup()
+        self._audit_factory_patch.stop()
+        from src.auth import refresh_auth_state
+
+        refresh_auth_state()
 
     def test_connectivity_probe_rejects_candidate_before_persist(self) -> None:
         before = self.env_path.read_bytes()
@@ -606,6 +617,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             connectivity_timeout_seconds=12,
             items=[{"key": "STOCK_LIST", "value": "300750"}],
         )
+        audit = SecurityAuditRecorderStub()
 
         with patch.object(
             system_config_api,
@@ -615,7 +627,7 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             response = system_config_api.update_system_config(
                 request=request,
                 service=service,
-                security_audit=SecurityAuditRecorderStub(),
+                security_audit=audit,
             )
 
         self.assertTrue(response.success)
@@ -627,6 +639,9 @@ class SystemConfigRuntimeReliabilityTestCase(unittest.TestCase):
             validate_connectivity=True,
             connectivity_timeout_seconds=12.0,
             actor="authenticated_admin",
+            security_audit=audit,
+            source="http_put",
+            audit_actor_id="authenticated_admin",
         )
 
     def test_rollback_api_returns_conflict_when_snapshot_is_unavailable(self) -> None:

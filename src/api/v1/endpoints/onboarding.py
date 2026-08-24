@@ -9,8 +9,13 @@ from typing import Any, Dict, Literal
 
 from fastapi import APIRouter, Depends
 
-from src.api.deps import get_system_config_service
+from src.api.deps import get_security_audit_service, get_system_config_service
 from src.api.v1.errors import api_error
+from src.api.v1.services.system_config_write_audit import (
+    map_system_config_write_audit_exception,
+    raise_system_config_write_audit_unavailable,
+    system_config_write_audit_actor_id,
+)
 from src.api.v1.schemas.common import ErrorResponse
 from src.api.v1.schemas.onboarding import (
     DemoAnalysisResponse,
@@ -28,10 +33,12 @@ from src.services.onboarding_plan_service import (
     OnboardingProfileValidationError,
     OnboardingSecretRejectedError,
 )
+from src.services.security_audit_service import SecurityAuditUnavailable
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
 )
 from src.utils.sanitize import log_safe_exception
 
@@ -42,6 +49,7 @@ _ERROR_RESPONSES = {
     400: {"model": ErrorResponse},
     409: {"model": ErrorResponse},
     500: {"model": ErrorResponse},
+    503: {"model": ErrorResponse, "description": "Security audit unavailable (operation_completed)"},
 }
 
 
@@ -102,12 +110,16 @@ def generate_onboarding_plan(
     summary="Apply non-secret onboarding config recommendations",
     description=(
         "Writes only non-secret config keys through SystemConfigService. "
-        "Secrets are never invented; remaining secret steps stay in the plan todos."
+        "Secrets are never invented; remaining secret steps stay in the plan todos. "
+        "Attempt-store failure returns 503 operation_completed=false. After persist, "
+        "completion-store failure returns 503 operation_completed=true with "
+        "config_version, applied_count, and reload_triggered."
     ),
 )
 def apply_onboarding_plan(
     request: OnboardingApplyRequest,
     system_config: SystemConfigService = Depends(get_system_config_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> OnboardingApplyResponse:
     service = _plan_service(system_config)
     try:
@@ -117,6 +129,8 @@ def apply_onboarding_plan(
             model_available=request.model_available,
             prefer_llm=request.prefer_llm,
             confirm=request.confirm,
+            security_audit=security_audit,
+            audit_actor_id=system_config_write_audit_actor_id(),
         )
         return OnboardingApplyResponse.model_validate({
             **payload,
@@ -147,7 +161,10 @@ def apply_onboarding_plan(
         ) from exc
     except OnboardingPlanError as exc:
         raise api_error(400, exc.error_code, str(exc)) from exc
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+        map_system_config_write_audit_exception(exc)
         log_safe_exception(
             logger,
             "Onboarding plan apply failed",

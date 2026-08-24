@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import os
 from typing import Any, Mapping
@@ -12,8 +11,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from src.api.deps import (
     get_runtime_scheduler_service,
+    get_security_audit_service,
     get_system_config_service,
     require_security_audit_service,
+)
+from src.api.v1.services.system_config_write_audit import (
+    map_system_config_write_audit_exception,
+    require_system_config_write_audit,
+    raise_system_config_write_audit_unavailable,
+    system_config_write_audit_actor_id,
 )
 from src.api.v1.errors import api_error
 from src.api.v1.schemas.common import ErrorResponse
@@ -56,6 +62,7 @@ from src.services.system_config_service import (
     ConfigRollbackError,
     ConfigValidationError,
     SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
 )
 from src.services.runtime_scheduler import RuntimeSchedulerService
 from src.services.security_audit_service import (
@@ -65,7 +72,6 @@ from src.services.security_audit_service import (
     require_security_audit_recorder,
 )
 from src.schemas.security_audit import (
-    SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS,
     SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH,
 )
 from src.utils.sanitize import log_safe_exception
@@ -84,34 +90,6 @@ def _require_config_audit_service(value: object) -> SecurityAuditRecorder:
             "security_audit_unavailable",
             "Security audit storage is unavailable",
         ) from None
-
-
-def _config_audit_metadata(request: UpdateSystemConfigRequest) -> dict[str, Any]:
-    """Build bounded, reproducible evidence for an arbitrary-size config update."""
-    canonical_keys = sorted({item.key for item in request.items})
-    canonical_payload = json.dumps(
-        canonical_keys,
-        ensure_ascii=True,
-        separators=(",", ":"),
-    ).encode("utf-8")
-
-    def _bounded_identity(value: str) -> str:
-        if len(value) <= SECURITY_AUDIT_MAX_METADATA_STRING_LENGTH:
-            return value
-        return f"sha256:{hashlib.sha256(value.encode('utf-8')).hexdigest()}"
-
-    return {
-        "key_sample": [
-            _bounded_identity(key)
-            for key in canonical_keys[:SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS]
-        ],
-        "key_count": len(canonical_keys),
-        "item_count": len(request.items),
-        "keys_sha256": hashlib.sha256(canonical_payload).hexdigest(),
-        "keys_truncated": len(canonical_keys) > SECURITY_AUDIT_MAX_METADATA_LIST_ITEMS,
-        "config_version": _bounded_identity(request.config_version),
-        "reload_now": request.reload_now,
-    }
 
 
 def _record_config_audit(
@@ -184,11 +162,7 @@ def _backup_audit_metadata(
 
 def _config_audit_actor() -> str:
     """Return the attributable operator class available in the single-admin model."""
-    if os.getenv("DSA_DESKTOP_MODE") == "true":
-        return "desktop_operator"
-    if is_auth_enabled():
-        return "authenticated_admin"
-    return "local_operator"
+    return system_config_write_audit_actor_id()
 
 
 def _log_config_exception(
@@ -689,21 +663,31 @@ def preview_legacy_channels_migration(
         400: {"description": "Validation error", "model": SystemConfigValidationErrorResponse},
         409: {"description": "Config version conflict", "model": SystemConfigConflictResponse},
         500: {"description": "Internal server error", "model": ErrorResponse},
+        503: {"description": "Security audit unavailable (operation_completed)", "model": ErrorResponse},
     },
     summary="Apply Legacy -> Channels migration",
-    description="Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels.",
+    description=(
+        "Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels. "
+        "Attempt-store failure returns 503 operation_completed=false and does not persist. "
+        "After persist, completion-store failure returns 503 operation_completed=true with "
+        "config_version, applied_count, and reload_triggered."
+    ),
 )
 def apply_legacy_channels_migration(
     payload: UpdateSystemConfigRequest,
     service: SystemConfigService = Depends(get_system_config_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> dict:
     """Apply the Legacy -> Channels migration atomically."""
     try:
+        audit_actor_id = _config_audit_actor()
         return service.apply_legacy_channels_migration(
             config_version=payload.config_version,
             validate_connectivity=payload.validate_connectivity,
             connectivity_timeout_seconds=payload.connectivity_timeout_seconds,
-            actor=_config_audit_actor(),
+            actor=audit_actor_id,
+            security_audit=security_audit,
+            audit_actor_id=audit_actor_id,
         )
     except ConfigValidationError as exc:
         raise HTTPException(status_code=400, detail={"error": "validation_error", "issues": exc.issues})
@@ -712,7 +696,10 @@ def apply_legacy_channels_migration(
             status_code=409,
             detail={"error": "config_conflict", "current_config_version": exc.current_version},
         )
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - map migration failures to a sanitized API error
+        map_system_config_write_audit_exception(exc)
         log_safe_exception(
             logger,
             "Legacy channel migration apply failed",
@@ -821,26 +808,27 @@ def test_generation_backend(
         400: {"description": "Validation failed", "model": SystemConfigValidationErrorResponse},
         409: {"description": "Version conflict", "model": SystemConfigConflictResponse},
         500: {"description": "Internal server error", "model": ErrorResponse},
-        503: {"description": "Security audit unavailable", "model": ErrorResponse},
+        503: {
+            "description": "Security audit unavailable (operation_completed)",
+            "model": ErrorResponse,
+        },
     },
     summary="Update system configuration",
-    description="Update key-value pairs in .env. Mask token preserves existing secret values.",
+    description=(
+        "Update key-value pairs in .env. Mask token preserves existing secret values. "
+        "Attempt-store failure returns 503 operation_completed=false and does not persist. "
+        "After persist, completion-store failure returns 503 operation_completed=true with "
+        "config_version, applied_count, and reload_triggered."
+    ),
 )
 def update_system_config(
     request: UpdateSystemConfigRequest,
     service: SystemConfigService = Depends(get_system_config_service),
-    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
+    security_audit: object = Depends(get_security_audit_service),
 ) -> UpdateSystemConfigResponse:
     """Validate and persist system configuration updates."""
-    audit_service = _require_config_audit_service(security_audit)
-    correlation_id = SecurityAuditService.new_correlation_id()
-    audit_metadata = _config_audit_metadata(request)
-    _record_config_audit(
-        audit_service,
-        phase="attempt",
-        correlation_id=correlation_id,
-        metadata=audit_metadata,
-    )
+    recorder = require_system_config_write_audit(security_audit)
+    audit_actor_id = _config_audit_actor()
     try:
         payload = service.update(
             config_version=request.config_version,
@@ -849,17 +837,12 @@ def update_system_config(
             reload_now=request.reload_now,
             validate_connectivity=request.validate_connectivity,
             connectivity_timeout_seconds=request.connectivity_timeout_seconds,
-            actor=_config_audit_actor(),
+            actor=audit_actor_id,
+            security_audit=recorder,
+            source="http_put",
+            audit_actor_id=audit_actor_id,
         )
     except ConfigValidationError as exc:
-        _record_config_audit(
-            audit_service,
-            phase="completion",
-            correlation_id=correlation_id,
-            outcome="rejected",
-            reason_code="validation_failed",
-            metadata=audit_metadata,
-        )
         raise HTTPException(
             status_code=400,
             detail={
@@ -869,14 +852,6 @@ def update_system_config(
             },
         )
     except ConfigConflictError as exc:
-        _record_config_audit(
-            audit_service,
-            phase="completion",
-            correlation_id=correlation_id,
-            outcome="rejected",
-            reason_code="config_version_conflict",
-            metadata=audit_metadata,
-        )
         raise HTTPException(
             status_code=409,
             detail={
@@ -885,15 +860,10 @@ def update_system_config(
                 "current_config_version": exc.current_version,
             },
         )
+    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable) as exc:
+        raise_system_config_write_audit_unavailable(exc)
     except Exception as exc:  # broad-exception: fallback_recorded - map update failures to a sanitized API error
-        _record_config_audit(
-            audit_service,
-            phase="completion",
-            correlation_id=correlation_id,
-            outcome="failure",
-            reason_code="config_update_failed",
-            metadata=audit_metadata,
-        )
+        map_system_config_write_audit_exception(exc)
         log_safe_exception(
             logger,
             "System configuration update failed",
@@ -907,14 +877,6 @@ def update_system_config(
                 "message": "Failed to update system configuration",
             },
         )
-    _record_config_audit(
-        audit_service,
-        phase="completion",
-        correlation_id=correlation_id,
-        outcome="success",
-        reason_code="config_updated",
-        metadata=audit_metadata,
-    )
     return UpdateSystemConfigResponse.model_validate(payload)
 
 

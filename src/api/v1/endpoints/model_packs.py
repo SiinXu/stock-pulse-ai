@@ -11,6 +11,9 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
 from src.api.deps import get_local_model_service, get_model_pack_import_service
+from src.api.v1.services.system_config_write_audit import (
+    system_config_write_audit_actor_id,
+)
 from src.api.middlewares.model_pack_upload import (
     MAX_MODEL_PACK_UPLOAD_BYTES,
     model_pack_too_large_detail,
@@ -163,6 +166,12 @@ def import_model_pack(
 @router.post(
     "/desktop-activations",
     response_model=LocalModelMutationResponse,
+    responses={
+        503: {
+            "description": "Security audit unavailable (operation_completed)",
+            "model": ErrorResponse,
+        },
+    },
     summary="Activate a Desktop-validated Model Pack",
     description=(
         "Register a model created by the isolated Desktop importer against an "
@@ -193,6 +202,7 @@ def activate_desktop_model_pack(
             license_id=request.license_id,
             expected_config_version=request.expected_config_version,
             expected_runtime_identity=request.expected_runtime_identity,
+            audit_actor_id=system_config_write_audit_actor_id(),
         )
         payload["success"] = True
         return LocalModelMutationResponse.model_validate(payload)

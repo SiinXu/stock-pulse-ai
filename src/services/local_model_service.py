@@ -18,12 +18,24 @@ import requests
 from src.llm.model_ref import decode_model_ref
 from src.llm.provider_catalog import get_provider
 from src.model_pack.errors import ModelPackError
-from src.model_pack.manifest import MAX_MODEL_ID_LENGTH, normalize_manifest_text
+from src.model_pack.manifest import normalize_manifest_text
 from src.security.http_bind import is_local_only_bind
+from src.services.local_model_errors import (
+    LocalModelError,
+    LocalModelInUseError,
+    LocalModelNotAllowedError,
+    LocalModelNotInstalledError,
+    LocalModelRuntimeRequestError,
+    LocalModelRuntimeUnavailableError,
+    LocalModelValidationError,
+    normalize_local_model_id,
+)
+from src.services.security_audit_service import SecurityAuditUnavailable
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
 )
 from src.services.task_queue import AnalysisTaskQueue, TaskInfo
 from src.task_execution import TaskCommand, TaskRunContext, TaskStatusEnum
@@ -40,12 +52,7 @@ OLLAMA_PULL_TIMEOUT_SECONDS = 30.0 * 60.0
 OLLAMA_MAX_JSON_BYTES = 4 * 1024 * 1024
 OLLAMA_MAX_EVENT_BYTES = 64 * 1024
 LOCAL_MODEL_PULL_TASK_KIND = "local_model_pull"
-LOCAL_MODEL_ID_PATTERN = re.compile(
-    r"^[A-Za-z0-9][A-Za-z0-9._-]*(?:/[A-Za-z0-9][A-Za-z0-9._-]*)*"
-    r"(?::[A-Za-z0-9][A-Za-z0-9._-]*)?$"
-)
 LOCAL_MODEL_RUNTIME_IDENTITY_PATTERN = re.compile(r"^[0-9a-f]{64}$")
-LOCAL_MODEL_MAX_ID_LENGTH = MAX_MODEL_ID_LENGTH
 LOCAL_MODEL_REGISTRATION_RECOVERY_TTL_SECONDS = 5.0 * 60.0
 LocalModelAssignment = Literal["auto", "primary", "agent"]
 ImportedModelMetadataProvider = Callable[[str], Iterable[Mapping[str, Any]]]
@@ -67,60 +74,6 @@ class _LocalModelPullActivationHandler(Protocol):
 
 
 logger = logging.getLogger(__name__)
-
-
-class LocalModelError(Exception):
-    """Base error for stable local-model service failures."""
-
-    error_code = "local_model_error"
-
-
-class LocalModelValidationError(LocalModelError):
-    """Raised when a model identifier or requested operation is invalid."""
-
-    error_code = "invalid_local_model"
-
-
-class LocalModelNotAllowedError(LocalModelError):
-    """Raised when a model is not pullable from the authoritative catalog."""
-
-    error_code = "local_model_not_pullable"
-
-
-class LocalModelNotInstalledError(LocalModelError):
-    """Raised when assignment targets a catalog model absent from Ollama."""
-
-    error_code = "local_model_not_installed"
-
-
-class LocalModelRuntimeUnavailableError(LocalModelError):
-    """Raised when the configured Ollama runtime cannot be reached."""
-
-    error_code = "local_model_runtime_unavailable"
-
-
-class LocalModelRuntimeRequestError(LocalModelError):
-    """Raised when Ollama rejects or malforms a lifecycle request."""
-
-    error_code = "local_model_runtime_request_failed"
-
-
-class LocalModelInUseError(LocalModelError):
-    """Raised when deletion would invalidate an active model assignment."""
-
-    error_code = "local_model_in_use"
-
-
-def normalize_local_model_id(value: Any) -> str:
-    """Return a safe Ollama model identifier or raise a stable validation error."""
-    model_id = str(value or "").strip()
-    if (
-        not model_id
-        or len(model_id) > LOCAL_MODEL_MAX_ID_LENGTH
-        or LOCAL_MODEL_ID_PATTERN.fullmatch(model_id) is None
-    ):
-        raise LocalModelValidationError("Invalid local model identifier")
-    return model_id
 
 
 def normalize_ollama_base_url(value: Any) -> str:
@@ -816,11 +769,16 @@ class LocalModelService:
         model_id: Any,
         *,
         assignment: LocalModelAssignment = "auto",
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Register one model and optionally assign it without stealing an existing default."""
         with self._operation_lock:
             normalized = normalize_local_model_id(model_id)
-            return self._register_installed_model(normalized, assignment=assignment)
+            return self._register_installed_model(
+                normalized,
+                assignment=assignment,
+                audit_actor_id=audit_actor_id,
+            )
 
     def activate_desktop_model(
         self,
@@ -828,6 +786,7 @@ class LocalModelService:
         *,
         expected_config_version: Any,
         expected_runtime_identity: Any,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Activate a Desktop pull only when its runtime snapshot is still current."""
         with self._operation_lock:
@@ -845,6 +804,7 @@ class LocalModelService:
                 config_version=config_version,
                 values=values,
                 base_url=base_url,
+                audit_actor_id=audit_actor_id,
             )
 
     def activate_desktop_imported_model(
@@ -854,6 +814,7 @@ class LocalModelService:
         expected_config_version: Any,
         expected_runtime_identity: Any,
         persist_metadata: Callable[[], Any],
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Register a Desktop-validated import against its immutable runtime snapshot."""
         with self._operation_lock:
@@ -880,6 +841,7 @@ class LocalModelService:
                 values=values,
                 base_url=base_url,
                 before_persist=persist_metadata,
+                audit_actor_id=audit_actor_id,
             )
 
     def _register_installed_model(
@@ -887,6 +849,7 @@ class LocalModelService:
         normalized: str,
         *,
         assignment: LocalModelAssignment,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         self._require_no_pending_unregistration(normalized)
         if assignment not in {"auto", "primary", "agent"}:
@@ -901,6 +864,7 @@ class LocalModelService:
             config_version=config_version,
             values=values,
             base_url=base_url,
+            audit_actor_id=audit_actor_id,
         )
 
     def _register_installed_model_from_snapshot(
@@ -911,6 +875,7 @@ class LocalModelService:
         config_version: str,
         values: Mapping[str, str],
         base_url: str,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         if assignment not in {"auto", "primary", "agent"}:
             raise LocalModelValidationError("Invalid local model assignment")
@@ -928,6 +893,7 @@ class LocalModelService:
             config_version=config_version,
             values=values,
             base_url=base_url,
+            audit_actor_id=audit_actor_id,
         )
 
     def _configure_model_from_snapshot(
@@ -938,6 +904,7 @@ class LocalModelService:
         config_version: str,
         values: Mapping[str, str],
         base_url: str,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Activate a verified model against one immutable runtime/config snapshot."""
         with self._operation_lock:
@@ -947,6 +914,7 @@ class LocalModelService:
                 config_version=config_version,
                 values=values,
                 base_url=base_url,
+                audit_actor_id=audit_actor_id,
             )
 
     def _configure_model_from_snapshot_locked(
@@ -958,6 +926,7 @@ class LocalModelService:
         values: Mapping[str, str],
         base_url: str,
         before_persist: Optional[Callable[[], Any]] = None,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         updates, selected_primary = self._build_model_configuration_update(
             normalized,
@@ -970,6 +939,7 @@ class LocalModelService:
         result = self._persist_model_configuration(
             config_version=config_version,
             updates=updates,
+            audit_actor_id=audit_actor_id,
         )
         configuration = self.get_configuration()
         return {
@@ -1040,9 +1010,7 @@ class LocalModelService:
             and not had_channels
             and has_legacy
         ):
-            # Adding the first channel would otherwise make auto mode silently
-            # supersede an existing legacy primary model.
-            updates.append({"key": "LLM_CONFIG_MODE", "value": "legacy"})
+            updates.append({"key": "LLM_CONFIG_MODE", "value": "legacy"})  # keep auto from replacing an existing legacy primary
 
         return updates, selected_primary
 
@@ -1051,6 +1019,7 @@ class LocalModelService:
         *,
         config_version: str,
         updates: Sequence[Dict[str, str]],
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Persist and activate one prevalidated local-model configuration update."""
         return self._system_config_service.update(
@@ -1059,6 +1028,7 @@ class LocalModelService:
             reload_now=True,
             validate_connectivity=False,
             actor="local_model_center",
+            audit_actor_id=audit_actor_id,
         )
 
     def unregister_model(
@@ -1067,6 +1037,7 @@ class LocalModelService:
         *,
         expected_config_version: Any,
         expected_runtime_identity: Any,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Reserve Desktop deletion and remove any non-active registration."""
         with self._task_lock, self._operation_lock:
@@ -1098,6 +1069,7 @@ class LocalModelService:
                         normalized,
                         config_version=config_version,
                         values=values,
+                        audit_actor_id=audit_actor_id,
                     )
                 self._prune_registration_recoveries()
                 self._registration_recoveries[recovery_token] = (
@@ -1147,6 +1119,7 @@ class LocalModelService:
         model_id: Any,
         *,
         recovery_token: Any,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Release a reservation and restore removed registration when weights remain."""
         with self._operation_lock:
@@ -1198,6 +1171,7 @@ class LocalModelService:
                         reload_now=True,
                         validate_connectivity=False,
                         actor="local_model_registration_restore",
+                        audit_actor_id=audit_actor_id,
                     )
                 return {
                     **result,
@@ -1213,6 +1187,7 @@ class LocalModelService:
         *,
         config_version: str,
         values: Mapping[str, str],
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Remove one model using the exact configuration snapshot already validated."""
         if self._is_model_referenced(values, normalized):
@@ -1248,6 +1223,7 @@ class LocalModelService:
             reload_now=True,
             validate_connectivity=False,
             actor="local_model_center",
+            audit_actor_id=audit_actor_id,
         )
         return {**result, **self.get_configuration(), "model_id": normalized}
 
@@ -1377,11 +1353,11 @@ class LocalModelService:
                             "activated": False,
                             "selected_primary": False,
                         }
+                except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable):
+                    raise
                 except Exception as exc:  # broad-exception: fallback_recorded - download already succeeded
                     log_safe_exception(
-                        logger,
-                        "Local model activation failed after download",
-                        exc,
+                        logger, "Local model activation failed after download", exc,
                         error_code="local_model_activation_failed",
                         context={"model_id": normalized},
                     )
@@ -1432,12 +1408,22 @@ class LocalModelService:
             "result": result,
         }
 
-    def delete_model(self, model_id: Any) -> Dict[str, Any]:
+    def delete_model(
+        self,
+        model_id: Any,
+        *,
+        audit_actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Validate and unregister one catalog model before deleting its weights."""
         with self._task_lock, self._operation_lock:
-            return self._delete_model(model_id)
+            return self._delete_model(model_id, audit_actor_id=audit_actor_id)
 
-    def _delete_model(self, model_id: Any) -> Dict[str, Any]:
+    def _delete_model(
+        self,
+        model_id: Any,
+        *,
+        audit_actor_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """Apply the server-side unregister/delete transaction for one model."""
         normalized = self._require_pullable(model_id)
         self._require_no_pending_unregistration(normalized)
@@ -1465,6 +1451,7 @@ class LocalModelService:
             normalized,
             config_version=config_version,
             values=previous_values,
+            audit_actor_id=audit_actor_id,
         )
         client = self._client_factory(base_url)
         try:
@@ -1527,12 +1514,13 @@ class LocalModelService:
                             reload_now=True,
                             validate_connectivity=False,
                             actor="local_model_delete_rollback",
+                            audit_actor_id=audit_actor_id,
                         )
+                    except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable):
+                        raise
                     except Exception as rollback_exc:  # broad-exception: fallback_recorded - preserve original boundary
                         log_safe_exception(
-                            logger,
-                            "Local model registration recovery failed",
-                            rollback_exc,
+                            logger, "Local model registration recovery failed", rollback_exc,
                             error_code="local_model_delete_rollback_failed",
                             context={"model_id": normalized},
                         )

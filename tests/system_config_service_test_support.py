@@ -22,7 +22,9 @@ ensure_litellm_stub()
 from src.config import ANSPIRE_LLM_MODEL_DEFAULT, DEFAULT_ALPHASIFT_INSTALL_SPEC, Config
 from src.core.config_manager import ConfigManager
 from src.llm.backend_registry import GENERATION_ONLY_BACKEND_IDS
+from src.auth import refresh_auth_state
 from src.services.system_config_service import ConfigConflictError, ConfigImportError, ConfigValidationError, SystemConfigService
+from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 
 class _SystemConfigServiceTestCaseBase(unittest.TestCase):
@@ -68,6 +70,12 @@ class _SystemConfigServiceTestCaseBase(unittest.TestCase):
 
         self.manager = ConfigManager(env_path=self.env_path)
         self.service = SystemConfigService(manager=self.manager)
+        self.security_audit = SecurityAuditRecorderStub()
+        self._audit_factory_patch = patch(
+            "src.services.security_audit_service.get_security_audit_service",
+            return_value=self.security_audit,
+        )
+        self._audit_factory_patch.start()
 
     def tearDown(self) -> None:
         Config.reset_instance()
@@ -89,6 +97,8 @@ class _SystemConfigServiceTestCaseBase(unittest.TestCase):
         self.temp_dir.cleanup()
         os.environ.clear()
         os.environ.update(self._original_process_env)
+        self._audit_factory_patch.stop()
+        refresh_auth_state()
 
     def _rewrite_env(self, *lines: str) -> None:
         self.env_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

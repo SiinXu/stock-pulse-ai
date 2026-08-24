@@ -31,10 +31,12 @@ from src.services.local_runtime_detect import (
     LocalRuntimeDetectResult,
     detect_local_runtime_from_config_map,
 )
+from src.services.security_audit_service import SecurityAuditUnavailable
 from src.services.system_config_service import (
     ConfigConflictError,
     ConfigValidationError,
     SystemConfigService,
+    SystemConfigWriteAuditCompletionUnavailable,
 )
 from src.utils.sanitize import log_safe_exception
 
@@ -740,6 +742,8 @@ class OnboardingPlanService:
         prefer_llm: bool = False,
         confirm: bool = True,
         actor: str = "onboarding_plan_service",
+        security_audit: Any = None,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Apply non-secret recommended config via SystemConfigService and persist profile."""
         if not confirm:
@@ -776,8 +780,13 @@ class OnboardingPlanService:
                     reload_now=True,
                     validate_connectivity=False,
                     actor=actor,
+                    security_audit=security_audit,
+                    source="onboarding_apply",
+                    audit_actor_id=audit_actor_id,
                 )
             except (ConfigValidationError, ConfigConflictError):
+                raise
+            except (SecurityAuditUnavailable, SystemConfigWriteAuditCompletionUnavailable):
                 raise
             except Exception as exc:  # broad-exception: fallback_recorded - surface as internal
                 log_safe_exception(

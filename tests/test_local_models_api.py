@@ -890,6 +890,48 @@ def test_unreachable_runtime_returns_manual_command_without_endpoint_details() -
     assert "private-runtime" not in response.text
 
 
+def test_delete_passes_audit_actor_id_to_the_service() -> None:
+    service = _FakeLocalModelService()
+    response = asyncio.run(
+        _request(
+            service,
+            "DELETE",
+            "/api/v1/local-models/models",
+            json={"model_id": "qwen3:4b"},
+        )
+    )
+
+    assert response.status_code == 200
+    service.delete_model.assert_called_once_with(
+        "qwen3:4b",
+        audit_actor_id="local_operator",
+    )
+
+
+def test_unregister_passes_audit_actor_id_to_the_service() -> None:
+    service = _FakeLocalModelService()
+    response = asyncio.run(
+        _request(
+            service,
+            "DELETE",
+            "/api/v1/local-models/registrations",
+            json={
+                "model_id": "qwen3:4b",
+                "expected_config_version": "config-1",
+                "expected_runtime_identity": DEFAULT_RUNTIME_IDENTITY,
+            },
+        )
+    )
+
+    assert response.status_code == 200
+    service.unregister_model.assert_called_once_with(
+        "qwen3:4b",
+        expected_config_version="config-1",
+        expected_runtime_identity=DEFAULT_RUNTIME_IDENTITY,
+        audit_actor_id="local_operator",
+    )
+
+
 def test_delete_rejects_an_active_model_before_mutation() -> None:
     service = _FakeLocalModelService()
     service.delete_model.side_effect = LocalModelInUseError("active")
@@ -920,7 +962,11 @@ def test_assignment_forbids_unknown_fields_and_keeps_primary_action_explicit() -
 
     assert response.status_code == 200
     assert response.json()["selected_primary"] is True
-    service.configure_model.assert_called_once_with("qwen3:4b", assignment="primary")
+    service.configure_model.assert_called_once_with(
+        "qwen3:4b",
+        assignment="primary",
+        audit_actor_id="local_operator",
+    )
 
 
 def test_assignment_rejects_a_catalog_model_missing_from_the_runtime() -> None:
@@ -962,6 +1008,7 @@ def test_desktop_activation_passes_only_snapshot_assertions_to_the_service() -> 
         "qwen3:4b",
         expected_config_version="config-1",
         expected_runtime_identity=DEFAULT_RUNTIME_IDENTITY,
+        audit_actor_id="local_operator",
     )
 
 
@@ -1006,6 +1053,7 @@ def test_registration_restore_passes_the_server_issued_recovery_token() -> None:
     service.restore_registration.assert_called_once_with(
         "qwen3:4b",
         recovery_token="registration-recovery-1",
+        audit_actor_id="local_operator",
     )
 
 

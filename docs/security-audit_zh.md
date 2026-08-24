@@ -61,7 +61,7 @@ English version: [Durable Security Audit](security-audit.md).
 | 认证启用/禁用 | `auth.policy` | **已落地** | 同上；AUTH-04 再认证仍在；不存储密码 |
 | 登出 / 会话失效 | `auth.logout` | **已落地** | 会话密钥轮转嵌在该路径内 |
 | 修改密码 | `auth.password_change` | **已落地** | 成功与拒绝均审计 |
-| 敏感配置创建/更新 | `system_config.write` | **部分** | 仅 HTTP `src/api/v1/endpoints/system_config.py`。`SystemConfigService.update` 本身无 recorder；配置预设、onboarding apply、本地模型配置写入会旁路。负责人：DAG-5 |
+| 敏感配置创建/更新 | `system_config.write` | **已落地** | 唯一写入器是 `SystemConfigService.update`。HTTP 适配器注入 `audit_actor_id`；写入器不探测 `is_auth_enabled()`。HTTP PUT `/config` 注入 recorder 且 `source=http_put`，不再双写。嵌套 `.env` 导入仍只写 `system_config.import`。 |
 | 配置导出 | `system_config.export` | **已落地** | 仅版本/字节长度，不含 `.env` 正文 |
 | 配置导入 | `system_config.import` | **已落地** | 同上边界 |
 | 配置回滚 | `system_config.rollback` | **已落地** | attempt 失败则阻止恢复 |
@@ -97,10 +97,11 @@ English version: [Durable Security Audit](security-audit.md).
 | 分析 HTTP cancel | `src/api/v1/endpoints/analysis.py` `cancel_analysis_task` → `AnalysisApiService.cancel_analysis_task` | **已落地** | `analysis.cancel` 仅在 HTTP 适配器上先 attempt 再 cancel。Actor 为 `api_client` / `analysis_canceller`。现有 200/404 协议不变。attempt 写入失败的 `503` 为 `operation_completed=false` 且不调用 `cancel`。cancel 已执行但 completion 失败的 `503` 为 `operation_completed=true` 并带 `task_id`/`status`。拒绝/失败 completion 为尽力写入，不得覆盖领域 `404`。内部队列 cancel、候选发现 cancel、worker 轮询、MCP `mcp.request.cancel` 不是本事件 | DAG-3 |
 | 报告 Markdown/HTML/PDF 导出 | `src/api/v1/endpoints/report_export.py` `export_history_report` | **已落地** | `report.export` 仅在 HTTP 适配器上先 attempt 再生成字节。Actor 为 `administrator` / `authenticated_admin`/`local_operator`/`desktop_operator`。非法 format 仍在 attempt 前返回 400。attempt 写入失败的 `503` 为 `operation_completed=false` 且不加载 markdown、不生成字节。生成已完成后 completion 失败的 `503` 为 `operation_completed=true` 并带 `record_id`/`format`，不返回文件。领域 `404`/`413`/`429`/`500`/`503` 导出状态码保持不变；拒绝/失败 completion 为尽力写入。当数字 lookup key 经 `query_id` 解析到另一行时，completion 使用已解析主键。`GET /history/export/capabilities` 与 `GET /history/{id}/markdown` 不是本事件 | DAG-4 |
 | 历史删除（按代码 / 按 id） | `src/api/v1/endpoints/history.py` `delete_history_by_code` / `delete_history_records` | **已落地** | `history.delete` 仅在 HTTP 适配器上先 attempt 再删除。Actor 与报告导出相同。空白代码与空 `record_ids` 仍在 attempt 前返回 400。attempt 写入失败的 `503` 为 `operation_completed=false` 且不删除。删除已发生但 completion 失败的 `503` 为 `operation_completed=true` 并带 `scope`/`deleted`。零删除仍是 HTTP 200 且 `delete_completed`。id 列表有界（`id_sample` ≤64，`ids_truncated`）。内部 `HistoryService.delete_history_*` 不是本事件 | DAG-4 |
-| 配置预设应用/保存 | `src/services/config_profile_service.py` → `SystemConfigService.update` | **缺失** | 与 HTTP `system_config.write` 同一特权配置变更 | DAG-5 |
-| Onboarding apply | `src/services/onboarding_plan_service.py` → `SystemConfigService.update` | **缺失** | 同一未审计配置写入器 | DAG-5 |
-| 写入配置的本地模型注册/分配/删除 | `src/services/local_model_service.py` → `SystemConfigService.update` | **缺失** | 运行时模型控制面走同一未审计 updater | DAG-5 |
-| 模型包导入 / 桌面激活 | `src/api/v1/endpoints/model_packs.py` | **缺失** | 可信制品安装 | DAG-5 / 具名延期 |
+| 配置预设应用/保存 | `src/services/config_profile_service.py` → `SystemConfigService.update` | **已落地** | 与 HTTP PUT 同一 `system_config.write` 对；跳过 `update()` 的空 no-op 不写行 | DAG-5 |
+| Onboarding apply | `src/services/onboarding_plan_service.py` → `SystemConfigService.update` | **已落地** | 同一写入器；`confirm=false` 仍在 `update()` 前返回 400 | DAG-5 |
+| 写入配置的本地模型注册/分配/删除 | `src/services/local_model_service.py` → `SystemConfigService.update` | **已落地** | `source=local_model`；HTTP 将 attempt/completion 不可用映射为带 `operation_completed` 的 503 | DAG-5 |
+| 自选 `STOCK_LIST` 增删 | `src/api/v1/endpoints/stocks.py` `_write_watchlist_codes` → `SystemConfigService.update` | **已落地** | 同一写入器，`source=watchlist`，共享 503 映射（`config_version` / `applied_count` / `reload_triggered`）。其余自选分组产品数据仍延期 | DAG-5 |
+| 模型包导入 / 桌面激活 | `src/api/v1/endpoints/model_packs.py` | **具名延期** | 可信制品安装（上传/暂存/解包）仍延期。桌面激活配置写入走 `update()`，已作为 `system_config.write` 落地 | DAG-5 / 具名负责人 |
 | HTTP 市场复盘 / 候选发现 / AlphaSift | analysis API、`candidate_discovery.py`、`alphasift.py` 的 `submit_background_task` | **缺失** | 另一套队列 API 上的特权后台执行。**不是** DAG-1 | 覆盖图具名行；后续负责人 |
 | 投资框架变更 | `src/services/investment_framework_service.py` | **缺失** | 分析策略内容；除非明确视为策略控制，否则延期 | 延期，除非重新归类 |
 
@@ -146,8 +147,7 @@ ids_truncated，不含公司名或无界 id 列表。HTTP `503`
 research-pack 的 `admin_session` `403`。能力探测、markdown GET 与内部
 HistoryService 删除不写这些事件。
 
-DAG-5 应在 `SystemConfigService.update` 上审计一次，而不是逐入口打补丁。
-已经审计的 HTTP `system_config.write` 路径不得重复写入。
+DAG-5 在 `SystemConfigService.update` 上只写一次 `system_config.write`。HTTP PUT 不再双写。嵌套导入仍只写 `system_config.import`。attempt 写入失败不调用 `apply_updates`。持久化后 completion 失败为 HTTP `503` `operation_completed=true`，并在每个可写适配器上带 `config_version` / `applied_count` / `reload_triggered`（PUT、预设、onboarding、本地模型、自选、legacy 迁移）。HTTP 适配器向写入器传入 `audit_actor_id`；写入器逻辑不读取 `ADMIN_AUTH_ENABLED`，也不调用 `is_auth_enabled()`。已回滚的 `runtime_activation_failed` 保持领域 400。
 
 ### 延期（不在本 DAG）
 
@@ -155,7 +155,7 @@ DAG-5 应在 `SystemConfigService.update` 上审计一次，而不是逐入口�
 | --- | --- | --- |
 | CLI / GitHub Actions 每日分析（`src/app/analysis.py` / `main.py`） | **延期** | 操作员 TTY / Actions 身份即 actor；不是未信任 API |
 | 安全审计查询本身（`GET /api/v1/security/audit-events`） | **延期** | 读取安全记录；#1062 验收未要求自审计 |
-| 自选 / 组合 CRUD / 告警 | **延期** | 产品数据，不是原始特权清单；会无界扩大 #1062 |
+| 自选分组 / 组合 CRUD / 告警 | **延期** | 产品数据，不是原始特权清单；经 `SystemConfigService.update` 的 `STOCK_LIST` 写入已作为 `system_config.write` 落地 |
 | 密码学篡改证据（哈希链 / HMAC / WORM） | **延期** | AUDIT-03 要求追加写与访问控制，不是 HSM/WORM。属操作员信任残余限制 |
 | SIEM / 批量审计导出 | **延期** | #1062 明确非目标 |
 | 多租户 actor | **延期** | [#230](https://github.com/SiinXu/stock-pulse-ai/issues/230) 以 not-planned 关闭；AUTH-05 仍为单管理员 |
@@ -168,8 +168,9 @@ prompt、stdout 或密钥。
 
 ## 剩余覆盖 DAG
 
-不要把剩余的 DAG-5 折进更早切片。不要纳入自选、组合 CRUD 或告警。不要把
-市场复盘、候选发现或 AlphaSift 折进 DAG-1。
+不要把剩余具名后续行折进更早切片。不要纳入组合 CRUD 或告警。自选
+`STOCK_LIST` 写入已在 DAG-5 落地。不要把市场复盘、候选发现或 AlphaSift
+折进 DAG-1。
 
 ```text
 DAG-0  本覆盖图（仅文档；无运行时行为）
@@ -192,11 +193,11 @@ DAG-0  本覆盖图（仅文档；无运行时行为）
                可选 AUDIT-02；仅 HTTP 适配器；
                覆盖图上独立于 DAG-3
 
-DAG-5  SystemConfigService.update 旁路
-         （预设 / onboarding / 本地模型配置写入）
-         + 若仍标为特权的模型包
-         覆盖图现在记为 Missing；在 DAG-1 之后实现；
-         服务层一次审计，HTTP 路径不得双写
+DAG-5  SystemConfigService.update 写入（已落地）
+         HTTP PUT、预设、onboarding、本地模型配置写入、
+         自选 STOCK_LIST、legacy 迁移；
+         服务层一次审计，HTTP 路径不得双写；
+         模型包可信制品安装仍延期
 ```
 
 后续建议标题（英文，无工具前缀）：
@@ -206,6 +207,7 @@ DAG-5  SystemConfigService.update 旁路
 3. `feat: emit security-audit events for scheduled-task mutations`（DAG-2，已落地）
 4. `feat: audit analysis task cancel at the HTTP boundary`（DAG-3，已落地）
 5. `feat: audit report export and history deletion`（DAG-4，已落地）
+6. `feat: audit SystemConfigService.update config writes`（DAG-5，已落地）
 
 在范围内剩余行变为 **已落地** 或带负责人的 **延期** 之前，保持 #1062 开放。
 不要用关闭 #535 代替本覆盖图。
@@ -216,7 +218,7 @@ DAG-5  SystemConfigService.update 旁路
 
 - 线上 #1062 工作流 A–D 与验收复选框仍全部未勾。原始 A 清单的
   HTTP/MCP/工具/HITL/插件/本地进程路径以及证据包导出已经是 **已落地** 或
-  **部分**。后续复选框应只列 DAG-5。
+  **部分**。后续复选框应只列具名后续负责人 / 延期行。
 - [#251](https://github.com/SiinXu/stock-pulse-ai/issues/251) HITL 门控已关闭
   并写入 `approval_*` 事件。Current Gaps 若仍写“门控缺失”则过时；见
   [security-baseline.md](security-baseline.md)。
@@ -276,13 +278,14 @@ SQLite 文件对操作员可写。本交付没有哈希链、HMAC 或 WORM 设�
 ## 失败语义
 
 受保护路径在执行前写入 attempt。写入失败则 fail-closed，错误码为
-`security_audit_unavailable`：不发登录 cookie、不改配置、不调用工具 handler、
-不入队分析、MCP 拒绝、管理员插件变更停止、本地 OCR/CLI 进程不启动、
-定时任务创建/启用/禁用不落库、HTTP 分析 cancel 不调用 `task_queue.cancel`、
-报告导出不加载 markdown 也不生成字节、历史删除不删行。
-completion 写入失败同样对外可见，禁止静默吞掉。cancel 已发出、报告已生成
-或历史行已删除后 completion 存储失败时，HTTP 返回 `503` 且
-`operation_completed=true`。
+`security_audit_unavailable`：不发登录 cookie、不调用 `apply_updates`、
+不调用工具 handler、不入队分析、MCP 拒绝、管理员插件变更停止、本地 OCR/CLI
+进程不启动、定时任务创建/启用/禁用不落库、HTTP 分析 cancel 不调用
+`task_queue.cancel`、报告导出不加载 markdown 也不生成字节、历史删除不删行。
+completion 写入失败同样对外可见，禁止静默吞掉。cancel 已发出、报告已生成、
+历史行已删除或配置已持久化后 completion 存储失败时，HTTP 返回 `503` 且
+`operation_completed=true`。配置写入适配器同时返回 `config_version` /
+`applied_count` / `reload_triggered`。
 
 审计写失败有可见告警路径：服务通过 `log_safe_exception` 记录脱敏错误日志，
 API 返回稳定 `503` / `security_audit_unavailable`。运营方应将其视为审计存储
