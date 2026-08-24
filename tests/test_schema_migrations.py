@@ -37,6 +37,7 @@ from src.migrations.registry import (
     AGENT_PREDICTION_SCHEMA_MIGRATION,
     MEMORY_WRITE_PROVENANCE_MIGRATION,
     AGENT_FEEDBACK_SCHEMA_MIGRATION,
+    AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
     APPROVAL_GATE_SCHEMA_MIGRATION,
     CHAT_TURN_IDENTITY_MIGRATION,
     DECISION_SIGNAL_PROFILE_MIGRATION,
@@ -455,6 +456,7 @@ def test_production_registry_is_stable_unique_and_strictly_ordered_across_import
         AGENT_PREDICTION_SCHEMA_MIGRATION.id,
         MEMORY_WRITE_PROVENANCE_MIGRATION.id,
         AGENT_FEEDBACK_SCHEMA_MIGRATION.id,
+        AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id,
     )
     assert reloaded.TARGET_VERSION == ids[-1]
     assert all(len(checksum) == 64 for _, _, checksum in after)

@@ -1,0 +1,1 @@
+- [Added] Added an opt-in CLI that upserts allowlisted 1d/5d research-only forward-return buckets onto an episode sidecar without mutating append-only agent_episodes (Refs #1096).

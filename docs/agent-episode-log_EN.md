@@ -13,7 +13,7 @@ Persist compact, queryable **episodes** after agent runs so offline eval, post-m
 | `run_id`, `mode`, `symbol`, timestamps | Correlation keys |
 | `trajectory_summary` | Tool names, success flags, optional argument fingerprints — not raw prompts |
 | `lessons` | Typed reflection / post-mortem lessons |
-| `outcome_labels` | Optional feedback / forward-return / prediction outcome labels. Issue #1105 user feedback is **not** written here. |
+| `outcome_labels` | Optional feedback / forward-return / prediction outcome labels stored on the episode row at append time. Issue #1105 user feedback and Issue #1096 forward-return buckets are **not** written here. |
 | `soul_version` / `soul_hash` | Identity only — **never** full Soul charter text |
 
 ## Modules
@@ -24,6 +24,10 @@ Persist compact, queryable **episodes** after agent runs so offline eval, post-m
 | `src/repositories/agent_episode_repo.py` | Append / query / retention |
 | `src/services/agent_episode_service.py` | Feature flag, redaction, fail-soft writer |
 | `src/migrations/versions/v202608120002_agent_episode_schema.py` | Table + append-only trigger |
+| `src/repositories/agent_forward_return_repo.py` | Sidecar upsert for #1096 forward-return buckets |
+| `src/services/forward_return_labeler.py` | CLI batch labeler (invocation is the gate) |
+| `scripts/label_forward_returns.py` | Opt-in CLI entry |
+| `src/migrations/versions/v202608250001_agent_forward_return_schema.py` | Sidecar table |
 
 ## Configuration
 
@@ -48,6 +52,12 @@ Queries and replay lists are bounded to 200 rows/IDs. Persisted JSON corruption 
 ## Optional user feedback (#1105)
 
 Authenticated `PUT`/`GET` APIs store run (`useful|partial|wrong|harmful`) and prediction (`agree_hit|agree_miss|disagree_score|context_note`) opinion in sidecar tables. They do **not** `UPDATE` append-only `agent_episodes`. Consumers that want a merged view must join at read time. Absence of feedback does not block automatic prediction resolve or evolution.
+
+## Optional forward-return buckets (#1096)
+
+Research-only 1d/5d direction buckets (`1d_up` / `1d_down` / `1d_flat` / `5d_up` / `5d_down` / `5d_flat`) live in the `agent_episode_forward_returns` sidecar, keyed by existing `episode_id` + horizon with `run_id` copied from the episode. They are **model-ops quality labels**, not trading advice and not a promised alpha signal.
+
+Invocation is the only gate: run `python scripts/label_forward_returns.py --as-of YYYY-MM-DD` (optional `--horizon 1d` / `--horizon 5d`, `--run-id`, `--dry-run`). There is no config-registry key and no scheduler. The job reads daily history through the existing ActualsFetcher / `DataFetcherManager` path, never fabricates prices, and **skips** a row when the horizon bar is missing, the trading calendar cannot compute the window, or the episode has no symbol. Unknown bucket strings are rejected. The labeler does not write `prediction_outcome` and does not `UPDATE` `agent_episodes` (`trg_agent_episodes_immutable` stays in force). Missing labels stay absent; calibration and evolution continue with neutral behavior.
 
 ## Rollback
 
