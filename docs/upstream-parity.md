@@ -1,7 +1,7 @@
 # Upstream Parity Checker
 
 - Status: `Living`
-- Last verified: 2026-08-21
+- Last verified: 2026-08-25
 - Scope: drift reporting for `ZhuLinsen/daily_stock_analysis`, whitelist semantics, trailer-safe vs do-not-trailer SHAs, triage, and maintainer cadence
 
 StockPulse ports upstream foundation fixes **manually**. There is no automatic
@@ -63,7 +63,17 @@ Path presence of ≥75% is only a heuristic (`record_trailer`). It is not author
 - Reformatting a malformed trailer for a `do_not_trailer` SHA would hide leftovers.
 - Do **not** expand the path whitelist to hide these SHAs.
 
-In-flight product ports may later absorb a heuristic `record_trailer` row; those SHAs are owned by the product PR, not by a trailer-only commit.
+In-flight product ports may later absorb a heuristic `record_trailer` row; those SHAs are owned by the product PR, not by a trailer-only commit. After a child product PR absorbs a former `do_not_trailer` residual, move that SHA to `trailer_safe` and record a well-formed trailer on a later related commit. Do not rewrite the child squash to invent provenance, and do not duplicate a trailer that already exists on main.
+
+### Intentional skips and residual malformed trailers
+
+A documented skip is the close for a SHA that must stay unported. Encode it on `do_not_trailer` with the skip issue or remaining product tracker. Do **not** add a well-formed `Ported-from` trailer, and do **not** expand the path whitelist.
+
+| Upstream SHA | Encoding | Why a trailer is unsafe |
+| --- | --- | --- |
+| `3b98aa1d7` | Intentional product skip ([#1222](https://github.com/SiinXu/stock-pulse-ai/issues/1222) CLOSED) | InferEra referral rename declined; StockPulse keeps AIHubMix URLs. |
+| `16e3421c1`, `a54f46e1e` | Intentional governance skip of `pull_request_target` auto-run ([#1422](https://github.com/SiinXu/stock-pulse-ai/issues/1422) absorbed the API-only `workflow_dispatch` slice) | Local PR Review stays default-off `workflow_dispatch` with a checkout-free `security-check`. Re-enabling automatic `pull_request` or `pull_request_target` remains out of scope (`docs/supply-chain-maintenance.md`). A trailer would mark the still-divergent trigger model as ported. `tests/test_ai_review_github_api.py` is still missing; fork-native `tests/test_pr_review_api_only.py` covers the API-only inventory. |
+| `e430fcfe4` | Residual malformed trailer; product tracker [#325](https://github.com/SiinXu/stock-pulse-ai/issues/325) OPEN | Historical line on `e78aea2f8` is `Ported-from: e430fcfe48016a33399c37efcd2ffb20d79b9a43` (missing `repo@`) and does **not** count. Do not reformat it. Screening/AlphaSift discovery leftovers remain. |
 
 ## Whitelist Semantics
 

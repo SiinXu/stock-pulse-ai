@@ -1,7 +1,7 @@
 {
   "version": 1,
   "upstream_repo": "ZhuLinsen/daily_stock_analysis",
-  "description": "SHA-level trailer contract for #1221. Path presence is a heuristic only. trailer_safe SHAs may receive a well-formed Ported-from trailer after semantic spot-check. do_not_trailer SHAs must remain Attention even at high path presence; do not add or reformat a trailer to silence them. This list does not expand the path whitelist.",
+  "description": "SHA-level trailer contract for #1221. Path presence is a heuristic only. trailer_safe SHAs may receive a well-formed Ported-from trailer after semantic spot-check. do_not_trailer SHAs must remain Attention even at high path presence; do not add or reformat a trailer to silence them. Intentional skips (for example pull_request_target auto-run) belong here with a documented skip, not a trailer. This list does not expand the path whitelist.",
   "trailer_safe": [
     {
       "sha": "487e49e565ffd1b96a7cf4d855f99cee3c981eaa",
@@ -42,43 +42,43 @@
       "sha": "ed848da6f0fc1080e1a61a1799b9c7d510a3eaca",
       "subject": "feat: persist Agent Chat Skill selection by session",
       "reason": "Per-session Skill selection persistence exists via agent_chat_session_service and ChatPage. Historical trailer Ported-from: ed848da6 is malformed (missing repo@) and does not count."
+    },
+    {
+      "sha": "cfd6b0a5fb9c57685dc2b02ca059fa88d8eff8ec",
+      "subject": "feat(agent): per-category tool timeouts with graceful degradation",
+      "reason": "Per-category tool timeouts landed via #1423 / PR #1427 squash 5fdb269c2. AGENT_{DATA,SEARCH,ANALYSIS,ACTION}_TOOL_TIMEOUT_S exist as commented defaults 0 in .env.example, load in src/config_parts/loading.py, and are registered in src/core/config_registry_parts/agent.py. tests/agent/test_tool_timeout.py covers the runtime fence. The child squash had no well-formed Ported-from line."
+    },
+    {
+      "sha": "40b8c6c3cd6829d3fa4146c7aa64e273387df0e3",
+      "subject": "fix: restore home mobile stock-bar touch scrolling",
+      "reason": "home-stock-scroll-shell landed via #1424 / PR #1428 squash 29d6ad850 on StockBar, HomeStockWorkspace, and unlayered CSS. Shared ScrollArea still rejects touch-pan-y (intentional). Live Home still mounts HomeWatchlistGroupsSection rather than those shells; that leftover is accepted by the #1424 contract and is not a reason to deny a trailer for the shell itself. The child squash had no well-formed Ported-from line."
+    },
+    {
+      "sha": "ae19329d6684c4ec4ad0b51e627c0c5204ccd594",
+      "subject": "fix: stabilize watchlist details and workspace state",
+      "reason": "Watchlist coverage abort/bound lookups landed via #1425 / PR #1432 squash 7562a2579: useWatchlistAnalysisCoverage passes a generation-scoped AbortSignal and WATCHLIST_HISTORY_LOOKUP_CONCURRENCY=4. Historical malformed trailer Ported-from: ae19329d on 4aec0439 does not count; this well-formed line is the absorb record (same pattern as ed848da6f)."
     }
   ],
   "do_not_trailer": [
     {
       "sha": "a54f46e1ec7d2ceeaa012d9029e8e66b97a4856b",
       "subject": "ci: temporarily disable automatic PR review",
-      "reason": "Local pr-review.yml is default-off workflow_dispatch that checkouts the worktree. That is not upstream's API-only fork-safe pull_request_target model. Trailer would launder a governance choice as a security port."
+      "reason": "Intentional governance skip of upstream pull_request_target auto-run (same cluster as 16e3421c1). #1422 / PR #1426 absorbed the API-only opt-in slice: workflow_dispatch with required pr_number and a checkout-free security-check that SHA-pins GitHub API inventory. Local trigger remains default-off workflow_dispatch. Re-enabling automatic pull_request or pull_request_target stays out of scope (docs/supply-chain-maintenance.md). Do not trailer: a trailer would mark the still-divergent trigger model as ported. Encoded like the #1222 InferEra skip."
     },
     {
       "sha": "16e3421c1bcad53ce0cfd5c8d69956c305ef867d",
       "subject": "fix: secure fork PR review workflow",
-      "reason": "Same PR-review security model gap as a54f46e1e; tests/test_ai_review_github_api.py is also missing. Path presence is not absorb."
-    },
-    {
-      "sha": "ae19329d6684c4ec4ad0b51e627c0c5204ccd594",
-      "subject": "fix: stabilize watchlist details and workspace state",
-      "reason": "Watchlist stock-bar loading was only partially ported; HomePage/HomeStockWorkspace UI deltas were deferred. Historical trailer is malformed (missing repo@). Reformatting it would hide leftovers."
+      "reason": "Same pull_request_target skip as a54f46e1e. Upstream is fork-safe pull_request_target; StockPulse is opt-in workflow_dispatch. tests/test_ai_review_github_api.py is still missing (fork-native tests/test_pr_review_api_only.py covers the API-only inventory). Downstream static/AI jobs still checkout captured SHAs. Do not trailer while pull_request_target auto-run remains out of scope."
     },
     {
       "sha": "e430fcfe48016a33399c37efcd2ffb20d79b9a43",
       "subject": "fix: converge screening sort, cache, and hotspot concurrency",
-      "reason": "Screening/AlphaSift port is partial. Historical trailer is malformed (missing repo@). Reformatting it would hide leftovers."
-    },
-    {
-      "sha": "40b8c6c3cd6829d3fa4146c7aa64e273387df0e3",
-      "subject": "fix: restore home mobile stock-bar touch scrolling",
-      "reason": "home-stock-scroll-shell is not applied; shared ScrollArea intentionally rejects touch-pan-y."
+      "reason": "Screening/AlphaSift residual is not fully absorbed (#325 OPEN). Historical malformed trailer on e78aea2f8 is Ported-from: e430fcfe48016a33399c37efcd2ffb20d79b9a43 (missing repo@) and must not be reformatted; that line does not count as already ported. Keep Attention until the discovery-layer leftover is actually absorbed."
     },
     {
       "sha": "3b98aa1d779a3525660b5bd95a2b297278808464",
       "subject": "docs: update AIHubMix referral links to InferEra",
       "reason": "Intentional product/docs skip tracked by #1222; StockPulse still documents AIHubMix rather than InferEra referral links."
-    },
-    {
-      "sha": "cfd6b0a5fb9c57685dc2b02ca059fa88d8eff8ec",
-      "subject": "feat(agent): per-category tool timeouts with graceful degradation",
-      "reason": "AGENT_{DATA,SEARCH,ANALYSIS,ACTION}_TOOL_TIMEOUT_S keys are absent; StockPulse still has global/stage timeouts only."
     }
   ]
 }

@@ -237,6 +237,17 @@ def test_do_not_trailer_shas_are_not_ported_on_head() -> None:
 
 DATE_FREEZE_SHA = "5c964bf23bade6571d09a085fc42199882b77f8f"
 SCHEDULE_RESTORE_SHA = "96bc532dfcb21e3a7d0fdbdfa87d764b9b61d2ee"
+CHILD_ABSORBED_TRAILER_SHAS = (
+    "cfd6b0a5fb9c57685dc2b02ca059fa88d8eff8ec",
+    "40b8c6c3cd6829d3fa4146c7aa64e273387df0e3",
+    "ae19329d6684c4ec4ad0b51e627c0c5204ccd594",
+)
+PR_REVIEW_SKIP_SHAS = (
+    "a54f46e1ec7d2ceeaa012d9029e8e66b97a4856b",
+    "16e3421c1bcad53ce0cfd5c8d69956c305ef867d",
+)
+E430_MALFORMED_SHA = "e430fcfe48016a33399c37efcd2ffb20d79b9a43"
+E430_MALFORMED_TRAILER = "Ported-from: e430fcfe48016a33399c37efcd2ffb20d79b9a43"
 
 
 def _triage_contains(entries, sha: str) -> bool:
@@ -273,6 +284,57 @@ def test_schedule_restore_sha_absorbed_on_main_is_not_denied_or_duplicated() -> 
         "96bc532df must stay already ported via the #1409 well-formed trailer"
     )
     assert len(matched) == 1
+
+
+def test_child_absorbed_shas_are_trailer_safe_not_denied() -> None:
+    """#1423/#1424/#1425 absorbed these residuals; authorize one well-formed trailer each."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    messages = list_local_commit_messages(ROOT, "HEAD")
+    index = build_ported_index(
+        messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    for sha in CHILD_ABSORBED_TRAILER_SHAS:
+        assert _triage_contains(triage.trailer_safe, sha), sha
+        assert not _triage_contains(triage.do_not_trailer, sha), sha
+        matched = match_ported_by(sha, index)
+        assert matched, f"{sha[:9]} must have exactly one well-formed Ported-from trailer"
+        assert len(matched) == 1, f"{sha[:9]} must not be duplicated: {matched}"
+
+
+def test_pr_review_pull_request_target_skip_is_encoded_and_unported() -> None:
+    """#1422 API-only slice is not a pull_request_target port; keep Attention."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    messages = list_local_commit_messages(ROOT, "HEAD")
+    index = build_ported_index(
+        messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    hits = [
+        entry
+        for entry in triage.do_not_trailer
+        if any(entry.sha.startswith(sha[:9]) for sha in PR_REVIEW_SKIP_SHAS)
+    ]
+    assert len(hits) == 2
+    for entry in hits:
+        assert "pull_request_target" in entry.reason.lower(), entry.sha
+        assert match_ported_by(entry.sha, index) == []
+
+
+def test_e430fcfe4_malformed_trailer_remains_denied_and_does_not_count() -> None:
+    """Do not reformat the historical malformed e430fcfe4 trailer while #325 is open."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    deny = next(
+        entry
+        for entry in triage.do_not_trailer
+        if entry.sha.startswith(E430_MALFORMED_SHA[:9])
+    )
+    messages = list_local_commit_messages(ROOT, "HEAD")
+    index = build_ported_index(
+        messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    assert match_ported_by(E430_MALFORMED_SHA, index) == []
+    assert any(E430_MALFORMED_TRAILER in message for message in messages)
+    assert "malformed" in deny.reason.lower() or "missing repo@" in deny.reason.lower()
+    assert "#325" in deny.reason
 
 
 def _git(args: list[str], cwd: Path, check: bool = True) -> subprocess.CompletedProcess[str]:

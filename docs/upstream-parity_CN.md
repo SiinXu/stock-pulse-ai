@@ -1,7 +1,7 @@
 # 上游一致性检查（Upstream Parity）
 
 - 状态：`Living`
-- 最近核对：2026-08-21
+- 最近核对：2026-08-25
 - 范围：`ZhuLinsen/daily_stock_analysis` 漂移报告、白名单语义、trailer-safe / do-not-trailer SHA 契约、分诊流程与维护节奏
 
 StockPulse **手动**移植上游 foundation 修复，不会自动 merge 或同步上游。本文说明每周运行的一致性检查如何报告漂移，以便维护者有计划地分诊移植。
@@ -57,7 +57,17 @@ Ported-from: ZhuLinsen/daily_stock_analysis@<sha>
 - 把 `do_not_trailer` SHA 的畸形 trailer 改成合法格式会掩盖残留差距。
 - **不要**靠扩大路径白名单来隐藏这些 SHA。
 
-进行中的产品 port PR 可能随后吸收某条启发式 `record_trailer`；那些 SHA 归产品 PR 所有，不属于 trailer-only 提交。
+进行中的产品 port PR 可能随后吸收某条启发式 `record_trailer`；那些 SHA 归产品 PR 所有，不属于 trailer-only 提交。子 Issue 产品 PR 吸收了原先 `do_not_trailer` 残留后，应把该 SHA 移入 `trailer_safe`，并在后续相关提交上补格式正确的 trailer。不要改写子 Issue squash 来伪造出处，也不要重复 main 上已有的 trailer。
+
+### 有意 skip 与畸形 trailer 残留
+
+对必须保持未移植的 SHA，正确收口是**有文档的 skip**：写入 `do_not_trailer` 并指向 skip Issue 或残留产品跟踪 Issue。**不要**补格式正确的 `Ported-from` trailer，也**不要**扩大路径白名单。
+
+| 上游 SHA | 编码方式 | 为何不能补 trailer |
+| --- | --- | --- |
+| `3b98aa1d7` | 有意的产品 skip（[#1222](https://github.com/SiinXu/stock-pulse-ai/issues/1222) 已关闭） | InferEra 推广链接改名被拒绝；StockPulse 仍使用 AIHubMix URL。 |
+| `16e3421c1`、`a54f46e1e` | 有意跳过 `pull_request_target` 自动运行（[#1422](https://github.com/SiinXu/stock-pulse-ai/issues/1422) 只吸收了 API-only 的 `workflow_dispatch` 切片） | 本地 PR Review 仍是默认关闭的 `workflow_dispatch`，`security-check` 不 checkout。重新启用自动 `pull_request` 或 `pull_request_target` 仍不在范围内（见 `docs/supply-chain-maintenance.md`）。补 trailer 会把仍分叉的触发模型标成已移植。`tests/test_ai_review_github_api.py` 仍缺失；fork-native 的 `tests/test_pr_review_api_only.py` 覆盖 API-only 清单。 |
+| `e430fcfe4` | 畸形 trailer 残留；产品跟踪 [#325](https://github.com/SiinXu/stock-pulse-ai/issues/325) 仍打开 | 历史行在 `e78aea2f8`：`Ported-from: e430fcfe48016a33399c37efcd2ffb20d79b9a43`（缺少 `repo@`），**不算** already ported。不要改写它。选股 / AlphaSift discovery 残留仍在。 |
 
 ## 白名单语义
 

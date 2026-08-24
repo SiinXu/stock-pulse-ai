@@ -1,0 +1,1 @@
+- [Chore] Record well-formed Ported-from trailers for child-absorbed SHAs `cfd6b0a5f`, `40b8c6c3c`, and `ae19329d6` after #1423/#1424/#1425, keep `e430fcfe4` unreformatted on the deny-list, and encode the `pull_request_target` skip for `16e3421c1` / `a54f46e1e` (Refs #1221).

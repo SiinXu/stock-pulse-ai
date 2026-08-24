@@ -122,7 +122,10 @@ Threat model for this opt-in `workflow_dispatch` design:
   `github.sha` fallback; static checks remain secret-free; AI review cannot
   block merge.
 - Re-enabling automatic `pull_request` or `pull_request_target` remains out of
-  scope.
+  scope. Upstream `16e3421c1` / `a54f46e1e` therefore stay on the #1221
+  `do_not_trailer` list (same skip encoding as #1222 for InferEra). Do not
+  record a `Ported-from` trailer for the API-only `workflow_dispatch` slice;
+  that would mark the still-divergent trigger model as ported.
 
 The API classifier compares `pull.base.ref` with the repository default branch
 using exact, case-sensitive equality. Write-capable label and comment jobs still
