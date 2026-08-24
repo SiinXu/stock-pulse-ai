@@ -49,10 +49,24 @@ def _clamp_confidence(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
 
-def _factor_from_stats(accuracy: float, avg_confidence: float) -> float:
-    if avg_confidence > 0:
-        return _clamp_factor(accuracy / avg_confidence)
-    return 1.0
+def _coerce_float(value: Any, default: float) -> float:
+    """Parse a numeric field. Preserve 0.0; do not treat it as missing."""
+    if value is None:
+        return default
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _coerce_int(value: Any, default: int = 0) -> int:
+    """Parse an integer field. Preserve 0; do not treat it as missing."""
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
 
 
 def calibrate_confidence(
@@ -66,7 +80,10 @@ def calibrate_confidence(
 ) -> Tuple[float, Dict[str, Any]]:
     """Wrap AgentMemory.get_calibration.
 
-    Identity if adapters off, memory off, or samples < min.
+    Identity if adapters off, memory off, samples < min, or not calibrated.
+    When applied, multiplies ``raw`` by the stored ``calibration_factor``
+    (AgentMemory already clamps ``historical_accuracy / avg_confidence``
+    to ``0.5..1.5``, including ``historical_accuracy=0.0``).
     """
     if not is_online_adapters_enabled(config):
         return float(raw), _identity_confidence(reason=_REASON_ADAPTERS_DISABLED)
@@ -76,16 +93,20 @@ def calibrate_confidence(
         return float(raw), _identity_confidence(reason=_REASON_MEMORY_DISABLED)
 
     cal = memory.get_calibration(agent_name, stock_code=stock_code)
-    samples = int(getattr(cal, "total_samples", 0) or 0)
+    samples = _coerce_int(getattr(cal, "total_samples", 0), default=0)
     if samples < threshold:
         return float(raw), _identity_confidence(
             samples=samples,
             reason=_REASON_INSUFFICIENT_SAMPLES,
         )
+    if not getattr(cal, "calibrated", False):
+        return float(raw), _identity_confidence(
+            samples=samples,
+            reason=_REASON_INSUFFICIENT_SAMPLES,
+        )
 
-    factor = _factor_from_stats(
-        float(getattr(cal, "historical_accuracy", 0.5) or 0.5),
-        float(getattr(cal, "avg_confidence", 0.5) or 0.0),
+    factor = _clamp_factor(
+        _coerce_float(getattr(cal, "calibration_factor", 1.0), default=1.0)
     )
     adjusted = _clamp_confidence(float(raw) * factor)
     return adjusted, {

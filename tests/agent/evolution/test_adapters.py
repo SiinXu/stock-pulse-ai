@@ -3,8 +3,9 @@
 
 from __future__ import annotations
 
+import inspect
 from types import SimpleNamespace
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock
 
 import pytest
@@ -46,16 +47,30 @@ def _memory(
     samples: int = 40,
     accuracy: float = 0.5,
     avg_confidence: float = 0.9,
+    min_samples: int = 30,
 ) -> AgentMemory:
+    """Real AgentMemory.get_calibration; only the stats source is stubbed."""
+    memory = AgentMemory(enabled=enabled, min_samples=min_samples)
+
+    def _get_accuracy_stats(
+        agent_name: str,
+        stock_code: Optional[str],
+        skill_id: Optional[str],
+    ) -> Dict[str, Any]:
+        return {
+            "total": samples,
+            "accuracy": accuracy,
+            "direction_accuracy": accuracy,
+            "avg_confidence": avg_confidence,
+        }
+
+    memory._get_accuracy_stats = _get_accuracy_stats  # type: ignore[method-assign]
+    return memory
+
+
+def _memory_with_result(result: CalibrationResult, *, enabled: bool = True) -> AgentMemory:
+    """Inject a stored CalibrationResult to prove wrap uses calibration_factor."""
     memory = AgentMemory(enabled=enabled, min_samples=30)
-    result = CalibrationResult(
-        agent_name="technical",
-        total_samples=samples,
-        historical_accuracy=accuracy,
-        avg_confidence=avg_confidence,
-        calibrated=enabled and samples >= 30,
-        calibration_factor=1.0,
-    )
 
     def _get_calibration(
         agent_name: str,
@@ -63,7 +78,7 @@ def _memory(
         skill_id: Optional[str] = None,
         strategy_id: Optional[str] = None,
     ) -> CalibrationResult:
-        copied = CalibrationResult(
+        return CalibrationResult(
             agent_name=agent_name,
             total_samples=result.total_samples,
             historical_accuracy=result.historical_accuracy,
@@ -71,7 +86,6 @@ def _memory(
             calibrated=result.calibrated,
             calibration_factor=result.calibration_factor,
         )
-        return copied
 
     memory.get_calibration = _get_calibration  # type: ignore[method-assign]
     return memory
@@ -326,6 +340,160 @@ def test_denied_tool_stays_permission_denied_and_snapshots_unchanged() -> None:
         denied_tools=denied,
         denial_codes=denials,
     )
+
+
+def test_zero_accuracy_uses_agent_memory_calibration_factor_not_truthy_fallback() -> None:
+    """Reviewer counterexample: historical_accuracy=0.0 must not invert the clamp.
+
+    AgentMemory clamps 0.0 / 0.4 to factor 0.5, so raw 0.6 becomes 0.3.
+    Re-deriving with ``accuracy or 0.5`` would yield 1.25 and raise confidence
+    to 0.75.
+    """
+    memory = _memory(enabled=True, samples=40, accuracy=0.0, avg_confidence=0.4)
+    raw = 0.6
+    cal = memory.get_calibration("technical", stock_code="600519")
+    assert cal.historical_accuracy == 0.0
+    assert cal.avg_confidence == 0.4
+    assert cal.calibrated is True
+    assert cal.calibration_factor == pytest.approx(0.5)
+
+    adjusted, meta = calibrate_confidence(
+        raw,
+        memory=memory,
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+
+    inverted_by_truthy_fallback = raw * (0.5 / 0.4)
+    memory_adjusted = memory.calibrate_confidence("technical", raw, stock_code="600519")
+    assert inverted_by_truthy_fallback == pytest.approx(0.75)
+    assert memory_adjusted == pytest.approx(0.3)
+    assert adjusted == pytest.approx(0.3)
+    assert adjusted == pytest.approx(memory_adjusted)
+    assert adjusted == pytest.approx(raw * cal.calibration_factor)
+    assert adjusted != pytest.approx(inverted_by_truthy_fallback)
+    assert adjusted < raw
+    assert meta["applied"] is True
+    assert meta["factor"] == pytest.approx(0.5)
+    assert meta["samples"] == 40
+    assert meta["reason"] == "applied"
+
+    ctx_a = AgentContext(stock_code="600519")
+    ctx_b = AgentContext(stock_code="600519")
+    record_adapter_influence(ctx_a, {"confidence": meta}, config=_config(enabled=True))
+    recorded = ctx_a.meta[ADAPTER_INFLUENCE_META_KEY]["confidence"]
+    assert recorded["applied"] is True
+    assert recorded["factor"] == pytest.approx(0.5)
+    assert ADAPTER_INFLUENCE_META_KEY not in ctx_b.meta
+    record_adapter_influence(ctx_b, {"confidence": meta}, config=_config(enabled=True))
+    assert ctx_a.meta is not ctx_b.meta
+    assert ctx_b.meta[ADAPTER_INFLUENCE_META_KEY]["confidence"]["factor"] == pytest.approx(0.5)
+
+
+def test_calibration_factor_table_for_accuracy_zero_half_and_one() -> None:
+    config = _config(enabled=True)
+    cases = [
+        # accuracy, avg_confidence, raw, expected_factor, expected_adjusted
+        (0.0, 0.4, 0.6, 0.5, 0.3),
+        (0.0, 0.4, 0.0, 0.5, 0.0),
+        (0.0, 0.4, 1.0, 0.5, 0.5),
+        (0.5, 0.5, 0.6, 1.0, 0.6),
+        (0.5, 1.0, 0.6, 0.5, 0.3),
+        (0.5, 0.25, 0.6, 1.5, 0.9),
+        (1.0, 1.0, 0.6, 1.0, 0.6),
+        (1.0, 0.4, 0.6, 1.5, 0.9),
+        (1.0, 0.4, 1.0, 1.5, 1.0),
+        (1.0, 0.0, 0.6, 1.0, 0.6),
+    ]
+    for accuracy, avg_confidence, raw, expected_factor, expected_adjusted in cases:
+        memory = _memory(
+            enabled=True,
+            samples=40,
+            accuracy=accuracy,
+            avg_confidence=avg_confidence,
+        )
+        cal = memory.get_calibration("technical", stock_code="600519")
+        assert cal.historical_accuracy == accuracy
+        assert cal.calibration_factor == pytest.approx(expected_factor)
+        adjusted, meta = calibrate_confidence(
+            raw,
+            memory=memory,
+            agent_name="technical",
+            stock_code="600519",
+            min_samples=30,
+            config=config,
+        )
+        assert meta["applied"] is True
+        assert meta["factor"] == pytest.approx(expected_factor)
+        assert adjusted == pytest.approx(expected_adjusted)
+        assert 0.0 <= adjusted <= 1.0
+
+
+def test_adapter_applies_stored_calibration_factor_not_rederived_ratio() -> None:
+    """Wrap must use calibration_factor even when it disagrees with accuracy/avg."""
+    result = CalibrationResult(
+        agent_name="technical",
+        total_samples=40,
+        historical_accuracy=1.0,
+        avg_confidence=0.4,
+        calibrated=True,
+        calibration_factor=0.5,
+    )
+    memory = _memory_with_result(result)
+    raw = 0.6
+    rederived = raw * min(1.5, max(0.5, 1.0 / 0.4))
+    adjusted, meta = calibrate_confidence(
+        raw,
+        memory=memory,
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+    assert rederived == pytest.approx(0.9)
+    assert adjusted == pytest.approx(0.3)
+    assert adjusted != pytest.approx(rederived)
+    assert meta["factor"] == pytest.approx(0.5)
+
+
+def test_uncalibrated_result_is_identity_even_with_non_neutral_factor() -> None:
+    result = CalibrationResult(
+        agent_name="technical",
+        total_samples=40,
+        historical_accuracy=0.0,
+        avg_confidence=0.4,
+        calibrated=False,
+        calibration_factor=0.5,
+    )
+    memory = _memory_with_result(result)
+    raw = 0.6
+    adjusted, meta = calibrate_confidence(
+        raw,
+        memory=memory,
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+    assert adjusted == raw
+    assert meta["applied"] is False
+    assert meta["factor"] == 1.0
+    assert meta["samples"] == 40
+    assert meta["reason"] == "insufficient_samples"
+
+
+def test_base_agent_calibration_path_does_not_call_online_adapters() -> None:
+    import src.agent.agents.base_agent as base_agent_mod
+    from src.agent.agents.base_agent import BaseAgent
+
+    module_source = inspect.getsource(base_agent_mod)
+    hook_source = inspect.getsource(BaseAgent._apply_memory_calibration)
+    assert "src.agent.evolution.adapters" not in module_source
+    assert "evolution.adapters" not in module_source
+    assert "calibration.calibration_factor" in hook_source
+    assert "adapters.calibrate_confidence" not in hook_source
 
 
 def test_episode_schema_has_no_adapter_field_and_tests_do_not_update_episodes() -> None:
