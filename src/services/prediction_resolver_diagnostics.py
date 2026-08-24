@@ -1,12 +1,12 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Read-only prediction-resolver claimable-due diagnostics (#1114)."""
+"""Read-only prediction-resolver claimable-due and UTC-day diagnostics (#1114)."""
 
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, List, Mapping, Optional
 
 from src.services.prediction_resolver.resolver import (
     PREDICTION_RESOLVER_BACKLOG_PROBE_LIMIT,
@@ -21,6 +21,7 @@ from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 OLDEST_DUE_LIMIT = 10
+_RESOLVED_UTC_DAY_COUNT_KEYS = ("hit", "miss", "partial", "unavailable", "unlabeled")
 
 
 class PredictionResolverDiagnosticsStoreError(RuntimeError):
@@ -60,6 +61,25 @@ def _probe_limit(claim_limit: int) -> int:
     )
 
 
+def _utc_civil_day_bounds(as_of: datetime) -> tuple[datetime, datetime]:
+    naive = _as_utc_naive(as_of)
+    start = datetime(naive.year, naive.month, naive.day)
+    end = start + timedelta(days=1)
+    return start, end
+
+
+def _normalize_resolved_utc_day_counts(raw: Any) -> Dict[str, int]:
+    if not isinstance(raw, Mapping):
+        raise TypeError("count_resolved_utc_day must return a mapping")
+    counts: Dict[str, int] = {}
+    for key in _RESOLVED_UTC_DAY_COUNT_KEYS:
+        value = raw[key]
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise ValueError(f"{key} count must be a non-negative integer")
+        counts[key] = value
+    return counts
+
+
 def _oldest_due_items(rows: List[Any], *, as_of: datetime) -> List[Dict[str, Any]]:
     items: List[Dict[str, Any]] = []
     for row in rows[:OLDEST_DUE_LIMIT]:
@@ -90,17 +110,23 @@ def collect_prediction_resolver_diagnostics(
     scheduler: Any = None,
     now: Optional[datetime] = None,
 ) -> Dict[str, Any]:
-    """Compose a read-only claimable-due snapshot for this API process.
+    """Compose a read-only claimable-due and UTC-day snapshot for this API process.
 
     Never claims, requeues, ticks, constructs, or starts a resolver worker.
     ``this_process_worker_registered`` is this process's scheduler cache only.
+    Either store probe failure raises ``PredictionResolverDiagnosticsStoreError``.
     """
     observed = now if now is not None else _utc_now()
     as_of = _as_utc_naive(observed)
+    day_start, day_end = _utc_civil_day_bounds(as_of)
     claim_limit = _claim_limit(config)
     probe_limit = _probe_limit(claim_limit)
     try:
         rows = list(list_claimable_due(store, as_of=as_of, limit=probe_limit))
+        counter = getattr(store, "count_resolved_utc_day", None)
+        if not callable(counter):
+            raise TypeError("prediction store does not implement count_resolved_utc_day")
+        counts = _normalize_resolved_utc_day_counts(counter(as_of=as_of))
     except Exception as exc:  # broad-exception: fallback_recorded - map unread store to explicit 503
         log_safe_exception(
             logger,
@@ -120,4 +146,7 @@ def collect_prediction_resolver_diagnostics(
         "claimable_due_truncated": len(rows) >= probe_limit,
         "claimable_due_probe_limit": probe_limit,
         "oldest_due": _oldest_due_items(rows, as_of=as_of),
+        "resolved_utc_day_start": _to_utc_iso(day_start),
+        "resolved_utc_day_end": _to_utc_iso(day_end),
+        "resolved_utc_day_counts": counts,
     }

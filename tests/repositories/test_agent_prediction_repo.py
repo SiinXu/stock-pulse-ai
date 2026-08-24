@@ -733,3 +733,143 @@ def test_corrupt_json_is_not_silently_coerced_to_empty_claims(isolated_db) -> No
     with pytest.raises(RepositoryError) as raised:
         repo.get("pred-corrupt")
     assert raised.value.error_code == "agent_prediction_corrupt_json"
+
+
+def _claim(repo: AgentPredictionRepository, prediction_id: str, *, as_of: datetime) -> None:
+    claimed = repo.claim_for_resolve(
+        prediction_id=prediction_id,
+        lease_owner="worker-count",
+        lease_token=f"token-{prediction_id}",
+        lease_ttl_seconds=120,
+        as_of=as_of,
+    )
+    assert claimed is not None
+    assert claimed.status == STATUS_RESOLVING
+
+
+def test_count_resolved_utc_day_empty_is_zero(isolated_db) -> None:
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    counts = repo.count_resolved_utc_day(as_of=_fixed_now())
+    assert counts == {
+        "hit": 0,
+        "miss": 0,
+        "partial": 0,
+        "unavailable": 0,
+        "unlabeled": 0,
+    }
+
+
+def test_count_resolved_utc_day_labels_and_window(isolated_db) -> None:
+    now = _fixed_now()
+    start = datetime(now.year, now.month, now.day)
+    repo = AgentPredictionRepository(isolated_db, clock=lambda: now)
+    _insert(repo, prediction_id="pred-hit")
+    _insert(repo, prediction_id="pred-miss")
+    _insert(repo, prediction_id="pred-partial")
+    _insert(repo, prediction_id="pred-yesterday")
+    _insert(repo, prediction_id="pred-unlabeled")
+    _insert(repo, prediction_id="pred-garbage")
+    _claim(repo, "pred-hit", as_of=now)
+    _claim(repo, "pred-miss", as_of=now)
+    _claim(repo, "pred-partial", as_of=now)
+    _claim(repo, "pred-yesterday", as_of=now)
+    _claim(repo, "pred-unlabeled", as_of=now)
+    _claim(repo, "pred-garbage", as_of=now)
+    applied_hit, _ = repo.resolve(
+        prediction_id="pred-hit",
+        outcome={"label": "hit", "score": 1.0},
+        expected_lease_token="token-pred-hit",
+        as_of=now,
+    )
+    applied_miss, _ = repo.resolve(
+        prediction_id="pred-miss",
+        outcome={"label": "miss", "score": 0.0},
+        expected_lease_token="token-pred-miss",
+        as_of=now,
+    )
+    applied_partial, _ = repo.resolve(
+        prediction_id="pred-partial",
+        outcome={"label": "partial", "score": 0.5},
+        expected_lease_token="token-pred-partial",
+        as_of=now,
+    )
+    applied_yesterday, _ = repo.resolve(
+        prediction_id="pred-yesterday",
+        outcome={"label": "hit", "score": 1.0},
+        expected_lease_token="token-pred-yesterday",
+        as_of=start - timedelta(seconds=1),
+    )
+    applied_unlabeled, _ = repo.resolve(
+        prediction_id="pred-unlabeled",
+        outcome={"score": 1.0},
+        expected_lease_token="token-pred-unlabeled",
+        as_of=now,
+    )
+    applied_garbage, _ = repo.resolve(
+        prediction_id="pred-garbage",
+        outcome={"label": "garbage", "score": 1.0},
+        expected_lease_token="token-pred-garbage",
+        as_of=now,
+    )
+    assert [
+        applied_hit,
+        applied_miss,
+        applied_partial,
+        applied_yesterday,
+        applied_unlabeled,
+        applied_garbage,
+    ] == [True] * 6
+    counts = repo.count_resolved_utc_day(as_of=now)
+    assert counts == {
+        "hit": 1,
+        "miss": 1,
+        "partial": 1,
+        "unavailable": 0,
+        "unlabeled": 2,
+    }
+    yesterday_counts = repo.count_resolved_utc_day(as_of=start - timedelta(seconds=1))
+    assert yesterday_counts["hit"] == 1
+    assert yesterday_counts["miss"] == 0
+
+
+def test_count_resolved_utc_day_unavailable_requires_retry_exhausted(isolated_db) -> None:
+    now = _fixed_now()
+    repo = AgentPredictionRepository(isolated_db, clock=lambda: now)
+    _insert(repo, prediction_id="pred-retryable")
+    _insert(repo, prediction_id="pred-exhausted")
+    _claim(repo, "pred-retryable", as_of=now)
+    _claim(repo, "pred-exhausted", as_of=now)
+    applied_retry, retry_row = repo.mark_data_unavailable(
+        prediction_id="pred-retryable",
+        reason="provider_down",
+        expected_lease_token="token-pred-retryable",
+        as_of=now,
+        outcome={"retryable": True, "retry_exhausted": False},
+    )
+    applied_exhausted, exhausted_row = repo.mark_data_unavailable(
+        prediction_id="pred-exhausted",
+        reason="attempts_exhausted",
+        expected_lease_token="token-pred-exhausted",
+        as_of=now,
+        outcome={"retryable": False, "retry_exhausted": True},
+    )
+    assert applied_retry is True
+    assert applied_exhausted is True
+    assert retry_row is not None and retry_row.status == STATUS_DATA_UNAVAILABLE
+    assert exhausted_row is not None and exhausted_row.status == STATUS_DATA_UNAVAILABLE
+    counts = repo.count_resolved_utc_day(as_of=now)
+    assert counts == {
+        "hit": 0,
+        "miss": 0,
+        "partial": 0,
+        "unavailable": 1,
+        "unlabeled": 0,
+    }
+
+
+def test_count_resolved_utc_day_does_not_return_row_payloads(isolated_db) -> None:
+    repo = AgentPredictionRepository(isolated_db, clock=_fixed_now)
+    _insert(repo, prediction_id="pred-payload")
+    counts = repo.count_resolved_utc_day(as_of=_fixed_now())
+    assert set(counts) == {"hit", "miss", "partial", "unavailable", "unlabeled"}
+    assert all(isinstance(value, int) and value >= 0 for value in counts.values())

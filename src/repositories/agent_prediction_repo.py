@@ -25,7 +25,7 @@ from typing import (
     get_args,
 )
 
-from sqlalchemy import and_, or_, select, update
+from sqlalchemy import and_, case, func, or_, select, update
 from sqlalchemy.exc import IntegrityError
 
 from src.repositories.agent_prediction_tables import agent_predictions_table
@@ -60,8 +60,22 @@ logger = logging.getLogger(__name__)
 _NO_VERIFIABLE_REASONS = frozenset(get_args(NoVerifiableReason))
 
 
+_RESOLVED_UTC_DAY_COUNT_KEYS = ("hit", "miss", "partial", "unavailable", "unlabeled")
+_SCORED_OUTCOME_LABELS = ("hit", "miss", "partial")
+
+
 def _utc_naive_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def utc_civil_day_bounds(as_of: datetime) -> Tuple[datetime, datetime]:
+    """Return naive-UTC ``[start, end)`` for the civil day that contains ``as_of``."""
+    naive = as_of
+    if naive.tzinfo is not None:
+        naive = naive.astimezone(timezone.utc).replace(tzinfo=None)
+    start = datetime(naive.year, naive.month, naive.day)
+    end = start + timedelta(days=1)
+    return start, end
 
 
 def _json_dumps(value: Any) -> str:
@@ -443,6 +457,107 @@ class AgentPredictionRepository(BaseRepository):
                 .limit(bound)
             ).all()
         return [self._row_to_record(row) for row in rows]
+
+    def count_resolved_utc_day(self, *, as_of: datetime) -> Dict[str, int]:
+        """Count durable UTC-day outcomes via SQL ``json_extract`` only.
+
+        Never returns row payloads, prediction ids, or ``outcome_json``.
+        """
+        start, end = utc_civil_day_bounds(as_of)
+        table = agent_predictions_table
+        label = func.json_extract(table.c.outcome_json, "$.label")
+        retry_exhausted = func.json_extract(table.c.outcome_json, "$.retry_exhausted")
+        resolved_in_window = and_(
+            table.c.status == STATUS_RESOLVED,
+            table.c.resolved_at >= start,
+            table.c.resolved_at < end,
+        )
+        unavailable_in_window = and_(
+            table.c.status == STATUS_DATA_UNAVAILABLE,
+            table.c.updated_at >= start,
+            table.c.updated_at < end,
+            retry_exhausted.in_((1, "true", "True")),
+        )
+        unlabeled_in_window = and_(
+            resolved_in_window,
+            or_(label.is_(None), label.notin_(_SCORED_OUTCOME_LABELS)),
+        )
+        try:
+            with self.db.get_session() as session:
+                row = session.execute(
+                    select(
+                        func.coalesce(
+                            func.sum(
+                                case(
+                                    (and_(resolved_in_window, label == "hit"), 1),
+                                    else_=0,
+                                )
+                            ),
+                            0,
+                        ).label("hit"),
+                        func.coalesce(
+                            func.sum(
+                                case(
+                                    (and_(resolved_in_window, label == "miss"), 1),
+                                    else_=0,
+                                )
+                            ),
+                            0,
+                        ).label("miss"),
+                        func.coalesce(
+                            func.sum(
+                                case(
+                                    (
+                                        and_(resolved_in_window, label == "partial"),
+                                        1,
+                                    ),
+                                    else_=0,
+                                )
+                            ),
+                            0,
+                        ).label("partial"),
+                        func.coalesce(
+                            func.sum(case((unavailable_in_window, 1), else_=0)),
+                            0,
+                        ).label("unavailable"),
+                        func.coalesce(
+                            func.sum(case((unlabeled_in_window, 1), else_=0)),
+                            0,
+                        ).label("unlabeled"),
+                    )
+                    .select_from(table)
+                    .where(
+                        or_(
+                            and_(
+                                table.c.status == STATUS_RESOLVED,
+                                table.c.resolved_at >= start,
+                                table.c.resolved_at < end,
+                            ),
+                            and_(
+                                table.c.status == STATUS_DATA_UNAVAILABLE,
+                                table.c.updated_at >= start,
+                                table.c.updated_at < end,
+                            ),
+                        )
+                    )
+                ).one()
+        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
+            context = {"as_of": str(as_of)}
+            log_safe_exception(
+                logger,
+                "Agent prediction UTC-day outcome count failed",
+                exc,
+                error_code="agent_prediction_utc_day_count_failed",
+                context=context,
+            )
+            raise RepositoryError(
+                "Agent prediction UTC-day outcome count failed",
+                error_code="agent_prediction_utc_day_count_failed",
+                context=context,
+            ) from exc
+        return {
+            key: int(getattr(row, key) or 0) for key in _RESOLVED_UTC_DAY_COUNT_KEYS
+        }
 
     def claim_for_resolve(
         self,

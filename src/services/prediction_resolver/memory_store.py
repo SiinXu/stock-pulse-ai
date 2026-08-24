@@ -94,6 +94,39 @@ class MemoryPredictionRecord:
         )
 
 
+_SCORED_OUTCOME_LABELS = frozenset({"hit", "miss", "partial"})
+_RESOLVED_UTC_DAY_COUNT_KEYS = ("hit", "miss", "partial", "unavailable", "unlabeled")
+
+
+def _utc_civil_day_bounds(as_of: datetime) -> tuple[datetime, datetime]:
+    naive = as_of
+    if naive.tzinfo is not None:
+        naive = naive.astimezone(timezone.utc).replace(tzinfo=None)
+    start = datetime(naive.year, naive.month, naive.day)
+    end = start + timedelta(days=1)
+    return start, end
+
+
+def _outcome_label(outcome: Optional[Mapping[str, Any]]) -> Optional[str]:
+    if not isinstance(outcome, Mapping) or "label" not in outcome:
+        return None
+    raw = outcome.get("label")
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return raw
+    return str(raw)
+
+
+def _outcome_retry_exhausted(outcome: Optional[Mapping[str, Any]]) -> bool:
+    if not isinstance(outcome, Mapping):
+        return False
+    value = outcome.get("retry_exhausted")
+    if value is True or value == 1:
+        return True
+    return isinstance(value, str) and value.strip().lower() == "true"
+
+
 def _row_is_due(row: MemoryPredictionRecord, as_of: datetime) -> bool:
     """Whether a row is eligible for claim in the current tick."""
     if row.status in TERMINAL or row.retry_exhausted:
@@ -191,6 +224,30 @@ class InMemoryPredictionStore:
             ]
         due.sort(key=lambda r: (r.resolve_after, r.prediction_id))
         return due[:bound]
+
+    def count_resolved_utc_day(self, *, as_of: datetime) -> Dict[str, int]:
+        """Match the SQL UTC-day aggregate using outcome JSON fields only."""
+        start, end = _utc_civil_day_bounds(as_of)
+        counts = {key: 0 for key in _RESOLVED_UTC_DAY_COUNT_KEYS}
+        with self._lock:
+            for row in self._rows.values():
+                if (
+                    row.status == STATUS_RESOLVED
+                    and row.resolved_at is not None
+                    and start <= row.resolved_at < end
+                ):
+                    label = _outcome_label(row.outcome)
+                    if label in _SCORED_OUTCOME_LABELS:
+                        counts[str(label)] += 1
+                    else:
+                        counts["unlabeled"] += 1
+                elif (
+                    row.status == STATUS_DATA_UNAVAILABLE
+                    and start <= row.updated_at < end
+                    and _outcome_retry_exhausted(row.outcome)
+                ):
+                    counts["unavailable"] += 1
+        return counts
 
     def claim_for_resolve(
         self,

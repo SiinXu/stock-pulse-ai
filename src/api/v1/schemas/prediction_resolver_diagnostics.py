@@ -22,6 +22,18 @@ class PredictionResolverOldestDueItem(BaseModel):
     lag_seconds: float = Field(ge=0)
 
 
+class PredictionResolverResolvedUtcDayCounts(BaseModel):
+    """Store-backed durable outcome mix for one UTC civil day."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    hit: int = Field(ge=0)
+    miss: int = Field(ge=0)
+    partial: int = Field(ge=0)
+    unavailable: int = Field(ge=0)
+    unlabeled: int = Field(ge=0)
+
+
 class PredictionResolverDiagnosticsResponse(BaseModel):
     """Read-only claimable-due diagnostics for this API process."""
 
@@ -35,3 +47,6 @@ class PredictionResolverDiagnosticsResponse(BaseModel):
     claimable_due_truncated: bool
     claimable_due_probe_limit: int = Field(ge=1)
     oldest_due: List[PredictionResolverOldestDueItem]
+    resolved_utc_day_start: str
+    resolved_utc_day_end: str
+    resolved_utc_day_counts: PredictionResolverResolvedUtcDayCounts

@@ -179,7 +179,7 @@ export interface paths {
         };
         /**
          * 读取预测解析器到期诊断
-         * @description 只读返回当前可认领的到期预测（pending 与已过期 resolving 租约）。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。
+         * @description 只读返回当前可认领的到期预测（pending 与已过期 resolving 租约），以及 observed_at 所在 UTC 自然日的持久化结果计数。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。
          */
         get: operations["getPredictionResolverDiagnostics"];
         put?: never;
@@ -14163,6 +14163,11 @@ export interface components {
             observed_at: string;
             /** Oldest Due */
             oldest_due: components["schemas"]["PredictionResolverOldestDueItem"][];
+            resolved_utc_day_counts: components["schemas"]["PredictionResolverResolvedUtcDayCounts"];
+            /** Resolved Utc Day End */
+            resolved_utc_day_end: string;
+            /** Resolved Utc Day Start */
+            resolved_utc_day_start: string;
             /** This Process Worker Registered */
             this_process_worker_registered: boolean;
         };
@@ -14183,6 +14188,22 @@ export interface components {
             status: string;
             /** Symbol */
             symbol: string;
+        };
+        /**
+         * PredictionResolverResolvedUtcDayCounts
+         * @description Store-backed durable outcome mix for one UTC civil day.
+         */
+        PredictionResolverResolvedUtcDayCounts: {
+            /** Hit */
+            hit: number;
+            /** Miss */
+            miss: number;
+            /** Partial */
+            partial: number;
+            /** Unavailable */
+            unavailable: number;
+            /** Unlabeled */
+            unlabeled: number;
         };
         /** RateStressShock */
         RateStressShock: {
@@ -20091,7 +20112,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description 预测存储不可读，无法探测 claimable due */
+            /** @description 预测存储不可读，无法探测 claimable due 或 UTC 日结果计数 */
             503: {
                 headers: {
                     [name: string]: unknown;
