@@ -1,10 +1,10 @@
 # Data Provider Module Ownership
 
 - Status: `Living`
-- Last verified: 2026-08-23
+- Last verified: 2026-08-24
 - Related: [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md),
   [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md),
-  Issue #622
+  Issue #622, Issue #1292
 
 ## Purpose
 
@@ -29,6 +29,17 @@ the facade or the private owner runs the same assembly callback, so both reload
 orders converge on one current inventory and descriptor set. New
 **implementations** of extracted responsibilities belong in the owner module
 below, then re-exported from the facade when a public name must remain stable.
+
+## Process manager identity (pipeline and agent tools)
+
+`resolve_process_data_fetcher_manager()` on the composition root
+(`src/application_services.py`) is the single resolver for the analysis
+pipeline and agent data/market tools. It prefers the installed
+`ApplicationServices.data_fetcher_manager` when auto-bind owns one, then the
+`src.agent.tools.data_tools` fallback singleton. `active_fetcher_manager()`
+and `reset_fetcher_manager()` still observe or clear **only** that fallback
+singleton. Ad-hoc `DataFetcherManager()` constructors elsewhere stay out of
+this identity.
 
 ## Ownership Map (after fundamental-cache method extraction)
 

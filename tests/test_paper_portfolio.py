@@ -12,6 +12,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from src.api.app import create_app
+from src.auth import refresh_auth_state
 from src.config import Config
 from src.services.paper_portfolio_service import (
     PaperAccountRequiredError,
@@ -410,6 +411,7 @@ def _client(tmp_path):
     os.environ["PAPER_PORTFOLIO_INITIAL_CASH"] = str(_INITIAL_CASH)
     Config.reset_instance()
     DatabaseManager.reset_instance()
+    refresh_auth_state()
     app = create_app(static_dir=Path(static_dir))
     client = TestClient(app)
     db = DatabaseManager.get_instance()
