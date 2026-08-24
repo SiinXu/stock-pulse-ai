@@ -1145,9 +1145,15 @@ class PredictionResolver:
             },
         )
         if applied and label in {OUTCOME_MISS, OUTCOME_PARTIAL}:
+            enqueue_outcome = dict(outcome)
+            run_id = _attr(claimed, "run_id")
+            if run_id:
+                enqueue_outcome["run_id"] = str(run_id)
+            if claims:
+                enqueue_outcome["claims"] = list(claims)
             self._maybe_enqueue_postmortem(
                 prediction_id=prediction_id,
-                outcome=outcome,
+                outcome=enqueue_outcome,
                 label=label,
             )
         return TickItemResult(
@@ -1366,6 +1372,14 @@ def build_prediction_resolver_background_tasks(
         getattr(config, "prediction_resolve_retry_jitter_ratio", 0.1)
     )
 
+    from src.services.prediction_resolver.postmortem_drain import (
+        drain_postmortem_queue,
+        maybe_build_postmortem_queue,
+    )
+
+    if postmortem_queue is None and resolver is None:
+        postmortem_queue = maybe_build_postmortem_queue(config)
+
     active = resolver
     if active is None:
         active = build_prediction_resolver(
@@ -1390,10 +1404,18 @@ def build_prediction_resolver_background_tasks(
         )
         return []
 
+    drain_queue = getattr(active, "_postmortem_queue", postmortem_queue)
+
     def prediction_resolver_task() -> None:
         summary = active.tick()
         if summary.skipped_overlap:
             return
+        drain_postmortem_queue(
+            drain_queue,
+            skipped_overlap=False,
+            max_items=postmortem_max_per_tick,
+            config=config,
+        )
         if summary.claimed or summary.errors:
             logger.info(
                 "[PredictionResolver] scheduled tick resolved=%s data_unavailable=%s errors=%s",

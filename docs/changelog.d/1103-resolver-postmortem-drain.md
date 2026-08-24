@@ -1,0 +1,1 @@
+- [Added] Drain the resolver postmortem queue after a non-overlap tick into typed lessons when AGENT_POSTMORTEM_ENABLED is on (Refs #1103, Refs #1107).

@@ -16,7 +16,14 @@
 
 - 运行内反思：`src/agent/evolution/reflection.py`
 - 预测后验：`src/agent/evolution/postmortem.py`
+- 生产排空：`src/services/prediction_resolver/postmortem_drain.py`
 - 共享教训类型：`src/agent/evolution/lessons.py`
+
+## 生产接线（调度 / CLI）
+
+默认关闭。仅当 **同时** 打开 `PREDICTION_RESOLVE_ENABLED` 与 `AGENT_POSTMORTEM_ENABLED` 时，调度任务与 CLI 才会注入已有的 `InMemoryPostmortemQueue`，并在非重叠 `tick()` 之后按 `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` 排空队列。
+
+处理器只映射已经写入的 outcome / score / actuals（含入队时拷贝的 `run_id` 与 claims），不重新拉行情，也不从价格编造方向。命中与 `data_unavailable` 不会入队。教训经 `record_reflection_lessons` 投影：若 `AGENT_EPISODE_LOG_ENABLED` 且能按 `run_id` 找到 episode，则带上该 `episode_id`；否则保留进程内 sidecar。找不到 episode 不会让 resolve 失败。排空 / LLM / episode 错误只记录并按队列策略重入队，**不会**回滚已 `resolved` 行，也不会伪造 hit。本切片不向 diagnostics HTTP 暴露队列深度。
 
 ## 配置项
 
@@ -28,5 +35,6 @@
 | `AGENT_POSTMORTEM_ENABLED` | `false` | 启用预测后验复盘 |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 单批后验 LLM 调用上限 |
 | `AGENT_POSTMORTEM_SKIP_CLEAN_HITS` | `true` | 干净命中跳过后验 LLM |
+| `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | 非重叠 tick 后最多排空的后验任务数 |
 
 英文版细节与回滚说明见 [agent-reflection-postmortem_EN.md](./agent-reflection-postmortem_EN.md)。
