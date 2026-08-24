@@ -44305,7 +44305,7 @@
     },
     "/api/v1/config-profiles/import/apply": {
       "post": {
-        "description": "Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply.",
+        "description": "Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
         "operationId": "apply_config_profile_import_api_v1_config_profiles_import_apply_post",
         "requestBody": {
           "content": {
@@ -44367,6 +44367,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Apply stockpulse-profile YAML import",
@@ -44481,7 +44491,7 @@
     },
     "/api/v1/config-profiles/presets/{preset_id}/apply": {
       "post": {
-        "description": "Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm.",
+        "description": "Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
         "operationId": "apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post",
         "parameters": [
           {
@@ -44564,6 +44574,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Apply a configuration preset",
@@ -49148,6 +49168,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Assign Local Model",
@@ -49212,6 +49235,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Activate Desktop Local Model",
@@ -49254,6 +49280,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Delete Local Model",
@@ -49423,6 +49452,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Unregister Local Model",
@@ -49463,6 +49495,9 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Restore Local Model Registration",
@@ -49527,6 +49562,16 @@
               }
             },
             "description": "Validation Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Activate a Desktop-validated Model Pack",
@@ -50024,7 +50069,7 @@
     },
     "/api/v1/onboarding/apply": {
       "post": {
-        "description": "Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.",
+        "description": "Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
         "operationId": "apply_onboarding_plan_api_v1_onboarding_apply_post",
         "requestBody": {
           "content": {
@@ -50086,6 +50131,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Apply non-secret onboarding config recommendations",
@@ -50249,6 +50304,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Generate an agent-guided onboarding plan",
@@ -55940,7 +56005,7 @@
     },
     "/api/v1/stocks/watchlist/add": {
       "post": {
-        "description": "将指定股票代码加入 STOCK_LIST。",
+        "description": "将指定股票代码加入 STOCK_LIST。Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
         "operationId": "add_to_watchlist_api_v1_stocks_watchlist_add_post",
         "requestBody": {
           "content": {
@@ -55992,6 +56057,16 @@
               }
             },
             "description": "服务器错误"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "加入自选队列",
@@ -56113,6 +56188,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Create a watchlist group",
@@ -56194,6 +56279,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Move or copy a symbol between groups",
@@ -56275,6 +56370,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Atomically reorder every watchlist group",
@@ -56357,6 +56462,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Restore a deleted watchlist group",
@@ -56449,6 +56564,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Delete a watchlist group",
@@ -56539,6 +56664,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Rename a watchlist group",
@@ -56631,6 +56766,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Add an authoritative symbol to a group",
@@ -56723,6 +56868,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Atomically reorder every member in one group",
@@ -56824,6 +56979,16 @@
               }
             },
             "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Remove a symbol from one group",
@@ -56834,7 +56999,7 @@
     },
     "/api/v1/stocks/watchlist/remove": {
       "post": {
-        "description": "从 STOCK_LIST 中移除指定股票代码。",
+        "description": "从 STOCK_LIST 中移除指定股票代码。Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
         "operationId": "remove_from_watchlist_api_v1_stocks_watchlist_remove_post",
         "requestBody": {
           "content": {
@@ -56886,6 +57051,16 @@
               }
             },
             "description": "服务器错误"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "从自选队列删除",
@@ -57368,7 +57543,7 @@
         ]
       },
       "put": {
-        "description": "Update key-value pairs in .env. Mask token preserves existing secret values.",
+        "description": "Update key-value pairs in .env. Mask token preserves existing secret values. Attempt-store failure returns 503 operation_completed=false and does not persist. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
         "operationId": "update_system_config_api_v1_system_config_put",
         "requestBody": {
           "content": {
@@ -57439,7 +57614,7 @@
                 }
               }
             },
-            "description": "Security audit unavailable"
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Update system configuration",
@@ -57907,7 +58082,7 @@
     },
     "/api/v1/system/config/llm/legacy-migration/apply": {
       "post": {
-        "description": "Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels.",
+        "description": "Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels. Attempt-store failure returns 503 operation_completed=false and does not persist. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.",
         "operationId": "apply_legacy_channels_migration_api_v1_system_config_llm_legacy_migration_apply_post",
         "requestBody": {
           "content": {
@@ -57971,6 +58146,16 @@
               }
             },
             "description": "Internal server error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Security audit unavailable (operation_completed)"
           }
         },
         "summary": "Apply Legacy -> Channels migration",

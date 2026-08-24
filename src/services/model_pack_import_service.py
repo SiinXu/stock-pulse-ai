@@ -266,6 +266,7 @@ class ModelPackImportService:
         license_id: str,
         expected_config_version: str,
         expected_runtime_identity: str,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Persist Desktop-validated manifest metadata with shared activation semantics."""
         metadata = {
@@ -283,6 +284,7 @@ class ModelPackImportService:
                     runtime_identity=expected_runtime_identity,
                     metadata=metadata,
                 ),
+                audit_actor_id=audit_actor_id,
             )
         except (LocalModelError, ConfigValidationError, ConfigConflictError):
             raise

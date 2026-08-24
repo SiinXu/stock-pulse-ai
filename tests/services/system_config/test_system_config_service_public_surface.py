@@ -109,6 +109,7 @@ EXPECTED_MODULE_NAMES = ('annotations',
  'ConfigValidationError',
  'ConfigImportError',
  'ConfigRollbackError',
+ 'SystemConfigWriteAuditCompletionUnavailable',
  'known_llm_provider_channel_names',
  '_LLMDiagnostic',
  'SystemConfigService')
@@ -203,6 +204,7 @@ EXPECTED_PUBLIC_NAMES = ('annotations',
  'ConfigValidationError',
  'ConfigImportError',
  'ConfigRollbackError',
+ 'SystemConfigWriteAuditCompletionUnavailable',
  'known_llm_provider_channel_names',
  'SystemConfigService')
 EXPECTED_MODULE_ANNOTATIONS = {}
@@ -268,7 +270,7 @@ EXPECTED_CLASS_SURFACE = (
  '_extract_llm_tool_call_names',
  '_extract_llm_stream_chunk_content',
  '_classify_llm_capability_exception',
- 'update',
+ '_update_validated',
  'restore_last_good_config',
  '_build_explainability_warnings',
  '_build_runtime_model_cleanup_warnings',
@@ -372,6 +374,24 @@ EXPECTED_CLASS_SURFACE = (
  '_unknown_connection_contract_issues',
  '_validate_llm_channel_definition',
  '_validate_llm_channel_connection',
+ '_WRITE_EVENT_TYPE',
+ '_WRITE_TARGET_TYPE',
+ '_WRITE_TARGET_ID',
+ '_WRITE_ACTOR_TYPE',
+ '_DEFAULT_WRITE_AUDIT_ACTOR_ID',
+ '_WRITE_AUDIT_ACTOR_IDS',
+ '_DEFAULT_WRITE_SOURCE',
+ '_WRITE_SOURCES',
+ '_LOCAL_MODEL_ACTORS',
+ '_MAX_WRITE_METADATA_KEYS',
+ '_resolve_write_source',
+ '_write_audit_actor',
+ '_write_audit_metadata',
+ '_resolve_write_audit_recorder',
+ '_record_system_config_write_audit',
+ '_complete_system_config_write_success',
+ '_complete_system_config_write_failure',
+ 'update',
 )
 EXPECTED_CLASS_ANNOTATIONS = {'_LLM_CAPABILITY_ORDER': 'Tuple[str, ...]',
  '_CONNECTION_SECRET_SCOPE_SUFFIXES': 'Tuple[str, ...]',
@@ -387,7 +407,7 @@ EXPECTED_CLASS_STATIC_ATTRIBUTES = (
     "_runtime_scheduler",
     "_runtime_config_transaction",
 )
-EXPECTED_METHOD_METADATA_SHA256 = '6ba62def12c168ab4285ee54205d8bf39dd466e0ffe7b82a88c9836683e0de05'
+EXPECTED_METHOD_METADATA_SHA256 = '7bbd704553931238268ef1011f63d8c385901cef0ca481bb60f911700be9baf7'
 
 
 def _descriptor_function(descriptor):

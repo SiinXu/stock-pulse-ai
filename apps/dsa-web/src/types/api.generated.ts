@@ -1147,7 +1147,7 @@ export interface paths {
         put?: never;
         /**
          * Apply stockpulse-profile YAML import
-         * @description Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply.
+         * @description Validate and apply a stockpulse-profile YAML through SystemConfigService. Secret-bearing profiles are rejected. Prefer /import/preview before apply. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.
          */
         post: operations["apply_config_profile_import_api_v1_config_profiles_import_apply_post"];
         delete?: never;
@@ -1207,7 +1207,7 @@ export interface paths {
         put?: never;
         /**
          * Apply a configuration preset
-         * @description Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm.
+         * @description Apply non-secret keys from an official preset through SystemConfigService. Never writes secrets. Callers should preview first and confirm. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.
          */
         post: operations["apply_config_preset_api_v1_config_profiles_presets__preset_id__apply_post"];
         delete?: never;
@@ -2393,7 +2393,7 @@ export interface paths {
         put?: never;
         /**
          * Apply non-secret onboarding config recommendations
-         * @description Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos.
+         * @description Writes only non-secret config keys through SystemConfigService. Secrets are never invented; remaining secret steps stay in the plan todos. Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.
          */
         post: operations["apply_onboarding_plan_api_v1_onboarding_apply_post"];
         delete?: never;
@@ -3471,7 +3471,7 @@ export interface paths {
         put?: never;
         /**
          * 加入自选队列
-         * @description 将指定股票代码加入 STOCK_LIST。
+         * @description 将指定股票代码加入 STOCK_LIST。Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.
          */
         post: operations["add_to_watchlist_api_v1_stocks_watchlist_add_post"];
         delete?: never;
@@ -3635,7 +3635,7 @@ export interface paths {
         put?: never;
         /**
          * 从自选队列删除
-         * @description 从 STOCK_LIST 中移除指定股票代码。
+         * @description 从 STOCK_LIST 中移除指定股票代码。Attempt-store failure returns 503 operation_completed=false. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.
          */
         post: operations["remove_from_watchlist_api_v1_stocks_watchlist_remove_post"];
         delete?: never;
@@ -3758,7 +3758,7 @@ export interface paths {
         get: operations["get_system_config_api_v1_system_config_get"];
         /**
          * Update system configuration
-         * @description Update key-value pairs in .env. Mask token preserves existing secret values.
+         * @description Update key-value pairs in .env. Mask token preserves existing secret values. Attempt-store failure returns 503 operation_completed=false and does not persist. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.
          */
         put: operations["update_system_config_api_v1_system_config_put"];
         post?: never;
@@ -3959,7 +3959,7 @@ export interface paths {
         put?: never;
         /**
          * Apply Legacy -> Channels migration
-         * @description Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels.
+         * @description Copy detected legacy provider config into channels and set LLM_CONFIG_MODE=channels. Attempt-store failure returns 503 operation_completed=false and does not persist. After persist, completion-store failure returns 503 operation_completed=true with config_version, applied_count, and reload_triggered.
          */
         post: operations["apply_legacy_channels_migration_api_v1_system_config_llm_legacy_migration_apply_post"];
         delete?: never;
@@ -22890,6 +22890,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     preview_config_profile_import_api_v1_config_profiles_import_preview_post: {
@@ -23043,6 +23052,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -26011,6 +26029,13 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     get_local_model_configuration_api_v1_local_models_configuration_get: {
@@ -26064,6 +26089,13 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     delete_local_model_api_v1_local_models_models_delete: {
@@ -26096,6 +26128,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -26227,6 +26266,13 @@ export interface operations {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     unregister_local_model_api_v1_local_models_registrations_delete: {
@@ -26259,6 +26305,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -26311,6 +26364,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };
@@ -26713,6 +26775,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     get_demo_analysis_api_v1_onboarding_demo_analysis_get: {
@@ -26835,6 +26906,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -30333,6 +30413,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     list_watchlist_groups_api_v1_stocks_watchlist_groups_get: {
@@ -30440,6 +30529,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     move_watchlist_group_member_api_v1_stocks_watchlist_groups_move_member_post: {
@@ -30502,6 +30600,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -30578,6 +30685,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     restore_watchlist_group_api_v1_stocks_watchlist_groups_restore_post: {
@@ -30647,6 +30763,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     delete_watchlist_group_api_v1_stocks_watchlist_groups__group_id__delete: {
@@ -30709,6 +30834,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -30787,6 +30921,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     add_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members_post: {
@@ -30851,6 +30994,15 @@ export interface operations {
             };
             /** @description Internal Server Error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -30929,6 +31081,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     remove_watchlist_group_member_api_v1_stocks_watchlist_groups__group_id__members__stock_code__delete: {
@@ -30999,6 +31160,15 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
         };
     };
     remove_from_watchlist_api_v1_stocks_watchlist_remove_post: {
@@ -31043,6 +31213,15 @@ export interface operations {
             };
             /** @description 服务器错误 */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -31420,7 +31599,7 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
-            /** @description Security audit unavailable */
+            /** @description Security audit unavailable (operation_completed) */
             503: {
                 headers: {
                     [name: string]: unknown;
@@ -31871,6 +32050,15 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
                 headers: {
                     [name: string]: unknown;
                 };

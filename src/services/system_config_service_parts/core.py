@@ -561,6 +561,8 @@ class _SystemConfigCoreMethods:
         validate_connectivity: bool = False,
         connectivity_timeout_seconds: float = 20.0,
         actor: str = "system_config_service",
+        security_audit: Any = None,
+        audit_actor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Copy detected legacy provider config into channels and switch mode."""
         raw_map = {str(key).upper(): value for key, value in self._manager.read_config_map().items()}
@@ -581,6 +583,9 @@ class _SystemConfigCoreMethods:
             validate_connectivity=validate_connectivity,
             connectivity_timeout_seconds=connectivity_timeout_seconds,
             actor=actor,
+            security_audit=security_audit,
+            source="legacy_migration",
+            audit_actor_id=audit_actor_id,
         )
 
     def get_generation_backend_status(self) -> Dict[str, Any]:
@@ -672,7 +677,7 @@ class _SystemConfigCoreMethods:
         self._conflict.guard_version(config_version)
 
         updates = self._parse_imported_env_content(content)
-        return self.update(
+        return self._update_validated(
             config_version=config_version,
             items=updates,
             mask_token="__DSA_IMPORT_LITERAL_MASK__",

@@ -136,6 +136,11 @@ class ConfigRollbackError(Exception):
         self.message = message
 
 
+from src.services.system_config_service_parts.write_audit import (  # noqa: E402
+    SystemConfigWriteAuditCompletionUnavailable,
+)
+
+
 def known_llm_provider_channel_names() -> frozenset:
     """Provider channel names that ship a built-in default endpoint.
 
@@ -350,6 +355,7 @@ for _service_part_module_name, _service_part_class_name in (
     ("src.services.system_config_service_parts.notifications", "_SystemConfigNotificationMethods"),
     ("src.services.system_config_service_parts.setup", "_SystemConfigSetupMethods"),
     ("src.services.system_config_service_parts.llm_validation", "_SystemConfigLLMValidationMethods"),
+    ("src.services.system_config_service_parts.write_audit", "_SystemConfigWriteAuditMethods"),
 ):
     if _service_part_module_name in _service_part_modules:
         _service_part_module = __import__("importlib").reload(
