@@ -51,6 +51,7 @@ import { ReportStrata } from '../../components/report/ReportStrata';
 import { ReportStrategy } from '../../components/report/ReportStrategy';
 import { ReportStructuredInsights } from '../../components/report/ReportStructuredInsights';
 import { ReportSummary } from '../../components/report/ReportSummary';
+import { ReportRunFeedback } from '../../components/report/ReportRunFeedback';
 import { ShareImageButton } from '../../components/report/ShareImageButton';
 import { MarketReviewRegionSelector } from '../../components/market-review/MarketReviewRegionSelector';
 import { RunFlowEventList } from '../../components/run-flow/RunFlowEventList';
@@ -817,6 +818,31 @@ const ReportStructuredInsightsStory = () => {
 
 const ReportSummaryStory = () => <ReportSummary data={fixtureReport} isHistory onOpenRunFlow={() => undefined} />;
 
+const SAVED_RUN_FEEDBACK_NOTE = 'Looks consistent with the tape.';
+
+const ReportRunFeedbackStory = () => {
+  const text = useSamples();
+  const { scenario } = usePlaygroundScenario();
+  const [feedbackValue, setFeedbackValue] = useState<'useful' | 'partial' | 'wrong' | 'harmful' | null>(
+    scenario === 'empty' || scenario === 'loading' ? null : 'useful',
+  );
+  const [draftNote, setDraftNote] = useState(
+    scenario === 'empty' || scenario === 'loading' ? '' : SAVED_RUN_FEEDBACK_NOTE,
+  );
+  return (
+    <div className="max-w-2xl">
+      <ReportRunFeedback
+        feedbackValue={feedbackValue}
+        draftNote={draftNote}
+        isLoading={scenario === 'loading'}
+        errorMessage={scenario === 'error' ? text.error : null}
+        onDraftNoteChange={setDraftNote}
+        onSubmitValue={setFeedbackValue}
+      />
+    </div>
+  );
+};
+
 const RunFlowEventListStory = () => {
   const { scenario } = usePlaygroundScenario();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -936,6 +962,7 @@ export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenar
   'report-strategy': ReportStrategyStory,
   'report-structured-insights': ReportStructuredInsightsStory,
   'report-summary': ReportSummaryStory,
+  'report-run-feedback': ReportRunFeedbackStory,
   'deep-research-panel': DeepResearchPanelStory,
   'chat-composer': ChatComposerStory,
   'chat-send-feedback-alert': ChatSendFeedbackAlertStory,

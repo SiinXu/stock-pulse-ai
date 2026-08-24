@@ -63,6 +63,12 @@ export {
   DECISION_SIGNAL_OUTCOMES_QUERY_KEY_ROOT,
   useDecisionSignalDetailQueries,
 } from './useDecisionSignalDetailQueries';
+export {
+  AGENT_RUN_FEEDBACK_QUERY_KEY_ROOT,
+  buildAgentRunFeedbackQueryKey,
+  useAgentRunFeedback,
+} from './useAgentRunFeedback';
+export type { AgentRunFeedbackView } from './useAgentRunFeedback';
 export type { DecisionSignalDetailQueryView } from './useDecisionSignalDetailQueries';
 export { useDecisionSignalStatusMutation } from './useDecisionSignalStatusMutation';
 export type {

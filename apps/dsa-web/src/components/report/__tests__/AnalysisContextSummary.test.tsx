@@ -1,4 +1,6 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../../api/history';
 import type {
@@ -17,6 +19,33 @@ vi.mock('../../../api/history', () => ({
     getRecordFlow: vi.fn().mockResolvedValue(null),
   },
 }));
+
+vi.mock('../../../api/agentFeedback', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../../api/agentFeedback')>();
+  return {
+    ...actual,
+    agentFeedbackApi: {
+      getRunFeedback: vi.fn().mockRejectedValue({
+        parsedError: {
+          title: 'Not found',
+          message: 'Analysis run not found.',
+          rawMessage: 'Analysis run not found.',
+          status: 404,
+          category: 'http_error',
+          code: 'not_found',
+        },
+      }),
+      putRunFeedback: vi.fn(),
+    },
+  };
+});
+
+function renderWithClient(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
+  });
+  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+}
 
 const overview: AnalysisContextPackOverview = {
   packVersion: '1.0',
@@ -595,7 +624,7 @@ describe('ReportSummary analysis context placement', () => {
       createdAt: '2026-04-10T12:00:00',
     };
 
-    render(<ReportSummary data={result} />);
+    renderWithClient(<ReportSummary data={result} />);
 
     // News is eager+async. ReportDiagnostics is React.lazy behind Suspense
     // with no fallback, so the panel is absent until the chunk resolves.

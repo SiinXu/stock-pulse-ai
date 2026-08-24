@@ -1806,7 +1806,7 @@ FastAPI 提供 RESTful API 服务，支持配置管理和触发分析。
 | `/api/v1/decision-signals/{signal_id}/feedback` | GET | 查询单个信号的用户反馈；无反馈时返回 `feedback_value=null` |
 | `/api/v1/decision-signals/{signal_id}/feedback` | PUT | 写入或更新单个信号的 `useful|not_useful` 反馈；混入行情 actuals / PredictionOutcome 字段、Soul 边界标记或超限备注的载荷会被拒绝，且不会改写 outcome 表。传输通道 `source` 不是 provenance；服务端盖章 `provenance_source` / `actor_id`，客户端 provenance 键会被拒绝 |
 | `/api/v1/agent/runs/{run_id}/feedback` | GET | 查询分析 run 的可选用户反馈 sidecar；无反馈时 `feedback_value=null`；未知 run 身份 404。与决策信号 `useful|not_useful` 不是同一契约 |
-| `/api/v1/agent/runs/{run_id}/feedback` | PUT | 按 canonical `run_id` upsert `useful|partial|wrong|harmful`；不改写 `outcome_json` 或 append-only episode |
+| `/api/v1/agent/runs/{run_id}/feedback` | PUT | 按 canonical `run_id` upsert `useful|partial|wrong|harmful`；不改写 `outcome_json` 或 append-only episode。Web 专业报告在 `ReportSummary` / `MarketReviewReportView` 提供该入口，键为 `report.meta.queryId`，`source=web`；未知 run 隐藏面板。预测反馈 UI 仍属后续切片 |
 | `/api/v1/agent/predictions/{prediction_id}/feedback` | GET | 查询预测可选用户反馈 sidecar；无反馈时 `feedback_value=null`；未知 `prediction_id` 404 |
 | `/api/v1/agent/predictions/{prediction_id}/feedback` | PUT | 按已落地 `prediction_id` upsert `agree_hit|agree_miss|disagree_score|context_note`；未 resolved 返回 409；混入 actuals / Soul / 超限备注 / 客户端 provenance 会被拒绝且不落库 |
 | `/api/v1/decision-signals/{signal_id}` | GET | 查询单条决策信号，读取前执行懒过期 |

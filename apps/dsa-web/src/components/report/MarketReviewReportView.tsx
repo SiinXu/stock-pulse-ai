@@ -24,11 +24,33 @@ import { getReportText, normalizeReportLanguage } from '../../utils/reportLangua
 import { getUiLocale } from '../../utils/uiLocale';
 import { ApiErrorAlert, Badge, Card, DataTable, IconButton, type DataTableColumn, InlineAlert, Spinner, useClipboard } from '../common';
 import { SignedChangeText } from '../theme/SignedChangeText';
+import { useAgentRunFeedback } from '../../hooks/useAgentRunFeedback';
 import { ScoreGauge } from './ScoreGauge';
 import { MarketStructureCard } from './MarketStructureCard';
 import { ReportMarkdownBody } from './ReportMarkdownBody';
+import { ReportRunFeedback } from './ReportRunFeedback';
 import { ShareImageButton } from './ShareImageButton';
 const ReportProcessTimeline = React.lazy(() => import('./ReportProcessTimeline'));
+
+function AnalysisRunFeedback({ queryId }: { queryId?: string | null }) {
+  const view = useAgentRunFeedback(queryId);
+  if (view.hidden) {
+    return null;
+  }
+  return (
+    <ReportRunFeedback
+      feedbackValue={view.feedbackValue}
+      draftNote={view.draftNote}
+      isLoading={view.isLoading}
+      isSaving={view.isSaving}
+      errorMessage={view.errorMessage}
+      onDraftNoteChange={view.setDraftNote}
+      onSubmitValue={(value) => {
+        void view.submitValue(value);
+      }}
+    />
+  );
+}
 
 interface MarketReviewReportViewProps {
   report?: AnalysisReport;
@@ -694,6 +716,8 @@ export const MarketReviewReportView: React.FC<MarketReviewReportViewProps> = ({
           language={normalizedReportLanguage}
         />
       ) : null}
+
+      <AnalysisRunFeedback queryId={report?.meta.queryId} />
 
       {isLoading ? (
         <Card level="interactive" padding="md" className="text-left">
