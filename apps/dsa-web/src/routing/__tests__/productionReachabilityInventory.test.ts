@@ -7,15 +7,15 @@ import {
 } from '../../components/__tests__/productionSourceInventory';
 import { APP_ROUTE_PATHS } from '../routes';
 import {
+  APP_ROUTE_MODULE_SNAPSHOT,
   NAMED_BOARD_CAPABILITIES,
   UNREACHABLE_CAPABILITY_LEDGER,
   buildReachabilityInventory,
-  buildValueImportConsumers,
+  formatReachableMapping,
   listRelativeValueImportSpecifiers,
   normalizeSrcRelativePath,
-  parseAppRouteTable,
-  resolveProductionRoute,
 } from '../productionReachability';
+import { REACHABLE_SURFACE_ROUTE_SNAPSHOT } from './productionReachabilitySnapshot';
 
 function srcSources(): Record<string, string> {
   return Object.fromEntries(
@@ -33,7 +33,7 @@ describe('production reachability inventory', () => {
     )).toEqual(['../components/event-calendar/EventCalendarWorkspace']);
   });
 
-  it('lists every product surface and the route that reaches it', () => {
+  it('lists every product surface and the pinned route that reaches it', () => {
     assertNonEmptyProductionInventory(productionTypeScriptSources, 'productionTypeScriptSources');
     const sources = srcSources();
     const appSource = sources['App.tsx'];
@@ -42,33 +42,11 @@ describe('production reachability inventory', () => {
 
     expect(unreachable).toEqual(UNREACHABLE_CAPABILITY_LEDGER.map((entry) => entry.file).sort());
     expect(NAMED_BOARD_CAPABILITIES).toHaveLength(19);
-    // Pin the mechanical inventory size so the PR body can quote counts.
-    expect(reachable.length).toBe(74);
-
-    const listed = reachable.map((entry) => `${entry.file} ${entry.route}`);
-    expect(listed).toEqual([...listed].sort());
+    expect(formatReachableMapping(reachable)).toEqual(REACHABLE_SURFACE_ROUTE_SNAPSHOT);
+    expect(reachable.length).toBe(REACHABLE_SURFACE_ROUTE_SNAPSHOT.length);
 
     for (const entry of reachable) {
-      expect(entry.route.startsWith('/')).toBe(true);
-      expect(Object.values(APP_ROUTE_PATHS)).toContain(entry.route);
-    }
-  });
-
-  it('keeps every named #1058/#1008 board capability on a production route', () => {
-    const sources = srcSources();
-    const routeByModule = new Map(
-      parseAppRouteTable(sources['App.tsx'] ?? '').map((binding) => [binding.module, binding]),
-    );
-    const consumers = buildValueImportConsumers(sources);
-    const ledgerFiles = new Set(UNREACHABLE_CAPABILITY_LEDGER.map((entry) => entry.file));
-
-    expect(NAMED_BOARD_CAPABILITIES).toHaveLength(19);
-    for (const capability of NAMED_BOARD_CAPABILITIES) {
-      expect(ledgerFiles.has(capability.file)).toBe(false);
-      expect(sources[capability.file], capability.file).toBeTruthy();
-      const routed = resolveProductionRoute(capability.file, consumers, routeByModule);
-      expect(routed, capability.id).toBeDefined();
-      expect(routed?.route.startsWith('/')).toBe(true);
+      expect(entry.route).toBe(APP_ROUTE_PATHS[entry.routeKey as keyof typeof APP_ROUTE_PATHS]);
     }
   });
 
@@ -76,12 +54,8 @@ describe('production reachability inventory', () => {
     const sources = srcSources();
     const { reachable } = buildReachabilityInventory(sources, sources['App.tsx'] ?? '');
     const routedKeys = new Set(reachable.map((entry) => entry.routeKey));
-    const productRouteKeys = Object.entries(APP_ROUTE_PATHS)
-      .filter(([key]) => key !== 'playground' && key !== 'playgroundRender')
-      .map(([key]) => key);
-
-    for (const key of productRouteKeys) {
-      expect(routedKeys.has(key), key).toBe(true);
+    for (const { routeKey } of APP_ROUTE_MODULE_SNAPSHOT) {
+      expect(routedKeys.has(routeKey), routeKey).toBe(true);
     }
   });
 });
