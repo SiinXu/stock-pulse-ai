@@ -87,14 +87,19 @@ GET /api/v1/agent/prediction-resolver/diagnostics
 | `claimable_due_truncated` | 探测长度达到上限时为 `true` |
 | `claimable_due_probe_limit` | 探测上限（`max(1000, max_per_tick + 1)`，硬顶 10000；存储层 `list_due` 仍硬顶 1000） |
 | `oldest_due` | 最多 10 条允许字段，已按最老 `resolve_after` 排序：`prediction_id`、`symbol`、`market`、`status`（`pending` 或租约过期的 `resolving`）、`resolve_after`、`lag_seconds` |
+| `resolved_utc_day_start` | `observed_at` 所在 UTC 自然日的闭区间起点（ISO-8601 UTC） |
+| `resolved_utc_day_end` | 该自然日的开区间终点（`[start, end)`，ISO-8601 UTC） |
+| `resolved_utc_day_counts` | 存储层持久化结果计数：`hit`、`miss`、`partial`、已耗尽重试的 `unavailable`，以及 `unlabeled`。当日无结果时全部为 0。 |
 
-该 GET 只读。它不会 tick、认领、重新排队、启动或构造 resolver worker。存储读取失败返回 **503**，不会伪装成空积压。开关关闭 / 空队列 / API 进程未挂 worker 时仍返回 **200** 并带上上述字段。
+该 GET 只读。它不会 tick、认领、重新排队、启动或构造 resolver worker。若可认领探测或 UTC 日聚合任一失败，返回 **503**，并同时省略 due 快照与 UTC 日字段，不会伪装成全 0。开关关闭 / 空队列 / API 进程未挂 worker 时仍返回 **200** 并带上上述字段（若 cron 等其他 worker 已写回结果，计数可以大于 0）。
 
-可认领集合是 pending 行加上已过期的 `resolving` 租约。到期的 `data_unavailable` 重试在 tick 重新排队之前 **不会** 被计入，因此 `claimable_due_count` 可能低于下一次 tick 的 `due_before`。`claimable_due_count` / `lag_seconds` 增大只是**提示**，不能证明 worker 卡住。熔断、重叠跳过和上次 tick 计数仍只在日志中；本接口不提供进程内 `last_tick`。
+`hit` / `miss` / `partial` 统计 `status=resolved` 且 `resolved_at` 落在该 UTC 日、`outcome_json.label` 等于对应 token 的行。`unavailable` 统计 `status=data_unavailable`、`updated_at` 落在窗口内且 `outcome_json.retry_exhausted` 为 true 的行；仍可重试的 unavailable **不算**结果。`unlabeled` 统计窗口内 label 缺失或不在 `{hit,miss,partial}` 的 resolved 行。计数只使用 SQL `json_extract`，不会返回 outcome 载荷、claims、notes 或已解析行的 prediction id。响应不含 `today_resolve_counts` 或进程内 `last_tick`。
+
+可认领集合是 pending 行加上已过期的 `resolving` 租约。到期的 `data_unavailable` 重试在 tick 重新排队之前 **不会** 被计入，因此 `claimable_due_count` 可能低于下一次 tick 的 `due_before`。`claimable_due_count` 增大且 UTC 日结果为 **0** 只是 worker 可能未完成的**提示**；`unavailable` 增大提示 provider / 熔断问题；`hit+miss+partial` 增加且 due 缩小提示 worker 正在推进。这仍不是融合后的 `stuck` 布尔。熔断、重叠跳过和上次 tick 计数仍只在日志中。
 
 ## Epic 剩余边界
 
 - 预测查询列表 / 按 id 查询 HTTP API（剩余 #1102）
-- p50/p95 解析延迟直方图、持久化当日命中率、最近拉取错误、Prometheus / OTel，以及可跨进程证明 cron 健康的 worker 心跳
+- p50/p95 解析延迟直方图、最近拉取错误、Prometheus / OTel，以及可跨进程证明 cron 健康的 worker 心跳
 - 交易日历 `resolve_after`（#1109）
 - 复盘 lesson writer / adapter（#1103 / #1106）；resolver 只提供有界队列边界

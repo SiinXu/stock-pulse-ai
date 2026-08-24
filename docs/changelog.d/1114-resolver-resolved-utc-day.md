@@ -1,0 +1,1 @@
+- [Added] Added store-backed UTC-day outcome counts (hit, miss, partial, exhausted unavailable, unlabeled) to GET /api/v1/agent/prediction-resolver/diagnostics (Refs #1114).

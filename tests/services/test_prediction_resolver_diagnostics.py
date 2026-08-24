@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from types import SimpleNamespace
 from typing import Any, List
 
@@ -74,6 +74,15 @@ def test_collect_disabled_empty_store_is_honest() -> None:
     assert payload["claimable_due_truncated"] is False
     assert payload["claimable_due_probe_limit"] == 1000
     assert payload["observed_at"].endswith("+00:00")
+    assert payload["resolved_utc_day_start"] == "2026-08-12T00:00:00+00:00"
+    assert payload["resolved_utc_day_end"] == "2026-08-13T00:00:00+00:00"
+    assert payload["resolved_utc_day_counts"] == {
+        "hit": 0,
+        "miss": 0,
+        "partial": 0,
+        "unavailable": 0,
+        "unlabeled": 0,
+    }
 
 
 def test_collect_includes_pending_and_expired_resolving_without_requeue() -> None:
@@ -178,6 +187,82 @@ def test_collect_store_failure_is_explicit() -> None:
             store=_BrokenStore(),
             now=_now(),
         )
+
+
+def test_collect_missing_count_method_is_explicit() -> None:
+    class _DueOnlyStore:
+        def list_due(self, *, as_of, limit, statuses=None):
+            return []
+
+    with pytest.raises(PredictionResolverDiagnosticsStoreError):
+        collect_prediction_resolver_diagnostics(
+            config=_config(),
+            store=_DueOnlyStore(),
+            now=_now(),
+        )
+
+
+def test_collect_count_failure_is_explicit() -> None:
+    class _CountBrokenStore:
+        def list_due(self, *, as_of, limit, statuses=None):
+            return []
+
+        def count_resolved_utc_day(self, *, as_of):
+            raise RuntimeError("count down")
+
+    with pytest.raises(PredictionResolverDiagnosticsStoreError):
+        collect_prediction_resolver_diagnostics(
+            config=_config(),
+            store=_CountBrokenStore(),
+            now=_now(),
+        )
+
+
+def test_collect_includes_utc_day_outcome_mix() -> None:
+    store = InMemoryPredictionStore()
+    store._clock = _now
+    now = _now()
+    start = datetime(now.year, now.month, now.day)
+    _insert(store, prediction_id="pred-hit", resolve_after_hours=1)
+    claimed = store.claim_for_resolve(
+        prediction_id="pred-hit",
+        lease_owner="worker-1",
+        lease_token="token-hit",
+        lease_ttl_seconds=120,
+        as_of=now,
+    )
+    assert claimed is not None
+    applied, _ = store.resolve(
+        prediction_id="pred-hit",
+        outcome={"label": "hit", "score": 1.0},
+        expected_lease_token="token-hit",
+        as_of=now,
+    )
+    assert applied is True
+    _insert(store, prediction_id="pred-yesterday", resolve_after_hours=2)
+    claimed_yesterday = store.claim_for_resolve(
+        prediction_id="pred-yesterday",
+        lease_owner="worker-1",
+        lease_token="token-yesterday",
+        lease_ttl_seconds=120,
+        as_of=now,
+    )
+    assert claimed_yesterday is not None
+    applied_yesterday, _ = store.resolve(
+        prediction_id="pred-yesterday",
+        outcome={"label": "hit", "score": 1.0},
+        expected_lease_token="token-yesterday",
+        as_of=start - timedelta(seconds=1),
+    )
+    assert applied_yesterday is True
+    payload = collect_prediction_resolver_diagnostics(
+        config=_config(),
+        store=store,
+        now=now,
+    )
+    assert payload["resolved_utc_day_counts"]["hit"] == 1
+    assert payload["resolved_utc_day_counts"]["unlabeled"] == 0
+    assert payload["resolved_utc_day_start"] == "2026-08-12T00:00:00+00:00"
 
 
 def test_collect_registration_bit_is_this_process_cache_only() -> None:

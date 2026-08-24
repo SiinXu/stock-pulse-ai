@@ -25795,6 +25795,17 @@
             "title": "Oldest Due",
             "type": "array"
           },
+          "resolved_utc_day_counts": {
+            "$ref": "#/components/schemas/PredictionResolverResolvedUtcDayCounts"
+          },
+          "resolved_utc_day_end": {
+            "title": "Resolved Utc Day End",
+            "type": "string"
+          },
+          "resolved_utc_day_start": {
+            "title": "Resolved Utc Day Start",
+            "type": "string"
+          },
           "this_process_worker_registered": {
             "title": "This Process Worker Registered",
             "type": "boolean"
@@ -25808,7 +25819,10 @@
           "claimable_due_count",
           "claimable_due_truncated",
           "claimable_due_probe_limit",
-          "oldest_due"
+          "oldest_due",
+          "resolved_utc_day_start",
+          "resolved_utc_day_end",
+          "resolved_utc_day_counts"
         ],
         "title": "PredictionResolverDiagnosticsResponse",
         "type": "object"
@@ -25852,6 +25866,46 @@
           "lag_seconds"
         ],
         "title": "PredictionResolverOldestDueItem",
+        "type": "object"
+      },
+      "PredictionResolverResolvedUtcDayCounts": {
+        "additionalProperties": false,
+        "description": "Store-backed durable outcome mix for one UTC civil day.",
+        "properties": {
+          "hit": {
+            "minimum": 0.0,
+            "title": "Hit",
+            "type": "integer"
+          },
+          "miss": {
+            "minimum": 0.0,
+            "title": "Miss",
+            "type": "integer"
+          },
+          "partial": {
+            "minimum": 0.0,
+            "title": "Partial",
+            "type": "integer"
+          },
+          "unavailable": {
+            "minimum": 0.0,
+            "title": "Unavailable",
+            "type": "integer"
+          },
+          "unlabeled": {
+            "minimum": 0.0,
+            "title": "Unlabeled",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "hit",
+          "miss",
+          "partial",
+          "unavailable",
+          "unlabeled"
+        ],
+        "title": "PredictionResolverResolvedUtcDayCounts",
         "type": "object"
       },
       "RateStressShock": {
@@ -40285,7 +40339,7 @@
     },
     "/api/v1/agent/prediction-resolver/diagnostics": {
       "get": {
-        "description": "只读返回当前可认领的到期预测（pending 与已过期 resolving 租约）。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。",
+        "description": "只读返回当前可认领的到期预测（pending 与已过期 resolving 租约），以及 observed_at 所在 UTC 自然日的持久化结果计数。不会 tick、认领、重新排队或启动 worker。this_process_worker_registered 仅表示本 API 进程是否登记了 prediction_resolver 后台任务，不是全局 worker 健康。",
         "operationId": "getPredictionResolverDiagnostics",
         "responses": {
           "200": {
@@ -40316,7 +40370,7 @@
                 }
               }
             },
-            "description": "预测存储不可读，无法探测 claimable due"
+            "description": "预测存储不可读，无法探测 claimable due 或 UTC 日结果计数"
           }
         },
         "security": [

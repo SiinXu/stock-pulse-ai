@@ -32,6 +32,7 @@ from src.repositories.agent_prediction_repo import AgentPredictionRepository
 from src.schemas.agent_prediction import (
     STATUS_DATA_UNAVAILABLE,
     STATUS_PENDING,
+    STATUS_RESOLVED,
     STATUS_RESOLVING,
     AgentPredictionInsert,
 )
@@ -196,6 +197,15 @@ def test_disabled_empty_store_returns_honest_200(client_and_db) -> None:
     assert payload["claimable_due_truncated"] is False
     assert payload["claimable_due_probe_limit"] >= 1
     assert "interval_seconds" in payload
+    assert payload["resolved_utc_day_counts"] == {
+        "hit": 0,
+        "miss": 0,
+        "partial": 0,
+        "unavailable": 0,
+        "unlabeled": 0,
+    }
+    assert payload["resolved_utc_day_start"].endswith("+00:00")
+    assert payload["resolved_utc_day_end"].endswith("+00:00")
     _assert_no_forbidden_keys(payload)
 
 
@@ -206,6 +216,8 @@ def test_disabled_pending_due_is_listed_without_mutation(client_and_db, monkeypa
     requeue_calls: List[str] = []
     original_claim = AgentPredictionRepository.claim_for_resolve
     original_requeue = AgentPredictionRepository.requeue_pending
+    original_resolve = AgentPredictionRepository.resolve
+    resolve_calls: List[str] = []
 
     def _claim(self, *args, **kwargs):
         claim_calls.append("claim")
@@ -215,8 +227,13 @@ def test_disabled_pending_due_is_listed_without_mutation(client_and_db, monkeypa
         requeue_calls.append("requeue")
         return original_requeue(self, *args, **kwargs)
 
+    def _resolve(self, *args, **kwargs):
+        resolve_calls.append("resolve")
+        return original_resolve(self, *args, **kwargs)
+
     monkeypatch.setattr(AgentPredictionRepository, "claim_for_resolve", _claim)
     monkeypatch.setattr(AgentPredictionRepository, "requeue_pending", _requeue)
+    monkeypatch.setattr(AgentPredictionRepository, "resolve", _resolve)
     monkeypatch.setattr(
         "src.services.prediction_resolver.resolver.build_prediction_resolver",
         lambda *args, **kwargs: (_ for _ in ()).throw(
@@ -246,6 +263,7 @@ def test_disabled_pending_due_is_listed_without_mutation(client_and_db, monkeypa
     assert after.status == STATUS_PENDING
     assert claim_calls == []
     assert requeue_calls == []
+    assert resolve_calls == []
     _assert_no_forbidden_keys(payload)
 
 
@@ -434,6 +452,29 @@ def test_store_read_failure_returns_503_not_empty_backlog(
     assert payload["error"] == "internal_error"
     assert "claimable_due_count" not in payload
     assert "oldest_due" not in payload
+    assert "resolved_utc_day_counts" not in payload
+    assert "resolved_utc_day_start" not in payload
+    _assert_no_forbidden_keys(payload)
+
+
+def test_count_query_failure_returns_503_without_partial_snapshot(
+    client_and_db, monkeypatch
+) -> None:
+    client, db = client_and_db
+    _insert_prediction(db, prediction_id="pred-due-count-fail")
+
+    def _raise(self, *args, **kwargs):
+        raise RuntimeError("count unavailable")
+
+    monkeypatch.setattr(AgentPredictionRepository, "count_resolved_utc_day", _raise)
+    response = client.get(DIAGNOSTICS_PATH)
+    assert response.status_code == 503, response.text
+    payload = response.json()
+    assert payload["error"] == "internal_error"
+    assert "claimable_due_count" not in payload
+    assert "oldest_due" not in payload
+    assert "resolved_utc_day_counts" not in payload
+    assert "pred-due-count-fail" not in response.text
     _assert_no_forbidden_keys(payload)
 
 
@@ -483,8 +524,11 @@ def test_admin_auth_enabled_rejects_missing_and_invalid_session(
             assert missing.json()["error"] == "unauthorized"
             assert "pred-secret" not in missing.text
             assert "oldest_due" not in missing.json()
+            assert "resolved_utc_day_counts" not in missing.json()
+            assert "resolved_utc_day_start" not in missing.json()
             assert invalid.status_code == 401
             assert invalid.json()["error"] == "unauthorized"
+            assert "resolved_utc_day_counts" not in invalid.json()
             assert allowed.status_code == 200, allowed.text
             assert allowed.json()["oldest_due"][0]["prediction_id"] == "pred-secret"
             assert allowed.status_code != 403
@@ -514,6 +558,22 @@ def test_openapi_contract_uses_resolver_scoped_path(client_and_db) -> None:
     assert operation["operationId"] == "getPredictionResolverDiagnostics"
     assert "401" in operation["responses"]
     assert "503" in operation["responses"]
+    parent = schema["components"]["schemas"]["PredictionResolverDiagnosticsResponse"]
+    counts = schema["components"]["schemas"]["PredictionResolverResolvedUtcDayCounts"]
+    assert parent["additionalProperties"] is False
+    assert counts["additionalProperties"] is False
+    assert "resolved_utc_day_start" in parent["properties"]
+    assert "resolved_utc_day_end" in parent["properties"]
+    assert "resolved_utc_day_counts" in parent["properties"]
+    assert "today_resolve_counts" not in parent["properties"]
+    assert "last_tick" not in parent["properties"]
+    assert set(counts["required"]) == {
+        "hit",
+        "miss",
+        "partial",
+        "unavailable",
+        "unlabeled",
+    }
     collision = client.get(COLLISION_PATH)
     assert collision.status_code != 200
     feedback_path = "/api/v1/agent/predictions/{prediction_id}/feedback"
@@ -581,3 +641,133 @@ def test_endpoint_reads_installed_application_services_config(
     assert get_installed_application_services() is installed
     assert installed.config is sentinel
     _assert_no_forbidden_keys(payload)
+
+
+def _claim_and_write(
+    db: DatabaseManager,
+    *,
+    prediction_id: str,
+    as_of: datetime,
+    outcome: dict,
+    unavailable: bool = False,
+) -> None:
+    _insert_prediction(
+        db,
+        prediction_id=prediction_id,
+        resolve_after=as_of - timedelta(hours=1),
+        clock=lambda: as_of,
+    )
+    repo = AgentPredictionRepository(db, clock=lambda: as_of)
+    claimed = repo.claim_for_resolve(
+        prediction_id=prediction_id,
+        lease_owner="worker-mix",
+        lease_token=f"token-{prediction_id}",
+        lease_ttl_seconds=120,
+        as_of=as_of,
+    )
+    assert claimed is not None
+    if unavailable:
+        applied, record = repo.mark_data_unavailable(
+            prediction_id=prediction_id,
+            reason=str(outcome.get("reason") or "data_unavailable"),
+            expected_lease_token=f"token-{prediction_id}",
+            as_of=as_of,
+            outcome=outcome,
+        )
+    else:
+        applied, record = repo.resolve(
+            prediction_id=prediction_id,
+            outcome=outcome,
+            expected_lease_token=f"token-{prediction_id}",
+            as_of=as_of,
+        )
+    assert applied is True
+    assert record is not None
+
+
+def test_utc_day_counts_mix_and_exclusions(client_and_db, monkeypatch) -> None:
+    client, db = client_and_db
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    start = datetime(now.year, now.month, now.day)
+    _claim_and_write(
+        db,
+        prediction_id="pred-hit",
+        as_of=now,
+        outcome={"label": "hit", "score": 1.0},
+    )
+    _claim_and_write(
+        db,
+        prediction_id="pred-miss",
+        as_of=now,
+        outcome={"label": "miss", "score": 0.0},
+    )
+    _claim_and_write(
+        db,
+        prediction_id="pred-partial",
+        as_of=now,
+        outcome={"label": "partial", "score": 0.5},
+    )
+    _claim_and_write(
+        db,
+        prediction_id="pred-yesterday-hit",
+        as_of=start - timedelta(seconds=1),
+        outcome={"label": "hit", "score": 1.0},
+    )
+    _claim_and_write(
+        db,
+        prediction_id="pred-unlabeled",
+        as_of=now,
+        outcome={"score": 1.0},
+    )
+    _claim_and_write(
+        db,
+        prediction_id="pred-retryable",
+        as_of=now,
+        outcome={"retryable": True, "retry_exhausted": False},
+        unavailable=True,
+    )
+    _claim_and_write(
+        db,
+        prediction_id="pred-exhausted",
+        as_of=now,
+        outcome={"retryable": False, "retry_exhausted": True},
+        unavailable=True,
+    )
+    original_claim = AgentPredictionRepository.claim_for_resolve
+    claim_calls: List[str] = []
+
+    def _claim(self, *args, **kwargs):
+        claim_calls.append("claim")
+        return original_claim(self, *args, **kwargs)
+
+    monkeypatch.setattr(AgentPredictionRepository, "claim_for_resolve", _claim)
+    monkeypatch.setattr(
+        PredictionResolver,
+        "tick",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("diagnostics must not tick")
+        ),
+    )
+    response = client.get(DIAGNOSTICS_PATH)
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["resolved_utc_day_counts"] == {
+        "hit": 1,
+        "miss": 1,
+        "partial": 1,
+        "unavailable": 1,
+        "unlabeled": 1,
+    }
+    assert payload["resolved_utc_day_start"].endswith("T00:00:00+00:00")
+    assert payload["resolved_utc_day_end"].endswith("T00:00:00+00:00")
+    assert claim_calls == []
+    repo = AgentPredictionRepository(db)
+    hit_row = repo.get("pred-hit")
+    retry_row = repo.get("pred-retryable")
+    assert hit_row is not None and hit_row.status == STATUS_RESOLVED
+    assert retry_row is not None and retry_row.status == STATUS_DATA_UNAVAILABLE
+    _assert_no_forbidden_keys(payload)
+    found = _collect_keys(payload)
+    assert "today_resolve_counts" not in found
+    assert "outcome_json" not in found
+    assert "pred-hit" not in str(payload.get("resolved_utc_day_counts"))
