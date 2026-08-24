@@ -1,2 +1,3 @@
 - [Changed] Include as_of in the fundamental aggregation cache key and coalesce in-flight same-key loads (Refs #1292).
+- [Fixed] Resolve fundamental cache TTL and max entries through injected Config, manager ownership, or application services rather than a new-module get_config().
 - [Tests] Cover fundamental cache TTL hit/expiry, as_of isolation, concurrent coalesce, and failed context not cached.

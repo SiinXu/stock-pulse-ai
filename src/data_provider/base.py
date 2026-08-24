@@ -2966,6 +2966,11 @@ class DataFetcherManager:
         return None, last_error, total_cost_ms
 
     def _get_fundamental_config(self):
+        """Return process Config for fundamental timeouts, retries, and cache TTL.
+
+        CN/offshore aggregation and the rebound cache helper share this owner so
+        tests can keep patching ``src.config.get_config``.
+        """
         from src.config import get_config
         return get_config()
 
@@ -3165,18 +3170,13 @@ class DataFetcherManager:
         Cache, retry and fail-open semantics intentionally match the CN path so
         upstream callers see the same shape regardless of market.
         """
-        from src.config import get_config
-
-        config = get_config()
+        config = self._get_fundamental_config()
         stage_timeout = float(
             budget_seconds if budget_seconds is not None else config.fundamental_stage_timeout_seconds
         )
         stage_timeout = max(0.0, stage_timeout)
         fetch_timeout = float(config.fundamental_fetch_timeout_seconds)
         fetch_timeout = max(0.0, fetch_timeout)
-
-        cache_ttl = int(config.fundamental_cache_ttl_seconds)
-        cache_max_entries = max(0, int(getattr(config, "fundamental_cache_max_entries", 256)))
 
         def _load() -> Dict[str, Any]:
             result_ctx: Dict[str, Any] = {
@@ -3410,8 +3410,7 @@ class DataFetcherManager:
             stage_timeout,
             _load,
             market=market,
-            cache_ttl=cache_ttl,
-            cache_max_entries=cache_max_entries,
+            config=config,
         )
 
     def build_failed_fundamental_context(self, stock_code: str, reason: str) -> Dict[str, Any]:
@@ -3506,9 +3505,7 @@ class DataFetcherManager:
         """
         Aggregate fundamental blocks with fail-open semantics.
         """
-        from src.config import get_config
-
-        config = get_config()
+        config = self._get_fundamental_config()
         if not config.enable_fundamental_pipeline:
             return self._build_market_not_supported(
                 market=_market_tag(stock_code),
@@ -3536,9 +3533,6 @@ class DataFetcherManager:
         stage_timeout = max(0.0, stage_timeout)
         fetch_timeout = float(config.fundamental_fetch_timeout_seconds)
         fetch_timeout = max(0.0, fetch_timeout)
-
-        cache_ttl = int(config.fundamental_cache_ttl_seconds)
-        cache_max_entries = max(0, int(getattr(config, "fundamental_cache_max_entries", 256)))
 
         def _load() -> Dict[str, Any]:
             remaining_seconds = stage_timeout
@@ -3797,8 +3791,7 @@ class DataFetcherManager:
             stage_timeout,
             _load,
             market=market,
-            cache_ttl=cache_ttl,
-            cache_max_entries=cache_max_entries,
+            config=config,
         )
 
     def get_capital_flow_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:

@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import inspect
 import subprocess
@@ -464,7 +465,8 @@ def test_ttl_zero_concurrent_still_coalesces_without_store() -> None:
 def test_cn_and_offshore_paths_call_shared_helper() -> None:
     manager = DataFetcherManager(fetchers=[])
     sentinel = {"status": "ok", "market": "sentinel"}
-    with patch("src.config.get_config", return_value=_cn_cfg()), patch.object(
+    cfg = _cn_cfg()
+    with patch("src.config.get_config", return_value=cfg), patch.object(
         DataFetcherManager,
         "_get_or_load_fundamental_context",
         return_value=sentinel,
@@ -474,6 +476,11 @@ def test_cn_and_offshore_paths_call_shared_helper() -> None:
     assert cn is sentinel
     assert offshore is sentinel
     assert mocked.call_count == 2
+    for call in mocked.call_args_list:
+        kwargs = call.kwargs
+        assert kwargs.get("config") is cfg
+        assert "cache_ttl" not in kwargs
+        assert "cache_max_entries" not in kwargs
 
 
 def test_cn_get_fundamental_context_coalesces_adapter_calls() -> None:
@@ -566,6 +573,118 @@ def test_offshore_get_fundamental_context_coalesces_adapter_calls() -> None:
     assert results[0]["status"] == "ok"
     assert results[1]["status"] == "ok"
     assert results[0] is not results[1]
+
+
+def test_owner_module_has_no_bare_get_config_calls() -> None:
+    tree = ast.parse(OWNER_PATH.read_text(encoding="utf-8"))
+    sites = [
+        node.lineno
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "get_config"
+    ]
+    assert sites == []
+
+
+def test_omitted_ttl_uses_injected_config() -> None:
+    manager = _manager()
+    cfg = SimpleNamespace(
+        fundamental_cache_ttl_seconds=90,
+        fundamental_cache_max_entries=8,
+    )
+    injected = manager._get_fundamental_cache_key(
+        "600519", 1.5, market="cn", config=cfg
+    )
+    explicit = manager._get_fundamental_cache_key(
+        "600519", 1.5, market="cn", ttl_seconds=90
+    )
+    assert injected == explicit
+
+    loader = _RecordingLoader()
+    manager._get_or_load_fundamental_context(
+        "600519",
+        1.5,
+        loader,
+        market="cn",
+        config=cfg,
+    )
+    manager._get_or_load_fundamental_context(
+        "600519",
+        1.5,
+        loader,
+        market="cn",
+        config=cfg,
+    )
+    assert loader.calls == 1
+    manager._fundamental_cache_clock.tick(91)
+    manager._get_or_load_fundamental_context(
+        "600519",
+        1.5,
+        loader,
+        market="cn",
+        config=cfg,
+    )
+    assert loader.calls == 2
+
+
+def test_omitted_ttl_uses_manager_fundamental_config() -> None:
+    manager = _manager()
+    cfg = SimpleNamespace(
+        fundamental_cache_ttl_seconds=60,
+        fundamental_cache_max_entries=4,
+    )
+    with patch.object(manager, "_get_fundamental_config", return_value=cfg):
+        injected = manager._get_fundamental_cache_key("600519", 1.5, market="cn")
+        explicit = manager._get_fundamental_cache_key(
+            "600519", 1.5, market="cn", ttl_seconds=60
+        )
+    assert injected == explicit
+
+
+def test_omitted_ttl_uses_application_services_when_manager_getter_absent() -> None:
+    manager = _manager()
+    cfg = SimpleNamespace(
+        fundamental_cache_ttl_seconds=45,
+        fundamental_cache_max_entries=3,
+    )
+    with patch.object(DataFetcherManager, "_get_fundamental_config", None), patch(
+        "src.application_services.get_application_services",
+        return_value=SimpleNamespace(config=cfg),
+    ):
+        injected = manager._get_fundamental_cache_key("600519", 1.5, market="cn")
+        explicit = manager._get_fundamental_cache_key(
+            "600519", 1.5, market="cn", ttl_seconds=45
+        )
+    assert injected == explicit
+
+
+def test_explicit_cache_settings_skip_config_resolver() -> None:
+    manager = _manager()
+    calls = {"n": 0}
+
+    def _resolve(*_args: Any, **_kwargs: Any) -> Any:
+        calls["n"] += 1
+        raise AssertionError("resolver must not run when ttl and max_entries are explicit")
+
+    loader = _RecordingLoader()
+    manager._get_or_load_fundamental_context(
+        "600519",
+        1.5,
+        loader,
+        market="cn",
+        cache_ttl=120,
+        cache_max_entries=256,
+        _resolve=_resolve,
+    )
+    manager._get_fundamental_cache_key(
+        "600519",
+        1.5,
+        market="cn",
+        ttl_seconds=120,
+        _resolve=_resolve,
+    )
+    assert calls["n"] == 0
 
 
 def test_does_not_reuse_realtime_chip_pull_coalesce_singleton() -> None:

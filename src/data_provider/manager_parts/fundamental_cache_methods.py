@@ -111,6 +111,18 @@ def _budget_bucket(budget_seconds: Optional[float]) -> str:
     return str(int(round(budget * 10)))
 
 
+def _resolve_fundamental_config(manager: Any, config: Any = None) -> Any:
+    """Resolve fundamental Config: injected, manager owner, then composition root."""
+    if config is not None:
+        return config
+    getter = getattr(manager, "_get_fundamental_config", None)
+    if callable(getter):
+        return getter()
+    from src.application_services import get_application_services
+
+    return get_application_services().config
+
+
 def _begin_fundamental_inflight(
     *,
     lock: threading.RLock,
@@ -161,9 +173,11 @@ class _FundamentalCacheMethods:
         market: Optional[str] = None,
         ttl_seconds: Optional[int] = None,
         now: Optional[datetime] = None,
+        config: Any = None,
         _as_of=_as_of_bucket,
         _wall=_manager_wall_now,
         _budget=_budget_bucket,
+        _resolve=_resolve_fundamental_config,
     ) -> str:
         """Build the fundamental cache key: symbol, market, budget, as_of."""
         normalized_code = normalize_stock_code(stock_code)
@@ -172,10 +186,12 @@ class _FundamentalCacheMethods:
         else:
             market_tag = str(market).strip()
         if ttl_seconds is None:
-            from src.config import get_config
-
             ttl_seconds = int(
-                getattr(get_config(), "fundamental_cache_ttl_seconds", 120)
+                getattr(
+                    _resolve(self, config=config),
+                    "fundamental_cache_ttl_seconds",
+                    120,
+                )
             )
         as_of = _as_of(
             int(ttl_seconds),
@@ -228,21 +244,21 @@ class _FundamentalCacheMethods:
         market: Optional[str] = None,
         cache_ttl: Optional[int] = None,
         cache_max_entries: Optional[int] = None,
+        config: Any = None,
         _begin=_begin_fundamental_inflight,
         _end=_end_fundamental_inflight,
         _clone=_clone_fundamental_value,
         _now=_manager_now_ts,
+        _resolve=_resolve_fundamental_config,
     ) -> Any:
         """Lookup, coalesce in-flight, and maybe store one fundamental context."""
         if cache_ttl is None or cache_max_entries is None:
-            from src.config import get_config
-
-            config = get_config()
+            resolved = _resolve(self, config=config)
             if cache_ttl is None:
-                cache_ttl = int(config.fundamental_cache_ttl_seconds)
+                cache_ttl = int(resolved.fundamental_cache_ttl_seconds)
             if cache_max_entries is None:
                 cache_max_entries = max(
-                    0, int(getattr(config, "fundamental_cache_max_entries", 256))
+                    0, int(getattr(resolved, "fundamental_cache_max_entries", 256))
                 )
         cache_ttl = int(cache_ttl)
         cache_max_entries = max(0, int(cache_max_entries))
