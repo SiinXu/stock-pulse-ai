@@ -1,22 +1,22 @@
 # Agent Router Rules Library
 
-**Status**: Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) slices 1–2 (rules library + structured fact projection, both with deterministic tests). **Not wired** into production callers.
+**Status**: Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) slices 1–3 (rules library + structured fact projection + `AgentOrchestrator.run()` apply). Chat, factory, native adapter, Analyze, API, CLI, Bot, and MCP remain **not wired**.
 
 **Chinese**: [agent-router.md](agent-router.md)
 
 ## Honest boundary
 
-`src/agent/runtime/agent_router.py` is a pure rules-first `AgentRouter`. It classifies analysis depth and Chat path from **already-normalized** facts. `src/agent/runtime/agent_router_facts.py` projects those facts from structured StockScope / entry_kind / symbol count / optional explicit per-run override. These slices:
+`src/agent/runtime/agent_router.py` is a pure rules-first `AgentRouter`. It classifies analysis depth and Chat path from **already-normalized** facts. `src/agent/runtime/agent_router_facts.py` projects those facts from structured StockScope / entry_kind / symbol count / optional explicit per-run override. `AgentOrchestrator.run()` (dashboard analysis) projects facts and applies the router **once per run**. These slices:
 
 - Do **not** parse raw prompts / user messages, provider payloads, or tool results.
-- Do **not** change `AGENT_ORCHESTRATOR_MODE`, mode budgets, Soul, ToolSurface, factory / orchestrator / native adapter, Chat/API/OpenAPI/Web/Desktop/CLI/Bot/MCP.
+- Do **not** change Settings/env `AGENT_ORCHESTRATOR_MODE`, Soul, ToolSurface, factory / native adapter, Chat/API/OpenAPI/Web/Desktop/CLI/Bot/MCP.
 - Do **not** write episode / trace public metadata, EvolutionEvents, or memory admission.
 - Do **not** call or expand `prefer_route`. Valid miss-rate evidence has **zero routing influence** (identity-neutral until #1091 / #1106).
 - Do **not** copy process-wide Settings/env `AGENT_ORCHESTRATOR_MODE` into `user_mode_override`.
 - Do **not** map `report_type` or `skills` / `selected_skill_ids` onto router mode.
-- Do **not** close #1120: AC2–AC4 (caller override wiring, Chat incremental skipping `_execute_pipeline`, decision visible in run metadata) remain later slices.
+- Do **not** close #1120: Chat incremental skipping `_execute_pipeline` (AC3) and decision visible in run metadata (AC4) remain later slices. Factory / Chat / Analyze / CLI / Bot / MCP remain not wired.
 
-Production still uses process-wide `AGENT_ORCHESTRATOR_MODE`. Invalid config values fail open to `standard` in the orchestrator constructor; the router and projector do **not** copy that behavior.
+Dashboard `run()` is fail-closed: a rejected projection or route returns `AgentResult(success=False)` with the public execution failure message and does **not** fall back to the constructor mode. When the run context has no explicit `user_mode_override`, `run()` passes the constructor-configured `self.mode` (factory/Settings `AGENT_ORCHESTRATOR_MODE`) into the router as the user mode so `quick` / `standard` / `full` / `specialist` stay the pipeline depth. An explicit per-run context override still wins. Compare / multi-symbol floors without a user mode remain library behavior and do **not** raise constructor depth on dashboard `run()`. The constructor-configured mode and mode-budget limits are restored in a `finally` block on success, rejection, and every exception path. Chat still always calls `_execute_pipeline` and still uses the constructor mode.
 
 ## Input
 
@@ -136,15 +136,29 @@ assert decision.mode == "standard"
 assert decision.chat_path == "full_repipeline"
 ```
 
+## Dashboard run apply (slice 3)
+
+`AgentOrchestrator.run()` builds a bounded facts mapping from the already-resolved StockScope (`entry_kind=run`, `scope_mode`, codes) plus an optional explicit context `user_mode_override`. When that context has no explicit user mode, it passes constructor `self.mode` as `user_mode_override` so factory/Settings depth is honored. It does not re-read env/Settings, `report_type`, or skills. After an accepted route it sets `self.mode` (and matching mode-budget limits) for that pipeline only.
+
+```python
+from src.agent.orchestrator import AgentOrchestrator
+
+orch = AgentOrchestrator(tool_registry=registry, llm_adapter=adapter, mode="quick")
+result = orch.run("analyze", {"stock_code": "600519"})
+assert orch.mode == "quick"  # constructor mode restored; pipeline also used quick
+```
+
+Rejected projection/route does not call `_execute_pipeline`. Chat is unchanged.
+
 ## Remaining work (#1120 stays open)
 
-Landed: slice 1 rules library; slice 2 structured fact projection.
+Landed: slice 1 rules library; slice 2 structured fact projection; slice 3 dashboard `run()` apply (fail-closed, constructor mode restored).
 
 Still remaining:
 
-- Wire the projector + router into orchestrator / factory / native adapter / analysis and Chat entry points (per-run decisions, not process-wide mode).
-- Chat `incremental_tool` must actually skip `_execute_pipeline` (AC3).
+- Wire the projector + router into factory / native adapter / analysis and Chat entry points (per-run decisions, not process-wide mode).
+- Chat `incremental_tool` must actually skip `_execute_pipeline` (AC3). Chat remains not wired and still always re-pipelines.
 - Record the secret-free decision on run-local metadata (AC4); episode persistence must not collide with #1511.
 - Outcome bias from miss rates belongs to #1091 / #1106 and must stay threshold-gated.
 
-Rollback: delete the library modules, tests, changelog fragment, and these pages. No migration and no config keys.
+Rollback: revert the `run()` apply, then delete the library modules, tests, changelog fragment, and these pages. No migration and no config keys.

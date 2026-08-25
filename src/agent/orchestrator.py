@@ -120,7 +120,10 @@ from src.services.prediction_extractor import (
     PRESENTATION_CONFIDENCE_FLAG as _PRESENTATION_CONFIDENCE_FLAG,
     drop_presentation_confidence as _drop_presentation_confidence,
 )
-from src.agent.orchestrator_parts.chat import _ChatMethods
+from src.agent.orchestrator_parts.chat import (
+    _ChatMethods,
+    _build_dashboard_run_router_facts,
+)
 from src.agent.orchestrator_parts.dashboard import (
     _DashboardMethods,
     _dashboard_content_json,
@@ -156,6 +159,7 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     build_agent_chat_tool_registry,
     build_agent_tool_history_context,
     build_agent_disagreement_summary,
+    _build_dashboard_run_router_facts,
     build_agent_runtime_facts,
     _build_approved_risk_bypass_application,
     build_risk_override_application,
@@ -322,6 +326,7 @@ class AgentOrchestrator:
         self.mode_budget_limits = resolve_mode_budget_limits(
             config, mode=self.mode
         )
+
 
 _EXECUTION_METHOD_NAMES = _bind_facade_methods(
     AgentOrchestrator, _ExecutionMethods, globals()

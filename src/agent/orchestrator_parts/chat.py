@@ -16,6 +16,7 @@ from src.agent.protocols import AgentContext
 from src.agent.public_contract import (
     AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
     AGENT_CHAT_FAILURE_MESSAGE,
+    AGENT_EXECUTION_FAILURE_MESSAGE,
     build_agent_tool_history_context,
     sanitize_agent_diagnostic,
 )
@@ -40,6 +41,46 @@ if TYPE_CHECKING:
 logger = logging.getLogger("src.agent.orchestrator")
 
 
+def _build_dashboard_run_router_facts(
+    scope_resolution: Any,
+    context: Optional[Dict[str, Any]],
+    *,
+    constructor_mode: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Project already-structured StockScope facts for one dashboard ``run()``.
+
+    Does not parse prompts, copy process-wide ``AGENT_ORCHESTRATOR_MODE``,
+    or map ``report_type`` / skills onto the router. When the run context has
+    no explicit ``user_mode_override``, ``constructor_mode`` (factory/Settings
+    depth already on the orchestrator) is passed through so the router keeps
+    ``quick`` / ``standard`` / ``full`` / ``specialist``.
+    """
+    facts: Dict[str, Any] = {"entry_kind": "run"}
+    stock_scope = getattr(scope_resolution, "stock_scope", None)
+    if stock_scope is not None:
+        facts["scope_mode"] = stock_scope.mode
+        allowed = tuple(sorted(stock_scope.allowed_stock_codes))
+        if allowed:
+            facts["allowed_stock_codes"] = allowed
+        expected = stock_scope.expected_stock_code
+        if expected:
+            facts["expected_stock_code"] = expected
+    else:
+        effective = getattr(scope_resolution, "effective_context", None) or {}
+        stock_code = effective.get("stock_code") if isinstance(effective, dict) else None
+        if type(stock_code) is str and stock_code:
+            facts["symbol_codes"] = (stock_code,)
+    explicit_override = False
+    if isinstance(context, dict) and "user_mode_override" in context:
+        override = context["user_mode_override"]
+        if override is not None:
+            facts["user_mode_override"] = override
+            explicit_override = True
+    if not explicit_override and constructor_mode is not None:
+        facts["user_mode_override"] = constructor_mode
+    return facts
+
+
 class _ChatMethods:
     """Source container rebound onto ``AgentOrchestrator`` by the facade."""
 
@@ -51,33 +92,74 @@ class _ChatMethods:
     ) -> "AgentResult":
         """Run the multi-agent pipeline for a dashboard analysis.
 
+        Applies the structured-fact projector and AgentRouter once per run.
+        Constructor/factory depth is the default user mode unless the run
+        context supplies an explicit override. Constructor mode is restored
+        in ``finally``. Chat is unchanged.
+
         Returns an ``AgentResult`` (same type as ``AgentExecutor.run``).
         """
         from src.agent.executor import AgentResult
+        from src.agent.runtime.agent_router import AgentRouter
+        from src.agent.runtime.agent_router_facts import project_router_request
+        from src.agent.runtime.mode_budget import resolve_mode_budget_limits
 
-        scope_resolution = resolve_stock_scope(task, context)
-        ctx = self._build_context(task, scope_resolution.effective_context)
-        ctx.meta["response_mode"] = "dashboard"
-        if scope_resolution.stock_scope is not None:
-            ctx.meta["stock_scope"] = scope_resolution.stock_scope
-        orch_result = self._execute_pipeline(
-            ctx, parse_dashboard=True, cancelled_check=cancelled_check
-        )
+        configured_mode = self.mode
+        configured_budget_limits = self.mode_budget_limits
+        try:
+            scope_resolution = resolve_stock_scope(task, context)
+            projection = project_router_request(
+                _build_dashboard_run_router_facts(
+                    scope_resolution,
+                    context,
+                    constructor_mode=configured_mode,
+                )
+            )
+            if not projection.accepted or projection.request is None:
+                logger.warning("Agent orchestrator run routing rejected")
+                return AgentResult(
+                    success=False,
+                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                )
 
-        return AgentResult(
-            success=orch_result.success,
-            content=orch_result.content,
-            dashboard=orch_result.dashboard,
-            tool_calls_log=orch_result.tool_calls_log,
-            total_steps=orch_result.total_steps,
-            total_tokens=orch_result.total_tokens,
-            provider=orch_result.provider,
-            model=orch_result.model,
-            error=orch_result.error,
-            runtime_facts=orch_result.runtime_facts,
-            cancelled=orch_result.cancelled,
-            timed_out=orch_result.timed_out,
-        )
+            decision = AgentRouter().route(projection.request)
+            if not decision.accepted or decision.mode is None:
+                logger.warning("Agent orchestrator run routing rejected")
+                return AgentResult(
+                    success=False,
+                    error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                )
+
+            self.mode = decision.mode
+            self.mode_budget_limits = resolve_mode_budget_limits(
+                self.config, mode=decision.mode
+            )
+
+            ctx = self._build_context(task, scope_resolution.effective_context)
+            ctx.meta["response_mode"] = "dashboard"
+            if scope_resolution.stock_scope is not None:
+                ctx.meta["stock_scope"] = scope_resolution.stock_scope
+            orch_result = self._execute_pipeline(
+                ctx, parse_dashboard=True, cancelled_check=cancelled_check
+            )
+
+            return AgentResult(
+                success=orch_result.success,
+                content=orch_result.content,
+                dashboard=orch_result.dashboard,
+                tool_calls_log=orch_result.tool_calls_log,
+                total_steps=orch_result.total_steps,
+                total_tokens=orch_result.total_tokens,
+                provider=orch_result.provider,
+                model=orch_result.model,
+                error=orch_result.error,
+                runtime_facts=orch_result.runtime_facts,
+                cancelled=orch_result.cancelled,
+                timed_out=orch_result.timed_out,
+            )
+        finally:
+            self.mode = configured_mode
+            self.mode_budget_limits = configured_budget_limits
 
     def chat(
         self,

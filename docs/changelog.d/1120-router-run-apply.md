@@ -1,0 +1,2 @@
+- [Added] Apply AgentRouter once per dashboard AgentOrchestrator.run() from structured StockScope facts, honor constructor/Settings depth unless an explicit per-run user_mode_override is provided, fail closed on projection or routing rejection, and restore the constructor-configured mode in finally (Refs #1120).
+- [Docs] Document dashboard run apply as #1120 slice 3 and keep Chat incremental, run-metadata, and remaining callers as remaining work (Refs #1120).
