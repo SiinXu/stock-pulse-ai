@@ -1,0 +1,1 @@
+- [Fixed] Aligned Local Only Mode copy with the enforced network surface (Refs #218).

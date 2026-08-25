@@ -540,7 +540,7 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     ],
     impact: ['Affects daily history reads for analysis, stock history API, and scheduled runs that depend on market data.'],
     notes: [
-      'Independent of LOCAL_ONLY_MODE, which gates non-loopback outbound HTTP for the whole process.',
+      'Independent of LOCAL_ONLY_MODE, which gates policy-owned non-loopback outbound HTTP rather than every process socket.',
       'See docs/local-first-market-data_EN.md.',
     ],
   },
@@ -887,11 +887,11 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   },
   'settings.system.LOCAL_ONLY_MODE': {
     title: 'Local Only Mode',
-    summary: 'Fail-closed privacy mode that blocks every non-loopback outbound HTTP destination.',
-    usage: 'Enable only when you intentionally run with local models and cached data. Cloud LLM, search, news, remote data providers, and notification webhooks are denied with coded LOCAL_ONLY_MODE errors. Pure loopback remains allowed.',
-    valueNotes: ['Default is false.', 'OUTBOUND_HTTP_ALLOWLIST cannot expand beyond loopback while on.', 'Blocked calls never silently fall through.'],
-    impact: ['Remote-dependent analysis fails visibly unless local backends and cache cover the path.'],
-    notes: ['Restart after changing. See docs/local-only-mode_EN.md.'],
+    summary: 'Fail-closed gate for outbound HTTP that uses the shared policy helpers. It is not a full air-gap.',
+    usage: 'Enable when you want policy-owned HTTP to deny every non-loopback destination with coded LOCAL_ONLY_MODE errors. Cloud LLM, search, news, notification webhooks, and providers that already go through safe_get/safe_post are blocked. Pure loopback remains allowed. This switch does not cover non-HTTP provider sockets, plugin processes, desktop update checks, or provider clients not yet routed through the safe wrapper.',
+    valueNotes: ['Default is false.', 'OUTBOUND_HTTP_ALLOWLIST cannot expand beyond loopback while on.', 'Blocked policy-owned calls never silently fall through.'],
+    impact: ['Policy-owned remote HTTP fails visibly unless local backends and cache cover the path. Surfaces outside the gate keep their existing network behavior.'],
+    notes: ['Restart after changing. See docs/local-only-mode_EN.md for the exact enforcement surface.'],
   },
   'settings.system.ADMIN_AUTH_ENABLED': {
 
@@ -2146,7 +2146,7 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     usage: 'Keep disabled by default. Enable only when a trusted Clash/Mihomo TUN owns the documented Fake-IP ranges and the configured proxy is loopback-only.',
     valueNotes: [
       'Literal Fake-IP URLs, private names, metadata, link-local, and non-loopback proxy targets remain blocked.',
-      'Local Only Mode takes precedence and continues to block every non-loopback target.',
+      'Local Only Mode takes precedence and continues to block every non-loopback target on this outbound HTTP policy path.',
     ],
     impact: ['Expands outbound DNS acceptance only for standard Fake-IP ranges and the exact configured loopback proxy.'],
     notes: ['Disable immediately when the TUN or loopback proxy is no longer trusted.'],
