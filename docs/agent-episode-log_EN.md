@@ -13,7 +13,7 @@ Persist compact, queryable **episodes** after agent runs so offline eval, post-m
 | `run_id`, `mode`, `symbol`, timestamps | Correlation keys |
 | `trajectory_summary` | Tool names, success flags, optional argument fingerprints — not raw prompts |
 | `lessons` | Typed reflection / post-mortem lessons |
-| `outcome_labels` | Optional feedback / forward-return / prediction outcome labels stored on the episode row at append time. Issue #1105 user feedback and Issue #1096 forward-return buckets are **not** written here. |
+| `outcome_labels` | Optional feedback / forward-return / curator-grade / prediction outcome labels stored on the episode row at append time. Issue #1105 user feedback, Issue #1096 forward-return buckets, and post-hoc #1096 curator grades are **not** written here. |
 | `soul_version` / `soul_hash` | Identity only — **never** full Soul charter text |
 
 ## Modules
@@ -28,6 +28,11 @@ Persist compact, queryable **episodes** after agent runs so offline eval, post-m
 | `src/services/forward_return_labeler.py` | CLI batch labeler (invocation is the gate) |
 | `scripts/label_forward_returns.py` | Opt-in CLI entry |
 | `src/migrations/versions/v202608250001_agent_forward_return_schema.py` | Sidecar table |
+| `src/schemas/curator_grade.py` | Sidecar/CLI allowlist only; does not constrain episode rows |
+| `src/repositories/agent_curator_grade_repo.py` | Sidecar upsert for #1096 eval-fixture curator grades |
+| `src/services/curator_grade_ingester.py` | CLI fixture loader (invocation is the gate) |
+| `scripts/label_curator_grades.py` | Opt-in CLI entry |
+| `src/migrations/versions/v202608250002_agent_curator_grade_schema.py` | Sidecar table |
 
 ## Configuration
 
@@ -58,6 +63,14 @@ Authenticated `PUT`/`GET` APIs store run (`useful|partial|wrong|harmful`) and pr
 Research-only 1d/5d direction buckets (`1d_up` / `1d_down` / `1d_flat` / `5d_up` / `5d_down` / `5d_flat`) live in the `agent_episode_forward_returns` sidecar, keyed by existing `episode_id` + horizon with `run_id` copied from the episode. They are **model-ops quality labels**, not trading advice and not a promised alpha signal.
 
 Invocation is the only gate: run `python scripts/label_forward_returns.py --as-of YYYY-MM-DD` (optional `--horizon 1d` / `--horizon 5d`, `--run-id`, `--dry-run`). There is no config-registry key and no scheduler. The job reads daily history through the existing ActualsFetcher / `DataFetcherManager` path, never fabricates prices, and **skips** a row when the horizon bar is missing, the trading calendar cannot compute the window, or the episode has no symbol. Unknown bucket strings are rejected. The labeler does not write `prediction_outcome` and does not `UPDATE` `agent_episodes` (`trg_agent_episodes_immutable` stays in force). Missing labels stay absent; calibration and evolution continue with neutral behavior.
+
+## Optional curator grades on eval fixtures (#1096)
+
+`EpisodeOutcomeLabels.manual_grade` remains the optional semantic slot on the episode row and stays free-form (max 64). Historical append-time values such as `wrong` still read. Post-hoc eval-fixture ingest does **not** rewrite that field. It writes the `agent_episode_curator_grades` sidecar, keyed by `episode_id`, with `run_id` copied from the episode. Sidecar/CLI tokens are allowlisted as `pass` / `fail` / `partial` / `harmful` in `src/schemas/curator_grade.py`. The sidecar never `UPDATE`s append-only `agent_episodes` (`trg_agent_episodes_immutable` stays in force).
+
+These grades are **model-ops quality labels** for eval fixtures, not trading advice and not a promised alpha signal.
+
+Invocation is the only gate: run `python scripts/label_curator_grades.py --fixture path.json` (optional `--episode-id`, `--dry-run`). There is no config-registry key and no scheduler. The fixture is JSON: either `{"version":"curator_grade/1.0","grades":[...]}` or a bare array of grade objects. Each object needs `episode_id` and may include `run_id` and `manual_grade`. Missing or blank `manual_grade` is absence (no sidecar write, no fabricated neutral). Unknown tokens fail closed before any write. A fixture `run_id` that does not match the stored episode is rejected. Missing episodes are skipped. Adapter consumption of these labels is #1106.
 
 ## Rollback
 

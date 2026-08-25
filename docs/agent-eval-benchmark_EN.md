@@ -55,6 +55,15 @@ The CLI itself is the explicit opt-in boundary. There is no runtime
 invoke this evaluator, so advertising an environment gate would be inert and
 would create a second configuration owner.
 
+## Optional curator grades (#1096)
+
+Recorded eval episodes may receive a sidecar curator grade (`pass` / `fail` /
+`partial` / `harmful`) through `python scripts/label_curator_grades.py --fixture path.json`.
+Invocation is the only gate. Missing fixture grades stay absent. Historical
+episode-row `manual_grade` values such as `wrong` are unchanged and still read.
+This does not score the offline benchmark and does not feed adapters (#1106).
+See [agent-episode-log_EN.md](agent-episode-log_EN.md).
+
 ## Trajectory evaluation contract
 
 Every `scenario_details[]` item in the full `--json-out` artifact contains a

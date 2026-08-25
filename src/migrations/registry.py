@@ -82,6 +82,9 @@ from src.migrations.versions.v202608240001_agent_feedback_schema import (
 from src.migrations.versions.v202608250001_agent_forward_return_schema import (
     MIGRATION as AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
 )
+from src.migrations.versions.v202608250002_agent_curator_grade_schema import (
+    MIGRATION as AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -111,6 +114,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         MEMORY_WRITE_PROVENANCE_MIGRATION,
         AGENT_FEEDBACK_SCHEMA_MIGRATION,
         AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
+        AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
     )
 )
 
