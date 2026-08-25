@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import inspect
+import logging
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
@@ -484,7 +485,12 @@ def test_uncalibrated_result_is_identity_even_with_non_neutral_factor() -> None:
     assert meta["reason"] == "insufficient_samples"
 
 
-def _make_base_agent(memory: AgentMemory, *, agent_name: str = "technical"):
+def _make_base_agent(
+    memory: AgentMemory,
+    *,
+    agent_name: str = "technical",
+    config: Any = None,
+):
     from src.agent.agents.base_agent import BaseAgent
 
     class DummyAgent(BaseAgent):
@@ -504,7 +510,11 @@ def _make_base_agent(memory: AgentMemory, *, agent_name: str = "technical"):
 
     DummyAgent.agent_name = agent_name
     with patch("src.agent.agents.base_agent.AgentMemory.from_config", return_value=memory):
-        return DummyAgent(tool_registry=MagicMock(), llm_adapter=MagicMock())
+        return DummyAgent(
+            tool_registry=MagicMock(),
+            llm_adapter=MagicMock(),
+            config=config,
+        )
 
 
 def _loop_result() -> Any:
@@ -517,13 +527,20 @@ def _loop_result() -> Any:
     )
 
 
+def _patch_live_adapter_config(config: Any):
+    return patch(
+        "src.application_services.get_application_services",
+        return_value=SimpleNamespace(config=config),
+    )
+
+
 def _run_agent(agent: Any, ctx: AgentContext, *, adapters_enabled: bool) -> Any:
-    with patch("src.config.get_config", return_value=_config(enabled=adapters_enabled)):
-        with patch(
-            "src.agent.agents.base_agent.run_agent_loop",
-            return_value=_loop_result(),
-        ):
-            return agent.run(ctx)
+    agent.config = _config(enabled=adapters_enabled)
+    with patch(
+        "src.agent.agents.base_agent.run_agent_loop",
+        return_value=_loop_result(),
+    ):
+        return agent.run(ctx)
 
 
 def test_base_agent_flag_off_keeps_ungated_memory_multiply() -> None:
@@ -533,7 +550,7 @@ def test_base_agent_flag_off_keeps_ungated_memory_multiply() -> None:
     opinion = AgentOpinion(agent_name="technical", signal="buy", confidence=0.6, reasoning="ok")
     result = StageResult(stage_name="technical", status=StageStatus.RUNNING)
 
-    with patch("src.config.get_config", return_value=_config(enabled=False)):
+    with _patch_live_adapter_config(_config(enabled=False)):
         with patch(
             "src.agent.agents.base_agent.calibrate_confidence",
             wraps=calibrate_confidence,
@@ -574,24 +591,81 @@ def test_base_agent_missing_config_keeps_ungated_memory_multiply() -> None:
     opinion = AgentOpinion(agent_name="technical", signal="buy", confidence=0.6, reasoning="ok")
     result = StageResult(stage_name="technical", status=StageStatus.RUNNING)
 
-    with patch("src.config.get_config", side_effect=RuntimeError("config missing")):
-        agent._apply_memory_calibration(ctx, opinion, result)
+    with patch(
+        "src.application_services.get_application_services",
+        side_effect=RuntimeError("config missing"),
+    ):
+        with patch("src.agent.agents.base_agent.log_safe_exception") as safe_log:
+            agent._apply_memory_calibration(ctx, opinion, result)
 
     assert opinion.confidence == pytest.approx(0.3)
     assert result.meta["memory_calibration"]["factor"] == pytest.approx(0.5)
     assert ADAPTER_INFLUENCE_META_KEY not in ctx.meta
+    safe_log.assert_called_once()
+    assert safe_log.call_args.args[1] == (
+        "Online adapter config lookup failed; keeping ungated memory calibration"
+    )
+    assert isinstance(safe_log.call_args.args[2], RuntimeError)
+    assert safe_log.call_args.kwargs["error_code"] == "agent_online_adapter_config_unavailable"
+    assert safe_log.call_args.kwargs["level"] == logging.WARNING
+    assert safe_log.call_args.kwargs["context"] == {"agent": agent.agent_name}
 
     missing_attr_ctx = AgentContext(query="test", stock_code="600519")
     missing_attr_opinion = AgentOpinion(
         agent_name="technical", signal="buy", confidence=0.6, reasoning="ok"
     )
     missing_attr_result = StageResult(stage_name="technical", status=StageStatus.RUNNING)
-    with patch("src.config.get_config", return_value=SimpleNamespace()):
-        agent._apply_memory_calibration(
-            missing_attr_ctx, missing_attr_opinion, missing_attr_result
-        )
+    with _patch_live_adapter_config(SimpleNamespace()):
+        with patch("src.agent.agents.base_agent.log_safe_exception") as missing_attr_log:
+            agent._apply_memory_calibration(
+                missing_attr_ctx, missing_attr_opinion, missing_attr_result
+            )
+    missing_attr_log.assert_not_called()
     assert missing_attr_opinion.confidence == pytest.approx(0.3)
     assert ADAPTER_INFLUENCE_META_KEY not in missing_attr_ctx.meta
+
+
+def test_base_agent_injected_config_skips_composition_root_lookup() -> None:
+    memory = _memory(enabled=True, samples=40, accuracy=0.0, avg_confidence=0.4)
+    gated_agent = _make_base_agent(memory, config=_config(enabled=True))
+    gated_ctx = AgentContext(query="test", stock_code="600519")
+    gated_opinion = AgentOpinion(
+        agent_name="technical", signal="buy", confidence=0.6, reasoning="ok"
+    )
+    gated_result = StageResult(stage_name="technical", status=StageStatus.RUNNING)
+
+    with patch(
+        "src.application_services.get_application_services",
+        side_effect=AssertionError("injected config must not look up composition root"),
+    ) as get_services:
+        with patch("src.agent.agents.base_agent.log_safe_exception") as safe_log:
+            gated_agent._apply_memory_calibration(gated_ctx, gated_opinion, gated_result)
+
+    get_services.assert_not_called()
+    safe_log.assert_not_called()
+    assert gated_opinion.confidence == pytest.approx(0.3)
+    assert "memory_calibration" not in gated_result.meta
+    assert gated_ctx.meta[ADAPTER_INFLUENCE_META_KEY]["confidence"]["applied"] is True
+
+    ungated_agent = _make_base_agent(memory, config=_config(enabled=False))
+    ungated_ctx = AgentContext(query="test", stock_code="600519")
+    ungated_opinion = AgentOpinion(
+        agent_name="technical", signal="buy", confidence=0.6, reasoning="ok"
+    )
+    ungated_result = StageResult(stage_name="technical", status=StageStatus.RUNNING)
+    with patch(
+        "src.application_services.get_application_services",
+        side_effect=AssertionError("injected config must not look up composition root"),
+    ) as ungated_services:
+        with patch("src.agent.agents.base_agent.log_safe_exception") as ungated_log:
+            ungated_agent._apply_memory_calibration(
+                ungated_ctx, ungated_opinion, ungated_result
+            )
+    ungated_services.assert_not_called()
+    ungated_log.assert_not_called()
+    assert ungated_opinion.confidence == pytest.approx(0.3)
+    assert ungated_result.meta["memory_calibration"]["factor"] == pytest.approx(0.5)
+    assert ADAPTER_INFLUENCE_META_KEY not in ungated_ctx.meta
 
 
 def test_base_agent_flag_on_applies_adapter_once_without_double_multiply() -> None:
@@ -604,7 +678,7 @@ def test_base_agent_flag_on_applies_adapter_once_without_double_multiply() -> No
     double_multiplied = raw * 0.5 * 0.5
     inverted = raw * (0.5 / 0.4)
 
-    with patch("src.config.get_config", return_value=_config(enabled=True)):
+    with _patch_live_adapter_config(_config(enabled=True)):
         with patch(
             "src.agent.agents.base_agent.calibrate_confidence",
             wraps=calibrate_confidence,

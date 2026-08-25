@@ -19,7 +19,7 @@ Existing `AgentMemory` numeric calibration behavior is unchanged when `AGENT_ONL
 
 ## Online evolution adapters (gated, default off)
 
-Gated confidence apply in `BaseAgent._apply_memory_calibration` through `src/agent/evolution/adapters.py`. Flag off / missing keeps today's `AgentMemory` multiply. Flag on applies the stored `calibration_factor` **once** (no double-multiply). Tool ranking and route preference remain identity stubs.
+Gated confidence apply in `BaseAgent._apply_memory_calibration` through `src/agent/evolution/adapters.py`. Flag off / missing keeps today's `AgentMemory` multiply. Production constructors that already own `Config` inject it; otherwise `BaseAgent` reads `get_application_services().config`. If that live lookup fails, `BaseAgent` safe-logs `agent_online_adapter_config_unavailable` and keeps that same ungated multiply (no `adapter_influence`). Flag on applies the stored `calibration_factor` **once** (no double-multiply). Tool ranking and route preference remain identity stubs.
 
 | Control | Default | Behavior |
 | --- | --- | --- |

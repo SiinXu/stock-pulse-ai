@@ -79,11 +79,13 @@ class BaseAgent(ABC):
         llm_adapter: LLMToolAdapter,
         skill_instructions: str = "",
         technical_skill_policy: str = "",
+        config: Any = None,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
         self.skill_instructions = skill_instructions
         self.technical_skill_policy = technical_skill_policy
+        self.config = config
         self.memory = AgentMemory.from_config()
 
     # -----------------------------------------------------------------
@@ -384,12 +386,22 @@ class BaseAgent(ABC):
         return f"{title}\n{isolated}\n{guardrail}"
 
     def _resolve_online_adapter_config(self) -> Any:
-        """Load live config for the online-adapter gate. Missing config is off."""
+        """Load config for the online-adapter gate. Missing config is off."""
+        if self.config is not None:
+            return self.config
         try:
-            from src.config import get_config
+            from src.application_services import get_application_services
 
-            return get_config()
-        except Exception:  # broad-exception: fallback_recorded - missing config keeps today's ungated multiply
+            return get_application_services().config
+        except Exception as exc:  # broad-exception: fallback_recorded - missing config keeps today's ungated multiply
+            log_safe_exception(
+                logger,
+                "Online adapter config lookup failed; keeping ungated memory calibration",
+                exc,
+                error_code="agent_online_adapter_config_unavailable",
+                level=logging.WARNING,
+                context={"agent": self.agent_name},
+            )
             return None
 
     def _apply_memory_calibration(self, ctx: AgentContext, opinion: AgentOpinion, result: StageResult) -> None:

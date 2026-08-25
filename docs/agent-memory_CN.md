@@ -19,7 +19,7 @@
 
 ## 在线进化适配器（默认关闭）
 
-`BaseAgent._apply_memory_calibration` 经 `src/agent/evolution/adapters.py` 做门控置信度应用。开关关闭或配置缺失时保持今天的 `AgentMemory` 相乘。开启时对已存 `calibration_factor` **只应用一次**（不得二次相乘）。工具排序与路由偏好仍是恒等桩。
+`BaseAgent._apply_memory_calibration` 经 `src/agent/evolution/adapters.py` 做门控置信度应用。开关关闭或配置缺失时保持今天的 `AgentMemory` 相乘。已持有 `Config` 的生产构造路径会注入该配置；否则 `BaseAgent` 读取 `get_application_services().config`。若该实时查找失败，`BaseAgent` 会安全记录 `agent_online_adapter_config_unavailable`，并继续走同一条非门控相乘（不写 `adapter_influence`）。开启时对已存 `calibration_factor` **只应用一次**（不得二次相乘）。工具排序与路由偏好仍是恒等桩。
 
 | 控制项 | 默认值 | 行为 |
 | --- | --- | --- |
