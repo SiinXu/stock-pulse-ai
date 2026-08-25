@@ -777,6 +777,7 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
     _FIELD_TITLE_FILES = (
         _WEB_ROOT / "utils/systemConfigI18n.ts",
         _WEB_ROOT / "i18n/reflectionSettingsCopy.ts",
+        _WEB_ROOT / "locales/skillRetrievalSettingsHelp.ts",
     )
     _FEATURE_FIELD_TITLE_FILE = (
         Path(__file__).resolve().parents[1]

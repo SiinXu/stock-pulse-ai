@@ -15,13 +15,18 @@ type AdditionalSkillRetrievalLanguage = Exclude<UiLanguage, 'zh' | 'en'>;
 
 export const SKILL_RETRIEVAL_HELP_KEY = 'settings.agent.AGENT_SKILL_RETRIEVAL_K';
 
-export const SKILL_RETRIEVAL_FIELD_TITLE_MAP_ZH = {
+// Keep these const names so TestSettingsFieldTitleContract can inventory
+// the isolated title map without copying literals into SettingsPage cores.
+const fieldTitleMapZh = {
   AGENT_SKILL_RETRIEVAL_K: '技能检索 Top-K',
 } as const;
 
-export const SKILL_RETRIEVAL_FIELD_TITLE_MAP_EN = {
+const fieldTitleMapEn = {
   AGENT_SKILL_RETRIEVAL_K: 'Skill Retrieval Top-K',
-} satisfies Record<keyof typeof SKILL_RETRIEVAL_FIELD_TITLE_MAP_ZH, string>;
+} satisfies Record<keyof typeof fieldTitleMapZh, string>;
+
+export const SKILL_RETRIEVAL_FIELD_TITLE_MAP_ZH = fieldTitleMapZh;
+export const SKILL_RETRIEVAL_FIELD_TITLE_MAP_EN = fieldTitleMapEn;
 
 export const SKILL_RETRIEVAL_FIELD_DESCRIPTION = {
   AGENT_SKILL_RETRIEVAL_K:
@@ -34,7 +39,7 @@ const SKILL_RETRIEVAL_EXAMPLES = [
 ] as const;
 
 const skillRetrievalSettingsHelpEn: SettingsHelpDefinition = {
-  title: 'Skill Retrieval Top-K',
+  title: fieldTitleMapEn.AGENT_SKILL_RETRIEVAL_K,
   summary: 'How many catalog skills automatic SkillRouter may retrieve by description. 0 keeps the current router.',
   usage: "Leave at 0 to disable retrieval and keep today's regime or default SkillRouter. A positive integer (hard cap 8) ranks catalog descriptions, display names, and aliases on the implicit automatic path only.",
   valueNotes: [
@@ -49,7 +54,7 @@ const skillRetrievalSettingsHelpEn: SettingsHelpDefinition = {
 };
 
 const skillRetrievalSettingsHelpZh: SettingsHelpDefinition = {
-  title: '技能检索 Top-K',
+  title: fieldTitleMapZh.AGENT_SKILL_RETRIEVAL_K,
   summary: '自动 SkillRouter 按目录描述检索时最多选取的技能数量。0 保持当前路由。',
   usage: '保持为 0 可关闭检索，并沿用今日的市场状态或默认 SkillRouter。正整数（硬顶 8）仅在隐式自动路径上按目录描述、显示名和别名排序。',
   valueNotes: [

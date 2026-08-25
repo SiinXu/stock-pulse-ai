@@ -23,6 +23,18 @@ describe('settings-help examples literal contract', () => {
     await loadAllUiLanguageTranslations();
   });
 
+  it('keeps catalog-description skill retrieval help out of extra-locale inventories', () => {
+    const marker = 'How many catalog skills automatic SkillRouter may retrieve by description';
+    for (const language of ADDITIONAL_UI_LANGUAGES) {
+      const bundle = getLoadedUiLanguageTranslations(language);
+      expect(bundle, language).toBeTruthy();
+      const serialized = JSON.stringify(bundle);
+      expect(serialized, language).not.toContain('AGENT_SKILL_RETRIEVAL_K');
+      expect(serialized, language).not.toContain(marker);
+    }
+    expect(Object.keys(SOURCE_UI_TRANSLATIONS).join('\n')).not.toContain('AGENT_SKILL_RETRIEVAL_K');
+  });
+
   it('keeps settings-help examples out of the English inventory and locale bundles', () => {
     const inventoryHits = UI_TRANSLATION_KEYS.filter((key) => EXAMPLES_KEY_PATTERN.test(key));
     expect(inventoryHits).toEqual([]);

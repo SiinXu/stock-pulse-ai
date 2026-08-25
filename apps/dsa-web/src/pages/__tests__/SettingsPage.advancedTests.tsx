@@ -1,10 +1,12 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, it, vi } from 'vitest';
+import type { UpdateSystemConfigResponse } from '../../types/systemConfig';
 import SettingsPageTestHarness from './SettingsPage.testHarness';
 
 const {
   SettingsPage,
   buildSystemConfigState,
+  createDeferred,
   createDesktopRuntime,
   desktopCheckForUpdates,
   desktopGetUpdateState,
@@ -509,13 +511,15 @@ export function registerSettingsPageAdvancedTests(): void {
 
   it('shows an error when env import succeeds but reload fails', async () => {
     (window as { dsaDesktop?: unknown }).dsaDesktop = { version: '3.12.0' };
-    load.mockResolvedValue(false);
+    const imported = createDeferred<UpdateSystemConfigResponse>();
+    const reloaded = createDeferred<boolean>();
     useAdvancedConfigState();
 
     render(<SettingsPage />);
 
     vi.clearAllMocks();
-    load.mockResolvedValue(false);
+    importEnv.mockReturnValue(imported.promise);
+    load.mockReturnValue(reloaded.promise);
 
     const input = document.querySelector('input[type="file"][accept=".env,.txt"]');
     expect(input).not.toBeNull();
@@ -527,8 +531,33 @@ export function registerSettingsPageAdvancedTests(): void {
     });
 
     await waitFor(() => expect(importEnv).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText('配置已导入但刷新失败')).not.toBeInTheDocument();
+    expect(screen.queryByText('已导入 .env 备份并重新加载配置。')).not.toBeInTheDocument();
+
+    await act(async () => {
+      imported.resolve({
+        success: true,
+        configVersion: 'v2',
+        appliedCount: 1,
+        skippedMaskedCount: 0,
+        reloadTriggered: true,
+        updatedKeys: ['STOCK_LIST'],
+        warnings: [],
+      });
+      await imported.promise;
+    });
+
     await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
-    expect(screen.getByText('配置已导入但刷新失败')).toBeInTheDocument();
+    expect(screen.queryByText('配置已导入但刷新失败')).not.toBeInTheDocument();
+    expect(screen.queryByText('已导入 .env 备份并重新加载配置。')).not.toBeInTheDocument();
+
+    await act(async () => {
+      reloaded.resolve(false);
+      await reloaded.promise;
+    });
+
+    const title = screen.getByText('配置已导入但刷新失败');
+    expect(title.closest('[data-overlay-root="toast"]')).not.toBeNull();
     expect(screen.getByText('备份已导入，但重新加载配置失败，请手动重载页面。')).toBeInTheDocument();
     expect(screen.queryByText('已导入 .env 备份并重新加载配置。')).not.toBeInTheDocument();
   });
