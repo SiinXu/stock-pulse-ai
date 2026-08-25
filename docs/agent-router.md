@@ -1,20 +1,22 @@
 # Agent 深度路由规则库
 
-**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一切片（库 + 确定性测试）。**未接线**生产调用方。
+**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一、二切片（规则库 + 结构化事实投影，均含确定性测试）。**未接线**生产调用方。
 
 **English**: [agent-router_EN.md](agent-router_EN.md)
 
 ## 诚实边界
 
-`src/agent/runtime/agent_router.py` 提供纯规则 `AgentRouter`：根据**已经规范化**的分类事实，确定性选择分析深度与 Chat 路径。本切片：
+`src/agent/runtime/agent_router.py` 提供纯规则 `AgentRouter`：根据**已经规范化**的分类事实，确定性选择分析深度与 Chat 路径。`src/agent/runtime/agent_router_facts.py` 从结构化 StockScope / entry_kind / 标的数量 / 可选的显式 per-run 覆盖投影这些事实。这些切片：
 
 - **不会**解析原始 prompt / 用户消息、provider 载荷或工具结果。
 - **不会**改写 `AGENT_ORCHESTRATOR_MODE`、mode budget、Soul、ToolSurface、factory / orchestrator / native adapter、Chat/API/OpenAPI/Web/Desktop/CLI/Bot/MCP。
 - **不会**写入 episode / trace 公共元数据、EvolutionEvent 或 memory admission。
 - **不会**调用或扩展 `prefer_route`；miss-rate 证据在通过校验后**零路由影响**（身份中立，直至 #1091 / #1106）。
+- **不会**把进程级 Settings/env `AGENT_ORCHESTRATOR_MODE` 复制为 `user_mode_override`。
+- **不会**把 `report_type` 或 `skills` / `selected_skill_ids` 映射为路由器 mode。
 - **不会**关闭 #1120：AC2–AC4（调用方覆盖接线、Chat incremental 真正跳过 `_execute_pipeline`、运行元数据可见决策）仍属后续切片。
 
-生产路径今天仍使用进程级 `AGENT_ORCHESTRATOR_MODE`。非法配置值在 orchestrator 构造时会静默落到 `standard`；路由器**不**复制该 fail-open 行为。
+生产路径今天仍使用进程级 `AGENT_ORCHESTRATOR_MODE`。非法配置值在 orchestrator 构造时会静默落到 `standard`；路由器与投影器**不**复制该 fail-open 行为。
 
 ## 输入
 
@@ -95,11 +97,54 @@ assert decision.mode == "quick"
 assert decision.chat_path == "full_repipeline"
 ```
 
+## 结构化事实投影（第二切片）
+
+`project_router_request(facts)` 把**已经结构化**的运行时事实投影为合法 `AgentRouterRequest`，或在调用 `route()` **之前**给出类型化拒绝。投影器不会把 `AgentRouter.route()` 当作副作用来调用。未知 mapping 键失败关闭，且不回显键名或取值。
+
+| 字段 | 规则 |
+| --- | --- |
+| `entry_kind` | 必填。只允许 `run` 或 `chat`（`ExecutionMode.RESEARCH` 及其它值失败关闭）。 |
+| `scope_mode` | 可选。`maintain` / `compare` / `switch`。未知值失败关闭。 |
+| `allowed_stock_codes` / `symbol_codes` | 可选的已规范化非空字符串序列。`symbol_count` 在 `allowed` 非空时取其长度，否则取 `symbol_codes` 长度，再否则为 `0`。字符串不当作字符序列。 |
+| `expected_stock_code` | 可选字符串。仅用于推导 Chat `maintain` 的 same-symbol。 |
+| `user_mode_override` | 可选字符串，且仅当调用方**已经**持有显式 per-run 值。缺省 / `None` 表示未提供。**从不**读取 `AGENT_ORCHESTRATOR_MODE`。非法 / 空白值原样传给路由器拒绝，**不会**改写成 `standard`。 |
+| `intent_category` | 可选。缺省时：`scope_mode=="compare"` 则为 `compare`，否则为 `unknown`。除非调用方已提供该枚举，否则**从不**发出 `simple`。 |
+| `need_news` / `need_risk` / `tool_suitable` | 可选严格布尔。缺省为 `false`。不从新闻文本、risk-gate 配置或工具目录推断。 |
+| Chat 标志 | 派生字段，不作为输入。Chat `maintain` → follow-up，且在 `expected_stock_code` 非空时 same-symbol。Chat `switch` → follow-up 且非 same-symbol。Chat `compare` / 缺省 scope → 非 incremental。RUN 的 `is_follow_up` / `same_symbol` / `tool_suitable` 恒为 false；若调用方传入 `tool_suitable=true` 则失败关闭。 |
+
+`report_type`、`skills`、`selected_skill_ids`、prompt、`miss_rate` 以及进程级配置键都是未知 mapping 键。
+
+默认组合路由（先投影再 `route()`，仅测试）：
+
+- RUN、单标的、缺省意图（`unknown`）、无 news/risk、无覆盖 → `standard` + `full_repipeline`（`default_standard`）。不是 `quick`。
+- RUN `scope_mode=compare` 或 `symbol_count>=2` → `full` + `full_repipeline`。
+- Chat `maintain` + 同标的 + 缺省 `tool_suitable=false` → `full_repipeline`（incremental 不得触发）。
+
+```python
+from src.agent.runtime.agent_router import route
+from src.agent.runtime.agent_router_facts import project_router_request
+
+projection = project_router_request(
+    {
+        "entry_kind": "run",
+        "symbol_codes": ["600519"],
+    }
+)
+assert projection.accepted is True
+decision = route(projection.request)
+assert decision.mode == "standard"
+assert decision.chat_path == "full_repipeline"
+```
+
 ## 剩余工作（#1120 保持开放）
 
-- 将路由器接入 orchestrator / factory / native adapter / analysis 与 Chat 入口（每 run 决策，而不是进程级 mode）。
+已落地：第一切片规则库；第二切片结构化事实投影。
+
+仍待后续：
+
+- 将投影器 + 路由器接入 orchestrator / factory / native adapter / analysis 与 Chat 入口（每 run 决策，而不是进程级 mode）。
 - Chat `incremental_tool` 必须真正避免 `_execute_pipeline`（AC3）。
 - 将 secret-free 决策写入 run-local 元数据（AC4）；episode 持久化需避开与 #1511 冲突。
 - 基于 miss-rate 的 outcome bias 归 #1091 / #1106，且须有样本阈值。
 
-回滚：删除本库模块、测试与本文档即可；无迁移、无配置键。
+回滚：删除本库模块、测试、changelog fragment 与本文档即可；无迁移、无配置键。
