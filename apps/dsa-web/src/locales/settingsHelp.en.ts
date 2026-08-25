@@ -1653,6 +1653,23 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     impact: ['Affects the strategy coverage during Agent analysis.'],
     notes: ['In manual mode, make sure AGENT_SKILLS is correctly configured.'],
   },
+  'settings.agent.AGENT_SKILL_RETRIEVAL_K': {
+    title: 'Skill Retrieval Top-K',
+    summary: 'How many catalog skills automatic SkillRouter may retrieve by description. 0 keeps the current router.',
+    usage: 'Leave at 0 to disable retrieval and keep today\'s regime or default SkillRouter. A positive integer (hard cap 8) ranks catalog descriptions, display names, and aliases on the implicit automatic path only.',
+    valueNotes: [
+      '0 is default-off. Values above 8 clamp to 8. Empty catalog, empty query, or all-zero match falls back to the default router set, never AGENT_SKILLS=all.',
+    ],
+    impact: ['Affects which skills automatic Agent analysis loads when AGENT_SKILL_RETRIEVAL_K is greater than 0.'],
+    notes: [
+      'Per-run requested skills, factory or config explicit AGENT_SKILLS (specific or all), and AGENT_SKILL_ROUTING=manual still win.',
+      'This does not rank tools and does not write episode retrieval logs.',
+    ],
+    examples: [
+      'AGENT_SKILL_RETRIEVAL_K=0',
+      'AGENT_SKILL_RETRIEVAL_K=2',
+    ],
+  },
   'settings.agent.context_compression': {
     title: 'Ask-Stock Context Compression',
     summary: 'Controls rolling summary compression for visible ask-stock chat history. It is off by default to preserve existing behavior.',

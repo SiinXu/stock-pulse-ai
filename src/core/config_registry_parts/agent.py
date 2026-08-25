@@ -2315,7 +2315,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "today's regime/default routing. Positive values select a bounded "
             "subset by skill description; empty or all-zero match falls back to "
             "the default router set, never AGENT_SKILLS=all. Hard cap 8. "
-            "User-explicit skills_requested and manual AGENT_SKILLS still win. "
+            "Per-run skills_requested, factory/config explicit AGENT_SKILLS "
+            "(specific or all), and manual AGENT_SKILL_ROUTING still win. "
             "This is not the #1118 procedural layer and not #1091 tool scoring."
         ),
         "category": "agent",

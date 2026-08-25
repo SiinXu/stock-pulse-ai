@@ -137,6 +137,21 @@ def test_empty_query_and_all_zero_match_return_empty_not_full_catalog() -> None:
     assert retrieve_skills("箱体震荡", catalog, k="2") == []
 
 
+def test_injected_all_zero_cosine_scores_return_empty_not_full_catalog(monkeypatch) -> None:
+    catalog = _catalog_manager().list_skills()
+
+    class _ZeroIndex:
+        def add_many(self, documents):
+            self._documents = list(documents)
+
+        def query(self, query_text, top_k):
+            del query_text
+            return [(doc, 0.0) for doc in self._documents[:top_k]]
+
+    monkeypatch.setattr("src.agent.skills.retrieval.HashingVectorIndex", _ZeroIndex)
+    assert retrieve_skills("箱体震荡", catalog, k=2) == []
+
+
 def test_skill_router_k1_versus_k2_on_production_select_skills() -> None:
     manager = _catalog_manager()
     ctx_one = AgentContext(query="箱体震荡")
