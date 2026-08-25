@@ -1,7 +1,7 @@
 # Prompt / Skill 版本化（#249）
 
 **Issue:** #249
-**相关：** 晋升流水线 #1093（本议题不实现）、评估架 #215
+**相关：** 晋升流水线 #1093（本切片提供 dry-run CLI sidecar；受治理的目录激活仍为遗留）、评估架 #215
 
 英文版：`docs/prompt-skill-versioning_EN.md`
 
@@ -14,7 +14,7 @@
 本议题明确不做：
 
 - 改写任何已发布 prompt / Skill `instructions` 正文
-- experimental → production 晋升（#1093）
+- 受治理的 experimental → production Skill 激活（#1093 在 dry-run CLI 之后的遗留）
 - 审批 UI、A/B 分配、跨版本评估编排
 
 ## 身份模型
@@ -84,8 +84,12 @@ image extract 在解析实际 prompt 时把对应修订合并到
 | 版本 id + content hash | 是 | 消费 |
 | 历史 + key prompt 回滚 pin；Skill 管理 pin | 是 | 消费 Skill pin 并治理激活 |
 | lifecycle 字段 | 存储 | 策略迁移 |
-| experimental 激活 | 否 | 是 |
-| 晋升 CLI / eval | 否 | 是 |
+| experimental 目录激活 | 否 | dry-run CLI 之后的遗留 |
+| 晋升 CLI / eval | 否 | dry-run `scripts/agent_evolve.py` sidecar（见 [agent-promotion_CN.md](agent-promotion_CN.md)）；approve 不激活 Skill |
+
+#1093 dry-run CLI 消费本文的版本身份，并嵌入沙箱 `PromotionReceipt`。批准 sidecar
+不会激活 Skill、改写 `strategies/*.yaml` 或套用生产 pin。受治理的 Skill-pin 激活
+仍是 #1093 后续遗留。
 
 ## 用法
 
