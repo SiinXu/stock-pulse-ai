@@ -912,6 +912,7 @@ class TestSettingsHelpContract(unittest.TestCase):
     _SETTINGS_HELP_FILES = (
         *_LANGUAGE_HELP_FILES,
         _LOCALE_DIR.parent / "i18n/reflectionSettingsCopy.ts",
+        _LOCALE_DIR / "skillRetrievalSettingsHelp.ts",
     )
 
     @classmethod

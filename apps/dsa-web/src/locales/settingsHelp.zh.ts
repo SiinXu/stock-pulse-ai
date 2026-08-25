@@ -1696,23 +1696,6 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     impact: ['影响 Agent 分析时的策略覆盖面。'],
     notes: ['manual 模式下需要确保 AGENT_SKILLS 已正确配置。'],
   },
-  'settings.agent.AGENT_SKILL_RETRIEVAL_K': {
-    title: '技能检索 Top-K',
-    summary: '自动 SkillRouter 按目录描述检索时最多选取的技能数量。0 保持当前路由。',
-    usage: '保持为 0 可关闭检索，并沿用今日的市场状态或默认 SkillRouter。正整数（硬顶 8）仅在隐式自动路径上按目录描述、显示名和别名排序。',
-    valueNotes: [
-      '0 为默认关闭。大于 8 的值会钳到 8。空目录、空查询或全零匹配会回退到默认路由集，绝不会启用 AGENT_SKILLS=all。',
-    ],
-    impact: ['当 AGENT_SKILL_RETRIEVAL_K 大于 0 时，影响自动 Agent 分析加载哪些技能。'],
-    notes: [
-      '当次请求指定的技能、工厂或配置显式 AGENT_SKILLS（具体列表或 all）以及 AGENT_SKILL_ROUTING=manual 仍然优先。',
-      '这不会对工具排序，也不会写入 episode 检索日志。',
-    ],
-    examples: [
-      'AGENT_SKILL_RETRIEVAL_K=0',
-      'AGENT_SKILL_RETRIEVAL_K=2',
-    ],
-  },
   'settings.agent.context_compression': {
     title: '问股上下文压缩',
     summary: '控制问股可见对话历史的滚动摘要压缩，默认关闭以保持既有行为。',

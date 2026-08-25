@@ -3,6 +3,10 @@ import { EVIDENCE_EXPORT_FIELD_TITLES } from '../i18n/evidenceExportErrorTransla
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
 import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
+import {
+  getSkillRetrievalFieldDescription,
+  getSkillRetrievalFieldTitle,
+} from '../locales/skillRetrievalSettingsHelp';
 
 const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
@@ -312,7 +316,6 @@ const fieldTitleMapZh = {
   ANALYSIS_QUALITY_GATE_ON_FAILURE: '质量门失败策略',
   AGENT_SKILL_AUTOWEIGHT: '策略自动加权',
   AGENT_SKILL_ROUTING: '策略路由模式',
-  AGENT_SKILL_RETRIEVAL_K: '技能检索 Top-K',
   AGENT_MEMORY_ENABLED: '记忆与校准',
   AGENT_EPISODE_LOG_ENABLED: 'Agent 进化 episode 日志',
   AGENT_EPISODE_RETENTION_DAYS: 'Agent episode 保留天数',
@@ -820,7 +823,6 @@ const fieldTitleMapEn = {
   ANALYSIS_QUALITY_GATE_ON_FAILURE: 'Quality Gate Failure Policy',
   AGENT_SKILL_AUTOWEIGHT: 'Auto-Weight Strategies',
   AGENT_SKILL_ROUTING: 'Strategy Routing',
-  AGENT_SKILL_RETRIEVAL_K: 'Skill Retrieval Top-K',
   AGENT_MEMORY_ENABLED: 'Agent Memory',
   AGENT_EPISODE_LOG_ENABLED: 'Agent Episode Log',
   AGENT_EPISODE_RETENTION_DAYS: 'Agent Episode Retention Days',
@@ -1315,7 +1317,6 @@ const fieldDescriptionMap: Record<string, string> = {
   RISK_GATE_PROFILE: '选择最终建议发布前不可关闭的风控裁决档位；非法值会阻止启动。',
   AGENT_SKILL_AUTOWEIGHT: "根据回测表现自动调整策略权重。",
   AGENT_SKILL_ROUTING: "策略选择方式。auto 按市场状态自动选择，manual 使用 AGENT_SKILLS 列表。",
-  AGENT_SKILL_RETRIEVAL_K: "自动 SkillRouter 按目录描述检索的数量。0 关闭并保持当前路由。正整数硬顶 8；空匹配回退默认路由集，不会启用 AGENT_SKILLS=all。当次请求指定技能、工厂/配置显式 AGENT_SKILLS（具体列表或 all）以及 AGENT_SKILL_ROUTING=manual 仍优先。",
   AGENT_MEMORY_ENABLED: "启用记忆与校准系统，追踪历史分析准确率并自动调节置信度。",
   AGENT_EPISODE_LOG_ENABLED: "默认关闭；记录精简 Agent episode。",
   AGENT_EPISODE_RETENTION_DAYS: "episode 保留天数。",
@@ -1653,10 +1654,16 @@ export function getFieldTitle(
   fallback?: string,
   locale: UiLanguage = 'zh',
 ): string {
+  if (key === 'AGENT_SKILL_RETRIEVAL_K') {
+    return getSkillRetrievalFieldTitle(locale);
+  }
   return fieldTitleMaps[locale][key] || fallback || key;
 }
 
 export function getFieldDescriptionZh(key: string, fallback?: string): string {
+  if (key === 'AGENT_SKILL_RETRIEVAL_K') {
+    return getSkillRetrievalFieldDescription();
+  }
   return fieldDescriptionMap[key] || fallback || '';
 }
 
