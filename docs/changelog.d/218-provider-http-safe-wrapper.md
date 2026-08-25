@@ -1,0 +1,1 @@
+- [Fixed] Routed remaining data-provider HTTP through the outbound safe wrapper (Refs #218).
