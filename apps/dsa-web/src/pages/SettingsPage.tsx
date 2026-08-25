@@ -18,12 +18,11 @@ import { getParsedApiError, type ParsedApiError } from '../api/error';
 import type { SetupSmokeOutcome } from '../utils/setupSmokeTask';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, Modal, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
   InvestmentFrameworkSettingsCard,
   GenerationBackendStatusPanel,
-  IntelligentImport,
   LocalModelsWithKronos,
   LLMChannelEditor,
   LLMConfigModeBanner,
@@ -55,6 +54,11 @@ import ConfigBackupCard from '../components/settings/ConfigBackupCard';
 import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
 import OverviewSection from '../components/settings/sections/OverviewSection';
 import SystemSecuritySection from '../components/settings/sections/SystemSecuritySection';
+import {
+  CHANNEL_ROUTING_FIELD_KEYS,
+  LOCAL_MODEL_CONFIG_KEYS,
+  parseSetupStockList,
+} from '../components/settings/sections/settingsPageConstants';
 import {
   AiOverviewCard,
   AiTaskRoutingCard,
@@ -99,7 +103,6 @@ import {
 } from '../components/settings/autosaveMachine';
 import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
-import { parseStockListValue } from '../utils/stockList';
 import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI18n';
 import {
   hasUnknownConfigContractCondition,
@@ -125,29 +128,6 @@ const RuntimeCapabilitiesPanel = lazy(async () => {
   const module = await import('../components/settings/RuntimeCapabilitiesPanel');
   return { default: module.RuntimeCapabilitiesPanel };
 });
-
-// Routing fields whose options must be limited to channels the user has
-// actually configured (values follow ROUTABLE_NOTIFICATION_CHANNELS).
-const CHANNEL_ROUTING_FIELD_KEYS = new Set([
-  'NOTIFICATION_REPORT_CHANNELS',
-  'NOTIFICATION_ALERT_CHANNELS',
-  'NOTIFICATION_SYSTEM_ERROR_CHANNELS',
-]);
-const LOCAL_MODEL_CONFIG_KEYS = [
-  'GENERATION_BACKEND',
-  'LLM_CONFIG_MODE',
-  'LLM_CHANNELS',
-  'LLM_OLLAMA_PROVIDER',
-  'LLM_OLLAMA_PROTOCOL',
-  'LLM_OLLAMA_BASE_URL',
-  'LLM_OLLAMA_MODELS',
-  'LLM_OLLAMA_ENABLED',
-  'LITELLM_MODEL',
-  'AGENT_LITELLM_MODEL',
-];
-function parseSetupStockList(value: unknown) {
-  return parseStockListValue(String(value ?? ''));
-}
 
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
@@ -577,8 +557,6 @@ const SettingsPage: React.FC = () => {
     void refreshSetupStatus();
   }, [refreshSetupStatus]);
 
-  const [isToastPaused, setIsToastPaused] = useState(false);
-
   useEffect(() => {
     void load();
   }, [load]);
@@ -611,6 +589,8 @@ const SettingsPage: React.FC = () => {
       setIsWizardOpen(true);
     }
   }, [isProviderCatalogLoading, providerCatalog.length, searchParams, setupStatus]);
+
+  const [isToastPaused, setIsToastPaused] = useState(false);
 
   useEffect(() => {
     if (!toast || toast.type !== 'success' || isToastPaused) {
@@ -1584,6 +1564,10 @@ const SettingsPage: React.FC = () => {
               configVersion={configVersion}
               maskToken={maskToken}
               refreshAfterExternalSave={refreshAfterExternalSave}
+              stockListValue={(activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''}
+              applyPostSaveEffects={applyPostSaveEffects}
+              isIntelligentImportOpen={isIntelligentImportOpen}
+              setIsIntelligentImportOpen={setIsIntelligentImportOpen}
             />
             {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
             <SystemSecuritySection
@@ -1604,51 +1588,6 @@ const SettingsPage: React.FC = () => {
               <>
                 <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
                 <ConfigBackupCard configVersion={configVersion} hasDirty={hasDirty} disabled={isSaving || isLoading} load={load} onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((c) => c + 1)} onRefreshSetupStatus={() => { void refreshSetupStatus(); }} onRolledBack={async (result) => { await refreshAfterExternalSave(result.updatedKeys); applyPostSaveEffects(); }} onReloadLatest={() => refreshAfterExternalSave([])} />
-              </>
-            ) : null}
-            {activeCategory === 'base' ? (
-              <>
-                <SettingsSectionCard
-                  title={t('settings.intelligentImport')}
-                  description={t('settings.intelligentImportDescription')}
-                  actions={(
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      size="default"
-                      aria-haspopup="dialog"
-                      onClick={() => setIsIntelligentImportOpen(true)}
-                    >
-                      {t('settings.openConfigItems')}
-                    </Button>
-                  )}
-                >
-                  <p className="text-xs leading-6 text-muted-text">
-                    {t('settings.intelligentImportSupportedInputs')}
-                    {' · '}
-                    {t('settings.intelligentImportHint')}
-                  </p>
-                </SettingsSectionCard>
-                <Modal
-                  isOpen={isIntelligentImportOpen}
-                  onClose={() => setIsIntelligentImportOpen(false)}
-                  title={t('settings.intelligentImport')}
-                  description={t('settings.intelligentImportDescription')}
-                  size="wide"
-                >
-                  <IntelligentImport
-                    stockListValue={
-                      (activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''
-                    }
-                    configVersion={configVersion}
-                    maskToken={maskToken}
-                    onMerged={async () => {
-                      await refreshAfterExternalSave(['STOCK_LIST']);
-                      applyPostSaveEffects();
-                    }}
-                    disabled={isSaving || isLoading}
-                  />
-                </Modal>
               </>
             ) : null}
             {isAiOverview ? (

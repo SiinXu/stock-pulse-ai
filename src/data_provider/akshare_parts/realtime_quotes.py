@@ -16,6 +16,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 import pandas as pd
 import requests
 
+from src.security.outbound_policy import safe_get
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger("src.data_provider.akshare_fetcher")
@@ -239,7 +240,7 @@ class _RealtimeQuotesMethods:
             )
             
             self._enforce_rate_limit()
-            response = requests.get(url, headers=headers, timeout=10)
+            response = safe_get(url, headers=headers, timeout=10)
             response.encoding = 'gbk'
             api_elapsed = time.time() - api_start
             
@@ -393,7 +394,7 @@ class _RealtimeQuotesMethods:
             )
             
             self._enforce_rate_limit()
-            response = requests.get(url, headers=headers, timeout=10)
+            response = safe_get(url, headers=headers, timeout=10)
             response.encoding = 'gbk'
             api_elapsed = time.time() - api_start
             

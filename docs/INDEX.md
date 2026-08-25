@@ -67,7 +67,7 @@
 | [Community Intel Agent Tool（英文）](community-intel-tool.md) | Phase A 股票作用域社区情报契约、降级语义、默认目录隔离与验证 |
 | [估值模型与 DCF/相对估值 Agent Tool](valuation-models.md) | Phase 1 DCF/相对估值、假设透明、敏感性区间、默认关闭工具与不足 fundamentals 语义（[英文](valuation-models_EN.md)） |
 | [Agent Soul 行为宪章（英文）](agent-soul.md) | 版本/hash 规则、Single/Multi/Chat 装配、Soul/Persona/Skill 优先级、运行元数据与回滚 |
-| [Agent 深度路由规则库](agent-router.md) | 纯规则 AgentRouter 与结构化事实投影（StockScope/entry_kind/标的数量）：quick/standard/full/specialist 与 Chat incremental_tool/full_repipeline；合法覆盖优先、非法覆盖失败关闭（#1120 第一、二切片，未接线生产调用方；[英文](agent-router_EN.md)） |
+| [Agent 深度路由规则库](agent-router.md) | 纯规则 AgentRouter 与结构化事实投影；仪表盘 `AgentOrchestrator.run()` 每次 run 应用路由器，无显式覆盖时尊重构造时/Settings 深度，并恢复构造时 mode（#1120 第一至三切片；Chat/factory 仍未接线；[英文](agent-router_EN.md)） |
 | [Bot 平台配置](bot/) | 飞书、钉钉、Discord 等 Bot 配置截图和补充说明 |
 | [实时告警中心](alerts.md) | EventMonitor 基线、Web 规则管理、通知结果、冷却状态和 Phase 边界（含 #241 企业事件/影响上下文） |
 | [Alert Center English companion](alerts_EN.md) | Issue #241 后端 V0 英文摘要（企业事件告警与 impact context） |

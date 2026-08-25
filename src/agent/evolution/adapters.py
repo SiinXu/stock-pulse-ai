@@ -1,9 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Gated online evolution adapters (Issue #1091 first slice).
+"""Gated online evolution adapters (Issue #1091).
 
 Wraps existing ``AgentMemory`` calibration. Tool ranking and route preference
-are explicit identity stubs. Default-off. This module does not edit BaseAgent,
-the orchestrator, Soul, ToolSurface, or episode storage.
+are explicit identity stubs. Default-off. ``BaseAgent`` applies
+``calibrate_confidence`` when ``AGENT_ONLINE_ADAPTERS_ENABLED`` is true.
+This module does not edit Soul, ToolSurface, episode storage, or orchestrator
+route, and does not implement real tool ranking or route preference.
 """
 
 from __future__ import annotations

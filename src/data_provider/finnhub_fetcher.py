@@ -15,6 +15,7 @@ from typing import Optional
 import pandas as pd
 import requests
 
+from src.security.outbound_policy import safe_get
 from src.utils.sanitize import log_safe_exception
 
 from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS
@@ -61,10 +62,18 @@ class FinnhubFetcher(BaseFetcher):
 
         try:
             self.random_sleep(0.3, 0.8)
-            resp = requests.get(url, params=params, timeout=15)
+            resp = safe_get(url, params=params, timeout=15)
             resp.raise_for_status()
             data = resp.json()
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Map provider I/O failure to DataFetchError for manager fallback.
+            log_safe_exception(
+                logger,
+                "Finnhub daily HTTP request failed",
+                e,
+                error_code="finnhub_daily_http_failed",
+                level=logging.DEBUG,
+                context={"symbol": symbol},
+            )
             raise DataFetchError(f"[Finnhub] HTTP request failed for {symbol}: {e}") from e
 
         if data.get('s') != 'ok' or not data.get('c'):
@@ -105,14 +114,14 @@ class FinnhubFetcher(BaseFetcher):
         symbol = stock_code.strip().upper()
         try:
             self.random_sleep(0.3, 0.8)
-            resp = requests.get(
+            resp = safe_get(
                 f"{_FINNHUB_BASE_URL}/quote",
                 params={'symbol': symbol, 'token': self._api_key},
                 timeout=15,
             )
             resp.raise_for_status()
             data = resp.json()
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve the None realtime fallback.
             log_safe_exception(
                 logger,
                 "Finnhub realtime quote failed",
@@ -161,14 +170,14 @@ class FinnhubFetcher(BaseFetcher):
 
         symbol = stock_code.strip().upper()
         try:
-            resp = requests.get(
+            resp = safe_get(
                 f"{_FINNHUB_BASE_URL}/search",
                 params={'q': symbol, 'token': self._api_key},
                 timeout=10,
             )
             resp.raise_for_status()
             data = resp.json()
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve the None name fallback.
             log_safe_exception(
                 logger,
                 "Finnhub symbol search failed",

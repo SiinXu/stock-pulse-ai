@@ -5,7 +5,7 @@
 - ``budget`` / ``reflection`` / ``postmortem`` — run-local critique and forecast post-mortem
 - ``error_patterns`` — human-editable pattern cards clustered from lessons (#1138)
 - ``guards`` — Soul / ToolSurface immutability proofs
-- ``adapters`` — gated online adapters wrapping AgentMemory (Issue #1091; default off)
+- ``adapters`` — gated online adapters wrapping AgentMemory; BaseAgent applies confidence when enabled (Issue #1091; default off)
 - ``outcome_ingest`` — default-off pull overlay of resolved forecasts onto adapters (#1106)
 
 These modules do not mutate Agent Soul charter bytes and never expand ToolSurface
