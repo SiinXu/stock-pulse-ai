@@ -379,6 +379,7 @@ def maybe_insert_before_decision(
             llm_adapter=pipeline.llm_adapter,
             skill_instructions=_skill_instructions_for_run(pipeline, ctx),
             technical_skill_policy=pipeline.technical_skill_policy,
+            config=pipeline.config,
             debate_config=pipeline.config,
         )
     )

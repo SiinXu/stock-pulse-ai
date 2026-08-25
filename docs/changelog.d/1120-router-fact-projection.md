@@ -1,0 +1,2 @@
+- [Added] Project AgentRouterRequest from structured StockScope / entry_kind / symbol count / optional explicit per-run override without parsing prompts or copying process-wide config (Refs #1120).
+- [Docs] Document the structured fact projector as #1120 slice 2 and keep caller wiring, Chat incremental, and run-metadata as remaining work (Refs #1120).

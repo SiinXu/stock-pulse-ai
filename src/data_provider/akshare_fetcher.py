@@ -39,6 +39,7 @@ from tenacity import (
 
 from src.patches.eastmoney_patch import eastmoney_patch
 from src.config import get_config
+from src.security.outbound_policy import safe_get
 from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 from .base import (
     BaseFetcher,

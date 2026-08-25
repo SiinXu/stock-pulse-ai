@@ -1776,9 +1776,11 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "AGENT_ONLINE_ADAPTERS_ENABLED": {
         "title": "Online Evolution Adapters",
         "description": (
-            "Enable the gated online evolution adapter library wrapping AgentMemory "
-            "confidence calibration. Default off. Tool ranking and route preference "
-            "are identity stubs in this slice. Does not persist episode metadata."
+            "Enable gated online evolution adapters. Default off. When true, "
+            "BaseAgent applies AgentMemory confidence calibration once through "
+            "the adapter (no double-multiply) and records run-local "
+            "adapter_influence. Tool ranking and route preference remain "
+            "identity stubs. Does not persist episode metadata."
         ),
         "category": "agent",
         "data_type": "boolean",

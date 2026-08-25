@@ -16,6 +16,8 @@ try:
 except ImportError:  # pragma: no cover - dependency is present in supported installs
     xcals = None
 
+from src.security.outbound_policy import safe_get
+
 from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS, normalize_stock_code, is_bse_code
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,7 @@ class TencentFetcher(BaseFetcher):
             if explicit_start and explicit_end
             else ","
         )
-        response = requests.get(
+        response = safe_get(
             self._KLINE_ENDPOINT,
             params={"param": f"{symbol},day,{explicit_window},{lookback},qfq"},
             headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"},

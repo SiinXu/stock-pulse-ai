@@ -19,7 +19,7 @@ Use this order. Do not skip ahead to adapters or promotion.
    - keep `PREDICTION_RESOLVE_ENABLED=false` on app workers and run `python -m src.services.prediction_resolver` (optional `--limit`, `--worker-id`, `--json`).
    Manual CLI invocation is an **intentional operator gate**: the CLI runs one `tick()` even when the scheduler flag is off. Do not register the background worker on every app replica.
 4. **Enable miss/partial-only postmortem with skip-clean-hits.** Set `AGENT_POSTMORTEM_ENABLED=true` and leave `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true` (default). Hits are not enqueued. Drain happens after a non-overlap resolver tick, capped by `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` (default `10`).
-5. **Enable gated adapters only after the sample threshold.** Set `AGENT_ONLINE_ADAPTERS_ENABLED=true` only once `AgentMemory` / resolved-forecast samples can meet `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` (default `30`). Below the threshold, adapters stay identity (`applied=false`, `reason=insufficient_samples`).
+5. **Enable gated adapters only after the sample threshold.** Set `AGENT_ONLINE_ADAPTERS_ENABLED=true` only once `AgentMemory` / resolved-forecast samples can meet `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` (default `30`). When enabled, `BaseAgent` applies stored `calibration_factor` once to displayed/decided confidence and records run-local `adapter_influence`. Below the threshold, the gated path stays identity (`applied=false`, `reason=insufficient_samples`). Tool ranking, route preference, forecast overlay, EvolutionEvent producers, and episode persistence remain out of this flag.
 6. **Auto-promote stays hard off.** There is no env key that turns skill auto-promotion on. Sandbox `PromotionReceipt.auto_promote` is hardcoded `false` until an eval gate exists.
 
 To stop **new** verification work without breaking analysis: set the enable flags back to `false` (or omit them). Pending `agent_predictions` rows are left in place; the analysis path does not depend on them.
@@ -55,7 +55,7 @@ These are **current product facts**, not operator-tunable rollout knobs:
 | Auto-promote | Hard `false` on `PromotionReceipt` and sandbox policy until an eval gate exists. Do not invent `EVOLUTION_AUTO_PROMOTE_SKILLS=true`. |
 | Manual resolver CLI | `python -m src.services.prediction_resolver` is an intentional operator gate. It loads config for caps (lease, batch, fetch concurrency, circuit, postmortem budget) and runs one tick **even when** `PREDICTION_RESOLVE_ENABLED` is false. The scheduler flag only registers the background worker. |
 | Scheduler vs CLI postmortem inject | Queue inject follows `AGENT_POSTMORTEM_ENABLED` only. A **scheduled** drain also needs the resolver worker (`PREDICTION_RESOLVE_ENABLED`). CLI drain does not require that scheduler flag. |
-| Disabling flags | Extraction off → hooks are no-ops. Resolver scheduler off → no `prediction_resolver` background task (CLI still available). Postmortem off → no queue inject / drain. Adapters off → identity. Analysis continues in all cases. |
+| Disabling flags | Extraction off → hooks are no-ops. Resolver scheduler off → no `prediction_resolver` background task (CLI still available). Postmortem off → no queue inject / drain. Adapters off → `BaseAgent` keeps today's `AgentMemory` multiply and does not write `adapter_influence`. Analysis continues in all cases. |
 
 ## Related docs
 

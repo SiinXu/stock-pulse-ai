@@ -215,6 +215,7 @@ class _CriticRevisionRunner:
                 technical_skill_policy=(
                     self.orchestrator.technical_skill_policy
                 ),
+                config=self.orchestrator.config,
             )
         )
         recheck_agent.max_steps = _critic.CRITIC_MAX_STEPS
