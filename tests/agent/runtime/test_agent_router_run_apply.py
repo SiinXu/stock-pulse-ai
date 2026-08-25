@@ -31,6 +31,14 @@ def _orchestrator(mode="quick"):
     )
 
 
+STAGE_CHAIN_BY_MODE = {
+    "quick": ("technical", "decision"),
+    "standard": ("technical", "intel", "decision"),
+    "full": ("technical", "intel", "risk", "decision"),
+    "specialist": ("technical", "intel", "risk", "decision"),
+}
+
+
 def test_dashboard_run_facts_use_stock_scope_without_env_or_report_type():
     scope = StockScope(
         expected_stock_code="600519",
@@ -66,9 +74,21 @@ def test_dashboard_run_facts_pass_through_explicit_per_run_override_only():
     facts = _build_dashboard_run_router_facts(
         resolution,
         {"user_mode_override": "full", "agent_orchestrator_mode": "quick"},
+        constructor_mode="quick",
     )
     assert facts["entry_kind"] == "run"
     assert facts["user_mode_override"] == "full"
+    assert "agent_orchestrator_mode" not in facts
+
+
+def test_dashboard_run_facts_use_constructor_mode_when_context_has_no_override():
+    resolution = StockScopeResolution(effective_context={}, stock_scope=None)
+    facts = _build_dashboard_run_router_facts(
+        resolution,
+        {"stock_code": "600519", "agent_orchestrator_mode": "full"},
+        constructor_mode="quick",
+    )
+    assert facts["user_mode_override"] == "quick"
     assert "agent_orchestrator_mode" not in facts
 
 
@@ -79,6 +99,9 @@ def test_run_applies_router_once_and_restores_constructor_mode():
     def fake_execute(ctx, **_kwargs):
         captured["mode"] = orch.mode
         captured["budget_mode"] = orch.mode_budget_limits.mode
+        captured["stages"] = tuple(
+            agent.agent_name for agent in orch._build_agent_chain(ctx)
+        )
         return OrchestratorResult(success=True, content="ok")
 
     with patch.object(orch, "_execute_pipeline", side_effect=fake_execute) as pipeline:
@@ -92,19 +115,47 @@ def test_run_applies_router_once_and_restores_constructor_mode():
     assert result.content == "ok"
     assert pipeline.call_count == 1
     assert projector.call_count == 1
-    assert captured["mode"] == "standard"
-    assert captured["budget_mode"] == "standard"
+    assert captured["mode"] == "quick"
+    assert captured["budget_mode"] == "quick"
+    assert captured["stages"] == STAGE_CHAIN_BY_MODE["quick"]
     assert orch.mode == "quick"
     assert orch.mode_budget_limits.mode == "quick"
     assert result.error is None
 
 
-def test_run_compare_scope_routes_full_then_restores():
+@pytest.mark.parametrize("mode", ("quick", "standard", "full", "specialist"))
+def test_run_constructor_mode_keeps_factory_stage_chain(mode):
+    """Omitted-intent single-symbol RUN must not rewire factory/Settings depth."""
+    orch = _orchestrator(mode)
+    captured = {}
+
+    def fake_execute(ctx, **_kwargs):
+        captured["mode"] = orch.mode
+        captured["stages"] = tuple(
+            agent.agent_name for agent in orch._build_agent_chain(ctx)
+        )
+        return OrchestratorResult(success=True)
+
+    with patch.object(orch, "_execute_pipeline", side_effect=fake_execute):
+        result = orch.run("analyze", {"stock_code": "600519"})
+
+    assert result.success is True
+    assert captured["mode"] == mode
+    assert captured["stages"] == STAGE_CHAIN_BY_MODE[mode]
+    assert orch.mode == mode
+    assert orch.mode_budget_limits.mode == mode
+
+
+def test_run_compare_scope_keeps_constructor_mode_then_restores():
+    """Compare/multi-symbol floors must not discard factory depth on dashboard run()."""
     orch = _orchestrator("quick")
     captured = {}
 
     def fake_execute(ctx, **_kwargs):
         captured["mode"] = orch.mode
+        captured["stages"] = tuple(
+            agent.agent_name for agent in orch._build_agent_chain(ctx)
+        )
         return OrchestratorResult(success=True)
 
     with patch.object(orch, "_execute_pipeline", side_effect=fake_execute):
@@ -114,8 +165,28 @@ def test_run_compare_scope_routes_full_then_restores():
         )
 
     assert result.success is True
-    assert captured["mode"] == "full"
+    assert captured["mode"] == "quick"
+    assert captured["stages"] == STAGE_CHAIN_BY_MODE["quick"]
     assert orch.mode == "quick"
+
+
+def test_library_compare_floor_still_full_without_constructor_mode():
+    """Slices 1–2: compare without a user mode still floors to full at the library."""
+    resolution = StockScopeResolution(
+        effective_context={},
+        stock_scope=StockScope(
+            expected_stock_code="600519",
+            allowed_stock_codes={"600519", "000001"},
+            mode="compare",
+        ),
+    )
+    facts = _build_dashboard_run_router_facts(resolution, {})
+    assert "user_mode_override" not in facts
+    projection = project_router_request(facts)
+    assert projection.accepted is True
+    decision = AgentRouter().route(projection.request)
+    assert decision.accepted is True
+    assert decision.mode == "full"
 
 
 def test_run_explicit_override_wins_for_this_run_only():
@@ -124,6 +195,9 @@ def test_run_explicit_override_wins_for_this_run_only():
 
     def fake_execute(ctx, **_kwargs):
         captured["mode"] = orch.mode
+        captured["stages"] = tuple(
+            agent.agent_name for agent in orch._build_agent_chain(ctx)
+        )
         return OrchestratorResult(success=True)
 
     with patch.object(orch, "_execute_pipeline", side_effect=fake_execute):
@@ -134,6 +208,7 @@ def test_run_explicit_override_wins_for_this_run_only():
 
     assert result.success is True
     assert captured["mode"] == "specialist"
+    assert captured["stages"] == STAGE_CHAIN_BY_MODE["specialist"]
     assert orch.mode == "standard"
 
 
@@ -151,7 +226,7 @@ def test_run_does_not_copy_process_wide_env_as_override(monkeypatch):
 
     assert os.environ["AGENT_ORCHESTRATOR_MODE"] == "full"
     assert result.success is True
-    assert captured["mode"] == "standard"
+    assert captured["mode"] == "quick"
     assert orch.mode == "quick"
 
 
@@ -200,7 +275,7 @@ def test_run_restores_constructor_mode_after_pipeline_exception():
     configured_budget = orch.mode_budget_limits
 
     def boom(_ctx, **_kwargs):
-        assert orch.mode == "standard"
+        assert orch.mode == "quick"
         raise RuntimeError("pipeline exploded")
 
     with patch.object(orch, "_execute_pipeline", side_effect=boom):

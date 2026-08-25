@@ -44,11 +44,16 @@ logger = logging.getLogger("src.agent.orchestrator")
 def _build_dashboard_run_router_facts(
     scope_resolution: Any,
     context: Optional[Dict[str, Any]],
+    *,
+    constructor_mode: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Project already-structured StockScope facts for one dashboard ``run()``.
 
     Does not parse prompts, copy process-wide ``AGENT_ORCHESTRATOR_MODE``,
-    or map ``report_type`` / skills onto the router.
+    or map ``report_type`` / skills onto the router. When the run context has
+    no explicit ``user_mode_override``, ``constructor_mode`` (factory/Settings
+    depth already on the orchestrator) is passed through so the router keeps
+    ``quick`` / ``standard`` / ``full`` / ``specialist``.
     """
     facts: Dict[str, Any] = {"entry_kind": "run"}
     stock_scope = getattr(scope_resolution, "stock_scope", None)
@@ -65,10 +70,14 @@ def _build_dashboard_run_router_facts(
         stock_code = effective.get("stock_code") if isinstance(effective, dict) else None
         if type(stock_code) is str and stock_code:
             facts["symbol_codes"] = (stock_code,)
+    explicit_override = False
     if isinstance(context, dict) and "user_mode_override" in context:
         override = context["user_mode_override"]
         if override is not None:
             facts["user_mode_override"] = override
+            explicit_override = True
+    if not explicit_override and constructor_mode is not None:
+        facts["user_mode_override"] = constructor_mode
     return facts
 
 
@@ -83,8 +92,10 @@ class _ChatMethods:
     ) -> "AgentResult":
         """Run the multi-agent pipeline for a dashboard analysis.
 
-        Applies the structured-fact projector and AgentRouter once per run,
-        then restores the constructor-configured mode. Chat is unchanged.
+        Applies the structured-fact projector and AgentRouter once per run.
+        Constructor/factory depth is the default user mode unless the run
+        context supplies an explicit override. Constructor mode is restored
+        in ``finally``. Chat is unchanged.
 
         Returns an ``AgentResult`` (same type as ``AgentExecutor.run``).
         """
@@ -98,7 +109,11 @@ class _ChatMethods:
         try:
             scope_resolution = resolve_stock_scope(task, context)
             projection = project_router_request(
-                _build_dashboard_run_router_facts(scope_resolution, context)
+                _build_dashboard_run_router_facts(
+                    scope_resolution,
+                    context,
+                    constructor_mode=configured_mode,
+                )
             )
             if not projection.accepted or projection.request is None:
                 logger.warning("Agent orchestrator run routing rejected")

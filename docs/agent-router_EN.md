@@ -16,7 +16,7 @@
 - Do **not** map `report_type` or `skills` / `selected_skill_ids` onto router mode.
 - Do **not** close #1120: Chat incremental skipping `_execute_pipeline` (AC3) and decision visible in run metadata (AC4) remain later slices. Factory / Chat / Analyze / CLI / Bot / MCP remain not wired.
 
-Dashboard `run()` is fail-closed: a rejected projection or route returns `AgentResult(success=False)` with the public execution failure message and does **not** fall back to the constructor mode. The constructor-configured mode and mode-budget limits are restored in a `finally` block on success, rejection, and every exception path. Chat still always calls `_execute_pipeline` and still uses the constructor mode.
+Dashboard `run()` is fail-closed: a rejected projection or route returns `AgentResult(success=False)` with the public execution failure message and does **not** fall back to the constructor mode. When the run context has no explicit `user_mode_override`, `run()` passes the constructor-configured `self.mode` (factory/Settings `AGENT_ORCHESTRATOR_MODE`) into the router as the user mode so `quick` / `standard` / `full` / `specialist` stay the pipeline depth. An explicit per-run context override still wins. Compare / multi-symbol floors without a user mode remain library behavior and do **not** raise constructor depth on dashboard `run()`. The constructor-configured mode and mode-budget limits are restored in a `finally` block on success, rejection, and every exception path. Chat still always calls `_execute_pipeline` and still uses the constructor mode.
 
 ## Input
 
@@ -138,14 +138,14 @@ assert decision.chat_path == "full_repipeline"
 
 ## Dashboard run apply (slice 3)
 
-`AgentOrchestrator.run()` builds a bounded facts mapping from the already-resolved StockScope (`entry_kind=run`, `scope_mode`, codes) plus an optional explicit context `user_mode_override`. It does not read env/Settings, `report_type`, or skills. After an accepted route it sets `self.mode` (and matching mode-budget limits) for that pipeline only.
+`AgentOrchestrator.run()` builds a bounded facts mapping from the already-resolved StockScope (`entry_kind=run`, `scope_mode`, codes) plus an optional explicit context `user_mode_override`. When that context has no explicit user mode, it passes constructor `self.mode` as `user_mode_override` so factory/Settings depth is honored. It does not re-read env/Settings, `report_type`, or skills. After an accepted route it sets `self.mode` (and matching mode-budget limits) for that pipeline only.
 
 ```python
 from src.agent.orchestrator import AgentOrchestrator
 
 orch = AgentOrchestrator(tool_registry=registry, llm_adapter=adapter, mode="quick")
 result = orch.run("analyze", {"stock_code": "600519"})
-assert orch.mode == "quick"  # constructor mode restored
+assert orch.mode == "quick"  # constructor mode restored; pipeline also used quick
 ```
 
 Rejected projection/route does not call `_execute_pipeline`. Chat is unchanged.

@@ -16,7 +16,7 @@
 - **不会**把 `report_type` 或 `skills` / `selected_skill_ids` 映射为路由器 mode。
 - **不会**关闭 #1120：Chat incremental 真正跳过 `_execute_pipeline`（AC3）与运行元数据可见决策（AC4）仍属后续切片。factory / Chat / Analyze / CLI / Bot / MCP 仍未接线。
 
-仪表盘 `run()` 失败关闭：投影或路由被拒绝时返回 `AgentResult(success=False)` 与公开执行失败文案，**不会**回退到构造时 mode。构造时配置的 mode 与 mode-budget limits 在成功、拒绝和所有异常路径上由 `finally` 恢复。Chat 仍始终调用 `_execute_pipeline`，仍使用构造时 mode。
+仪表盘 `run()` 失败关闭：投影或路由被拒绝时返回 `AgentResult(success=False)` 与公开执行失败文案，**不会**回退到构造时 mode。当 run context 没有显式 `user_mode_override` 时，`run()` 把构造时 `self.mode`（factory/Settings `AGENT_ORCHESTRATOR_MODE`）作为用户 mode 传给路由器，从而保留 `quick` / `standard` / `full` / `specialist` 深度。显式 per-run context 覆盖仍然优先。没有用户 mode 时的 compare / 多标的 floor 仍是库行为，**不会**在仪表盘 `run()` 上抬高构造时深度。构造时配置的 mode 与 mode-budget limits 在成功、拒绝和所有异常路径上由 `finally` 恢复。Chat 仍始终调用 `_execute_pipeline`，仍使用构造时 mode。
 
 ## 输入
 
@@ -138,14 +138,14 @@ assert decision.chat_path == "full_repipeline"
 
 ## 仪表盘 run 应用（第三切片）
 
-`AgentOrchestrator.run()` 从已解析的 StockScope 构造有界事实（`entry_kind=run`、`scope_mode`、标的代码），外加可选的显式 context `user_mode_override`。不读取 env/Settings、`report_type` 或 skills。接受路由后仅在本次 pipeline 设置 `self.mode`（及对应 mode-budget limits）。
+`AgentOrchestrator.run()` 从已解析的 StockScope 构造有界事实（`entry_kind=run`、`scope_mode`、标的代码），外加可选的显式 context `user_mode_override`。当 context 没有显式用户 mode 时，把构造时 `self.mode` 作为 `user_mode_override` 传入，以尊重 factory/Settings 深度。不重新读取 env/Settings、`report_type` 或 skills。接受路由后仅在本次 pipeline 设置 `self.mode`（及对应 mode-budget limits）。
 
 ```python
 from src.agent.orchestrator import AgentOrchestrator
 
 orch = AgentOrchestrator(tool_registry=registry, llm_adapter=adapter, mode="quick")
 result = orch.run("analyze", {"stock_code": "600519"})
-assert orch.mode == "quick"  # 构造时 mode 已恢复
+assert orch.mode == "quick"  # 构造时 mode 已恢复；本次 pipeline 也使用 quick
 ```
 
 投影/路由拒绝时不调用 `_execute_pipeline`。Chat 行为不变。
