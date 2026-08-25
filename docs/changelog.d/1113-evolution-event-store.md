@@ -1,0 +1,1 @@
+- [Added] Added an append-only EvolutionEvent store with inclusive UTC time-range and exact-type query (Refs #1113).
