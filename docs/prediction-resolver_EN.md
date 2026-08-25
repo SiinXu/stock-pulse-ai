@@ -29,6 +29,21 @@ When `resolve_after` is reached, the **system** claims the prediction, pulls act
 | `PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK` | `5` | Reduced claim cap while the circuit is open |
 | `PREDICTION_RESOLVE_RETRY_JITTER_RATIO` | `0.1` | Positive retry jitter ratio (`0` to `1`) |
 
+Issue #1115 example names such as `PREDICTION_VERIFY_ENABLED`, `PREDICTION_RESOLVER_INTERVAL_SEC`, `PREDICTION_RESOLVER_BATCH_LIMIT`, and `PREDICTION_FETCH_CONCURRENCY` are **not aliases** of the keys above. Mapping and remaining deferrals: [Prediction verification safe rollout](prediction-verification-rollout_EN.md).
+
+## Safe rollout
+
+Operator order for the whole verification loop (do not skip to adapters or auto-promote):
+
+1. All verification-loop flags off (landed defaults).
+2. Enable `PREDICTION_EXTRACT_ENABLED` and verify analysis remains healthy.
+3. Enable `PREDICTION_RESOLVE_ENABLED` on **exactly one** scheduled worker, **or** keep that flag off and invoke `python -m src.services.prediction_resolver` explicitly.
+4. Enable miss/partial-only postmortem with `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true`.
+5. Enable gated adapters only after `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`.
+6. Auto-promote stays hard off.
+
+The CLI in step 3 is an **intentional operator gate** and runs one tick even when `PREDICTION_RESOLVE_ENABLED` is false. The scheduler flag only registers background task `prediction_resolver`.
+
 ## Single-process deploy
 
 1. Ensure A3 store (`agent_predictions`), A4 `ActualsFetcher`, and A5 `ClaimScorer` are available.
@@ -155,4 +170,5 @@ These GETs are read-only. They never tick, claim, resolve, requeue, or start a w
 
 ## Related
 
+- [Prediction verification safe rollout](prediction-verification-rollout_EN.md)
 - Epic #1107, daily-brief background-task pattern, scheduled tasks docs.

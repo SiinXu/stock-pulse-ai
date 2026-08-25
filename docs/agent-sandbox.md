@@ -99,6 +99,8 @@ Schema: `sandbox-promotion-receipt-v1`. Required fields include:
 - `rollback_condition`
 - `review_required=true`, `auto_promote=false` (hard)
 
+Issue #1115 example `EVOLUTION_AUTO_PROMOTE_SKILLS` is **not** an environment key and is not an alias of this receipt field. Auto-promote stays hard off in the [prediction verification safe rollout](prediction-verification-rollout_EN.md) until an eval gate exists.
+
 Caller-supplied `risk_boundary` or `production_authority_scope` values cannot
 broaden these defaults. Conflicting values are rejected rather than copied into
 a receipt that could misleadingly imply production authority.

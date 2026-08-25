@@ -77,11 +77,19 @@ Verifiable pending drafts are persisted through `AgentPredictionRepository.inser
 
 ## Rollout
 
-1. Leave the flag off in production until the persistence + resolver path is ready.
-2. Enable in non-prod to inspect draft `PredictionRecord` shapes.
-3. Disable at any time; analysis continues unchanged.
+Safe operator order for the whole verification loop is in [Prediction verification safe rollout](prediction-verification-rollout_EN.md) (Issue #1115). Extraction is **step 2** of that sequence:
+
+1. Leave every verification-loop flag at its default off.
+2. Enable `PREDICTION_EXTRACT_ENABLED=true` and confirm analysis / history save still succeed (extraction failures never fail analysis).
+3. Only then enable the resolver on exactly one scheduled worker **or** invoke `python -m src.services.prediction_resolver` explicitly.
+4. Enable miss/partial-only postmortem with `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true`.
+5. Enable gated adapters only after `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`.
+6. Auto-promote stays hard off.
+
+Disable `PREDICTION_EXTRACT_ENABLED` at any time; analysis continues unchanged. Issue example `PREDICTION_VERIFY_ENABLED` is **not** an alias of this key.
 
 ## Related docs
 
 - [Prediction Contract (EN)](prediction-contract_EN.md)
+- [Prediction verification safe rollout](prediction-verification-rollout_EN.md)
 - Epic product rules in issue #1107

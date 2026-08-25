@@ -50,7 +50,7 @@ ClaimScorer.score(claims, actuals, config) → claim_results + aggregate
 
 ### 边界约定
 
-* **方向 sideways 带**：`|收益小数| <= sideways_epsilon`（含边界；默认 0.1%）。`flat_epsilon` 为别名。
+* **方向 sideways 带**：`|收益小数| <= sideways_epsilon`（含边界；默认 0.1%）。构造参数 `flat_epsilon` 是**打分器本地**别名，设置后覆盖 `sideways_epsilon`。**没有** `PREDICTION_FLAT_EPSILON_PCT` 环境变量（Issue #1115 示例名不是别名）。
 * **收益桶**：遵循 A1 的 inclusive 标志（默认半开 `[low, high)`）。`0.0` 是合法有限边界。
   * **开区间上界 + 默认 margin**：恰落在 exclusive 边界时距离为 0；默认 `bucket_partial_margin_pct=1.0` 记为 **partial**，仅当 margin 为 `0` 时为 **miss**。
 * **关键位突破**：绝对价或相对 as_of 收盘百分比；近触碰为 partial。缺少对应方向的路径极值时，期末价可以证明 hit / near-touch，但不能证明 miss；后者为 `missing_path_extreme` / `data_unavailable`。
@@ -75,3 +75,5 @@ A4 风格实际值 mapping 采用 fail-closed：非 `ok` 状态、`data_unavaila
 ```bash
 python -m pytest tests/services/test_claim_scorer.py -q
 ```
+
+运营放量与 epsilon 非环境变量边界见 [预测核验安全放量](prediction-verification-rollout.md)。

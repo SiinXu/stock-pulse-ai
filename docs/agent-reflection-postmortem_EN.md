@@ -73,10 +73,14 @@ Library entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`,
    Post-mortem is not an `AgentResult` path; callers that need a result snapshot
    must read the account or `ctx.meta["mode_budget"]`. Skip stays
    `budget_skipped`.
-8. Production scheduler/CLI wire: when **both** `PREDICTION_RESOLVE_ENABLED` and
-   `AGENT_POSTMORTEM_ENABLED` are true, the existing `InMemoryPostmortemQueue` is
-   injected and drained after a non-overlap `tick()`, at most
-   `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` jobs. The handler maps stored
+8. Production wire: `InMemoryPostmortemQueue` is injected when
+   `AGENT_POSTMORTEM_ENABLED` is true. A **scheduled** drain also needs the
+   resolver worker (`PREDICTION_RESOLVE_ENABLED`). The cron CLI
+   (`python -m src.services.prediction_resolver`) drains after its tick even
+   when that scheduler flag is off — an intentional operator gate. Drain runs
+   after a non-overlap `tick()`, at most
+   `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` jobs. Drain concurrency is
+   hardcoded `2` (not an env key). The handler maps stored
    outcome/score/actuals (plus copied `run_id` / claims). It does not re-fetch
    market data or invent direction. Hits and `data_unavailable` are not
    enqueued. Lessons project through `record_reflection_lessons`: if
@@ -98,6 +102,21 @@ Library entry: `src/agent/evolution/postmortem.py` (`reflect_resolved_forecast`,
 | `AGENT_POSTMORTEM_SKIP_CLEAN_HITS` | `true` | Skip post-mortem LLM on clean hits |
 | `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | Max postmortem jobs drained after a non-overlap tick |
 
+Issue #1115 examples (`PREDICTION_POSTMORTEM_ENABLED`, `PREDICTION_POSTMORTEM_ON_HIT`, `PREDICTION_POSTMORTEM_CONCURRENCY`, `PREDICTION_POSTMORTEM_MAX_PER_TICK`) are **not aliases** of these keys. `PREDICTION_POSTMORTEM_CONCURRENCY` has no env surface; drain workers stay hardcoded `2`.
+
+## Safe rollout
+
+Operator order for the whole verification loop:
+
+1. All verification-loop flags off.
+2. Enable extraction and verify analysis remains healthy.
+3. Enable the resolver on exactly one scheduled worker **or** invoke the cron CLI explicitly.
+4. Enable miss/partial-only postmortem with `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true` (this step).
+5. Enable gated adapters only after `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`.
+6. Auto-promote stays hard off.
+
+Full mapping and deferrals: [Prediction verification safe rollout](prediction-verification-rollout_EN.md).
+
 ## Rollback
 
-Set enable flags to `false` or remove them. No data migration required.
+Set enable flags to `false` or remove them. No data migration required. Analysis continues.
