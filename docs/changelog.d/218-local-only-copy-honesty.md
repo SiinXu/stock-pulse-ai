@@ -1,1 +1,1 @@
-- [Fixed] Aligned Local Only Mode copy with the enforced network surface (Refs #218).
+- [Fixed] Aligned Local Only Mode copy with the enforced HTTP surface, including the plugin_safe_* gate (Refs #218).

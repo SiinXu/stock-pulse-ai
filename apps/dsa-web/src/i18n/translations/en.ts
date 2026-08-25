@@ -11918,7 +11918,7 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "Restart after changing. See docs/local-only-mode_EN.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "Fail-closed gate for policy-owned outbound HTTP, not a full air-gap.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "Local Only Mode",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "Policy-owned HTTP (safe_get/safe_post), including market-data providers, denies non-loopback destinations with coded LOCAL_ONLY_MODE errors. Loopback stays allowed. Desktop update checks skip. Outside this gate: non-HTTP provider sockets and plugin processes.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "Policy-owned HTTP (safe_get/safe_post/plugin_safe_*), including market-data providers, denies non-loopback destinations with coded LOCAL_ONLY_MODE errors. Loopback stays allowed. Desktop update checks skip. Outside this gate: non-HTTP provider sockets. Raw in-process plugin code is not a sandbox.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "Default is false.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "OUTBOUND_HTTP_ALLOWLIST cannot expand beyond loopback while on.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "Blocked policy-owned calls never silently fall through.",

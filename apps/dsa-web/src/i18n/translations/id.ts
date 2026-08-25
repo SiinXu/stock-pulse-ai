@@ -4306,7 +4306,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "Mulai ulang setelah mengubah. Lihat docs/local-only-mode_EN.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "Gerbang fail-closed untuk HTTP keluar milik kebijakan, bukan air-gap penuh.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "Mode Hanya Lokal",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "HTTP milik kebijakan (safe_get/safe_post), termasuk penyedia data pasar, menolak tujuan non-loopback dengan kesalahan LOCAL_ONLY_MODE. Loopback tetap diizinkan. Pemeriksaan pembaruan desktop dilewati. Di luar gerbang: soket penyedia non-HTTP dan proses plugin.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "HTTP milik kebijakan (safe_get/safe_post/plugin_safe_*), termasuk penyedia data pasar, menolak tujuan non-loopback dengan kesalahan LOCAL_ONLY_MODE. Loopback tetap diizinkan. Pemeriksaan pembaruan desktop dilewati. Di luar gerbang: soket penyedia non-HTTP. Kode plugin in-process mentah bukan sandbox.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "Default adalah false.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "OUTBOUND_HTTP_ALLOWLIST tidak dapat diperluas di luar loopback saat aktif.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "Panggilan yang diblokir di jalur kebijakan tidak pernah diloloskan secara diam-diam.",

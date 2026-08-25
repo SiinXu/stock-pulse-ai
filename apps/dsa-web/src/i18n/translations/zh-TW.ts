@@ -4306,7 +4306,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "修改後重啟。見 docs/local-only-mode.md。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "對走共享策略的出站 HTTP 失敗即關閉，不是完整氣隙。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "本地專用模式",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "策略管轄的 HTTP（safe_get/safe_post），含行情 provider，以 LOCAL_ONLY_MODE 編碼錯誤拒絕非回環目標。純回環仍可用。桌面更新檢查會跳過。不覆蓋：非 HTTP 資料源套接字與外掛程式進程。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "策略管轄的 HTTP（safe_get/safe_post/plugin_safe_*），含行情 provider，以 LOCAL_ONLY_MODE 編碼錯誤拒絕非回環目標。純回環仍可用。桌面更新檢查會跳過。不覆蓋：非 HTTP 資料源套接字。行程內原始外掛程式碼不是沙箱。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "預設 false。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "開啟後 OUTBOUND_HTTP_ALLOWLIST 不能擴到回環以外。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "策略管轄的攔截不會靜默放行。",

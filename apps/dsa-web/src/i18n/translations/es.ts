@@ -4306,7 +4306,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "Reinicie tras el cambio. Consulte docs/local-only-mode_EN.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "Puerta fail-closed para HTTP saliente bajo la política, no un aislamiento total.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "Modo solo local",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "El HTTP bajo la política (safe_get/safe_post), incluidos los proveedores de mercado, deniega destinos no loopback con errores LOCAL_ONLY_MODE. El loopback sigue permitido. Las comprobaciones de actualización de escritorio se omiten. Fuera de esta puerta: sockets de proveedores no HTTP y procesos de plugins.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "El HTTP bajo la política (safe_get/safe_post/plugin_safe_*), incluidos los proveedores de mercado, deniega destinos no loopback con errores LOCAL_ONLY_MODE. El loopback sigue permitido. Las comprobaciones de actualización de escritorio se omiten. Fuera de esta puerta: sockets de proveedores no HTTP. El código de plugin en proceso no es un sandbox.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "El valor predeterminado es false.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "OUTBOUND_HTTP_ALLOWLIST no puede ampliarse más allá de loopback mientras está activada.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "Las llamadas bloqueadas bajo la política nunca se omiten en silencio.",

@@ -888,7 +888,7 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   'settings.system.LOCAL_ONLY_MODE': {
     title: 'Local Only Mode',
     summary: 'Fail-closed gate for policy-owned outbound HTTP, not a full air-gap.',
-    usage: 'Policy-owned HTTP (safe_get/safe_post), including market-data providers, denies non-loopback destinations with coded LOCAL_ONLY_MODE errors. Loopback stays allowed. Desktop update checks skip. Outside this gate: non-HTTP provider sockets and plugin processes.',
+    usage: 'Policy-owned HTTP (safe_get/safe_post/plugin_safe_*), including market-data providers, denies non-loopback destinations with coded LOCAL_ONLY_MODE errors. Loopback stays allowed. Desktop update checks skip. Outside this gate: non-HTTP provider sockets. Raw in-process plugin code is not a sandbox.',
     valueNotes: ['Default is false.', 'OUTBOUND_HTTP_ALLOWLIST cannot expand beyond loopback while on.', 'Blocked policy-owned calls never silently fall through.'],
     impact: ['Policy-owned remote HTTP fails visibly unless local backends and cache cover the path.'],
     notes: ['Restart after changing. See docs/local-only-mode_EN.md.'],

@@ -926,7 +926,7 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
   'settings.system.LOCAL_ONLY_MODE': {
     title: '本地专用模式',
     summary: '对走共享策略的出站 HTTP 失败即关闭，不是完整气隙。',
-    usage: '策略管辖的 HTTP（safe_get/safe_post），含行情 provider，以 LOCAL_ONLY_MODE 编码错误拒绝非回环目标。纯回环仍可用。桌面更新检查会跳过。不覆盖：非 HTTP 数据源套接字与插件进程。',
+    usage: '策略管辖的 HTTP（safe_get/safe_post/plugin_safe_*），含行情 provider，以 LOCAL_ONLY_MODE 编码错误拒绝非回环目标。纯回环仍可用。桌面更新检查会跳过。不覆盖：非 HTTP 数据源套接字。进程内原始插件代码不是沙箱。',
     valueNotes: ['默认 false。', '开启后 allowlist 不能扩到回环以外。', '策略管辖的拦截不会静默放行。'],
     impact: ['策略管辖的远程 HTTP 会显式失败，除非本地后端与缓存覆盖。'],
     notes: ['修改后重启。见 docs/local-only-mode.md。'],

@@ -4306,7 +4306,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "Nach Änderungen neu starten. Siehe docs/local-only-mode_EN.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "Fail-closed-Tor für policy-eigenes ausgehendes HTTP, kein vollständiges Air-Gap.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "Nur-Lokal-Modus",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "Policy-eigenes HTTP (safe_get/safe_post), einschließlich Marktdaten-Anbieter, lehnt Nicht-Loopback-Ziele mit kodierten LOCAL_ONLY_MODE-Fehlern ab. Loopback bleibt erlaubt. Desktop-Update-Prüfungen werden übersprungen. Außerhalb: Nicht-HTTP-Anbieter-Sockets und Plugin-Prozesse.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "Policy-eigenes HTTP (safe_get/safe_post/plugin_safe_*), einschließlich Marktdaten-Anbieter, lehnt Nicht-Loopback-Ziele mit kodierten LOCAL_ONLY_MODE-Fehlern ab. Loopback bleibt erlaubt. Desktop-Update-Prüfungen werden übersprungen. Außerhalb: Nicht-HTTP-Anbieter-Sockets. Roher In-Process-Plugin-Code ist keine Sandbox.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "Standard ist false.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "OUTBOUND_HTTP_ALLOWLIST kann im aktivierten Zustand nicht über Loopback hinaus erweitert werden.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "Blockierte policy-eigene Aufrufe fallen nie stillschweigend durch.",

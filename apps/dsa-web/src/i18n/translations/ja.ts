@@ -4306,7 +4306,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "変更後に再起動してください。docs/local-only-mode_EN.md を参照。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "ポリシー管轄の外向き HTTP のフェイルクローズゲートであり、完全なエアギャップではありません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "ローカル専用モード",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "ポリシー管轄の HTTP（safe_get/safe_post）は相場プロバイダーを含めループバック以外を LOCAL_ONLY_MODE エラーコードで拒否します。ループバックは許可されます。デスクトップ更新チェックはスキップされます。対象外：非 HTTP プロバイダーソケットとプラグインプロセス。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "ポリシー管轄の HTTP（safe_get/safe_post/plugin_safe_*）は相場プロバイダーを含めループバック以外を LOCAL_ONLY_MODE エラーコードで拒否します。ループバックは許可されます。デスクトップ更新チェックはスキップされます。対象外：非 HTTP プロバイダーソケット。プロセス内の生プラグインコードはサンドボックスではありません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "デフォルトは false です。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "OUTBOUND_HTTP_ALLOWLIST が有効な間は、loopback を超えて拡張できません。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "ポリシー管轄のブロック呼び出しが黙って通過することはありません。",

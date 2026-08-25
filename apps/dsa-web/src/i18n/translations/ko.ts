@@ -4306,7 +4306,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "변경 후 재시작하세요. docs/local-only-mode_EN.md 참조.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "정책 관할 아웃바운드 HTTP의 페일클로즈 게이트이며, 완전한 에어갭은 아닙니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "로컬 전용 모드",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "정책 관할 HTTP(safe_get/safe_post)는 시세 제공자를 포함해 비루프백 대상을 LOCAL_ONLY_MODE 코드 오류로 거부합니다. 루프백은 허용됩니다. 데스크톱 업데이트 확인은 건너뜁니다. 대상 아님: 비 HTTP 제공자 소켓과 플러그인 프로세스.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "정책 관할 HTTP(safe_get/safe_post/plugin_safe_*)는 시세 제공자를 포함해 비루프백 대상을 LOCAL_ONLY_MODE 코드 오류로 거부합니다. 루프백은 허용됩니다. 데스크톱 업데이트 확인은 건너뜁니다. 대상 아님: 비 HTTP 제공자 소켓. 프로세스 내 원시 플러그인 코드는 샌드박스가 아닙니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "기본값은 false입니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "OUTBOUND_HTTP_ALLOWLIST가 켜져 있는 동안에는 loopback 밖으로 확장할 수 없습니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "정책 관할 차단 호출이 조용히 통과하는 일은 없습니다.",

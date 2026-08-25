@@ -4306,7 +4306,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.notes.0": "Mulakan semula selepas menukar. Lihat docs/local-only-mode_EN.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.summary": "Gerbang fail-tertutup untuk HTTP keluar milik dasar, bukan jurang udara penuh.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.title": "Mod Setempat Sahaja",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "HTTP milik dasar (safe_get/safe_post), termasuk penyedia data pasaran, menolak destinasi bukan loopback dengan ralat LOCAL_ONLY_MODE. Loopback kekal dibenarkan. Semakan kemas kini desktop dilangkau. Di luar gerbang: soket penyedia bukan HTTP dan proses pemalam.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.usage": "HTTP milik dasar (safe_get/safe_post/plugin_safe_*), termasuk penyedia data pasaran, menolak destinasi bukan loopback dengan ralat LOCAL_ONLY_MODE. Loopback kekal dibenarkan. Semakan kemas kini desktop dilangkau. Di luar gerbang: soket penyedia bukan HTTP. Kod pemalam in-process mentah bukan kotak pasir.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.0": "Lalai ialah false.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.1": "OUTBOUND_HTTP_ALLOWLIST tidak boleh diluaskan melampaui loopback semasa dihidupkan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.system.LOCAL_ONLY_MODE.valueNotes.2": "Panggilan disekat milik dasar tidak pernah diluluskan secara senyap.",
