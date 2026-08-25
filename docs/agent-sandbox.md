@@ -99,7 +99,7 @@ Schema: `sandbox-promotion-receipt-v1`. Required fields include:
 - `rollback_condition`
 - `review_required=true`, `auto_promote=false` (hard)
 
-Issue #1115 example `EVOLUTION_AUTO_PROMOTE_SKILLS` is **not** an environment key and is not an alias of this receipt field. Auto-promote stays hard off in the [prediction verification safe rollout](prediction-verification-rollout_EN.md) until an eval gate exists.
+Issue #1115 example `EVOLUTION_AUTO_PROMOTE_SKILLS` is **not** an environment key and is not an alias of this receipt field. Auto-promote stays hard off in the [prediction verification safe rollout](prediction-verification-rollout_EN.md). The #1093 dry-run CLI embeds this receipt in a sidecar; `approve` cannot set `auto_promote` or `auto_promote_to_production`. See the [agent promotion checklist](agent-promotion.md).
 
 Caller-supplied `risk_boundary` or `production_authority_scope` values cannot
 broaden these defaults. Conflicting values are rejected rather than copied into
@@ -122,5 +122,6 @@ Fences raise `SandboxExternalEffectBlocked` only while a `SandboxContext` is act
 - Issue #247 (parent safe sandbox)
 - Issue #202 (research sandbox)
 - Issue #442 (sandbox enhancement / multi-scenario)
+- Issue #1093 dry-run promotion CLI: `docs/agent-promotion.md` (sidecar review only; `auto_promote=false`)
 - `docs/agent-observability.md` (production L0 events; sandbox traces stay field-comparable)
 - Backtest UI manual: `docs/ui-manual/09-backtest.md`

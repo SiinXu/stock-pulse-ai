@@ -1,0 +1,1 @@
+- [Added] Add an opt-in dry-run agent promotion CLI that stores sidecar review proposals and offline eval scores without activating SkillRouter or auto-promoting (Refs #1093).
