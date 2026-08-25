@@ -1,10 +1,15 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { useState } from 'react';
 import { useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { SETTINGS_PAGE_TEXT } from '../../../locales/settingsPage';
 import { getUiListSeparator } from '../../../utils/uiLocale';
-import { Button, Surface } from '../../common';
+import { Button, Modal, Surface } from '../../common';
+import {
+  IntelligentImport,
+  SettingsSectionCard,
+} from '..';
 import AlphaSiftSettingsCard from '../AlphaSiftSettingsCard';
 import FirstRunSetupCard from '../FirstRunSetupCard';
 import {
@@ -35,12 +40,15 @@ type OverviewSectionProps = {
   configVersion: string;
   maskToken: string;
   refreshAfterExternalSave: (keys: string[]) => Promise<void>;
+  stockListValue: string;
+  applyPostSaveEffects: () => void;
 };
 
 const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
   const { language, t } = useUiLanguage();
   const settingsText = SETTINGS_PAGE_TEXT[language];
   const canStartWizard = !props.isProviderCatalogLoading && props.providerCatalogLength > 0;
+  const [isIntelligentImportOpen, setIsIntelligentImportOpen] = useState(false);
 
   return (
     <>
@@ -84,6 +92,49 @@ const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
           listSeparator={getUiListSeparator(language)}
           t={t}
         />
+      ) : null}
+      {props.shouldShowFirstRunSetup ? (
+        <>
+          <SettingsSectionCard
+            title={t('settings.intelligentImport')}
+            description={t('settings.intelligentImportDescription')}
+            actions={(
+              <Button
+                type="button"
+                variant="secondary"
+                size="default"
+                aria-haspopup="dialog"
+                onClick={() => setIsIntelligentImportOpen(true)}
+              >
+                {t('settings.openConfigItems')}
+              </Button>
+            )}
+          >
+            <p className="text-xs leading-6 text-muted-text">
+              {t('settings.intelligentImportSupportedInputs')}
+              {' · '}
+              {t('settings.intelligentImportHint')}
+            </p>
+          </SettingsSectionCard>
+          <Modal
+            isOpen={isIntelligentImportOpen}
+            onClose={() => setIsIntelligentImportOpen(false)}
+            title={t('settings.intelligentImport')}
+            description={t('settings.intelligentImportDescription')}
+            size="wide"
+          >
+            <IntelligentImport
+              stockListValue={props.stockListValue}
+              configVersion={props.configVersion}
+              maskToken={props.maskToken}
+              onMerged={async () => {
+                await props.refreshAfterExternalSave(['STOCK_LIST']);
+                props.applyPostSaveEffects();
+              }}
+              disabled={props.isSaving || props.isLoading}
+            />
+          </Modal>
+        </>
       ) : null}
       {props.shouldShowAlphaSiftSettings ? (
         <AlphaSiftSettingsCard

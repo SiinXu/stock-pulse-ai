@@ -1,7 +1,8 @@
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
+import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
@@ -17,10 +18,14 @@ import { getParsedApiError, type ParsedApiError } from '../api/error';
 import type { SetupSmokeOutcome } from '../utils/setupSmokeTask';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { AppPage, Button, ConfirmDialog, PageHeader, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, ConfirmDialog, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
   InvestmentFrameworkSettingsCard,
+  GenerationBackendStatusPanel,
+  LocalModelsWithKronos,
+  LLMChannelEditor,
+  LLMConfigModeBanner,
   NotificationTestPanel,
   NOTIFICATION_FIELD_GROUP_ORDER,
   getNotificationFieldGroupId,
@@ -32,8 +37,11 @@ import {
   getSubCategoryOfKey,
   getSubCategoryFieldOrder,
   SettingsAlert,
+  SettingsField,
   SettingsLoading,
   SettingsPanelErrorBoundary,
+  SettingsSectionCard,
+  SettingsErrorSummary,
   type ErrorSummaryEntry,
   type WizardDraftItem,
   type WizardCompleteResult,
@@ -42,19 +50,20 @@ import {
 import { parseModelAccessFieldKey, type ModelAccessFieldFocusRequest } from '../utils/modelAccessFieldKey';
 import { connectionItemsRespectSchema } from '../components/settings/settingsConnectionUpdateContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
+import ConfigBackupCard from '../components/settings/ConfigBackupCard';
+import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
 import OverviewSection from '../components/settings/sections/OverviewSection';
 import SystemSecuritySection from '../components/settings/sections/SystemSecuritySection';
-import IntelligentImportSection from '../components/settings/sections/IntelligentImportSection';
-import AiModelsSection from '../components/settings/sections/AiModelsSection';
-import AdvancedSection from '../components/settings/sections/AdvancedSection';
-import AlertsEventsSection from '../components/settings/sections/AlertsEventsSection';
-import SettingsSaveActions from '../components/settings/sections/SettingsSaveActions';
-import SettingsPageToasts from '../components/settings/sections/SettingsPageToasts';
 import {
   CHANNEL_ROUTING_FIELD_KEYS,
   LOCAL_MODEL_CONFIG_KEYS,
   parseSetupStockList,
 } from '../components/settings/sections/settingsPageConstants';
+import {
+  AiOverviewCard,
+  AiTaskRoutingCard,
+  AiReliabilityCard,
+} from '../components/settings/AiModelsViewCards';
 import {
   TASK_MODEL_KEYS,
   buildModelSelectorOptions,
@@ -86,6 +95,7 @@ import { computeSectionStatus } from '../components/settings/settingsSectionStat
 import { keyBelongsToSection, placementForKey, SCHEDULER_SETTING_KEYS } from '../components/settings/settingsFieldPlacement';
 import {
   type SettingsGroupSaveState,
+  type SettingsSaveStatus,
   SETTINGS_AUTOSAVE_DEBOUNCE_MS,
   classifyAiModelGate,
   computeGroupFingerprint,
@@ -97,6 +107,8 @@ import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI
 import {
   hasUnknownConfigContractCondition,
   isFieldVisibleByContract,
+  isFieldEnabledByContract,
+  resolveFieldRequirement,
 } from '../utils/configConditions';
 import type {
   LLMConfigModeStatus,
@@ -106,9 +118,16 @@ import type {
   SystemConfigUpdateItem,
 } from '../types/systemConfig';
 import { SETTINGS_PAGE_TEXT, SETTINGS_TASK_REFERENCE_LABELS } from '../locales/settingsPage';
+import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
+import { isAgentExpertJsonKey } from '../components/settings/agentSetupPresets';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
 import TokenUsagePage from '../components/usage/TokenUsagePage';
+
+const RuntimeCapabilitiesPanel = lazy(async () => {
+  const module = await import('../components/settings/RuntimeCapabilitiesPanel');
+  return { default: module.RuntimeCapabilitiesPanel };
+});
 
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
@@ -569,6 +588,22 @@ const SettingsPage: React.FC = () => {
       setIsWizardOpen(true);
     }
   }, [isProviderCatalogLoading, providerCatalog.length, searchParams, setupStatus]);
+
+  const [isToastPaused, setIsToastPaused] = useState(false);
+
+  useEffect(() => {
+    if (!toast || toast.type !== 'success' || isToastPaused) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      clearToast();
+    }, 3200);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [clearToast, isToastPaused, toast]);
 
   const rawActiveItems = itemsByCategory[activeCategory] || [];
   const firstSetupStockCode = parseSetupStockList(getConfigItem(itemsByCategory.base || [], 'STOCK_LIST')?.value)[0] || '';
@@ -1391,18 +1426,60 @@ const SettingsPage: React.FC = () => {
   );
   const activeSaveGroup = activeCategory;
   const activeGroupDirtyCount = pendingGroups.get(activeSaveGroup)?.length ?? 0;
-  const settingsSaveActions = (
-    <SettingsSaveActions
-      groupSaveStates={groupSaveStates}
-      activeSaveGroup={activeSaveGroup}
-      activeGroupDirtyCount={activeGroupDirtyCount}
-      isLoading={isLoading}
-      uiLanguage={uiLanguage}
-      onRetryGroup={retryAutosaveGroup}
-      onRestoreGroup={restoreAutosaveGroup}
-      onRequestResetGroup={() => setShowResetConfirm(true)}
-    />
-  );
+  const saveStatusLabel = (status: SettingsSaveStatus): string => {
+    switch (status) {
+      case 'dirty': return settingsText.autosaveScheduled;
+      case 'scheduled': return settingsText.autosaveScheduled;
+      case 'saving': return settingsText.autosaveSaving;
+      case 'saved': return settingsText.autosaveSaved;
+      case 'failed': return settingsText.autosaveFailed;
+      case 'conflicted': return settingsText.autosaveConflicted;
+      default: return '';
+    }
+  };
+  const visibleGroupSaveStates = Object.entries(groupSaveStates)
+    .filter(([, state]) => state.status !== 'idle');
+  const settingsSaveActions = visibleGroupSaveStates.length > 0 || activeGroupDirtyCount > 0 ? (
+    <div className="flex flex-wrap items-center justify-end gap-2" aria-live="polite">
+      {visibleGroupSaveStates.map(([group, state]) => (
+        <span
+          key={group}
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
+        >
+          {state.status === 'saved' ? (
+            <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
+          ) : state.status === 'failed' || state.status === 'conflicted' ? (
+            <CircleAlert className="h-4 w-4 text-danger" aria-hidden="true" />
+          ) : (
+            <Clock className="h-4 w-4 text-warning" aria-hidden="true" />
+          )}
+          <span>{getCategoryTitle(group as SystemConfigCategory, group, uiLanguage)}: {saveStatusLabel(state.status)}</span>
+          {state.status === 'failed' ? (
+            <button type="button" className="settings-accent-text inline-flex min-h-11 min-w-11 items-center justify-center px-1 underline" onClick={() => retryAutosaveGroup(group)}>
+              {settingsText.autosaveRetry}
+            </button>
+          ) : null}
+          {state.status === 'failed' || state.status === 'conflicted' ? (
+            <button type="button" className="inline-flex min-h-11 min-w-11 items-center justify-center px-1 text-danger underline" onClick={() => restoreAutosaveGroup(group)}>
+              {settingsText.autosaveRestore}
+            </button>
+          ) : null}
+        </span>
+      ))}
+      {activeGroupDirtyCount > 0 ? (
+        <Button
+          type="button"
+          variant="secondary"
+          size="default"
+          onClick={() => setShowResetConfirm(true)}
+          disabled={isLoading || groupSaveStates[activeSaveGroup]?.status === 'saving'}
+        >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+          {settingsText.autosaveResetGroup}
+        </Button>
+      ) : null}
+    </div>
+  ) : null;
 
   return (
     <AppPage className="settings-page pb-6">
@@ -1486,6 +1563,8 @@ const SettingsPage: React.FC = () => {
               configVersion={configVersion}
               maskToken={maskToken}
               refreshAfterExternalSave={refreshAfterExternalSave}
+              stockListValue={(activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''}
+              applyPostSaveEffects={applyPostSaveEffects}
             />
             {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
             <SystemSecuritySection
@@ -1502,97 +1581,179 @@ const SettingsPage: React.FC = () => {
               t={t}
               language={uiLanguage}
             />
-            <AdvancedSection
-              isTopLevelAdvanced={isTopLevelAdvanced}
-              activeView={activeView}
-              configVersion={configVersion}
-              isSaving={isSaving}
-              isLoading={isLoading}
-              hasDirty={hasDirty}
-              load={load}
-              refreshAfterExternalSave={refreshAfterExternalSave}
-              applyPostSaveEffects={applyPostSaveEffects}
-              setSchedulerStatusRefreshToken={setSchedulerStatusRefreshToken}
-              refreshSetupStatus={refreshSetupStatus}
-              llmModeStatus={llmModeStatus}
-              generationBackendDraftItems={generationBackendDraftItems}
-              maskToken={maskToken}
-              uiLanguage={uiLanguage}
-              advancedSectionItems={advancedSectionItems}
-              setDraftValue={setDraftValue}
-              issueByKey={issueByKey}
-              allValuesByKey={allValuesByKey}
-              readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
-              categoryByKey={categoryByKey}
-              t={t}
-            />
-            <IntelligentImportSection
-              activeCategory={activeCategory}
-              activeItems={activeItems}
-              configVersion={configVersion}
-              maskToken={maskToken}
-              isSaving={isSaving}
-              isLoading={isLoading}
-              t={t}
-              refreshAfterExternalSave={refreshAfterExternalSave}
-              applyPostSaveEffects={applyPostSaveEffects}
-            />
-            <AiModelsSection
-              isAiOverview={isAiOverview}
-              isAiLocalModels={isAiLocalModels}
-              isAiTaskRouting={isAiTaskRouting}
-              isAiReliability={isAiReliability}
-              isTopLevelAdvanced={isTopLevelAdvanced}
-              activeCategory={activeCategory}
-              allValuesByKey={allValuesByKey}
-              availableModelRefSet={availableModelRefSet}
-              availableModelsError={availableModelsError}
-              availableModelsLoading={availableModelsLoading}
-              formatConfiguredModel={formatConfiguredModel}
-              selectSectionView={selectSectionView}
-              reloadAvailableModels={reloadAvailableModels}
-              uiLanguage={uiLanguage}
-              refreshAfterExternalSave={refreshAfterExternalSave}
-              applyPostSaveEffects={applyPostSaveEffects}
-              aiModelItems={itemsByCategory.ai_model || []}
-              issueByKey={issueByKey}
-              isSaving={isSaving}
-              isLoading={isLoading}
-              setDraftValue={setDraftValue}
-              readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
-              taskRoutingItems={taskRoutingItems}
-              modelSelectorOptions={modelSelectorOptions}
-              availableModels={availableModels}
-              configuredTaskRoutes={configuredTaskRoutes}
-              hasSafeFallbackPlacement={hasSafeFallbackPlacement}
-              resolveConfiguredModelRef={resolveConfiguredModelRef}
-              goToModelAccessFromTaskRouting={goToModelAccessFromTaskRouting}
-              fallbackRoutingItem={fallbackRoutingItem}
-              sourceQuery={searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.source)}
-              returnToTaskRouting={returnToTaskRouting}
-              isProviderCatalogLoading={isProviderCatalogLoading}
-              providerCatalogError={providerCatalogError}
-              providerConnectionSchemaUnavailable={providerConnectionSchemaUnavailable}
-              channelsOverriddenByMode={channelsOverriddenByMode}
-              hasUnsafeModelAccessSchema={hasUnsafeModelAccessSchema}
-              setLlmChannelAddSignal={setLlmChannelAddSignal}
-              configVersion={configVersion}
-              rawActiveItems={rawActiveItems}
-              providerCatalog={providerCatalog}
-              providerConnectionFields={providerConnectionFields}
-              providerEmptyApiKeyHosts={providerEmptyApiKeyHosts}
-              maskToken={maskToken}
-              llmChannelDraftItems={llmChannelDraftItems}
-              handleLlmChannelDraftItemsChange={handleLlmChannelDraftItemsChange}
-              handleLlmChannelValidityChange={handleLlmChannelValidityChange}
-              llmChannelResetSignal={llmChannelResetSignal}
-              llmChannelAddSignal={llmChannelAddSignal}
-              llmFocusFieldRequest={llmFocusFieldRequest}
-              providerConnectionSchemaAllowsInspection={providerConnectionSchemaAllowsInspection}
-              reloadProviderCatalog={reloadProviderCatalog}
-              taskModelRefs={taskModelRefs}
-              replaceModelReferences={replaceModelReferences}
-            />
+            {isTopLevelAdvanced && activeView === 'backup' ? (
+              <>
+                <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
+                <ConfigBackupCard configVersion={configVersion} hasDirty={hasDirty} disabled={isSaving || isLoading} load={load} onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((c) => c + 1)} onRefreshSetupStatus={() => { void refreshSetupStatus(); }} onRolledBack={async (result) => { await refreshAfterExternalSave(result.updatedKeys); applyPostSaveEffects(); }} onReloadLatest={() => refreshAfterExternalSave([])} />
+              </>
+            ) : null}
+            {isAiOverview ? (
+              <AiOverviewCard
+                allValuesByKey={allValuesByKey}
+                availableRoutes={availableModelRefSet}
+                availableModelsError={availableModelsError}
+                availableModelsLoading={availableModelsLoading}
+                formatModel={formatConfiguredModel}
+                onEditRouting={() => selectSectionView('ai_models', 'task_routing')}
+                onReloadModels={() => reloadAvailableModels()}
+              />
+            ) : null}
+            {isAiLocalModels ? (
+              <LocalModelsWithKronos
+                language={uiLanguage}
+                onConfigurationChanged={async () => {
+                  await refreshAfterExternalSave(LOCAL_MODEL_CONFIG_KEYS);
+                  applyPostSaveEffects();
+                }}
+                kronosItems={itemsByCategory.ai_model || []}
+                allValuesByKey={allValuesByKey}
+                issueByKey={issueByKey}
+                disabled={isSaving || isLoading}
+                onKronosChange={setDraftValue}
+                readOnlyDiagnostic={(item) => readOnlyDiagnosticForItem(item, 'ai_model')}
+              />
+            ) : null}
+            {isAiTaskRouting ? (
+              <AiTaskRoutingCard
+                taskRoutingItems={taskRoutingItems}
+                fallbackModelsValue={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
+                issueByKey={issueByKey}
+                allValuesByKey={allValuesByKey}
+                modelSelectorOptions={modelSelectorOptions}
+                availableModels={availableModels}
+                availableModelsError={availableModelsError}
+                availableModelsLoading={availableModelsLoading}
+                configuredTaskRoutes={configuredTaskRoutes}
+                hasSafeFallbackPlacement={hasSafeFallbackPlacement}
+                isSaving={isSaving}
+                setDraftValue={setDraftValue}
+                resolveConfiguredModelRef={resolveConfiguredModelRef}
+                formatConfiguredModel={formatConfiguredModel}
+                readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
+                onGoToModelAccess={goToModelAccessFromTaskRouting}
+                onEditReliability={() => selectSectionView('ai_models', 'reliability')}
+                onReloadModels={() => reloadAvailableModels()}
+              />
+            ) : null}
+            {isAiReliability ? (
+              <AiReliabilityCard
+                fallbackValue={allValuesByKey.LITELLM_FALLBACK_MODELS || ''}
+                fallbackIssues={issueByKey.LITELLM_FALLBACK_MODELS || []}
+                fallbackItem={fallbackRoutingItem}
+                hasSafeFallbackPlacement={hasSafeFallbackPlacement}
+                modelSelectorOptions={modelSelectorOptions}
+                primaryRoute={resolveConfiguredModelRef(allValuesByKey.LITELLM_MODEL || '')}
+                allValuesByKey={allValuesByKey}
+                isSaving={isSaving}
+                setDraftValue={setDraftValue}
+                resolveConfiguredModelRef={resolveConfiguredModelRef}
+              />
+            ) : null}
+            {isTopLevelAdvanced && activeView === 'raw_config' ? (
+              <>
+                <LLMConfigModeBanner
+                  status={llmModeStatus}
+                  configVersion={configVersion}
+                  onMigrated={() => {
+                    void (async () => {
+                      await load();
+                      applyPostSaveEffects();
+                    })();
+                  }}
+                />
+                <GenerationBackendStatusPanel
+                  items={generationBackendDraftItems}
+                  maskToken={maskToken}
+                  disabled={isSaving || isLoading}
+                />
+              </>
+            ) : null}
+            {isTopLevelAdvanced && activeView === 'diagnostics' ? (
+              <SettingsSectionCard
+                title={settingsText.diagnostics}
+                description={settingsText.advancedDescription}
+              >
+                {advancedSectionItems.length > 0 ? (
+                  <form
+                    className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                    onSubmit={(event) => event.preventDefault()}
+                  >
+                    {advancedSectionItems.map((item) => (
+                      <SettingsField
+                        key={item.key}
+                        item={item}
+                        value={item.value}
+                        disabled={isSaving}
+                        onChange={setDraftValue}
+                        issues={issueByKey[item.key] || []}
+                        requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                        dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                        readOnlyDiagnostic={readOnlyDiagnosticForItem(item, categoryByKey[item.key])}
+                      />
+                    ))}
+                  </form>
+                ) : null}
+              </SettingsSectionCard>
+            ) : null}
+            {isTopLevelAdvanced && activeView === 'capabilities' ? (
+              <Suspense fallback={<SettingsLoading />}>
+                <RuntimeCapabilitiesPanel />
+              </Suspense>
+            ) : null}
+            {activeCategory === 'ai_model' && !isAiOverview && !isAiLocalModels && !isAiTaskRouting && !isAiReliability && !isTopLevelAdvanced ? (
+              <section className="space-y-4" aria-labelledby="model-access-heading" data-testid="model-access-section">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 space-y-1">
+                    <h2 id="model-access-heading" className="text-base font-semibold text-foreground">
+                      {settingsText.modelAccess}
+                    </h2>
+                    <p className="text-sm leading-6 text-muted-text">
+                      {settingsText.modelAccessDescription}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    {searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.source) === 'task_routing' ? (
+                      <Button type="button" variant="secondary" onClick={returnToTaskRouting}>
+                        {settingsText.returnTaskRouting}
+                      </Button>
+                    ) : null}
+                    <Button
+                      type="button"
+                      variant="primary"
+                      disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || providerConnectionSchemaUnavailable || Boolean(channelsOverriddenByMode) || hasUnsafeModelAccessSchema}
+                      onClick={() => setLlmChannelAddSignal((signal) => signal + 1)}
+                    >
+                      {settingsText.addModelService}
+                    </Button>
+                  </div>
+                </div>
+                <LLMChannelEditor
+                  key={`llm-connections-${configVersion}`}
+                  items={rawActiveItems}
+                  providers={providerCatalog}
+                  connectionFields={providerConnectionFields}
+                  catalogLoading={isProviderCatalogLoading}
+                  emptyApiKeyHosts={providerEmptyApiKeyHosts}
+                  availableModels={availableModels}
+                  availableModelRoutes={availableModels.map((model) => model.route)}
+                  maskToken={maskToken}
+                  persistedDraftItems={llmChannelDraftItems}
+                  onDraftItemsChange={handleLlmChannelDraftItemsChange}
+                  onValidityChange={handleLlmChannelValidityChange}
+                  resetSignal={llmChannelResetSignal}
+                  addSignal={llmChannelAddSignal}
+                  focusFieldRequest={llmFocusFieldRequest}
+                  disabled={isSaving || isLoading || isProviderCatalogLoading || Boolean(providerCatalogError) || (providerConnectionSchemaUnavailable && !providerConnectionSchemaAllowsInspection) || hasUnsafeModelAccessSchema}
+                  catalogUnavailable={Boolean(providerCatalogError)}
+                  onReloadCatalog={() => reloadProviderCatalog()}
+                  overriddenByMode={channelsOverriddenByMode}
+                  onViewDiagnostics={() => selectSectionView('advanced', 'raw_config')}
+                  taskModelRefs={taskModelRefs}
+                  onManageModels={() => selectSectionView('ai_models', 'task_routing')}
+                  onReplaceModelReferences={replaceModelReferences}
+                />
+              </section>
+            ) : null}
             {activeCategory === 'notification' && activeSubCategory === 'channels' ? (
               <SettingsPanelErrorBoundary
                 title={t('settings.notificationTest')}
@@ -1627,42 +1788,120 @@ const SettingsPage: React.FC = () => {
                 </div>
               </SettingsPanelErrorBoundary>
             ) : null}
-            <AlertsEventsSection
-              isAlertsSection={isAlertsSection}
-              activeView={activeView}
-              eventMonitorItems={eventMonitorItems}
-              uiLanguage={uiLanguage}
-              isSaving={isSaving}
-              setDraftValue={setDraftValue}
-              issueByKey={issueByKey}
-              allValuesByKey={allValuesByKey}
-              readOnlyDiagnosticForItem={readOnlyDiagnosticForItem}
-            />
+            {isAlertsSection && activeView === 'events' && eventMonitorItems.length > 0 ? (
+              <SettingsSectionCard
+                title={settingsText.eventMonitor}
+                description={settingsText.eventMonitorDescription}
+              >
+                {(() => {
+                  const eventEssentials = eventMonitorItems.filter((item) => !isAgentExpertJsonKey(item.key));
+                  const eventExpertJson = eventMonitorItems.filter((item) => isAgentExpertJsonKey(item.key));
+                  const renderEventField = (item: (typeof eventMonitorItems)[number]) => (
+                    <SettingsField
+                      key={item.key}
+                      item={item}
+                      value={item.value}
+                      disabled={isSaving}
+                      onChange={setDraftValue}
+                      issues={issueByKey[item.key] || []}
+                      requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                      dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                      readOnlyDiagnostic={readOnlyDiagnosticForItem(item, 'agent')}
+                    />
+                  );
+                  return (
+                    <div className="space-y-3">
+                      {eventEssentials.length ? (
+                        <form
+                          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                          onSubmit={(event) => event.preventDefault()}
+                          data-testid="event-monitor-essentials"
+                        >
+                          {eventEssentials.map(renderEventField)}
+                        </form>
+                      ) : null}
+                      {eventExpertJson.length ? (
+                        <details
+                          className="group/event-expert overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                          data-testid="event-monitor-expert-json"
+                        >
+                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                            <span>{SETTINGS_MISC_TEXT[uiLanguage].showAdvanced}</span>
+                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open/event-expert:rotate-180" aria-hidden="true" />
+                          </summary>
+                          <form
+                            className="border-t border-[var(--settings-border-soft)] p-1"
+                            onSubmit={(event) => event.preventDefault()}
+                          >
+                            {eventExpertJson.map(renderEventField)}
+                          </form>
+                        </details>
+                      ) : null}
+                    </div>
+                  );
+                })()}
+              </SettingsSectionCard>
+                ) : null}
               </>
             )}
           </section>
         </div>
       )}
 
-      <SettingsPageToasts
-        showErrorSummary={showErrorSummary}
-        hasValidationSummary={hasValidationSummary}
-        saveError={saveError}
-        loadError={loadError}
-        activeSection={activeSection}
-        toast={toast}
-        errorSummaryEntries={errorSummaryEntries}
-        jumpToErrorField={jumpToErrorField}
-        uiLanguage={uiLanguage}
-        errorSummaryFingerprint={errorSummaryFingerprint}
-        setDismissedErrorSummaryFingerprint={setDismissedErrorSummaryFingerprint}
-        retryAction={retryAction}
-        lastSaveGroupRef={lastSaveGroupRef}
-        retryAutosaveGroup={retryAutosaveGroup}
-        retry={retry}
-        t={t}
-        clearToast={clearToast}
-      />
+      {(
+        showErrorSummary
+        || (!hasValidationSummary && (
+          saveError
+          || (loadError && activeSection !== SETTINGS_SECTION_IDS.usage)
+          || toast
+        ))
+      ) ? (
+        <ToastViewport>
+          <div
+            className="pointer-events-auto max-h-[calc(100dvh-2rem)] overflow-y-auto"
+            onMouseEnter={() => setIsToastPaused(true)}
+            onMouseLeave={() => setIsToastPaused(false)}
+            onFocusCapture={() => setIsToastPaused(true)}
+            onBlurCapture={(event) => {
+              if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                setIsToastPaused(false);
+              }
+            }}
+          >
+            {showErrorSummary ? (
+              <SettingsErrorSummary
+                entries={errorSummaryEntries}
+                onJump={jumpToErrorField}
+                language={uiLanguage}
+                dismissLabel={t('common.close')}
+                onDismiss={() => setDismissedErrorSummaryFingerprint(errorSummaryFingerprint)}
+              />
+            ) : !hasValidationSummary && saveError ? (
+              <ApiErrorAlert
+                error={saveError}
+                actionLabel={retryAction === 'save' && lastSaveGroupRef.current ? settingsText.autosaveRetry : undefined}
+                onAction={retryAction === 'save' && lastSaveGroupRef.current
+                  ? () => retryAutosaveGroup(lastSaveGroupRef.current!)
+                  : undefined}
+              />
+            ) : loadError && activeSection !== SETTINGS_SECTION_IDS.usage ? (
+              <ApiErrorAlert
+                error={loadError}
+                actionLabel={retryAction === 'load' ? t('common.retry') : t('settings.reload')}
+                onAction={() => void retry()}
+              />
+            ) : toast?.type === 'success' ? (
+              <SettingsAlert
+                title={t('settings.actionSuccess')}
+                message={toast.message}
+                variant="success"
+              />
+            ) : toast ? (
+              <ApiErrorAlert error={toast.error} />
+            ) : null}
+          </div>
+        </ToastViewport>
+      ) : null}
       <ConfirmDialog
         isOpen={showResetConfirm}
         title={t('settings.resetConfirmTitle')}
