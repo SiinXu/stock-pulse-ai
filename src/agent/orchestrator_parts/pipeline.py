@@ -398,7 +398,6 @@ class _PipelineMethods:
                         llm_adapter=self.llm_adapter,
                         skill_instructions=self.skill_instructions,
                         technical_skill_policy=self.technical_skill_policy,
-                        config=self.config,
                     ))
                     critic_agent.max_steps = _critic.CRITIC_MAX_STEPS
                     agents.insert(index, critic_agent)
@@ -1090,7 +1089,6 @@ class _PipelineMethods:
             llm_adapter=self.llm_adapter,
             skill_instructions=self.skill_instructions,
             technical_skill_policy=self.technical_skill_policy,
-            config=self.config,
         )
 
         technical = self._prepare_agent(TechnicalAgent(**common_kwargs))
@@ -1166,7 +1164,6 @@ class _PipelineMethods:
                 llm_adapter=self.llm_adapter,
                 skill_instructions=self.skill_instructions,
                 technical_skill_policy=self.technical_skill_policy,
-                config=self.config,
             )
             router = SkillRouter(
                 skill_manager=self.skill_manager,

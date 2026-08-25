@@ -265,6 +265,7 @@ class _ExecutionMethods:
             if mode_limits is not None:
                 agent.max_steps = mode_limits.effective_max_steps(agent.max_steps)
         agent.runtime_guard_policy = self.runtime_guard_policy
+        agent.config = self.config
         return agent
 
     def _callable_accepts_kwarg(self, func: Any, param_name: str) -> Optional[bool]:
