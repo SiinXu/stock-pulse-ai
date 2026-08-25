@@ -6,6 +6,7 @@
 - ``error_patterns`` — human-editable pattern cards clustered from lessons (#1138)
 - ``guards`` — Soul / ToolSurface immutability proofs
 - ``adapters`` — gated online adapters wrapping AgentMemory (Issue #1091; default off)
+- ``outcome_ingest`` — default-off pull overlay of resolved forecasts onto adapters (#1106)
 
 These modules do not mutate Agent Soul charter bytes and never expand ToolSurface
 denials. Pattern injection is a read-only, quota-bounded checklist.
@@ -19,6 +20,12 @@ from src.agent.evolution.adapters import (
     prefer_route,
     rank_tools,
     record_adapter_influence,
+)
+from src.agent.evolution.outcome_ingest import (
+    FORECAST_OUTCOME_LIST_LIMIT,
+    apply_forecast_outcome_calibration,
+    forecast_calibration_stats,
+    load_scored_forecast_rows,
 )
 from src.agent.evolution.budget import (
     BUDGET_SKIPPED,
@@ -93,6 +100,10 @@ __all__ = [
     "ADAPTER_INFLUENCE_META_KEY",
     "BUDGET_SKIPPED",
     "DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES",
+    "FORECAST_OUTCOME_LIST_LIMIT",
+    "apply_forecast_outcome_calibration",
+    "forecast_calibration_stats",
+    "load_scored_forecast_rows",
     "DEFAULT_INJECT_CHAR_BUDGET",
     "DEFAULT_INJECT_TOP_K",
     "DEFAULT_POSTMORTEM_BATCH_LLM_BUDGET",

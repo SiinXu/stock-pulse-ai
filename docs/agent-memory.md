@@ -27,6 +27,16 @@ Library-only slice in `src/agent/evolution/adapters.py`. Production `BaseAgent` 
 
 When enabled and samples meet the adapter threshold, `calibrate_confidence` applies the stored `CalibrationResult.calibration_factor` from `AgentMemory.get_calibration` (and only when `calibrated` is true). AgentMemory already clamps `historical_accuracy / avg_confidence` to `0.5..1.5`, including a real `historical_accuracy=0.0`; the adapter must not re-derive that ratio with truthy fallbacks such as `accuracy or 0.5`. Confidence is then clamped to `[0,1]`. Sample source is existing `AGENT_MEMORY_ENABLED` / `AgentMemory`; this slice does not add a second store. Tool-effectiveness and route-preference are explicit identity stubs: they do not unlock denied ToolSurface tools and do not write `AGENT_ORCHESTRATOR_MODE`. Influence is recorded only on run-local `AgentContext.meta["adapter_influence"]` (not episodes).
 
+### Forecast-outcome overlay (gated, default off)
+
+When adapters are on, `apply_forecast_outcome_calibration` in `src/agent/evolution/outcome_ingest.py` may pull resolved `agent_predictions` for the current symbol/market through existing `list_by_symbol_market` (`limit <= 500`) and feed scored `hit` / `partial` / `miss` rows that have a finite confidence in `[0, 1]` into the gated adapter. Numeric accuracy uses `OUTCOME_NUMERIC_SCORE` (`hit=1.0`, `partial=0.5`, `miss=0.0`).
+
+- Flag off or missing `stock_code`: identity, and the overlay does not query the store. When adapters are off, `adapter_influence` is not written.
+- `N < AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`: identity (`applied=false`, `reason=insufficient_samples`).
+- `N >=` threshold: forecast stats only. This slice does **not** blend `AgentMemory` / backtest stats with live forecast outcomes.
+- `data_unavailable`, unlabeled rows, invalid confidence, forward-return sidecar buckets (`1d_up` / …), and store failures are not samples and never fabricate hits.
+- Influence remains `AgentContext.meta["adapter_influence"]` only. `BaseAgent`, Soul, ToolSurface, episodes, prediction HTTP, and tool/route stubs are unchanged.
+
 ## Honest layer naming
 
 The second layer is **outcome-pattern memory**, not free-text "semantic knowledge":

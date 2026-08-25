@@ -27,6 +27,16 @@
 
 开启且样本达到适配器阈值后，`calibrate_confidence` 使用 `AgentMemory.get_calibration` 已存的 `CalibrationResult.calibration_factor`（且仅在 `calibrated` 为真时生效）。AgentMemory 已将 `historical_accuracy / avg_confidence` 钳制到 `0.5..1.5`，其中 `historical_accuracy=0.0` 是真实的 0% 准确率；适配器不得再用 `accuracy or 0.5` 这类真值回退重算该比值。随后将置信度限制在 `[0,1]`。样本来源仍是既有 `AGENT_MEMORY_ENABLED` / `AgentMemory`，本切片不新增存储。工具有效性与路由偏好是显式恒等桩：不会解锁已拒绝的 ToolSurface 工具，也不会写入 `AGENT_ORCHESTRATOR_MODE`。影响只记录在运行期 `AgentContext.meta["adapter_influence"]`（不写入 episode）。
 
+### 预测结果叠加（默认关闭）
+
+适配器开启时，`src/agent/evolution/outcome_ingest.py` 中的 `apply_forecast_outcome_calibration` 可通过既有 `list_by_symbol_market`（`limit <= 500`）拉取当前标的/市场已结算的 `agent_predictions`，并将带有 `[0, 1]` 内有限置信度的 `hit` / `partial` / `miss` 行送入既有门控适配器。数值准确率使用 `OUTCOME_NUMERIC_SCORE`（`hit=1.0`、`partial=0.5`、`miss=0.0`）。
+
+- 开关关闭或缺少 `stock_code`：恒等，且不查询存储。适配器关闭时不写入 `adapter_influence`。
+- `N < AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`：恒等（`applied=false`，`reason=insufficient_samples`）。
+- `N >=` 阈值：只用预测结果统计。本切片 **不会** 把 `AgentMemory` / 回测统计与实盘预测结果混合。
+- `data_unavailable`、未标注行、无效置信度、远期收益 sidecar 分桶（`1d_up` 等）以及存储失败都不是样本，也绝不会伪造 hit。
+- 影响仍只写在 `AgentContext.meta["adapter_influence"]`。`BaseAgent`、Soul、ToolSurface、episode、预测 HTTP 以及工具/路由桩均不变。
+
 ## 诚实命名
 
 第二层是 **outcome-pattern（结果模式）记忆**，不是自由文本「语义知识库」。Payload 使用 `outcome_patterns`；`semantic` 为弃用别名。
