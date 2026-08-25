@@ -1,22 +1,22 @@
 # Agent 深度路由规则库
 
-**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一、二切片（规则库 + 结构化事实投影，均含确定性测试）。**未接线**生产调用方。
+**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一至三切片（规则库 + 结构化事实投影 + `AgentOrchestrator.run()` 应用）。Chat、factory、native adapter、Analyze、API、CLI、Bot、MCP 仍**未接线**。
 
 **English**: [agent-router_EN.md](agent-router_EN.md)
 
 ## 诚实边界
 
-`src/agent/runtime/agent_router.py` 提供纯规则 `AgentRouter`：根据**已经规范化**的分类事实，确定性选择分析深度与 Chat 路径。`src/agent/runtime/agent_router_facts.py` 从结构化 StockScope / entry_kind / 标的数量 / 可选的显式 per-run 覆盖投影这些事实。这些切片：
+`src/agent/runtime/agent_router.py` 提供纯规则 `AgentRouter`：根据**已经规范化**的分类事实，确定性选择分析深度与 Chat 路径。`src/agent/runtime/agent_router_facts.py` 从结构化 StockScope / entry_kind / 标的数量 / 可选的显式 per-run 覆盖投影这些事实。`AgentOrchestrator.run()`（仪表盘分析）对**每一次 run** 投影事实并应用路由器。这些切片：
 
 - **不会**解析原始 prompt / 用户消息、provider 载荷或工具结果。
-- **不会**改写 `AGENT_ORCHESTRATOR_MODE`、mode budget、Soul、ToolSurface、factory / orchestrator / native adapter、Chat/API/OpenAPI/Web/Desktop/CLI/Bot/MCP。
+- **不会**改写 Settings/env `AGENT_ORCHESTRATOR_MODE`、Soul、ToolSurface、factory / native adapter、Chat/API/OpenAPI/Web/Desktop/CLI/Bot/MCP。
 - **不会**写入 episode / trace 公共元数据、EvolutionEvent 或 memory admission。
 - **不会**调用或扩展 `prefer_route`；miss-rate 证据在通过校验后**零路由影响**（身份中立，直至 #1091 / #1106）。
 - **不会**把进程级 Settings/env `AGENT_ORCHESTRATOR_MODE` 复制为 `user_mode_override`。
 - **不会**把 `report_type` 或 `skills` / `selected_skill_ids` 映射为路由器 mode。
-- **不会**关闭 #1120：AC2–AC4（调用方覆盖接线、Chat incremental 真正跳过 `_execute_pipeline`、运行元数据可见决策）仍属后续切片。
+- **不会**关闭 #1120：Chat incremental 真正跳过 `_execute_pipeline`（AC3）与运行元数据可见决策（AC4）仍属后续切片。factory / Chat / Analyze / CLI / Bot / MCP 仍未接线。
 
-生产路径今天仍使用进程级 `AGENT_ORCHESTRATOR_MODE`。非法配置值在 orchestrator 构造时会静默落到 `standard`；路由器与投影器**不**复制该 fail-open 行为。
+仪表盘 `run()` 失败关闭：投影或路由被拒绝时返回 `AgentResult(success=False)` 与公开执行失败文案，**不会**回退到构造时 mode。构造时配置的 mode 与 mode-budget limits 在成功、拒绝和所有异常路径上由 `finally` 恢复。Chat 仍始终调用 `_execute_pipeline`，仍使用构造时 mode。
 
 ## 输入
 
@@ -136,15 +136,29 @@ assert decision.mode == "standard"
 assert decision.chat_path == "full_repipeline"
 ```
 
+## 仪表盘 run 应用（第三切片）
+
+`AgentOrchestrator.run()` 从已解析的 StockScope 构造有界事实（`entry_kind=run`、`scope_mode`、标的代码），外加可选的显式 context `user_mode_override`。不读取 env/Settings、`report_type` 或 skills。接受路由后仅在本次 pipeline 设置 `self.mode`（及对应 mode-budget limits）。
+
+```python
+from src.agent.orchestrator import AgentOrchestrator
+
+orch = AgentOrchestrator(tool_registry=registry, llm_adapter=adapter, mode="quick")
+result = orch.run("analyze", {"stock_code": "600519"})
+assert orch.mode == "quick"  # 构造时 mode 已恢复
+```
+
+投影/路由拒绝时不调用 `_execute_pipeline`。Chat 行为不变。
+
 ## 剩余工作（#1120 保持开放）
 
-已落地：第一切片规则库；第二切片结构化事实投影。
+已落地：第一切片规则库；第二切片结构化事实投影；第三切片仪表盘 `run()` 应用（失败关闭，构造时 mode 恢复）。
 
 仍待后续：
 
-- 将投影器 + 路由器接入 orchestrator / factory / native adapter / analysis 与 Chat 入口（每 run 决策，而不是进程级 mode）。
-- Chat `incremental_tool` 必须真正避免 `_execute_pipeline`（AC3）。
+- 将投影器 + 路由器接入 factory / native adapter / analysis 与 Chat 入口（每 run 决策，而不是进程级 mode）。
+- Chat `incremental_tool` 必须真正避免 `_execute_pipeline`（AC3）。Chat 仍未接线，仍始终重新跑 pipeline。
 - 将 secret-free 决策写入 run-local 元数据（AC4）；episode 持久化需避开与 #1511 冲突。
 - 基于 miss-rate 的 outcome bias 归 #1091 / #1106，且须有样本阈值。
 
-回滚：删除本库模块、测试、changelog fragment 与本文档即可；无迁移、无配置键。
+回滚：先回退 `run()` 应用，再删除本库模块、测试、changelog fragment 与本文档即可；无迁移、无配置键。
