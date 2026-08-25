@@ -803,6 +803,17 @@ class TestOrchestratorModes(unittest.TestCase):
         names = [a.agent_name for a in chain]
         self.assertEqual(names, ["technical", "intel", "risk", "decision"])
 
+    def test_full_mode_chain_receives_owned_config(self):
+        orch = self._make_orchestrator("full")
+        ctx = AgentContext(query="test", stock_code="600519")
+        chain = orch._build_agent_chain(ctx)
+        self.assertEqual(
+            [a.agent_name for a in chain],
+            ["technical", "intel", "risk", "decision"],
+        )
+        for agent in chain:
+            self.assertIs(agent.config, orch.config)
+
     def test_non_chat_chain_preserves_declared_tools_outside_registry(self):
         from src.agent.orchestrator import AgentOrchestrator
         from src.agent.tools.registry import ToolRegistry
@@ -887,6 +898,15 @@ class TestOrchestratorModes(unittest.TestCase):
 
         self.assertIs(prepared, decision)
         self.assertEqual(prepared.max_steps, AGENT_MAX_STEPS_DEFAULT + 2)
+
+    def test_prepare_agent_assigns_owned_config(self):
+        orch = self._make_orchestrator("full")
+        agent = MagicMock(agent_name="technical", max_steps=6)
+
+        prepared = orch._prepare_agent(agent)
+
+        self.assertIs(prepared, agent)
+        self.assertIs(prepared.config, orch.config)
 
     def test_build_context_from_dict(self):
         orch = self._make_orchestrator()

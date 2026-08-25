@@ -398,6 +398,7 @@ class Config:
     agent_deep_research_timeout: int = 180  # Max seconds for /research command before returning timeout
     agent_memory_enabled: bool = False  # Enable memory & calibration system
     # Gated online evolution adapters wrapping AgentMemory (Issue #1091). Default off.
+    # When true, BaseAgent applies confidence calibration once (no double-multiply).
     agent_online_adapters_enabled: bool = False
     agent_online_adapters_min_samples: int = 30
     # Layered memory lifecycle (principal-scoped; minimize-by-default).

@@ -686,6 +686,7 @@ class AskCommand(BotCommand):
             agent = PortfolioAgent(
                 tool_registry=get_tool_registry(),
                 llm_adapter=LLMToolAdapter(config),
+                config=config,
             )
             stage_result = agent.run(ctx)
             if not stage_result.success:
