@@ -35,6 +35,12 @@ from .data_provider_binding import (
 )
 from .errors import PluginContextClosedError, PluginError, PluginRegistryError
 from .health import PluginHealthEntry, PluginHealthReport, build_plugin_health_report
+from .http import (
+    OutboundPolicyError,
+    plugin_safe_get,
+    plugin_safe_post,
+    plugin_safe_request,
+)
 from .lifecycle_audit import (
     PLUGIN_LIFECYCLE_EVENT_TYPE,
     LifecycleAuditRecorder,
@@ -146,6 +152,7 @@ __all__ = [
     "NotificationChannelRegistry",
     "NotificationChannelSnapshot",
     "NotificationRequest",
+    "OutboundPolicyError",
     "PERMISSION_ID_PATTERN",
     "PLUGIN_DATA_PROVIDER_AUTO_BIND_ENV",
     "PLUGIN_LIFECYCLE_EVENT_TYPE",
@@ -204,6 +211,9 @@ __all__ = [
     "find_undeclared_agent_tool_permissions",
     "resolve_data_provider_registry",
     "normalize_report_platform",
+    "plugin_safe_get",
+    "plugin_safe_post",
+    "plugin_safe_request",
     "try_build_auto_bound_registry",
     "undeclared_agent_tool_permissions",
     "validate_agent_tool_definition",

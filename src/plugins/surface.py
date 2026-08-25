@@ -65,5 +65,9 @@ PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS: Final[frozenset[str]] = frozenset(
         "PluginEvent",
         "EVENT_HOOK_NAMES",
         "EVENT_HOOK_SCHEMA_VERSION",
+        "OutboundPolicyError",
+        "plugin_safe_get",
+        "plugin_safe_post",
+        "plugin_safe_request",
     }
 )
