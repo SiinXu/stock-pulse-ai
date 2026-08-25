@@ -1,0 +1,1 @@
+- [Added] Feed resolved forecast outcomes into gated online adapter confidence calibration when sample thresholds are met (Refs #1106).
