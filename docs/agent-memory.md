@@ -15,20 +15,20 @@
 | `src/agent/memory_isolation.py` | Untrusted-data isolation for any future prompt path |
 | `src/schemas/memory_write_policy.py` | Library-only persist write admission over existing stores (#1119 Slice 1) |
 
-Existing `AgentMemory` / `BaseAgent` numeric calibration behavior is unchanged. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` history inject is default-off; when enabled, `BaseAgent._build_memory_context` wraps history lines with `isolate_untrusted_memory_body` and canonicalizes `signal` to `buy|hold|sell` (see [Threat notes](#threat-notes)).
+Existing `AgentMemory` numeric calibration behavior is unchanged when `AGENT_ONLINE_ADAPTERS_ENABLED` is off or missing. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` history inject is default-off; when enabled, `BaseAgent._build_memory_context` wraps history lines with `isolate_untrusted_memory_body` and canonicalizes `signal` to `buy|hold|sell` (see [Threat notes](#threat-notes)).
 
 ## Online evolution adapters (gated, default off)
 
-Library-only slice in `src/agent/evolution/adapters.py`. Production `BaseAgent` calibration is unchanged and must not be double-multiplied.
+Gated confidence apply in `BaseAgent._apply_memory_calibration` through `src/agent/evolution/adapters.py`. Flag off / missing keeps today's `AgentMemory` multiply. Flag on applies the stored `calibration_factor` **once** (no double-multiply). Tool ranking and route preference remain identity stubs.
 
 | Control | Default | Behavior |
 | --- | --- | --- |
-| `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | Master gate. When false, adapters are identity: raw confidence, input tool order, the same route, and no `adapter_influence` key on `AgentContext.meta`. |
-| `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | Minimum `AgentMemory` samples before confidence calibration applies. Below threshold: factor `1.0`, `applied=false`. |
+| `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | Master gate. When false or missing, `BaseAgent` keeps today's `AgentMemory` multiply, adapter helpers are identity (raw confidence, input tool order, the same route), and no `adapter_influence` key is written on `AgentContext.meta`. |
+| `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | Minimum `AgentMemory` samples before gated confidence calibration applies. Below threshold: factor `1.0`, `applied=false`, displayed confidence stays raw on the gated path. |
 
 Issue #1115 example `EVOLUTION_MIN_SAMPLES` is **not** an alias of `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`. Enable this adapter gate only as **step 5** of the [prediction verification safe rollout](prediction-verification-rollout_EN.md), after extraction, a single resolver worker or explicit CLI, and miss/partial-only postmortem. Auto-promote stays hard off; there is no `EVOLUTION_AUTO_PROMOTE_SKILLS` env key.
 
-When enabled and samples meet the adapter threshold, `calibrate_confidence` applies the stored `CalibrationResult.calibration_factor` from `AgentMemory.get_calibration` (and only when `calibrated` is true). AgentMemory already clamps `historical_accuracy / avg_confidence` to `0.5..1.5`, including a real `historical_accuracy=0.0`; the adapter must not re-derive that ratio with truthy fallbacks such as `accuracy or 0.5`. Confidence is then clamped to `[0,1]`. Sample source is existing `AGENT_MEMORY_ENABLED` / `AgentMemory`; this slice does not add a second store. Tool-effectiveness and route-preference are explicit identity stubs: they do not unlock denied ToolSurface tools and do not write `AGENT_ORCHESTRATOR_MODE`. Influence is recorded only on run-local `AgentContext.meta["adapter_influence"]` (not episodes).
+When enabled and samples meet the adapter threshold, `BaseAgent` routes displayed/decided confidence through `calibrate_confidence`, which applies the stored `CalibrationResult.calibration_factor` from `AgentMemory.get_calibration` (and only when `calibrated` is true). The gated call uses the existing adapter signature (`agent_name`, `stock_code`) and does not pass `skill_id`; the ungated path still passes `extract_skill_id(self.agent_name)`. AgentMemory already clamps `historical_accuracy / avg_confidence` to `0.5..1.5`, including a real `historical_accuracy=0.0`; the adapter must not re-derive that ratio with truthy fallbacks such as `accuracy or 0.5`. Confidence is then clamped to `[0,1]`. Sample source is existing `AGENT_MEMORY_ENABLED` / `AgentMemory`; this slice does not add a second store. Tool-effectiveness and route-preference are explicit identity stubs: they do not unlock denied ToolSurface tools and do not write `AGENT_ORCHESTRATOR_MODE`. Influence is recorded only on run-local `AgentContext.meta["adapter_influence"]` (not episodes). This slice does **not** implement real `rank_tools` scoring (#1123), `prefer_route` / AgentRouter (#1120), the forecast overlay hook (#1106), an EvolutionEvent producer (#1113), episode schema persistence, or promotion.
 
 ### Forecast-outcome overlay (gated, default off)
 
@@ -38,7 +38,7 @@ When adapters are on, `apply_forecast_outcome_calibration` in `src/agent/evoluti
 - `N < AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`: identity (`applied=false`, `reason=insufficient_samples`).
 - `N >=` threshold: forecast stats only. This slice does **not** blend `AgentMemory` / backtest stats with live forecast outcomes.
 - `data_unavailable`, unlabeled rows, invalid confidence, forward-return sidecar buckets (`1d_up` / …), and store failures are not samples and never fabricate hits.
-- Influence remains `AgentContext.meta["adapter_influence"]` only. `BaseAgent`, Soul, ToolSurface, episodes, prediction HTTP, and tool/route stubs are unchanged.
+- Influence remains `AgentContext.meta["adapter_influence"]` only. The overlay is still library-only: `BaseAgent` does **not** call `apply_forecast_outcome_calibration`. Soul, ToolSurface, episodes, prediction HTTP, and tool/route stubs are unchanged.
 
 ## Honest layer naming
 

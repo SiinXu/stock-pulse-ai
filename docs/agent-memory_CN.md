@@ -15,20 +15,20 @@
 | `src/agent/memory_isolation.py` | 面向 prompt 的不可信数据隔离 |
 | `src/schemas/memory_write_policy.py` | 仅库层、覆盖既有存储的写入准入（#1119 Slice 1） |
 
-既有 `AgentMemory` / `BaseAgent` 数值校准行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 历史注入默认关闭；开启时 `BaseAgent._build_memory_context` 用 `isolate_untrusted_memory_body` 包裹历史行，并将 `signal` 规范为 `buy|hold|sell`（见[威胁注释](#threat-notes)）。
+`AGENT_ONLINE_ADAPTERS_ENABLED` 关闭或缺失时，既有 `AgentMemory` 数值校准行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 历史注入默认关闭；开启时 `BaseAgent._build_memory_context` 用 `isolate_untrusted_memory_body` 包裹历史行，并将 `signal` 规范为 `buy|hold|sell`（见[威胁注释](#threat-notes)）。
 
 ## 在线进化适配器（默认关闭）
 
-仅库层切片，位于 `src/agent/evolution/adapters.py`。生产路径上的 `BaseAgent` 校准不变，本切片不得二次相乘。
+`BaseAgent._apply_memory_calibration` 经 `src/agent/evolution/adapters.py` 做门控置信度应用。开关关闭或配置缺失时保持今天的 `AgentMemory` 相乘。开启时对已存 `calibration_factor` **只应用一次**（不得二次相乘）。工具排序与路由偏好仍是恒等桩。
 
 | 控制项 | 默认值 | 行为 |
 | --- | --- | --- |
-| `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | 总开关。关闭时适配器为恒等：原始置信度、输入工具顺序、原路由，且不在 `AgentContext.meta` 写入 `adapter_influence`。 |
-| `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | 置信度校准生效所需的最少 `AgentMemory` 样本。低于阈值时因子为 `1.0`，`applied=false`。 |
+| `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | 总开关。关闭或缺失时 `BaseAgent` 走今天的 `AgentMemory` 相乘，适配器辅助函数为恒等（原始置信度、输入工具顺序、原路由），且不在 `AgentContext.meta` 写入 `adapter_influence`。 |
+| `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | 门控置信度校准生效所需的最少 `AgentMemory` 样本。低于阈值时因子为 `1.0`，`applied=false`，门控路径上展示置信度保持原始值。 |
 
 Issue #1115 示例名 `EVOLUTION_MIN_SAMPLES` **不是** `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` 的别名。只应作为 [预测核验安全放量](prediction-verification-rollout.md) 的 **第 5 步** 打开本适配器闸门：先抽取、再单 worker / 显式 CLI 解析器、再 miss/partial 后验。自动晋升保持硬关闭；没有 `EVOLUTION_AUTO_PROMOTE_SKILLS` 环境变量。
 
-开启且样本达到适配器阈值后，`calibrate_confidence` 使用 `AgentMemory.get_calibration` 已存的 `CalibrationResult.calibration_factor`（且仅在 `calibrated` 为真时生效）。AgentMemory 已将 `historical_accuracy / avg_confidence` 钳制到 `0.5..1.5`，其中 `historical_accuracy=0.0` 是真实的 0% 准确率；适配器不得再用 `accuracy or 0.5` 这类真值回退重算该比值。随后将置信度限制在 `[0,1]`。样本来源仍是既有 `AGENT_MEMORY_ENABLED` / `AgentMemory`，本切片不新增存储。工具有效性与路由偏好是显式恒等桩：不会解锁已拒绝的 ToolSurface 工具，也不会写入 `AGENT_ORCHESTRATOR_MODE`。影响只记录在运行期 `AgentContext.meta["adapter_influence"]`（不写入 episode）。
+开启且样本达到适配器阈值后，`BaseAgent` 把展示/决策置信度交给 `calibrate_confidence`，后者使用 `AgentMemory.get_calibration` 已存的 `CalibrationResult.calibration_factor`（且仅在 `calibrated` 为真时生效）。门控调用使用既有适配器签名（`agent_name`、`stock_code`），不传 `skill_id`；非门控路径仍传入 `extract_skill_id(self.agent_name)`。AgentMemory 已将 `historical_accuracy / avg_confidence` 钳制到 `0.5..1.5`，其中 `historical_accuracy=0.0` 是真实的 0% 准确率；适配器不得再用 `accuracy or 0.5` 这类真值回退重算该比值。随后将置信度限制在 `[0,1]`。样本来源仍是既有 `AGENT_MEMORY_ENABLED` / `AgentMemory`，本切片不新增存储。工具有效性与路由偏好是显式恒等桩：不会解锁已拒绝的 ToolSurface 工具，也不会写入 `AGENT_ORCHESTRATOR_MODE`。影响只记录在运行期 `AgentContext.meta["adapter_influence"]`（不写入 episode）。本切片 **不** 实现真正的 `rank_tools` 打分（#1123）、`prefer_route` / AgentRouter（#1120）、预测结果叠加挂钩（#1106）、EvolutionEvent 生产者（#1113）、episode schema 持久化或晋升。
 
 ### 预测结果叠加（默认关闭）
 
@@ -38,7 +38,7 @@ Issue #1115 示例名 `EVOLUTION_MIN_SAMPLES` **不是** `AGENT_ONLINE_ADAPTERS_
 - `N < AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`：恒等（`applied=false`，`reason=insufficient_samples`）。
 - `N >=` 阈值：只用预测结果统计。本切片 **不会** 把 `AgentMemory` / 回测统计与实盘预测结果混合。
 - `data_unavailable`、未标注行、无效置信度、远期收益 sidecar 分桶（`1d_up` 等）以及存储失败都不是样本，也绝不会伪造 hit。
-- 影响仍只写在 `AgentContext.meta["adapter_influence"]`。`BaseAgent`、Soul、ToolSurface、episode、预测 HTTP 以及工具/路由桩均不变。
+- 影响仍只写在 `AgentContext.meta["adapter_influence"]`。叠加层仍是仅库层：`BaseAgent` **不会**调用 `apply_forecast_outcome_calibration`。Soul、ToolSurface、episode、预测 HTTP 以及工具/路由桩均不变。
 
 ## 诚实命名
 

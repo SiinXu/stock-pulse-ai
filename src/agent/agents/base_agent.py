@@ -15,6 +15,12 @@ import time
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Dict, List, Optional
 
+from src.agent.evolution.adapters import (
+    DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES,
+    calibrate_confidence,
+    is_online_adapters_enabled,
+    record_adapter_influence,
+)
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.memory import AgentMemory
 from src.agent.protocols import (
@@ -377,8 +383,66 @@ class BaseAgent(ABC):
         )
         return f"{title}\n{isolated}\n{guardrail}"
 
+    def _resolve_online_adapter_config(self) -> Any:
+        """Load live config for the online-adapter gate. Missing config is off."""
+        try:
+            from src.config import get_config
+
+            return get_config()
+        except Exception:  # broad-exception: fallback_recorded - missing config keeps today's ungated multiply
+            return None
+
     def _apply_memory_calibration(self, ctx: AgentContext, opinion: AgentOpinion, result: StageResult) -> None:
-        """Adjust confidence using historical calibration when enabled."""
+        """Adjust confidence using historical calibration when enabled.
+
+        When ``AGENT_ONLINE_ADAPTERS_ENABLED`` is true, apply
+        ``calibrate_confidence`` exactly once and record run-local
+        ``adapter_influence``. Flag off or missing keeps today's
+        AgentMemory multiply and does not write adapter metadata.
+        """
+        config = self._resolve_online_adapter_config()
+        if is_online_adapters_enabled(config):
+            self._apply_gated_online_calibration(ctx, opinion, config)
+            return
+        self._apply_ungated_memory_calibration(ctx, opinion, result)
+
+    def _apply_gated_online_calibration(
+        self,
+        ctx: AgentContext,
+        opinion: AgentOpinion,
+        config: Any,
+    ) -> None:
+        """Apply stored calibration_factor once through the gated adapter."""
+        raw_min = getattr(
+            config,
+            "agent_online_adapters_min_samples",
+            DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES,
+        )
+        if raw_min is None:
+            raw_min = DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES
+        raw_confidence = opinion.confidence
+        adjusted, confidence_meta = calibrate_confidence(
+            raw_confidence,
+            memory=self.memory,
+            agent_name=self.agent_name,
+            stock_code=ctx.stock_code or None,
+            min_samples=raw_min,
+            config=config,
+        )
+        opinion.confidence = adjusted
+        record_adapter_influence(
+            ctx,
+            {"confidence": confidence_meta},
+            config=config,
+        )
+
+    def _apply_ungated_memory_calibration(
+        self,
+        ctx: AgentContext,
+        opinion: AgentOpinion,
+        result: StageResult,
+    ) -> None:
+        """Today's AgentMemory multiply when the online-adapter flag is off."""
         if not self.memory.enabled:
             return
 

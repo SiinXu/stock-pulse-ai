@@ -1,0 +1,1 @@
+- [Changed] Apply gated online confidence calibration in BaseAgent when AGENT_ONLINE_ADAPTERS_ENABLED is true, using AgentMemory.calibration_factor once with run-local adapter_influence and no double-multiply (Refs #1091).

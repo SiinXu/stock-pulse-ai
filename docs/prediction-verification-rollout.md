@@ -19,7 +19,7 @@
    - 应用 worker 保持 `PREDICTION_RESOLVE_ENABLED=false`，运行 `python -m src.services.prediction_resolver`（可选 `--limit`、`--worker-id`、`--json`）。
    手动 CLI 调用是 **有意的运营闸门**：即使调度开关关闭，CLI 也会执行一次 `tick()`。不要在每个应用副本上都注册后台 worker。
 4. **打开仅 miss/partial 的后验，并保持 skip-clean-hits。** 设置 `AGENT_POSTMORTEM_ENABLED=true`，保留 `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true`（默认）。命中不会入队。排空发生在非重叠 resolver tick 之后，受 `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK`（默认 `10`）限制。
-5. **仅在样本达到阈值后再打开门控适配器。** 只有 `AgentMemory` / 已解析预测样本能满足 `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`（默认 `30`）时，才设置 `AGENT_ONLINE_ADAPTERS_ENABLED=true`。低于阈值时适配器保持恒等（`applied=false`，`reason=insufficient_samples`）。
+5. **仅在样本达到阈值后再打开门控适配器。** 只有 `AgentMemory` / 已解析预测样本能满足 `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`（默认 `30`）时，才设置 `AGENT_ONLINE_ADAPTERS_ENABLED=true`。开启后 `BaseAgent` 对展示/决策置信度只应用一次已存 `calibration_factor`，并记录运行期 `adapter_influence`。低于阈值时门控路径保持恒等（`applied=false`，`reason=insufficient_samples`）。工具排序、路由偏好、预测结果叠加、EvolutionEvent 生产者和 episode 持久化仍不在本开关范围内。
 6. **自动晋升保持硬关闭。** 没有环境变量可以打开 skill 自动晋升。沙箱 `PromotionReceipt.auto_promote` 硬编码为 `false`，直到存在评估闸门。
 
 要停止 **新的** 核验工作且不破坏分析：把 enable 开关改回 `false`（或删除）。已写入的 `agent_predictions` pending 行会留在库中；分析路径不依赖它们。
@@ -55,7 +55,7 @@ Issue #1115 列出的是示例名（`e.g.`）。这些字符串 **不是** 已�
 | 自动晋升 | `PromotionReceipt` 与沙箱策略硬 `false`，直到存在评估闸门。不要臆造 `EVOLUTION_AUTO_PROMOTE_SKILLS=true`。 |
 | 手动 resolver CLI | `python -m src.services.prediction_resolver` 是有意的运营闸门。它会读取上限配置（租约、批次、拉取并发、熔断、后验预算）并执行一次 tick，**即使** `PREDICTION_RESOLVE_ENABLED` 为 false。调度开关只负责注册后台 worker。 |
 | 调度 vs CLI 后验注入 | 队列注入只看 `AGENT_POSTMORTEM_ENABLED`。**调度** 排空还需要 resolver worker（`PREDICTION_RESOLVE_ENABLED`）。CLI 排空不要求该调度开关。 |
-| 关闭开关 | 抽取关闭 → 钩子空操作。解析器调度关闭 → 不注册 `prediction_resolver` 后台任务（CLI 仍可用）。后验关闭 → 不注入 / 不排空队列。适配器关闭 → 恒等。上述情况下分析路径均继续。 |
+| 关闭开关 | 抽取关闭 → 钩子空操作。解析器调度关闭 → 不注册 `prediction_resolver` 后台任务（CLI 仍可用）。后验关闭 → 不注入 / 不排空队列。适配器关闭 → `BaseAgent` 保持今天的 `AgentMemory` 相乘，且不写入 `adapter_influence`。上述情况下分析路径均继续。 |
 
 ## 相关文档
 
