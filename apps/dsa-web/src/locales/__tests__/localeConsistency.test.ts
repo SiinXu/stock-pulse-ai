@@ -141,6 +141,7 @@ const CONTEXTUAL_STABLE_LITERALS_BY_KEY = new Map<string, readonly string[]>([
   ['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_ORCHESTRATOR_MODE.valueNotes.1', ['specialist']],
   ['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_SKILL_ROUTING.usage', ['auto', 'manual']],
   ['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_SKILL_ROUTING.valueNotes.0', ['auto', 'bull', 'bear', 'range']],
+  ['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_SKILL_RETRIEVAL_K.valueNotes.0', ['all']],
   ['locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.AGENT_SKILL_RETRIEVAL_K.notes.0', ['all', 'manual']],
   [
     'locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.context_compression.valueNotes.0',

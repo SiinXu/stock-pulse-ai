@@ -130,6 +130,7 @@ from src.agent.orchestrator_parts import disagreement as _disagreement
 from src.agent.orchestrator_parts.critic_revision import _CriticRevisionRunner
 from src.agent.orchestrator_parts.pipeline import (
     _PipelineMethods,
+    _select_specialist_skill_ids,
     _skill_instructions_for_run,
 )
 
