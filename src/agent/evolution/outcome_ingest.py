@@ -263,7 +263,7 @@ def apply_forecast_outcome_calibration(
             market=market,
             limit=FORECAST_OUTCOME_LIST_LIMIT,
         )
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - store lookup failure is logged and returns identity
         log_safe_exception(
             logger,
             "Forecast outcome overlay store lookup failed",
