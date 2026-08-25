@@ -90,6 +90,12 @@ Registering an unsupported extension point fails closed with
   permission sandbox in surface v1 (trusted in-process code only).
 - Additive optional fields and event names may stay within major `1`; removals,
   renames, type changes, or semantic changes require a new contract major.
+- Additive author HTTP helpers (`plugin_safe_get`, `plugin_safe_post`,
+  `plugin_safe_request`, `OutboundPolicyError`) stay within major `1`. They
+  wrap the host outbound policy so `LOCAL_ONLY_MODE` can deny non-loopback
+  plugin HTTP. They are **not** a seventh extension point and **not** a
+  sandbox: in-process plugins can still import `socket` or a raw HTTP client.
+  Bundled and example plugin trees are scanned for those direct clients.
 
 ### Runnable reference packages
 

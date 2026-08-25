@@ -52,7 +52,7 @@ Until a multi-user model ships ([#230](https://github.com/SiinXu/stock-pulse-ai/
 | Setting `PLUGINS_DIR` | Opts into **arbitrary Python** discovered under that directory, running with the **same OS privileges** as the StockPulse process |
 | Not claimed | Marketplace download, dependency install sandbox, browser-extension isolation, or separate-process permission sandbox |
 
-Plugins can reach environment variables, secrets, databases, filesystem paths, and outbound network paths that the process itself can use. Only load packages you trust as if you installed them into the application tree. Full contract: [Plugin extension contract](plugin-extension-contract.md) (operator trust boundary and six extension points). Skill/strategy YAML packages are declarative analysis input; they are not a substitute for reviewing system plugins.
+Plugins can reach environment variables, secrets, databases, filesystem paths, and outbound network paths that the process itself can use. Only load packages you trust as if you installed them into the application tree. Plugin HTTP that uses `plugin_safe_get` / `plugin_safe_request` honors `LOCAL_ONLY_MODE`; this is a contract plus a bundled/example-plugin detector, not a process sandbox. Full contract: [Plugin extension contract](plugin-extension-contract.md) (operator trust boundary and six extension points). Skill/strategy YAML packages are declarative analysis input; they are not a substitute for reviewing system plugins.
 
 ### 3. Public bind, reverse proxy, and auth-disabled behavior
 

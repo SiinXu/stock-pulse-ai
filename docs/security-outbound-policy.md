@@ -98,6 +98,7 @@ Typical reasons include:
 ## Limits
 
 - The policy governs HTTP(S). SMTP, database protocols, and WebSocket connections have separate libraries and are not converted into HTTP policy exceptions.
+- Trusted plugins run in-process. Sanctioned plugin HTTP is `plugin_safe_get` / `plugin_safe_request` from `src.plugins`, which uses this same policy (including `LOCAL_ONLY_MODE`). Direct `requests` / `urllib.request` / `httpx` usage in bundled and example plugins is flagged by tests. This is not a sandbox: a plugin can still import `socket` and bypass the wrapper.
 - Third-party SDKs that use an explicit model base URL are guarded during their DNS activity. Provider SDK traffic with no caller-selected base URL continues to use the provider library's fixed service contract.
 - DNS checks protect the destination selected by the application. They do not replace host firewall rules, container/network egress controls, or cloud-level service controls.
 - An allowlist is a deliberate trust decision, not a discovery mechanism. Do not add a broad shared hostname merely to silence a rejection.
