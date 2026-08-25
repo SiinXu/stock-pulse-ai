@@ -38,7 +38,12 @@ StockPulse 插件允许**可信运维方**在不 fork 主程序的前提下，�
 - 无远程应用商店或自动下载；
 - 无插件依赖安装器；
 - manifest `permissions` 是声明而非进程沙箱；`agent_tool` 在 load/enable 时做声明子集校验（非权限隔离）；
-- 无热加载（修改后需重启进程）。
+- 无热加载（修改后需重启进程）；
+- 无网络沙箱：插件与宿主同进程。出站 HTTP 必须使用 `src.plugins` 上的
+  `plugin_safe_get` / `plugin_safe_post` / `plugin_safe_request`，以便
+  `LOCAL_ONLY_MODE` 拦截非回环出站。捆绑/示例插件中的直接 `requests` /
+  `urllib.request` / `httpx` 用法由测试标记。恶意插件仍可 `import socket`
+  绕过该 wrapper。
 
 启用任何包前请逐行审阅。生产环境默认保持 `PLUGINS_DIR` 未设置，除非包已审阅并固定。
 运维信任边界亦见
@@ -178,6 +183,8 @@ NaN 与正负 Infinity 都会 fail-closed，且不会改变持久化文件。
 外部插件应只导入：
 
 1. `src.plugins` 上 `PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS` 列出的名称
+   （含 `plugin_safe_get`、`plugin_safe_post`、`plugin_safe_request`、
+   `OutboundPolicyError`）
 2. 数据源用的 `src.data_provider.DataProvider` / `DataProviderRegistration`
 3. 特定扩展点需要、但不在插件包根导出的宿主类型：
    - `analysis_strategy`：`src.agent.skills.base.Skill`
