@@ -38,6 +38,7 @@ from src.agent.soul import (
 from src.agent.skills.engine import StrategyResultStatus
 from src.agent.stream_events import stream_event
 from src.agent.deliberation_scheduler import AgentSkillScheduler, SkillBatchResult
+from src.agent.skills.router import skill_instructions_for_run as _skill_instructions_for_run
 from src.agent.tools.registry import ToolRegistry
 from src.utils.sanitize import log_safe_exception
 
@@ -396,7 +397,7 @@ class _PipelineMethods:
                     critic_agent = self._prepare_agent(_critic.BoundedCriticAgent(
                         tool_registry=self._tool_registry_for_context(ctx),
                         llm_adapter=self.llm_adapter,
-                        skill_instructions=self.skill_instructions,
+                        skill_instructions=_skill_instructions_for_run(self, ctx),
                         technical_skill_policy=self.technical_skill_policy,
                     ))
                     critic_agent.max_steps = _critic.CRITIC_MAX_STEPS
@@ -1087,7 +1088,7 @@ class _PipelineMethods:
         common_kwargs = dict(
             tool_registry=tool_registry,
             llm_adapter=self.llm_adapter,
-            skill_instructions=self.skill_instructions,
+            skill_instructions=_skill_instructions_for_run(self, ctx),
             technical_skill_policy=self.technical_skill_policy,
         )
 
@@ -1157,21 +1158,40 @@ class _PipelineMethods:
         lightweight agent wrappers for each.
         """
         try:
-            from src.agent.skills.router import SkillRouter
+            from src.agent.skills.router import SkillRouter, _context_has_requested_skills
             tool_registry = self._tool_registry_for_context(ctx)
+            if _context_has_requested_skills(ctx):
+                selected = SkillRouter(
+                    skill_manager=self.skill_manager,
+                    config=self.config,
+                ).select_skills(ctx)
+            elif getattr(self, "explicit_skill_selection", False):
+                selected = [
+                    skill.name
+                    for skill in (
+                        self.skill_manager.list_active_skills()
+                        if self.skill_manager is not None
+                        else []
+                    )
+                ]
+            else:
+                selected = SkillRouter(
+                    skill_manager=self.skill_manager,
+                    config=self.config,
+                ).select_skills(ctx)
+            if not selected:
+                return []
+
             common_kwargs = dict(
                 tool_registry=tool_registry,
                 llm_adapter=self.llm_adapter,
-                skill_instructions=self.skill_instructions,
+                skill_instructions=_skill_instructions_for_run(
+                    self,
+                    ctx,
+                    selected=selected,
+                ),
                 technical_skill_policy=self.technical_skill_policy,
             )
-            router = SkillRouter(
-                skill_manager=self.skill_manager,
-                config=self.config,
-            )
-            selected = router.select_skills(ctx)
-            if not selected:
-                return []
 
             from src.agent.skills.skill_agent import SkillAgent
             agents = []

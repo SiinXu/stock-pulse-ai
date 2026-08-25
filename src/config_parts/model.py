@@ -427,6 +427,8 @@ class Config:
     agent_planning_on_step_failure: str = "replan"  # replan | terminate
     agent_skill_autoweight: bool = True  # Auto-weight skills by backtest performance
     agent_skill_routing: str = "auto"  # Skill routing: 'auto' (regime-based) or 'manual'
+    # Catalog-description skill retrieval K (#1123 Slice A). 0 disables (current router).
+    agent_skill_retrieval_k: int = 0
     market_regime_enabled: bool = True  # Explainable market-regime detection (Issue #220)
     market_regime_override: str = ""  # Optional forced regime label; empty = auto
     agent_context_compression_enabled: bool = False  # Compress visible chat history before Agent calls

@@ -128,7 +128,10 @@ from src.agent.orchestrator_parts.dashboard import (
 from src.agent.orchestrator_parts.execution import _ExecutionMethods
 from src.agent.orchestrator_parts import disagreement as _disagreement
 from src.agent.orchestrator_parts.critic_revision import _CriticRevisionRunner
-from src.agent.orchestrator_parts.pipeline import _PipelineMethods
+from src.agent.orchestrator_parts.pipeline import (
+    _PipelineMethods,
+    _skill_instructions_for_run,
+)
 
 if TYPE_CHECKING:
     from src.agent.executor import AgentResult
@@ -291,6 +294,7 @@ class AgentOrchestrator:
         skill_manager=None,
         config=None,
         runtime_guard_policy: Optional[RuntimeGuardPolicy] = None,
+        explicit_skill_selection: bool = False,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
@@ -301,6 +305,7 @@ class AgentOrchestrator:
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
         self.skill_manager = skill_manager
         self.config = config
+        self.explicit_skill_selection = bool(explicit_skill_selection)
         from src.agent.disagreement_handling import disagreement_handling_thresholds
 
         high_threshold, medium_threshold = disagreement_handling_thresholds(config)

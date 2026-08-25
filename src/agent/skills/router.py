@@ -4,8 +4,10 @@ SkillRouter — rule-based skill selection.
 
 Selects which trading skills to apply based on:
 1. User-explicit request (highest priority)
-2. Market regime detection from technical data in ``AgentContext``
-3. Centralised default fallback
+2. Manual ``AGENT_SKILLS`` when routing mode is manual
+3. Optional catalog-description retrieval (``AGENT_SKILL_RETRIEVAL_K`` > 0)
+4. Market regime detection from technical data in ``AgentContext``
+5. Centralised default fallback
 """
 
 from __future__ import annotations
@@ -18,6 +20,13 @@ from src.agent.skills.defaults import (
     get_default_router_skill_ids,
     get_regime_skill_ids,
 )
+from src.agent.skills.retrieval import (
+    build_skill_retrieval_query,
+    load_optional_skill_performance_prior,
+    record_retrieved_skill_ids,
+    resolve_skill_retrieval_k,
+    retrieve_skills,
+)
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -26,9 +35,18 @@ logger = logging.getLogger(__name__)
 class SkillRouter:
     """Select applicable skills for a given analysis context."""
 
-    def __init__(self, *, skill_manager=None, config=None) -> None:
+    def __init__(
+        self,
+        *,
+        skill_manager=None,
+        config=None,
+        memory=None,
+        explicit_selection: bool = False,
+    ) -> None:
         self._skill_manager = skill_manager
         self._config = config
+        self._memory = memory
+        self._explicit_selection = bool(explicit_selection)
 
     def select_skills(
         self,
@@ -54,6 +72,27 @@ class SkillRouter:
         available_skills = self._get_available_skills(self._skill_manager)
         skill_catalog = available_skills or None
         available_ids = {skill.name for skill in available_skills}
+        retrieval_k = resolve_skill_retrieval_k(self._config)
+        if retrieval_k > 0 and not self._explicit_selection:
+            effective_k = retrieval_k if max_count < 0 else min(retrieval_k, max_count)
+            if effective_k <= 0:
+                return []
+            selected = self._select_retrieved_skills(
+                ctx,
+                available_skills=available_skills,
+                skill_catalog=skill_catalog,
+                available_ids=available_ids,
+                retrieval_k=effective_k,
+            )
+            record_retrieved_skill_ids(ctx, selected)
+            logger.info(
+                "[SkillRouter] retrieval k=%s max_count=%s -> skills: %s",
+                retrieval_k,
+                max_count,
+                selected,
+            )
+            return selected
+
         regime = self._detect_regime(ctx)
         if regime:
             selected = get_regime_skill_ids(
@@ -174,6 +213,46 @@ class SkillRouter:
             )
             return []
 
+    def _select_retrieved_skills(
+        self,
+        ctx: AgentContext,
+        *,
+        available_skills: list,
+        skill_catalog,
+        available_ids: set,
+        retrieval_k: int,
+    ) -> List[str]:
+        """Description retrieval for the automatic/regime/default path."""
+        regime = self._detect_regime(ctx)
+        query = build_skill_retrieval_query(ctx, regime)
+        prior = load_optional_skill_performance_prior(
+            available_skills,
+            memory=self._memory,
+        )
+        selected = retrieve_skills(
+            query,
+            available_skills,
+            k=retrieval_k,
+            performance_prior=prior or None,
+        )
+        if not selected:
+            selected = get_default_router_skill_ids(
+                skill_catalog,
+                max_count=retrieval_k,
+                available_skill_ids=available_ids or None,
+            )
+        selected = self._filter_for_context(selected, ctx)[:retrieval_k]
+        if selected:
+            return selected
+        return self._filter_for_context(
+            get_default_router_skill_ids(
+                skill_catalog,
+                max_count=retrieval_k,
+                available_skill_ids=available_ids or None,
+            ),
+            ctx,
+        )[:retrieval_k]
+
     def _filter_for_context(
         self,
         skill_ids: Sequence[str],
@@ -281,6 +360,106 @@ class SkillRouter:
             max_count=max_count,
             available_skill_ids=available or None,
         )
+
+
+def _context_has_requested_skills(ctx: AgentContext) -> bool:
+    meta = getattr(ctx, "meta", None) or {}
+    if not isinstance(meta, dict):
+        return False
+    requested = meta.get("skills_requested") or meta.get("strategies_requested") or []
+    return bool(requested)
+
+
+def skill_instructions_for_run(owner, ctx: AgentContext, selected=None) -> str:
+    """Render this run's instructions locally. Do not mutate owner state.
+
+    Hierarchy matches SkillRouter: context-local skills_requested wins;
+    otherwise explicit factory/config selection returns the pre-resolved dump
+    verbatim; only implicit auto uses description retrieval.
+    """
+    fallback = getattr(owner, "skill_instructions", "") or ""
+    try:
+        skill_manager = getattr(owner, "skill_manager", None)
+        if _context_has_requested_skills(ctx):
+            if skill_manager is None:
+                return fallback
+            if selected is None:
+                selected = SkillRouter(
+                    skill_manager=skill_manager,
+                    config=getattr(owner, "config", None),
+                ).select_skills(ctx)
+            return skill_manager.get_skill_instructions(selected)
+        if getattr(owner, "explicit_skill_selection", False):
+            return fallback
+        if resolve_skill_retrieval_k(getattr(owner, "config", None)) <= 0:
+            return fallback
+        if skill_manager is None:
+            return fallback
+        if selected is None:
+            selected = SkillRouter(
+                skill_manager=skill_manager,
+                config=getattr(owner, "config", None),
+            ).select_skills(ctx)
+        return skill_manager.get_skill_instructions(selected)
+    except Exception as exc:  # broad-exception: fallback_recorded - keep pre-resolved prompt.
+        log_safe_exception(
+            logger,
+            "Skill retrieval instructions failed; keeping factory skill dump",
+            exc,
+            error_code="agent_skill_retrieval_instructions_failed",
+            level=logging.WARNING,
+        )
+        return fallback
+
+
+def skill_instructions_for_native_task(owner, query: str, context=None) -> str:
+    """Native run/chat instructions.
+
+    Context-local skills_requested wins over factory/config selection.
+    Explicit factory dump is used only when the call has no request.
+    Implicit auto + K>0 uses the real task/query. Failures keep the factory dump.
+    """
+    from types import SimpleNamespace
+
+    fallback = getattr(owner, "skill_instructions", "") or ""
+    try:
+        from src.agent.factory import get_skill_manager
+
+        payload = dict(context or {})
+        meta: dict = {}
+        raw_meta = payload.get("meta")
+        if isinstance(raw_meta, dict):
+            meta.update(raw_meta)
+        for key in ("skills_requested", "strategies_requested"):
+            if key in payload and key not in meta:
+                meta[key] = payload[key]
+        run_ctx = AgentContext(
+            query=str(payload.get("query") or query or ""),
+            stock_code=str(payload.get("stock_code") or ""),
+            stock_name=str(payload.get("stock_name") or ""),
+            meta=meta,
+        )
+        skill_manager = getattr(owner, "skill_manager", None)
+        if skill_manager is None:
+            skill_manager = get_skill_manager(getattr(owner, "config", None))
+        proxy = SimpleNamespace(
+            skill_instructions=fallback,
+            skill_manager=skill_manager,
+            config=getattr(owner, "config", None),
+            explicit_skill_selection=bool(
+                getattr(owner, "explicit_skill_selection", False)
+            ),
+        )
+        return skill_instructions_for_run(proxy, run_ctx)
+    except Exception as exc:  # broad-exception: fallback_recorded - keep pre-resolved prompt.
+        log_safe_exception(
+            logger,
+            "Native skill retrieval failed; keeping factory skill dump",
+            exc,
+            error_code="agent_skill_retrieval_native_failed",
+            level=logging.WARNING,
+        )
+        return fallback
 
 
 StrategyRouter = SkillRouter
