@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 from src.config import Config
 from src.migrations.registry import (
     AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
+    AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION,
     AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
     get_migrations,
 )
@@ -156,7 +157,7 @@ def test_fresh_database_applies_forward_return_schema(isolated_db) -> None:
         )
     assert "ck_agent_episode_forward_returns_bucket" in ddl
     assert "uix_agent_episode_forward_returns_episode_horizon" in ddl
-    assert get_migrations()[-1].id == AGENT_CURATOR_GRADE_SCHEMA_MIGRATION.id
+    assert get_migrations()[-1].id == AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id
     assert AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id in {
         migration.id for migration in get_migrations()
     }
