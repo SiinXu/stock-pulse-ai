@@ -39,22 +39,23 @@ type SettingsPageToastsProps = {
 };
 
 const SettingsPageToasts: React.FC<SettingsPageToastsProps> = (props) => {
+  const { toast, clearToast } = props;
   const settingsText = SETTINGS_PAGE_TEXT[props.uiLanguage];
   const [isToastPaused, setIsToastPaused] = useState(false);
 
   useEffect(() => {
-    if (!props.toast || props.toast.type !== 'success' || isToastPaused) {
+    if (!toast || toast.type !== 'success' || isToastPaused) {
       return;
     }
 
     const timer = window.setTimeout(() => {
-      props.clearToast();
+      clearToast();
     }, 3200);
 
     return () => {
       window.clearTimeout(timer);
     };
-  }, [props.clearToast, isToastPaused, props.toast]);
+  }, [clearToast, isToastPaused, toast]);
 
   if (!(
     props.showErrorSummary

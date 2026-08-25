@@ -12,7 +12,6 @@ import {
   AiTaskRoutingCard,
   AiReliabilityCard,
 } from '../AiModelsViewCards';
-import { SETTINGS_ROUTE_QUERY_KEYS } from '../../../routing/routes';
 import type { ModelAccessFieldFocusRequest } from '../../../utils/modelAccessFieldKey';
 import type { UiLanguage } from '../../../i18n/uiText';
 import { SETTINGS_PAGE_TEXT } from '../../../locales/settingsPage';
