@@ -15,10 +15,21 @@ export type LocalOnlyModeStatusState =
   | { status: 'off' }
   | { status: 'on' };
 
-export function useLocalOnlyModeStatus(): LocalOnlyModeStatusState {
+export type UseLocalOnlyModeStatusOptions = {
+  /** Playground preview skips the live endpoint. */
+  enabled?: boolean;
+};
+
+export function useLocalOnlyModeStatus(
+  options: UseLocalOnlyModeStatusOptions = {},
+): LocalOnlyModeStatusState {
+  const fetchEnabled = options.enabled ?? true;
   const [state, setState] = useState<LocalOnlyModeStatusState>({ status: 'unknown' });
 
   useEffect(() => {
+    if (!fetchEnabled) {
+      return undefined;
+    }
     let cancelled = false;
     void outboundActivityApi.getLocalOnlyStatus()
       .then((result) => {
@@ -32,7 +43,7 @@ export function useLocalOnlyModeStatus(): LocalOnlyModeStatusState {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [fetchEnabled]);
 
   return state;
 }

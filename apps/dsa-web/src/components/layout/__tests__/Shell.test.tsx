@@ -143,11 +143,21 @@ describe('Shell', () => {
     expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
   });
 
-  it('surfaces Local Only in the shell when enabled and opens Auth & Security', () => {
+  it('keeps the notification bell immediate while Local Only chrome is still pending', () => {
     localOnlyModeState.status = 'on';
     renderShell();
 
-    const indicator = screen.getByTestId('shell-local-only-indicator');
+    expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1);
+    expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
+  });
+
+  it('surfaces Local Only in the shell when enabled and opens Auth & Security', async () => {
+    localOnlyModeState.status = 'on';
+    renderShell();
+
+    expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1);
+    const indicator = await screen.findByTestId('shell-local-only-indicator');
+    expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1);
     expect(indicator).toHaveAttribute('href', buildLocalOnlyModeSettingsHref());
     fireEvent.click(indicator);
     expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(

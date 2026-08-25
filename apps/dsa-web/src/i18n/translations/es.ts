@@ -1045,7 +1045,6 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "Navegación en la barra lateral del escritorio",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "Expandir menú de {label}",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "Expandir la barra lateral",
-  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "El modo solo local está activado. Abra Configuración para revisar este modo.",
   "i18n.uiText.UI_TEXT.layout.logout": "Cerrar sesión",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "Cerrar sesión",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "¿Cerrar la sesión actual? Tendrás que volver a introducir la contraseña.",

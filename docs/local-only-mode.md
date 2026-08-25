@@ -78,6 +78,7 @@ LOCAL_ONLY_MODE=true
 | 状态 API | `GET /api/v1/security/local-only` |
 | 活动 API | `GET /api/v1/security/outbound-activity` |
 | Web 面板 | 设置 → 认证与安全 → 出站活动 |
+| Web 应用壳层 | 认证后的顶栏/侧栏指示器：仅当 `GET /api/v1/security/local-only` 报告已启用时显示，并打开设置 → 认证与安全的 `LOCAL_ONLY_MODE`。未知或请求失败时不显示。 |
 | 自动化证明 | `tests/security/test_local_only_mode.py`（分析路径夹具：零非回环允许） |
 | 插件 HTTP 契约 | `tests/plugins/test_plugin_outbound_http.py`（受支持 helper 被拦截；直接客户端守卫；分析隔离） |
 

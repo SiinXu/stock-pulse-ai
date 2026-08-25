@@ -7,7 +7,7 @@ import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { useLocalOnlyModeStatus } from '../../hooks/useLocalOnlyModeStatus';
 import { cn } from '../../utils/cn';
 import { Tooltip } from '../common/Tooltip';
-import { buildLocalOnlyModeSettingsHref } from './localOnlyMode';
+import { buildLocalOnlyModeSettingsHref, localOnlyModeFieldTitle } from './localOnlyMode';
 
 export type LocalOnlyModeIndicatorProps = {
   className?: string;
@@ -19,15 +19,15 @@ export const LocalOnlyModeIndicator: React.FC<LocalOnlyModeIndicatorProps> = ({
   className,
   previewStatus,
 }) => {
-  const { t } = useUiLanguage();
-  const fetched = useLocalOnlyModeStatus();
+  const { language } = useUiLanguage();
+  const fetched = useLocalOnlyModeStatus({ enabled: previewStatus === undefined });
   const status = previewStatus ?? fetched.status;
 
   if (status !== 'on') {
     return null;
   }
 
-  const hint = t('layout.localOnlyModeOpenSettings');
+  const hint = localOnlyModeFieldTitle(language);
 
   return (
     <Tooltip content={hint} className={className}>
@@ -45,3 +45,5 @@ export const LocalOnlyModeIndicator: React.FC<LocalOnlyModeIndicatorProps> = ({
     </Tooltip>
   );
 };
+
+export default LocalOnlyModeIndicator;

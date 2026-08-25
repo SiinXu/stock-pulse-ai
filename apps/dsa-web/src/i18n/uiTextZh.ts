@@ -113,7 +113,6 @@ export const zh = {
   'layout.logoutConfirm': '确认退出',
   'layout.logoutMessage': '确认退出当前登录状态吗？退出后需要重新输入密码。',
   'layout.logoutTitle': '退出登录',
-  'layout.localOnlyModeOpenSettings': '本地专用模式已开启。打开设置查看该模式说明。',
 
   'usage.breakdown': 'Breakdown',
   'usage.completionLabel': 'Completion',

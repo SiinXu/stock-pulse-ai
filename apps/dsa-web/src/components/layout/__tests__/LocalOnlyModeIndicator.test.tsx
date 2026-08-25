@@ -5,9 +5,16 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { outboundActivityApi } from '../../../api/outboundActivity';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { ADDITIONAL_UI_LANGUAGES } from '../../../i18n/uiLanguages';
+import { loadUiLanguageTranslations } from '../../../i18n/translations';
 import type { LocalOnlyModeStatus } from '../../../types/outboundActivity';
+import { getFieldTitle } from '../../../utils/systemConfigI18n';
 import { LocalOnlyModeIndicator } from '../LocalOnlyModeIndicator';
-import { buildLocalOnlyModeSettingsHref } from '../localOnlyMode';
+import {
+  buildLocalOnlyModeSettingsHref,
+  LOCAL_ONLY_MODE_FIELD_KEY,
+  localOnlyModeFieldTitle,
+} from '../localOnlyMode';
 
 vi.mock('../../../api/outboundActivity', () => ({
   outboundActivityApi: {
@@ -36,10 +43,10 @@ function LocationProbe() {
   return <output aria-label="current location">{`${location.pathname}${location.search}`}</output>;
 }
 
-function renderIndicator() {
+function renderIndicator(language: 'en' | 'zh' | 'de' = 'en') {
   return render(
     <MemoryRouter initialEntries={['/']}>
-      <UiLanguageProvider initialLanguage="en">
+      <UiLanguageProvider initialLanguage={language}>
         <LocalOnlyModeIndicator />
         <LocationProbe />
       </UiLanguageProvider>
@@ -58,7 +65,8 @@ describe('LocalOnlyModeIndicator', () => {
 
     const indicator = await screen.findByTestId('shell-local-only-indicator');
     expect(indicator).toHaveAttribute('data-local-only-mode', 'on');
-    expect(indicator).toHaveAttribute('aria-label', 'Local Only Mode is on. Open Settings to review this mode.');
+    expect(indicator).toHaveAttribute('aria-label', localOnlyModeFieldTitle('en'));
+    expect(indicator).toHaveAttribute('aria-label', 'Local Only Mode');
     expect(indicator).toHaveAttribute('href', buildLocalOnlyModeSettingsHref());
     expect(indicator.getAttribute('aria-label') ?? '').not.toMatch(
       /airtight|every destination|all outbound|protected|blocked/i,
@@ -95,5 +103,33 @@ describe('LocalOnlyModeIndicator', () => {
 
     expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
     expect(screen.queryByText(/Local Only/i)).not.toBeInTheDocument();
+  });
+
+  it('resolves the existing Local Only field title for every extra locale', async () => {
+    await Promise.all(ADDITIONAL_UI_LANGUAGES.map((language) => loadUiLanguageTranslations(language)));
+    const titles = ADDITIONAL_UI_LANGUAGES.map((language) => ({
+      language,
+      title: localOnlyModeFieldTitle(language),
+      catalog: getFieldTitle(LOCAL_ONLY_MODE_FIELD_KEY, undefined, language),
+    }));
+    for (const { language, title, catalog } of titles) {
+      expect(title.trim().length, `field title for ${language}`).toBeGreaterThan(0);
+      expect(title, `field title for ${language}`).toBe(catalog);
+      expect(title, `field title for ${language}`).not.toMatch(
+        /airtight|every destination|all outbound|protected|blocked/i,
+      );
+    }
+    expect(localOnlyModeFieldTitle('en')).toBe(getFieldTitle(LOCAL_ONLY_MODE_FIELD_KEY, undefined, 'en'));
+    expect(localOnlyModeFieldTitle('zh')).toBe(getFieldTitle(LOCAL_ONLY_MODE_FIELD_KEY, undefined, 'zh'));
+    expect(localOnlyModeFieldTitle('de')).toBe('Nur-lokal-Modus');
+  });
+
+  it('renders the German catalog field title after extra-locale load', async () => {
+    await loadUiLanguageTranslations('de');
+    getLocalOnlyStatus.mockResolvedValue(ENABLED_STATUS);
+    renderIndicator('de');
+
+    const indicator = await screen.findByTestId('shell-local-only-indicator');
+    expect(indicator).toHaveAttribute('aria-label', 'Nur-lokal-Modus');
   });
 });

@@ -1045,7 +1045,6 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "Navigation in der Seitenleiste des Desktops",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "Menü {label} ausklappen",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "Seitenleiste erweitern",
-  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "Nur-lokal-Modus ist an. Öffnen Sie die Einstellungen, um diesen Modus zu prüfen.",
   "i18n.uiText.UI_TEXT.layout.logout": "Abmelden",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "Abmelden",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "Möchten Sie sich von der aktuellen Sitzung abmelden? Sie müssen das Passwort anschließend erneut eingeben.",

@@ -50,4 +50,13 @@ describe('useLocalOnlyModeStatus', () => {
     await waitFor(() => expect(getLocalOnlyStatus).toHaveBeenCalledTimes(1));
     expect(result.current).toEqual({ status: 'unknown' });
   });
+
+  it('does not call the live endpoint when preview disables fetching', async () => {
+    const { result } = renderHook(() => useLocalOnlyModeStatus({ enabled: false }));
+
+    expect(result.current).toEqual({ status: 'unknown' });
+    await Promise.resolve();
+    expect(getLocalOnlyStatus).not.toHaveBeenCalled();
+    expect(result.current).toEqual({ status: 'unknown' });
+  });
 });

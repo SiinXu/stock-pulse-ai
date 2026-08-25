@@ -1045,7 +1045,6 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "Navigation dans la barre latérale du bureau",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "Développer le menu {label}",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "Agrandir la barre latérale",
-  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "Le mode local uniquement est activé. Ouvrez les Paramètres pour examiner ce mode.",
   "i18n.uiText.UI_TEXT.layout.logout": "Se déconnecter",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "Confirmer la déconnexion",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "Se déconnecter de la session actuelle ? Vous devrez ensuite saisir à nouveau votre mot de passe.",

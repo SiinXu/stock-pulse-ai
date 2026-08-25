@@ -114,7 +114,6 @@ export const en: Record<UiTextKey, string> = {
   'layout.logoutConfirm': 'Log out',
   'layout.logoutMessage': 'Log out of the current session? You will need to enter the password again.',
   'layout.logoutTitle': 'Log out',
-  'layout.localOnlyModeOpenSettings': 'Local Only Mode is on. Open Settings to review this mode.',
 
   'usage.breakdown': 'Breakdown',
   'usage.completionLabel': 'Completion',

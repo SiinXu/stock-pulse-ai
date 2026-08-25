@@ -6,7 +6,6 @@ import { Drawer } from '../common/Drawer';
 import { IconButton } from '../common/IconButton';
 import { CommandPalette, useCommandPaletteShortcut } from '../command-palette';
 import { NotificationBell } from '../notifications';
-import { LocalOnlyModeIndicator } from './LocalOnlyModeIndicator';
 import { SidebarNav } from './SidebarNav';
 import { SidebarProfile } from './SidebarProfile';
 import { cn } from '../../utils/cn';
@@ -63,6 +62,17 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const desktopSidebar = useMediaQuery(DESKTOP_SIDEBAR_QUERY);
   const compactSidebar = useMediaQuery(COMPACT_SIDEBAR_QUERY);
   const sidebarCollapsed = collapsedPreference ?? compactSidebar;
+  const [LocalOnlyModeIndicator, setLocalOnlyModeIndicator] = useState<React.ComponentType<{ className?: string }> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void import('./LocalOnlyModeIndicator').then((module) => {
+      if (!cancelled) setLocalOnlyModeIndicator(() => module.default);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
@@ -161,7 +171,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
         </span>
         {!desktopSidebar ? (
           <>
-            <LocalOnlyModeIndicator className="pointer-events-auto" />
+            {LocalOnlyModeIndicator ? <LocalOnlyModeIndicator className="pointer-events-auto" /> : null}
             <NotificationBell className="pointer-events-auto" placement="bottom" />
           </>
         ) : null}
@@ -195,7 +205,7 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
             onOpenCommandPalette={openCommandPalette}
             globalActions={desktopSidebar ? (
               <div className="flex items-center gap-1">
-                <LocalOnlyModeIndicator />
+                {LocalOnlyModeIndicator ? <LocalOnlyModeIndicator /> : null}
                 <NotificationBell placement="right" />
               </div>
             ) : null}
