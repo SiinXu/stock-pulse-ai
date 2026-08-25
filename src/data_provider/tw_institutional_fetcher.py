@@ -33,6 +33,7 @@ from typing import Any, Dict, Optional
 import requests
 
 from src.data_provider.realtime_types import CircuitBreaker
+from src.security.outbound_policy import safe_get
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
@@ -271,7 +272,7 @@ class TwInstitutionalFetcher:
 
     def _get_json(self, url: str, params: Optional[dict] = None) -> Any:
         self._throttle()
-        resp = requests.get(
+        resp = safe_get(
             url,
             params=params,
             headers={"User-Agent": _UA, "Accept": "application/json"},

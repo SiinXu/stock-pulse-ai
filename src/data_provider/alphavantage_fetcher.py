@@ -15,6 +15,7 @@ from typing import Optional
 import pandas as pd
 import requests
 
+from src.security.outbound_policy import safe_get
 from src.utils.sanitize import log_safe_exception
 
 from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS
@@ -56,10 +57,18 @@ class AlphaVantageFetcher(BaseFetcher):
 
         try:
             self.random_sleep(0.5, 1.5)
-            resp = requests.get(_AV_BASE_URL, params=params, timeout=30)
+            resp = safe_get(_AV_BASE_URL, params=params, timeout=30)
             resp.raise_for_status()
             data = resp.json()
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Map provider I/O failure to DataFetchError for manager fallback.
+            log_safe_exception(
+                logger,
+                "AlphaVantage daily HTTP request failed",
+                e,
+                error_code="alphavantage_daily_http_failed",
+                level=logging.DEBUG,
+                context={"symbol": symbol},
+            )
             raise DataFetchError(f"[AlphaVantage] HTTP request failed for {symbol}: {e}") from e
 
         if 'Note' in data:
@@ -122,14 +131,14 @@ class AlphaVantageFetcher(BaseFetcher):
         symbol = stock_code.strip().upper()
         try:
             self.random_sleep(0.5, 1.5)
-            resp = requests.get(_AV_BASE_URL, params={
+            resp = safe_get(_AV_BASE_URL, params={
                 'function': 'GLOBAL_QUOTE',
                 'symbol': symbol,
                 'apikey': self._api_key,
             }, timeout=15)
             resp.raise_for_status()
             data = resp.json()
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve the None realtime fallback.
             log_safe_exception(
                 logger,
                 "AlphaVantage realtime quote failed",
@@ -173,14 +182,14 @@ class AlphaVantageFetcher(BaseFetcher):
 
         symbol = stock_code.strip().upper()
         try:
-            resp = requests.get(_AV_BASE_URL, params={
+            resp = safe_get(_AV_BASE_URL, params={
                 'function': 'SYMBOL_SEARCH',
                 'keywords': symbol,
                 'apikey': self._api_key,
             }, timeout=10)
             resp.raise_for_status()
             data = resp.json()
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve the None name fallback.
             log_safe_exception(
                 logger,
                 "AlphaVantage symbol search failed",

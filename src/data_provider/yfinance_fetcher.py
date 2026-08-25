@@ -33,6 +33,7 @@ from tenacity import (
 from .base import BaseFetcher, DataFetchError, STANDARD_COLUMNS, is_bse_code
 from .realtime_types import UnifiedRealtimeQuote, RealtimeSource
 from .us_index_mapping import get_us_index_yf_symbol, is_us_stock_code
+from src.security.outbound_policy import OutboundPolicyError, guard_outbound_urls
 from src.services.market_symbol_utils import get_suffix_market, is_suffix_market_symbol
 from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 
@@ -52,6 +53,19 @@ except (ImportError, ModuleNotFoundError):
 import os
 
 logger = logging.getLogger(__name__)
+
+# Hosts owned by the yfinance SDK and the Stooq urllib fallback. LOCAL_ONLY_MODE
+# rejects these at guard entry; strict_dns is off so extra Yahoo CDN hosts used
+# when the flag is off do not become unexpected-target failures.
+_YFINANCE_OUTBOUND_URLS = (
+    "https://query1.finance.yahoo.com/",
+    "https://query2.finance.yahoo.com/",
+    "https://stooq.com/",
+)
+
+
+def _yfinance_http_guard():
+    return guard_outbound_urls(_YFINANCE_OUTBOUND_URLS, strict_dns=False)
 
 
 class YfinanceFetcher(BaseFetcher):
@@ -199,39 +213,48 @@ class YfinanceFetcher(BaseFetcher):
         2. 调用 yfinance API
         3. 处理返回数据
         """
-        import yfinance as yf
-
         # Convert Code Format
         yf_code = self._convert_stock_code(stock_code)
 
         logger.debug(f"调用 yfinance.download({yf_code}, {start_date}, {end_date})")
 
         try:
-            # Use yfinance to download data
-            df = yf.download(
-                tickers=yf_code,
-                start=start_date,
-                end=end_date,
-                progress=False,  # Disable progress bar
-                auto_adjust=True,  # Automatically adjust prices for splits and dividends.
-                multi_level_index=True
-            )
+            with _yfinance_http_guard():
+                import yfinance as yf
 
-            # Filter yf_code columns, avoid confusion of data for multiple stocks
-            if isinstance(df.columns, pd.MultiIndex) and len(df.columns) > 1:
-                ticker_level = df.columns.get_level_values(1)
-                mask = ticker_level == yf_code
-                if mask.any():
-                    df = df.loc[:, mask].copy()
+                # Use yfinance to download data
+                df = yf.download(
+                    tickers=yf_code,
+                    start=start_date,
+                    end=end_date,
+                    progress=False,  # Disable progress bar
+                    auto_adjust=True,  # Automatically adjust prices for splits and dividends.
+                    multi_level_index=True
+                )
 
-            if df.empty:
-                raise DataFetchError(f"Yahoo Finance 未查询到 {stock_code} 的数据")
+                # Filter yf_code columns, avoid confusion of data for multiple stocks
+                if isinstance(df.columns, pd.MultiIndex) and len(df.columns) > 1:
+                    ticker_level = df.columns.get_level_values(1)
+                    mask = ticker_level == yf_code
+                    if mask.any():
+                        df = df.loc[:, mask].copy()
 
-            return df
+                if df.empty:
+                    raise DataFetchError(f"Yahoo Finance 未查询到 {stock_code} 的数据")
 
-        except Exception as e:
+                return df
+
+        except Exception as e:  # broad-exception: fallback_recorded - Map provider I/O failure to DataFetchError for manager fallback.
             if isinstance(e, DataFetchError):
                 raise
+            log_safe_exception(
+                logger,
+                "Yfinance daily HTTP request failed",
+                e,
+                error_code="yfinance_daily_http_failed",
+                level=logging.DEBUG,
+                context={"symbol": stock_code},
+            )
             raise DataFetchError(f"Yahoo Finance 获取数据失败: {e}") from e
 
     def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
@@ -319,9 +342,10 @@ class YfinanceFetcher(BaseFetcher):
         Returns:
             行情字典，失败时返回 None
         """
-        ticker = yf.Ticker(yf_code)
-        # Retrieve data from the last two days to calculate percentage change.
-        hist = ticker.history(period='2d')
+        with _yfinance_http_guard():
+            ticker = yf.Ticker(yf_code)
+            # Retrieve data from the last two days to calculate percentage change.
+            hist = ticker.history(period='2d')
         if hist.empty:
             return None
         today_row = hist.iloc[-1]
@@ -638,9 +662,10 @@ class YfinanceFetcher(BaseFetcher):
         )
 
         try:
-            with urlopen(request, timeout=15) as response:
-                payload = response.read().decode("utf-8", "ignore").strip()
-        except (HTTPError, URLError, TimeoutError) as exc:
+            with _yfinance_http_guard():
+                with urlopen(request, timeout=15) as response:
+                    payload = response.read().decode("utf-8", "ignore").strip()
+        except (HTTPError, URLError, TimeoutError, OutboundPolicyError) as exc:
             log_safe_exception(
                 logger,
                 "Stooq realtime quote request failed",
@@ -665,9 +690,10 @@ class YfinanceFetcher(BaseFetcher):
                 },
             )
             try:
-                with urlopen(history_request, timeout=15) as response:
-                    history_payload = response.read().decode("utf-8", "ignore").strip()
-            except (HTTPError, URLError, TimeoutError) as exc:
+                with _yfinance_http_guard():
+                    with urlopen(history_request, timeout=15) as response:
+                        history_payload = response.read().decode("utf-8", "ignore").strip()
+            except (HTTPError, URLError, TimeoutError, OutboundPolicyError) as exc:
                 log_safe_exception(
                     logger,
                     "Stooq daily history request failed",
@@ -811,89 +837,90 @@ class YfinanceFetcher(BaseFetcher):
         import yfinance as yf
 
         try:
-            logger.debug(f"[Yfinance] 获取美股指数 {user_code} ({yf_symbol}) 实时行情")
-            ticker = yf.Ticker(yf_symbol)
+            with _yfinance_http_guard():
+                logger.debug(f"[Yfinance] 获取美股指数 {user_code} ({yf_symbol}) 实时行情")
+                ticker = yf.Ticker(yf_symbol)
 
-            try:
-                info = ticker.fast_info
-                if info is None:
-                    raise ValueError("fast_info is None")
-                price = getattr(info, 'lastPrice', None) or getattr(info, 'last_price', None)
-                prev_close = getattr(info, 'previousClose', None) or getattr(info, 'previous_close', None)
-                open_price = getattr(info, 'open', None)
-                high = getattr(info, 'dayHigh', None) or getattr(info, 'day_high', None)
-                low = getattr(info, 'dayLow', None) or getattr(info, 'day_low', None)
-                volume = getattr(info, 'lastVolume', None) or getattr(info, 'last_volume', None)
-            except Exception:
-                logger.debug("[Yfinance] fast_info 失败，尝试 history 方法")
-                hist = ticker.history(period='2d')
-                if hist.empty:
-                    logger.warning(f"[Yfinance] 无法获取 {yf_symbol} 的数据")
-                    return None
-                today = hist.iloc[-1]
-                prev = hist.iloc[-2] if len(hist) > 1 else today
-                price = float(today['Close'])
-                prev_close = float(prev['Close'])
-                open_price = float(today['Open'])
-                high = float(today['High'])
-                low = float(today['Low'])
-                volume = int(today['Volume'])
+                try:
+                    info = ticker.fast_info
+                    if info is None:
+                        raise ValueError("fast_info is None")
+                    price = getattr(info, 'lastPrice', None) or getattr(info, 'last_price', None)
+                    prev_close = getattr(info, 'previousClose', None) or getattr(info, 'previous_close', None)
+                    open_price = getattr(info, 'open', None)
+                    high = getattr(info, 'dayHigh', None) or getattr(info, 'day_high', None)
+                    low = getattr(info, 'dayLow', None) or getattr(info, 'day_low', None)
+                    volume = getattr(info, 'lastVolume', None) or getattr(info, 'last_volume', None)
+                except Exception:  # broad-exception: fallback_recorded - Debug log precedes the history fallback.
+                    logger.debug("[Yfinance] fast_info 失败，尝试 history 方法")
+                    hist = ticker.history(period='2d')
+                    if hist.empty:
+                        logger.warning(f"[Yfinance] 无法获取 {yf_symbol} 的数据")
+                        return None
+                    today = hist.iloc[-1]
+                    prev = hist.iloc[-2] if len(hist) > 1 else today
+                    price = float(today['Close'])
+                    prev_close = float(prev['Close'])
+                    open_price = float(today['Open'])
+                    high = float(today['High'])
+                    low = float(today['Low'])
+                    volume = int(today['Volume'])
 
-            change_amount = None
-            change_pct = None
-            if price is not None and prev_close is not None and prev_close > 0:
-                change_amount = price - prev_close
-                change_pct = (change_amount / prev_close) * 100
+                change_amount = None
+                change_pct = None
+                if price is not None and prev_close is not None and prev_close > 0:
+                    change_amount = price - prev_close
+                    change_pct = (change_amount / prev_close) * 100
 
-            amplitude = None
-            if high is not None and low is not None and prev_close is not None and prev_close > 0:
-                amplitude = ((high - low) / prev_close) * 100
+                amplitude = None
+                if high is not None and low is not None and prev_close is not None and prev_close > 0:
+                    amplitude = ((high - low) / prev_close) * 100
 
-            try:
-                ticker_info = ticker.info or {}
-            except Exception:
-                ticker_info = {}
-            missing_fields = [
-                field
-                for field, value in {
-                    "price": price,
-                    "prev_close": prev_close,
-                    "volume": volume,
-                    "amount": None,
-                    "pe_ratio": None,
-                    "pb_ratio": None,
-                }.items()
-                if value is None
-            ]
+                try:
+                    ticker_info = ticker.info or {}
+                except Exception:  # broad-exception: optional_metadata - ticker.info is supplementary to the already-fetched quote.
+                    ticker_info = {}
+                missing_fields = [
+                    field
+                    for field, value in {
+                        "price": price,
+                        "prev_close": prev_close,
+                        "volume": volume,
+                        "amount": None,
+                        "pe_ratio": None,
+                        "pb_ratio": None,
+                    }.items()
+                    if value is None
+                ]
 
-            quote = UnifiedRealtimeQuote(
-                code=user_code,
-                name=index_name or user_code,
-                source=RealtimeSource.FALLBACK,
-                market="us",
-                currency=str(ticker_info.get("currency") or "").upper() or None,
-                data_quality="partial" if missing_fields else "ok",
-                missing_fields=missing_fields or None,
-                price=price,
-                change_pct=round(change_pct, 2) if change_pct is not None else None,
-                change_amount=round(change_amount, 4) if change_amount is not None else None,
-                volume=volume,
-                amount=None,
-                volume_ratio=None,
-                turnover_rate=None,
-                amplitude=round(amplitude, 2) if amplitude is not None else None,
-                open_price=open_price,
-                high=high,
-                low=low,
-                pre_close=prev_close,
-                pe_ratio=None,
-                pb_ratio=None,
-                total_mv=None,
-                circ_mv=None,
-            )
-            logger.info(f"[Yfinance] 获取美股指数 {user_code} 实时行情成功: 价格={price}")
-            return quote
-        except Exception as e:
+                quote = UnifiedRealtimeQuote(
+                    code=user_code,
+                    name=index_name or user_code,
+                    source=RealtimeSource.FALLBACK,
+                    market="us",
+                    currency=str(ticker_info.get("currency") or "").upper() or None,
+                    data_quality="partial" if missing_fields else "ok",
+                    missing_fields=missing_fields or None,
+                    price=price,
+                    change_pct=round(change_pct, 2) if change_pct is not None else None,
+                    change_amount=round(change_amount, 4) if change_amount is not None else None,
+                    volume=volume,
+                    amount=None,
+                    volume_ratio=None,
+                    turnover_rate=None,
+                    amplitude=round(amplitude, 2) if amplitude is not None else None,
+                    open_price=open_price,
+                    high=high,
+                    low=low,
+                    pre_close=prev_close,
+                    pe_ratio=None,
+                    pb_ratio=None,
+                    total_mv=None,
+                    circ_mv=None,
+                )
+                logger.info(f"[Yfinance] 获取美股指数 {user_code} 实时行情成功: 价格={price}")
+                return quote
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics preserve the None index-quote fallback.
             log_safe_exception(
                 logger,
                 "Yfinance US index realtime quote failed",
@@ -941,119 +968,120 @@ class YfinanceFetcher(BaseFetcher):
             return None
 
         try:
-            symbol = self._convert_stock_code(stock_code)
-            is_us_symbol = self._is_us_stock(symbol)
-            suffix_market = get_suffix_market(symbol)
-            logger.debug(f"[Yfinance] 获取 {symbol} 实时行情")
+            with _yfinance_http_guard():
+                symbol = self._convert_stock_code(stock_code)
+                is_us_symbol = self._is_us_stock(symbol)
+                suffix_market = get_suffix_market(symbol)
+                logger.debug(f"[Yfinance] 获取 {symbol} 实时行情")
 
-            ticker = yf.Ticker(symbol)
+                ticker = yf.Ticker(symbol)
 
-            # Attempt to fetch fast_info (faster, but fewer fields)
-            try:
-                info = ticker.fast_info
-                if info is None:
-                    raise ValueError("fast_info is None")
+                # Attempt to fetch fast_info (faster, but fewer fields)
+                try:
+                    info = ticker.fast_info
+                    if info is None:
+                        raise ValueError("fast_info is None")
 
-                price = getattr(info, 'lastPrice', None) or getattr(info, 'last_price', None)
-                prev_close = getattr(info, 'previousClose', None) or getattr(info, 'previous_close', None)
-                open_price = getattr(info, 'open', None)
-                high = getattr(info, 'dayHigh', None) or getattr(info, 'day_high', None)
-                low = getattr(info, 'dayLow', None) or getattr(info, 'day_low', None)
-                volume = getattr(info, 'lastVolume', None) or getattr(info, 'last_volume', None)
-                market_cap = getattr(info, 'marketCap', None) or getattr(info, 'market_cap', None)
+                    price = getattr(info, 'lastPrice', None) or getattr(info, 'last_price', None)
+                    prev_close = getattr(info, 'previousClose', None) or getattr(info, 'previous_close', None)
+                    open_price = getattr(info, 'open', None)
+                    high = getattr(info, 'dayHigh', None) or getattr(info, 'day_high', None)
+                    low = getattr(info, 'dayLow', None) or getattr(info, 'day_low', None)
+                    volume = getattr(info, 'lastVolume', None) or getattr(info, 'last_volume', None)
+                    market_cap = getattr(info, 'marketCap', None) or getattr(info, 'market_cap', None)
 
-            except Exception:
-                # Fallback to the history method to get the latest data
-                logger.debug("[Yfinance] fast_info 失败，尝试 history 方法")
-                hist = ticker.history(period='2d')
-                if hist.empty:
-                    if is_us_symbol:
-                        logger.warning(f"[Yfinance] 无法获取 {symbol} 的数据，尝试 Stooq 兜底")
-                        return self._get_us_stock_quote_from_stooq(symbol)
-                    logger.warning(f"[Yfinance] 无法获取 {symbol} 的数据")
-                    return None
+                except Exception:  # broad-exception: fallback_recorded - Debug log precedes the history fallback.
+                    # Fallback to the history method to get the latest data
+                    logger.debug("[Yfinance] fast_info 失败，尝试 history 方法")
+                    hist = ticker.history(period='2d')
+                    if hist.empty:
+                        if is_us_symbol:
+                            logger.warning(f"[Yfinance] 无法获取 {symbol} 的数据，尝试 Stooq 兜底")
+                            return self._get_us_stock_quote_from_stooq(symbol)
+                        logger.warning(f"[Yfinance] 无法获取 {symbol} 的数据")
+                        return None
 
-                today = hist.iloc[-1]
-                prev = hist.iloc[-2] if len(hist) > 1 else today
+                    today = hist.iloc[-1]
+                    prev = hist.iloc[-2] if len(hist) > 1 else today
 
-                price = float(today['Close'])
-                prev_close = float(prev['Close'])
-                open_price = float(today['Open'])
-                high = float(today['High'])
-                low = float(today['Low'])
-                volume = int(today['Volume'])
-                market_cap = None
+                    price = float(today['Close'])
+                    prev_close = float(prev['Close'])
+                    open_price = float(today['Open'])
+                    high = float(today['High'])
+                    low = float(today['Low'])
+                    volume = int(today['Volume'])
+                    market_cap = None
 
-            # Calculate Percentage Change
-            change_amount = None
-            change_pct = None
-            if price is not None and prev_close is not None and prev_close > 0:
-                change_amount = price - prev_close
-                change_pct = (change_amount / prev_close) * 100
+                # Calculate Percentage Change
+                change_amount = None
+                change_pct = None
+                if price is not None and prev_close is not None and prev_close > 0:
+                    change_amount = price - prev_close
+                    change_pct = (change_amount / prev_close) * 100
 
-            # Calculate Amplitude
-            amplitude = None
-            if high is not None and low is not None and prev_close is not None and prev_close > 0:
-                amplitude = ((high - low) / prev_close) * 100
+                # Calculate Amplitude
+                amplitude = None
+                if high is not None and low is not None and prev_close is not None and prev_close > 0:
+                    amplitude = ((high - low) / prev_close) * 100
 
-            # Get stock name and provider metadata
-            try:
-                ticker_info = ticker.info or {}
-            except Exception:
-                ticker_info = {}
-            try:
-                info_name = ticker_info.get('shortName', '') or ticker_info.get('longName', '') or ''
-                name = info_name if is_meaningful_stock_name(info_name, symbol) else STOCK_NAME_MAP.get(symbol, '')
-            except Exception:
-                name = STOCK_NAME_MAP.get(symbol, '')
+                # Get stock name and provider metadata
+                try:
+                    ticker_info = ticker.info or {}
+                except Exception:  # broad-exception: optional_metadata - ticker.info is supplementary to the already-fetched quote.
+                    ticker_info = {}
+                try:
+                    info_name = ticker_info.get('shortName', '') or ticker_info.get('longName', '') or ''
+                    name = info_name if is_meaningful_stock_name(info_name, symbol) else STOCK_NAME_MAP.get(symbol, '')
+                except Exception:  # broad-exception: optional_metadata - stock name is optional display metadata.
+                    name = STOCK_NAME_MAP.get(symbol, '')
 
-            # Reuse the ticker_info fetched above for valuation; no extra request.
-            # Imported locally (module still has no module-level dependency on the
-            # fundamental adapter) to keep the module import block unchanged.
-            from .yfinance_fundamental_adapter import _safe_float
-            pe_ratio = _safe_float(ticker_info.get('trailingPE'))
-            pb_ratio = _safe_float(ticker_info.get('priceToBook'))
+                # Reuse the ticker_info fetched above for valuation; no extra request.
+                # Imported locally (module still has no module-level dependency on the
+                # fundamental adapter) to keep the module import block unchanged.
+                from .yfinance_fundamental_adapter import _safe_float
+                pe_ratio = _safe_float(ticker_info.get('trailingPE'))
+                pb_ratio = _safe_float(ticker_info.get('priceToBook'))
 
-            missing_fields = [
-                field
-                for field, value in {
-                    "price": price,
-                    "prev_close": prev_close,
-                    "volume": volume,
-                    "amount": None,
-                    "pe_ratio": pe_ratio,
-                    "pb_ratio": pb_ratio,
-                }.items()
-                if value is None
-            ]
-            quote = UnifiedRealtimeQuote(
-                code=symbol,
-                name=name,
-                source=RealtimeSource.YFINANCE,
-                market=suffix_market or ("us" if is_us_symbol else None),
-                currency=str(ticker_info.get("currency") or "").upper() or None,
-                data_quality="partial" if missing_fields else "ok",
-                missing_fields=missing_fields or None,
-                price=price,
-                change_pct=round(change_pct, 2) if change_pct is not None else None,
-                change_amount=round(change_amount, 4) if change_amount is not None else None,
-                volume=volume,
-                amount=None,  # yfinance does not directly provide trading value
-                volume_ratio=None,
-                turnover_rate=None,
-                amplitude=round(amplitude, 2) if amplitude is not None else None,
-                open_price=open_price,
-                high=high,
-                low=low,
-                pre_close=prev_close,
-                pe_ratio=pe_ratio,
-                pb_ratio=pb_ratio,
-                total_mv=market_cap,
-                circ_mv=None,
-            )
+                missing_fields = [
+                    field
+                    for field, value in {
+                        "price": price,
+                        "prev_close": prev_close,
+                        "volume": volume,
+                        "amount": None,
+                        "pe_ratio": pe_ratio,
+                        "pb_ratio": pb_ratio,
+                    }.items()
+                    if value is None
+                ]
+                quote = UnifiedRealtimeQuote(
+                    code=symbol,
+                    name=name,
+                    source=RealtimeSource.YFINANCE,
+                    market=suffix_market or ("us" if is_us_symbol else None),
+                    currency=str(ticker_info.get("currency") or "").upper() or None,
+                    data_quality="partial" if missing_fields else "ok",
+                    missing_fields=missing_fields or None,
+                    price=price,
+                    change_pct=round(change_pct, 2) if change_pct is not None else None,
+                    change_amount=round(change_amount, 4) if change_amount is not None else None,
+                    volume=volume,
+                    amount=None,  # yfinance does not directly provide trading value
+                    volume_ratio=None,
+                    turnover_rate=None,
+                    amplitude=round(amplitude, 2) if amplitude is not None else None,
+                    open_price=open_price,
+                    high=high,
+                    low=low,
+                    pre_close=prev_close,
+                    pe_ratio=pe_ratio,
+                    pb_ratio=pb_ratio,
+                    total_mv=market_cap,
+                    circ_mv=None,
+                )
 
-            logger.info(f"[Yfinance] 获取 {symbol} 实时行情成功: 价格={price}")
-            return quote
+                logger.info(f"[Yfinance] 获取 {symbol} 实时行情成功: 价格={price}")
+                return quote
 
         except Exception as e:  # broad-exception: fallback_recorded - failure is logged, then degraded to Stooq (US) or None
             is_us = self._is_us_stock(stock_code)
@@ -1084,5 +1112,5 @@ if __name__ == "__main__":
         df = fetcher.get_daily_data('600519')  # Maotai
         print(f"获取成功，共 {len(df)} 条数据")
         print(df.tail())
-    except Exception as e:
+    except Exception as e:  # broad-exception: optional_metadata - demo CLI prints failure and exits the snippet.
         print(f"获取失败: {e}")
