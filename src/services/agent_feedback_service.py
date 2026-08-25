@@ -18,12 +18,15 @@ from src.repositories.agent_feedback_repo import (
 from src.repositories.agent_prediction_repo import AgentPredictionRepository
 from src.repositories.analysis_repo import AnalysisRepository
 from src.schemas.agent_prediction import STATUS_RESOLVED
-from src.schemas.memory_fact_opinion import lock_opinion_payload
-from src.schemas.memory_provenance import reject_client_provenance_keys
+from src.schemas.memory_provenance import (
+    FEEDBACK_ACTOR_ID,
+    PROVENANCE_SOURCE_USER_FEEDBACK,
+)
 from src.schemas.memory_write_guard import (
     FEEDBACK_NOTE_MAX_LENGTH,
     reject_memory_write_text,
 )
+from src.schemas.memory_write_policy import require_opinion_write
 from src.storage import DatabaseManager
 
 
@@ -182,8 +185,11 @@ class AgentFeedbackService:
             "note": normalized_note,
             "source": self._normalize_enum(source or "api", FEEDBACK_SOURCES, "source"),
         }
-        reject_client_provenance_keys(fields)
-        lock_opinion_payload(fields)
+        require_opinion_write(
+            fields,
+            provenance_source=PROVENANCE_SOURCE_USER_FEEDBACK,
+            actor_id=FEEDBACK_ACTOR_ID,
+        )
         return fields
 
     @staticmethod

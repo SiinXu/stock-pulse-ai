@@ -8,14 +8,14 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy import and_, desc, func, select
 
-from src.schemas.memory_fact_opinion import lock_fact_payload, lock_opinion_payload
+from src.schemas.memory_write_policy import (
+    require_market_actuals_write,
+    require_opinion_write,
+)
 from src.schemas.memory_provenance import (
     FEEDBACK_ACTOR_ID,
-    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
     PROVENANCE_SOURCE_USER_FEEDBACK,
-    apply_server_provenance,
 )
-from src.schemas.memory_write_guard import reject_feedback_write_fields
 from src.storage import (
     DatabaseManager,
     DecisionSignalFeedbackRecord,
@@ -115,12 +115,7 @@ class DecisionSignalOutcomeRepository:
             ).scalar_one_or_none()
 
     def upsert_outcome(self, fields: Dict[str, Any]) -> Tuple[DecisionSignalOutcomeRecord, bool]:
-        lock_fact_payload(fields)
-        fields = apply_server_provenance(
-            fields,
-            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-            actor_id=None,
-        )
+        fields = require_market_actuals_write(fields).stamped_payload(fields)
         now = utc_naive_now()
         with self.db.get_session() as session:
             existing = session.execute(
@@ -232,9 +227,7 @@ class DecisionSignalOutcomeRepository:
             ).scalar_one_or_none()
 
     def upsert_feedback(self, fields: Dict[str, Any]) -> DecisionSignalFeedbackRecord:
-        lock_opinion_payload(fields)
-        reject_feedback_write_fields(fields)
-        fields = apply_server_provenance(
+        _decision, fields = require_opinion_write(
             fields,
             provenance_source=PROVENANCE_SOURCE_USER_FEEDBACK,
             actor_id=FEEDBACK_ACTOR_ID,

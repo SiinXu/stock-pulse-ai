@@ -18,8 +18,9 @@ Design guardrails (Issue #118 acceptance criteria):
    flip or override the current directional decision. The structure below has no
    action/direction field by construction, and the rendered guidance says so.
 
-Injection contract (aligned with memory write admission #1119 and layered
-memory isolation #1017 / #250):
+Injection contract (READ-path renderer filter for #118 / PR #1270; layered
+memory isolation #1017 / #250). This is **not** the #1119 write-admission
+policy in ``src.schemas.memory_write_policy``:
 
 - Only **admitted** structured outcome facts may reach the prompt. Free-form
   signal ``reason`` / user notes never enter the reflection payload.
@@ -28,6 +29,8 @@ memory isolation #1017 / #250):
   ``isolate_untrusted_memory_body``.
 - Global toggle ``DECISION_MEMORY_ENABLED`` (and per-request ``use_memory``)
   disables the path with zero extra work.
+- Do not route this inject filter through the persist write policy. Outcome
+  keys are required here and would be rejected on opinion writes.
 
 Hit / miss / neutral classifications are the authoritative values already stored
 on ``DecisionSignalOutcomeRecord`` by ``DecisionSignalOutcomeService``; this
@@ -178,10 +181,11 @@ def admit_decision_memory(
     *,
     max_calls: Optional[int] = None,
 ) -> Optional[DecisionReflection]:
-    """Admit a reflection for prompt/report injection (Issue #1119 alignment).
+    """Admit a reflection for prompt/report injection (READ path, #118).
 
-    Episodic outcome summaries are size-capped and provenance-required. Free-form
-    signal text never enters. Returns None when nothing admits, so callers never
+    This renderer filter is not the #1119 persist write policy. Episodic
+    outcome summaries are size-capped and provenance-required. Free-form signal
+    text never enters. Returns None when nothing admits, so callers never
     inject a non-admitted payload.
     """
     if reflection is None:

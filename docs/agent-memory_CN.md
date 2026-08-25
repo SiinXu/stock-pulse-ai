@@ -1,6 +1,6 @@
 # Principal 作用域分层 Agent 记忆
 
-**状态**：分层记忆基础 + 生命周期（分层记忆尚未接入生产 prompt）。持久化存储/UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。
+**状态**：分层记忆基础 + 生命周期（分层记忆尚未接入生产 prompt）。持久化存储/UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。写入准入库：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1（遗忘 / 压缩仍开放）。
 
 **English**: [agent-memory.md](agent-memory.md)
 
@@ -13,6 +13,7 @@
 | `src/agent/memory_vector.py` | 无额外依赖的粗排 |
 | `src/agent/memory_governance.py` | 知情同意、保留期、按 principal 删除/清空、访问审计 |
 | `src/agent/memory_isolation.py` | 面向 prompt 的不可信数据隔离 |
+| `src/schemas/memory_write_policy.py` | 仅库层、覆盖既有存储的写入准入（#1119 Slice 1） |
 
 既有 `AgentMemory` / `BaseAgent` 数值校准行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 历史注入默认关闭；开启时 `BaseAgent._build_memory_context` 用 `isolate_untrusted_memory_body` 包裹历史行，并将 `signal` 规范为 `buy|hold|sell`（见[威胁注释](#threat-notes)）。
 
@@ -87,13 +88,35 @@ outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
 
 写路径上的非法、超限或标记注入载荷必须 **拒绝**，不得截断后当事实存储。Decision-memory **准入** 保持失败即关闭（不准入则不注入）；分析 **构建** 失败保持失败即跳过（跳过注入、分析继续）。见[安全基线 Current Gaps](security-baseline.md#current-gaps)。
 
+<a id="write-admission-policy"></a>
+## 写入准入策略（#1119 Slice 1）
+
+仅库层的持久化写入准入位于 `src/schemas/memory_write_policy.py`，与 #1124 写入契约同层。它分类写入并失败即关闭。它 **复用** `memory_fact_opinion`、`memory_write_guard`、`memory_provenance`，不分叉、不削弱。没有新表、新环境变量、公开 API、Web 或 Desktop 面。
+
+| 写入类别 | 准入 | 是否持久化 |
+| --- | --- | --- |
+| **Episodic（情景）** | 紧凑的 run/outcome 摘要仅在既有结构化大小 / Soul / 控制字符校验之后准入 | 是 — 仅追加的 `agent_episodes` |
+| **Market actuals（行情事实）** | `system_resolve` 载荷准入并由 **服务端盖章**。意见字段不得混入 | 是 — prediction resolve / decision-signal outcomes |
+| **Opinion（意见）** | `user_feedback` / `operator` 载荷不得包含或覆盖 actual / outcome 字段；委托既有事实/意见锁 | 是 — decision-signal 反馈 sidecar 以及 run/prediction 反馈 sidecar |
+| **Semantic fact（语义事实）** | 单条未验证用户笔记拒绝。达到 `MIN_OUTCOME_PATTERN_EVIDENCE`（3）的重复独立验证证据 **或** 显式 operator-promote 意图仅作为 **候选** 准入 | **否** — 尚无语义存储（[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)） |
+| **Procedural auto-flag（程序性自动标记）** | 必须 **同时** 提供显式的正整数 `min_samples`（需要适配器下限时由调用方传入 `DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES`；缺省或非法 `min_samples` 失败即关闭）**以及** 显式通过的 eval 闸门。闸门缺席 / 为假一律拒绝 | **否** — 无程序性存储；自动晋升保持硬关闭 |
+
+受治理的持久化入口：prediction resolve / `data_unavailable` actuals（SQLite 与解析器内存存储）、decision-signal outcome 与 feedback upsert、run/prediction 反馈 upsert（`AgentFeedbackRepository` / `AgentFeedbackService`）、episode 追加。成功载荷、状态迁移、不可变性、provenance source、分析失败即跳过、episode 仅追加行为，以及 run/prediction 反馈的 `_OPINION_KEYS` 身份键边界均不变。
+
+已扫描但不并入本切片：curator-grade 入库与 forward-return 分桶（#1096）会在 sidecar 标签上盖 provenance，但不是覆盖行情 actuals 的用户笔记意见写入。请求体 schema 仍用 #1124 锁做传输校验，不是持久化准入。
+
+Decision Memory 的 `admit_decision_memory` 是 **独立的 READ / 注入** 过滤器。渲染准入不是本写入策略；注入载荷按设计包含 `outcome` 键。
+
+本切片 **不** 增加压缩、遗忘、按标的 TTL / 行数上限、检索分数衰减、#1118 存储、#1113 EvolutionEvent 持久化、自动晋升或新的产品反馈 API。[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) 保持开放。
+
 ## 剩余范围
 
 - 权威 principal 赋值（API/bot/CLI/定时任务）与遗留迁移。
 - 持久化生命周期存储与用户 UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)（吸收已关闭的 [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) 与 [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)）。
 - 经安全审查的生产 prompt 消费。
 - 偏好层：[#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117)（吸收已关闭的 [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)）。
-- 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。DAG-0 威胁注释、DAG-1 事实/意见锁定、DAG-2 Soul/超限写路径拒绝（`src/schemas/memory_write_guard.py`）和 DAG-3 服务端盖章 provenance（`src/schemas/memory_provenance.py`）已落地。DAG-4 将默认关闭的 AgentMemory 注入隔离为不可信数据（`src/agent/agents/base_agent.py` / `src/agent/memory.py`），`signal` 规范为 `buy` / `hold` / `sell`。不要并入 #1118 存储/UI、#1119 遗忘策略或 #1105 产品反馈 API。在维护者确认全部验收项之前保持 issue 开放。
+- 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。DAG-0 威胁注释、DAG-1 事实/意见锁定、DAG-2 Soul/超限写路径拒绝（`src/schemas/memory_write_guard.py`）和 DAG-3 服务端盖章 provenance（`src/schemas/memory_provenance.py`）已落地。DAG-4 将默认关闭的 AgentMemory 注入隔离为不可信数据（`src/agent/agents/base_agent.py` / `src/agent/memory.py`），`signal` 规范为 `buy` / `hold` / `sell`。不要并入 #1118 存储/UI 或 #1105 产品反馈 API。
+- 写入准入 / 压缩 / 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119)。Slice 1（覆盖既有存储的库层写入准入）见上文。仍缺：旧 episodic 行压缩、不改 Soul 的语义/程序性候选晋升、按标的 TTL / 行数上限、检索分数衰减，以及 [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113) 落地后丢弃已回滚的程序性标记。保持 #1119 开放。
 
 不要重开 #250、#198 或 #150。
 
