@@ -1,7 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useState } from 'react';
 import { useUiLanguage } from '../../../contexts/UiLanguageContext';
 import { SETTINGS_PAGE_TEXT } from '../../../locales/settingsPage';
 import { getUiListSeparator } from '../../../utils/uiLocale';
@@ -42,13 +41,14 @@ type OverviewSectionProps = {
   refreshAfterExternalSave: (keys: string[]) => Promise<void>;
   stockListValue: string;
   applyPostSaveEffects: () => void;
+  isIntelligentImportOpen: boolean;
+  setIsIntelligentImportOpen: (open: boolean) => void;
 };
 
 const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
   const { language, t } = useUiLanguage();
   const settingsText = SETTINGS_PAGE_TEXT[language];
   const canStartWizard = !props.isProviderCatalogLoading && props.providerCatalogLength > 0;
-  const [isIntelligentImportOpen, setIsIntelligentImportOpen] = useState(false);
 
   return (
     <>
@@ -104,7 +104,7 @@ const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
                 variant="secondary"
                 size="default"
                 aria-haspopup="dialog"
-                onClick={() => setIsIntelligentImportOpen(true)}
+                onClick={() => props.setIsIntelligentImportOpen(true)}
               >
                 {t('settings.openConfigItems')}
               </Button>
@@ -117,8 +117,8 @@ const OverviewSection: React.FC<OverviewSectionProps> = (props) => {
             </p>
           </SettingsSectionCard>
           <Modal
-            isOpen={isIntelligentImportOpen}
-            onClose={() => setIsIntelligentImportOpen(false)}
+            isOpen={props.isIntelligentImportOpen}
+            onClose={() => props.setIsIntelligentImportOpen(false)}
             title={t('settings.intelligentImport')}
             description={t('settings.intelligentImportDescription')}
             size="wide"

@@ -151,6 +151,7 @@ const SettingsPage: React.FC = () => {
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(null);
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [isAgentOnboardingOpen, setIsAgentOnboardingOpen] = useState(false);
+  const [isIntelligentImportOpen, setIsIntelligentImportOpen] = useState(false);
   const { beginnerMode, mode: settingsMode, setMode: setSettingsMode } = useBeginnerMode();
   // Advanced sections stay hidden until the user reveals them; re-hiding on
   // Essentials mode keeps the simplified navigation predictable.
@@ -1565,6 +1566,8 @@ const SettingsPage: React.FC = () => {
               refreshAfterExternalSave={refreshAfterExternalSave}
               stockListValue={(activeItems.find((i) => i.key === 'STOCK_LIST')?.value as string) ?? ''}
               applyPostSaveEffects={applyPostSaveEffects}
+              isIntelligentImportOpen={isIntelligentImportOpen}
+              setIsIntelligentImportOpen={setIsIntelligentImportOpen}
             />
             {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
             <SystemSecuritySection
