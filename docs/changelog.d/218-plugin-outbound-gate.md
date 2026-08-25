@@ -1,0 +1,1 @@
+- [Added] Brought plugin outbound HTTP under the Local Only gate (Refs #218).
