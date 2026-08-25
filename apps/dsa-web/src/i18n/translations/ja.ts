@@ -1045,6 +1045,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "デスクトップサイドバーナビゲーション",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "{label}メニューを展開",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "サイドバーを展開",
+  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "ローカル専用モードはオンです。設定を開いてこのモードの説明を確認してください。",
   "i18n.uiText.UI_TEXT.layout.logout": "ログアウト",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "ログアウト",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "現在のセッションからログアウトしますか？ ログアウト後はパスワードを再入力する必要があります。",

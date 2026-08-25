@@ -1045,6 +1045,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "Navigasi bilah sisi desktop",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "Perluas menu {label}",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "Perluas bilah samping",
+  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "Mode hanya lokal aktif. Buka Pengaturan untuk meninjau mode ini.",
   "i18n.uiText.UI_TEXT.layout.logout": "Keluar",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "Konfirmasi keluar",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "Keluar dari sesi saat ini? Anda harus memasukkan kembali kata sandi setelah keluar.",

@@ -1045,6 +1045,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "Navigasi bar sisi desktop",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "Kembangkan menu {label}",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "Kembangkan bar sisi",
+  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "Mod lokal sahaja dihidupkan. Buka Tetapan untuk semak mod ini.",
   "i18n.uiText.UI_TEXT.layout.logout": "Log keluar",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "Sahkan log keluar",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "Log keluar daripada sesi semasa? Anda perlu memasukkan semula kata laluan selepas log keluar.",

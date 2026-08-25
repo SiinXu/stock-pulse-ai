@@ -5,21 +5,9 @@ import { Shield } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { useLocalOnlyModeStatus } from '../../hooks/useLocalOnlyModeStatus';
-import { buildSettingsHref } from '../../routing/routes';
 import { cn } from '../../utils/cn';
 import { Tooltip } from '../common/Tooltip';
-
-export const LOCAL_ONLY_MODE_FIELD_KEY = 'LOCAL_ONLY_MODE';
-
-/** Settings → Auth & Security, focusing the Local Only Mode field. */
-export function buildLocalOnlyModeSettingsHref(): string {
-  const href = buildSettingsHref({
-    section: 'system_security',
-    view: 'security',
-  });
-  const separator = href.includes('?') ? '&' : '?';
-  return `${href}${separator}field=${encodeURIComponent(LOCAL_ONLY_MODE_FIELD_KEY)}`;
-}
+import { buildLocalOnlyModeSettingsHref } from './localOnlyMode';
 
 export type LocalOnlyModeIndicatorProps = {
   className?: string;
@@ -35,13 +23,13 @@ export const LocalOnlyModeIndicator: React.FC<LocalOnlyModeIndicatorProps> = ({
     return null;
   }
 
-  const label = t('settings.outboundActivityModeOn');
+  const hint = t('layout.localOnlyModeOpenSettings');
 
   return (
-    <Tooltip content={label} className={className}>
+    <Tooltip content={hint} className={className}>
       <Link
         to={buildLocalOnlyModeSettingsHref()}
-        aria-label={label}
+        aria-label={hint}
         data-testid="shell-local-only-indicator"
         data-local-only-mode="on"
         className={cn(

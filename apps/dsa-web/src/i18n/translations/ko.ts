@@ -1045,6 +1045,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "데스크톱 사이드바 내비게이션",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "{label} 메뉴 펼치기",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "사이드바 확장",
+  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "로컬 전용 모드가 켜져 있습니다. 설정에서 이 모드 설명을 확인하세요.",
   "i18n.uiText.UI_TEXT.layout.logout": "로그아웃",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "로그아웃",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "현재 세션에서 로그아웃하시겠습니까? 로그아웃 후에는 비밀번호를 다시 입력해야 합니다.",

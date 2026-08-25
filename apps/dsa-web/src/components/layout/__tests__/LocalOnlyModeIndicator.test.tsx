@@ -6,10 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { outboundActivityApi } from '../../../api/outboundActivity';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { LocalOnlyModeStatus } from '../../../types/outboundActivity';
-import {
-  buildLocalOnlyModeSettingsHref,
-  LocalOnlyModeIndicator,
-} from '../LocalOnlyModeIndicator';
+import { LocalOnlyModeIndicator } from '../LocalOnlyModeIndicator';
+import { buildLocalOnlyModeSettingsHref } from '../localOnlyMode';
 
 vi.mock('../../../api/outboundActivity', () => ({
   outboundActivityApi: {
@@ -60,7 +58,7 @@ describe('LocalOnlyModeIndicator', () => {
 
     const indicator = await screen.findByTestId('shell-local-only-indicator');
     expect(indicator).toHaveAttribute('data-local-only-mode', 'on');
-    expect(indicator).toHaveAttribute('aria-label', 'Local Only mode is on');
+    expect(indicator).toHaveAttribute('aria-label', 'Local Only Mode is on. Open Settings to review this mode.');
     expect(indicator).toHaveAttribute('href', buildLocalOnlyModeSettingsHref());
     expect(indicator.getAttribute('aria-label') ?? '').not.toMatch(
       /airtight|every destination|all outbound|protected|blocked/i,
@@ -78,7 +76,7 @@ describe('LocalOnlyModeIndicator', () => {
 
     await waitFor(() => expect(getLocalOnlyStatus).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Local Only mode is on' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Local Only/i })).not.toBeInTheDocument();
   });
 
   it('does not claim protection when the endpoint fails', async () => {
@@ -87,8 +85,8 @@ describe('LocalOnlyModeIndicator', () => {
 
     await waitFor(() => expect(getLocalOnlyStatus).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Local Only mode is on' })).not.toBeInTheDocument();
-    expect(screen.queryByText(/Local Only mode is on/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Local Only/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local Only/i)).not.toBeInTheDocument();
   });
 
   it('does not claim protection while status is still unknown', () => {
@@ -96,6 +94,6 @@ describe('LocalOnlyModeIndicator', () => {
     renderIndicator();
 
     expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
-    expect(screen.queryByText(/Local Only mode is on/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Local Only/i)).not.toBeInTheDocument();
   });
 });

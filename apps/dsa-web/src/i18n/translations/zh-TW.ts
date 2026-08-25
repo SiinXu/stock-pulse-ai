@@ -1045,6 +1045,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.layout.desktopSidebar": "桌面側邊導航",
   "i18n.uiText.UI_TEXT.layout.expandNavGroup": "展開{label}選單",
   "i18n.uiText.UI_TEXT.layout.expandSidebar": "展開側邊欄",
+  "i18n.uiText.UI_TEXT.layout.localOnlyModeOpenSettings": "本地專用模式已開啟。打開設定查看該模式說明。",
   "i18n.uiText.UI_TEXT.layout.logout": "退出",
   "i18n.uiText.UI_TEXT.layout.logoutConfirm": "確認退出",
   "i18n.uiText.UI_TEXT.layout.logoutMessage": "確認退出當前登入狀態嗎？退出後需要重新輸入密碼。",

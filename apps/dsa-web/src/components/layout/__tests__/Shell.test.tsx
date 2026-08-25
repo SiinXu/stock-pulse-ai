@@ -1,10 +1,13 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { outboundActivityApi } from '../../../api/outboundActivity';
 import { ThemeProvider } from '../../theme/ThemeProvider';
 import { Shell } from '../Shell';
-import { buildLocalOnlyModeSettingsHref } from '../LocalOnlyModeIndicator';
+import { buildLocalOnlyModeSettingsHref } from '../localOnlyMode';
+
+const { localOnlyModeState } = vi.hoisted(() => ({
+  localOnlyModeState: { status: 'off' as 'unknown' | 'off' | 'on' },
+}));
 
 const DESKTOP_SIDEBAR_QUERY = '(min-width: 1024px)';
 const COMPACT_SIDEBAR_QUERY = '(min-width: 1024px) and (max-width: 1279px)';
@@ -56,17 +59,8 @@ vi.mock('../../../api/history', () => ({
   },
 }));
 
-vi.mock('../../../api/outboundActivity', () => ({
-  outboundActivityApi: {
-    getLocalOnlyStatus: vi.fn().mockResolvedValue({
-      enabled: false,
-      envKey: 'LOCAL_ONLY_MODE',
-      policy: 'non_loopback_denied',
-      allowedDestinationClasses: ['loopback'],
-      blockedErrorReason: 'local_only_mode_blocked',
-    }),
-    listActivity: vi.fn(),
-  },
+vi.mock('../../../hooks/useLocalOnlyModeStatus', () => ({
+  useLocalOnlyModeStatus: () => ({ status: localOnlyModeState.status }),
 }));
 
 function LocationProbe() {
@@ -130,13 +124,7 @@ beforeEach(() => {
   mediaMatches.clear();
   mediaListeners.clear();
   localStorage.removeItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
-  vi.mocked(outboundActivityApi.getLocalOnlyStatus).mockResolvedValue({
-    enabled: false,
-    envKey: 'LOCAL_ONLY_MODE',
-    policy: 'non_loopback_denied',
-    allowedDestinationClasses: ['loopback'],
-    blockedErrorReason: 'local_only_mode_blocked',
-  });
+  localOnlyModeState.status = 'off';
 });
 
 describe('Shell', () => {
@@ -149,24 +137,17 @@ describe('Shell', () => {
     expect(screen.getByText('page content')).toBeInTheDocument();
   });
 
-  it('keeps Local Only chrome hidden unless the endpoint reports enabled', async () => {
+  it('keeps Local Only chrome hidden unless the endpoint reports enabled', () => {
     renderShell();
 
-    await waitFor(() => expect(outboundActivityApi.getLocalOnlyStatus).toHaveBeenCalled());
     expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
   });
 
-  it('surfaces Local Only in the shell when enabled and opens Auth & Security', async () => {
-    vi.mocked(outboundActivityApi.getLocalOnlyStatus).mockResolvedValue({
-      enabled: true,
-      envKey: 'LOCAL_ONLY_MODE',
-      policy: 'non_loopback_denied',
-      allowedDestinationClasses: ['loopback'],
-      blockedErrorReason: 'local_only_mode_blocked',
-    });
+  it('surfaces Local Only in the shell when enabled and opens Auth & Security', () => {
+    localOnlyModeState.status = 'on';
     renderShell();
 
-    const indicator = await screen.findByTestId('shell-local-only-indicator');
+    const indicator = screen.getByTestId('shell-local-only-indicator');
     expect(indicator).toHaveAttribute('href', buildLocalOnlyModeSettingsHref());
     fireEvent.click(indicator);
     expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(

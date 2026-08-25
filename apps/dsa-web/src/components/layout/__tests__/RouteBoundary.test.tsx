@@ -23,6 +23,10 @@ vi.mock('../../../stores/agentChatStore', () => {
   };
 });
 
+vi.mock('../../../hooks/useLocalOnlyModeStatus', () => ({
+  useLocalOnlyModeStatus: () => ({ status: 'off' }),
+}));
+
 describe('RouteOutletBoundary', () => {
   it('catches rejected lazy route imports inside the shell and resets on navigation', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
