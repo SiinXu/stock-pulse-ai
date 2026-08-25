@@ -60,6 +60,14 @@ CLI 本身就是显式选择加入的边界。不存在运行时
 `AGENT_TRAJECTORY_EVAL_ENABLED` 配置：生产分析路径并不调用本评估器，发布
 一个无消费者的环境变量只会形成第二套配置所有者。
 
+## 可选策展等级（#1096）
+
+已记录的评测 episode 可通过 `python scripts/label_curator_grades.py --fixture path.json`
+写入 sidecar 策展等级（`pass` / `fail` / `partial` / `harmful`）。调用即门禁。
+fixture 缺失等级保持缺席。episode 行上历史 `manual_grade`（例如 `wrong`）仍可读取，不会被收紧。
+这不会给离线基准打分，也不会喂给适配器（#1106）。详见
+[agent-episode-log.md](agent-episode-log.md)。
+
 ## 轨迹评估契约
 
 完整 `--json-out` 产物的每个 `scenario_details[]` 都包含带版本的

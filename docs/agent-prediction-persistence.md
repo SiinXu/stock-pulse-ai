@@ -96,7 +96,7 @@ Opinion is a separate sidecar, not a rewrite of resolver actuals:
 - Identity keys are path-only. Request bodies may not include `run_id` / `prediction_id`.
 - Writes reuse `lock_opinion_payload`, `reject_memory_write_text`, and `apply_server_provenance` (`provenance_source=user_feedback`, optional `actor_id=local_admin`). Client provenance keys are rejected and not persisted.
 - Feedback never writes `agent_predictions.outcome_json`, never `UPDATE`s append-only `agent_episodes`, and never changes prediction `status` / `resolved_at`. Missing feedback does not keep a row `pending`. Episode merge is a later read-time join; the sidecar is the system of record.
-- This is not decision-signal `useful|not_useful` feedback, not #1096 curator buckets, and not a prediction query/diagnostics API. Web professional reports now expose optional run feedback (`useful|partial|wrong|harmful` plus a 1000-character note) keyed by `report.meta.queryId`. Prediction-feedback UI is later.
+- This is not decision-signal `useful|not_useful` feedback, not #1096 eval-fixture curator grades (`pass|fail|partial|harmful` via `python scripts/label_curator_grades.py --fixture path.json`), and not a prediction query/diagnostics API. Web professional reports now expose optional run feedback (`useful|partial|wrong|harmful` plus a 1000-character note) keyed by `report.meta.queryId`. Prediction-feedback UI is later.
 
 ## Concurrency
 
