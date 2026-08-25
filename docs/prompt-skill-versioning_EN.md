@@ -1,7 +1,7 @@
 # Prompt and Skill versioning
 
 **Issue:** #249
-**Related:** promotion pipeline #1093 (out of scope here), evaluation harness #215
+**Related:** promotion pipeline #1093 (dry-run CLI sidecar on this slice; governed catalog activation remains leftover), evaluation harness #215
 
 Chinese version: `docs/prompt-skill-versioning.md`
 
@@ -14,7 +14,7 @@ back without rewriting source modules or the runtime ToolSurface.
 This issue intentionally does **not**:
 
 - Change any shipped prompt / Skill instruction text
-- Implement experimental → production promotion (#1093)
+- Governed experimental → production Skill activation (#1093 leftover after the dry-run CLI)
 - Build approval UI, A/B assignment, or cross-version eval orchestration
 
 ## Identity model
@@ -88,8 +88,13 @@ proof.
 | Version id + content hash | Yes | Consumes |
 | History + key-prompt rollback pin; Skill management pin | Yes | Consumes and governs Skill-pin activation |
 | Lifecycle label field | Store only | Transitions / policy |
-| Experimental activation | No | Yes |
-| Eval + promotion CLI | No | Yes |
+| Experimental catalog activation | No | Leftover after the dry-run CLI |
+| Eval + promotion CLI | No | Dry-run `scripts/agent_evolve.py` sidecar (see [agent-promotion.md](agent-promotion.md)); approve does not activate Skills |
+
+The #1093 dry-run CLI consumes version identity from this document and embeds a
+sandbox `PromotionReceipt`. Approving a sidecar does not activate Skills, rewrite
+`strategies/*.yaml`, or apply a production pin. Governed Skill-pin activation
+remains a later leftover of #1093.
 
 ## Programmatic usage
 

@@ -43,6 +43,12 @@ OS privileges as StockPulse. There is:
 - no dependency installer for plugins;
 - no OS/process sandbox from manifest `permissions` (declaration only; agent_tool load-time subset check is not containment);
 - no hot reload (change requires process restart).
+- no network sandbox: plugins share the host process. Outbound HTTP must use
+  `plugin_safe_get` / `plugin_safe_post` / `plugin_safe_request` from
+  `src.plugins` so `LOCAL_ONLY_MODE` can deny non-loopback egress. Direct
+  `requests` / `urllib.request` / `httpx` usage in bundled and example plugins
+  is flagged by tests. A malicious plugin can still `import socket` and bypass
+  this wrapper.
 
 
 ### Manifest `permissions` (declaration, not sandbox)
@@ -194,7 +200,8 @@ closed without changing the persisted file.
 External plugins should import only:
 
 1. Names re-exported from `src.plugins` listed in
-   `PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS`
+   `PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS` (including `plugin_safe_get`,
+   `plugin_safe_post`, `plugin_safe_request`, and `OutboundPolicyError`)
 2. `src.data_provider.DataProvider` / `DataProviderRegistration` for providers
 3. Host-owned types required by a specific point when not on the plugin root:
    - `Skill` from `src.agent.skills.base` for `analysis_strategy`

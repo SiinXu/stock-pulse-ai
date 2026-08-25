@@ -42,7 +42,8 @@ Loopback and other non-public destinations remain denied unless listed in
 | `OUTBOUND_HTTP_ALLOWLIST` remote hosts | **No** | Allowlist **cannot** expand the perimeter beyond pure loopback while Local Only is on |
 | Desktop GitHub update checks | **No (desktop shell skips)** | The shell queries `GET /api/v1/security/local-only` and does not contact GitHub while the mode is on or unknown |
 | Non-HTTP provider sockets (for example pytdx / baostock TCP) | **Out of scope** | Outside the HTTP policy by design |
-| Plugin child processes | **Out of scope** | Manifest permissions are descriptive and do not sandbox the child |
+| Plugin HTTP via `plugin_safe_*` | **No** for non-loopback | Sanctioned plugin HTTP uses the same outbound policy; blocked with `local_only_mode_blocked` |
+| Plugin HTTP via `requests` / `socket` | **Not contained** | Plugins run in-process. Direct clients in bundled/example plugins are flagged by tests; a malicious plugin can still bypass the wrapper |
 | SMTP / DB / other non-HTTP protocols | **Out of scope** | Same limits as the outbound HTTP policy document |
 
 Local Only is an **egress gate**, not a guarantee of “full offline analysis
@@ -54,6 +55,7 @@ models (#178, #203). This mode makes policy-owned remote HTTP **verifiable and f
 | Threat | Mitigation |
 | --- | --- |
 | Operator believes Privacy Mode is on but cloud LLM still runs | Single env/config key `LOCAL_ONLY_MODE` enforced inside `src/security/outbound_policy.py` for all `safe_*` / `validate_outbound_url` / DNS-guarded SDK paths |
+| Plugin calls `requests.get` while Local Only is on | Bundled/example plugins must use `plugin_safe_*`; tests flag direct HTTP clients. This is **not** a process sandbox — in-process Python can still import `socket` |
 | Silent degradation (blocked call returns empty success) | Policy raises before connect; reason code is stable and named |
 | Allowlist used to re-open cloud while “local only” is claimed | Local Only ignores allowlist expansion for non-loopback |
 | DNS rebinding of `localhost` to a public IP | DNS answers under Local Only must be loopback or the call is blocked |
@@ -80,11 +82,13 @@ LOCAL_ONLY_MODE=true
 | Activity API | `GET /api/v1/security/outbound-activity` |
 | Web panel | Settings → Auth & Security → Outbound activity |
 | Automated proof | `tests/security/test_local_only_mode.py` (analysis-walk fixture: zero non-loopback allows) |
+| Plugin HTTP contract | `tests/plugins/test_plugin_outbound_http.py` (sanctioned helper blocked; direct-client guard; analysis isolation) |
 
 ## Limits
 
 - In-memory activity ring buffer (default capacity 100) is per process and clears on restart.
-- Paths that bypass `src.security.outbound_policy` are outside this contract; new HTTP call sites must use the shared helpers. Today that includes non-HTTP provider sockets and plugin child processes. Desktop GitHub update checks are skipped by the desktop shell when this mode is on.
+- Paths that bypass `src.security.outbound_policy` are outside this contract; new HTTP call sites must use the shared helpers. Today that includes non-HTTP provider sockets. Desktop GitHub update checks are skipped by the desktop shell when this mode is on.
+- Plugins are in-process Python. `plugin_safe_*` is the sanctioned API and is fail-closed under Local Only. It is not a sandbox and does not stop a plugin that imports `socket` or a raw HTTP client.
 - Local Only does not by itself install models or historical data.
 
 ## Rollback

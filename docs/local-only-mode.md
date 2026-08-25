@@ -42,7 +42,8 @@
 | `OUTBOUND_HTTP_ALLOWLIST` 远程主机 | **否** | 本地专用开启时，allowlist **不能**把边界扩到回环以外 |
 | 桌面端 GitHub 更新检查 | **否（桌面壳跳过）** | 壳查询 `GET /api/v1/security/local-only`；模式开启或状态未知时不联系 GitHub |
 | 非 HTTP 数据源套接字（如 pytdx / baostock TCP） | **不在本闸门范围** | 按设计不在 HTTP 策略内 |
-| 插件子进程 | **不在本闸门范围** | 清单 permissions 仅作说明，不构成沙箱 |
+| 经 `plugin_safe_*` 的插件 HTTP | 非回环为 **否** | 插件受支持的 HTTP 走同一出站策略，拦截 reason 为 `local_only_mode_blocked` |
+| 插件直接使用 `requests` / `socket` | **无法真正隔离** | 插件在进程内运行。捆绑/示例插件的直接 HTTP 客户端由测试标记；恶意插件仍可绕过 wrapper |
 | SMTP / 数据库 / 其他非 HTTP | **不在本闸门范围** | 与出站 HTTP 策略文档相同限制 |
 
 本地专用是 **出站闸门**，并不单独保证「离线分析质量足够好」。可接受的离线分析仍依赖缓存覆盖与本地模型（#178、#203）。本模式让策略管辖的远程 HTTP **可核验且 fail-closed**。
@@ -52,6 +53,7 @@
 | 威胁 | 缓解 |
 | --- | --- |
 | 用户以为开了隐私模式，云端 LLM 仍在跑 | 单一配置键 `LOCAL_ONLY_MODE`，在 `src/security/outbound_policy.py` 对所有 `safe_*` / `validate_outbound_url` / DNS 守卫路径强制生效 |
+| 插件在本地专用开启时调用 `requests.get` | 捆绑/示例插件必须使用 `plugin_safe_*`；测试会标记直接 HTTP 客户端。这 **不是** 进程沙箱——进程内 Python 仍可 `import socket` |
 | 静默降级（拦截却返回空成功） | 建连前抛错；reason 码稳定且点名模式 |
 | 用 allowlist 在「本地专用」下重新打开云端 | 本地专用对非回环忽略 allowlist 扩权 |
 | `localhost` DNS 重绑定到公网 IP | 本地专用下 DNS 答案必须是回环，否则拦截 |
@@ -78,11 +80,13 @@ LOCAL_ONLY_MODE=true
 | 活动 API | `GET /api/v1/security/outbound-activity` |
 | Web 面板 | 设置 → 认证与安全 → 出站活动 |
 | 自动化证明 | `tests/security/test_local_only_mode.py`（分析路径夹具：零非回环允许） |
+| 插件 HTTP 契约 | `tests/plugins/test_plugin_outbound_http.py`（受支持 helper 被拦截；直接客户端守卫；分析隔离） |
 
 ## 限制
 
 - 活动记录为进程内环形缓冲（默认容量 100），重启清空。
-- 绕过 `src.security.outbound_policy` 的 HTTP 调用不在本合同内；新增调用点必须使用共享 helper。当前包括非 HTTP 数据源套接字与插件子进程。桌面 GitHub 更新检查在本模式开启时由桌面壳跳过。
+- 绕过 `src.security.outbound_policy` 的 HTTP 调用不在本合同内；新增调用点必须使用共享 helper。当前包括非 HTTP 数据源套接字。桌面 GitHub 更新检查在本模式开启时由桌面壳跳过。
+- 插件是进程内 Python。`plugin_safe_*` 是受支持的 API，在本地专用下 fail-closed。它不是沙箱，也无法阻止插件 `import socket` 或原始 HTTP 客户端。
 - 本模式不会自动安装模型或历史数据。
 
 ## 回滚
