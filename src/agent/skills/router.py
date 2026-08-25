@@ -372,6 +372,30 @@ def _context_has_requested_skills(ctx: AgentContext) -> bool:
     return bool(requested)
 
 
+def select_specialist_skill_ids(owner, ctx: AgentContext) -> List[str]:
+    """Resolve specialist skill ids for this run without mutating owner dumps.
+
+    Hierarchy: context ``skills_requested`` still wins; explicit factory/config
+    selection uses the already-activated SkillManager set and does not retrieve;
+    implicit auto uses ``SkillRouter.select_skills`` (including K>0 retrieval).
+    """
+    skill_manager = getattr(owner, "skill_manager", None)
+    config = getattr(owner, "config", None)
+    if _context_has_requested_skills(ctx):
+        return SkillRouter(
+            skill_manager=skill_manager,
+            config=config,
+        ).select_skills(ctx)
+    if getattr(owner, "explicit_skill_selection", False):
+        if skill_manager is None:
+            return []
+        return [skill.name for skill in skill_manager.list_active_skills()]
+    return SkillRouter(
+        skill_manager=skill_manager,
+        config=config,
+    ).select_skills(ctx)
+
+
 def skill_instructions_for_run(
     owner,
     ctx: AgentContext,
