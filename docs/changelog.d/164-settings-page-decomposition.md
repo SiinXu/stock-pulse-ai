@@ -1,0 +1,1 @@
+- [Changed] Decomposed SettingsPage behind a stable surface (Refs #164).

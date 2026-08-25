@@ -37,6 +37,13 @@ const {
   DESKTOP_BACKEND_DEFAULT_HOST,
   createBackendRuntime,
 } = require('./backend-runtime');
+const {
+  LOCAL_ONLY_STATUS_PATH,
+  UPDATE_CHECK_DECISION,
+  buildLocalOnlyStatusUrl,
+  decideDesktopUpdateCheckEligibility,
+  parseLocalOnlyModeStatus,
+} = require('./desktop-update-policy');
 const { spawn } = require('child_process');
 const net = require('net');
 const http = require('http');
@@ -56,6 +63,7 @@ let lastPromptedInstallVersion = '';
 let electronAutoUpdater = undefined;
 let electronAutoUpdaterConfigured = false;
 let electronUpdateCheckInFlight = false;
+let localOnlyModeStatusForTest = undefined;
 let desktopMainPageUrl = '';
 let desktopWebReady = false;
 let pendingDesktopDeepLinkRoute = null;
@@ -854,6 +862,144 @@ async function checkForDesktopUpdates({
 } = {}) {
   const release = await fetchLatestRelease({ timeoutMs });
   return evaluateReleaseUpdate({ currentVersion, release });
+}
+
+function resolveDesktopBackendOrigin(pageUrl = desktopMainPageUrl) {
+  if (typeof pageUrl !== 'string' || !pageUrl.trim()) {
+    return '';
+  }
+  try {
+    return new URL(pageUrl).origin;
+  } catch (_error) {
+    return '';
+  }
+}
+
+function fetchLocalOnlyModeStatus({
+  origin = resolveDesktopBackendOrigin(),
+  timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
+  request = http.request,
+} = {}) {
+  if (localOnlyModeStatusForTest !== undefined) {
+    if (localOnlyModeStatusForTest instanceof Error) {
+      return Promise.reject(localOnlyModeStatusForTest);
+    }
+    return Promise.resolve(localOnlyModeStatusForTest);
+  }
+
+  const requestUrl = buildLocalOnlyStatusUrl(origin);
+  if (!requestUrl) {
+    return Promise.reject(new Error('Desktop backend origin is unavailable.'));
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    let response = null;
+
+    const cleanupResponseListeners = () => {
+      if (!response) {
+        return;
+      }
+      response.removeAllListeners('data');
+      response.removeAllListeners('end');
+      response.removeAllListeners('error');
+      response.removeAllListeners('aborted');
+      response.removeAllListeners('close');
+    };
+
+    const finishWithError = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanupResponseListeners();
+      if (!req.destroyed) {
+        req.destroy();
+      }
+      reject(error instanceof Error ? error : new Error(String(error)));
+    };
+
+    const finishWithResult = (value) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanupResponseListeners();
+      resolve(value);
+    };
+
+    const req = request(
+      requestUrl,
+      {
+        method: 'GET',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'StockPulse-Desktop/1.0',
+        },
+      },
+      (incomingResponse) => {
+        response = incomingResponse;
+        const chunks = [];
+
+        response.on('data', (chunk) => {
+          chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(String(chunk)));
+        });
+
+        response.on('end', () => {
+          if (settled) {
+            return;
+          }
+          const body = Buffer.concat(chunks).toString('utf-8');
+          if (response.statusCode !== 200) {
+            finishWithError(new Error(`Local Only status responded with status ${response.statusCode || 'unknown'}`));
+            return;
+          }
+
+          try {
+            finishWithResult(JSON.parse(body));
+          } catch (_error) {
+            finishWithError(new Error('Failed to parse Local Only status response.'));
+          }
+        });
+
+        response.on('error', (error) => {
+          finishWithError(error);
+        });
+        response.on('aborted', () => {
+          finishWithError(new Error('Local Only status response was aborted.'));
+        });
+        response.on('close', () => {
+          if (!response.complete) {
+            finishWithError(new Error('Local Only status response closed before completion.'));
+          }
+        });
+      }
+    );
+
+    req.setTimeout(timeoutMs, () => {
+      req.destroy(new Error(`Local Only status timeout after ${timeoutMs}ms`));
+    });
+    req.on('error', finishWithError);
+    req.end();
+  });
+}
+
+async function resolveDesktopUpdateCheckEligibility({
+  fetchLocalOnlyStatus = fetchLocalOnlyModeStatus,
+} = {}) {
+  const origin = resolveDesktopBackendOrigin();
+  if (!origin) {
+    return decideDesktopUpdateCheckEligibility({ known: false, enabled: null });
+  }
+
+  try {
+    const payload = await fetchLocalOnlyStatus({ origin });
+    return decideDesktopUpdateCheckEligibility(parseLocalOnlyModeStatus(payload));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logLine(`[update] local-only status unavailable: ${message}`);
+    return decideDesktopUpdateCheckEligibility({ known: false, enabled: null });
+  }
 }
 
 desktopUpdateState = buildUpdateState();
@@ -1783,7 +1929,23 @@ async function performElectronUpdaterCheck({ manual = false } = {}) {
   }
 }
 
-async function performDesktopUpdateCheck({ manual = false, notify = false } = {}) {
+async function performDesktopUpdateCheck({
+  manual = false,
+  notify = false,
+  fetchLocalOnlyStatus = fetchLocalOnlyModeStatus,
+  fetchLatestRelease = fetchLatestReleaseJson,
+} = {}) {
+  const eligibility = await resolveDesktopUpdateCheckEligibility({ fetchLocalOnlyStatus });
+  if (!eligibility.allowed) {
+    logLine(`[update] skipped decision=${eligibility.decision}`);
+    return setDesktopUpdateState({
+      status: UPDATE_STATUS.ERROR,
+      currentVersion: resolveDesktopVersion(),
+      checkedAt: new Date().toISOString(),
+      message: eligibility.message,
+    });
+  }
+
   if (canUseElectronAutoUpdater()) {
     return performElectronUpdaterCheck({ manual, notify });
   }
@@ -1796,7 +1958,7 @@ async function performDesktopUpdateCheck({ manual = false, notify = false } = {}
   });
 
   try {
-    const nextState = await checkForDesktopUpdates({ currentVersion });
+    const nextState = await checkForDesktopUpdates({ currentVersion, fetchLatestRelease });
     const resolvedState = setDesktopUpdateState(nextState);
     logLine(
       `[update] status=${resolvedState.status} current=${resolvedState.currentVersion || 'unknown'} latest=${resolvedState.latestVersion || 'unknown'}`
@@ -4208,15 +4370,20 @@ module.exports = {
   DESKTOP_OPEN_OPERATOR_TERMINAL_CHANNEL,
   DESKTOP_OPEN_CLI_INSTALL_GUIDE_CHANNEL,
   DESKTOP_UPDATE_RUNTIME_RELATIVE_FILES,
+  LOCAL_ONLY_STATUS_PATH,
+  UPDATE_CHECK_DECISION,
   UPDATE_MODE,
   UPDATE_STATUS,
+  buildLocalOnlyStatusUrl,
   buildUpdateState,
   backupPackagedRuntimeState,
   buildBackendArgs,
   buildCliOperatorGuidance,
   checkForDesktopUpdates,
   compareVersions,
+  decideDesktopUpdateCheckEligibility,
   evaluateReleaseUpdate,
+  fetchLocalOnlyModeStatus,
   buildBackendUrl,
   buildBackendEnvironment,
   createDesktopModelPackAttestation,
@@ -4280,13 +4447,17 @@ module.exports = {
   migrateMacPackagedRuntimeState,
   migrateLegacyProductUserData,
   normalizeVersionString,
+  parseLocalOnlyModeStatus,
   parseSemver,
   parseDesktopDeepLink,
+  performDesktopUpdateCheck,
   queueDesktopDeepLink,
   readEnvFileValue,
   requestPackagedSingleInstanceLock,
   registerDesktopProtocolClient,
   resolveDesktopAssistantTrayIconPath,
+  resolveDesktopBackendOrigin,
+  resolveDesktopUpdateCheckEligibility,
   resolveAppDir,
   resolveLegacyProductUserDataDirs,
   resolveBackendBindHost,
@@ -4323,6 +4494,9 @@ module.exports = {
     desktopWebReady = webReady;
     backendRuntime.setStartErrorForTest(startError);
     desktopAssistantLastReadyAt = lastReadyAt;
+  },
+  __setLocalOnlyModeStatusForTest(payload = undefined) {
+    localOnlyModeStatusForTest = payload;
   },
   __setDesktopDeepLinkStateForTest({
     mainPageUrl = '',

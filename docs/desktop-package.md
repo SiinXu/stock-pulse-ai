@@ -603,8 +603,9 @@ win-unpacked/
 
 ### 桌面端更新提醒
 
-- 应用在主界面加载完成后会后台检查 GitHub Releases 的最新正式版，并与当前 `app.getVersion()` 做语义化版本比较
-- Windows NSIS 安装版会通过内置 GitHub 更新源自动下载新版本；下载完成后弹出一次性提醒，用户确认后静默重启并安装
+- 应用在主界面加载完成后，会先向本机后端查询 `GET /api/v1/security/local-only`。仅当该接口确认 `LOCAL_ONLY_MODE` 为关闭时，才后台检查 GitHub Releases，并与当前 `app.getVersion()` 做语义化版本比较
+- 若 Local Only Mode 已开启，或状态无法确认（后端未就绪、接口失败、未授权），桌面端 **fail-closed**：不访问 GitHub，也不走 Windows NSIS `electron-updater`。设置「关于」卡片展示跳过原因，`logs/desktop.log` 记录 `[update] skipped ...`
+- Windows NSIS 安装版在 Local Only 确认关闭后，会通过内置 GitHub 更新源自动下载新版本；下载完成后弹出一次性提醒，用户确认后静默重启并安装
 - 自动更新静默安装会复用当前安装目录；如果用户安装时选择了非默认目录或带空格目录，后续自动更新仍会覆盖同一目录
 - `系统设置 -> 版本信息` 中的“桌面端更新”区域可手动检查更新；若更新已下载，会展示“重启安装”操作
 - Windows 免安装包、开发态和 macOS DMG 仍保持“提醒 + 跳转下载页”的兼容路径，不会因为网络失败而阻断桌面端启动

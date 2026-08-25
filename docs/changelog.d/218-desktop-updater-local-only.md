@@ -1,0 +1,1 @@
+- [Fixed] Skipped desktop update checks under Local Only Mode (Refs #218).
