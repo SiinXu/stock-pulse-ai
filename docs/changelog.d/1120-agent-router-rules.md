@@ -1,0 +1,2 @@
+- [Added] Add a rules-first AgentRouter library that classifies quick|standard|full|specialist and chat incremental_tool vs full_repipeline from bounded facts, with fail-closed invalid overrides and identity-neutral miss-rate evidence (Refs #1120).
+- [Docs] Document the AgentRouter library contract, remaining caller-wiring gaps, and the #1091/#1106 outcome-bias boundary (Refs #1120).
