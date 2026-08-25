@@ -27,7 +27,7 @@ from src.agent.skills.retrieval import (
     resolve_skill_retrieval_k,
     retrieve_skills,
 )
-from src.utils.sanitize import log_safe_exception
+from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
 
 logger = logging.getLogger(__name__)
 
@@ -218,7 +218,7 @@ class SkillRouter:
         ctx: AgentContext,
         *,
         available_skills: list,
-        skill_catalog,
+        skill_catalog: Optional[Sequence],
         available_ids: set,
         retrieval_k: int,
     ) -> List[str]:
@@ -241,17 +241,19 @@ class SkillRouter:
                 max_count=retrieval_k,
                 available_skill_ids=available_ids or None,
             )
-        selected = self._filter_for_context(selected, ctx)[:retrieval_k]
+        selected_ids = [skill_id for skill_id in selected]
+        selected = self._filter_for_context(selected_ids, ctx)[:retrieval_k]
         if selected:
             return selected
-        return self._filter_for_context(
-            get_default_router_skill_ids(
+        fallback_ids = [
+            skill_id
+            for skill_id in get_default_router_skill_ids(
                 skill_catalog,
                 max_count=retrieval_k,
                 available_skill_ids=available_ids or None,
-            ),
-            ctx,
-        )[:retrieval_k]
+            )
+        ]
+        return self._filter_for_context(fallback_ids, ctx)[:retrieval_k]
 
     def _filter_for_context(
         self,
@@ -270,8 +272,8 @@ class SkillRouter:
             if market_scopes and not self._context_matches_scopes(ctx, market_scopes):
                 logger.info(
                     "[SkillRouter] scope excluded skill=%s stock_code=%s",
-                    skill_id,
-                    ctx.stock_code,
+                    sanitize_diagnostic_text(skill_id),
+                    sanitize_diagnostic_text(ctx.stock_code),
                 )
                 continue
             selected.append(skill_id)
@@ -370,7 +372,11 @@ def _context_has_requested_skills(ctx: AgentContext) -> bool:
     return bool(requested)
 
 
-def skill_instructions_for_run(owner, ctx: AgentContext, selected=None) -> str:
+def skill_instructions_for_run(
+    owner,
+    ctx: AgentContext,
+    selected: Optional[Sequence[str]] = None,
+) -> str:
     """Render this run's instructions locally. Do not mutate owner state.
 
     Hierarchy matches SkillRouter: context-local skills_requested wins;

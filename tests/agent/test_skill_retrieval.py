@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import inspect
 import math
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -38,6 +39,7 @@ def _skill(
     aliases: list[str] | None = None,
     default_router: bool = False,
     category: str = "trend",
+    market_scopes: list[str] | None = None,
 ) -> Skill:
     return Skill(
         name=name,
@@ -48,6 +50,7 @@ def _skill(
         default_router=default_router,
         category=category,
         enabled=False,
+        market_scopes=list(market_scopes or []),
     )
 
 
@@ -758,3 +761,36 @@ def test_denied_tool_still_not_invocable_after_skill_retrieval() -> None:
         denial_codes=denials,
     )
     assert AGENT_SOUL_HASH
+
+
+def test_skill_router_has_no_raw_exception_object_log_violations() -> None:
+    """Counterexample: unannotated skill_catalog taint flagged the scope-exclusion log."""
+    from tests.test_exception_log_callsite_guard import find_exception_log_violations
+
+    path = "src/agent/skills/router.py"
+    source = Path(path).read_text(encoding="utf-8")
+    assert find_exception_log_violations(path, source) == []
+
+
+def test_retrieval_scope_exclusion_falls_back_to_default_router_set() -> None:
+    manager = SkillManager()
+    manager.register(
+        _skill(
+            "us_box",
+            display_name="US box",
+            description="箱体震荡",
+            market_scopes=["us/equity"],
+        )
+    )
+    manager.register(
+        _skill("bull_trend", description="默认多头趋势", default_router=True)
+    )
+    ctx = AgentContext(query="箱体震荡", stock_code="600519")
+    selected = SkillRouter(
+        skill_manager=manager,
+        config=_auto_config(2),
+    ).select_skills(ctx)
+    expected = get_default_router_skill_ids(manager.list_skills(), max_count=2)
+    assert "us_box" not in selected
+    assert selected == expected
+    assert ctx.meta[RETRIEVED_SKILLS_META_KEY] == selected
