@@ -215,6 +215,7 @@ test('desktop package includes the isolated floating assistant surface and tray 
   );
 
   assert.ok(packageMetadata.build.files.includes('backend-runtime.js'));
+  assert.ok(packageMetadata.build.files.includes('desktop-update-policy.js'));
   assert.ok(packageMetadata.build.files.includes('assistant-preload.js'));
   assert.ok(packageMetadata.build.files.includes('renderer/**/*'));
   assert.ok(packageMetadata.build.extraResources.some((entry) =>
@@ -259,6 +260,7 @@ test('Electron Builder selects the backend runtime modules', () => {
     'main.js',
     'backend-runtime.js',
     'desktop-env.js',
+    'desktop-update-policy.js',
     'preload.js',
     'package.json',
   ]) {
@@ -2034,6 +2036,145 @@ test('checkForDesktopUpdates delegates to release fetcher', async (t) => {
   assert.equal(state.releaseUrl, mainModule.RELEASES_PAGE_URL);
 });
 
+test('performDesktopUpdateCheck skip-closes when Local Only is on', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0',
+    ready: true,
+  });
+  let githubCalls = 0;
+  const state = await mainModule.performDesktopUpdateCheck({
+    fetchLocalOnlyStatus: async () => ({ enabled: true }),
+    fetchLatestRelease: async () => {
+      githubCalls += 1;
+      return { tag_name: 'v3.13.0' };
+    },
+  });
+
+  assert.equal(githubCalls, 0);
+  assert.equal(state.status, mainModule.UPDATE_STATUS.ERROR);
+  assert.equal(state.message, mainModule.decideDesktopUpdateCheckEligibility({
+    known: true,
+    enabled: true,
+  }).message);
+  assert.equal(
+    mainModule.decideDesktopUpdateCheckEligibility({ known: true, enabled: true }).decision,
+    mainModule.UPDATE_CHECK_DECISION.SKIP_LOCAL_ONLY
+  );
+});
+
+test('performDesktopUpdateCheck skip-closes when Local Only status is unknown', async (t) => {
+  const mainModule = loadMainModule(t);
+  const unknownCases = [
+    { label: 'missing origin', pageUrl: '', fetchLocalOnlyStatus: async () => ({ enabled: false }) },
+    { label: 'endpoint failure', pageUrl: 'http://127.0.0.1:8123/', fetchLocalOnlyStatus: async () => {
+      throw new Error('backend not ready');
+    } },
+    { label: 'malformed payload', pageUrl: 'http://127.0.0.1:8123/', fetchLocalOnlyStatus: async () => ({ enabled: 'yes' }) },
+  ];
+
+  for (const unknownCase of unknownCases) {
+    mainModule.__setDesktopDeepLinkStateForTest({
+      mainPageUrl: unknownCase.pageUrl,
+      ready: Boolean(unknownCase.pageUrl),
+    });
+    let githubCalls = 0;
+    const state = await mainModule.performDesktopUpdateCheck({
+      fetchLocalOnlyStatus: unknownCase.fetchLocalOnlyStatus,
+      fetchLatestRelease: async () => {
+        githubCalls += 1;
+        return { tag_name: 'v3.13.0' };
+      },
+    });
+    assert.equal(githubCalls, 0, unknownCase.label);
+    assert.equal(state.status, mainModule.UPDATE_STATUS.ERROR, unknownCase.label);
+    assert.equal(
+      mainModule.decideDesktopUpdateCheckEligibility({ known: false, enabled: null }).decision,
+      mainModule.UPDATE_CHECK_DECISION.SKIP_UNKNOWN
+    );
+    assert.equal(
+      state.message,
+      mainModule.decideDesktopUpdateCheckEligibility({ known: false, enabled: null }).message,
+      unknownCase.label
+    );
+  }
+});
+
+test('performDesktopUpdateCheck does not start electron-updater when Local Only is on', async (t) => {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-local-only-updater-'));
+  const exeDir = path.join(tempRoot, 'app');
+  const userDataDir = path.join(tempRoot, 'userData');
+  const exePath = path.join(exeDir, 'StockPulse.exe');
+  const uninstallPath = path.join(exeDir, 'Uninstall StockPulse.exe');
+  let updaterChecks = 0;
+  const fakeUpdater = {
+    autoDownload: true,
+    autoInstallOnAppQuit: false,
+    on: () => undefined,
+    checkForUpdates: async () => {
+      updaterChecks += 1;
+      return undefined;
+    },
+  };
+  const mainModule = loadMainModule(t, {
+    electronUpdater: fakeUpdater,
+    platform: 'win32',
+    app: {
+      isPackaged: true,
+      getPath: (name) => (name === 'exe' ? exePath : userDataDir),
+    },
+  });
+
+  fs.mkdirSync(exeDir, { recursive: true });
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.writeFileSync(uninstallPath, '');
+  t.after(() => {
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  assert.equal(mainModule.isWindowsNsisInstalledApp(), true);
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0',
+    ready: true,
+  });
+  const state = await mainModule.performDesktopUpdateCheck({
+    fetchLocalOnlyStatus: async () => ({ enabled: true }),
+    fetchLatestRelease: async () => {
+      throw new Error('GitHub must not be contacted');
+    },
+  });
+
+  assert.equal(updaterChecks, 0);
+  assert.equal(state.status, mainModule.UPDATE_STATUS.ERROR);
+  assert.equal(
+    state.message,
+    mainModule.decideDesktopUpdateCheckEligibility({ known: true, enabled: true }).message
+  );
+});
+
+test('performDesktopUpdateCheck reaches GitHub only when Local Only is confirmed off', async (t) => {
+  const mainModule = loadMainModule(t);
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0',
+    ready: true,
+  });
+  let githubCalls = 0;
+  const state = await mainModule.performDesktopUpdateCheck({
+    fetchLocalOnlyStatus: async () => ({ enabled: false, env_key: 'LOCAL_ONLY_MODE' }),
+    fetchLatestRelease: async () => {
+      githubCalls += 1;
+      return {
+        tag_name: 'v3.13.0',
+        html_url: 'https://github.com/SiinXu/stock-pulse-ai/releases/tag/v3.13.0',
+      };
+    },
+  });
+
+  assert.equal(githubCalls, 1);
+  assert.equal(state.status, mainModule.UPDATE_STATUS.UPDATE_AVAILABLE);
+  assert.equal(state.latestVersion, '3.13.0');
+});
+
 test('sanitizeReleaseUrl falls back for non-release links', (t) => {
   const mainModule = loadMainModule(t);
 
@@ -2148,6 +2289,11 @@ test('auto download prompt falls back to error when install path fails', async (
   });
 
   const mainSenderEvent = { sender: mainWebContents };
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0',
+    ready: true,
+  });
+  mainModule.__setLocalOnlyModeStatusForTest({ enabled: false });
   await mainModule.__getIpcMainHandler('desktop:check-for-updates')(mainSenderEvent);
   let state = await mainModule.__getIpcMainHandler('desktop:get-update-state')(mainSenderEvent);
   for (let idx = 0; idx < 12 && state.status !== mainModule.UPDATE_STATUS.ERROR; idx += 1) {
@@ -2232,6 +2378,11 @@ test('auto update backup copies AlphaSift hotspot detail directories recursively
     webContents: mainWebContents,
   });
 
+  mainModule.__setDesktopDeepLinkStateForTest({
+    mainPageUrl: 'http://127.0.0.1:8123/?desktop_version=0.1.0',
+    ready: true,
+  });
+  mainModule.__setLocalOnlyModeStatusForTest({ enabled: false });
   await mainModule.__getIpcMainHandler('desktop:check-for-updates')({
     sender: mainWebContents,
   });
@@ -3237,6 +3388,31 @@ test('createWindow startup routes a pending deep link after restore and backend 
         onResponse(response);
       });
       return request;
+    },
+    request: (url, _options, onResponse) => {
+      const req = new EventEmitter();
+      req.destroyed = false;
+      req.setTimeout = () => undefined;
+      req.destroy = () => {
+        req.destroyed = true;
+      };
+      req.end = () => {
+        process.nextTick(() => {
+          const response = new EventEmitter();
+          const isLocalOnlyStatus = String(url).includes('/api/v1/security/local-only');
+          response.statusCode = isLocalOnlyStatus ? 200 : 404;
+          response.complete = true;
+          onResponse(response);
+          response.emit(
+            'data',
+            Buffer.from(JSON.stringify(isLocalOnlyStatus
+              ? { enabled: false, env_key: 'LOCAL_ONLY_MODE' }
+              : {}))
+          );
+          response.emit('end');
+        });
+      };
+      return req;
     },
   };
 
