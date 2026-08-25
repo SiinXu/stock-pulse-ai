@@ -214,7 +214,8 @@ def test_do_not_trailer_overrides_high_presence_heuristic() -> None:
         triage=triage,
     )
     assert action == ACTION_DO_NOT_TRAILER
-    assert "pull_request_target" in rationale.lower() or "checkout" in rationale.lower()
+    assert "pull_request_target" in rationale.lower()
+    assert "workflow_dispatch" in rationale.lower()
 
     commit = UpstreamCommit(
         sha=deny.sha,
@@ -227,6 +228,44 @@ def test_do_not_trailer_overrides_high_presence_heuristic() -> None:
     )
     row = inventory_attention_commit(commit, repo=ROOT, trailer_triage=triage)
     assert row.suggested_action == ACTION_DO_NOT_TRAILER
+
+
+def test_sixteen_e342_pr_review_skip_overrides_high_presence() -> None:
+    """16e3421c1 stays do_not_trailer after the API-only #1422 slice."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    deny = next(entry for entry in triage.do_not_trailer if entry.sha.startswith("16e3421c1"))
+    action, rationale, _cluster = apply_trailer_triage(
+        sha=deny.sha,
+        action=ACTION_RECORD_TRAILER,
+        rationale="Most shared paths exist locally",
+        cluster="likely-absorbed",
+        triage=triage,
+    )
+    assert action == ACTION_DO_NOT_TRAILER
+    assert "pull_request_target" in rationale.lower()
+
+
+def test_post_child_absorbed_shas_moved_to_trailer_safe() -> None:
+    """#1423/#1424/#1425 product ports must not remain on the deny-list."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    absorbed = (
+        "cfd6b0a5fb9c57685dc2b02ca059fa88d8eff8ec",
+        "40b8c6c3cd6829d3fa4146c7aa64e273387df0e3",
+        "ae19329d6684c4ec4ad0b51e627c0c5204ccd594",
+    )
+    for sha in absorbed:
+        entry = triage.lookup(sha)
+        assert entry is not None, sha
+        assert entry.kind == KIND_TRAILER_SAFE, sha
+        action, rationale, _cluster = apply_trailer_triage(
+            sha=sha,
+            action=ACTION_DO_NOT_TRAILER,
+            rationale="stale deny-list reason",
+            cluster="stale",
+            triage=triage,
+        )
+        assert action == ACTION_RECORD_TRAILER, sha
+        assert rationale == entry.reason
 
 
 def test_trailer_safe_overrides_missing_renamed_path_heuristic() -> None:
