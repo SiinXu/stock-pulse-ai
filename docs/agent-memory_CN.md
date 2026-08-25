@@ -25,6 +25,8 @@
 | `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | 总开关。关闭时适配器为恒等：原始置信度、输入工具顺序、原路由，且不在 `AgentContext.meta` 写入 `adapter_influence`。 |
 | `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | 置信度校准生效所需的最少 `AgentMemory` 样本。低于阈值时因子为 `1.0`，`applied=false`。 |
 
+Issue #1115 示例名 `EVOLUTION_MIN_SAMPLES` **不是** `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` 的别名。只应作为 [预测核验安全放量](prediction-verification-rollout.md) 的 **第 5 步** 打开本适配器闸门：先抽取、再单 worker / 显式 CLI 解析器、再 miss/partial 后验。自动晋升保持硬关闭；没有 `EVOLUTION_AUTO_PROMOTE_SKILLS` 环境变量。
+
 开启且样本达到适配器阈值后，`calibrate_confidence` 使用 `AgentMemory.get_calibration` 已存的 `CalibrationResult.calibration_factor`（且仅在 `calibrated` 为真时生效）。AgentMemory 已将 `historical_accuracy / avg_confidence` 钳制到 `0.5..1.5`，其中 `historical_accuracy=0.0` 是真实的 0% 准确率；适配器不得再用 `accuracy or 0.5` 这类真值回退重算该比值。随后将置信度限制在 `[0,1]`。样本来源仍是既有 `AGENT_MEMORY_ENABLED` / `AgentMemory`，本切片不新增存储。工具有效性与路由偏好是显式恒等桩：不会解锁已拒绝的 ToolSurface 工具，也不会写入 `AGENT_ORCHESTRATOR_MODE`。影响只记录在运行期 `AgentContext.meta["adapter_influence"]`（不写入 episode）。
 
 ### 预测结果叠加（默认关闭）

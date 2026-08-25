@@ -54,7 +54,7 @@ Optional A1 `confidence` ∈ [0, 1] participates in aggregate calibration only; 
 
 ### Boundary rules (stable)
 
-* **Direction sideways band**: `|return_fraction| <= sideways_epsilon` is sideways (inclusive; default `0.001` = 0.1%). Config key `flat_epsilon` is an accepted alias. Predicting sideways vs a non-sideways move (or the reverse) is `partial`; opposite directions are `miss`.
+* **Direction sideways band**: `|return_fraction| <= sideways_epsilon` is sideways (inclusive; default `0.001` = 0.1%). Constructor key `flat_epsilon` is an accepted **scorer-local** alias that overrides `sideways_epsilon` when set. There is **no** `PREDICTION_FLAT_EPSILON_PCT` environment variable (Issue #1115 example names are not aliases). Predicting sideways vs a non-sideways move (or the reverse) is `partial`; opposite directions are `miss`.
 * **Return bucket**: honors payload `inclusive_low` / `inclusive_high` (A1 default half-open `[low, high)`). Distance to the interval within `bucket_partial_margin_pct` (default `1.0` percentage point) is `partial`. Bound value `0.0` is a valid finite bound.
   * **Exclusive bound under default margin**: a realized return *exactly* on an exclusive edge has distance `0`. With the default `bucket_partial_margin_pct=1.0` that scores **`partial`**; it is **`miss` only when the margin is `0`**.
 * **Level break**: absolute price or `pct_from_as_of_close`. `high >= level` (above) or `low <= level` (below) is `hit`. Near-touch within `level_touch_epsilon * |level|` is `partial`. When the side-specific path extreme is absent, an end close can prove a hit/near-touch, but cannot prove a miss; that case is `missing_path_extreme` / `data_unavailable`.
@@ -86,7 +86,7 @@ Over scored claims (`hit`/`partial`/`miss` only):
 | Key | Default | Notes |
 | --- | --- | --- |
 | `sideways_epsilon` | `0.001` | Return fraction sideways band |
-| `flat_epsilon` | unset | Alias that overrides `sideways_epsilon` when set |
+| `flat_epsilon` | unset | Scorer-local constructor alias that overrides `sideways_epsilon` when set. Not an env key. |
 | `bucket_partial_margin_pct` | `1.0` | Percentage points |
 | `level_touch_epsilon` | `0.002` | Relative to absolute resolved level |
 | `calibration_bin_count` | `10` | ECE bins |
@@ -98,3 +98,5 @@ The code-owned `scorer_version` is `claim-scorer-v1` and is reported on every re
 ```bash
 python -m pytest tests/services/test_claim_scorer.py -q
 ```
+
+Operator rollout and the non-env epsilon boundary: [Prediction verification safe rollout](prediction-verification-rollout_EN.md).

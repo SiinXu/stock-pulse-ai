@@ -25,6 +25,8 @@ Library-only slice in `src/agent/evolution/adapters.py`. Production `BaseAgent` 
 | `AGENT_ONLINE_ADAPTERS_ENABLED` | `false` | Master gate. When false, adapters are identity: raw confidence, input tool order, the same route, and no `adapter_influence` key on `AgentContext.meta`. |
 | `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | Minimum `AgentMemory` samples before confidence calibration applies. Below threshold: factor `1.0`, `applied=false`. |
 
+Issue #1115 example `EVOLUTION_MIN_SAMPLES` is **not** an alias of `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES`. Enable this adapter gate only as **step 5** of the [prediction verification safe rollout](prediction-verification-rollout_EN.md), after extraction, a single resolver worker or explicit CLI, and miss/partial-only postmortem. Auto-promote stays hard off; there is no `EVOLUTION_AUTO_PROMOTE_SKILLS` env key.
+
 When enabled and samples meet the adapter threshold, `calibrate_confidence` applies the stored `CalibrationResult.calibration_factor` from `AgentMemory.get_calibration` (and only when `calibrated` is true). AgentMemory already clamps `historical_accuracy / avg_confidence` to `0.5..1.5`, including a real `historical_accuracy=0.0`; the adapter must not re-derive that ratio with truthy fallbacks such as `accuracy or 0.5`. Confidence is then clamped to `[0,1]`. Sample source is existing `AGENT_MEMORY_ENABLED` / `AgentMemory`; this slice does not add a second store. Tool-effectiveness and route-preference are explicit identity stubs: they do not unlock denied ToolSurface tools and do not write `AGENT_ORCHESTRATOR_MODE`. Influence is recorded only on run-local `AgentContext.meta["adapter_influence"]` (not episodes).
 
 ### Forecast-outcome overlay (gated, default off)

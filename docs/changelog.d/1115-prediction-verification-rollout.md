@@ -1,0 +1,1 @@
+- [Docs] Documented the operator-facing prediction verification safe rollout order, issue-example-to-landed-key mapping, and current deferrals (Refs #1115).

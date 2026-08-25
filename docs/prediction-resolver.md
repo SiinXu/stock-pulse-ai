@@ -29,6 +29,21 @@
 | `PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK` | `5` | 熔断期间收缩后的每 tick 认领上限 |
 | `PREDICTION_RESOLVE_RETRY_JITTER_RATIO` | `0.1` | 正向重试抖动比例（`0` 到 `1`） |
 
+Issue #1115 示例名（如 `PREDICTION_VERIFY_ENABLED`、`PREDICTION_RESOLVER_INTERVAL_SEC`、`PREDICTION_RESOLVER_BATCH_LIMIT`、`PREDICTION_FETCH_CONCURRENCY`）**不是**上表键的别名。映射与延期边界见 [预测核验安全放量](prediction-verification-rollout.md)。
+
+## 安全放量
+
+整条核验环路的运营顺序（不要跳到适配器或自动晋升）：
+
+1. 核验环路全部开关关闭（落地默认值）。
+2. 打开 `PREDICTION_EXTRACT_ENABLED` 并确认分析仍然健康。
+3. 只在 **一个** 调度 worker 上打开 `PREDICTION_RESOLVE_ENABLED`，**或**保持该开关关闭并显式调用 `python -m src.services.prediction_resolver`。
+4. 打开仅 miss/partial 的后验，并保持 `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true`。
+5. 仅在达到 `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` 后再打开门控适配器。
+6. 自动晋升保持硬关闭。
+
+第 3 步的 CLI 是 **有意的运营闸门**：即使 `PREDICTION_RESOLVE_ENABLED` 为 false，也会执行一次 tick。调度开关只负责注册后台任务 `prediction_resolver`。
+
 ## 单进程部署
 
 1. 运行时具备 A3 持久化、A4 `ActualsFetcher`、A5 `ClaimScorer`。
@@ -145,3 +160,8 @@ GET /api/v1/agent/predictions?symbol=...&market=...
 - 拉取错误 recency HTTP、复盘队列深度 HTTP、Prometheus / OTel，以及可跨进程证明 cron 健康的 worker 心跳
 - 交易日历 `resolve_after`（#1109）
 - Adapter 接线 / `adapter_updates_total`（#1106）。worker/CLI 在注入队列 adapter 后已会在非重叠 tick 后 drain 复盘队列（#1499）；本 HTTP 面仍不暴露进程内队列深度
+
+## 相关
+
+- [预测核验安全放量](prediction-verification-rollout.md)
+- Epic #1107、daily-brief 后台任务模式、定时任务文档。

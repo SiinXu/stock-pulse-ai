@@ -75,7 +75,21 @@
 
 可验证 pending 草稿通过 `AgentPredictionRepository.insert_pending` 持久化。稳定 `prediction_id` 使用长度前缀（`pred-{len(run_id)}:{run_id}:{symbol}`，超 128 字符时改为哈希），避免连字符拼接碰撞。同一 run/symbol 再次 finalize 复用已有行（主键冲突，不覆盖，含 resolve 之后）。持久化失败只记录日志，不中断分析。调用方在 persist 之后挂载 `prediction_extraction`，因此内存草稿携带存库主键。
 
+## 放量
+
+整条核验环路的安全运营顺序见 [预测核验安全放量](prediction-verification-rollout.md)（Issue #1115）。抽取是该顺序的 **第 2 步**：
+
+1. 核验环路全部开关保持默认关闭。
+2. 打开 `PREDICTION_EXTRACT_ENABLED=true`，并确认分析 / 历史保存仍然成功（抽取失败永不中断分析）。
+3. 然后只在一个调度 worker 上打开解析器，**或**显式调用 `python -m src.services.prediction_resolver`。
+4. 打开仅 miss/partial 的后验，并保持 `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true`。
+5. 仅在达到 `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` 后再打开门控适配器。
+6. 自动晋升保持硬关闭。
+
+随时关闭 `PREDICTION_EXTRACT_ENABLED`；分析路径不变。Issue 示例名 `PREDICTION_VERIFY_ENABLED` **不是**本键的别名。
+
 ## 相关文档
 
 - [预测契约](prediction-contract.md)
+- [预测核验安全放量](prediction-verification-rollout.md)
 - Epic 产品规则见 issue #1107

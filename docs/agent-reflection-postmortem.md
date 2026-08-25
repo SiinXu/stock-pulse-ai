@@ -21,7 +21,7 @@
 
 ## 生产接线（调度 / CLI）
 
-默认关闭。仅当 **同时** 打开 `PREDICTION_RESOLVE_ENABLED` 与 `AGENT_POSTMORTEM_ENABLED` 时，调度任务与 CLI 才会注入已有的 `InMemoryPostmortemQueue`，并在非重叠 `tick()` 之后按 `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` 排空队列。
+默认关闭。`AGENT_POSTMORTEM_ENABLED=true` 时才会注入已有的 `InMemoryPostmortemQueue`。**调度**排空还需要 resolver worker（`PREDICTION_RESOLVE_ENABLED`）。cron CLI（`python -m src.services.prediction_resolver`）在调度开关关闭时仍会在 tick 后排空——这是有意的运营闸门。排空发生在非重叠 `tick()` 之后，受 `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` 限制；drain 并发硬编码为 `2`（不是环境变量）。
 
 处理器只映射已经写入的 outcome / score / actuals（含入队时拷贝的 `run_id` 与 claims），不重新拉行情，也不从价格编造方向。命中与 `data_unavailable` 不会入队。教训经 `record_reflection_lessons` 投影：若 `AGENT_EPISODE_LOG_ENABLED` 且能按 `run_id` 找到 episode，则带上该 `episode_id`；否则保留进程内 sidecar。找不到 episode 不会让 resolve 失败。排空 / LLM / episode 错误只记录并按队列策略重入队，**不会**回滚已 `resolved` 行，也不会伪造 hit。本切片不向 diagnostics HTTP 暴露队列深度。
 
@@ -36,5 +36,20 @@
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 单批后验 LLM 调用上限 |
 | `AGENT_POSTMORTEM_SKIP_CLEAN_HITS` | `true` | 干净命中跳过后验 LLM |
 | `PREDICTION_RESOLVE_POSTMORTEM_MAX_PER_TICK` | `10` | 非重叠 tick 后最多排空的后验任务数 |
+
+Issue #1115 示例名（`PREDICTION_POSTMORTEM_ENABLED`、`PREDICTION_POSTMORTEM_ON_HIT`、`PREDICTION_POSTMORTEM_CONCURRENCY`、`PREDICTION_POSTMORTEM_MAX_PER_TICK`）**不是**上表键的别名。`PREDICTION_POSTMORTEM_CONCURRENCY` 没有环境变量；drain worker 数硬编码为 `2`。
+
+## 安全放量
+
+整条核验环路的运营顺序：
+
+1. 核验环路全部开关关闭。
+2. 打开抽取并确认分析仍然健康。
+3. 只在一个调度 worker 上打开解析器，**或**显式调用 cron CLI。
+4. 打开仅 miss/partial 的后验，并保持 `AGENT_POSTMORTEM_SKIP_CLEAN_HITS=true`（本步）。
+5. 仅在达到 `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` 后再打开门控适配器。
+6. 自动晋升保持硬关闭。
+
+完整映射与延期边界见 [预测核验安全放量](prediction-verification-rollout.md)。
 
 英文版细节与回滚说明见 [agent-reflection-postmortem_EN.md](./agent-reflection-postmortem_EN.md)。
