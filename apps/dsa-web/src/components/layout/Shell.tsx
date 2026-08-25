@@ -6,6 +6,7 @@ import { Drawer } from '../common/Drawer';
 import { IconButton } from '../common/IconButton';
 import { CommandPalette, useCommandPaletteShortcut } from '../command-palette';
 import { NotificationBell } from '../notifications';
+import { LocalOnlyModeIndicator } from './LocalOnlyModeIndicator';
 import { SidebarNav } from './SidebarNav';
 import { SidebarProfile } from './SidebarProfile';
 import { cn } from '../../utils/cn';
@@ -159,7 +160,10 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           {t('layout.appFallbackTitle')}
         </span>
         {!desktopSidebar ? (
-          <NotificationBell className="pointer-events-auto" placement="bottom" />
+          <>
+            <LocalOnlyModeIndicator className="pointer-events-auto" />
+            <NotificationBell className="pointer-events-auto" placement="bottom" />
+          </>
         ) : null}
         <SidebarProfile
           collapsed
@@ -189,7 +193,12 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
             onToggleCollapse={toggleCollapsed}
             onNavigate={() => setMobileNavigationOpen(false)}
             onOpenCommandPalette={openCommandPalette}
-            globalActions={desktopSidebar ? <NotificationBell placement="right" /> : null}
+            globalActions={desktopSidebar ? (
+              <div className="flex items-center gap-1">
+                <LocalOnlyModeIndicator />
+                <NotificationBell placement="right" />
+              </div>
+            ) : null}
             focusKeyPrefix="shell-nav-desktop"
             profileOpen={profilePresentation === 'desktop'}
             onProfileOpenChange={(open) => updateProfilePresentation('desktop', open)}

@@ -1,8 +1,10 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { outboundActivityApi } from '../../../api/outboundActivity';
 import { ThemeProvider } from '../../theme/ThemeProvider';
 import { Shell } from '../Shell';
+import { buildLocalOnlyModeSettingsHref } from '../LocalOnlyModeIndicator';
 
 const DESKTOP_SIDEBAR_QUERY = '(min-width: 1024px)';
 const COMPACT_SIDEBAR_QUERY = '(min-width: 1024px) and (max-width: 1279px)';
@@ -51,6 +53,19 @@ vi.mock('../../../api/agent', () => ({
 vi.mock('../../../api/history', () => ({
   historyApi: {
     search: vi.fn().mockResolvedValue({ query: '', limit: 5, items: [] }),
+  },
+}));
+
+vi.mock('../../../api/outboundActivity', () => ({
+  outboundActivityApi: {
+    getLocalOnlyStatus: vi.fn().mockResolvedValue({
+      enabled: false,
+      envKey: 'LOCAL_ONLY_MODE',
+      policy: 'non_loopback_denied',
+      allowedDestinationClasses: ['loopback'],
+      blockedErrorReason: 'local_only_mode_blocked',
+    }),
+    listActivity: vi.fn(),
   },
 }));
 
@@ -115,6 +130,13 @@ beforeEach(() => {
   mediaMatches.clear();
   mediaListeners.clear();
   localStorage.removeItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+  vi.mocked(outboundActivityApi.getLocalOnlyStatus).mockResolvedValue({
+    enabled: false,
+    envKey: 'LOCAL_ONLY_MODE',
+    policy: 'non_loopback_denied',
+    allowedDestinationClasses: ['loopback'],
+    blockedErrorReason: 'local_only_mode_blocked',
+  });
 });
 
 describe('Shell', () => {
@@ -125,6 +147,31 @@ describe('Shell', () => {
     expect(screen.getByRole('link', { name: 'Agent' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'StockPulse' }).length).toBeGreaterThan(0);
     expect(screen.getByText('page content')).toBeInTheDocument();
+  });
+
+  it('keeps Local Only chrome hidden unless the endpoint reports enabled', async () => {
+    renderShell();
+
+    await waitFor(() => expect(outboundActivityApi.getLocalOnlyStatus).toHaveBeenCalled());
+    expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
+  });
+
+  it('surfaces Local Only in the shell when enabled and opens Auth & Security', async () => {
+    vi.mocked(outboundActivityApi.getLocalOnlyStatus).mockResolvedValue({
+      enabled: true,
+      envKey: 'LOCAL_ONLY_MODE',
+      policy: 'non_loopback_denied',
+      allowedDestinationClasses: ['loopback'],
+      blockedErrorReason: 'local_only_mode_blocked',
+    });
+    renderShell();
+
+    const indicator = await screen.findByTestId('shell-local-only-indicator');
+    expect(indicator).toHaveAttribute('href', buildLocalOnlyModeSettingsHref());
+    fireEvent.click(indicator);
+    expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(
+      '/settings?section=system_security&view=security&field=LOCAL_ONLY_MODE',
+    );
   });
 
   it('renders exactly one Bell and moves it between the mobile header and desktop Sidebar', async () => {
