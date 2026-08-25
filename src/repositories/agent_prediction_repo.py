@@ -40,12 +40,7 @@ from src.schemas.agent_prediction import (
     AgentPredictionInsert,
     AgentPredictionRecord,
 )
-from src.schemas.memory_fact_opinion import lock_prediction_outcome_actuals
-from src.schemas.memory_provenance import (
-    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-    reject_client_provenance_keys,
-    stamp_memory_provenance,
-)
+from src.schemas.memory_write_policy import require_market_actuals_write
 from src.schemas.prediction_record import (
     NoVerifiableReason,
     PREDICTION_HORIZON_TOKENS,
@@ -658,12 +653,7 @@ class AgentPredictionRepository(BaseRepository):
             raise ValueError("prediction_id is required")
         if not isinstance(outcome, Mapping):
             raise ValueError("outcome must be a mapping")
-        lock_prediction_outcome_actuals(outcome)
-        reject_client_provenance_keys(outcome)
-        stamp = stamp_memory_provenance(
-            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-            actor_id=None,
-        )
+        stamp = require_market_actuals_write(outcome).stamp_mapping()
         now = as_of or self._clock()
         token = str(expected_lease_token or "").strip() or None
         if token is not None and len(token) > 64:
@@ -751,12 +741,7 @@ class AgentPredictionRepository(BaseRepository):
                 "reason": str(reason or "data_unavailable"),
             }
         )
-        lock_prediction_outcome_actuals(payload)
-        reject_client_provenance_keys(payload)
-        stamp = stamp_memory_provenance(
-            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-            actor_id=None,
-        )
+        stamp = require_market_actuals_write(payload).stamp_mapping()
         conditions = [
             agent_predictions_table.c.prediction_id == canonical,
             agent_predictions_table.c.status == STATUS_RESOLVING,

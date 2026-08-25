@@ -1,6 +1,6 @@
 # Principal-scoped layered Agent memory
 
-**Status**: layered foundation + lifecycle (no production layered-memory hook). Durable store/UX: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124).
+**Status**: layered foundation + lifecycle (no production layered-memory hook). Durable store/UX: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). Write admission library: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1 (forgetting / consolidation remain open).
 
 **Chinese**: [agent-memory_CN.md](agent-memory_CN.md)
 
@@ -13,6 +13,7 @@
 | `src/agent/memory_vector.py` | Dependency-free coarse ranking |
 | `src/agent/memory_governance.py` | Consent, retention, principal delete/clear, access audit |
 | `src/agent/memory_isolation.py` | Untrusted-data isolation for any future prompt path |
+| `src/schemas/memory_write_policy.py` | Library-only persist write admission over existing stores (#1119 Slice 1) |
 
 Existing `AgentMemory` / `BaseAgent` numeric calibration behavior is unchanged. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` history inject is default-off; when enabled, `BaseAgent._build_memory_context` wraps history lines with `isolate_untrusted_memory_body` and canonicalizes `signal` to `buy|hold|sell` (see [Threat notes](#threat-notes)).
 
@@ -109,13 +110,35 @@ Short Agent-safety baseline for shared/long-term memory. This is a scope map, no
 
 Write-path illegal, oversized, or marker-injected payloads must be **rejected**, not truncated and stored as facts. Decision-memory **admission** stays fail-closed (nothing admitted → no inject); analysis **build** failure stays fail-open (skip inject, continue analysis). See [security baseline current gaps](security-baseline.md#current-gaps).
 
+<a id="write-admission-policy"></a>
+## Write admission policy (#1119 Slice 1)
+
+Library-only persist admission in `src/schemas/memory_write_policy.py`, next to the #1124 write contracts. It classifies writes and fails closed. It **reuses** `memory_fact_opinion`, `memory_write_guard`, and `memory_provenance` and does not fork or weaken them. No new table, env key, public API, Web, or Desktop surface.
+
+| Write class | Admission | Persist |
+| --- | --- | --- |
+| **Episodic** | Compact run/outcome summaries are admitted only after existing structured size / Soul / control validation | Yes — append-only `agent_episodes` |
+| **Market actuals** | `system_resolve` payloads are admitted and **server-stamped**. Opinion keys cannot ride along | Yes — prediction resolve / decision-signal outcomes |
+| **Opinion** | `user_feedback` / `operator` payloads cannot contain or overwrite actual / outcome fields; they delegate to the existing fact/opinion lock | Yes — decision-signal feedback sidecars and run/prediction feedback sidecars |
+| **Semantic fact** | A single unverified user note is rejected. Repeated independently verified evidence at `MIN_OUTCOME_PATTERN_EVIDENCE` (3) **or** an explicit operator-promote intent is admitted as a **candidate only** | **No** — no semantic store yet ([#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)) |
+| **Procedural auto-flag** | Requires **both** an explicit positive `min_samples` (callers that want the adapters floor pass `DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES`; omitted or invalid `min_samples` fail closed) **and** an explicit passed eval gate. Absent / false gate always rejects | **No** — no procedural store; auto-promote stays hard off |
+
+Governed persist entry points: prediction resolve / `data_unavailable` actuals (SQLite and in-memory resolver store), decision-signal outcome and feedback upsert, run/prediction feedback upsert (`AgentFeedbackRepository` / `AgentFeedbackService`), and episode append. Success payloads, status transitions, immutability, provenance source, fail-soft analysis, append-only episode behavior, and the run/prediction feedback `_OPINION_KEYS` identity-key boundary are unchanged.
+
+Scanned but not folded into this slice: curator-grade ingest and forward-return buckets (#1096) stamp provenance on sidecar labels; they are not user-note opinion writers over market actuals. Request-body schemas still use the #1124 locks as transport validation, not persist.
+
+Decision Memory `admit_decision_memory` is a **separate READ / inject** filter. Renderer admission is not this write policy; inject payloads include `outcome` keys by design.
+
+This slice does **not** add consolidation, forgetting, TTL / per-symbol caps, retrieval-score decay, the #1118 store, #1113 EvolutionEvent persistence, auto-promotion, or new product feedback APIs. [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) stays open.
+
 ## Remaining scope
 
 - Authoritative principal assignment across API/bot/CLI/scheduled runs; legacy migration.
 - Durable DB-backed lifecycle store and user-facing UI controls: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118) (absorbs closed [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) and [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)).
 - Security-reviewed production prompt consumption.
 - Preference-profile layer: [#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117) (absorbs closed [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)).
-- Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). DAG-0 threat notes, DAG-1 fact/opinion lock, DAG-2 Soul/oversize write reject (`src/schemas/memory_write_guard.py`), and DAG-3 server-stamped provenance (`src/schemas/memory_provenance.py`) have landed. DAG-4 isolates default-off AgentMemory prompt inject (`src/agent/agents/base_agent.py` / `src/agent/memory.py`) as untrusted data with canonical `buy` / `hold` / `sell` signals. Do not fold in #1118 store/UX, #1119 forgetting, or #1105 product feedback APIs. Keep the issue open until maintainers confirm every acceptance item.
+- Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). DAG-0 threat notes, DAG-1 fact/opinion lock, DAG-2 Soul/oversize write reject (`src/schemas/memory_write_guard.py`), and DAG-3 server-stamped provenance (`src/schemas/memory_provenance.py`) have landed. DAG-4 isolates default-off AgentMemory prompt inject (`src/agent/agents/base_agent.py` / `src/agent/memory.py`) as untrusted data with canonical `buy` / `hold` / `sell` signals. Do not fold in #1118 store/UX or #1105 product feedback APIs.
+- Write admission / consolidation / forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119). Slice 1 (library write admission over existing stores) is documented above. Remaining: consolidation of old episodic rows, semantic/procedural candidate promotion without Soul edits, per-symbol TTL / max rows, retrieval-score decay, and drop of rolled-back procedural flags after [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113). Keep #1119 open.
 
 Do not reopen #250, #198, or #150.
 

@@ -19,12 +19,7 @@ from dataclasses import dataclass, field, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
-from src.schemas.memory_fact_opinion import lock_prediction_outcome_actuals
-from src.schemas.memory_provenance import (
-    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-    reject_client_provenance_keys,
-    stamp_memory_provenance,
-)
+from src.schemas.memory_write_policy import require_market_actuals_write
 
 
 STATUS_PENDING = "pending"
@@ -301,12 +296,7 @@ class InMemoryPredictionStore:
             raise ValueError("prediction_id is required")
         if not isinstance(outcome, Mapping):
             raise ValueError("outcome must be a mapping")
-        lock_prediction_outcome_actuals(outcome)
-        reject_client_provenance_keys(outcome)
-        stamp = stamp_memory_provenance(
-            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-            actor_id=None,
-        )
+        stamp = require_market_actuals_write(outcome).stamp_mapping()
         now = as_of or self._clock()
         with self._lock:
             row = self._rows.get(canonical)
@@ -348,12 +338,7 @@ class InMemoryPredictionStore:
         }
         if outcome:
             payload.update(dict(outcome))
-        lock_prediction_outcome_actuals(payload)
-        reject_client_provenance_keys(payload)
-        stamp = stamp_memory_provenance(
-            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-            actor_id=None,
-        )
+        stamp = require_market_actuals_write(payload).stamp_mapping()
         with self._lock:
             row = self._rows.get(canonical)
             if row is None:

@@ -14,6 +14,7 @@ from sqlalchemy.exc import IntegrityError
 
 from src.repositories.agent_episode_tables import agent_episodes_table
 from src.repositories.base import BaseRepository, RepositoryError
+from src.schemas.memory_write_policy import require_episodic_write
 from src.schemas.agent_episode import (
     AGENT_EPISODE_MAX_PAGE_SIZE,
     AGENT_EPISODE_SCHEMA_VERSION,
@@ -23,11 +24,6 @@ from src.schemas.agent_episode import (
     EpisodeLesson,
     EpisodeOutcomeLabels,
     TrajectoryStepSummary,
-    reject_episode_free_text,
-)
-from src.schemas.memory_provenance import (
-    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-    stamp_memory_provenance,
 )
 from src.storage import DatabaseManager
 
@@ -178,14 +174,10 @@ class AgentEpisodeRepository(BaseRepository):
         )
 
     def append(self, episode: AgentEpisodeCreate) -> AgentEpisode:
-        reject_episode_free_text(episode)
+        stamp = require_episodic_write(episode).stamp_mapping()
         now = _as_utc_naive(self._clock())
         if now is None:
             raise ValueError("agent episode clock must return a datetime")
-        stamp = stamp_memory_provenance(
-            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
-            actor_id=None,
-        )
         values = {
             "schema_version": episode.schema_version or AGENT_EPISODE_SCHEMA_VERSION,
             "episode_id": episode.episode_id,

@@ -21,14 +21,11 @@ from src.repositories.agent_feedback_tables import (
     agent_run_feedback_table,
 )
 from src.repositories.base import BaseRepository
-from src.schemas.memory_fact_opinion import lock_opinion_payload
 from src.schemas.memory_provenance import (
     FEEDBACK_ACTOR_ID,
     PROVENANCE_SOURCE_USER_FEEDBACK,
-    apply_server_provenance,
-    reject_client_provenance_keys,
 )
-from src.schemas.memory_write_guard import reject_feedback_write_fields
+from src.schemas.memory_write_policy import require_opinion_write
 from src.storage import DatabaseManager, utc_naive_now
 
 
@@ -66,15 +63,21 @@ def _row_to_record(row: Any, *, subject_field: str) -> AgentFeedbackRecord:
 
 
 def _opinion_fields(fields: Mapping[str, Any]) -> Dict[str, Any]:
-    lock_opinion_payload(fields)
-    reject_client_provenance_keys(fields)
+    decision, stamped = require_opinion_write(
+        fields,
+        provenance_source=PROVENANCE_SOURCE_USER_FEEDBACK,
+        actor_id=FEEDBACK_ACTOR_ID,
+    )
     extra = tuple(sorted(str(key) for key in fields if str(key) not in _OPINION_KEYS))
     if extra:
         raise ValueError(
             "feedback persist mapping cannot include identity or extra keys: "
             + ", ".join(extra)
         )
-    return {str(key): fields[key] for key in _OPINION_KEYS if key in fields}
+    persist = {str(key): stamped[key] for key in _OPINION_KEYS if key in stamped}
+    persist["provenance_source"] = decision.provenance_source
+    persist["actor_id"] = decision.actor_id
+    return persist
 
 
 class AgentFeedbackRepository(BaseRepository):
@@ -150,20 +153,14 @@ class AgentFeedbackRepository(BaseRepository):
         if not canonical:
             raise ValueError(f"{key_field} is required")
         opinion = _opinion_fields(fields)
-        reject_feedback_write_fields(opinion)
-        stamped = apply_server_provenance(
-            opinion,
-            provenance_source=PROVENANCE_SOURCE_USER_FEEDBACK,
-            actor_id=FEEDBACK_ACTOR_ID,
-        )
         now = utc_naive_now()
         persist: Dict[str, Any] = {
             key_field: canonical,
-            "feedback_value": stamped["feedback_value"],
-            "note": stamped.get("note"),
-            "source": stamped.get("source") or "api",
-            "provenance_source": stamped["provenance_source"],
-            "actor_id": stamped["actor_id"],
+            "feedback_value": opinion["feedback_value"],
+            "note": opinion.get("note"),
+            "source": opinion.get("source") or "api",
+            "provenance_source": opinion["provenance_source"],
+            "actor_id": opinion["actor_id"],
         }
         if extra_values:
             persist.update(dict(extra_values))

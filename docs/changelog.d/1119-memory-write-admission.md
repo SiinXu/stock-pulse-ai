@@ -1,0 +1,1 @@
+- [Added] Add a library-only memory write admission policy over existing episode, prediction-actuals, and decision outcome/feedback persist paths; semantic and procedural writes fail closed without a store, and Decision Memory inject admission stays a separate read-path contract (Refs #1119).
