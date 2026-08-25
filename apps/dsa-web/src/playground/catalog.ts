@@ -106,6 +106,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('layout', 'shell', 'Shell', 'components/layout/Shell.tsx', ['default'], 'full'),
   entry('layout', 'command-palette', 'CommandPalette', 'components/command-palette/CommandPalette.tsx', ['interactive']),
   entry('layout', 'notification-bell', 'NotificationBell', 'components/notifications/NotificationBell.tsx', ['interactive', 'empty', 'error']),
+  entry('layout', 'local-only-mode-indicator', 'LocalOnlyModeIndicator', 'components/layout/LocalOnlyModeIndicator.tsx', ['default', 'states']),
   entry('layout', 'notification-inbox-list', 'NotificationInboxList', 'components/notification-center/NotificationInboxList.tsx', ['default', 'empty']),
   entry('layout', 'sidebar-nav', 'SidebarNav', 'components/layout/SidebarNav.tsx', ['default', 'states']),
   entry('layout', 'sidebar-profile', 'SidebarProfile', 'components/layout/SidebarProfile.tsx', ['interactive']),

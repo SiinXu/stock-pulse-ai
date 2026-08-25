@@ -11,13 +11,17 @@ import { buildLocalOnlyModeSettingsHref } from './localOnlyMode';
 
 export type LocalOnlyModeIndicatorProps = {
   className?: string;
+  /** Playground preview only. Production Shell omits this and uses the live endpoint. */
+  previewStatus?: 'unknown' | 'off' | 'on';
 };
 
 export const LocalOnlyModeIndicator: React.FC<LocalOnlyModeIndicatorProps> = ({
   className,
+  previewStatus,
 }) => {
   const { t } = useUiLanguage();
-  const { status } = useLocalOnlyModeStatus();
+  const fetched = useLocalOnlyModeStatus();
+  const status = previewStatus ?? fetched.status;
 
   if (status !== 'on') {
     return null;
