@@ -492,12 +492,10 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "title": "Local Only Mode",
         "description": (
             "When enabled, the outbound HTTP policy fails closed for every non-loopback "
-            "destination that uses the shared helpers (public cloud APIs, private LAN "
-            "hosts, and allowlisted remote services). Pure loopback HTTP remains allowed. "
-            "Blocked policy-owned calls raise coded errors that name LOCAL_ONLY_MODE; they "
-            "never silently fall through. Non-HTTP provider sockets, plugin processes, "
-            "desktop update checks, and provider clients not yet routed through the safe "
-            "wrapper stay outside this gate."
+            "destination that uses the shared helpers. Pure loopback HTTP remains allowed. "
+            "Blocked policy-owned calls raise coded LOCAL_ONLY_MODE errors and never "
+            "silently fall through. Desktop update checks skip. Non-HTTP provider sockets "
+            "and plugin processes stay outside this gate."
         ),
         "category": "system",
         "data_type": "boolean",

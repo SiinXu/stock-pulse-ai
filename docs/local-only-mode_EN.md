@@ -40,10 +40,9 @@ Loopback and other non-public destinations remain denied unless listed in
 | Notification HTTP webhooks | **No** | Channel failures must not be silent security fall-through |
 | Local Ollama / loopback model HTTP | **Yes (loopback only)** | `127.0.0.0/8`, `::1`, `localhost` |
 | `OUTBOUND_HTTP_ALLOWLIST` remote hosts | **No** | Allowlist **cannot** expand the perimeter beyond pure loopback while Local Only is on |
-| Desktop GitHub update checks | **Out of scope of this gate** | Owned by the desktop shell; not enforced by backend outbound policy |
+| Desktop GitHub update checks | **No (desktop shell skips)** | The shell queries `GET /api/v1/security/local-only` and does not contact GitHub while the mode is on or unknown |
 | Non-HTTP provider sockets (for example pytdx / baostock TCP) | **Out of scope** | Outside the HTTP policy by design |
 | Plugin child processes | **Out of scope** | Manifest permissions are descriptive and do not sandbox the child |
-| Provider HTTP clients not yet routed through `safe_*` | **Out of scope** | Those call sites bypass `src.security.outbound_policy` until wrapped |
 | SMTP / DB / other non-HTTP protocols | **Out of scope** | Same limits as the outbound HTTP policy document |
 
 Local Only is an **egress gate**, not a guarantee of “full offline analysis
@@ -85,7 +84,7 @@ LOCAL_ONLY_MODE=true
 ## Limits
 
 - In-memory activity ring buffer (default capacity 100) is per process and clears on restart.
-- Paths that bypass `src.security.outbound_policy` are outside this contract; new HTTP call sites must use the shared helpers. Today that includes some provider HTTP clients not yet routed through `safe_*`, non-HTTP provider sockets, plugin child processes, and desktop update checks.
+- Paths that bypass `src.security.outbound_policy` are outside this contract; new HTTP call sites must use the shared helpers. Today that includes non-HTTP provider sockets and plugin child processes. Desktop GitHub update checks are skipped by the desktop shell when this mode is on.
 - Local Only does not by itself install models or historical data.
 
 ## Rollback

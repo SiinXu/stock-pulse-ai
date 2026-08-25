@@ -40,10 +40,9 @@
 | 通知 HTTP Webhook | **否** | 渠道失败不得变成静默安全放行 |
 | 本地 Ollama / 回环模型 HTTP | **是（仅回环）** | `127.0.0.0/8`、`::1`、`localhost` |
 | `OUTBOUND_HTTP_ALLOWLIST` 远程主机 | **否** | 本地专用开启时，allowlist **不能**把边界扩到回环以外 |
-| 桌面端 GitHub 更新检查 | **不在本闸门范围** | 属桌面壳职责，不由后端出站策略强制 |
+| 桌面端 GitHub 更新检查 | **否（桌面壳跳过）** | 壳查询 `GET /api/v1/security/local-only`；模式开启或状态未知时不联系 GitHub |
 | 非 HTTP 数据源套接字（如 pytdx / baostock TCP） | **不在本闸门范围** | 按设计不在 HTTP 策略内 |
 | 插件子进程 | **不在本闸门范围** | 清单 permissions 仅作说明，不构成沙箱 |
-| 尚未接入 `safe_*` 的 provider HTTP 客户端 | **不在本闸门范围** | 这些调用点在接入前会绕过 `src.security.outbound_policy` |
 | SMTP / 数据库 / 其他非 HTTP | **不在本闸门范围** | 与出站 HTTP 策略文档相同限制 |
 
 本地专用是 **出站闸门**，并不单独保证「离线分析质量足够好」。可接受的离线分析仍依赖缓存覆盖与本地模型（#178、#203）。本模式让策略管辖的远程 HTTP **可核验且 fail-closed**。
@@ -83,7 +82,7 @@ LOCAL_ONLY_MODE=true
 ## 限制
 
 - 活动记录为进程内环形缓冲（默认容量 100），重启清空。
-- 绕过 `src.security.outbound_policy` 的 HTTP 调用不在本合同内；新增调用点必须使用共享 helper。当前包括尚未接入 `safe_*` 的部分 provider HTTP 客户端、非 HTTP 数据源套接字、插件子进程，以及桌面更新检查。
+- 绕过 `src.security.outbound_policy` 的 HTTP 调用不在本合同内；新增调用点必须使用共享 helper。当前包括非 HTTP 数据源套接字与插件子进程。桌面 GitHub 更新检查在本模式开启时由桌面壳跳过。
 - 本模式不会自动安装模型或历史数据。
 
 ## 回滚
