@@ -517,6 +517,15 @@ def _loop_result() -> Any:
     )
 
 
+def _run_agent(agent: Any, ctx: AgentContext, *, adapters_enabled: bool) -> Any:
+    with patch("src.config.get_config", return_value=_config(enabled=adapters_enabled)):
+        with patch(
+            "src.agent.agents.base_agent.run_agent_loop",
+            return_value=_loop_result(),
+        ):
+            return agent.run(ctx)
+
+
 def test_base_agent_flag_off_keeps_ungated_memory_multiply() -> None:
     memory = _memory(enabled=True, samples=40, accuracy=0.0, avg_confidence=0.4)
     agent = _make_base_agent(memory)
@@ -534,6 +543,27 @@ def test_base_agent_flag_off_keeps_ungated_memory_multiply() -> None:
     spy.assert_not_called()
     assert opinion.confidence == pytest.approx(0.3)
     assert result.meta["memory_calibration"]["factor"] == pytest.approx(0.5)
+    assert ADAPTER_INFLUENCE_META_KEY not in ctx.meta
+
+
+def test_base_agent_flag_off_keeps_ungated_multiply_on_run_path() -> None:
+    memory = _memory(enabled=True, samples=40, accuracy=0.0, avg_confidence=0.4)
+    agent = _make_base_agent(memory)
+    ctx = AgentContext(query="test", stock_code="600519")
+
+    with patch(
+        "src.agent.agents.base_agent.calibrate_confidence",
+        wraps=calibrate_confidence,
+    ) as spy:
+        result = _run_agent(agent, ctx, adapters_enabled=False)
+
+    spy.assert_not_called()
+    assert result.success
+    assert result.opinion is not None
+    assert result.opinion.confidence == pytest.approx(0.3)
+    assert ctx.opinions[0].confidence == pytest.approx(0.3)
+    assert result.meta["memory_calibration"]["factor"] == pytest.approx(0.5)
+    assert result.meta["memory_calibration"]["samples"] == 40
     assert ADAPTER_INFLUENCE_META_KEY not in ctx.meta
 
 
@@ -610,49 +640,68 @@ def test_base_agent_flag_on_zero_accuracy_clamps_down_on_run_path() -> None:
     agent = _make_base_agent(memory)
     ctx = AgentContext(query="test", stock_code="600519")
     other_ctx = AgentContext(query="test", stock_code="600519")
+    raw = 0.6
+    double_multiplied = raw * 0.5 * 0.5
+    inverted = raw * (0.5 / 0.4)
 
-    with patch("src.config.get_config", return_value=_config(enabled=True)):
-        with patch(
-            "src.agent.agents.base_agent.run_agent_loop",
-            return_value=_loop_result(),
-        ):
-            result = agent.run(ctx)
+    result = _run_agent(agent, ctx, adapters_enabled=True)
 
     assert result.success
     assert result.opinion is not None
     assert result.opinion.confidence == pytest.approx(0.3)
+    assert result.opinion.confidence != pytest.approx(double_multiplied)
+    assert result.opinion.confidence != pytest.approx(inverted)
     assert ctx.opinions[0].confidence == pytest.approx(0.3)
+    assert "memory_calibration" not in result.meta
     recorded = ctx.meta[ADAPTER_INFLUENCE_META_KEY]["confidence"]
     assert recorded["applied"] is True
     assert recorded["factor"] == pytest.approx(0.5)
+    assert recorded["reason"] == "applied"
     assert ADAPTER_INFLUENCE_META_KEY not in other_ctx.meta
     assert ctx.meta is not other_ctx.meta
 
 
-def test_base_agent_flag_on_below_threshold_is_identity_with_influence() -> None:
-    memory = _memory(enabled=True, samples=29, accuracy=0.0, avg_confidence=0.4)
+def test_base_agent_flag_on_memory_disabled_is_identity_on_run_path() -> None:
+    memory = _memory(enabled=False, samples=80, accuracy=0.1, avg_confidence=0.95)
     agent = _make_base_agent(memory)
     ctx = AgentContext(query="test", stock_code="600519")
-    opinion = AgentOpinion(agent_name="technical", signal="buy", confidence=0.6, reasoning="ok")
-    result = StageResult(stage_name="technical", status=StageStatus.RUNNING)
 
-    with patch("src.config.get_config", return_value=_config(enabled=True)):
-        agent._apply_memory_calibration(ctx, opinion, result)
+    result = _run_agent(agent, ctx, adapters_enabled=True)
 
-    assert opinion.confidence == pytest.approx(0.6)
+    assert result.success
+    assert result.opinion is not None
+    assert result.opinion.confidence == pytest.approx(0.6)
+    assert ctx.opinions[0].confidence == pytest.approx(0.6)
     assert "memory_calibration" not in result.meta
     influence = ctx.meta[ADAPTER_INFLUENCE_META_KEY]["confidence"]
     assert influence["applied"] is False
     assert influence["factor"] == 1.0
+    assert influence["reason"] == "memory_disabled"
+
+
+def test_base_agent_flag_on_below_threshold_is_identity_on_run_path() -> None:
+    memory = _memory(enabled=True, samples=29, accuracy=0.0, avg_confidence=0.4)
+    agent = _make_base_agent(memory)
+    ctx = AgentContext(query="test", stock_code="600519")
+
+    result = _run_agent(agent, ctx, adapters_enabled=True)
+
+    assert result.success
+    assert result.opinion is not None
+    assert result.opinion.confidence == pytest.approx(0.6)
+    assert ctx.opinions[0].confidence == pytest.approx(0.6)
+    assert "memory_calibration" not in result.meta
+    influence = ctx.meta[ADAPTER_INFLUENCE_META_KEY]["confidence"]
+    assert influence["applied"] is False
+    assert influence["factor"] == 1.0
+    assert influence["samples"] == 29
     assert influence["reason"] == "insufficient_samples"
 
 
-def test_base_agent_gated_apply_leaves_soul_and_denied_tools_unchanged() -> None:
+def test_base_agent_gated_run_leaves_soul_and_denied_tools_unchanged() -> None:
     memory = _memory(enabled=True, samples=40, accuracy=0.0, avg_confidence=0.4)
     agent = _make_base_agent(memory)
     ctx = AgentContext(query="test", stock_code="600519")
-    opinion = AgentOpinion(agent_name="technical", signal="buy", confidence=0.6, reasoning="ok")
-    result = StageResult(stage_name="technical", status=StageStatus.RUNNING)
 
     calls: List[Any] = []
     surface = ToolSurface(_echo_registry(calls))
@@ -666,8 +715,7 @@ def test_base_agent_gated_apply_leaves_soul_and_denied_tools_unchanged() -> None
         denial_codes=denials,
     )
 
-    with patch("src.config.get_config", return_value=_config(enabled=True)):
-        agent._apply_memory_calibration(ctx, opinion, result)
+    result = _run_agent(agent, ctx, adapters_enabled=True)
 
     ranked = rank_tools(["echo", "quote"], denied_names=["echo"])
     tool_result = surface.execute_tool(
@@ -676,7 +724,9 @@ def test_base_agent_gated_apply_leaves_soul_and_denied_tools_unchanged() -> None
         ToolAccessContext(),
     )
 
-    assert opinion.confidence == pytest.approx(0.3)
+    assert result.success
+    assert result.opinion is not None
+    assert result.opinion.confidence == pytest.approx(0.3)
     assert tool_result["error"]["code"] == "permission_denied"
     assert calls == []
     assert AGENT_SOUL_HASH == soul_hash_before
@@ -713,6 +763,7 @@ def test_specialised_agents_do_not_override_memory_calibration() -> None:
 
 
 def test_base_agent_does_not_hook_tool_route_overlay_or_events() -> None:
+    """Supplemental source scan. Functional BaseAgent.run tests are the proof."""
     import src.agent.agents.base_agent as base_agent_mod
     from src.agent.agents.base_agent import BaseAgent
 
