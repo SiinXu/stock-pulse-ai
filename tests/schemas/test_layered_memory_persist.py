@@ -4,11 +4,15 @@
 
 from __future__ import annotations
 
+import ast
+from pathlib import Path
+
 import pytest
 
 from src.schemas.layered_memory_persist import (
     LayeredMemoryPersistError,
     admit_layered_observation_mapping,
+    observation_to_persist_mapping,
 )
 from src.schemas.memory_fact_opinion import FactOpinionMixError
 from src.schemas.memory_provenance import (
@@ -38,11 +42,30 @@ def _payload(**overrides):
     return data
 
 
+def test_persist_module_does_not_import_src_agent() -> None:
+    source = Path("src/schemas/layered_memory_persist.py").read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("src.agent"):
+            raise AssertionError(
+                f"src.schemas.layered_memory_persist must not import {node.module}"
+            )
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "src.agent" or alias.name.startswith("src.agent."):
+                    raise AssertionError(
+                        f"src.schemas.layered_memory_persist must not import {alias.name}"
+                    )
+
+
 def test_admitted_observation_is_server_stamped() -> None:
-    observation, stamp = admit_layered_observation_mapping(_payload())
-    assert observation.provenance_source == PROVENANCE_SOURCE_SYSTEM_RESOLVE
+    admitted, stamp = admit_layered_observation_mapping(_payload())
+    assert admitted["provenance_source"] == PROVENANCE_SOURCE_SYSTEM_RESOLVE
     assert stamp["provenance_source"] == PROVENANCE_SOURCE_SYSTEM_RESOLVE
     assert stamp["actor_id"] is None
+    persist_fields = observation_to_persist_mapping(admitted)
+    assert "provenance_source" not in persist_fields
+    assert "actor_id" not in persist_fields
 
 
 @pytest.mark.parametrize(

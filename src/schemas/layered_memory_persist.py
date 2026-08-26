@@ -9,10 +9,8 @@ a production prompt hook, and not user CRUD.
 
 from __future__ import annotations
 
-from dataclasses import asdict, replace
 from typing import Any, Dict, Mapping, Optional, Tuple
 
-from src.agent.memory_layers import MemoryObservation
 from src.schemas.memory_fact_opinion import FactOpinionMixError, lock_fact_payload
 from src.schemas.memory_provenance import (
     MemoryProvenanceError,
@@ -95,8 +93,13 @@ def admit_layered_observation_mapping(
     *,
     provenance_source: str = PROVENANCE_SOURCE_SYSTEM_RESOLVE,
     actor_id: Optional[str] = None,
-) -> Tuple[MemoryObservation, Dict[str, Optional[str]]]:
-    """Reject spoofed provenance, secrets, and mixed opinion keys, then stamp."""
+) -> Tuple[Dict[str, Any], Dict[str, Optional[str]]]:
+    """Reject spoofed provenance, secrets, and mixed opinion keys, then stamp.
+
+    Returns a server-stamped mapping. Callers in ``src.agent`` / ``src.services``
+    construct ``MemoryObservation``; this schema module must not import
+    ``src.agent``.
+    """
     if not isinstance(payload, Mapping):
         raise TypeError("layered observation payload must be a mapping")
     try:
@@ -124,35 +127,34 @@ def admit_layered_observation_mapping(
         LayeredMemoryPersistError,
     ):
         raise
-    observation = MemoryObservation(
-        principal_id=payload["principal_id"],
-        analysis_history_id=payload["analysis_history_id"],
-        stock_code=payload["stock_code"],
-        observed_at=payload["observed_at"],
-        expires_at=payload.get("expires_at"),
-        signal=payload["signal"],
-        sentiment_score=payload["sentiment_score"],
-        price_at_analysis=payload["price_at_analysis"],
-        outcome_id=payload.get("outcome_id"),
-        outcome_horizon_days=payload.get("outcome_horizon_days"),
-        evaluated_at=payload.get("evaluated_at"),
-        was_correct=payload.get("was_correct"),
-    )
     stamp = stamp_memory_provenance(
         provenance_source=provenance_source or decision.provenance_source or PROVENANCE_SOURCE_SYSTEM_RESOLVE,
         actor_id=actor_id if actor_id is not None else decision.actor_id,
     )
-    stamped = replace(
-        observation,
-        provenance_source=stamp["provenance_source"],
-        actor_id=stamp["actor_id"],
-    )
-    return stamped, stamp
+    admitted = {
+        "principal_id": payload["principal_id"],
+        "analysis_history_id": payload["analysis_history_id"],
+        "stock_code": payload["stock_code"],
+        "observed_at": payload["observed_at"],
+        "expires_at": payload.get("expires_at"),
+        "signal": payload["signal"],
+        "sentiment_score": payload["sentiment_score"],
+        "price_at_analysis": payload["price_at_analysis"],
+        "outcome_id": payload.get("outcome_id"),
+        "outcome_horizon_days": payload.get("outcome_horizon_days"),
+        "evaluated_at": payload.get("evaluated_at"),
+        "was_correct": payload.get("was_correct"),
+        "provenance_source": stamp["provenance_source"],
+        "actor_id": stamp["actor_id"],
+    }
+    return admitted, stamp
 
 
-def observation_to_persist_mapping(observation: MemoryObservation) -> Dict[str, Any]:
+def observation_to_persist_mapping(observation: Mapping[str, Any]) -> Dict[str, Any]:
     """Return the admitted persist fields without client provenance keys."""
-    payload = asdict(observation)
+    if not isinstance(observation, Mapping):
+        raise TypeError("layered observation payload must be a mapping")
+    payload = dict(observation)
     payload.pop("provenance_source", None)
     payload.pop("actor_id", None)
     return payload

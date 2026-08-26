@@ -55,6 +55,26 @@ def _finite_price(value: Any) -> Optional[float]:
     return price
 
 
+def _observation_from_admitted_mapping(admitted: Mapping[str, Any]) -> MemoryObservation:
+    """Build the agent-layer observation from a schema-admitted mapping."""
+    return MemoryObservation(
+        principal_id=admitted["principal_id"],
+        analysis_history_id=admitted["analysis_history_id"],
+        stock_code=admitted["stock_code"],
+        observed_at=admitted["observed_at"],
+        expires_at=admitted.get("expires_at"),
+        signal=admitted["signal"],
+        sentiment_score=admitted["sentiment_score"],
+        price_at_analysis=admitted["price_at_analysis"],
+        outcome_id=admitted.get("outcome_id"),
+        outcome_horizon_days=admitted.get("outcome_horizon_days"),
+        evaluated_at=admitted.get("evaluated_at"),
+        was_correct=admitted.get("was_correct"),
+        provenance_source=admitted.get("provenance_source"),
+        actor_id=admitted.get("actor_id"),
+    )
+
+
 def _finite_score(value: Any) -> Optional[float]:
     if isinstance(value, bool) or value is None:
         return None
@@ -99,11 +119,12 @@ class LayeredMemoryCollectionService:
         if not is_layered_memory_collection_enabled(cfg):
             return None
         try:
-            observation, _stamp = admit_layered_observation_mapping(
+            admitted, _stamp = admit_layered_observation_mapping(
                 payload,
                 provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
                 actor_id=None,
             )
+            observation = _observation_from_admitted_mapping(admitted)
             lifecycle = self._lifecycle(cfg)
             if not lifecycle.has_consent(observation.principal_id):
                 return None
