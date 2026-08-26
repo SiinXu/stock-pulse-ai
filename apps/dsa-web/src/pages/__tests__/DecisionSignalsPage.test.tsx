@@ -3068,6 +3068,7 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
     const chip = screen.getByTestId('decision-signal-context-chip');
     expect(chip).toHaveAttribute('data-selected-signal-id', '7');
+    expect(chip).toHaveAccessibleName('600519 贵州茅台, 来源 分析报告, 状态 有效');
     const chipButton = within(chip).getByRole('button', { name: '查看详情 600519 贵州茅台' });
     expect(chipButton).not.toHaveAttribute('aria-hidden', 'true');
     fireEvent.click(chipButton);

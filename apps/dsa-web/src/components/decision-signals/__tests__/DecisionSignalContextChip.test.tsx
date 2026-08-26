@@ -19,8 +19,8 @@ const item: DecisionSignalItem = {
   status: 'active',
 };
 
-function renderChip(onOpen = vi.fn()) {
-  window.localStorage.setItem('dsa.uiLanguage', 'zh');
+function renderChip(onOpen = vi.fn(), language: 'zh' | 'en' = 'zh') {
+  window.localStorage.setItem('dsa.uiLanguage', language);
   render(
     <UiLanguageProvider>
       <DecisionSignalContextChip
@@ -33,12 +33,21 @@ function renderChip(onOpen = vi.fn()) {
 }
 
 describe('DecisionSignalContextChip', () => {
-  it('shows symbol, source, and status and reopens details on click', () => {
+  it('shows symbol, labeled source, and status in Simplified Chinese and reopens details on click', () => {
     const onOpen = renderChip();
     const chip = screen.getByTestId('decision-signal-context-chip');
     expect(chip).toHaveAttribute('data-selected-signal-id', '7');
-    expect(chip).toHaveAccessibleName('600519 贵州茅台，来源 分析报告，状态 有效');
+    expect(chip).toHaveAccessibleName('600519 贵州茅台, 来源 分析报告, 状态 有效');
     fireEvent.click(screen.getByRole('button', { name: '查看详情 600519 贵州茅台' }));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows symbol, labeled source, and status in English with locale-neutral separators', () => {
+    const onOpen = renderChip(vi.fn(), 'en');
+    const chip = screen.getByTestId('decision-signal-context-chip');
+    expect(chip).toHaveAttribute('data-selected-signal-id', '7');
+    expect(chip).toHaveAccessibleName('600519 贵州茅台, Source Analysis report, Status Active');
+    fireEvent.click(screen.getByRole('button', { name: 'View details 600519 贵州茅台' }));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 

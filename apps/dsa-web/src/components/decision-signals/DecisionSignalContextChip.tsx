@@ -32,7 +32,7 @@ export const DecisionSignalContextChip: React.FC<DecisionSignalContextChipProps>
       padding="sm"
       data-testid="decision-signal-context-chip"
       data-selected-signal-id={String(item.id)}
-      aria-label={`${symbol}，${t('decisionSignals.source')} ${sourceLabel}，${t('decisionSignals.status')} ${statusLabel}`}
+      aria-label={`${symbol}, ${t('decisionSignals.source')} ${sourceLabel}, ${t('decisionSignals.status')} ${statusLabel}`}
     >
       <SelectionChip
         selected
