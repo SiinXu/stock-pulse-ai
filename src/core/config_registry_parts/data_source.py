@@ -964,7 +964,7 @@ DATA_SOURCE_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "never enters provider/socket paths), or refresh (skip local read, "
             "run provider chain once). Empty or unset defaults to auto. Invalid "
             "values fail closed at configuration load. Independent of "
-            "LOCAL_ONLY_MODE (process-wide outbound HTTP gate)."
+            "LOCAL_ONLY_MODE (policy-owned outbound HTTP gate, not a process air-gap)."
         ),
         "category": "data_source",
         "data_type": "string",

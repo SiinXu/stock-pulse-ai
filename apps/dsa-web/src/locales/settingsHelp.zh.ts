@@ -562,7 +562,7 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     ],
     impact: ['影响分析、股票历史 API 与依赖行情的定时任务的日线读取路径。'],
     notes: [
-      '与进程级出站 HTTP 门禁 LOCAL_ONLY_MODE 相互独立。',
+      '与 LOCAL_ONLY_MODE 相互独立：后者门禁策略管辖的出站 HTTP，不是每个进程套接字。',
       '详见 docs/local-first-market-data.md。',
     ],
   },
@@ -925,10 +925,10 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
   },
   'settings.system.LOCAL_ONLY_MODE': {
     title: '本地专用模式',
-    summary: '失败即关闭的隐私模式：拦截所有非回环出站 HTTP 目标。',
-    usage: '仅在明确使用本地模型与缓存时启用。云端 LLM/搜索/新闻/远程数据源/通知以 LOCAL_ONLY_MODE 编码错误拒绝。纯回环仍可用。',
-    valueNotes: ['默认 false。', '开启后 allowlist 不能扩到回环以外。', '拦截不会静默放行。'],
-    impact: ['依赖远程的分析会显式失败，除非本地后端与缓存覆盖。'],
+    summary: '对走共享策略的出站 HTTP 失败即关闭，不是完整气隙。',
+    usage: '策略管辖的 HTTP（safe_get/safe_post/plugin_safe_*），含行情 provider，以 LOCAL_ONLY_MODE 编码错误拒绝非回环目标。纯回环仍可用。桌面更新检查会跳过。不覆盖：非 HTTP 数据源套接字。进程内原始插件代码不是沙箱。',
+    valueNotes: ['默认 false。', '开启后 allowlist 不能扩到回环以外。', '策略管辖的拦截不会静默放行。'],
+    impact: ['策略管辖的远程 HTTP 会显式失败，除非本地后端与缓存覆盖。'],
     notes: ['修改后重启。见 docs/local-only-mode.md。'],
   },
   'settings.system.ADMIN_AUTH_ENABLED': {
@@ -2189,7 +2189,7 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     usage: '默认保持关闭。仅当可信 Clash/Mihomo TUN 接管文档所列 Fake-IP 网段，且系统代理严格绑定回环地址时开启。',
     valueNotes: [
       '字面 Fake-IP URL、私网域名、metadata、链路本地地址和非回环代理仍会被拒绝。',
-      'Local Only Mode 优先级更高，仍会阻断所有非回环目标。',
+      'Local Only Mode 在本出站 HTTP 策略路径上优先。',
     ],
     impact: ['仅为标准 Fake-IP 网段和精确配置的回环代理扩展出站 DNS 接受范围。'],
     notes: ['不再信任 TUN 或回环代理时应立即关闭。'],

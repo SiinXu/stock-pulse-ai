@@ -1861,7 +1861,7 @@ export const zh = {
   'settings.outboundActivityRefresh': '刷新出站活动',
   'settings.outboundActivityModeOn': '本地专用模式已开启',
   'settings.outboundActivityModeOff': '本地专用模式已关闭',
-  'settings.outboundActivityModeHint': '拦截原因码：{reason}。开启后仅回环地址可出站。',
+  'settings.outboundActivityModeHint': '拦截原因码：{reason}。开启后策略管辖 HTTP 受闸，不是沙箱。',
   'settings.outboundActivityEmptyTitle': '暂无出站决策',
   'settings.outboundActivityEmptyDescription': '发起分析、搜索、通知或模型请求后，允许与拦截记录会出现在此列表。',
   'settings.outboundActivityWhen': '时间',
