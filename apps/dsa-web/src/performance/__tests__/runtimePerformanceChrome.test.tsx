@@ -37,6 +37,10 @@ vi.mock('../../hooks/useUnreadNotifications', () => ({
   }),
 }));
 
+vi.mock('../../hooks/useLocalOnlyModeStatus', () => ({
+  useLocalOnlyModeStatus: () => ({ status: 'off' }),
+}));
+
 vi.mock('../../components/StockAutocomplete', () => ({
   StockAutocomplete: ({ ariaLabel }: { ariaLabel: string }) => <input aria-label={ariaLabel} />,
 }));

@@ -14,6 +14,7 @@ import {
   SETTINGS_SECTION_IDS,
   SETTINGS_VIEW_IDS,
 } from '../routing/routes';
+import { SETTINGS_FIELD_QUERY_KEY } from '../components/settings/settingsFieldGroupDisclosure';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import type { SetupSmokeOutcome } from '../utils/setupSmokeTask';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
@@ -275,7 +276,7 @@ const SettingsPage: React.FC = () => {
     }
     return SETTINGS_SECTIONS[0].id;
   }, [searchParams]);
-  const queryField = searchParams.get('field');
+  const queryField = searchParams.get(SETTINGS_FIELD_QUERY_KEY);
   useEffect(() => {
     if (!revealFieldRequest || parseModelAccessFieldKey(revealFieldRequest.key)) {
       return undefined;
