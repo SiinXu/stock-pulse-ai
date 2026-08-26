@@ -30,7 +30,7 @@ export async function loadEnglishUiTextPayload(): Promise<void> {
 
 export function unloadEnglishUiTextForTests(): void {
   if (import.meta.env.MODE !== 'test') {
-    throw new Error('unloadEnglishUiTextForTests is test-only');
+    throw new Error('test-only');
   }
   loadedEnglishUiText = null;
   pendingEnglishUiText = null;

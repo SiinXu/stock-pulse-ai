@@ -40,7 +40,7 @@ if (import.meta.env.PROD) {
   void registerServiceWorker({
     enabled: true,
     onError: (error) => {
-      console.warn('[pwa] service worker registration failed', error)
+      console.warn('[pwa] sw failed', error)
     },
   })
 }
