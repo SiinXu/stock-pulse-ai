@@ -28,7 +28,7 @@ Percent encoding in a URL hostname is rejected so policy preflight and the HTTP 
 
 ## Local Only Mode
 
-Set `LOCAL_ONLY_MODE=true` to deny **all non-loopback** destinations at this same
+Set `LOCAL_ONLY_MODE=true` to deny **all non-loopback HTTP** destinations at this same
 policy boundary. Public HTTPS, private LAN hosts, and `OUTBOUND_HTTP_ALLOWLIST`
 entries outside pure loopback are blocked with reason `local_only_mode_blocked`.
 Pure loopback remains allowed for local models. See

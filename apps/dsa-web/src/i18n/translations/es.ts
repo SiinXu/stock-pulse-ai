@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "Vista de solo lectura de decisiones recientes de la política HTTP saliente (clase de destino, permitir/bloquear, motivo). No se almacenan hosts, URL ni credenciales. Sirve para verificar LOCAL_ONLY_MODE.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "Los registros de permitir y bloquear aparecen aquí tras análisis, búsqueda, notificación o solicitudes de modelo a la política de salida.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "Aún no hay decisiones de salida",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Código de bloqueo: {reason}. Cuando está activado, solo se permite salida loopback pura.",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Código de bloqueo: {reason}. Cuando está activado, el HTTP de la política está restringido, no es un sandbox.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "El modo solo local está desactivado",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "El modo solo local está activado",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "Los registros están redactados: sin nombres de host, URL, cadenas de consulta ni secretos. Búfer circular en memoria de este proceso; se borra al reiniciar.",

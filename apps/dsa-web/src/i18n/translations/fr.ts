@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "Vue en lecture seule des décisions récentes de la politique HTTP sortante (classe de destination, autoriser/bloquer, motif). Les hôtes, URL et identifiants ne sont jamais stockés. Permet de vérifier LOCAL_ONLY_MODE.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "Les enregistrements d’autorisation et de blocage apparaissent ici après des requêtes d’analyse, de recherche, de notification ou de modèle.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "Aucune décision sortante pour le moment",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Code de blocage : {reason}. Lorsqu’il est activé, seul le trafic loopback pur est autorisé.",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Code de blocage : {reason}. Lorsqu’il est activé, le HTTP sous politique est filtré, ce n’est pas un bac à sable.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "Le mode local uniquement est désactivé",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "Le mode local uniquement est activé",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "Enregistrements expurgés : pas de noms d’hôte, d’URL, de chaînes de requête ni de secrets. Tampon circulaire en mémoire pour ce processus ; effacé au redémarrage.",

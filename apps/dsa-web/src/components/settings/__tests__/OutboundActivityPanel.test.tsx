@@ -37,6 +37,8 @@ describe('OutboundActivityPanel', () => {
     render(<OutboundActivityPanel t={t} language="en" />);
     expect(await screen.findByTestId('settings-local-only-status')).toBeInTheDocument();
     expect(screen.getByText(/Local Only mode is on/i)).toBeInTheDocument();
+    expect(await screen.findByText(/policy-owned HTTP is gated, not a sandbox/i)).toBeInTheDocument();
+    expect(screen.queryByText(/only pure loopback egress is allowed/i)).not.toBeInTheDocument();
     expect(await screen.findByText('local_only_mode_blocked')).toBeInTheDocument();
     expect(screen.getByText('public_hostname')).toBeInTheDocument();
   });

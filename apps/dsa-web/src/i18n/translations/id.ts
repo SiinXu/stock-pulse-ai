@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "Tampilan hanya-baca keputusan kebijakan HTTP keluar terbaru (kelas tujuan, izinkan/blokir, alasan). Host, URL, dan kredensial tidak disimpan. Digunakan untuk memverifikasi LOCAL_ONLY_MODE.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "Catatan izinkan dan blokir muncul di sini setelah analisis, pencarian, notifikasi, atau permintaan model mengenai kebijakan keluar.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "Belum ada keputusan keluar",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Kode blokir: {reason}. Saat aktif, hanya egress loopback murni yang diizinkan.",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Kode blokir: {reason}. Saat aktif, HTTP milik kebijakan dibatasi, bukan sandbox.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "Mode hanya lokal nonaktif",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "Mode hanya lokal aktif",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "Catatan disunting: tanpa nama host, URL, string kueri, atau rahasia. Buffer cincin memori untuk proses ini; dikosongkan saat restart.",

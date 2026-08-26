@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "Schreibgeschützte Ansicht der letzten ausgehenden HTTP-Richtlinienentscheidungen (Zielklasse, erlauben/blockieren, warum). Hosts, URLs und Anmeldeinformationen werden nicht gespeichert. Dient zur Überprüfung von LOCAL_ONLY_MODE.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "Zulassen- und Blockierdatensätze erscheinen hier, nachdem Analyse-, Such-, Benachrichtigungs- oder Modellanfragen die ausgehende Richtlinie erreichen.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "Noch keine ausgehenden Entscheidungen",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Blockiercode: {reason}. Bei Aktivierung ist nur reiner Loopback-Ausgangsverkehr erlaubt.",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Blockiercode: {reason}. Bei Aktivierung ist policy-eigenes HTTP gegated, keine Sandbox.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "Nur-lokal-Modus ist aus",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "Nur-lokal-Modus ist aktiv",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "Datensätze sind redigiert: keine Hostnamen, URLs, Abfragezeichenfolgen oder Geheimnisse. In-Memory-Ringpuffer für diesen Prozess; wird beim Neustart geleert.",

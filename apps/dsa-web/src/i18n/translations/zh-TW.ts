@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "唯讀檢視最近出站 HTTP 策略決策（目標類別、允許/攔截、原因）。不記錄主機名、URL 或憑證。用於核驗 LOCAL_ONLY_MODE。",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "發起分析、搜尋、通知或模型請求後，允許與攔截記錄會出現在此列表。",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "暫無出站決策",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "攔截原因碼：{reason}。開啟後僅回環位址可出站。",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "攔截原因碼：{reason}。開啟後策略管轄 HTTP 受閘，不是沙箱。",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "本地專用模式已關閉",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "本地專用模式已開啟",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "記錄已脫敏：不含主機名、URL、查詢字串或密鑰。本行程記憶體環形緩衝，重啟後清空。",

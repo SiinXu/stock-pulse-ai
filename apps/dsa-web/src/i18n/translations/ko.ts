@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "최근 아웃바운드 HTTP 정책 결정(대상 클래스, 허용/차단, 이유)의 읽기 전용 보기입니다. 호스트, URL, 자격 증명은 저장되지 않습니다. LOCAL_ONLY_MODE 검증에 사용합니다.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "분석, 검색, 알림 또는 모델 요청이 아웃바운드 정책에 도달하면 허용/차단 기록이 여기에 나타납니다.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "아직 아웃바운드 결정 없음",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "차단 이유 코드: {reason}. 켜져 있으면 순수 루프백만 허용됩니다.",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "차단 이유 코드: {reason}. 켜져 있으면 정책 관할 HTTP가 제한되며 샌드박스가 아닙니다.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "로컬 전용 모드 꺼짐",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "로컬 전용 모드 켜짐",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "기록은 수정되었습니다. 호스트명, URL, 쿼리 문자열, 비밀은 없습니다. 이 프로세스의 메모리 링 버퍼이며 재시작 시 지워집니다.",

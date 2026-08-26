@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "最近の送信 HTTP ポリシー判定（宛先クラス、許可/拒否、理由）の読み取り専用ビュー。ホスト・URL・資格情報は保存しません。LOCAL_ONLY_MODE の検証に使用します。",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "分析・検索・通知・モデル要求が送信ポリシーに到達すると、許可と拒否の記録がここに表示されます。",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "送信判定はまだありません",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "拒否理由コード: {reason}。オンのときは純粋なループバック送信のみ許可されます。",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "拒否理由コード: {reason}。オンのときはポリシー管轄 HTTP がゲートされ、サンドボックスではありません。",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "ローカル専用モードはオフです",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "ローカル専用モードはオンです",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "記録はリダクション済みです。ホスト名・URL・クエリ・秘密は含みません。このプロセスのメモリ上リングバッファで、再起動で消えます。",

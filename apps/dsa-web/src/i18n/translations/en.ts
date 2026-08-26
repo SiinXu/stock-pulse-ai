@@ -8666,7 +8666,7 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "Read-only view of recent outbound HTTP policy decisions (destination class, allow/block, why). Hosts, URLs, and credentials are never stored. Use this to verify LOCAL_ONLY_MODE.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "Allow and block records appear here after analysis, search, notification, or model requests hit the outbound policy.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "No outbound decisions yet",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Block reason code: {reason}. When on, only pure loopback egress is allowed.",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Block reason code: {reason}. When on, policy-owned HTTP is gated, not a sandbox.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "Local Only mode is off",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "Local Only mode is on",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "Records are redacted: no hostnames, URLs, query strings, or secrets. In-memory ring buffer for this process; cleared on restart.",

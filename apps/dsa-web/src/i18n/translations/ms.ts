@@ -1760,7 +1760,7 @@ export const translations = {
   "i18n.uiText.UI_TEXT.settings.outboundActivityDescription": "Paparan baca sahaja keputusan dasar HTTP keluar terkini (kelas destinasi, benarkan/sekat, sebab). Hos, URL dan kelayakan tidak disimpan. Digunakan untuk mengesahkan LOCAL_ONLY_MODE.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyDescription": "Rekod benarkan dan sekat muncul di sini selepas analisis, carian, pemberitahuan atau permintaan model mengenai dasar keluar.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityEmptyTitle": "Belum ada keputusan keluar",
-  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Kod sekat: {reason}. Apabila dihidupkan, hanya egress loopback tulen dibenarkan.",
+  "i18n.uiText.UI_TEXT.settings.outboundActivityModeHint": "Kod sekat: {reason}. Apabila dihidupkan, HTTP milik dasar dikawal, bukan kotak pasir.",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOff": "Mod lokal sahaja dimatikan",
   "i18n.uiText.UI_TEXT.settings.outboundActivityModeOn": "Mod lokal sahaja dihidupkan",
   "i18n.uiText.UI_TEXT.settings.outboundActivityReadOnlyNote": "Rekod telah disunting: tiada nama hos, URL, rentetan pertanyaan atau rahsia. Penimbal gelang memori untuk proses ini; dikosongkan semasa mula semula.",
