@@ -72,7 +72,6 @@ import {
   WorkspacePage,
   type ButtonVariant,
   type DataTableColumn,
-  type IconButtonSize,
   type IconButtonVariant,
 } from '../../components/common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -250,9 +249,15 @@ const IconButtonStory = () => {
   const text = useSampleText();
   const { scenario } = usePlaygroundScenario();
   const variants: IconButtonVariant[] = ['ghost', 'outline', 'danger'];
-  const sizes: IconButtonSize[] = ['compact', 'default', 'comfortable', 'navigation'];
   if (scenario === 'sizes') {
-    return <Surface className="flex items-center gap-3">{sizes.map((size) => <IconButton key={size} size={size} variant="outline" aria-label={`${text.preview} ${size}`}><Search /></IconButton>)}</Surface>;
+    return (
+      <Surface className="flex items-center gap-3">
+        <IconButton size="compact" variant="outline" aria-label={text.preview}><Search /></IconButton>
+        <IconButton size="default" variant="outline" aria-label={text.quietAction}><Search /></IconButton>
+        <IconButton size="comfortable" variant="outline" aria-label={text.secondaryAction}><Search /></IconButton>
+        <IconButton size="navigation" variant="outline" aria-label={text.loadingAction}><Search /></IconButton>
+      </Surface>
+    );
   }
   if (scenario === 'states') {
     return (
