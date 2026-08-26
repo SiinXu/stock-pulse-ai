@@ -4,6 +4,9 @@ import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
 import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
 import {
+  EPISODE_FORGET_FIELD_DESCRIPTION,
+} from '../locales/episodeForgetSettingsHelp';
+import {
   getSkillRetrievalFieldTitle,
   SKILL_RETRIEVAL_FIELD_DESCRIPTION,
 } from '../locales/skillRetrievalSettingsHelp';
@@ -1318,10 +1321,9 @@ const fieldDescriptionMap: Record<string, string> = {
   AGENT_SKILL_AUTOWEIGHT: "根据回测表现自动调整策略权重。",
   AGENT_SKILL_ROUTING: "策略选择方式。auto 按市场状态自动选择，manual 使用 AGENT_SKILLS 列表。",
   ...SKILL_RETRIEVAL_FIELD_DESCRIPTION,
+  ...EPISODE_FORGET_FIELD_DESCRIPTION,
   AGENT_MEMORY_ENABLED: "启用记忆与校准系统，追踪历史分析准确率并自动调节置信度。",
   AGENT_EPISODE_LOG_ENABLED: "默认关闭；记录精简 Agent episode。",
-  AGENT_EPISODE_RETENTION_DAYS: "按标的 episode 最大保留天数；仅在该标的追加成功后清理。无标的不删除，不是全表清理。",
-  AGENT_EPISODE_MAX_ROWS: "按标的 episode 行数上限；仅删除同一标的最旧行。50000 不是全表上限。",
   AGENT_ERROR_PATTERN_ENABLED: '启用持久化错误模式百科，并把已启用卡片作为只读清单注入分析。',
   AGENT_ERROR_PATTERN_INJECT_TOP_K: '限制每次分析注入的错误模式卡片数；0 表示不注入。',
   AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET: '限制错误模式清单字符数；0 表示不注入。',
