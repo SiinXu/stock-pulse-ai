@@ -15,7 +15,7 @@ Tool contracts, registration gates, and output schema live in [Kronos Agent Tool
 
 | Topic | Detail |
 | --- | --- |
-| Dependencies | `requirements-kronos.txt` (includes `torch==2.13.0`, **not** installed by default) |
+| Dependencies | `requirements/kronos.txt` (includes `torch==2.13.0`, **not** installed by default) |
 | Platforms | Linux x86_64/arm64, Windows x64, macOS Apple Silicon (macOS 14+); **macOS Intel unsupported** for this torch wheel |
 | Memory | Start with mini; small/base need substantially more RAM and CPU/GPU |
 | Desktop | **Prebuilt desktop packages do not support Kronos** (PyInstaller backend does not ship torch/weights). Use a supported source install |
@@ -27,7 +27,7 @@ Install the normal StockPulse environment first, then the isolated Kronos set:
 
 ```bash
 python -m pip install --upgrade --constraint constraints.txt pip
-python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt
+python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements/kronos.txt
 python -m pip check
 ```
 
@@ -94,7 +94,7 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 | `reason` | Meaning | Next step |
 | --- | --- | --- |
 | `disabled` | Tool off | Install deps → download weights → set dir → enable → restart |
-| `dependencies_missing` | Optional packages missing | Full command above: `python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt` |
+| `dependencies_missing` | Optional packages missing | Full command above: `python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements/kronos.txt` |
 | `weights_dir_*` / `weights_incomplete` / `weights_invalid` | Path or artifact issues | `scripts/download_kronos_weights.py` or fix directories |
 | `ready` | Local gates pass | Restart if the tool is not registered yet; then use Agent |
 | `packaged_desktop_unsupported` | Prebuilt desktop | Use a source install |
@@ -110,7 +110,7 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 | Symptom | Action |
 | --- | --- |
 | No Kronos UI | Upgrade to a build that includes this feature; open Local Models |
-| Dependency probe fails | Install `requirements-kronos.txt` and run `pip check` |
+| Dependency probe fails | Install `requirements/kronos.txt` and run `pip check` |
 | Weights incomplete/invalid | Re-run the download helper or verify `config.json` + `model.safetensors` |
 | Enabled but no tool | **Restart** the API/CLI process; confirm `KRONOS_ENABLED=true` |
 | Desktop unsupported | Expected; use a source backend |

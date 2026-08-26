@@ -3,7 +3,7 @@
 # This file is not included by requirements.txt. Install the base StockPulse
 # requirements first, then install this exact optional set with the repository
 # runtime and build constraints as documented in docs/kronos-agent-tool.md.
--c constraints.txt
+-c ../constraints.txt
 
 torch==2.13.0
 einops==0.8.2

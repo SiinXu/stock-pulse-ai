@@ -4,7 +4,7 @@
 # PDF tooling. Install the base application first, then:
 #
 #   python -m pip install --build-constraint build-constraints.txt \
-#     -r requirements-report-export.txt
+#     -r requirements/report-export.txt
 #
 # Selection notes (see docs/report-export.md):
 # - markdown-it-py powers secret-safe HTML and PDF Markdown AST parsing.
@@ -16,7 +16,7 @@
 # every supported host. The base application's transitive packages continue to
 # obey constraints.txt and build-constraints.txt.
 
--c constraints.txt
+-c ../constraints.txt
 fpdf2==2.8.3
 fonttools==4.63.0
 markdown-it-py==4.2.0

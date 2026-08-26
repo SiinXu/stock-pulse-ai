@@ -216,3 +216,18 @@ def ensure_validation_wrappers(target_class: Type[Any]) -> bool:
             setattr(target_class, "__init_subclass__", validation_init_subclass)
             installed_or_present = True
     return installed_or_present
+
+
+def install_facade_validation_wrappers(target_class: Type[Any]) -> None:
+    """Install final-exit wrappers after facade rebinds. Fail-open on import."""
+
+    try:
+        ensure_validation_wrappers(target_class)
+    except Exception as exc:  # broad-exception: fallback_recorded - validation install must not break imports
+        log_safe_exception(
+            logger,
+            "data validation wrapper install skipped",
+            exc,
+            error_code="data_validation_install",
+            level=logging.WARNING,
+        )

@@ -115,7 +115,9 @@ export const Tabs = forwardRef<
   );
 });
 
-Tabs.displayName = 'Tabs';
+if (import.meta.env.DEV) {
+  Tabs.displayName = 'Tabs';
+}
 
 export interface TabPanelProps extends Omit<React.HTMLAttributes<HTMLDivElement>, 'role'> {
   tabsId: string;
@@ -149,4 +151,6 @@ export const TabPanel = forwardRef<
   </div>
 ));
 
-TabPanel.displayName = 'TabPanel';
+if (import.meta.env.DEV) {
+  TabPanel.displayName = 'TabPanel';
+}

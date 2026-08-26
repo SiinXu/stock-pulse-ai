@@ -110,7 +110,7 @@ def build_kronos_tool(
     except Exception:  # broad-exception: fallback_recorded - Offline model-load failures are reported and keep the optional tool absent.
         logger.warning(
             "Kronos Agent Tool was not registered reason=model_load_failed "
-            "guidance=Reinstall requirements-kronos.txt and replace both local "
+            "guidance=Reinstall requirements/kronos.txt and replace both local "
             "directories with the selected official model/tokenizer artifacts."
         )
         return None

@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "05f9db232a9675cfd3e357252de1727250e5e93dcb009bf254203da9475f66fb"
+    "13880e5ca058da04b82edf4c9a58833a0e3785ec8c5b26c971df3d8b90e0901b"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "5b677ee7da55b7d174e033dcb266254da6f6be4e9420bdb5b23c7210a32a6e73"
+    "61d79ff852b712c1b183c8e3909f5e2830313b3237f6b7a2fdbb66b48a83eaa8"
 )
 
 
@@ -104,8 +104,9 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for AGENT_ONLINE_ADAPTERS_ENABLED description
-    # after BaseAgent gated confidence apply (Issue #1091).
+    # Combined live snapshot after merging current main: #1518 skill-retrieval
+    # key, #1513 Local Only Mode copy/registry description, and Lane E
+    # OCR/Kronos extras-path description rewrites. Keys digest unchanged.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

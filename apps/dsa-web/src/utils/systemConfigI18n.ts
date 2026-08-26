@@ -3,6 +3,10 @@ import { EVIDENCE_EXPORT_FIELD_TITLES } from '../i18n/evidenceExportErrorTransla
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
 import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
+import {
+  getSkillRetrievalFieldTitle,
+  SKILL_RETRIEVAL_FIELD_DESCRIPTION,
+} from '../locales/skillRetrievalSettingsHelp';
 
 const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
@@ -1252,7 +1256,7 @@ const fieldDescriptionMap: Record<string, string> = {
   LOCAL_RUNTIME_AUTO_DETECT: '默认开启。就绪检查对回环地址快速探测本机 Ollama；失败仅记录日志，不阻塞启动。',
   LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS: '本地运行时探测的单次超时（秒），限制在 0.05–2.0。',
   READINESS_CHECK_TIMEOUT_SECONDS: '结构化就绪/自检的单检查超时（秒），默认 1.0，限制 0.1–5.0；仅按需调用，不在启动时自动运行；超时不得报就绪。',
-  KRONOS_ENABLED: '可选本地 Kronos K 线预测 Agent Tool。需安装 requirements-kronos.txt、配置权重目录并重启后注册；预构建桌面端不支持。详见 docs/kronos-local-model.md。',
+  KRONOS_ENABLED: '可选本地 Kronos K 线预测 Agent Tool。需安装 requirements/kronos.txt、配置权重目录并重启后注册；预构建桌面端不支持。详见 docs/kronos-local-model.md。',
   KRONOS_MODEL_SIZE: '官方规格：mini（约 40MB）、small（约 150MB）、base（约 500MB，含 tokenizer）。网页不会自动下载权重。',
   KRONOS_WEIGHTS_DIR: '本地权重根目录，需包含所选模型与对应 tokenizer 子目录。使用 scripts/download_kronos_weights.py 显式下载。',
   ANALYSIS_DELAY: '启动任务前的延迟秒数，可用于等待依赖服务就绪。',
@@ -1313,6 +1317,7 @@ const fieldDescriptionMap: Record<string, string> = {
   RISK_GATE_PROFILE: '选择最终建议发布前不可关闭的风控裁决档位；非法值会阻止启动。',
   AGENT_SKILL_AUTOWEIGHT: "根据回测表现自动调整策略权重。",
   AGENT_SKILL_ROUTING: "策略选择方式。auto 按市场状态自动选择，manual 使用 AGENT_SKILLS 列表。",
+  ...SKILL_RETRIEVAL_FIELD_DESCRIPTION,
   AGENT_MEMORY_ENABLED: "启用记忆与校准系统，追踪历史分析准确率并自动调节置信度。",
   AGENT_EPISODE_LOG_ENABLED: "默认关闭；记录精简 Agent episode。",
   AGENT_EPISODE_RETENTION_DAYS: "episode 保留天数。",
@@ -1650,6 +1655,9 @@ export function getFieldTitle(
   fallback?: string,
   locale: UiLanguage = 'zh',
 ): string {
+  if (key === 'AGENT_SKILL_RETRIEVAL_K') {
+    return getSkillRetrievalFieldTitle(locale);
+  }
   return fieldTitleMaps[locale][key] || fallback || key;
 }
 

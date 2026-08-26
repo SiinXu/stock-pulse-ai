@@ -20,7 +20,7 @@ This is the entry point for project documentation. The README covers the project
 | **Confirm security boundaries before a public or non-local bind** | [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) | [Deploy Guide (EN)](DEPLOY_EN.md), [Outbound HTTP Policy](security-outbound-policy.md) |
 | Understand the plugin trust model (not a marketplace sandbox) | [Plugin extension contract](plugin-extension-contract.md) | [Plugin development guide](plugin-development-guide.md) ([中文](plugin-development-guide_zh.md)), [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) |
 | **Author or load a system plugin** | [Plugin development guide](plugin-development-guide.md) ([中文](plugin-development-guide_zh.md)) | [Plugin extension contract](plugin-extension-contract.md), [examples/plugins](../examples/plugins/) |
-| [Local Only Mode](local-only-mode_EN.md) | Fail-closed non-loopback egress gate, threat model, and verification surfaces (#218) |
+| [Local Only Mode](local-only-mode_EN.md) | Fail-closed policy-owned HTTP gate, threat model, limits, and verification surfaces (#218) |
 | Understand the plugin trust model (not a marketplace sandbox) | [Plugin extension contract](plugin-extension-contract.md) | [Security baseline — operator boundaries](security-baseline.md#operator-security-boundaries) |
 | Use Bot / IM integrations | [Bot Commands (EN)](bot-command_EN.md) | [Bot Platform Docs](bot/) <sub><sub>![P2 Badge](https://img.shields.io/badge/P2-yellow?style=flat)</sub></sub> (Chinese-only) |
 | Troubleshoot runtime issues | [FAQ (EN)](FAQ_EN.md) | [Changelog](CHANGELOG.md) |
@@ -41,6 +41,7 @@ This is the entry point for project documentation. The README covers the project
 | [Full Guide (EN)](full-guide_EN.md) | Environment setup, run modes, configuration, deployment paths, and common issues |
 | [Environment variable inventory (EN)](environment-variables_EN.md) | Three-way `.env.example` / registry / docs inventory, config addition process, and consistency check |
 | [FAQ (EN)](FAQ_EN.md) | Common configuration, model, notification, deployment, and runtime issues |
+| [Third-party notices](legal/THIRD_PARTY_NOTICES) | Licenses and copyright notices for bundled dependencies, including embedded Ollama |
 | [Data-source Priority, Health, and Degradation](data-source-stability_EN.md) | Static/realtime priority, health scoring, adaptive ordering, fallback chains, deployment profiles, and troubleshooting |
 | [Futu OpenD Portfolio Import](futu-opend-portfolio-import_EN.md) | OpenD setup, FUTU_* settings, live position import API, degradation, and local-gateway network policy |
 | [Financial reports in fundamental analysis](financial-reports-integration_EN.md) | A-share-first multi-period statement normalization, metric formulas, sufficiency (insufficient fundamentals), and extension of existing fundamental_context |

@@ -141,6 +141,52 @@ describe('bundle size checker', () => {
     expect(result.stderr).toContain('axios-mock-adapter');
   });
 
+  it('fails when skill retrieval help leaks into the SettingsPage family', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'SettingsPage-hash.js'),
+      'How many catalog skills automatic SkillRouter may retrieve by description\n',
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Skill retrieval help leaked');
+    expect(result.stderr).toContain('SettingsPage-hash.js');
+  });
+
+  it('accepts skill retrieval help only on the CredentialInput chunk', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'CredentialInput-hash.js'),
+      'How many catalog skills automatic SkillRouter may retrieve by description\n',
+    );
+    writeFileSync(
+      path.join(root, 'assets', 'SettingsPage-hash.js'),
+      'export const settingsPage = true;\n',
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(0);
+  });
+
+  it('fails when SettingsPage exists but the isolated help payload is missing', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'SettingsPage-hash.js'),
+      'export const settingsPage = true;\n',
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Skill retrieval help marker missing');
+  });
+
   it('fails when the build output contains no JavaScript or CSS assets', () => {
     const root = createOutput();
     writeFileSync(path.join(root, 'assets', 'manifest.txt'), 'not a bundle asset');
@@ -656,6 +702,24 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(budget.rules.some((rule) => rule.id === 'criticalPath')).toBe(false);
   });
 
+  it('reseeds locale-de and locale-ko gzip budgets after Local Only copy honesty (Refs #218)', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const reseeds = {
+      'locale-de': 157743,
+      'locale-ko': 157613,
+    };
+
+    for (const [id, measuredGzipBytes] of Object.entries(reseeds)) {
+      const rule = budget.rules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        measuredGzipBytes,
+        maxGzipBytes: measuredGzipBytes + 400,
+      }));
+      expect(rule.note).toContain('Refs #218');
+    }
+  });
+
   it('reseeds only overflowed locale gzip budgets after reportRunFeedback keys (Refs #1105)', () => {
     const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
     const affectedAssets = {
@@ -678,8 +742,6 @@ describe('first-paint entry budget (Refs #883)', () => {
       'js-entry': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
       'ui-text-en': { measuredGzipBytes: 34893, maxGzipBytes: 38383 },
       'locale-ja': { measuredGzipBytes: 164341, maxGzipBytes: 164741 },
-      'locale-de': { measuredGzipBytes: 157314, maxGzipBytes: 157714 },
-      'locale-ko': { measuredGzipBytes: 157191, maxGzipBytes: 157591 },
       'locale-zh-TW': { measuredGzipBytes: 149591, maxGzipBytes: 149991 },
       'locale-extra': { measuredGzipBytes: 3087, maxGzipBytes: 3487 },
       'vendor-charts': { measuredGzipBytes: 111229, maxGzipBytes: 122352 },

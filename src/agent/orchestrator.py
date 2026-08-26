@@ -122,7 +122,9 @@ from src.services.prediction_extractor import (
 )
 from src.agent.orchestrator_parts.chat import (
     _ChatMethods,
+    _aggregate_mode_budget_fields,
     _build_dashboard_run_router_facts,
+    _public_agent_result,
 )
 from src.agent.orchestrator_parts.dashboard import (
     _DashboardMethods,
@@ -131,7 +133,11 @@ from src.agent.orchestrator_parts.dashboard import (
 from src.agent.orchestrator_parts.execution import _ExecutionMethods
 from src.agent.orchestrator_parts import disagreement as _disagreement
 from src.agent.orchestrator_parts.critic_revision import _CriticRevisionRunner
-from src.agent.orchestrator_parts.pipeline import _PipelineMethods
+from src.agent.orchestrator_parts.pipeline import (
+    _PipelineMethods,
+    _select_specialist_skill_ids,
+    _skill_instructions_for_run,
+)
 
 if TYPE_CHECKING:
     from src.agent.executor import AgentResult
@@ -159,7 +165,9 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     build_agent_chat_tool_registry,
     build_agent_tool_history_context,
     build_agent_disagreement_summary,
+    _aggregate_mode_budget_fields,
     _build_dashboard_run_router_facts,
+    _public_agent_result,
     build_agent_runtime_facts,
     _build_approved_risk_bypass_application,
     build_risk_override_application,
@@ -295,6 +303,7 @@ class AgentOrchestrator:
         skill_manager=None,
         config=None,
         runtime_guard_policy: Optional[RuntimeGuardPolicy] = None,
+        explicit_skill_selection: bool = False,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
@@ -305,6 +314,7 @@ class AgentOrchestrator:
         self.mode = normalized_mode if normalized_mode in VALID_MODES else "standard"
         self.skill_manager = skill_manager
         self.config = config
+        self.explicit_skill_selection = bool(explicit_skill_selection)
         from src.agent.disagreement_handling import disagreement_handling_thresholds
 
         high_threshold, medium_threshold = disagreement_handling_thresholds(config)

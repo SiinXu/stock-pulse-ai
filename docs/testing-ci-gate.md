@@ -29,7 +29,7 @@ Path-triggered blocking jobs in `.github/workflows/ci.yml` always conclude so th
 
 | Check | When the full matrix runs | Command |
 | --- | --- | --- |
-| `ocr-stock-extractor` | OCR / image stock-extractor sources, tests, `requirements-ocr.txt`, or `ci.yml` | Install `requirements-ocr.txt` + Tesseract, then the existing extractor pytest files; skips are failures |
+| `ocr-stock-extractor` | OCR / image stock-extractor sources, tests, `requirements/ocr.txt`, or `ci.yml` | Install `requirements/ocr.txt` + Tesseract, then the existing extractor pytest files; skips are failures |
 | `desktop-gate` | `apps/dsa-desktop/**`, desktop packaging scripts, or `ci.yml` | `cd apps/dsa-desktop && npm ci && npm test` (no `electron-builder` / Ollama download) |
 
 Default backend pytest still excludes `@pytest.mark.network`. These jobs do not promote network tests to blocking.

@@ -8,13 +8,13 @@
 #   python -m pip install --build-constraint build-constraints.txt -r requirements.txt
 #   python -m pip check
 #
-# Optional groups below map to requirements-*.txt extras. Prefer those
+# Optional groups below map to requirements/*.txt extras. Prefer those
 # requirements files (with the same constraints) for reproducible installs.
 # Do not resolve this project unconstrained against PyPI.
 #
 # Note: experimental PydanticAI package names must not appear in this file
 # (tests/agent/runtime/test_native_default.py). Install that optional set only
-# via requirements-pydanticai.txt under constraints.
+# via requirements/pydanticai.txt under constraints.
 #
 # Application install entrypoint remains requirements.txt (it embeds
 # -c constraints.txt). This file is packaging metadata + optional group
@@ -107,13 +107,13 @@ dependencies = [
 
 [project.optional-dependencies]
 # Empty sentinel on purpose: the experimental adapter's locked package set is
-# only declared in requirements-pydanticai.txt so default manifests stay free
+# only declared in requirements/pydanticai.txt so default manifests stay free
 # of that stack. `pip install '.[pydanticai]'` does NOT install the POC packages.
 # Install with:
 #   python -m pip install --constraint constraints.txt \
-#     --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+#     --build-constraint build-constraints.txt -r requirements/pydanticai.txt
 pydanticai = []
-# Local Kronos Agent Tool inference stack (mirrors requirements-kronos.txt names).
+# Local Kronos Agent Tool inference stack (mirrors requirements/kronos.txt names).
 # Always resolve with constraints.txt; unpinned names here are not a lock.
 kronos = [
     "torch",
@@ -123,7 +123,7 @@ kronos = [
     "tqdm",
 ]
 # Desktop packaging toolchain. `pip install '.[desktop]'` adds pyinstaller on
-# top of [project].dependencies; prefer requirements-desktop.txt + constraints.
+# top of [project].dependencies; prefer requirements/desktop.txt + constraints.
 desktop = [
     "pyinstaller",
 ]
@@ -137,15 +137,15 @@ dev = [
     "uv==0.11.31",
 ]
 
-# Optional offline OCR (mirrors requirements-ocr.txt names).
-# Pins stay in requirements-ocr.txt + constraints.txt; unpinned names here are not a lock.
-# Prefer: python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-ocr.txt
+# Optional offline OCR (mirrors requirements/ocr.txt names).
+# Pins stay in requirements/ocr.txt + constraints.txt; unpinned names here are not a lock.
+# Prefer: python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements/ocr.txt
 ocr = [
     "Pillow",
     "pytesseract",
 ]
-# Optional report PDF export (mirrors requirements-report-export.txt).
-# Prefer: python -m pip install --build-constraint build-constraints.txt -r requirements-report-export.txt
+# Optional report PDF export (mirrors requirements/report-export.txt).
+# Prefer: python -m pip install --build-constraint build-constraints.txt -r requirements/report-export.txt
 # Exact optional versions keep PDF/font parsing behavior reproducible without
 # adding either package to the default install.
 report-export = [
