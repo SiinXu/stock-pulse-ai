@@ -73,6 +73,25 @@ def _echo_registry(handler=None):
     return registry
 
 
+class _ControllableClock:
+    """Monotonic test clock for pipeline `time.time()` lookups.
+
+    Isolated-stage `Future.result(timeout=...)` still uses the real wall clock.
+    """
+
+    def __init__(self, start: float = 1_000_000.0) -> None:
+        self._now = start
+        self._lock = threading.Lock()
+
+    def time(self) -> float:
+        with self._lock:
+            return self._now
+
+    def advance(self, seconds: float) -> None:
+        with self._lock:
+            self._now += seconds
+
+
 def _guard_events(records):
     events = []
     prefix = "agent_runtime_guard "
@@ -887,23 +906,44 @@ def test_full_run_deadline_wins_over_critical_stage_timeout(caplog):
         runtime_guard_policy=_policy(),
     )
     stage_finished = threading.Event()
+    run_timeout_s = 0.01
+    clock = _ControllableClock()
+    isolated_stage = orchestrator._execute_isolated_stage
 
     def _slow_stage(agent, _ctx, **_kwargs):
-        time.sleep(0.05)
+        # Exceed the isolated-stage Future timeout (remaining run budget) so
+        # the in-flight critical stage is recorded as stage_timeout.
+        time.sleep(run_timeout_s + 0.04)
         stage_finished.set()
         return StageResult(
             stage_name=agent.agent_name,
             status=StageStatus.COMPLETED,
         )
 
-    with caplog.at_level(logging.WARNING), patch.object(
+    def _isolated_stage_then_consume_run_budget(*args, **kwargs):
+        try:
+            return isolated_stage(*args, **kwargs)
+        finally:
+            # Pipeline elapsed time is independent of setup cost. Consume the
+            # run budget only after the stage attempt so before_stage cannot
+            # expire on a slow runner before technical is entered.
+            clock.advance(run_timeout_s)
+
+    with caplog.at_level(logging.WARNING), patch(
+        "src.agent.orchestrator.time.time",
+        clock.time,
+    ), patch.object(
         orchestrator,
         "_get_timeout_seconds",
-        return_value=0.01,
+        return_value=run_timeout_s,
     ), patch.object(
         orchestrator,
         "_build_agent_chain",
         return_value=[SimpleNamespace(agent_name="technical")],
+    ), patch.object(
+        orchestrator,
+        "_execute_isolated_stage",
+        side_effect=_isolated_stage_then_consume_run_budget,
     ), patch.object(orchestrator, "_run_stage_agent", side_effect=_slow_stage):
         result = orchestrator._execute_pipeline(
             AgentContext(query="test"),
