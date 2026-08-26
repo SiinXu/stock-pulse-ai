@@ -2271,7 +2271,7 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   'settings.ai_model.KRONOS_ENABLED': {
     title: 'Enable Kronos Local Forecast',
     summary: 'Opt-in local Kronos K-line forecasting Agent Tool (not an LLM chat model).',
-    usage: 'Install requirements-kronos.txt, download weights with scripts/download_kronos_weights.py, set KRONOS_WEIGHTS_DIR, then enable and restart. Use the Kronos status panel on Local Models to verify.',
+    usage: 'Install requirements/kronos.txt, download weights with scripts/download_kronos_weights.py, set KRONOS_WEIGHTS_DIR, then enable and restart. Use the Kronos status panel on Local Models to verify.',
     valueNotes: [
       'Default is false; analysis continues without Kronos when disabled or not ready.',
       'A process restart is required after enabling so the built-in plugin can register the tool.',

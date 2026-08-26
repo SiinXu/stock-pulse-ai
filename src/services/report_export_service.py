@@ -45,7 +45,7 @@ PDF_MAX_MAJOR = 3
 PDF_INSTALL_HINT = (
     "Install the optional report-export dependency set with "
     "'python -m pip install --build-constraint build-constraints.txt "
-    "-r requirements-report-export.txt'."
+    "-r requirements/report-export.txt'."
 )
 HTML_INSTALL_HINT = PDF_INSTALL_HINT
 

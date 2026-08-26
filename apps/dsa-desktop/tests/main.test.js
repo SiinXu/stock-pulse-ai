@@ -4880,7 +4880,7 @@ test('desktop package retires the standalone model surface and keeps embedded ru
   assert.ok(packageMetadata.build.extraResources.some((entry) =>
     entry.from === 'vendor/ollama' && entry.to === 'ollama'));
   assert.ok(packageMetadata.build.extraResources.some((entry) =>
-    entry.from === '../../THIRD_PARTY_NOTICES' && entry.to === 'THIRD_PARTY_NOTICES'));
+    entry.from === '../../docs/legal/THIRD_PARTY_NOTICES' && entry.to === 'THIRD_PARTY_NOTICES'));
 });
 
 test('starting never leaves more than one managed daemon alive', async (t) => {

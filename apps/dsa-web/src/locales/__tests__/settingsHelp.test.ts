@@ -102,6 +102,30 @@ describe('fallback model settings help', () => {
     expect(copy).toContain('budget_skipped');
   });
 
+  it.each(UI_LANGUAGES)('keeps full catalog-description skill retrieval help for %s', (language) => {
+    const content = getSettingsHelpContent('settings.agent.AGENT_SKILL_RETRIEVAL_K', undefined, language);
+    const fieldContent = getSettingsHelpContent('AGENT_SKILL_RETRIEVAL_K', undefined, language);
+    expect(content?.title.trim(), `${language}:title`).not.toBe('');
+    expect(content?.summary?.trim(), `${language}:summary`).not.toBe('');
+    expect(content?.usage?.trim(), `${language}:usage`).not.toBe('');
+    expect(content?.impact?.length, `${language}:impact`).toBeGreaterThan(0);
+    expect(content?.notes?.length, `${language}:notes`).toBeGreaterThanOrEqual(2);
+    expect(content?.valueNotes?.length, `${language}:valueNotes`).toBeGreaterThan(0);
+    expect(content?.examples).toEqual(['AGENT_SKILL_RETRIEVAL_K=0', 'AGENT_SKILL_RETRIEVAL_K=2']);
+    expect(fieldContent?.title).toBe(content?.title);
+    expect(fieldContent?.summary).toBe(content?.summary);
+    const copy = JSON.stringify(content);
+    expect(copy).toContain('AGENT_SKILL_RETRIEVAL_K');
+    expect(copy).toContain('AGENT_SKILLS');
+    expect(copy).toMatch(/manual/);
+    expect(copy).toMatch(/\ball\b/);
+    if (language !== 'en' && language !== 'zh') {
+      expect(content?.title).not.toBe(
+        getSettingsHelpContent('settings.agent.AGENT_SKILL_RETRIEVAL_K', undefined, 'en')?.title,
+      );
+    }
+  });
+
   it.each([
     ['zh-CN', '失效引用会保留并标记不可用', '显式替换或删除'],
     ['en-US', 'stale references remain marked unavailable', 'explicitly replaces or removes'],

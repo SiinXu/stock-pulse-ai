@@ -22,6 +22,9 @@ from src.agent.public_contract import (
     sanitize_agent_diagnostic,
 )
 from src.agent.runtime.contract import ExecutionState
+from src.agent.skills.router import (
+    skill_instructions_for_native_task as _skill_instructions_for_native_task,
+)
 from src.agent.runtime.lifecycle import classify_result_terminal_state
 from src.agent.runtime_facts import (
     build_agent_soul_runtime_facts as _build_agent_soul_runtime_facts,
@@ -73,8 +76,9 @@ class _ChatMethods:
 
         # Build system prompt with skills
         skills_section = ""
-        if self.skill_instructions:
-            skills_section = f"## 激活的交易技能\n\n{self.skill_instructions}"
+        skill_instructions = _skill_instructions_for_native_task(self, message, context)
+        if skill_instructions:
+            skills_section = f"## 激活的交易技能\n\n{skill_instructions}"
         default_skill_policy_section = ""
         if self.default_skill_policy:
             default_skill_policy_section = f"\n{self.default_skill_policy}\n"

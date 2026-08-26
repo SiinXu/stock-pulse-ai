@@ -160,7 +160,7 @@ def test_missing_dependencies_prevent_registration_with_actionable_log(
     assert registry.get(KRONOS_FORECAST_TOOL_NAME) is None
     rendered = "\n".join(record.getMessage() for record in caplog.records)
     assert "dependencies_missing" in rendered
-    assert "requirements-kronos.txt" in rendered
+    assert "requirements/kronos.txt" in rendered
 
 
 def test_missing_weights_prevent_registration_without_network_access(

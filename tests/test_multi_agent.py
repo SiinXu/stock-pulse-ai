@@ -1787,6 +1787,8 @@ class TestOrchestratorExecution(unittest.TestCase):
         self.assertTrue(result.success)
         self.assertEqual(result.content, "done")
         self.assertEqual(result.total_steps, 2)
+        self.assertIsNone(result.budget_snapshot)
+        self.assertIsNone(result.failure_reason)
 
     def test_chat_loads_prior_history_into_context(self):
         from src.agent.orchestrator import OrchestratorResult

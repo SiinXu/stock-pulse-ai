@@ -118,6 +118,13 @@ const getVendorChunkName = (id: string): string | undefined => {
   ) {
     return 'settings-reflection'
   }
+  // Slice A catalog-description skill retrieval help (Refs #1123). Attach to
+  // an existing Settings-lazy chunk already in the entry dep map. A new
+  // filename here inflates criticalPath; SettingsPage / settings-route /
+  // locale-* / extra-locale-* families must not absorb this payload.
+  if (normalizedId.endsWith('/src/locales/skillRetrievalSettingsHelp.ts')) {
+    return 'CredentialInput'
+  }
   if (normalizedId.endsWith('/src/i18n/dataProviderRuntimeTranslations.ts')) {
     return 'settings-data-provider'
   }

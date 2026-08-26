@@ -54,7 +54,7 @@ First open does **not** consume cloud LLM tokens. Completing the local-model wiz
 - Import: after explicit pack selection, auto detect/start then import (one-click path above).
 - Activation and assignment go through backend `SystemConfigService` with desktop attestation; Electron does not re-implement config mutation.
 
-Embedded model data is isolated from system Ollama (`data/ollama/models` under the Windows app dir or macOS userData). See the Chinese doc for update backup size, uninstall cleanup, and security baselines (allowlisted binaries, fixed argv arrays, main-window IPC sender checks).
+Embedded model data is isolated from system Ollama (`data/ollama/models` under the Windows app dir or macOS userData). electron-builder copies `docs/legal/THIRD_PARTY_NOTICES` into the package as `THIRD_PARTY_NOTICES`. See the Chinese doc for update backup size, uninstall cleanup, and security baselines (allowlisted binaries, fixed argv arrays, main-window IPC sender checks).
 
 ## Local development
 

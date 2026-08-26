@@ -466,7 +466,7 @@ def assess_ocr_dependencies(
         message = (
             "Install optional OCR packages with: python -m pip install "
             "--constraint constraints.txt --build-constraint build-constraints.txt "
-            "-r requirements-ocr.txt."
+            "-r requirements/ocr.txt."
         )
     elif not binary_ok:
         reason = "tesseract_binary_missing"
