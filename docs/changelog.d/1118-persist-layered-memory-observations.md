@@ -1,0 +1,1 @@
+- [Added] Persist principal-scoped layered memory observations, consent, and append-only access audit to additive SQLite tables behind default-off collection, with server-stamped provenance and fail-soft analysis writes (Refs #1118).

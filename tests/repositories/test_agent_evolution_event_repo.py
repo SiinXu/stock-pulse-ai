@@ -16,6 +16,7 @@ from src.config import Config
 from src.migrations.registry import (
     AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
     AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION,
+    LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION,
     get_migrations,
 )
 from src.migrations.versions import (
@@ -106,7 +107,7 @@ def test_fresh_database_applies_evolution_event_schema(isolated_db) -> None:
     assert "uix_agent_evolution_events_event_id" in ddl
     assert "trg_agent_evolution_events_no_update" in triggers
     assert "trg_agent_evolution_events_no_delete" in triggers
-    assert get_migrations()[-1].id == AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id
+    assert get_migrations()[-1].id == LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id
     assert AGENT_CURATOR_GRADE_SCHEMA_MIGRATION.id in {
         migration.id for migration in get_migrations()
     }
