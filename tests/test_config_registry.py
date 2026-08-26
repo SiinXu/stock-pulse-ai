@@ -778,6 +778,7 @@ class TestSettingsFieldTitleContract(unittest.TestCase):
         _WEB_ROOT / "utils/systemConfigI18n.ts",
         _WEB_ROOT / "i18n/reflectionSettingsCopy.ts",
         _WEB_ROOT / "locales/skillRetrievalSettingsHelp.ts",
+        _WEB_ROOT / "locales/redTeamSettingsHelp.ts",
     )
     _FEATURE_FIELD_TITLE_FILE = (
         Path(__file__).resolve().parents[1]
@@ -914,6 +915,7 @@ class TestSettingsHelpContract(unittest.TestCase):
         *_LANGUAGE_HELP_FILES,
         _LOCALE_DIR.parent / "i18n/reflectionSettingsCopy.ts",
         _LOCALE_DIR / "skillRetrievalSettingsHelp.ts",
+        _LOCALE_DIR / "redTeamSettingsHelp.ts",
     )
 
     @classmethod

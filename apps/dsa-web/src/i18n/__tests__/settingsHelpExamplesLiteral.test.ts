@@ -35,6 +35,18 @@ describe('settings-help examples literal contract', () => {
     expect(Object.keys(SOURCE_UI_TRANSLATIONS).join('\n')).not.toContain('AGENT_SKILL_RETRIEVAL_K');
   });
 
+  it('keeps red-team second-opinion help out of extra-locale inventories', () => {
+    const marker = 'Run one tool-free post-Decision red-team review on Native Multi full/specialist analysis.';
+    for (const language of ADDITIONAL_UI_LANGUAGES) {
+      const bundle = getLoadedUiLanguageTranslations(language);
+      expect(bundle, language).toBeTruthy();
+      const serialized = JSON.stringify(bundle);
+      expect(serialized, language).not.toContain('AGENT_RED_TEAM_ENABLED');
+      expect(serialized, language).not.toContain(marker);
+    }
+    expect(Object.keys(SOURCE_UI_TRANSLATIONS).join('\n')).not.toContain('AGENT_RED_TEAM_ENABLED');
+  });
+
   it('keeps settings-help examples out of the English inventory and locale bundles', () => {
     const inventoryHits = UI_TRANSLATION_KEYS.filter((key) => EXAMPLES_KEY_PATTERN.test(key));
     expect(inventoryHits).toEqual([]);

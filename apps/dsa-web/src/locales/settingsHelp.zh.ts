@@ -1568,17 +1568,6 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     impact: ['在保留 Decision 预算的同时限制可选 Critic 修订成本。'],
     notes: ['达到轮次上限仍无显式 pass 时保持 not_converged，并保留 Critic 限制项。'],
   },
-  'settings.agent.AGENT_RED_TEAM_ENABLED': {
-    title: '对抗性红队二审',
-    summary: '在 Native Multi 的 full/specialist 分析中，于 Decision 之后执行一次无工具红队复核。',
-    usage: '仅在需要独立挑战弱证据与过度自信时开启；默认关闭。',
-    valueNotes: [
-      '默认关闭。Chat 永不运行。quick / standard 除非显式请求覆盖，否则不运行。',
-      '不会改写 decision_type、confidence_level 或 operation_advice。已有 data_limitations 优先占用 12 个产品槽位，溢出只留在红队章节。预算或供应商失败会 fail-soft。',
-    ],
-    impact: ['最多在 Decision 之后增加一次 LLM 调用，并把挑战追加到风险与证据缺口。'],
-    notes: ['这不是多空辩论，也不是 Risk veto。'],
-  },
   'settings.agent.DEBATE': {
     title: '多空辩论',
     summary: '配置可选辩论阶段、限制与专用模型。',

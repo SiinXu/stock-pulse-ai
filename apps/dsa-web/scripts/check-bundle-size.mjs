@@ -41,9 +41,7 @@ const FORBIDDEN_PRODUCTION_ASSET_GLOBS = Object.freeze([
   'assets/PlaygroundRenderPage-*.js',
   'assets/ComponentPlaygroundPage-*.js',
 ]);
-const SKILL_RETRIEVAL_HELP_MARKER = 'How many catalog skills automatic SkillRouter may retrieve by description';
-const SKILL_RETRIEVAL_HELP_ALLOWED_GLOB = 'assets/CredentialInput-*.js';
-const SKILL_RETRIEVAL_HELP_FORBIDDEN_GLOBS = Object.freeze([
+const ISOLATED_SETTINGS_HELP_FORBIDDEN_GLOBS = Object.freeze([
   'assets/SettingsPage-*.js',
   'assets/settings-*.js',
   'assets/settingsPage-*.js',
@@ -57,6 +55,20 @@ const SKILL_RETRIEVAL_HELP_FORBIDDEN_GLOBS = Object.freeze([
   'assets/id-*.js',
   'assets/ms-*.js',
   'assets/zh-TW-*.js',
+]);
+const ISOLATED_SETTINGS_HELP_PAYLOADS = Object.freeze([
+  {
+    id: 'skill-retrieval',
+    label: 'Skill retrieval help',
+    marker: 'How many catalog skills automatic SkillRouter may retrieve by description',
+    allowedGlob: 'assets/CredentialInput-*.js',
+  },
+  {
+    id: 'red-team',
+    label: 'Red-team help',
+    marker: 'Run one tool-free post-Decision red-team review on Native Multi full/specialist analysis.',
+    allowedGlob: 'assets/CredentialInput-*.js',
+  },
 ]);
 const INDEX_HTML_MODULEPRELOAD_SOURCE = 'indexHtmlModulepreload';
 const CRITICAL_PATH_FAMILY_ID = 'criticalPath';
@@ -419,43 +431,48 @@ function main() {
     return;
   }
 
-  const skillRetrievalHits = [];
+  const isolatedHelpHits = new Map(ISOLATED_SETTINGS_HELP_PAYLOADS.map((payload) => [payload.id, []]));
   let hasSettingsOrCredentialChunk = false;
   for (const filePath of files) {
     if (!filePath.endsWith('.js')) continue;
     const relativePath = path.relative(outDir, filePath).split(path.sep).join('/');
     if (
       globToRegExp('assets/SettingsPage-*.js').test(relativePath)
-      || globToRegExp(SKILL_RETRIEVAL_HELP_ALLOWED_GLOB).test(relativePath)
+      || ISOLATED_SETTINGS_HELP_PAYLOADS.some((payload) => globToRegExp(payload.allowedGlob).test(relativePath))
     ) {
       hasSettingsOrCredentialChunk = true;
     }
     const contents = readFileSync(filePath, 'utf8');
-    if (contents.includes(SKILL_RETRIEVAL_HELP_MARKER)) {
-      skillRetrievalHits.push(relativePath);
+    for (const payload of ISOLATED_SETTINGS_HELP_PAYLOADS) {
+      if (contents.includes(payload.marker)) {
+        isolatedHelpHits.get(payload.id).push(relativePath);
+      }
     }
   }
-  if (skillRetrievalHits.length === 0) {
-    if (hasSettingsOrCredentialChunk) {
-      fail(
-        `Skill retrieval help marker missing from production chunks; expected ${SKILL_RETRIEVAL_HELP_ALLOWED_GLOB}`,
-      );
-      return;
+  for (const payload of ISOLATED_SETTINGS_HELP_PAYLOADS) {
+    const hits = isolatedHelpHits.get(payload.id) || [];
+    if (hits.length === 0) {
+      if (hasSettingsOrCredentialChunk) {
+        fail(
+          `${payload.label} marker missing from production chunks; expected ${payload.allowedGlob}`,
+        );
+        return;
+      }
+      continue;
     }
-  } else {
-    const leaked = skillRetrievalHits.filter((relativePath) => (
-      SKILL_RETRIEVAL_HELP_FORBIDDEN_GLOBS.some((pattern) => globToRegExp(pattern).test(relativePath))
+    const leaked = hits.filter((relativePath) => (
+      ISOLATED_SETTINGS_HELP_FORBIDDEN_GLOBS.some((pattern) => globToRegExp(pattern).test(relativePath))
     ));
-    const allowedHits = skillRetrievalHits.filter((relativePath) => (
-      globToRegExp(SKILL_RETRIEVAL_HELP_ALLOWED_GLOB).test(relativePath)
+    const allowedHits = hits.filter((relativePath) => (
+      globToRegExp(payload.allowedGlob).test(relativePath)
     ));
     if (leaked.length > 0) {
-      fail(`Skill retrieval help leaked into Settings/locale families: ${leaked.join(', ')}`);
+      fail(`${payload.label} leaked into Settings/locale families: ${leaked.join(', ')}`);
       return;
     }
     if (allowedHits.length === 0) {
       fail(
-        `Skill retrieval help must live on ${SKILL_RETRIEVAL_HELP_ALLOWED_GLOB}, found: ${skillRetrievalHits.join(', ')}`,
+        `${payload.label} must live on ${payload.allowedGlob}, found: ${hits.join(', ')}`,
       );
       return;
     }
