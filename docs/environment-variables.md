@@ -4,7 +4,7 @@
 
 | 事实源 | 路径 | 职责 |
 |--------|------|------|
-| 模板默认值 | [`.env.example`](../.env.example) | 键名、示例/默认值、敏感占位符、注释中的行为说明 |
+| 模板默认值 | [`.env.example`](../.env.example) | 键名、示例/默认值、敏感占位符、复制粘贴模板；长说明见专题文档 |
 | 配置注册表 | [`src/core/config_registry_parts/`](../src/core/config_registry_parts/) | Web 设置页分组、控件类型、校验、help 元数据、默认值提示 |
 | 本文档清单 | 下方机器校验表格 | 键是否已被文档收录；与模板默认值对齐 |
 
@@ -173,6 +173,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
+| `AGENT_SKILL_RETRIEVAL_K` | `0` | 是 | 模板中注释 |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
 | `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; Multi-level reflection (#1094): immediate step critique / trajectory / meta-review |

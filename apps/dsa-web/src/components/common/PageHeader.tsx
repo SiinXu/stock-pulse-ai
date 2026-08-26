@@ -43,4 +43,6 @@ export const PageHeader = forwardRef<
   );
 });
 
-PageHeader.displayName = 'PageHeader';
+if (import.meta.env.DEV) {
+  PageHeader.displayName = 'PageHeader';
+}

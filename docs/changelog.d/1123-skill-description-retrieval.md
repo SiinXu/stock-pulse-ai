@@ -1,0 +1,2 @@
+- [Added] Add default-off catalog-description skill retrieval (`AGENT_SKILL_RETRIEVAL_K`) on the existing SkillRouter automatic path, with a hard-capped K and fallback to the default router set when the catalog, query, or match scores are empty (Refs #1123).
+- [Added] Expose `AGENT_SKILL_RETRIEVAL_K` in Agent Settings with bilingual help, field titles, and skills-group placement (Refs #1123).

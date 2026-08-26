@@ -60,7 +60,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             requirements.txt
-            requirements-desktop.txt
+            requirements/desktop.txt
             constraints.txt
             build-constraints.txt
 
@@ -206,7 +206,7 @@ jobs:
           cache: 'pip'
           cache-dependency-path: |
             requirements.txt
-            requirements-desktop.txt
+            requirements/desktop.txt
             constraints.txt
             build-constraints.txt
 

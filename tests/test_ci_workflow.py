@@ -48,7 +48,7 @@ OCR_EXTRACTOR_PATH_FILTER = (
     *OCR_EXTRACTOR_SOURCE_FILES,
     *OCR_EXTRACTOR_TEST_FILES,
     *OCR_EXTRACTOR_FIXTURE_PATHS,
-    "requirements-ocr.txt",
+    "requirements/ocr.txt",
     ".github/workflows/ci.yml",
 )
 DESKTOP_PATH_FILTER = (
@@ -62,8 +62,8 @@ DESKTOP_PATH_FILTER = (
     "scripts/build-backend-macos.sh",
     "scripts/verify-desktop-updater-artifacts.ps1",
     "scripts/prepare-embedded-ollama.js",
-    "requirements-desktop.txt",
-    "THIRD_PARTY_NOTICES",
+    "requirements/desktop.txt",
+    "docs/legal/THIRD_PARTY_NOTICES",
     ".github/workflows/desktop-release.yml",
     ".github/workflows/ci.yml",
 )
@@ -72,7 +72,7 @@ DESKTOP_TEST_PINNED_REPO_FILES = (
     "scripts/build-backend-macos.sh",
     "scripts/build-desktop-macos.sh",
     "scripts/prepare-embedded-ollama.js",
-    "THIRD_PARTY_NOTICES",
+    "docs/legal/THIRD_PARTY_NOTICES",
     ".github/workflows/desktop-release.yml",
 )
 
@@ -987,7 +987,7 @@ def test_ocr_stock_extractor_is_path_triggered_fail_closed_and_offline() -> None
     assert "must execute stock-extractor tests, not skip them" in test_step["run"]
     assert "system Tesseract + pytesseract not installed" in test_step["run"]
     assert "assess_ocr_dependencies" in import_step["run"]
-    assert "requirements-ocr.txt" in steps_by_name[
+    assert "requirements/ocr.txt" in steps_by_name[
         "📦 Install dependencies (native + optional OCR)"
     ]["run"]
     assert "tesseract-ocr-eng" in tesseract_step["run"]

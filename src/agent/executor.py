@@ -45,6 +45,9 @@ from src.agent.runtime_facts import (
     build_agent_soul_runtime_facts as _build_agent_soul_runtime_facts,
 )
 from src.agent.soul import compose_agent_soul_prompt as _compose_agent_soul_prompt
+from src.agent.skills.router import (
+    skill_instructions_for_native_task as _skill_instructions_for_native_task,
+)
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.storage import get_db
 from src.agent.tools.registry import ToolRegistry
@@ -615,6 +618,8 @@ class AgentExecutor:
         max_steps: int = 10,
         timeout_seconds: Optional[float] = None,
         config: Any = None,
+        skill_manager=None,
+        explicit_skill_selection: bool = False,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
@@ -626,6 +631,8 @@ class AgentExecutor:
         # Optional injected Config for feature flags (e.g. episode log). Prefer
         # factory injection over bare get_config() in run paths.
         self.config = config
+        self.skill_manager = skill_manager
+        self.explicit_skill_selection = bool(explicit_skill_selection)
 
 
 _RUN_METHOD_NAMES = _bind_facade_methods(

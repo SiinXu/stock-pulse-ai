@@ -699,32 +699,40 @@ same constraints / build-constraints:
 
 ```bash
 # Kronos local-inference Agent Tool (see docs/kronos-agent-tool.md)
-# (requirements-kronos.txt also embeds -c constraints.txt)
+# (requirements/kronos.txt also embeds -c constraints.txt)
 python -m pip install --constraint constraints.txt \
-  --build-constraint build-constraints.txt -r requirements-kronos.txt
+  --build-constraint build-constraints.txt -r requirements/kronos.txt
 
 # Desktop packaging toolchain (adds pyinstaller on top of the default set)
 python -m pip install --constraint constraints.txt \
-  --build-constraint build-constraints.txt -r requirements-desktop.txt
+  --build-constraint build-constraints.txt -r requirements/desktop.txt
 
 # Backend CI / local dev tooling (flake8, pytest, pip-audit, uv, …)
 python -m pip install --constraint constraints.txt \
   --build-constraint build-constraints.txt -r .github/requirements-ci.txt
 
 # Experimental PydanticAI runtime POC (Native stays the default zero-dep path)
-# Exact pins live in requirements-pydanticai.txt; still pass constraints.
+# Exact pins live in requirements/pydanticai.txt; still pass constraints.
 python -m pip install --constraint constraints.txt \
-  --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+  --build-constraint build-constraints.txt -r requirements/pydanticai.txt
+
+# Optional offline OCR Agent Tool (also needs system Tesseract; see docs/agent-ocr-tool_EN.md)
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r requirements/ocr.txt
+
+# Optional report PDF/HTML export (see docs/report-export.md)
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r requirements/report-export.txt
 
 python -m pip check
 ```
 
 Optional-dependency group names in `pyproject.toml` align with those extras
 (`kronos` / `desktop` / `dev` / `pydanticai`) once that packaging PR is present.
-Prefer the corresponding `requirements-*.txt` (or CI file) plus constraints for
+Prefer the corresponding `requirements/*.txt` (or CI file) plus constraints for
 reproducible installs. Do not use unconstrained `pip install '.[extra]'` as the
 pin path. The `pydanticai` metadata group is an empty sentinel; the exact package
-set lives only in `requirements-pydanticai.txt`.
+set lives only in `requirements/pydanticai.txt`.
 
 #### Docker / CI vs local
 
@@ -733,7 +741,7 @@ set lives only in `requirements-pydanticai.txt`.
 | Local source | `requirements.txt` + `constraints.txt` + `build-constraints.txt` | Canonical commands above |
 | Docker image | Same trio inside the Dockerfile | Image build freezes the lock at that commit |
 | GitHub Actions `backend-gate` and similar | `.github/requirements-ci.txt` (includes `requirements.txt`) + the same constraints | Adds test/audit tools; does not invent a second pin authority |
-| Desktop packaging | `requirements-desktop.txt` | Default deps plus packaging tools |
+| Desktop packaging | `requirements/desktop.txt` | Default deps plus packaging tools |
 
 On Windows PowerShell, if Python or pip still uses the system default code page, enable UTF-8 before the first dependency install or environment check. This keeps terminal output and third-party tooling from failing on non-ASCII text:
 
@@ -1868,7 +1876,7 @@ Cost boundary: an eligible enabled Multi run adds at most one Critic LLM call. O
 
 ### Hard per-mode budgets (#1121 / #125)
 
-Each run mode (`quick` / `standard` / `full` / `specialist` / chat) has hard caps for LLM turns, tool calls, and estimated USD cost (optional token ceiling via `AGENT_MODE_BUDGET_MAX_TOKENS`). Consumption is tracked on a shared `mode_budget` account and exposed in diagnostics (`ctx.meta["mode_budget"]` / `result.budget_snapshot`). Optional end-of-run reflection and in-process post-mortem LLM calls consume the same LLM-turn cap; skipped optional work is `budget_skipped`, and the returned `budget_snapshot` includes those charges. On breach the run terminates with `success=false` and an explicit reason (`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`). Existing residual wall-clock skips remain `budget_skip` / `timeout` and record into the same snapshot — there is a single budget concept, not a parallel system. Registered keys are `AGENT_MODE_BUDGET_ENABLED` and the global `AGENT_MODE_BUDGET_MAX_*` tighteners. Optional per-mode caps are Config attributes (`agent_mode_budget_<mode>_max_llm_turns` / `max_tool_calls` / `max_cost_usd` for `quick|standard|full|specialist|chat`); the loader maps optional unregistered `AGENT_MODE_BUDGET_<MODE>_MAX_*` env vars onto those attributes. They are not Web Settings fields. Prefer the global tighteners unless you need mode-specific caps; `0` keeps the built-in mode default. See `.env.example`. There is no `AGENT_MAX_RUN_LLM_CALLS` key; the run LLM-turn cap is `AGENT_MODE_BUDGET_MAX_LLM_TURNS` (and optional per-mode Config overrides).
+Each run mode (`quick` / `standard` / `full` / `specialist` / chat) has hard caps for LLM turns, tool calls, and estimated USD cost (optional token ceiling via `AGENT_MODE_BUDGET_MAX_TOKENS`). Consumption is tracked on a shared `mode_budget` account and exposed in diagnostics (`ctx.meta["mode_budget"]` / `result.budget_snapshot`). Multi `AgentOrchestrator.run()` / `chat()` copy `budget_snapshot` and `failure_reason` onto the public `AgentResult` (results without budget metadata keep those fields unset; successful result ordering is unchanged). Optional end-of-run reflection and in-process post-mortem LLM calls consume the same LLM-turn cap; skipped optional work is `budget_skipped`, and the returned `budget_snapshot` includes those charges. On breach the run terminates with `success=false` and an explicit reason (`budget_turns` / `budget_tools` / `budget_cost` / `budget_tokens`). Existing residual wall-clock skips remain `budget_skip` / `timeout` and record into the same snapshot — there is a single budget concept, not a parallel system. Registered keys are `AGENT_MODE_BUDGET_ENABLED` and the global `AGENT_MODE_BUDGET_MAX_*` tighteners. Optional per-mode caps are Config attributes (`agent_mode_budget_<mode>_max_llm_turns` / `max_tool_calls` / `max_cost_usd` for `quick|standard|full|specialist|chat`); the loader maps optional unregistered `AGENT_MODE_BUDGET_<MODE>_MAX_*` env vars onto those attributes. They are not Web Settings fields. Prefer the global tighteners unless you need mode-specific caps; `0` keeps the built-in mode default. See `.env.example`. There is no `AGENT_MAX_RUN_LLM_CALLS` key; the run LLM-turn cap is `AGENT_MODE_BUDGET_MAX_LLM_TURNS` (and optional per-mode Config overrides).
 
 
 ## Agent Runtime Guards
