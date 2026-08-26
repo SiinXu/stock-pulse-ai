@@ -131,6 +131,9 @@ describe('ReportStructuredInsights', () => {
     const synthesis = screen.getByTestId('report-strategy-synthesis');
     expect(synthesis).toHaveTextContent('Buy');
     expect(synthesis).toHaveTextContent('74%');
+    expandInsightSection('report-supporting-skills', SECTION_TITLES.skills);
+    expandInsightSection('report-opposing-skills', SECTION_TITLES.opposing);
+    expandInsightSection('report-strategy-conflicts', SECTION_TITLES.conflicts);
     expect(screen.getByTestId('report-supporting-skills')).toHaveTextContent('volume_breakout');
     expect(screen.getByTestId('report-opposing-skills')).toHaveTextContent('box_oscillation');
     expect(screen.getByTestId('report-strategy-conflicts')).toHaveTextContent(
@@ -142,6 +145,9 @@ describe('ReportStructuredInsights', () => {
 
     const committee = screen.getByTestId('report-committee-deliberation');
     expect(committee).toHaveTextContent('Committee Conclusion');
+    expandInsightSection('report-committee-members', SECTION_TITLES.members);
+    expandInsightSection('report-committee-dissent', SECTION_TITLES.dissent);
+    expandInsightSection('report-committee-divergence', SECTION_TITLES.divergences);
     expect(screen.getByTestId('report-committee-members')).toHaveTextContent('Value & Moat');
     expect(screen.getByTestId('report-committee-dissent')).toHaveTextContent('Tail Risk');
     expect(screen.getByTestId('report-committee-divergence')).toHaveTextContent(
@@ -306,6 +312,8 @@ describe('ReportStructuredInsights', () => {
     expect(screen.getByTestId('report-committee-deliberation')).toHaveTextContent(
       'Committee Conclusion',
     );
+    expandInsightSection('report-committee-members', SECTION_TITLES.members);
+    expandInsightSection('report-committee-dissent', SECTION_TITLES.dissent);
     expect(screen.getByTestId('report-committee-members')).toHaveTextContent('Value & Moat');
     expect(screen.getByTestId('report-committee-dissent')).toHaveTextContent('Tail Risk');
     expect(screen.queryByTestId('report-phase-decision')).not.toBeInTheDocument();
@@ -384,9 +392,13 @@ const insightsWithLists = ({
   },
 });
 
+const isInsightItemHidden = (node: Element): boolean => (
+  node.hasAttribute('hidden') || node.closest('[hidden]') !== null
+);
+
 const visibleInsightNames = (testId: string): string[] => (
   [...screen.getByTestId(testId).querySelectorAll('[data-insight-item]')]
-    .filter((node) => !node.hasAttribute('hidden'))
+    .filter((node) => !isInsightItemHidden(node))
     .map((node) => node.getAttribute('data-insight-item') ?? '')
 );
 
@@ -394,6 +406,25 @@ const allInsightNames = (testId: string): string[] => (
   [...screen.getByTestId(testId).querySelectorAll('[data-insight-item]')]
     .map((node) => node.getAttribute('data-insight-item') ?? '')
 );
+
+const sectionCollapseToggle = (testId: string, title: string): HTMLElement => (
+  within(screen.getByTestId(testId)).getByRole('button', { name: new RegExp(`^${title}$`) })
+);
+
+const expandInsightSection = (testId: string, title: string): HTMLElement => {
+  const toggle = sectionCollapseToggle(testId, title);
+  fireEvent.click(toggle);
+  return toggle;
+};
+
+const SECTION_TITLES = {
+  skills: 'Supporting Strategies',
+  opposing: 'Opposing Strategies',
+  conflicts: 'Strategy Conflicts',
+  members: 'Member Stances',
+  dissent: 'Reserved Opinions',
+  divergences: 'Divergence Record',
+} as const;
 
 describe('ReportStructuredInsights top-N list disclosure', () => {
   it('keeps Phase and Attribution fully open when insight lists overflow', () => {
@@ -414,7 +445,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
     { section: 'skills', testId: 'report-supporting-skills', fixture: { skills: 0 }, name: 'skill_1' },
     { section: 'committee', testId: 'report-committee-members', fixture: { members: 0 }, name: 'Member 1' },
     { section: 'conflicts', testId: 'report-strategy-conflicts', fixture: { conflicts: 0 }, name: 'conflict_1' },
-  ] as const)('omits the $section list and toggle when it has 0 items', ({ testId, fixture }) => {
+  ] as const)('omits the $section list, collapse, and toggle when it has 0 items', ({ testId, fixture }) => {
     render(<ReportStructuredInsights insights={insightsWithLists(fixture)} language="en" />);
 
     expect(screen.queryByTestId(testId)).not.toBeInTheDocument();
@@ -427,6 +458,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       count: 1,
       section: 'skills',
       testId: 'report-supporting-skills',
+      title: SECTION_TITLES.skills,
       fixture: { skills: 1 },
       visible: ['skill_1'],
     },
@@ -434,6 +466,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       count: 3,
       section: 'skills',
       testId: 'report-supporting-skills',
+      title: SECTION_TITLES.skills,
       fixture: { skills: 3 },
       visible: ['skill_1', 'skill_2', 'skill_3'],
     },
@@ -441,6 +474,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       count: 1,
       section: 'committee',
       testId: 'report-committee-members',
+      title: SECTION_TITLES.members,
       fixture: { members: 1 },
       visible: ['Member 1'],
     },
@@ -448,6 +482,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       count: 3,
       section: 'committee',
       testId: 'report-committee-members',
+      title: SECTION_TITLES.members,
       fixture: { members: 3 },
       visible: ['Member 1', 'Member 2', 'Member 3'],
     },
@@ -455,6 +490,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       count: 1,
       section: 'conflicts',
       testId: 'report-strategy-conflicts',
+      title: SECTION_TITLES.conflicts,
       fixture: { conflicts: 1 },
       visible: ['directional_opposition-0'],
     },
@@ -462,6 +498,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       count: 3,
       section: 'conflicts',
       testId: 'report-strategy-conflicts',
+      title: SECTION_TITLES.conflicts,
       fixture: { conflicts: 3 },
       visible: [
         'directional_opposition-0',
@@ -470,10 +507,12 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       ],
     },
   ] as const)(
-    'shows all $count $section items without a disclosure control',
-    ({ testId, fixture, visible }) => {
+    'shows all $count $section items without a Show all control after expanding the section',
+    ({ testId, title, fixture, visible }) => {
       render(<ReportStructuredInsights insights={insightsWithLists(fixture)} language="en" />);
 
+      expect(visibleInsightNames(testId)).toEqual([]);
+      expandInsightSection(testId, title);
       expect(visibleInsightNames(testId)).toEqual([...visible]);
       expect(screen.queryByTestId(`${testId}-disclosure`)).not.toBeInTheDocument();
     },
@@ -483,6 +522,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
     {
       section: 'skills',
       testId: 'report-supporting-skills',
+      title: SECTION_TITLES.skills,
       fixture: { skills: 4 },
       preview: ['skill_1', 'skill_2', 'skill_3'],
       full: ['skill_1', 'skill_2', 'skill_3', 'skill_4'],
@@ -490,6 +530,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
     {
       section: 'committee',
       testId: 'report-committee-members',
+      title: SECTION_TITLES.members,
       fixture: { members: 5 },
       preview: ['Member 1', 'Member 2', 'Member 3'],
       full: ['Member 1', 'Member 2', 'Member 3', 'Member 4', 'Member 5'],
@@ -497,6 +538,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
     {
       section: 'conflicts',
       testId: 'report-strategy-conflicts',
+      title: SECTION_TITLES.conflicts,
       fixture: { conflicts: 4 },
       preview: [
         'directional_opposition-0',
@@ -512,10 +554,12 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
     },
   ] as const)(
     'shows the first $preview.length $section items and the exact remaining count behind Show all',
-    ({ testId, fixture, preview, full }) => {
+    ({ testId, title, fixture, preview, full }) => {
       render(<ReportStructuredInsights insights={insightsWithLists(fixture)} language="en" />);
 
       expect(preview).toHaveLength(3);
+      expect(visibleInsightNames(testId)).toEqual([]);
+      expandInsightSection(testId, title);
       expect(visibleInsightNames(testId)).toEqual([...preview]);
       expect(allInsightNames(testId)).toEqual([...full]);
       const toggle = screen.getByTestId(`${testId}-disclosure`);
@@ -532,6 +576,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       />,
     );
 
+    expandInsightSection('report-supporting-skills', SECTION_TITLES.skills);
     const toggle = screen.getByTestId('report-supporting-skills-disclosure');
     expect(visibleInsightNames('report-supporting-skills')).toEqual([
       'skill_1',
@@ -568,6 +613,9 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       />,
     );
 
+    expandInsightSection('report-supporting-skills', SECTION_TITLES.skills);
+    expandInsightSection('report-committee-members', SECTION_TITLES.members);
+    expandInsightSection('report-strategy-conflicts', SECTION_TITLES.conflicts);
     fireEvent.click(screen.getByTestId('report-supporting-skills-disclosure'));
 
     expect(visibleInsightNames('report-supporting-skills')).toEqual([
@@ -612,6 +660,10 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       />,
     );
 
+    expandInsightSection('report-supporting-skills', SECTION_TITLES.skills);
+    expandInsightSection('report-committee-members', SECTION_TITLES.members);
+    expandInsightSection('report-strategy-conflicts', SECTION_TITLES.conflicts);
+
     const skillsToggle = screen.getByRole('button', {
       name: 'Supporting Strategies: Show all (4)',
     });
@@ -653,6 +705,7 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
       />,
     );
 
+    expandInsightSection('report-supporting-skills', SECTION_TITLES.skills);
     const englishToggle = screen.getByTestId('report-supporting-skills-disclosure');
     expect(englishToggle).toHaveTextContent('Show all (4)');
     fireEvent.click(englishToggle);
@@ -709,10 +762,146 @@ describe('ReportStructuredInsights top-N list disclosure', () => {
         language="en"
       />,
     );
+    expandInsightSection('report-supporting-skills', SECTION_TITLES.skills);
     expect(screen.getByTestId('report-supporting-skills-disclosure')).toHaveTextContent(
       'Show all (4)',
     );
     expect(screen.queryByTestId('report-committee-members')).not.toBeInTheDocument();
     expect(screen.queryByTestId('report-strategy-conflicts')).not.toBeInTheDocument();
+  });
+});
+
+describe('ReportStructuredInsights inner collapsible sections', () => {
+  it('keeps Phase, Attribution, and card conclusions open while list sections start collapsed', () => {
+    render(
+      <ReportStructuredInsights
+        insights={insightsWithLists({ skills: 5, members: 5, conflicts: 5, dissent: 4, divergences: 4 })}
+        language="en"
+      />,
+    );
+
+    expect(screen.getByTestId('report-phase-decision')).toHaveTextContent('Wait for confirmation');
+    expect(screen.getByTestId('report-signal-attribution')).toHaveTextContent('Volume expansion');
+    expect(screen.getByTestId('report-strategy-synthesis')).toHaveTextContent('Buy');
+    expect(screen.getByTestId('report-committee-deliberation')).toHaveTextContent('Member Stances');
+
+    expect(sectionCollapseToggle('report-supporting-skills', SECTION_TITLES.skills))
+      .toHaveAttribute('aria-expanded', 'false');
+    expect(sectionCollapseToggle('report-committee-members', SECTION_TITLES.members))
+      .toHaveAttribute('aria-expanded', 'false');
+    expect(sectionCollapseToggle('report-strategy-conflicts', SECTION_TITLES.conflicts))
+      .toHaveAttribute('aria-expanded', 'false');
+    expect(sectionCollapseToggle('report-committee-dissent', SECTION_TITLES.dissent))
+      .toHaveAttribute('aria-expanded', 'false');
+    expect(sectionCollapseToggle('report-committee-divergence', SECTION_TITLES.divergences))
+      .toHaveAttribute('aria-expanded', 'false');
+
+    expect(visibleInsightNames('report-supporting-skills')).toEqual([]);
+    expect(visibleInsightNames('report-committee-members')).toEqual([]);
+    expect(visibleInsightNames('report-strategy-conflicts')).toEqual([]);
+    expect(allInsightNames('report-supporting-skills')).toEqual([
+      'skill_1',
+      'skill_2',
+      'skill_3',
+      'skill_4',
+      'skill_5',
+    ]);
+  });
+
+  it('wires Collapsible aria-expanded / aria-controls and reveals Top-N independently', () => {
+    render(
+      <ReportStructuredInsights
+        insights={insightsWithLists({ skills: 4, members: 4, conflicts: 4 })}
+        language="en"
+      />,
+    );
+
+    const skillsToggle = sectionCollapseToggle('report-supporting-skills', SECTION_TITLES.skills);
+    const membersToggle = sectionCollapseToggle('report-committee-members', SECTION_TITLES.members);
+    const conflictsToggle = sectionCollapseToggle('report-strategy-conflicts', SECTION_TITLES.conflicts);
+
+    expect(skillsToggle).toHaveAttribute('type', 'button');
+    const skillsPanel = document.getElementById(skillsToggle.getAttribute('aria-controls')!);
+    expect(skillsPanel).not.toBeNull();
+    expect(skillsPanel).toHaveAttribute('hidden');
+    expect(skillsPanel).toHaveAttribute('inert');
+    expect(screen.getByTestId('report-supporting-skills')).toContainElement(skillsPanel);
+
+    skillsToggle.focus();
+    expect(skillsToggle).toHaveFocus();
+    fireEvent.keyDown(skillsToggle, { key: 'Enter', code: 'Enter' });
+    fireEvent.click(skillsToggle);
+    expect(skillsToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(skillsPanel).not.toHaveAttribute('hidden');
+    expect(visibleInsightNames('report-supporting-skills')).toEqual([
+      'skill_1',
+      'skill_2',
+      'skill_3',
+    ]);
+    expect(membersToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(conflictsToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(visibleInsightNames('report-committee-members')).toEqual([]);
+
+    fireEvent.click(membersToggle);
+    expect(visibleInsightNames('report-committee-members')).toEqual([
+      'Member 1',
+      'Member 2',
+      'Member 3',
+    ]);
+    expect(conflictsToggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('keeps full list content reachable after expanding Collapsible and Show all', () => {
+    render(
+      <ReportStructuredInsights
+        insights={insightsWithLists({ skills: 5 })}
+        language="en"
+      />,
+    );
+
+    expect(visibleInsightNames('report-supporting-skills')).toEqual([]);
+    expandInsightSection('report-supporting-skills', SECTION_TITLES.skills);
+    expect(visibleInsightNames('report-supporting-skills')).toEqual([
+      'skill_1',
+      'skill_2',
+      'skill_3',
+    ]);
+    fireEvent.click(screen.getByTestId('report-supporting-skills-disclosure'));
+    expect(visibleInsightNames('report-supporting-skills')).toEqual([
+      'skill_1',
+      'skill_2',
+      'skill_3',
+      'skill_4',
+      'skill_5',
+    ]);
+  });
+
+  it('localizes inner Collapsible titles with the report language', () => {
+    const { rerender } = render(
+      <ReportStructuredInsights
+        insights={insightsWithLists({ skills: 4 })}
+        language="en"
+      />,
+    );
+    expect(sectionCollapseToggle('report-supporting-skills', SECTION_TITLES.skills)).toBeInTheDocument();
+
+    rerender(
+      <ReportStructuredInsights
+        insights={insightsWithLists({ skills: 4 })}
+        language="zh"
+      />,
+    );
+    expect(sectionCollapseToggle('report-supporting-skills', '支持策略')).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    );
+
+    rerender(
+      <ReportStructuredInsights
+        insights={insightsWithLists({ skills: 4 })}
+        language="ko"
+      />,
+    );
+    expect(sectionCollapseToggle('report-supporting-skills', '지지 전략')).toBeInTheDocument();
   });
 });
