@@ -764,7 +764,6 @@ describe('first-paint entry budget (Refs #883)', () => {
       'js-entry': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
       'ui-text-en': { measuredGzipBytes: 34893, maxGzipBytes: 38383 },
       'locale-ja': { measuredGzipBytes: 164341, maxGzipBytes: 164741 },
-      'locale-zh-TW': { measuredGzipBytes: 149591, maxGzipBytes: 149991 },
       'locale-extra': { measuredGzipBytes: 3087, maxGzipBytes: 3487 },
       'vendor-charts': { measuredGzipBytes: 111229, maxGzipBytes: 122352 },
       'vendor-react': { measuredGzipBytes: 60605, maxGzipBytes: 66666 },
@@ -933,5 +932,18 @@ describe('first-paint entry budget (Refs #883)', () => {
       'backtest-route',
       'criticalPath',
     ]);
+  });
+
+  it('reseeds locale-zh-TW gzip budget after Decision Signals context chip keys (Refs #1332)', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const rule = budget.rules.find((entry) => entry.id === 'locale-zh-TW');
+    expect(rule).toEqual(expect.objectContaining({
+      id: 'locale-zh-TW',
+      match: 'assets/zh-TW-*.js',
+      measuredGzipBytes: 150043,
+      maxGzipBytes: 150443,
+    }));
+    expect(rule.maxGzipBytes).toBe(rule.measuredGzipBytes + 400);
+    expect(rule.note).toContain('Refs #1332');
   });
 });
