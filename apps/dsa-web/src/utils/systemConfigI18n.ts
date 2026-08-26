@@ -3,6 +3,10 @@ import { EVIDENCE_EXPORT_FIELD_TITLES } from '../i18n/evidenceExportErrorTransla
 import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
 import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
+import {
+  getSkillRetrievalFieldTitle,
+  SKILL_RETRIEVAL_FIELD_DESCRIPTION,
+} from '../locales/skillRetrievalSettingsHelp';
 
 const categoryTitleMap: Record<UiLanguage, Record<SystemConfigCategory, string>> = createUiLanguageRecord("utils.systemConfigI18n.categoryTitleMap", {
   zh: {
@@ -1313,6 +1317,7 @@ const fieldDescriptionMap: Record<string, string> = {
   RISK_GATE_PROFILE: '选择最终建议发布前不可关闭的风控裁决档位；非法值会阻止启动。',
   AGENT_SKILL_AUTOWEIGHT: "根据回测表现自动调整策略权重。",
   AGENT_SKILL_ROUTING: "策略选择方式。auto 按市场状态自动选择，manual 使用 AGENT_SKILLS 列表。",
+  ...SKILL_RETRIEVAL_FIELD_DESCRIPTION,
   AGENT_MEMORY_ENABLED: "启用记忆与校准系统，追踪历史分析准确率并自动调节置信度。",
   AGENT_EPISODE_LOG_ENABLED: "默认关闭；记录精简 Agent episode。",
   AGENT_EPISODE_RETENTION_DAYS: "按标的 episode 最大保留天数；仅在该标的追加成功后清理。无标的不删除，不是全表清理。",
@@ -1650,6 +1655,9 @@ export function getFieldTitle(
   fallback?: string,
   locale: UiLanguage = 'zh',
 ): string {
+  if (key === 'AGENT_SKILL_RETRIEVAL_K') {
+    return getSkillRetrievalFieldTitle(locale);
+  }
   return fieldTitleMaps[locale][key] || fallback || key;
 }
 

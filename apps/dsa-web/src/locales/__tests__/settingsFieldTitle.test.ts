@@ -19,4 +19,22 @@ describe('resolveSettingsFieldTitle', () => {
       language: 'en',
     })).toBe('Future Setting');
   });
+
+  it('keeps AGENT_SKILL_RETRIEVAL_K titles aligned on the public Settings path', () => {
+    expect(resolveSettingsFieldTitle({
+      itemKey: 'AGENT_SKILL_RETRIEVAL_K',
+      fallbackTitle: 'Skill Retrieval Top-K',
+      language: 'en',
+    })).toBe('Skill Retrieval Top-K');
+    expect(resolveSettingsFieldTitle({
+      itemKey: 'AGENT_SKILL_RETRIEVAL_K',
+      fallbackTitle: 'Skill Retrieval Top-K',
+      language: 'zh',
+    })).toBe('技能检索 Top-K');
+    expect(resolveSettingsFieldTitle({
+      itemKey: 'AGENT_SKILL_RETRIEVAL_K',
+      fallbackTitle: 'Skill Retrieval Top-K',
+      language: 'de',
+    })).toBe('Skill-Abruf Top-K');
+  });
 });
