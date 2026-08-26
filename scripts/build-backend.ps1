@@ -40,9 +40,9 @@ Write-Host 'Installing reproducible desktop backend dependencies...'
 if ($LASTEXITCODE -ne 0) {
   throw "Pinned pip bootstrap failed with exit code $LASTEXITCODE."
 }
-& $pythonBin -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
+& $pythonBin -m pip install --build-constraint build-constraints.txt -r requirements/desktop.txt
 if ($LASTEXITCODE -ne 0) {
-  throw "Dependency installation from requirements-desktop.txt failed with exit code $LASTEXITCODE."
+  throw "Dependency installation from requirements/desktop.txt failed with exit code $LASTEXITCODE."
 }
 & $pythonBin -m pip install --build-constraint build-constraints.txt -e . --no-deps
 if ($LASTEXITCODE -ne 0) {
@@ -55,7 +55,7 @@ if ($LASTEXITCODE -ne 0) {
 
 Write-Host 'Checking PyInstaller availability...'
 if (-not (Test-PythonCode -Python $pythonBin -Code "import PyInstaller")) {
-  throw 'PyInstaller is not importable after installing requirements-desktop.txt.'
+  throw 'PyInstaller is not importable after installing requirements/desktop.txt.'
 }
 
 Write-Host 'Checking python-multipart availability...'

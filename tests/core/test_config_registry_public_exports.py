@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "13880e5ca058da04b82edf4c9a58833a0e3785ec8c5b26c971df3d8b90e0901b"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "357463a274a28fb1b26d44919267999723bb562491642fb85b91e7429885fccb"
+    "1a7774d9d0cbc0045ceb29e73f787977dacecf02b7144d06a3ec824b3e3a5e8f"
 )
 
 
@@ -104,8 +104,9 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for AGENT_EPISODE_RETENTION_DAYS / AGENT_EPISODE_MAX_ROWS
-    # per-symbol forgetting help (Refs #1119).
+    # Combined snapshot after per-symbol episode forgetting help (Refs #1119)
+    # plus #1518 AGENT_SKILL_RETRIEVAL_K and Lane E OCR/Kronos extras-path
+    # description rewrites.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

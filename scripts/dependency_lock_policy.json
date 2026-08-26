@@ -24,19 +24,19 @@
   },
   "source_files": [
     "requirements.txt",
-    "requirements-pydanticai.txt",
-    "requirements-kronos.txt",
+    "requirements/pydanticai.txt",
+    "requirements/kronos.txt",
     ".github/requirements-ci.txt",
     ".github/requirements-review.txt",
-    "requirements-desktop.txt",
-    "requirements-ocr.txt",
-    "requirements-report-export.txt",
+    "requirements/desktop.txt",
+    "requirements/ocr.txt",
+    "requirements/report-export.txt",
     "build-constraints.txt"
   ],
   "exact_source_files": [
-    "requirements-pydanticai.txt",
-    "requirements-kronos.txt",
-    "requirements-report-export.txt",
+    "requirements/pydanticai.txt",
+    "requirements/kronos.txt",
+    "requirements/report-export.txt",
     "build-constraints.txt"
   ],
   "install_contracts": {
@@ -46,7 +46,7 @@
       "packages": [],
       "allow_other_packages": true
     },
-    "requirements-kronos.txt": {
+    "requirements/kronos.txt": {
       "constraint": "constraints.txt",
       "includes": [],
       "packages": [
@@ -87,7 +87,7 @@
       ],
       "allow_other_packages": false
     },
-    "requirements-desktop.txt": {
+    "requirements/desktop.txt": {
       "constraint": "constraints.txt",
       "includes": [
         "requirements.txt"
@@ -97,7 +97,7 @@
       ],
       "allow_other_packages": false
     },
-    "requirements-ocr.txt": {
+    "requirements/ocr.txt": {
       "constraint": "constraints.txt",
       "includes": [],
       "packages": [
@@ -106,7 +106,7 @@
       ],
       "allow_other_packages": false
     },
-    "requirements-report-export.txt": {
+    "requirements/report-export.txt": {
       "constraint": "constraints.txt",
       "includes": [],
       "packages": [
@@ -125,5 +125,5 @@
       ]
     }
   },
-  "lock_sha256": "c6f8d7dbaff48273fb021f3fbb7ad7dc242b9c79da1aa28688f478d2770bb6e9"
+  "lock_sha256": "a54a933521eccea5f118d46a8b891808ac88768e6fb3f831140987e7fe460d18"
 }

@@ -66,7 +66,7 @@ test('embedded Ollama manifest pins official artifacts for every desktop target'
 
 test('third-party notices cover native and linked Go components in both Ollama archives', () => {
   const repositoryRoot = path.resolve(__dirname, '..', '..', '..');
-  const notices = fs.readFileSync(path.join(repositoryRoot, 'THIRD_PARTY_NOTICES'), 'utf-8');
+  const notices = fs.readFileSync(path.join(repositoryRoot, 'docs', 'legal', 'THIRD_PARTY_NOTICES'), 'utf-8');
   for (const component of [
     'Ollama',
     'llama.cpp and ggml',

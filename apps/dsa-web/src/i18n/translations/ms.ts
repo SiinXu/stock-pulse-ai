@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "Tidak memuat turun pemberat secara automatik dari UI web. Lihat docs/kronos-local-model.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "Alat Agent ramalan K-line Kronos setempat pilihan (bukan LLM sembang).",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Dayakan ramalan setempat Kronos",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Pasang requirements-kronos.txt, muat turun pemberat dengan scripts/download_kronos_weights.py, tetapkan KRONOS_WEIGHTS_DIR, dayakan dan mulakan semula. Sahkan di Model setempat.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Pasang requirements/kronos.txt, muat turun pemberat dengan scripts/download_kronos_weights.py, tetapkan KRONOS_WEIGHTS_DIR, dayakan dan mulakan semula. Sahkan di Model setempat.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "Lalai false; analisis diteruskan tanpa Kronos jika dilumpuhkan atau belum sedia.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "Selepas didayakan, proses mesti dimulakan semula supaya alat didaftarkan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "Pakej desktop prabina tidak menyokong Kronos.",

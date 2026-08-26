@@ -15,7 +15,7 @@
 
 | 项目 | 说明 |
 | --- | --- |
-| 依赖 | `requirements-kronos.txt`（含 `torch==2.13.0` 等，**默认不安装**） |
+| 依赖 | `requirements/kronos.txt`（含 `torch==2.13.0` 等，**默认不安装**） |
 | 平台 | Linux x86_64/arm64、Windows x64、macOS Apple Silicon（macOS 14+）；**macOS Intel 不支持** 该 PyTorch 轮子 |
 | 内存 | mini 适合首装；small/base 显著增加 RAM 与 CPU/GPU 占用 |
 | 桌面端 | **预构建桌面包不支持 Kronos**（PyInstaller 后端不捆绑 torch/权重）。请在支持的源码环境使用 |
@@ -27,7 +27,7 @@
 
 ```bash
 python -m pip install --upgrade --constraint constraints.txt pip
-python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt
+python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements/kronos.txt
 python -m pip check
 ```
 
@@ -96,7 +96,7 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 | 状态 reason | 含义 | 下一步 |
 | --- | --- | --- |
 | `disabled` | 未启用 | 装依赖 → 下载权重 → 配置目录 → 启用 → 重启 |
-| `dependencies_missing` | 可选包缺失 | 上文完整 `python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt` |
+| `dependencies_missing` | 可选包缺失 | 上文完整 `python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements/kronos.txt` |
 | `weights_dir_*` / `weights_incomplete` / `weights_invalid` | 权重路径或文件问题 | `scripts/download_kronos_weights.py` 或修复目录 |
 | `ready` | 本地门禁通过 | 若工具未注册则重启；再走 Agent 路径 |
 | `packaged_desktop_unsupported` | 预构建桌面 | 改用源码环境 |
@@ -112,7 +112,7 @@ KRONOS_WEIGHTS_DIR=/absolute/path/to/kronos-weights
 | 现象 | 处理 |
 | --- | --- |
 | 设置里找不到 Kronos | 升级到包含本功能的版本；查看本地模型页 |
-| 依赖探测失败 | 确认安装了 `requirements-kronos.txt` 且 `pip check` 通过 |
+| 依赖探测失败 | 确认安装了 `requirements/kronos.txt` 且 `pip check` 通过 |
 | 权重 incomplete/invalid | 重新运行下载脚本或核对 `config.json` + `model.safetensors` |
 | 启用后仍无工具 | **重启** API/CLI 进程；确认 `KRONOS_ENABLED=true` |
 | 桌面端提示不支持 | 预期行为；使用源码后端 |

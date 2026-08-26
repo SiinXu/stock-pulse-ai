@@ -4,7 +4,7 @@ This page is the StockPulse **configuration key inventory** and **config additio
 
 | Source | Path | Role |
 |--------|------|------|
-| Template defaults | [`.env.example`](../.env.example) | Key names, sample/default values, secret placeholders, behavioral comments |
+| Template defaults | [`.env.example`](../.env.example) | Key names, sample/default values, secret placeholders, copy-paste templates; long-form behavior lives in topic docs |
 | Configuration registry | [`src/core/config_registry_parts/`](../src/core/config_registry_parts/) | Web Settings grouping, control types, validation, help metadata, default hints |
 | This inventory | Machine-checked table below | Whether each key is documented; default alignment with the template |
 

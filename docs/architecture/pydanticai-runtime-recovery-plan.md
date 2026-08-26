@@ -141,8 +141,8 @@ pydanticai-installed
 
 **实现要求**
 
-- Native job 不安装 `requirements-pydanticai.txt`，验证默认启动、factory、API 和 Docker 导入均不依赖 PydanticAI。
-- PydanticAI job 同时安装 `.github/requirements-ci.txt` 与 `requirements-pydanticai.txt`。
+- Native job 不安装 `requirements/pydanticai.txt`，验证默认启动、factory、API 和 Docker 导入均不依赖 PydanticAI。
+- PydanticAI job 同时安装 `.github/requirements-ci.txt` 与 `requirements/pydanticai.txt`。
 - cache key 纳入两个 requirements 文件。
 - 安装态 job 首先强制 `import pydantic_ai` 并打印受控版本信息；缺失即失败。
 - 安装态运行 `tests/agent/runtime/test_pydantic_ai_adapter.py`、`test_tool_session.py`、`test_conformance.py`。
@@ -446,10 +446,10 @@ git diff --check
 ### 8.2 PydanticAI 阶段附加门禁
 
 ```text
-环境 A：不安装 requirements-pydanticai.txt
+环境 A：不安装 requirements/pydanticai.txt
   -> Native 全套 + import isolation
 
-环境 B：安装 requirements-pydanticai.txt
+环境 B：安装 requirements/pydanticai.txt
   -> 强制 import/version assertion
   -> Adapter/tool bridge/conformance tests
   -> 禁止 skip

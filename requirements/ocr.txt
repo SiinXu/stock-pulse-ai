@@ -4,7 +4,7 @@
 # requirements first, then install this optional set. You must also install the
 # system Tesseract binary and language packs (chi_sim for Simplified Chinese).
 # See docs/agent-ocr-tool_EN.md.
--c constraints.txt
+-c ../constraints.txt
 
 Pillow>=10.0.0,<13
 pytesseract>=0.3.10,<0.4

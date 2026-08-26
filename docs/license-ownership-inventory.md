@@ -2,7 +2,7 @@
 
 **Status**: Process (progressive coverage)  
 **Last updated**: 2026-07-26  
-**Authority**: Root [LICENSE](../LICENSE) and [LICENSE.AGPL](../LICENSE.AGPL)
+**Authority**: Root [LICENSE](../LICENSE) and [LICENSE.AGPL](../LICENSE.AGPL). Bundled third-party notices: [THIRD_PARTY_NOTICES](legal/THIRD_PARTY_NOTICES).
 
 This document defines a **repeatable maintainer process** for classifying and
 recording file-level license ownership between:

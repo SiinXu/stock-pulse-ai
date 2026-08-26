@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "Web UI から重みを自動ダウンロードしません。docs/kronos-local-model.md を参照。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "任意のローカル Kronos K 線予測 Agent Tool（チャット LLM ではありません）。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Kronos ローカル予測を有効化",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "requirements-kronos.txt を入れ、scripts/download_kronos_weights.py で重みを取得し、KRONOS_WEIGHTS_DIR を設定して有効化後に再起動。ローカルモデルの状態パネルで確認。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "requirements/kronos.txt を入れ、scripts/download_kronos_weights.py で重みを取得し、KRONOS_WEIGHTS_DIR を設定して有効化後に再起動。ローカルモデルの状態パネルで確認。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "既定は false。無効または未準備でも主分析は継続します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "有効化後はプロセス再起動が必要で、プラグインがツールを登録します。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "プリビルドのデスクトップ版は Kronos をサポートしません。",
