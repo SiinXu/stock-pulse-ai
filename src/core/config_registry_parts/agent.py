@@ -1636,7 +1636,11 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "LAYERED_MEMORY_COLLECTION_ENABLED": {
         "title": "Layered Memory Collection",
-        "description": "Collect bounded per-principal records for the layered Agent memory service.",
+        "description": (
+            "Collect bounded per-principal layered-memory observations into the durable "
+            "SQLite store. Default off. Requires per-principal consent. Failures never "
+            "abort analysis. Does not inject into production prompts."
+        ),
         "category": "agent",
         "data_type": "boolean",
         "ui_control": "switch",

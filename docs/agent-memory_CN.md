@@ -1,6 +1,6 @@
 # Principal 作用域分层 Agent 记忆
 
-**状态**：分层记忆基础 + 生命周期（分层记忆尚未接入生产 prompt）。持久化存储/UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。写入准入库：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1（遗忘 / 压缩仍开放）。
+**状态**：分层记忆基础 + 生命周期 + 默认关闭的观测持久化存储（无生产分层记忆 prompt 注入，无用户 CRUD）。#1118 剩余 UX/prompt/语义事实/程序层 persist：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。写入准入库：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1（遗忘 / 压缩仍开放）。
 
 **English**: [agent-memory.md](agent-memory.md)
 
@@ -11,11 +11,14 @@
 | `src/agent/memory_layers.py` | 严格类型记录与投影类型 |
 | `src/agent/memory_retrieval.py` | 结构化 episodic + **outcome-pattern** 检索；可选向量粗排 |
 | `src/agent/memory_vector.py` | 无额外依赖的粗排 |
-| `src/agent/memory_governance.py` | 知情同意、保留期、按 principal 删除/清空、访问审计 |
+| `src/agent/memory_governance.py` | 知情同意、保留期、按 principal 删除/清空、访问审计；可选耐久存储 |
 | `src/agent/memory_isolation.py` | 面向 prompt 的不可信数据隔离 |
 | `src/schemas/memory_write_policy.py` | 仅库层、覆盖既有存储的写入准入（#1119 Slice 1） |
+| `src/schemas/layered_memory_persist.py` | 观测映射准入：服务端 provenance、secret/PII 拒绝、事实/意见锁 |
+| `src/repositories/layered_memory_repo.py` | SQLite 观测行 + 同意 + 仅追加访问审计 |
+| `src/services/layered_memory_collection_service.py` | 分析历史保存后的默认关闭、失败软化收集 |
 
-`AGENT_ONLINE_ADAPTERS_ENABLED` 关闭或缺失时，既有 `AgentMemory` 数值校准行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 历史注入默认关闭；开启时 `BaseAgent._build_memory_context` 用 `isolate_untrusted_memory_body` 包裹历史行，并将 `signal` 规范为 `buy|hold|sell`（见[威胁注释](#threat-notes)）。
+`AGENT_ONLINE_ADAPTERS_ENABLED` 关闭或缺失时，既有 `AgentMemory` 数值校准行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。耐久存储仅在 `LAYERED_MEMORY_COLLECTION_ENABLED` 为真 **且** operator principal（`local_admin`）已同意时写入现有 `MemoryObservation`。存储失败 fail-soft，不得中断分析。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 历史注入默认关闭；开启时 `BaseAgent._build_memory_context` 用 `isolate_untrusted_memory_body` 包裹历史行，并将 `signal` 规范为 `buy|hold|sell`（见[威胁注释](#threat-notes)）。
 
 ## 在线进化适配器（默认关闭）
 
@@ -48,12 +51,14 @@ Issue #1115 示例名 `EVOLUTION_MIN_SAMPLES` **不是** `AGENT_ONLINE_ADAPTERS_
 
 | 控制 | 默认 |
 | --- | --- |
-| `LAYERED_MEMORY_COLLECTION_ENABLED` | `false` |
-| 按 principal 同意 | 无（collect/list/project/export 前必须） |
+| `LAYERED_MEMORY_COLLECTION_ENABLED` | `false`（关闭时收集助手不打开 repository） |
+| 按 principal 同意 | 无（collect/list/project/export 前必须；生产收集使用单一 operator `local_admin`） |
 | `LAYERED_MEMORY_RETENTION_DAYS` | `90` |
-| `LAYERED_MEMORY_AUDIT_ENABLED` | `true` |
+| `LAYERED_MEMORY_AUDIT_ENABLED` | `true`（审计表禁止 UPDATE/DELETE） |
 | `LAYERED_MEMORY_VECTOR_ENABLED` | `false` |
 | `LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL` | `200` |
+
+耐久表：`layered_memory_observations`、`layered_memory_consent`、`layered_memory_access_audit`。这不是 `agent_episodes`，也不持久化 semantic-fact 或 procedural 权重。本切片无 HTTP/Web CRUD。
 
 ## 注入防护
 
@@ -112,8 +117,9 @@ Decision Memory 的 `admit_decision_memory` 是 **独立的 READ / 注入** 过�
 ## 剩余范围
 
 - 权威 principal 赋值（API/bot/CLI/定时任务）与遗留迁移。
-- 持久化生命周期存储与用户 UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)（吸收已关闭的 [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) 与 [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)）。
+- 用户侧查看/编辑/删除/导出 UI 与 HTTP CRUD：仍属 [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)（吸收已关闭的 [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) 与 [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)）。观测/同意/审计耐久存储已落地；issue 保持开放。
 - 经安全审查的生产 prompt 消费。
+- 语义事实表 persist 与程序层权重 persist（#1119 下仍为 fail-closed `persist=False`）。
 - 偏好层：[#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117)（吸收已关闭的 [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)）。
 - 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。DAG-0 威胁注释、DAG-1 事实/意见锁定、DAG-2 Soul/超限写路径拒绝（`src/schemas/memory_write_guard.py`）和 DAG-3 服务端盖章 provenance（`src/schemas/memory_provenance.py`）已落地。DAG-4 将默认关闭的 AgentMemory 注入隔离为不可信数据（`src/agent/agents/base_agent.py` / `src/agent/memory.py`），`signal` 规范为 `buy` / `hold` / `sell`。不要并入 #1118 存储/UI 或 #1105 产品反馈 API。
 - 写入准入 / 压缩 / 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119)。Slice 1（覆盖既有存储的库层写入准入）见上文。仍缺：旧 episodic 行压缩、不改 Soul 的语义/程序性候选晋升、按标的 TTL / 行数上限、检索分数衰减，以及 [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113) 落地后丢弃已回滚的程序性标记。保持 #1119 开放。
@@ -143,7 +149,7 @@ automatic 路径开启时：
 
 ## 回滚
 
-回退新增模块/测试/文档/配置字段与 changelog 行。
+将 `LAYERED_MEMORY_COLLECTION_ENABLED=false`（默认值）关闭收集。然后执行本切片 migration `downgrade`，仅 DROP `layered_memory_observations`、`layered_memory_consent`、`layered_memory_access_audit` 及其索引/trigger。不得触碰 episode / evolution-event / prediction / decision-memory 表。回退 PR 以移除收集助手。未接线生产 prompt，关闭开关后分析输出不变。
 
 ## 相关：错误模式百科
 

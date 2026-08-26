@@ -88,6 +88,9 @@ from src.migrations.versions.v202608250002_agent_curator_grade_schema import (
 from src.migrations.versions.v202608250003_agent_evolution_event_schema import (
     MIGRATION as AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION,
 )
+from src.migrations.versions.v202608260001_layered_memory_observation_schema import (
+    MIGRATION as LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION,
+)
 
 
 MIGRATIONS: Tuple[Migration, ...] = validate_registry(
@@ -119,6 +122,7 @@ MIGRATIONS: Tuple[Migration, ...] = validate_registry(
         AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
         AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
         AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION,
+        LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION,
     )
 )
 

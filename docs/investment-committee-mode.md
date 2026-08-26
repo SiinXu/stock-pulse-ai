@@ -73,7 +73,7 @@ Markdown / WeChat / History / Notification 在 `strategy_synthesis` 之后渲染
 ## Web UI
 
 - **设置 / 模式开关**：仍以配置与 API context 为主（本批不新增设置 IA）。
-- **报告 / History**：`ReportStructuredInsights` 在 payload 存在时渲染结论、委员立场、保留意见与分歧。委员立场、保留意见与分歧列表默认只显示前 3 条，可通过「展开全部 / 收起」查看其余项；委员会结论始终展开。
+- **报告 / History**：`ReportStructuredInsights` 在 payload 存在时渲染结论、委员立场、保留意见与分歧。委员立场、保留意见与分歧列表默认收在可折叠区块内，展开后默认只显示前 3 条，可通过「展开全部 / 收起」查看其余项；委员会结论始终展开。
 - **Signal Center**：详情页从 `evidence.committee_deliberation` 复用同一卡片。
 
 ## 回滚

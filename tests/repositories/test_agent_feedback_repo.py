@@ -16,6 +16,7 @@ from src.config import Config
 from src.migrations.registry import (
     AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
     AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION,
+    LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION,
     AGENT_FEEDBACK_SCHEMA_MIGRATION,
     AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
     AGENT_PREDICTION_SCHEMA_MIGRATION,
@@ -127,7 +128,7 @@ def test_fresh_database_applies_feedback_schema(isolated_db) -> None:
     assert "ck_agent_run_feedback_value" in run_ddl
     assert "ck_agent_prediction_feedback_value" in pred_ddl
     assert "run_id VARCHAR(128) NOT NULL" in pred_ddl
-    assert get_migrations()[-1].id == AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id
+    assert get_migrations()[-1].id == LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id
     assert AGENT_FEEDBACK_SCHEMA_MIGRATION.id in {
         migration.id for migration in get_migrations()
     }
@@ -508,6 +509,19 @@ def test_apply_pending_repairs_missing_feedback_tables(tmp_path, monkeypatch) ->
                 {"version": AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id},
             )
             connection.exec_driver_sql(
+                "DROP TRIGGER IF EXISTS trg_layered_memory_access_audit_no_delete"
+            )
+            connection.exec_driver_sql(
+                "DROP TRIGGER IF EXISTS trg_layered_memory_access_audit_no_update"
+            )
+            connection.exec_driver_sql("DROP TABLE IF EXISTS layered_memory_access_audit")
+            connection.exec_driver_sql("DROP TABLE IF EXISTS layered_memory_consent")
+            connection.exec_driver_sql("DROP TABLE IF EXISTS layered_memory_observations")
+            connection.exec_driver_sql(
+                "DELETE FROM schema_migrations WHERE version = :version",
+                {"version": LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id},
+            )
+            connection.exec_driver_sql(
                 "DELETE FROM schema_migrations WHERE version = :version",
                 {"version": AGENT_FEEDBACK_SCHEMA_MIGRATION.id},
             )
@@ -517,6 +531,7 @@ def test_apply_pending_repairs_missing_feedback_tables(tmp_path, monkeypatch) ->
         assert AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id in result.executed_ids
         assert AGENT_CURATOR_GRADE_SCHEMA_MIGRATION.id in result.executed_ids
         assert AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id in result.executed_ids
+        assert LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id in result.executed_ids
         inspector = inspect(engine)
         assert "agent_run_feedback" in inspector.get_table_names()
         assert "agent_prediction_feedback" in inspector.get_table_names()
@@ -525,7 +540,7 @@ def test_apply_pending_repairs_missing_feedback_tables(tmp_path, monkeypatch) ->
         assert "agent_predictions" in inspector.get_table_names()
         verification = MigrationRunner().verify(engine)
         assert verification.success is True
-        assert verification.current_version == AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id
+        assert verification.current_version == LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id
         assert AGENT_PREDICTION_SCHEMA_MIGRATION.id in {
             migration.id for migration in get_migrations()
         }
