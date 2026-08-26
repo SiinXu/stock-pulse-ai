@@ -3053,8 +3053,10 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('8'));
 
     act(() => window.history.back());
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('7'));
-    expect(await screen.findByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
+      expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    });
     expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('趋势保持')).toBeInTheDocument();
   });
 
@@ -3104,10 +3106,15 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('8'));
 
     act(() => window.history.back());
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('7'));
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
+      expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    });
     act(() => window.history.forward());
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('8'));
-    expect(await screen.findByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    await waitFor(() => {
+      expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
+      expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    });
     expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('Second analysis signal')).toBeInTheDocument();
   });
 
