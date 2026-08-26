@@ -1,0 +1,1 @@
+- [Chore] Extracted DataFetcherManager daily provider execution (`get_daily_data`, provider call validation, and fallback loop) into `src/data_provider/manager_parts/daily_provider_execution.py` behind the existing ADR-006 facade (Refs #1067).
