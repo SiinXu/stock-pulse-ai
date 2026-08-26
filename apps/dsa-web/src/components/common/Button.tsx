@@ -7,6 +7,8 @@ import { Spinner } from './Spinner';
 export type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'danger-subtle';
 export type ButtonSize = 'compact' | 'default' | 'comfortable' | 'primary';
 
+/** Action density (#1332): toolbar labeled actions use `comfortable` or `primary`; `compact` only on declared dense tables. Do not override height/width via caller className. */
+
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant: ButtonVariant;
   size?: ButtonSize;

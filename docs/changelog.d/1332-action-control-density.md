@@ -1,0 +1,2 @@
+- [Changed] Aligned shared Button/IconButton toolbar density and failed closed on IconButton geometry overrides (Refs #1332).
+- [Docs] Document live Button 20/24/28/32 and IconButton 28/32/36/44 maps without resizing primitives (Refs #1332).

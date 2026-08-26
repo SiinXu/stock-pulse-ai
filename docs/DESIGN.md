@@ -203,8 +203,8 @@ mean every visible control must be 44px tall.
 
 | Element | Compact desktop | Default desktop | Touch/narrow-screen behavior |
 |---|---:|---:|---|
-| Button height | 28–32px | 36px | 40–44px visible height when it is a primary touch action |
-| Icon button visual box | 32px | 36px | retain a 44px hit target through container/hit-area sizing |
+| Button visible height | `compact` 20px / `default` 24px | labeled default `comfortable` 28px; task CTA `primary` 32px | coarse pointer: 44px via `.control-hit-target`, not a larger visible box |
+| IconButton visible box | `compact` 28px | `default` 32px; `comfortable` 36px | `navigation` 44px visible + target; other sizes keep 44px hit via `::after` |
 | Input/select height | 32px | 36px | 44px where coarse pointer use is expected |
 | Page horizontal padding | 16px | 20–24px | 12–16px |
 | Card padding | 12px dense | 16px | 12–16px |
@@ -306,9 +306,10 @@ const controlSizes = {
 } as const;
 ```
 
-The example describes the contract, not permission to duplicate the map in each component. Keep
-complete Tailwind class strings in shared component maps so the compiler can discover them; do not
-build utility names dynamically from arbitrary values.
+The example describes the contract, not permission to duplicate the map in each component. Live
+named-size maps live in `Button.tsx` and `IconButton.tsx` (and `docs/web-ui-foundation.md`); do not
+copy this snippet into those primitives. Keep complete Tailwind class strings in shared component
+maps so the compiler can discover them; do not build utility names dynamically from arbitrary values.
 
 - Width normally follows content. Use `w-full` only for narrow stacked layouts, forms where the
   field owns a column, or explicitly full-width primary mobile actions.
@@ -371,9 +372,10 @@ Interaction timing:
 - Secondary/outline: card or transparent surface with standard border.
 - Destructive: the error family, with an explicit destructive label.
 - Every icon-only button needs an accessible name and a visible focus state.
-- Default desktop button is 36px high with 14px text and 12–16px horizontal padding. Use 32px for
-  compact table/toolbar actions, 40px for prominent actions, and 44px visible controls only where
-  touch context warrants it.
+- Live labeled default is `Button` `comfortable` (28px); 32px is `Button` `primary` or IconButton
+  `default`; 44px visible is IconButton `navigation` or the coarse `.control-hit-target` hit-area
+  only. Do not treat 36px as the labeled Button default or 40px as a Button size. See
+  `docs/web-ui-foundation.md` Visible Size And Hit Target.
 - Ordinary buttons use the shared 12px radius. Pills are reserved for compact filters, badges, and
   intentional segmented selections—not all buttons.
 - Keep one-line labels. If localized text does not fit, allow sensible width growth or move the

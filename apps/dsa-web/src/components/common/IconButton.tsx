@@ -5,6 +5,8 @@ import { Spinner } from './Spinner';
 import { Tooltip } from './Tooltip';
 
 export type IconButtonSize = 'compact' | 'default' | 'comfortable' | 'navigation';
+
+/** Action density (#1332): toolbar/row icons use `default` (`h-8`); nav uses `navigation`; `compact` only on declared dense tables. */
 export type IconButtonVariant = 'ghost' | 'bare' | 'outline' | 'danger';
 
 export interface IconButtonProps extends Omit<

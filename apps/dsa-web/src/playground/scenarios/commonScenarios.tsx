@@ -250,7 +250,7 @@ const IconButtonStory = () => {
   const text = useSampleText();
   const { scenario } = usePlaygroundScenario();
   const variants: IconButtonVariant[] = ['ghost', 'outline', 'danger'];
-  const sizes: IconButtonSize[] = ['compact', 'default', 'comfortable'];
+  const sizes: IconButtonSize[] = ['compact', 'default', 'comfortable', 'navigation'];
   if (scenario === 'sizes') {
     return <Surface className="flex items-center gap-3">{sizes.map((size) => <IconButton key={size} size={size} variant="outline" aria-label={`${text.preview} ${size}`}><Search /></IconButton>)}</Surface>;
   }
