@@ -151,6 +151,7 @@ export const PLAYGROUND_CATALOG: readonly PlaygroundEntry[] = [
   entry('history', 'stock-bar-item', 'StockBarItemComponent', 'components/history/StockBarItem.tsx', ['default', 'states']),
   entry('history', 'stock-history-trend-drawer', 'StockHistoryTrendDrawer', 'components/history/StockHistoryTrendDrawer.tsx', ['default', 'loading', 'empty', 'error']),
   entry('signals', 'decision-signal-card', 'DecisionSignalCard', 'components/decision-signals/DecisionSignalDisplay.tsx', ['default', 'interactive', 'states']),
+  entry('signals', 'decision-signal-context-chip', 'DecisionSignalContextChip', 'components/decision-signals/DecisionSignalContextChip.tsx'),
   entry('signals', 'decision-signal-details', 'DecisionSignalDetails', 'components/decision-signals/DecisionSignalDetails.tsx', ['default', 'loading', 'empty', 'error']),
   entry('signals', 'decision-signal-memory-controls', 'DecisionSignalMemoryControls', 'components/decision-signals/DecisionSignalMemoryControls.tsx', ['default', 'error']),
   entry('signals', 'decision-signal-outcome-badge', 'DecisionSignalOutcomeBadge', 'components/decision-signals/DecisionSignalDisplay.tsx', ['variants']),

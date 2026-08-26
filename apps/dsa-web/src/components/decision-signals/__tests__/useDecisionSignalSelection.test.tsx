@@ -83,4 +83,51 @@ describe('useDecisionSignalSelection', () => {
     expect(result.current.selected?.item.stockCode).toBe('600519');
     expect(fetchSignalById).not.toHaveBeenCalled();
   });
+
+  it('keeps selectedSignalId and URL identity when the detail drawer closes', () => {
+    const updateSearchParams = vi.fn();
+    const { result } = renderHook(() => useDecisionSignalSelection({
+      routeSearch: '',
+      routeKey: 'k1',
+      candidates: [{ source: 'list', items: [first, second] }],
+      fetchSignalById: vi.fn(),
+      updateSearchParams,
+      isMounted: () => true,
+    }));
+
+    act(() => result.current.selectSignal(first, 'list'));
+    expect(result.current.detailOpen).toBe(true);
+    expect(result.current.selectedSignalId).toBe(7);
+    updateSearchParams.mockClear();
+
+    act(() => result.current.closeDetail());
+    expect(result.current.detailOpen).toBe(false);
+    expect(result.current.selectedSignalId).toBe(7);
+    expect(updateSearchParams).not.toHaveBeenCalled();
+
+    act(() => result.current.openDetail());
+    expect(result.current.detailOpen).toBe(true);
+    expect(result.current.selectedSignalId).toBe(7);
+    expect(updateSearchParams).not.toHaveBeenCalled();
+  });
+
+  it('adopts a persisted id without restoring a stale pending URL selection', () => {
+    const updateSearchParams = vi.fn();
+    const { result } = renderHook(() => useDecisionSignalSelection({
+      routeSearch: '?signal=7',
+      routeKey: 'k1',
+      candidates: [{ source: 'list', items: [first, second] }],
+      fetchSignalById: vi.fn(),
+      updateSearchParams,
+      isMounted: () => true,
+    }));
+
+    expect(result.current.selectedSignalId).toBe(7);
+    updateSearchParams.mockClear();
+    act(() => result.current.adoptSelected(second, 'persisted'));
+    expect(result.current.selectedSignalId).toBe(8);
+    expect(result.current.detailOpen).toBe(true);
+    expect(updateSearchParams).toHaveBeenCalledWith({ signal: 8 }, true);
+    expect(result.current.takePendingSelection('list', [first, second])).toBeNull();
+  });
 });

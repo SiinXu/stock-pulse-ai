@@ -31,7 +31,9 @@ export function useDecisionSignalSelection({
   isMounted,
 }: UseDecisionSignalSelectionOptions) {
   const [selected, setSelected] = useState<SelectedSignal | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const selectedSignalIdRef = useRef<number | null>(null);
+  const selectedRef = useRef<SelectedSignal | null>(null);
   const pendingSelectedSignalIdRef = useRef<number | null>(getInitialSelectedSignalId(routeSearch));
   const candidatesRef = useRef(candidates);
   const fetchSignalByIdRef = useRef(fetchSignalById);
@@ -50,7 +52,9 @@ export function useDecisionSignalSelection({
     if (!item) return null;
     pendingSelectedSignalIdRef.current = null;
     selectedSignalIdRef.current = item.id;
-    return { source, item };
+    const next = { source, item };
+    selectedRef.current = next;
+    return next;
   }, []);
 
   useLayoutEffect(() => {
@@ -67,7 +71,12 @@ export function useDecisionSignalSelection({
     const routeSignalId = getInitialSelectedSignalId(routeSearch);
     if (routeSignalId === null) {
       pendingSelectedSignalIdRef.current = null;
-      if (selectedSignalIdRef.current !== null) setSelected(null);
+      if (selectedSignalIdRef.current !== null) {
+        selectedSignalIdRef.current = null;
+        selectedRef.current = null;
+        setSelected(null);
+        setDetailOpen(false);
+      }
       return;
     }
     if (selectedSignalIdRef.current === routeSignalId) {
@@ -79,22 +88,34 @@ export function useDecisionSignalSelection({
     if (found) {
       pendingSelectedSignalIdRef.current = null;
       selectedSignalIdRef.current = found.item.id;
+      selectedRef.current = found;
       setSelected(found);
+      setDetailOpen(true);
       return;
     }
     // Memory miss fallback: get() by id (source 'outcome' so list refresh won't drop off-page).
-    if (selectedSignalIdRef.current !== null) setSelected(null);
+    if (selectedSignalIdRef.current !== null) {
+      selectedSignalIdRef.current = null;
+      selectedRef.current = null;
+      setSelected(null);
+    }
+    setDetailOpen(false);
     void fetchSignalByIdRef.current(routeSignalId).then((item) => {
       if (!isMountedRef.current() || pendingSelectedSignalIdRef.current !== routeSignalId) return;
       pendingSelectedSignalIdRef.current = null;
       selectedSignalIdRef.current = item.id;
+      const next = { source: 'outcome' as const, item };
+      selectedRef.current = next;
       onLookupSuccessRef.current?.();
-      setSelected({ source: 'outcome', item });
+      setSelected(next);
+      setDetailOpen(true);
     }).catch((err) => {
       if (!isMountedRef.current() || pendingSelectedSignalIdRef.current !== routeSignalId) return;
       pendingSelectedSignalIdRef.current = null;
       selectedSignalIdRef.current = null;
+      selectedRef.current = null;
       setSelected(null);
+      setDetailOpen(false);
       onLookupErrorRef.current?.(err);
       updateSearchParamsRef.current({ signal: null });
     });
@@ -105,35 +126,97 @@ export function useDecisionSignalSelection({
     const previousId = selectedSignalIdRef.current;
     pendingSelectedSignalIdRef.current = null;
     selectedSignalIdRef.current = item.id;
-    setSelected({ source, item });
+    const next = { source, item };
+    selectedRef.current = next;
+    setSelected(next);
+    setDetailOpen(true);
     updateSearchParams({ signal: item.id }, previousId === item.id);
   }, [updateSearchParams]);
 
-  const closeSignal = useCallback(() => {
+  const closeDetail = useCallback(() => {
+    setDetailOpen(false);
+  }, []);
+
+  const openDetail = useCallback(() => {
+    if (selectedSignalIdRef.current === null) return;
+    setDetailOpen(true);
+  }, []);
+
+  const adoptSelected = useCallback((item: DecisionSignalItem, source: SelectedSignal['source']) => {
+    pendingSelectedSignalIdRef.current = null;
+    selectedSignalIdRef.current = item.id;
+    const next = { source, item };
+    selectedRef.current = next;
+    setSelected(next);
+    setDetailOpen(true);
+    updateSearchParams({ signal: item.id }, true);
+  }, [updateSearchParams]);
+
+  const clearSelection = useCallback(() => {
     pendingSelectedSignalIdRef.current = null;
     selectedSignalIdRef.current = null;
+    selectedRef.current = null;
     setSelected(null);
+    setDetailOpen(false);
     updateSearchParams({ signal: null });
   }, [updateSearchParams]);
 
-  useEffect(() => {
-    if (pendingSelectedSignalIdRef.current === null) {
-      updateSearchParams({ signal: selected?.item.id ?? null });
+  const updateSelected = useCallback((
+    updater: (current: SelectedSignal | null) => SelectedSignal | null,
+  ) => {
+    const current = selectedRef.current;
+    const next = updater(current);
+    if (next === current) return;
+    if (next === null) {
+      if (current !== null) clearSelection();
+      return;
     }
-  }, [selected?.item.id, updateSearchParams]);
+    selectedRef.current = next;
+    selectedSignalIdRef.current = next.item.id;
+    setSelected(next);
+  }, [clearSelection]);
+
+  const reconcileOwnedSelection = useCallback((
+    source: SelectedSignal['source'],
+    items: DecisionSignalItem[],
+  ) => {
+    const restored = takePendingSelection(source, items);
+    if (restored) {
+      setSelected(restored);
+      setDetailOpen(true);
+      return;
+    }
+    const current = selectedRef.current;
+    if (!current || current.source !== source) return;
+    const refreshed = items.find((item) => item.id === current.item.id);
+    if (refreshed) {
+      const next = { source, item: refreshed };
+      selectedRef.current = next;
+      setSelected(next);
+      return;
+    }
+    clearSelection();
+  }, [clearSelection, takePendingSelection]);
 
   useEffect(() => {
     selectedSignalIdRef.current = selected?.item.id ?? null;
-  }, [selected?.item.id]);
+    selectedRef.current = selected;
+  }, [selected]);
 
   return {
     selected,
     selectedSignalId: selected?.item.id ?? null,
     selectedSignalIdRef,
+    detailOpen,
     selectSignal,
-    closeSignal,
+    closeDetail,
+    openDetail,
+    adoptSelected,
+    clearSelection,
+    updateSelected,
     setSelected,
     takePendingSelection,
+    reconcileOwnedSelection,
   };
 }
 

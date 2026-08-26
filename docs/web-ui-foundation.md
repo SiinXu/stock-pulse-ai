@@ -455,7 +455,9 @@ visible `PageHeader`. Signal Center provides four top-level shared `Tabs` /
 without creating a second page identity. Decision Signals selection identity is
 `selectedSignalId` / `?signal=<id>`; list, latest, and timeline only supply
 candidates and a display source, and a fixed Context Chip shows symbol, source,
-and status. Its scope selector is a pressed-button
+and status. Closing the detail drawer leaves that chip visible and non-inert so
+it can reopen the same id; feed refreshes restore or update by id and do not
+overwrite a newer selection from another entry point. Its scope selector is a pressed-button
 group, not another tablist, and is only rendered for the signal and rule views
 that apply that scope to their requests. Portfolio renders one
 page-level onboarding state when no account exists, and Backtest renders one

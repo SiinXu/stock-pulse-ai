@@ -65,6 +65,8 @@ The primary tabs stay directly below the page header. Inside **Signals**, a comp
 
 Selecting a signal uses `?signal=<id>` as the single selection identity. List, latest, and timeline are only entry points; two signals that share a source do not replace each other. While a signal is selected, a fixed Context Chip under the page header shows its symbol, source, and status. Browser Back/Forward restores that same id. Deep links still fetch by id when the row is not on the current page.
 
+Closing the detail drawer does not clear `?signal=` or the Context Chip. The chip stays visible and accessible so you can reopen the same id without changing identity. List, latest, and timeline refreshes look up that id and do not drop a newer selection from another entry point.
+
 ## Signals: daily drawer
 
 **Beginner filters**

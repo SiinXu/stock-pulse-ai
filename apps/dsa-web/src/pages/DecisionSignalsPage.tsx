@@ -59,9 +59,6 @@ import {
   normalizeDecisionSignalMarket,
   PAGE_SIZE,
   parseSourceReportId,
-  refreshLatestSelection,
-  refreshOwnedSelectionFromItems,
-  refreshTimelineSelection,
   runWithRequestSlot,
   SIGNAL_CENTER_TABS_ID,
   SIGNAL_FEED_TABS_ID,
@@ -356,9 +353,12 @@ const DecisionSignalsPage: React.FC = () => {
     selectedSignalId,
     selectedSignalIdRef,
     selectSignal,
-    closeSignal,
-    setSelected,
-    takePendingSelection,
+    detailOpen,
+    closeDetail,
+    openDetail,
+    adoptSelected,
+    updateSelected,
+    reconcileOwnedSelection,
   } = useDecisionSignalSelection({
     routeSearch: routeLocation.search,
     routeKey: routeLocation.key,
@@ -389,8 +389,8 @@ const DecisionSignalsPage: React.FC = () => {
   }, [handleSelectSignal]);
   const handleCloseSignal = useCallback(() => {
     setStatusError(null);
-    closeSignal();
-  }, [closeSignal]);
+    closeDetail();
+  }, [closeDetail]);
   const popularCandidates = useMemo(
     () => toPopularCandidates(stockIndex, STOCK_CANDIDATE_LIMIT),
     [stockIndex],
@@ -575,25 +575,18 @@ const DecisionSignalsPage: React.FC = () => {
         error: responseError,
       });
       syncListSearchParams(appliedFilters, response.page);
-      const restoredSelection = takePendingSelection('list', response.items);
-      if (restoredSelection) {
-        setSelected(restoredSelection);
-      } else {
-        setSelected((current) => refreshOwnedSelectionFromItems(current, response.items, 'list'));
-      }
+      reconcileOwnedSelection('list', response.items);
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
       listDispatch({ type: 'loadFailure', error: getParsedApiError(err) });
-      setSelected((current) => (current?.source === 'list' ? null : current));
     }
   }, [
     appliedFilters,
     listDispatch,
     setPage,
-    setSelected,
+    reconcileOwnedSelection,
     signalCenterScope,
     syncListSearchParams,
-    takePendingSelection,
     watchlistState.isLoading,
     watchlistState.loadError,
     watchlistState.watchlistCodes,
@@ -729,8 +722,7 @@ const DecisionSignalsPage: React.FC = () => {
     setLatestSearched(false);
     setLatestLoading(false);
     setLatestError(null);
-    setSelected((current) => (current?.source === 'latest' ? null : current));
-  }, [setSelected]);
+  }, []);
 
   const loadLatestForContext = useCallback(async (context: StockContext) => {
     const stockCode = context.code.trim();
@@ -741,7 +733,6 @@ const DecisionSignalsPage: React.FC = () => {
     setLatestError(null);
     setLatestSearched(true);
     setLatestItems([]);
-    setSelected((current) => (current?.source === 'latest' ? null : current));
     try {
       const response = await decisionSignalsApi.getLatest(stockCode, {
         market: context.market,
@@ -749,26 +740,22 @@ const DecisionSignalsPage: React.FC = () => {
       });
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems(response.items);
-      const restoredSelection = takePendingSelection('latest', response.items);
-      if (restoredSelection) setSelected(restoredSelection);
-      else setSelected((current) => refreshLatestSelection(current, response.items));
+      reconcileOwnedSelection('latest', response.items);
     } catch (err) {
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems([]);
-      setSelected((current) => refreshLatestSelection(current, []));
       setLatestError(getParsedApiError(err));
     } finally {
       if (latestRequestIdRef.current === requestId) {
         setLatestLoading(false);
       }
     }
-  }, [setSelected, takePendingSelection]);
+  }, [reconcileOwnedSelection]);
 
   const resetTimelineView = useCallback(() => {
     timelineRequestIdRef.current += 1;
     resetTimelineState();
-    setSelected((current) => (current?.source === 'timeline' ? null : current));
-  }, [resetTimelineState, setSelected]);
+  }, [resetTimelineState]);
 
   const loadTimelineForContext = useCallback(async (
     context: StockContext,
@@ -780,7 +767,6 @@ const DecisionSignalsPage: React.FC = () => {
     const requestId = timelineRequestIdRef.current + 1;
     timelineRequestIdRef.current = requestId;
     timelineDispatch({ type: 'loadStart' });
-    setSelected((current) => (current?.source === 'timeline' ? null : current));
     if (syncUrl) syncTimelineSearchParams(filtersSnapshot);
     const nextAppliedContext: AppliedTimelineContext = {
       ...filtersSnapshot,
@@ -795,15 +781,12 @@ const DecisionSignalsPage: React.FC = () => {
         truncated: response.total > response.items.length,
         appliedContext: nextAppliedContext,
       });
-      const restoredSelection = takePendingSelection('timeline', response.items);
-      if (restoredSelection) setSelected(restoredSelection);
-      else setSelected((current) => refreshTimelineSelection(current, response.items));
+      reconcileOwnedSelection('timeline', response.items);
     } catch (err) {
       if (timelineRequestIdRef.current !== requestId) return;
-      setSelected((current) => refreshTimelineSelection(current, []));
       timelineDispatch({ type: 'loadFailure', error: getParsedApiError(err) });
     }
-  }, [setSelected, syncTimelineSearchParams, takePendingSelection, timelineDispatch]);
+  }, [reconcileOwnedSelection, syncTimelineSearchParams, timelineDispatch]);
 
   const handlePersistReassess = useCallback(async () => {
     const preview = reassessResponse?.preview;
@@ -828,8 +811,7 @@ const DecisionSignalsPage: React.FC = () => {
       const authoritativeItem = response.item;
       const shouldOptimisticallyUpsert = response.persistStatus !== 'existing';
       reassessDispatch({ type: 'persistSuccess', response });
-      selectedSignalIdRef.current = authoritativeItem.id;
-      setSelected((current) => (current ? { source: 'persisted', item: authoritativeItem } : null));
+      adoptSelected(authoritativeItem, 'persisted');
       if (
         shouldOptimisticallyUpsert
         &&
@@ -880,8 +862,7 @@ const DecisionSignalsPage: React.FC = () => {
     reassessProfile,
     reassessResponse,
     reassessSourceReportId,
-    selectedSignalIdRef,
-    setSelected,
+    adoptSelected,
     setTimelineItems,
   ]);
 
@@ -1042,7 +1023,7 @@ const DecisionSignalsPage: React.FC = () => {
         if (item.id !== updated.id) return [item];
         return appliedTimelineContext?.status === 'active' && updated.status !== 'active' ? [] : [updated];
       }));
-      setSelected((current) => {
+      updateSelected((current) => {
         if (!current || current.item.id !== updated.id) return current;
         if (current.source === 'latest') {
           return updated.status === 'active' ? { source: 'latest', item: updated } : null;
@@ -1189,10 +1170,7 @@ const DecisionSignalsPage: React.FC = () => {
 
         <DecisionSignalContextChip
           selected={selected}
-          onOpen={() => {
-            if (!selected) return;
-            selectSignal(selected.item, selected.source);
-          }}
+          onOpen={openDetail}
         />
 
         <DecisionSignalCreateDrawer
@@ -1400,6 +1378,7 @@ const DecisionSignalsPage: React.FC = () => {
 
       <DecisionSignalDetailDrawer
         selected={selected}
+        isOpen={detailOpen}
         onClose={handleCloseSignal}
         statusError={statusError}
         onDismissStatusError={() => setStatusError(null)}

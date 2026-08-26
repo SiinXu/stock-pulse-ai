@@ -2495,6 +2495,8 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(screen.queryByRole('button', { name: '查看 贵州茅台 AI 建议详情' })).not.toBeInTheDocument();
     expect(screen.getByText('共 0 条信号')).toBeInTheDocument();
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
   });
 
   it('opens details and confirms terminal status updates', async () => {
@@ -2685,6 +2687,8 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     expect(latestErrorToast.closest('[data-overlay-root="toast"]')).not.toBeNull();
     expect(latestErrorToast).not.toHaveTextContent('latest failed');
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
   });
 
   it('keeps list-sourced details available when latest search results change', async () => {
@@ -2979,7 +2983,11 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     await waitFor(() => expect(decisionSignalsApi.getMemoryFlag).toHaveBeenCalledWith(7));
     expect(within(dialog).getByRole('heading', { name: '决策记忆' })).toBeInTheDocument();
     fireEvent.click(within(dialog).getByRole('button', { name: '关闭抽屉' }));
-    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
+    const chip = screen.getByTestId('decision-signal-context-chip');
+    expect(chip).toHaveAttribute('data-selected-signal-id', '7');
+    expect(within(chip).getByRole('button', { name: '打开 600519 贵州茅台 的详情' })).toBeInTheDocument();
   });
 
   it('does not alias selection when two list signals share the same source', async () => {
@@ -3005,7 +3013,9 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     expect(await screen.findByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
-    fireEvent.click(screen.getByRole('button', { name: '查看 Apple AI 建议详情', hidden: true }));
+    closeSignalDetailsDrawer();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '查看 Apple AI 建议详情' }));
 
     const dialog = await screen.findByRole('dialog', { name: '信号详情' });
     expect(await within(dialog).findByText('Second analysis signal')).toBeInTheDocument();
@@ -3037,7 +3047,9 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
     await screen.findByRole('dialog', { name: '信号详情' });
-    fireEvent.click(screen.getByRole('button', { name: '查看 Apple AI 建议详情', hidden: true }));
+    closeSignalDetailsDrawer();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '查看 Apple AI 建议详情' }));
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('8'));
 
     act(() => window.history.back());
@@ -3049,12 +3061,172 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
   it('reopens the selected signal from the context chip without changing identity', async () => {
     renderPage();
     fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
-    const chip = await screen.findByTestId('decision-signal-context-chip');
+    await screen.findByRole('dialog', { name: '信号详情' });
+    closeSignalDetailsDrawer();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+    const chip = screen.getByTestId('decision-signal-context-chip');
     expect(chip).toHaveAttribute('data-selected-signal-id', '7');
-    fireEvent.click(within(chip).getByRole('button', { hidden: true }));
-    expect(await screen.findByRole('dialog', { name: '信号详情' })).toBeInTheDocument();
+    const chipButton = within(chip).getByRole('button', { name: '打开 600519 贵州茅台 的详情' });
+    expect(chipButton).not.toHaveAttribute('aria-hidden', 'true');
+    fireEvent.click(chipButton);
+    const dialog = await screen.findByRole('dialog', { name: '信号详情' });
+    expect(within(dialog).getByText('趋势保持')).toBeInTheDocument();
     expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
     expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
+  });
+
+  it('restores the next selectedSignalId on browser forward after back', async () => {
+    const sibling = makeSignal({
+      id: 8,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+      sourceType: 'analysis',
+      reason: 'Second analysis signal',
+    });
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([signal, sibling], 2));
+    vi.mocked(decisionSignalsApi.getFeedback).mockImplementation(async (signalId: number) => ({
+      ...emptyFeedback,
+      signalId,
+    }));
+    vi.mocked(decisionSignalsApi.getMemoryFlag).mockImplementation(async (signalId: number) => ({
+      signalId,
+      memorable: false,
+      ignored: false,
+    }));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    await screen.findByRole('dialog', { name: '信号详情' });
+    closeSignalDetailsDrawer();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button', { name: '查看 Apple AI 建议详情' }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('8'));
+
+    act(() => window.history.back());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('7'));
+    act(() => window.history.forward());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('8'));
+    expect(await screen.findByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('Second analysis signal')).toBeInTheDocument();
+  });
+
+  it('keeps a latest-owned selectedSignalId while latest refresh is in flight and after it returns the same id', async () => {
+    const latestSignal = makeSignal({
+      id: 8,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+      riskSummary: 'Latest owned risk',
+    });
+    const refreshedLatest = { ...latestSignal, riskSummary: 'Latest refreshed risk' };
+    const pendingLatest = createDeferred<DecisionSignalListResponse>();
+    vi.mocked(decisionSignalsApi.getLatest)
+      .mockResolvedValueOnce(listResponse([latestSignal]))
+      .mockReturnValueOnce(pendingLatest.promise);
+    renderPage();
+    await screen.findByText('贵州茅台');
+    submitCurrentStock('AAPL');
+    fireEvent.click(await screen.findByRole('button', { name: '查看 Apple AI 建议详情' }));
+    expect(within(await screen.findByRole('dialog')).getByText('Latest owned risk')).toBeInTheDocument();
+    closeSignalDetailsDrawer();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+
+    submitCurrentStock('AAPL');
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
+    expect(within(screen.getByTestId('decision-signal-context-chip')).getByRole('button', { name: '打开 AAPL Apple 的详情' })).toBeInTheDocument();
+
+    await act(async () => {
+      pendingLatest.resolve(listResponse([refreshedLatest]));
+    });
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
+    fireEvent.click(within(screen.getByTestId('decision-signal-context-chip')).getByRole('button', { name: '打开 AAPL Apple 的详情' }));
+    expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('Latest refreshed risk')).toBeInTheDocument();
+  });
+
+  it('does not let a latest refresh overwrite a newer list-owned selection', async () => {
+    const latestSignal = makeSignal({
+      id: 8,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+      riskSummary: 'Latest lookup risk',
+    });
+    const pendingLatest = createDeferred<DecisionSignalListResponse>();
+    vi.mocked(decisionSignalsApi.getLatest)
+      .mockResolvedValueOnce(listResponse([latestSignal]))
+      .mockReturnValueOnce(pendingLatest.promise);
+    renderPage();
+    await screen.findByText('贵州茅台');
+    submitCurrentStock('AAPL');
+    fireEvent.click(await screen.findByRole('button', { name: '查看 Apple AI 建议详情' }));
+    closeSignalDetailsDrawer();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+
+    submitCurrentStock('AAPL');
+    openSignalsView('全部信号');
+    fireEvent.click(screen.getByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('7'));
+
+    await act(async () => {
+      pendingLatest.resolve(listResponse([latestSignal]));
+    });
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
+    expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('趋势保持')).toBeInTheDocument();
+  });
+
+  it('keeps a timeline-owned selectedSignalId across timeline refresh', async () => {
+    const timelineSignal = makeSignal({
+      id: 8,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+      riskSummary: 'Timeline owned risk',
+    });
+    const pendingTimeline = createDeferred<DecisionSignalListResponse>();
+    vi.mocked(decisionSignalsApi.list)
+      .mockResolvedValueOnce(listResponse())
+      .mockResolvedValueOnce(listResponse([timelineSignal], 1))
+      .mockReturnValueOnce(pendingTimeline.promise);
+    renderPage();
+    await screen.findByText('贵州茅台');
+    submitCurrentStock('AAPL');
+    openSignalsView('股票信号时间线');
+    fireEvent.click(await screen.findByTestId('timeline-click-8'));
+    expect(within(await screen.findByRole('dialog')).getByText('Timeline owned risk')).toBeInTheDocument();
+    closeSignalDetailsDrawer();
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: '查询时间线' }));
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
+
+    await act(async () => {
+      pendingTimeline.resolve(listResponse([timelineSignal], 1));
+    });
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
+  });
+
+  it('updates ?signal= to the persisted id without restoring the previous pending id', async () => {
+    let persisted = false;
+    vi.mocked(decisionSignalsApi.reassess).mockImplementation(async (request) => {
+      if (!request.persist) return persistableReassessResponse;
+      persisted = true;
+      return persistedReassessResponse;
+    });
+    vi.mocked(decisionSignalsApi.list).mockImplementation(async () => (
+      listResponse(persisted ? [persistedReassessItem, signal] : [signal])
+    ));
+    renderPage();
+    await persistReassessFromFirstSignal();
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('88'));
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '88');
+    expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('已保存为新的 DecisionSignal #88。')).toBeInTheDocument();
   });
 
   it('opens a deep-linked signal by id when it is not in the loaded list page', async () => {
