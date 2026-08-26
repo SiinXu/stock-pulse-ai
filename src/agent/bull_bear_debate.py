@@ -34,6 +34,7 @@ from src.agent.protocols import (
 )
 from src.agent.public_contract import AGENT_EXECUTION_FAILURE_MESSAGE, sanitize_agent_diagnostic
 from src.agent.runtime_facts import DegradationBoundary
+from src.agent.skills.router import skill_instructions_for_run as _skill_instructions_for_run
 from src.agent.stream_events import stream_event
 from src.utils.sanitize import log_safe_exception
 
@@ -376,7 +377,7 @@ def maybe_insert_before_decision(
         BoundedBullBearDebateAgent(
             tool_registry=pipeline._tool_registry_for_context(ctx),
             llm_adapter=pipeline.llm_adapter,
-            skill_instructions=pipeline.skill_instructions,
+            skill_instructions=_skill_instructions_for_run(pipeline, ctx),
             technical_skill_policy=pipeline.technical_skill_policy,
             config=pipeline.config,
             debate_config=pipeline.config,

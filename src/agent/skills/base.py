@@ -15,7 +15,7 @@ import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Sequence, Union
 
 from src.utils.sanitize import log_safe_exception
 
@@ -443,8 +443,19 @@ class SkillManager:
         activated = [s.name for s in self._skills.values() if s.enabled]
         logger.info(f"Activated skills: {activated}")
 
-    def get_skill_instructions(self) -> str:
-        active = self.list_active_skills()
+    def get_skill_instructions(
+        self,
+        skill_ids: Optional[Sequence[str]] = None,
+    ) -> str:
+        if skill_ids is None:
+            active = self.list_active_skills()
+        else:
+            catalog = {skill.name: skill for skill in self.list_skills()}
+            active = [
+                catalog[skill_id]
+                for skill_id in skill_ids
+                if isinstance(skill_id, str) and skill_id in catalog
+            ]
         if not active:
             return ""
 

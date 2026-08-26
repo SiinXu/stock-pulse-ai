@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "05f9db232a9675cfd3e357252de1727250e5e93dcb009bf254203da9475f66fb"
+    "13880e5ca058da04b82edf4c9a58833a0e3785ec8c5b26c971df3d8b90e0901b"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "3abca8e17972655fbf7ad84421b42b24b12db1f6772978e414aa29e99b44dd2a"
+    "5fdfaf4354bc8b2e316c3271ffc9075018d50cda9ce73c7dbdeb748b6a1873ce"
 )
 
 
@@ -104,8 +104,8 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for AGENT_ONLINE_ADAPTERS_ENABLED description
-    # after BaseAgent gated confidence apply (Issue #1091).
+    # Combined live snapshot: #1518 AGENT_SKILL_RETRIEVAL_K plus #1513
+    # Local Only Mode copy/registry description (Refs #1123 / #218).
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

@@ -19,6 +19,7 @@ from src.agent.public_contract import AGENT_EXECUTION_FAILURE_MESSAGE
 from src.agent.soul import (
     propagate_agent_soul_composition as _propagate_agent_soul_composition,
 )
+from src.agent.skills.router import skill_instructions_for_run as _skill_instructions_for_run
 from src.agent.stream_events import stream_event
 from src.utils.sanitize import log_safe_exception
 
@@ -207,7 +208,10 @@ class _CriticRevisionRunner:
                     self.orchestrator._tool_registry_for_context(self.ctx)
                 ),
                 llm_adapter=self.orchestrator.llm_adapter,
-                skill_instructions=self.orchestrator.skill_instructions,
+                skill_instructions=_skill_instructions_for_run(
+                    self.orchestrator,
+                    self.ctx,
+                ),
                 technical_skill_policy=(
                     self.orchestrator.technical_skill_policy
                 ),

@@ -227,6 +227,7 @@ const AGENT_GROUPS: CategoryFieldGroup[] = [
       'AGENT_SKILL_DIR',
       'AGENT_SKILL_AUTOWEIGHT',
       'AGENT_SKILL_ROUTING',
+      'AGENT_SKILL_RETRIEVAL_K',
     ],
   },
   {
