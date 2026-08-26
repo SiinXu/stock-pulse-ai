@@ -18,7 +18,7 @@ request/context before dispatch, so a call for another symbol fails closed.
 The tool registers only when all three gates pass:
 
 1. `KRONOS_ENABLED=true`.
-2. Every package in `requirements-kronos.txt` imports successfully.
+2. Every package in `requirements/kronos.txt` imports successfully.
 3. `KRONOS_WEIGHTS_DIR` contains the selected official model and its matching
    tokenizer: both configs match the pinned architecture, both safetensors
    containers are structurally valid, and the official local-only loaders can
@@ -53,7 +53,7 @@ exact Kronos dependency set:
 
 ```bash
 python -m pip install --upgrade --constraint constraints.txt pip
-python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-kronos.txt
+python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements/kronos.txt
 python -m pip check
 ```
 

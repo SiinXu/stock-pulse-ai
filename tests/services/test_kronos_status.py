@@ -30,7 +30,7 @@ def test_status_disabled_has_actionable_next_step() -> None:
     assert report.reason == "disabled"
     assert report.dependencies_installed is False
     assert "KRONOS_ENABLED" in report.next_step
-    assert "requirements-kronos" in report.next_step
+    assert "requirements/kronos.txt" in report.next_step
     assert report.install_supported is True
     assert report.packaged_desktop is False
 
@@ -47,7 +47,7 @@ def test_status_reports_missing_dependencies_with_install_command(tmp_path) -> N
     assert report.dependencies_installed is False
     assert any(not item.available and item.name == "torch" for item in report.dependencies)
     assert KRONOS_INSTALL_COMMAND in report.message
-    assert "requirements-kronos" in report.next_step
+    assert "requirements/kronos.txt" in report.next_step
 
 
 def test_status_reports_weights_missing(tmp_path) -> None:

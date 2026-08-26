@@ -32,7 +32,7 @@ name uniqueness.
 - Cross-runtime tests compare every Unicode code point and retain named
   regressions on both sides of the pinned version boundary.
 - The Unicode source, digest, and license remain recorded with the generated
-  data and in `THIRD_PARTY_NOTICES`.
+  data and in `docs/legal/THIRD_PARTY_NOTICES`.
 - Upgrading Unicode is an explicit contract change. It must update both tables,
   constants, provenance, documentation, and regressions in one reviewed change.
 

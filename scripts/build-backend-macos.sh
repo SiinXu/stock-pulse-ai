@@ -36,7 +36,7 @@ log "Verifying static asset references (source)..."
 log "Installing reproducible desktop backend dependencies..."
 pushd "${ROOT_DIR}" >/dev/null
 "${PYTHON_BIN}" -m pip install --upgrade --constraint constraints.txt pip
-"${PYTHON_BIN}" -m pip install --build-constraint build-constraints.txt -r requirements-desktop.txt
+"${PYTHON_BIN}" -m pip install --build-constraint build-constraints.txt -r requirements/desktop.txt
 "${PYTHON_BIN}" -m pip install --build-constraint build-constraints.txt -e . --no-deps
 "${PYTHON_BIN}" -m pip check
 popd >/dev/null

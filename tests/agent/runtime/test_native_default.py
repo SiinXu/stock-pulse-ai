@@ -21,7 +21,7 @@ from src.agent.runtime.pydantic_ai_adapter import PydanticAIRuntimeAdapter
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[3]
 _REINSTATED_EXPERIMENTAL_ASSETS = (
-    "requirements-pydanticai.txt",
+    "requirements/pydanticai.txt",
     "src/agent/runtime/pydantic_ai_adapter.py",
     "src/agent/runtime/pydantic_ai_toolset.py",
 )
@@ -58,7 +58,7 @@ def test_experimental_runtime_asset_is_present(relative_path):
 
 def test_default_dependency_manifests_do_not_include_pydantic_ai():
     # Continue Experimental constraint: the default install must keep working
-    # with zero PydanticAI dependency; only requirements-pydanticai.txt may
+    # with zero PydanticAI dependency; only requirements/pydanticai.txt may
     # reference it.
     manifests = (
         _REPOSITORY_ROOT / "requirements.txt",
@@ -92,7 +92,7 @@ def test_experimental_runtime_is_explicit_test_evidence_construction_only():
 
 
 def test_optional_dependency_closure_is_complete_and_exactly_pinned():
-    manifest = _REPOSITORY_ROOT / "requirements-pydanticai.txt"
+    manifest = _REPOSITORY_ROOT / "requirements/pydanticai.txt"
     pins = {}
     for raw_line in manifest.read_text(encoding="utf-8").splitlines():
         requirement = raw_line.split("#", 1)[0].strip()

@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "Ne télécharge jamais les poids automatiquement depuis l’UI web. Voir docs/kronos-local-model.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "Outil Agent optionnel de prévision de bougies Kronos local (pas un LLM de chat).",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Activer la prévision locale Kronos",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Installer requirements-kronos.txt, télécharger les poids via scripts/download_kronos_weights.py, définir KRONOS_WEIGHTS_DIR, activer et redémarrer. Vérifier dans Modèles locaux.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Installer requirements/kronos.txt, télécharger les poids via scripts/download_kronos_weights.py, définir KRONOS_WEIGHTS_DIR, activer et redémarrer. Vérifier dans Modèles locaux.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "false par défaut ; l’analyse continue sans Kronos s’il est désactivé ou non prêt.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "Un redémarrage est requis après activation pour enregistrer l’outil.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "Les paquets bureau précompilés ne prennent pas en charge Kronos.",
