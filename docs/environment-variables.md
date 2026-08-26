@@ -138,7 +138,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_MODE_BUDGET_MAX_COST_USD` | `0` | 是 | 模板中注释 |
 | `AGENT_MODE_BUDGET_MAX_LLM_TURNS` | `0` | 是 | 模板中注释 |
 | `AGENT_MODE_BUDGET_MAX_TOKENS` | `0` | 是 | 模板中注释 |
-| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释 |
+| `AGENT_MODE_BUDGET_MAX_TOOL_CALLS` | `0` | 是 | 模板中注释; LLM-turn cap includes optional end-of-run reflection and in-process post-mortem calls |
 | `AGENT_MULTI_STRATEGY_DELIBERATION` | `false` | 是 | 模板中注释; Multi-strategy deliberation cluster (default off) |
 | `AGENT_NL_ROUTING` | `false` | 是 | 模板中注释; Route high-confidence stock-related bot messages to the Agent without an explicit command (default false). |
 | `AGENT_OBSERVABILITY_DEEP_PAYLOAD` | `false` | 是 | 模板中注释 |
@@ -161,6 +161,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_POSTMORTEM_ENABLED` | `false` | 是 | 模板中注释; Resolved-forecast post-mortem (default off) |
 | `AGENT_POSTMORTEM_LLM_BUDGET` | `8` | 是 | 模板中注释 |
 | `AGENT_POSTMORTEM_SKIP_CLEAN_HITS` | `true` | 是 | 模板中注释 |
+| `AGENT_RED_TEAM_ENABLED` | `false` | 是 | 模板中注释; Optional adversarial red-team second opinion after Decision (default off, Issue #1135) |
 | `AGENT_REFLECTION_ENABLED` | `false` | 是 | 模板中注释; Run-local reflection loop (default off) |
 | `AGENT_REFLECTION_LLM_BUDGET` | `1` | 是 | 模板中注释 |
 | `AGENT_REFLECTION_MAX_REVISE` | `1` | 是 | 模板中注释 |

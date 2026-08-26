@@ -224,6 +224,7 @@ def build_repro_snapshot(
             "agent_arch": getattr(config, "agent_arch", None),
             "agent_orchestrator_mode": getattr(config, "agent_orchestrator_mode", None),
             "agent_critic_enabled": bool(getattr(config, "agent_critic_enabled", False)),
+            "agent_red_team_enabled": bool(getattr(config, "agent_red_team_enabled", False)),
             "agent_multi_strategy_deliberation": bool(
                 getattr(config, "agent_multi_strategy_deliberation", False)
             ),

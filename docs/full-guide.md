@@ -1991,6 +1991,10 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 
 成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
 
+### 对抗性红队二审
+
+`AGENT_RED_TEAM_ENABLED=false`（默认）保持现有行为。设为 `true` 时，仅 Native Multi 的非 Chat `full` / `specialist` 分析在 `DecisionAgent` **完成之后**增加一次无工具 LLM 对抗二审。`quick` / `standard` 默认不跑；Chat 永不跑。产物写入独立的 `dashboard.red_team`（`challenges` / `missing_evidence` / `suggested_confidence_pressure`），并确定性追加到 `phase_decision.data_limitations` 与 `risk_warning`。`data_limitations` 合并策略为先保留已有主决策限制（原顺序、最多 12 条），再对红队条目去重并只填入剩余槽位；溢出留在 `dashboard.red_team`（含 `data_limitations_merge`），**禁止**为红队条目驱逐、重排或替换主决策对象。**禁止**改写 `decision_type` / `confidence_level` / `operation_advice`，也不会把红队文本喂回 DecisionAgent。标准/研究 Markdown 与通知/历史报告以加性章节展示；brief 省略。硬上限 1 次 LLM turn，受剩余 `AGENT_ORCHESTRATOR_TIMEOUT_S` 与每模式 hard budget 约束；不足则 `budget_skip` / `data_unavailable`，主决策仍成功，且不会伪造 challenges。该阶段不是 Bull-Bear 辩论（#117）或 Risk veto。回滚：关闭或删除 `AGENT_RED_TEAM_ENABLED`。
+
 ### 结构化多空辩论
 
 `DEBATE_ENABLED=false`（默认）保持现有行为。设为 `true` 时，仅 Native Multi 的非 Chat 分析在 Decision 前增加可选 Bull-Bear 结构化辩论（1–3 轮多方/空方立场 + 交锋点 + 非权威合成）。辩论结果写入 `dashboard.bull_bear_debate`、Markdown/WeChat 报告与 DecisionSignal metadata（`debate_summary`/`debate_rounds`），不得静默丢弃。受 `DEBATE_MAX_ROUNDS` 轮次上限、每轮 LLM turn 预算与 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余墙钟预算约束；与分歧记录契约对齐（`source=debate` 交锋点，不使用多数表决）。`DEBATE_MODEL` 非空时由每次辩论调用直接消费该 LiteLLM 模型路由；API/请求上下文可覆盖 `enable_debate`、`debate_max_rounds`。provider 失败或没有完成任何双边轮次时，产物明确记录 `data_unavailable`，不生成 `hold` 意见、伪造合成或把不可用当命中。回滚：关闭或删除 `DEBATE_ENABLED`。

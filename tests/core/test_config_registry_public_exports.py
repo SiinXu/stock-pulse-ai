@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "13880e5ca058da04b82edf4c9a58833a0e3785ec8c5b26c971df3d8b90e0901b"
+    "237ed83d7b6511a306ae2e23d093b2ef162c0d2b3bae8ea4de461529cb27a9fd"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "0a5fbd22e5a6de6c4c50e967d18d071a9a3e699e6ca8aadfe7f75b2f958a3292"
+    "05b522ef4ce72ab710ab76efa76c6a29c94f87201434195007e2f8357d2de487"
 )
 
 
@@ -106,9 +106,10 @@ def test_config_registry_module_annotations_are_stable():
 def test_config_registry_contract_snapshot_is_stable():
     # Combined live snapshot after merging current main: #1518 skill-retrieval
     # key, #1513 Local Only Mode copy/registry description, Lane E
-    # OCR/Kronos extras-path description rewrites, and #1118
-    # LAYERED_MEMORY_COLLECTION_ENABLED durable-store copy. Keys digest
-    # unchanged.
+    # OCR/Kronos extras-path description rewrites, #1118
+    # LAYERED_MEMORY_COLLECTION_ENABLED durable-store copy, and #1135
+    # AGENT_RED_TEAM_ENABLED. Keys digest unchanged from the red-team
+    # snapshot (`237ed83d…`).
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

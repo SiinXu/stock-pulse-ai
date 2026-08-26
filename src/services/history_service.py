@@ -19,7 +19,6 @@ from src.config import resolve_news_window_days
 from src.data.stock_index_loader import resolve_index_stock_code
 from src.repositories.analysis_repo import AnalysisRepository
 from src.report_language import (
-    append_bull_bear_debate_lines,
     append_committee_deliberation_lines,
     append_multi_model_comparison_lines,
     get_bias_status_emoji,
@@ -35,7 +34,7 @@ from src.report_language import (
 )
 from src.storage import DatabaseManager
 from src.services.run_diagnostics import build_run_diagnostic_summary
-from src.services.history_report_sections import append_strategy_synthesis_lines
+from src.services.history_report_sections import append_strategy_synthesis_lines, append_debate_and_red_team_lines
 from src.market.phase_summary import (
     extract_market_phase_summary,
     rebuild_market_phase_summary_for_stock_code,
@@ -1404,7 +1403,7 @@ class HistoryService:
         )
 
         append_multi_model_comparison_lines(report_lines, dashboard, labels, report_language)
-        append_bull_bear_debate_lines(report_lines, dashboard, labels)
+        append_debate_and_red_team_lines(report_lines, dashboard, labels)
         committee = dashboard.get("committee_deliberation") if dashboard else None
         append_committee_deliberation_lines(report_lines, committee, labels, report_language)
 

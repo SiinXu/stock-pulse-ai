@@ -125,6 +125,9 @@ const getVendorChunkName = (id: string): string | undefined => {
   if (normalizedId.endsWith('/src/locales/skillRetrievalSettingsHelp.ts')) {
     return 'CredentialInput'
   }
+  if (normalizedId.endsWith('/src/locales/redTeamSettingsHelp.ts')) {
+    return 'CredentialInput'
+  }
   if (normalizedId.endsWith('/src/i18n/dataProviderRuntimeTranslations.ts')) {
     return 'settings-data-provider'
   }

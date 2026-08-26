@@ -4,6 +4,10 @@ import type { SystemConfigCategory } from '../types/systemConfig';
 import type { UiLanguage } from '../i18n/uiText';
 import { REFLECTION_FIELD_TITLE_MAP_EN, REFLECTION_FIELD_TITLE_MAP_ZH } from '../i18n/reflectionSettingsCopy';
 import {
+  getRedTeamFieldTitle,
+  RED_TEAM_FIELD_DESCRIPTION,
+} from '../locales/redTeamSettingsHelp';
+import {
   getSkillRetrievalFieldTitle,
   SKILL_RETRIEVAL_FIELD_DESCRIPTION,
 } from '../locales/skillRetrievalSettingsHelp';
@@ -1307,6 +1311,7 @@ const fieldDescriptionMap: Record<string, string> = {
   DECISION_PROFILE_CALIBRATION_ENABLED: '默认关闭。开启后在决策信号后验统计中追加决策风格校准分组；关闭时响应保持兼容，不改变评估与持久化。',
   PREDICTION_EXTRACT_ENABLED: '默认关闭。开启后从结构化决策字段抽取 PredictionRecord 草稿（研究/质量运营）；散文不会变成可验证声明，失败不阻断分析。',
   AGENT_CRITIC_ENABLED: '在 Native Multi 的 Decision 前启用一次无工具 Critic；仅可消耗一次全局预算重试已进入的 intelligence 或目录内 skill 阶段。',
+  ...RED_TEAM_FIELD_DESCRIPTION,
   MARKET_REGIME_ENABLED: '启用可解释的规则型市场状态识别和自适应分析重点；证据不足时返回 unknown，不强行判断方向。',
   MARKET_REGIME_OVERRIDE: '可选的市场状态强制值；留空时使用自动规则识别，仅建议在诊断时设置。',
   DEBATE_ENABLED: '可选的 Decision 前 Bull vs Bear 结构化辩论（默认关闭，仅 Native Multi 非 Chat）。',
@@ -1657,6 +1662,9 @@ export function getFieldTitle(
 ): string {
   if (key === 'AGENT_SKILL_RETRIEVAL_K') {
     return getSkillRetrievalFieldTitle(locale);
+  }
+  if (key === 'AGENT_RED_TEAM_ENABLED') {
+    return getRedTeamFieldTitle(locale);
   }
   return fieldTitleMaps[locale][key] || fallback || key;
 }

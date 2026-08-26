@@ -45,6 +45,7 @@ from src.notification_parts.noise import (
 )
 from src.report_language import (
     append_committee_deliberation_lines as _append_committee_deliberation_lines,
+    format_red_team_limitations_overflow_note as _format_red_team_limitations_overflow_note,
     format_strategy_skill_items,
     get_localized_stock_name,
     get_report_labels,
@@ -767,6 +768,34 @@ class NotificationBuilder:
 
 
 # Convenient function
+
+def _append_red_team_block(lines: List[str], payload: Any, labels: Dict[str, str]) -> None:
+    if not isinstance(payload, dict) or not payload.get("enabled"):
+        return
+    lines.extend([
+        f"### 🛡️ {labels.get('red_team_heading', 'Red-Team Second Opinion')}",
+        (
+            f"- {labels.get('red_team_status_label', 'Review status')}: {payload.get('status')} | "
+            f"{labels.get('red_team_pressure_label', 'Suggested confidence pressure')}: "
+            f"{payload.get('suggested_confidence_pressure') or 'none'}"
+        ),
+    ])
+    if payload.get("counter_thesis"):
+        lines.append(
+            f"- {labels.get('red_team_counter_thesis_label', 'Independent counter-thesis')}: "
+            f"{payload.get('counter_thesis')}"
+        )
+    for item in (payload.get("challenges") or [])[:3]:
+        if not isinstance(item, dict):
+            continue
+        claim = item.get("claim") or ""
+        if claim:
+            lines.append(f"- [{item.get('severity') or 'medium'}] {claim}")
+    overflow_note = _format_red_team_limitations_overflow_note(payload, labels)
+    if overflow_note:
+        lines.append(f"- {overflow_note}")
+    lines.append(f"- {labels.get('red_team_no_replace_note', 'Red-team review does not replace the primary decision object.')}")
+
 
 def _append_bull_bear_debate_block(lines: List[str], debate: Any, labels: Dict[str, str], report_language: str) -> None:
     if not isinstance(debate, dict) or not debate.get("enabled"):

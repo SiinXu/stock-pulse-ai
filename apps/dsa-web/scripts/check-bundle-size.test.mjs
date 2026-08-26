@@ -160,7 +160,10 @@ describe('bundle size checker', () => {
     const root = createOutput();
     writeFileSync(
       path.join(root, 'assets', 'CredentialInput-hash.js'),
-      'How many catalog skills automatic SkillRouter may retrieve by description\n',
+      [
+        'How many catalog skills automatic SkillRouter may retrieve by description',
+        'Run one tool-free post-Decision red-team review on Native Multi full/specialist analysis.',
+      ].join('\n'),
     );
     writeFileSync(
       path.join(root, 'assets', 'SettingsPage-hash.js'),
@@ -171,6 +174,25 @@ describe('bundle size checker', () => {
     const result = runChecker(budgetPath);
 
     expect(result.status).toBe(0);
+  });
+
+  it('fails when red-team help leaks into the SettingsPage family', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'CredentialInput-hash.js'),
+      'How many catalog skills automatic SkillRouter may retrieve by description\n',
+    );
+    writeFileSync(
+      path.join(root, 'assets', 'SettingsPage-hash.js'),
+      'Run one tool-free post-Decision red-team review on Native Multi full/specialist analysis.\n',
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Red-team help leaked');
+    expect(result.stderr).toContain('SettingsPage-hash.js');
   });
 
   it('fails when SettingsPage exists but the isolated help payload is missing', () => {

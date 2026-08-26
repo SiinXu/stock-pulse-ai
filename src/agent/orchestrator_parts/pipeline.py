@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent import bull_bear_debate as _debate
 from src.agent import critic as _critic
+from src.agent.orchestrator_parts import red_team as _red_team
 from src.agent.chat_context import build_agent_chat_tool_registry
 from src.agent.disagreement import build_agent_disagreement_summary
 from src.agent.orchestrator_parts import disagreement as _disagreement
@@ -216,6 +217,8 @@ class _PipelineMethods:
                 and index > 0
                 and remaining_budget < stage_min_budget_s
             )
+            if _red_team.maybe_skip_current_agent(self, agents, index, ctx, stats, timeout_s, remaining_budget, stage_min_budget_s, progress_callback):
+                continue
             if timeout_exhausted:
                 log_runtime_guard_event(
                     logger,
@@ -405,7 +408,7 @@ class _PipelineMethods:
                     agents.insert(index, critic_agent)
                     continue
 
-            if _debate.maybe_insert_before_decision(
+            if _red_team.maybe_insert_review_stages(
                 self, agents, index, ctx, stats, timeout_s, remaining_budget, _OPTIONAL_STAGE_REQUIRED_S, progress_callback):
                 continue
 
@@ -586,7 +589,7 @@ class _PipelineMethods:
                 ):
                     critic_trace = _critic.finalize_convergence(ctx)
                 result.meta["critic"] = _critic.trace_event_fields(critic_trace)
-            _debate.commit_pipeline_stage_result(ctx, result, stage_name)
+            _red_team.commit_pipeline_stage_result(ctx, result, stage_name)
             stats.record_stage(result)
             all_tool_calls.extend(
                 tc for tc in (result.meta.get("tool_calls_log") or [])
@@ -1555,8 +1558,4 @@ class _PipelineMethods:
 
     def _is_non_critical_stage(self, agent_name: str) -> bool:
         """Return whether a failed stage should degrade instead of aborting."""
-        normalized_name = str(agent_name or "").strip()
-        return (
-            normalized_name in NON_CRITICAL_BASE_STAGES
-            or normalized_name in getattr(self, "_skill_agent_names", set())
-        )
+        return _red_team.is_non_critical_pipeline_stage(agent_name, NON_CRITICAL_BASE_STAGES, getattr(self, "_skill_agent_names", set()))

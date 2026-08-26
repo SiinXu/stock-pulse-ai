@@ -96,6 +96,21 @@ def test_greedy_partition_isolates_a_dominant_module() -> None:
     assert sorted(flat) == sorted(files)
 
 
+# Frozen equal-weight inventory for the empty-duration shard-1 timeout.
+# Keys are literals; they are not derived from discover_test_files() or
+# load_durations(). Live inventory stays in the discovery and coverage tests.
+_EMPTY_DURATION_HOTSPOT_FILES = (
+    "tests/test_a.py",
+    "tests/test_aa.py",
+    "tests/test_b.py",
+    "tests/test_broad_exception_guard.py",
+    "tests/test_c.py",
+    "tests/test_d.py",
+    "tests/test_e.py",
+    "tests/test_exception_log_callsite_guard.py",
+)
+
+
 def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
     """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment."""
 
@@ -104,6 +119,32 @@ def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
     assert _EMPTY_DURATION_HOTSPOT in shard_one
     assert _EMPTY_DURATION_SIBLING in shard_one
     assert len(groups[0]) > 1
+
+
+def test_empty_duration_red_team_unknown_file_shifts_frozen_hotspot() -> None:
+    """Equal 1.0 weights colocate the 32963128085 shard-1 timeout hotspots.
+
+    A one-unit first-shard offset is enough for this frozen inventory: the
+    first three modules fill shards 2-4, then the named hotspots land on
+    shard 1 together. An alphabetically earlier extra file is the
+    deterministic shift proof (PR #1527 ``tests/agent/test_red_team.py``).
+    """
+
+    files = list(_EMPTY_DURATION_HOTSPOT_FILES)
+    groups, _totals = partition_test_files(
+        files, {}, splits=4, initial_totals=[1.0, 0.0, 0.0, 0.0]
+    )
+    shard_one = set(groups[0])
+    assert "tests/test_exception_log_callsite_guard.py" in shard_one
+    assert "tests/test_broad_exception_guard.py" in shard_one
+
+    shifted_groups, _shifted_totals = partition_test_files(
+        [*files, "tests/agent/test_unknown_new.py"],
+        {},
+        splits=4,
+        initial_totals=[1.0, 0.0, 0.0, 0.0],
+    )
+    assert "tests/test_exception_log_callsite_guard.py" not in set(shifted_groups[0])
 
 
 def test_empty_duration_refresh_inventory_does_not_change_frozen_reconstruction() -> None:
