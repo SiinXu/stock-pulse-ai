@@ -11,8 +11,6 @@ modules receive a median fallback weight so partitioning remains deterministic.
 An empty durations map is valid JSON but equal 1.0 weights are *not* balanced:
 hosted main run 32963128085 attempt 3 cancelled backend-tests shard 1 at the
 30-minute job bound after colocating ``test_exception_log_callsite_guard``.
-That empty-map counterexample is locked to the committed duration snapshot so
-later unknown modules (median fallback) cannot shift shard membership.
 """
 
 from __future__ import annotations

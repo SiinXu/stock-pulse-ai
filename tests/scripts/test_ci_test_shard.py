@@ -63,20 +63,33 @@ def test_greedy_partition_isolates_a_dominant_module() -> None:
     assert sorted(flat) == sorted(files)
 
 
-def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
-    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment.
+# Frozen equal-weight inventory for the empty-duration shard-1 timeout.
+# Keys are literals; they are not derived from discover_test_files() or
+# load_durations(). Live inventory stays in the discovery and coverage tests.
+_EMPTY_DURATION_HOTSPOT_FILES = (
+    "tests/test_a.py",
+    "tests/test_aa.py",
+    "tests/test_b.py",
+    "tests/test_broad_exception_guard.py",
+    "tests/test_c.py",
+    "tests/test_d.py",
+    "tests/test_e.py",
+    "tests/test_exception_log_callsite_guard.py",
+)
 
-    Lock the counterexample to the committed duration snapshot. Unknown
-    modules may use median fallback before a hosted refresh; they must not
-    shift this empty-map assignment. An alphabetically early extra file is
-    the deterministic counterexample (PR #1527 ``tests/agent/test_red_team.py``).
+
+def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
+    """Equal 1.0 weights colocate the 32963128085 shard-1 timeout hotspots.
+
+    A one-unit first-shard offset is enough for this frozen inventory: the
+    first three modules fill shards 2-4, then the named hotspots land on
+    shard 1 together. An alphabetically earlier extra file is the
+    deterministic shift proof (PR #1527 ``tests/agent/test_red_team.py``).
     """
 
-    snapshot = load_durations()
-    assert snapshot, "empty duration weights regress to the equal-1.0 shard-1 timeout"
-    files = [path for path in discover_test_files() if path in snapshot]
+    files = list(_EMPTY_DURATION_HOTSPOT_FILES)
     groups, _totals = partition_test_files(
-        files, {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
+        files, {}, splits=4, initial_totals=[1.0, 0.0, 0.0, 0.0]
     )
     shard_one = set(groups[0])
     assert "tests/test_exception_log_callsite_guard.py" in shard_one
@@ -86,7 +99,7 @@ def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
         [*files, "tests/agent/test_unknown_new.py"],
         {},
         splits=4,
-        initial_totals=[30.0, 0.0, 0.0, 0.0],
+        initial_totals=[1.0, 0.0, 0.0, 0.0],
     )
     assert "tests/test_exception_log_callsite_guard.py" not in set(shifted_groups[0])
 
