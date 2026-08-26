@@ -739,27 +739,35 @@ python -m pip check
 
 ```bash
 # Kronos 本地推理 Agent Tool（见 docs/kronos-agent-tool.md）
-# （requirements-kronos.txt 内也嵌入了 -c constraints.txt）
+# （requirements/kronos.txt 内也嵌入了 -c constraints.txt）
 python -m pip install --constraint constraints.txt \
-  --build-constraint build-constraints.txt -r requirements-kronos.txt
+  --build-constraint build-constraints.txt -r requirements/kronos.txt
 
 # 桌面端打包工具链（含 pyinstaller；仍基于默认 requirements）
 python -m pip install --constraint constraints.txt \
-  --build-constraint build-constraints.txt -r requirements-desktop.txt
+  --build-constraint build-constraints.txt -r requirements/desktop.txt
 
 # 后端 CI / 本地开发工具（flake8、pytest、pip-audit、uv 等）
 python -m pip install --constraint constraints.txt \
   --build-constraint build-constraints.txt -r .github/requirements-ci.txt
 
 # 实验性 PydanticAI 运行时 POC（默认 Native 零依赖；勿并入默认安装）
-# 精确 pin 在 requirements-pydanticai.txt；仍须传入 constraints。
+# 精确 pin 在 requirements/pydanticai.txt；仍须传入 constraints。
 python -m pip install --constraint constraints.txt \
-  --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+  --build-constraint build-constraints.txt -r requirements/pydanticai.txt
+
+# 可选离线 OCR Agent Tool（还需系统 Tesseract；见 docs/agent-ocr-tool.md）
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r requirements/ocr.txt
+
+# 可选报告 PDF/HTML 导出（见 docs/report-export.md）
+python -m pip install --constraint constraints.txt \
+  --build-constraint build-constraints.txt -r requirements/report-export.txt
 
 python -m pip check
 ```
 
-`pyproject.toml` 中的 optional-dependencies 组名与上述 extras 对齐（`kronos` / `desktop` / `dev` / `pydanticai`；在 packaging metadata PR 合入后生效）。可复现安装仍优先使用对应的 `requirements-*.txt`（或 CI 文件）+ constraints，不要把无约束的 `pip install '.[extra]'` 当作 pin 路径；`pydanticai` 组在 metadata 中为**空哨兵**，实际包集合只在 `requirements-pydanticai.txt`。
+`pyproject.toml` 中的 optional-dependencies 组名与上述 extras 对齐（`kronos` / `desktop` / `dev` / `pydanticai`；在 packaging metadata PR 合入后生效）。可复现安装仍优先使用对应的 `requirements/*.txt`（或 CI 文件）+ constraints，不要把无约束的 `pip install '.[extra]'` 当作 pin 路径；`pydanticai` 组在 metadata 中为**空哨兵**，实际包集合只在 `requirements/pydanticai.txt`。
 
 #### Docker / CI 与本地差异
 
@@ -768,7 +776,7 @@ python -m pip check
 | 本地源码 | `requirements.txt` + `constraints.txt` + `build-constraints.txt` | 上表权威命令 |
 | Docker 镜像 | Dockerfile 内同样使用 `constraints.txt` / `build-constraints.txt` + `requirements.txt` | 镜像构建即冻结该提交的锁 |
 | GitHub Actions `backend-gate` 等 | `.github/requirements-ci.txt`（`-r` 包含 `requirements.txt`）+ 同一 constraints | CI 额外装测试/审计工具，不是另一套 pin 权威 |
-| 桌面打包 | `requirements-desktop.txt` | 在默认依赖上增加打包工具 |
+| 桌面打包 | `requirements/desktop.txt` | 在默认依赖上增加打包工具 |
 
 Windows PowerShell 若仍使用系统默认代码页，首次安装依赖或运行环境检查前建议先启用 UTF-8，避免第三方工具或终端输出在中文字符上失败：
 

@@ -124,7 +124,7 @@ After opening a PR, CI will automatically run the following PR checks:
 | `backend-gate` | PR: path-selective offline pytest; FULL mapping reuses the four `backend-tests` shards (required check name stays `backend-gate`); push-to-main: sharded full suite + coverage floor | ✅ |
 | `python-minimum` | PR: Python 3.10 import/schema smoke; push-to-main: sharded full offline suite on Python 3.10 (required check name stays `python-minimum`) | ✅ |
 | `pydanticai-installed` | Installs optional PydanticAI dependencies and runs experimental runtime tests with skips rejected | ✅ |
-| `ocr-stock-extractor` | Always concludes; for OCR / image stock-extractor path changes installs `requirements-ocr.txt` plus Tesseract and runs the existing extractor tests with skips rejected; otherwise records a no-OCR summary; fails closed when change detection is unavailable | ✅ |
+| `ocr-stock-extractor` | Always concludes; for OCR / image stock-extractor path changes installs `requirements/ocr.txt` plus Tesseract and runs the existing extractor tests with skips rejected; otherwise records a no-OCR summary; fails closed when change detection is unavailable | ✅ |
 | `docker-build` | Docker image build and key module import smoke test | ✅ |
 | `openapi-types-gate` | Regenerates the backend OpenAPI snapshot and Web TypeScript types and rejects checked-in artifact drift | ✅ |
 | `web-gate` | Always concludes; for Web changes runs `npm run lint` + `npm run test:i18n` + `npm run test:coverage`, then runtime performance budgets (blocking structural scenarios fail; observe warns; skip is unavailable), then `npm run build` and the bundle size budget; otherwise records a no-frontend summary; fails closed when change detection is unavailable | ✅ |
@@ -185,7 +185,7 @@ cd ../..
 
 # Optional OCR + image stock extractor (CI job ocr-stock-extractor)
 # Requires system Tesseract (`tesseract-ocr` + `tesseract-ocr-eng`)
-python -m pip install --build-constraint build-constraints.txt -r requirements-ocr.txt
+python -m pip install --build-constraint build-constraints.txt -r requirements/ocr.txt
 python -m pytest -m "not network" \
   tests/services/test_image_stock_extractor_litellm.py \
   tests/services/test_image_stock_extractor_contract.py \

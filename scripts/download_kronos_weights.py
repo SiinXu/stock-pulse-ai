@@ -12,7 +12,7 @@ Usage examples:
   python scripts/download_kronos_weights.py --help
   python scripts/download_kronos_weights.py --size mini --weights-dir ~/kronos --yes
 
-Requires optional packages from requirements-kronos.txt (huggingface_hub).
+Requires optional packages from requirements/kronos.txt (huggingface_hub).
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Install optional deps first:\n"
             "  python -m pip install --constraint constraints.txt "
-            "--build-constraint build-constraints.txt -r requirements-kronos.txt\n\n"
+            "--build-constraint build-constraints.txt -r requirements/kronos.txt\n\n"
             "Docs: docs/kronos-local-model.md"
         ),
     )
@@ -181,7 +181,7 @@ def main(argv: list[str] | None = None) -> int:
         print(
             "huggingface_hub is not installed. Install optional Kronos deps first:\n"
             "  python -m pip install --constraint constraints.txt "
-            "--build-constraint build-constraints.txt -r requirements-kronos.txt",
+            "--build-constraint build-constraints.txt -r requirements/kronos.txt",
             file=sys.stderr,
         )
         return 2

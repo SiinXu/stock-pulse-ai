@@ -32,7 +32,7 @@ PDF 的依赖、字体解析、目标语言代表字符或字体/后端冒烟验
 
 ```bash
 python -m pip install --build-constraint build-constraints.txt \
-  -r requirements-report-export.txt
+  -r requirements/report-export.txt
 ```
 
 可选依赖文件精确锁定 `fpdf2==2.8.3`、`fonttools==4.63.0` 与

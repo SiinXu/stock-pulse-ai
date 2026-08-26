@@ -174,7 +174,7 @@ source /opt/stock-analyzer/venv/bin/activate
 
 ### 2. 安装依赖
 
-默认应用依赖必须同时使用 `constraints.txt` 与 `build-constraints.txt`。不要省略其中任一约束文件。可选能力（Kronos / 桌面打包 / CI 开发工具 / 实验性 PydanticAI）在默认安装之后，用对应的 `requirements-*.txt` 或 `.github/requirements-ci.txt` 并继续带上同一套约束；细节见 [完整配置与部署指南 · 安装依赖](full-guide.md#安装依赖)。`pyproject.toml` extras 仅作组名发现，锁权威仍是 constraints。
+默认应用依赖必须同时使用 `constraints.txt` 与 `build-constraints.txt`。不要省略其中任一约束文件。可选能力（Kronos / 桌面打包 / CI 开发工具 / 实验性 PydanticAI）在默认安装之后，用对应的 `requirements/*.txt` 或 `.github/requirements-ci.txt` 并继续带上同一套约束；细节见 [完整配置与部署指南 · 安装依赖](full-guide.md#安装依赖)。`pyproject.toml` extras 仅作组名发现，锁权威仍是 constraints。
 
 ```bash
 cd /opt/stock-analyzer

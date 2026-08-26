@@ -818,8 +818,9 @@ def _write_fixture(
     if not any(line.startswith("setuptools") for line in lock_body.splitlines()):
         lock_body = lock_body.rstrip() + "\nsetuptools==1\n"
     (root / "scripts").mkdir(parents=True)
+    (root / "requirements").mkdir(parents=True)
     (root / "requirements.txt").write_text("-c constraints.txt\nfoo>=1\n", encoding="utf-8")
-    (root / "requirements-pydanticai.txt").write_text("bar==2\n", encoding="utf-8")
+    (root / "requirements/pydanticai.txt").write_text("bar==2\n", encoding="utf-8")
     (root / "build-constraints.txt").write_text("setuptools==1\n", encoding="utf-8")
     exception_path = root / "scripts" / "dependency_lock_exceptions.json"
     exception_path.write_text('{"exceptions": []}\n', encoding="utf-8")
@@ -838,10 +839,10 @@ def _write_fixture(
         },
         "source_files": [
             "requirements.txt",
-            "requirements-pydanticai.txt",
+            "requirements/pydanticai.txt",
             "build-constraints.txt",
         ],
-        "exact_source_files": ["requirements-pydanticai.txt", "build-constraints.txt"],
+        "exact_source_files": ["requirements/pydanticai.txt", "build-constraints.txt"],
         "install_contracts": {
             "requirements.txt": {
                 "constraint": "constraints.txt",

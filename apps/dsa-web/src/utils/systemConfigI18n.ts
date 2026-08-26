@@ -1252,7 +1252,7 @@ const fieldDescriptionMap: Record<string, string> = {
   LOCAL_RUNTIME_AUTO_DETECT: '默认开启。就绪检查对回环地址快速探测本机 Ollama；失败仅记录日志，不阻塞启动。',
   LOCAL_RUNTIME_DETECT_TIMEOUT_SECONDS: '本地运行时探测的单次超时（秒），限制在 0.05–2.0。',
   READINESS_CHECK_TIMEOUT_SECONDS: '结构化就绪/自检的单检查超时（秒），默认 1.0，限制 0.1–5.0；仅按需调用，不在启动时自动运行；超时不得报就绪。',
-  KRONOS_ENABLED: '可选本地 Kronos K 线预测 Agent Tool。需安装 requirements-kronos.txt、配置权重目录并重启后注册；预构建桌面端不支持。详见 docs/kronos-local-model.md。',
+  KRONOS_ENABLED: '可选本地 Kronos K 线预测 Agent Tool。需安装 requirements/kronos.txt、配置权重目录并重启后注册；预构建桌面端不支持。详见 docs/kronos-local-model.md。',
   KRONOS_MODEL_SIZE: '官方规格：mini（约 40MB）、small（约 150MB）、base（约 500MB，含 tokenizer）。网页不会自动下载权重。',
   KRONOS_WEIGHTS_DIR: '本地权重根目录，需包含所选模型与对应 tokenizer 子目录。使用 scripts/download_kronos_weights.py 显式下载。',
   ANALYSIS_DELAY: '启动任务前的延迟秒数，可用于等待依赖服务就绪。',
