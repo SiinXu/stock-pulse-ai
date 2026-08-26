@@ -2982,6 +2982,81 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBeNull());
   });
 
+  it('does not alias selection when two list signals share the same source', async () => {
+    const sibling = makeSignal({
+      id: 8,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+      sourceType: 'analysis',
+      reason: 'Second analysis signal',
+    });
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([signal, sibling], 2));
+    vi.mocked(decisionSignalsApi.getFeedback).mockImplementation(async (signalId: number) => ({
+      ...emptyFeedback,
+      signalId,
+    }));
+    vi.mocked(decisionSignalsApi.getMemoryFlag).mockImplementation(async (signalId: number) => ({
+      signalId,
+      memorable: false,
+      ignored: false,
+    }));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    expect(await screen.findByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    fireEvent.click(screen.getByRole('button', { name: '查看 Apple AI 建议详情', hidden: true }));
+
+    const dialog = await screen.findByRole('dialog', { name: '信号详情' });
+    expect(await within(dialog).findByText('Second analysis signal')).toBeInTheDocument();
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
+    expect(within(dialog).queryByText('趋势保持')).not.toBeInTheDocument();
+  });
+
+  it('restores the previous selectedSignalId on browser back and keeps the context chip in sync', async () => {
+    const sibling = makeSignal({
+      id: 8,
+      stockCode: 'AAPL',
+      stockName: 'Apple',
+      market: 'us',
+      sourceType: 'analysis',
+      reason: 'Second analysis signal',
+    });
+    vi.mocked(decisionSignalsApi.list).mockResolvedValue(listResponse([signal, sibling], 2));
+    vi.mocked(decisionSignalsApi.getFeedback).mockImplementation(async (signalId: number) => ({
+      ...emptyFeedback,
+      signalId,
+    }));
+    vi.mocked(decisionSignalsApi.getMemoryFlag).mockImplementation(async (signalId: number) => ({
+      signalId,
+      memorable: false,
+      ignored: false,
+    }));
+    renderPage();
+
+    fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    await screen.findByRole('dialog', { name: '信号详情' });
+    fireEvent.click(screen.getByRole('button', { name: '查看 Apple AI 建议详情', hidden: true }));
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('8'));
+
+    act(() => window.history.back());
+    await waitFor(() => expect(new URLSearchParams(window.location.search).get('signal')).toBe('7'));
+    expect(await screen.findByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('趋势保持')).toBeInTheDocument();
+  });
+
+  it('reopens the selected signal from the context chip without changing identity', async () => {
+    renderPage();
+    fireEvent.click(await screen.findByRole('button', { name: '查看 贵州茅台 AI 建议详情' }));
+    const chip = await screen.findByTestId('decision-signal-context-chip');
+    expect(chip).toHaveAttribute('data-selected-signal-id', '7');
+    fireEvent.click(within(chip).getByRole('button', { hidden: true }));
+    expect(await screen.findByRole('dialog', { name: '信号详情' })).toBeInTheDocument();
+    expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '7');
+    expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
+  });
+
   it('opens a deep-linked signal by id when it is not in the loaded list page', async () => {
     const remoteSignal = makeSignal({
       id: 99,

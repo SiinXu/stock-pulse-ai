@@ -490,6 +490,8 @@ export const translations = {
   "i18n.uiText.UI_TEXT.decisionSignals.closed": "Ditutup",
   "i18n.uiText.UI_TEXT.decisionSignals.confidence": "Tahap keyakinan",
   "i18n.uiText.UI_TEXT.decisionSignals.confirmStatusTitle": "Kemas kini status isyarat",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipLabel": "Isyarat semasa {symbol}, sumber {source}, status {status}",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipOpen": "Buka butiran {symbol}",
   "i18n.uiText.UI_TEXT.decisionSignals.create.button": "Cipta isyarat",
   "i18n.uiText.UI_TEXT.decisionSignals.create.confidenceHint": "Nombor perpuluhan antara 0 dan 1, pilihan.",
   "i18n.uiText.UI_TEXT.decisionSignals.create.dedup": "Isyarat serupa sudah wujud (#{id}); tiada yang baharu dicipta.",

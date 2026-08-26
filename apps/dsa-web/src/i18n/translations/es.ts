@@ -490,6 +490,8 @@ export const translations = {
   "i18n.uiText.UI_TEXT.decisionSignals.closed": "Cerrado",
   "i18n.uiText.UI_TEXT.decisionSignals.confidence": "Nivel de confianza",
   "i18n.uiText.UI_TEXT.decisionSignals.confirmStatusTitle": "Actualizar estado de la señal",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipLabel": "Señal actual {symbol}, origen {source}, estado {status}",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipOpen": "Abrir detalles de {symbol}",
   "i18n.uiText.UI_TEXT.decisionSignals.create.button": "Crear señal",
   "i18n.uiText.UI_TEXT.decisionSignals.create.confidenceHint": "Número decimal entre 0 y 1, opcional.",
   "i18n.uiText.UI_TEXT.decisionSignals.create.dedup": "Ya existe una señal idéntica (#{id}); no se creó nada nuevo.",

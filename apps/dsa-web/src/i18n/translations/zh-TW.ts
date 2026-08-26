@@ -490,6 +490,8 @@ export const translations = {
   "i18n.uiText.UI_TEXT.decisionSignals.closed": "已關閉",
   "i18n.uiText.UI_TEXT.decisionSignals.confidence": "置信度",
   "i18n.uiText.UI_TEXT.decisionSignals.confirmStatusTitle": "更新訊號狀態",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipLabel": "目前訊號 {symbol}，來源 {source}，狀態 {status}",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipOpen": "打開 {symbol} 的詳情",
   "i18n.uiText.UI_TEXT.decisionSignals.create.button": "建立訊號",
   "i18n.uiText.UI_TEXT.decisionSignals.create.confidenceHint": "0 到 1 之間的小數，可留空",
   "i18n.uiText.UI_TEXT.decisionSignals.create.dedup": "相同訊號已存在（#{id}），本次未重複建立。",

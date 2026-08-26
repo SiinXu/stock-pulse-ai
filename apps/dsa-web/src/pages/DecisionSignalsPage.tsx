@@ -37,6 +37,8 @@ import DecisionSignalReviewSection from '../components/decision-signals/Decision
 import DecisionSignalScopeControl from '../components/decision-signals/DecisionSignalScopeControl';
 import DecisionSignalStockContextModal from '../components/decision-signals/DecisionSignalStockContextModal';
 import DecisionSignalTimelineSection from '../components/decision-signals/DecisionSignalTimelineSection';
+import { DecisionSignalContextChip } from '../components/decision-signals/DecisionSignalContextChip';
+import { useDecisionSignalSelection } from '../components/decision-signals/useDecisionSignalSelection';
 import {
   EMPTY_MANUAL_SIGNAL_DRAFT,
   type ManualSignalDraft,
@@ -47,7 +49,6 @@ import {
   DEFAULT_LIST_FILTERS,
   getCandidateKey,
   getDecisionSignalLocation,
-  getInitialSelectedSignalId,
   getListSearchValues,
   getStockSearchValues,
   getTimelineSearchValues,
@@ -59,6 +60,7 @@ import {
   PAGE_SIZE,
   parseSourceReportId,
   refreshLatestSelection,
+  refreshOwnedSelectionFromItems,
   refreshTimelineSelection,
   runWithRequestSlot,
   SIGNAL_CENTER_TABS_ID,
@@ -274,7 +276,6 @@ const DecisionSignalsPage: React.FC = () => {
   } = useDecisionSignalListState();
   const queryClient = useQueryClient();
   const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
-  const [selected, setSelected] = useState<SelectedSignal | null>(null);
   const [pendingStatus, setPendingStatus] = useState<PendingStatusChange | null>(null);
   const [outcomeStats, setOutcomeStats] = useState<DecisionSignalOutcomeStatsResponse | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
@@ -308,15 +309,6 @@ const DecisionSignalsPage: React.FC = () => {
   } = useDecisionSignalTimelineState();
   const [feedbackSaving, setFeedbackSaving] = useState(false);
   const {
-    selectedOutcomes,
-    selectedOutcomesLoading,
-    selectedOutcomesError,
-    selectedFeedback,
-    selectedFeedbackLoading,
-    selectedFeedbackError: selectedFeedbackLoadError,
-  } = useDecisionSignalDetailQueries(selected?.item.id ?? null);
-  const selectedFeedbackError = feedbackWriteError ?? selectedFeedbackLoadError;
-  const {
     profile: reassessProfile,
     response: reassessResponse,
     loading: reassessLoading,
@@ -336,17 +328,6 @@ const DecisionSignalsPage: React.FC = () => {
   const latestRequestIdRef = useRef(0);
   const timelineRequestIdRef = useRef(0);
   const reassessRequestIdRef = useRef(0);
-  const selectedSignalIdRef = useRef<number | null>(null);
-  const pendingSelectedSignalIdRef = useRef<number | null>(getInitialSelectedSignalId());
-  const routeSelectionSourcesRef = useRef<Array<{
-    source: SelectedSignal['source'];
-    items: DecisionSignalItem[];
-  }>>([]);
-  routeSelectionSourcesRef.current = [
-    { source: 'list', items },
-    { source: 'latest', items: latestItems },
-    { source: 'timeline', items: timelineItems },
-  ];
   const didObserveViewNavigationRef = useRef(false);
   useEffect(() => {
     if (!didObserveViewNavigationRef.current) {
@@ -365,75 +346,51 @@ const DecisionSignalsPage: React.FC = () => {
   } | null>(null);
   const mountedRef = useRef(true);
 
-  const takePendingSelection = useCallback((
-    source: SelectedSignal['source'],
-    nextItems: DecisionSignalItem[],
-  ): SelectedSignal | null => {
-    const pendingId = pendingSelectedSignalIdRef.current;
-    if (pendingId === null) return null;
-    const item = nextItems.find((candidate) => candidate.id === pendingId);
-    if (!item) return null;
-    pendingSelectedSignalIdRef.current = null;
-    selectedSignalIdRef.current = item.id;
-    return { source, item };
-  }, []);
-
-  useLayoutEffect(() => {
-    const routeSignalId = getInitialSelectedSignalId(routeLocation.search);
-    if (routeSignalId === null) {
-      pendingSelectedSignalIdRef.current = null;
-      if (selectedSignalIdRef.current !== null) setSelected(null);
-      return;
-    }
-    if (selectedSignalIdRef.current === routeSignalId) {
-      pendingSelectedSignalIdRef.current = null;
-      return;
-    }
-    pendingSelectedSignalIdRef.current = routeSignalId;
-    for (const source of routeSelectionSourcesRef.current) {
-      const item = source.items.find((candidate) => candidate.id === routeSignalId);
-      if (!item) continue;
-      pendingSelectedSignalIdRef.current = null;
-      selectedSignalIdRef.current = item.id;
-      setSelected({ source: source.source, item });
-      return;
-    }
-    // Memory miss fallback: get() by id (source 'outcome' so list refresh won't drop off-page).
-    if (selectedSignalIdRef.current !== null) setSelected(null);
-    void decisionSignalsApi.get(routeSignalId).then((item) => {
-      if (!mountedRef.current || pendingSelectedSignalIdRef.current !== routeSignalId) return;
-      pendingSelectedSignalIdRef.current = null;
-      selectedSignalIdRef.current = item.id;
-      setStatusError(null);
-      setSelected({ source: 'outcome', item });
-    }).catch((err) => {
-      if (!mountedRef.current || pendingSelectedSignalIdRef.current !== routeSignalId) return;
-      pendingSelectedSignalIdRef.current = null;
-      selectedSignalIdRef.current = null;
-      setSelected(null);
-      setStatusError(getParsedApiError(err));
-      updateDecisionSignalSearchParams({ signal: null });
-    });
-  }, [routeLocation.key, routeLocation.search, updateDecisionSignalSearchParams]);
+  const selectionCandidates = useMemo(() => [
+    { source: 'list' as const, items },
+    { source: 'latest' as const, items: latestItems },
+    { source: 'timeline' as const, items: timelineItems },
+  ], [items, latestItems, timelineItems]);
+  const {
+    selected,
+    selectedSignalId,
+    selectedSignalIdRef,
+    selectSignal,
+    closeSignal,
+    setSelected,
+    takePendingSelection,
+  } = useDecisionSignalSelection({
+    routeSearch: routeLocation.search,
+    routeKey: routeLocation.key,
+    candidates: selectionCandidates,
+    fetchSignalById: decisionSignalsApi.get,
+    updateSearchParams: updateDecisionSignalSearchParams,
+    onLookupSuccess: () => setStatusError(null),
+    onLookupError: (err) => setStatusError(getParsedApiError(err)),
+    isMounted: () => mountedRef.current,
+  });
+  const {
+    selectedOutcomes,
+    selectedOutcomesLoading,
+    selectedOutcomesError,
+    selectedFeedback,
+    selectedFeedbackLoading,
+    selectedFeedbackError: selectedFeedbackLoadError,
+  } = useDecisionSignalDetailQueries(selectedSignalId);
+  const selectedFeedbackError = feedbackWriteError ?? selectedFeedbackLoadError;
 
   const handleSelectSignal = useCallback((source: SelectedSignal['source'], item: DecisionSignalItem) => {
-    pendingSelectedSignalIdRef.current = null;
-    selectedSignalIdRef.current = item.id;
-    setSelected({ source, item });
-    updateDecisionSignalSearchParams({ signal: item.id });
-  }, [updateDecisionSignalSearchParams]);
+    selectSignal(item, source);
+  }, [selectSignal]);
   const handleOpenOutcomeSignal = useCallback(async (signalId: number) => {
     const item = await decisionSignalsApi.get(signalId);
     if (!mountedRef.current) return;
     handleSelectSignal('outcome', item);
   }, [handleSelectSignal]);
   const handleCloseSignal = useCallback(() => {
-    pendingSelectedSignalIdRef.current = null;
-    selectedSignalIdRef.current = null;
     setStatusError(null);
-    setSelected(null);
-    updateDecisionSignalSearchParams({ signal: null });
-  }, [updateDecisionSignalSearchParams]);
+    closeSignal();
+  }, [closeSignal]);
   const popularCandidates = useMemo(
     () => toPopularCandidates(stockIndex, STOCK_CANDIDATE_LIMIT),
     [stockIndex],
@@ -622,12 +579,7 @@ const DecisionSignalsPage: React.FC = () => {
       if (restoredSelection) {
         setSelected(restoredSelection);
       } else {
-        setSelected((current) => {
-          if (!current) return current;
-          if (current.source !== 'list') return current;
-          const refreshed = response.items.find((item) => item.id === current.item.id);
-          return refreshed ? { source: 'list', item: refreshed } : null;
-        });
+        setSelected((current) => refreshOwnedSelectionFromItems(current, response.items, 'list'));
       }
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
@@ -638,6 +590,7 @@ const DecisionSignalsPage: React.FC = () => {
     appliedFilters,
     listDispatch,
     setPage,
+    setSelected,
     signalCenterScope,
     syncListSearchParams,
     takePendingSelection,
@@ -716,18 +669,11 @@ const DecisionSignalsPage: React.FC = () => {
       reassessRequestIdRef.current += 1;
       selectedSignalIdRef.current = null;
     };
-  }, []);
+  }, [selectedSignalIdRef]);
 
   useEffect(() => {
-    if (pendingSelectedSignalIdRef.current === null) {
-      updateDecisionSignalSearchParams({ signal: selected?.item.id ?? null });
-    }
-  }, [selected?.item.id, updateDecisionSignalSearchParams]);
-
-  useEffect(() => {
-    selectedSignalIdRef.current = selected?.item.id ?? null;
     setFeedbackWriteError(null);
-  }, [selected?.item.id]);
+  }, [selectedSignalId]);
 
   const appliedSourceReportId = parseSourceReportId(appliedFilters.sourceReportId);
   const selectedSourceReportId = selected?.item.sourceReportId ?? undefined;
@@ -784,7 +730,7 @@ const DecisionSignalsPage: React.FC = () => {
     setLatestLoading(false);
     setLatestError(null);
     setSelected((current) => (current?.source === 'latest' ? null : current));
-  }, []);
+  }, [setSelected]);
 
   const loadLatestForContext = useCallback(async (context: StockContext) => {
     const stockCode = context.code.trim();
@@ -816,13 +762,13 @@ const DecisionSignalsPage: React.FC = () => {
         setLatestLoading(false);
       }
     }
-  }, [takePendingSelection]);
+  }, [setSelected, takePendingSelection]);
 
   const resetTimelineView = useCallback(() => {
     timelineRequestIdRef.current += 1;
     resetTimelineState();
     setSelected((current) => (current?.source === 'timeline' ? null : current));
-  }, [resetTimelineState]);
+  }, [resetTimelineState, setSelected]);
 
   const loadTimelineForContext = useCallback(async (
     context: StockContext,
@@ -857,7 +803,7 @@ const DecisionSignalsPage: React.FC = () => {
       setSelected((current) => refreshTimelineSelection(current, []));
       timelineDispatch({ type: 'loadFailure', error: getParsedApiError(err) });
     }
-  }, [syncTimelineSearchParams, takePendingSelection, timelineDispatch]);
+  }, [setSelected, syncTimelineSearchParams, takePendingSelection, timelineDispatch]);
 
   const handlePersistReassess = useCallback(async () => {
     const preview = reassessResponse?.preview;
@@ -934,6 +880,8 @@ const DecisionSignalsPage: React.FC = () => {
     reassessProfile,
     reassessResponse,
     reassessSourceReportId,
+    selectedSignalIdRef,
+    setSelected,
     setTimelineItems,
   ]);
 
@@ -1138,7 +1086,7 @@ const DecisionSignalsPage: React.FC = () => {
     } finally {
       if (mountedRef.current) setFeedbackSaving(false);
     }
-  }, [feedbackSaving, queryClient, selected]);
+  }, [feedbackSaving, queryClient, selected, selectedSignalIdRef]);
 
   const handleManualSignalCreated = useCallback((result: DecisionSignalMutationResponse) => {
     void loadSignalsForPage(page);
@@ -1239,6 +1187,14 @@ const DecisionSignalsPage: React.FC = () => {
           ) : undefined}
         />
 
+        <DecisionSignalContextChip
+          selected={selected}
+          onOpen={() => {
+            if (!selected) return;
+            selectSignal(selected.item, selected.source);
+          }}
+        />
+
         <DecisionSignalCreateDrawer
           isOpen={createDrawerOpen}
           onClose={() => setCreateDrawerOpen(false)}
@@ -1321,7 +1277,7 @@ const DecisionSignalsPage: React.FC = () => {
               onRetry={() => void loadSignals()}
               total={total}
               items={items}
-              selectedId={selected?.item.id}
+              selectedId={selectedSignalId}
               onSelect={(selectedItem) => handleSelectSignal('list', selectedItem)}
               page={page}
               onPageChange={(nextPage) => {
@@ -1349,7 +1305,7 @@ const DecisionSignalsPage: React.FC = () => {
               searched={latestSearched}
               error={latestError}
               items={latestItems}
-              selectedId={selected?.item.id}
+              selectedId={selectedSignalId}
               onSelect={(selectedItem) => handleSelectSignal('latest', selectedItem)}
             />
           </TabPanel>
@@ -1373,7 +1329,7 @@ const DecisionSignalsPage: React.FC = () => {
               error={timelineError}
               items={timelineItems}
               truncated={timelineTruncated}
-              selectedId={selected?.item.id}
+              selectedId={selectedSignalId}
               onSelect={(selectedItem) => handleSelectSignal('timeline', selectedItem)}
             />
           </TabPanel>

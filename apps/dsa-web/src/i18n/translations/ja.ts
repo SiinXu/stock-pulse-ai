@@ -490,6 +490,8 @@ export const translations = {
   "i18n.uiText.UI_TEXT.decisionSignals.closed": "終了",
   "i18n.uiText.UI_TEXT.decisionSignals.confidence": "信頼度",
   "i18n.uiText.UI_TEXT.decisionSignals.confirmStatusTitle": "信号の状態を更新",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipLabel": "現在のシグナル {symbol}、ソース {source}、状態 {status}",
+  "i18n.uiText.UI_TEXT.decisionSignals.contextChipOpen": "{symbol} の詳細を開く",
   "i18n.uiText.UI_TEXT.decisionSignals.create.button": "シグナルを作成",
   "i18n.uiText.UI_TEXT.decisionSignals.create.confidenceHint": "0〜1 の小数。省略可。",
   "i18n.uiText.UI_TEXT.decisionSignals.create.dedup": "同一のシグナルが既に存在します（#{id}）。新規作成されませんでした。",

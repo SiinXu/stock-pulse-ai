@@ -452,7 +452,10 @@ The owner-selected PR #35 page restoration keeps Settings, Portfolio, Signal
 Center, and Backtest on the full-width `AppPage` canvas. Each exposes the shared
 visible `PageHeader`. Signal Center provides four top-level shared `Tabs` /
 `TabPanel` views and composes the existing decision-signal and alert surfaces
-without creating a second page identity. Its scope selector is a pressed-button
+without creating a second page identity. Decision Signals selection identity is
+`selectedSignalId` / `?signal=<id>`; list, latest, and timeline only supply
+candidates and a display source, and a fixed Context Chip shows symbol, source,
+and status. Its scope selector is a pressed-button
 group, not another tablist, and is only rendered for the signal and rule views
 that apply that scope to their requests. Portfolio renders one
 page-level onboarding state when no account exists, and Backtest renders one
