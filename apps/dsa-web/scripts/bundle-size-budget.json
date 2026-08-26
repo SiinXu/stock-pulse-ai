@@ -34,16 +34,16 @@
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 157714,
-      "measuredGzipBytes": 157314,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 157314 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 158143,
+      "measuredGzipBytes": 157743,
+      "note": "Re-baselined after honest Local Only Mode Settings help (Refs #218). Accurate copy is longer than the overclaim; local zlib-9 157743 B. Cap = measured + 400 B, the existing locale per-asset convention, so locale-de-family (not over budget) stays above this cap. A 5% cap would invert that family invariant."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 157591,
-      "measuredGzipBytes": 157191,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 157191 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 158013,
+      "measuredGzipBytes": 157613,
+      "note": "Re-baselined after honest Local Only Mode Settings help (Refs #218). Accurate copy is longer than the overclaim; local zlib-9 157613 B. Cap = measured + 400 B, the existing locale per-asset convention, so locale-ko-family (not over budget) stays above this cap. A 5% cap would invert that family invariant."
     },
     {
       "id": "locale-fr",

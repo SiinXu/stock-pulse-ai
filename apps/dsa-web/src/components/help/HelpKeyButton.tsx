@@ -63,11 +63,10 @@ export const HelpKeyButton: React.FC<HelpKeyButtonProps> = ({
 
   const ariaLabel = formatUiText(t('help.viewExplanation'), { title: resolvedTitle });
 
-  return (
+  const control = (
     <IconButton
       size="compact"
       variant="bare"
-      className={className}
       aria-label={ariaLabel}
       data-testid={testId}
       data-help-key={helpKey}
@@ -97,6 +96,7 @@ export const HelpKeyButton: React.FC<HelpKeyButtonProps> = ({
       <Info aria-hidden="true" />
     </IconButton>
   );
+  return className ? <span className={className}>{control}</span> : control;
 };
 
 export default HelpKeyButton;

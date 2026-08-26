@@ -81,6 +81,14 @@ const BUTTON_CANONICAL_SIZE_RADII = {
 } as const;
 const BUTTON_LEGACY_SIZE_ALIASES = new Set(['xsm', 'sm', 'md', 'lg', 'xl']);
 const BUTTON_HEIGHT_CLASS_PATTERN = /^h-\d+$/;
+const BUTTON_WIDTH_CLASS_PATTERN = /^w-\d+$/;
+const ICON_BUTTON_CANONICAL_SIZES = new Set(['compact', 'default', 'comfortable', 'navigation']);
+const ICON_BUTTON_CANONICAL_SIZE_GEOMETRY = {
+  compact: { height: 'h-7', width: 'w-7' },
+  default: { height: 'h-8', width: 'w-8' },
+  comfortable: { height: 'h-9', width: 'w-9' },
+  navigation: { height: 'h-11', width: 'w-11' },
+} as const;
 type ExactButtonAllowance = {
   line: number;
   owner: 'UIUX-HARNESS';
@@ -1024,8 +1032,9 @@ function appendButtonSizeUsageViolations(
   opening: ts.JsxOpeningElement | ts.JsxSelfClosingElement,
   bindings: SharedButtonBindings,
   violations: DesignViolation[],
+  controlName: 'Button' | 'IconButton' = 'Button',
 ): void {
-  if (!isSharedButtonOpening(opening, bindings)) return;
+  if (!isSharedButtonOpening(opening, bindings, controlName)) return;
   let candidates: string[] = [];
   let unresolved: ts.Node | null = null;
   for (const property of opening.attributes.properties) {
@@ -1056,7 +1065,10 @@ function appendButtonSizeUsageViolations(
   }
   const openingLine = lineNumberAt(source, opening.getStart(opening.getSourceFile()));
   for (const candidate of candidates) {
-    if (!BUTTON_LEGACY_SIZE_ALIASES.has(candidate)) continue;
+    const invalid = controlName === 'IconButton'
+      ? !ICON_BUTTON_CANONICAL_SIZES.has(candidate)
+      : BUTTON_LEGACY_SIZE_ALIASES.has(candidate);
+    if (!invalid) continue;
     violations.push({
       file: filename,
       line: openingLine,
@@ -1205,6 +1217,15 @@ function appendNonButtonControlVisualOverrideViolations(
         token: `${controlName}:${token}`,
       });
     }
+  }
+  if (controlName !== 'IconButton') return;
+  for (const unresolved of scan.unresolved) {
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, unresolved.index),
+      rule: 'control-visual-override',
+      token: `${controlName}:dynamic:${unresolved.text}`,
+    });
   }
 }
 
@@ -2153,6 +2174,45 @@ function buttonRadiusClasses(fragments: StaticClassFragment[]): string[] {
   ));
 }
 
+function buttonWidthClasses(fragments: StaticClassFragment[]): string[] {
+  return Array.from(new Set(
+    fragments.flatMap(({ text }) => text.split(/\s+/).filter((token) => BUTTON_WIDTH_CLASS_PATTERN.test(token))),
+  ));
+}
+
+function appendIconButtonSizeContractViolations(
+  filename: string,
+  source: string,
+  declarationIndex: number,
+  entries: Map<string, ButtonSizeStyleEntry>,
+  violations: DesignViolation[],
+): void {
+  for (const [size, expected] of Object.entries(ICON_BUTTON_CANONICAL_SIZE_GEOMETRY)) {
+    const entry = entries.get(size);
+    const heights = entry ? buttonHeightClasses(entry.fragments) : [];
+    const widths = entry ? buttonWidthClasses(entry.fragments) : [];
+    if (heights.length === 1 && heights[0] === expected.height
+      && widths.length === 1 && widths[0] === expected.width) {
+      continue;
+    }
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry?.index ?? declarationIndex),
+      rule: 'button-size-contract',
+      token: `${size}:${[...heights, ...widths].join('|') || 'missing'}`,
+    });
+  }
+  for (const [size, entry] of entries) {
+    if (size in ICON_BUTTON_CANONICAL_SIZE_GEOMETRY) continue;
+    violations.push({
+      file: filename,
+      line: lineNumberAt(source, entry.index),
+      rule: 'button-size-contract',
+      token: `${size}:unknown`,
+    });
+  }
+}
+
 function appendButtonSizeContractViolations(
   filename: string,
   source: string,
@@ -2427,6 +2487,14 @@ function scanPrimaryCtasInBoundSource(
         buttonBindings,
         result.violations,
       );
+      appendButtonSizeUsageViolations(
+        filename,
+        source,
+        node.openingElement,
+        buttonBindings,
+        result.violations,
+        'IconButton',
+      );
       appendButtonVisualOverrideViolations(
         filename,
         source,
@@ -2482,6 +2550,14 @@ function scanPrimaryCtasInBoundSource(
         node,
         buttonBindings,
         result.violations,
+      );
+      appendButtonSizeUsageViolations(
+        filename,
+        source,
+        node,
+        buttonBindings,
+        result.violations,
+        'IconButton',
       );
       appendButtonVisualOverrideViolations(
         filename,
@@ -2589,6 +2665,41 @@ function scanPrimaryCtasInBoundSource(
           }
         }
         appendButtonSizeContractViolations(
+          filename,
+          source,
+          node.getStart(sourceFile),
+          entries,
+          result.violations,
+        );
+      }
+    }
+    if (
+      ts.isVariableDeclaration(node)
+      && ts.isIdentifier(node.name)
+      && node.name.text === 'ICON_BUTTON_SIZE_STYLES'
+      && node.initializer
+    ) {
+      const initializer = unwrapExpression(node.initializer);
+      if (ts.isObjectLiteralExpression(initializer)) {
+        const entries = new Map<string, ButtonSizeStyleEntry>();
+        for (const property of initializer.properties) {
+          if (!ts.isPropertyAssignment(property)) continue;
+          const scan = scanStaticClassExpression(
+            property.initializer,
+            sourceFile,
+            initializers,
+            new Set(),
+            'ICON_BUTTON_SIZE_STYLES',
+          );
+          const names = propertyNameValues(property.name, initializers);
+          if (names?.length === 1) {
+            entries.set(names[0], {
+              index: property.getStart(sourceFile),
+              fragments: scan.fragments,
+            });
+          }
+        }
+        appendIconButtonSizeContractViolations(
           filename,
           source,
           node.getStart(sourceFile),
@@ -3138,6 +3249,53 @@ describe('production design guard', () => {
     `)).toContainEqual(
       expect.objectContaining({ rule: 'control-visual-override', token: 'Input:h-11' }),
     );
+  });
+
+  it('fails closed for IconButton geometry spreads, dynamic className, and size drift', () => {
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.iconButtonDynamicClassName,
+    )).toContainEqual(
+      expect.objectContaining({
+        rule: 'control-visual-override',
+        token: 'IconButton:dynamic:className',
+      }),
+    );
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.iconButtonClassNameSpread,
+    )).toContainEqual(
+      expect.objectContaining({
+        rule: 'control-visual-override',
+        token: expect.stringMatching(/^IconButton:dynamic:className spread:/),
+      }),
+    );
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.iconButtonDynamicSize,
+    )).toContainEqual(
+      expect.objectContaining({ rule: 'button-size-contract', token: 'size={dynamic}' }),
+    );
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.iconButtonUnknownSize,
+    )).toContainEqual(
+      expect.objectContaining({ rule: 'button-size-contract', token: 'size="primary"' }),
+    );
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.iconButtonEnumerableSize,
+    ).filter(({ rule }) => rule === 'button-size-contract')).toEqual([]);
+    expect(findProductionDesignViolations(
+      'fixture.tsx',
+      productionDesignGuardFixtures.iconButtonSizeMapDrift,
+    )).toContainEqual(
+      expect.objectContaining({ rule: 'button-size-contract', token: 'compact:h-6|w-6' }),
+    );
+    expect(findProductionDesignViolations('fixture.tsx', `
+      <Input className={dynamicWidth} />
+      <IconButton aria-label="Close" className="text-danger"><span>X</span></IconButton>
+    `)).toEqual([]);
   });
 
   it('self-tests the semantic Surface level boundary contract', () => {

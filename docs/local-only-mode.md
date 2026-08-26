@@ -36,16 +36,17 @@
 | 面 | 是否出站 | 说明 |
 | --- | --- | --- |
 | 云端 LLM | **否** | 在共享出站策略处以 `local_only_mode_blocked` 拦截 |
-| 远程行情 / 搜索 / 新闻 HTTP | **否** | 同上；数据源应按既有稳定性规则降级到缓存或显式错误 |
+| 走 `safe_*` / `guard_outbound_urls` 的远程行情 / 搜索 / 新闻 HTTP | **否** | 同上；这些数据源应按既有稳定性规则降级到缓存或显式错误 |
 | 通知 HTTP Webhook | **否** | 渠道失败不得变成静默安全放行 |
 | 本地 Ollama / 回环模型 HTTP | **是（仅回环）** | `127.0.0.0/8`、`::1`、`localhost` |
 | `OUTBOUND_HTTP_ALLOWLIST` 远程主机 | **否** | 本地专用开启时，allowlist **不能**把边界扩到回环以外 |
-| 桌面端 GitHub 更新检查 | **不在本闸门范围** | 属桌面壳职责，不由后端出站策略强制 |
+| 桌面端 GitHub 更新检查 | **否（桌面壳跳过）** | 壳查询 `GET /api/v1/security/local-only`；模式开启或状态未知时不联系 GitHub |
+| 非 HTTP 数据源套接字（如 pytdx / baostock TCP） | **不在本闸门范围** | 按设计不在 HTTP 策略内 |
 | 经 `plugin_safe_*` 的插件 HTTP | 非回环为 **否** | 插件受支持的 HTTP 走同一出站策略，拦截 reason 为 `local_only_mode_blocked` |
 | 插件直接使用 `requests` / `socket` | **无法真正隔离** | 插件在进程内运行。捆绑/示例插件的直接 HTTP 客户端由测试标记；恶意插件仍可绕过 wrapper |
-| SMTP / 数据库 / 非 HTTP | **不在本闸门范围** | 与出站 HTTP 策略文档相同限制 |
+| SMTP / 数据库 / 其他非 HTTP | **不在本闸门范围** | 与出站 HTTP 策略文档相同限制 |
 
-本地专用是 **出站闸门**，并不单独保证「离线分析质量足够好」。可接受的离线分析仍依赖缓存覆盖与本地模型（#178、#203）。本模式让远程出站 **可核验且 fail-closed**。
+本地专用是 **出站闸门**，并不单独保证「离线分析质量足够好」。可接受的离线分析仍依赖缓存覆盖与本地模型（#178、#203）。本模式让策略管辖的远程 HTTP **可核验且 fail-closed**。
 
 ## 威胁模型
 
@@ -84,7 +85,7 @@ LOCAL_ONLY_MODE=true
 ## 限制
 
 - 活动记录为进程内环形缓冲（默认容量 100），重启清空。
-- 绕过 `src.security.outbound_policy` 的 HTTP 调用不在本合同内；新增调用点必须使用共享 helper。
+- 绕过 `src.security.outbound_policy` 的 HTTP 调用不在本合同内；新增调用点必须使用共享 helper。当前包括非 HTTP 数据源套接字。桌面 GitHub 更新检查在本模式开启时由桌面壳跳过。
 - 插件是进程内 Python。`plugin_safe_*` 是受支持的 API，在本地专用下 fail-closed。它不是沙箱，也无法阻止插件 `import socket` 或原始 HTTP 客户端。
 - 本模式不会自动安装模型或历史数据。
 
