@@ -9,9 +9,10 @@ Defaults minimize collection:
 - Delete/clear are principal-scoped and audited.
 - Access (project/export/delete/clear/consent) is append-only audited.
 
-This store is an in-process foundation for the lifecycle contract. It does not
-replace shared ``analysis_history`` storage or assign principals for production
-API/bot/CLI paths; those remain separate remaining work.
+The default backend is in-process. A durable SQLite backend may be injected
+without changing this contract. This module does not replace shared
+``analysis_history`` storage, assign production principals, or inject into
+prompts.
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ import re
 import uuid
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Protocol, Sequence
 
 from src.agent.memory_isolation import isolate_layered_memory_for_prompt
 from src.agent.memory_layers import (
@@ -31,6 +32,10 @@ from src.agent.memory_layers import (
     validate_principal_id,
 )
 from src.agent.memory_retrieval import AuthorizedMemoryProjector
+from src.schemas.memory_provenance import (
+    PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+    stamp_memory_provenance,
+)
 
 _AUDIT_ACTIONS = frozenset({
     "consent_grant",
@@ -152,22 +157,181 @@ class MemoryAccessAuditor:
         return list(self._events)
 
 
+class LayeredMemoryStore(Protocol):
+    """Backend for consent, observations, and access audit."""
+
+    def has_consent(self, principal_id: str) -> bool:
+        ...
+
+    def grant_consent(self, principal_id: str, granted_at: str) -> None:
+        ...
+
+    def revoke_consent(self, principal_id: str) -> None:
+        ...
+
+    def upsert_observation(self, observation: MemoryObservation) -> MemoryObservation:
+        ...
+
+    def contains(self, principal_id: str, analysis_history_id: int) -> bool:
+        ...
+
+    def count_records(self, principal_id: str) -> int:
+        ...
+
+    def list_records(self, principal_id: str) -> List[MemoryObservation]:
+        ...
+
+    def delete(self, principal_id: str, analysis_history_id: int) -> bool:
+        ...
+
+    def clear(self, principal_id: str) -> int:
+        ...
+
+    def drop_expired(self, principal_id: str, now_iso: str) -> int:
+        ...
+
+    def expire_all_due(self, now_iso: str) -> Dict[str, int]:
+        ...
+
+    def record_audit(self, event: MemoryAuditEvent) -> MemoryAuditEvent:
+        ...
+
+    def list_audit(self, principal_id: str) -> List[MemoryAuditEvent]:
+        ...
+
+
 @dataclass
-class PrincipalMemoryLifecycle:
-    policy: LayeredMemoryPolicy = field(default_factory=LayeredMemoryPolicy)
+class InProcessLayeredMemoryStore:
     auditor: MemoryAccessAuditor = field(default_factory=MemoryAccessAuditor)
     _consent_at: Dict[str, str] = field(default_factory=dict)
     _records: Dict[str, Dict[int, MemoryObservation]] = field(default_factory=dict)
 
     def has_consent(self, principal_id: str) -> bool:
-        validate_principal_id(principal_id)
         return principal_id in self._consent_at
+
+    def grant_consent(self, principal_id: str, granted_at: str) -> None:
+        self._consent_at[principal_id] = granted_at
+
+    def revoke_consent(self, principal_id: str) -> None:
+        self._consent_at.pop(principal_id, None)
+
+    def upsert_observation(self, observation: MemoryObservation) -> MemoryObservation:
+        bucket = self._records.setdefault(observation.principal_id, {})
+        bucket[observation.analysis_history_id] = observation
+        return observation
+
+    def contains(self, principal_id: str, analysis_history_id: int) -> bool:
+        return analysis_history_id in self._records.get(principal_id, {})
+
+    def count_records(self, principal_id: str) -> int:
+        return len(self._records.get(principal_id, {}))
+
+    def list_records(self, principal_id: str) -> List[MemoryObservation]:
+        return list(self._records.get(principal_id, {}).values())
+
+    def delete(self, principal_id: str, analysis_history_id: int) -> bool:
+        bucket = self._records.get(principal_id, {})
+        removed = bucket.pop(analysis_history_id, None) is not None
+        if not bucket:
+            self._records.pop(principal_id, None)
+        return removed
+
+    def clear(self, principal_id: str) -> int:
+        bucket = self._records.pop(principal_id, {})
+        return len(bucket)
+
+    def drop_expired(self, principal_id: str, now_iso: str) -> int:
+        bucket = self._records.get(principal_id)
+        if not bucket:
+            return 0
+        now = parse_instant("now", now_iso)
+        expired_ids = [
+            history_id
+            for history_id, row in bucket.items()
+            if row.expires_at is not None
+            and parse_instant("expires_at", row.expires_at) <= now
+        ]
+        for history_id in expired_ids:
+            del bucket[history_id]
+        if not bucket:
+            self._records.pop(principal_id, None)
+        return len(expired_ids)
+
+    def expire_all_due(self, now_iso: str) -> Dict[str, int]:
+        expired: Dict[str, int] = {}
+        for principal_id in list(self._records):
+            count = self.drop_expired(principal_id, now_iso)
+            if count:
+                expired[principal_id] = count
+        return expired
+
+    def record_audit(self, event: MemoryAuditEvent) -> MemoryAuditEvent:
+        self.auditor._events.append(event)
+        return event
+
+    def list_audit(self, principal_id: str) -> List[MemoryAuditEvent]:
+        return self.auditor.list_for_principal(principal_id)
+
+
+@dataclass
+class _StoreBackedAuditor:
+    store: LayeredMemoryStore
+
+    def list_for_principal(self, principal_id: str) -> List[MemoryAuditEvent]:
+        return self.store.list_audit(principal_id)
+
+    def all_events(self) -> List[MemoryAuditEvent]:
+        raise NotImplementedError("durable audit listing is principal-scoped")
+
+    def record(
+        self,
+        *,
+        principal_id: str,
+        action: str,
+        at: Optional[str] = None,
+        detail: str = "",
+        resource_count: int = 0,
+    ) -> MemoryAuditEvent:
+        event = MemoryAuditEvent(
+            event_id=uuid.uuid4().hex,
+            principal_id=principal_id,
+            action=action,
+            at=at or _utc_now_iso(),
+            detail=detail,
+            resource_count=resource_count,
+        )
+        return self.store.record_audit(event)
+
+
+@dataclass
+class PrincipalMemoryLifecycle:
+    policy: LayeredMemoryPolicy = field(default_factory=LayeredMemoryPolicy)
+    auditor: MemoryAccessAuditor = field(default_factory=MemoryAccessAuditor)
+    store: Optional[LayeredMemoryStore] = None
+    _consent_at: Dict[str, str] = field(default_factory=dict)
+    _records: Dict[str, Dict[int, MemoryObservation]] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.store is None:
+            self.store = InProcessLayeredMemoryStore(
+                auditor=self.auditor,
+                _consent_at=self._consent_at,
+                _records=self._records,
+            )
+        else:
+            self.auditor = _StoreBackedAuditor(self.store)  # type: ignore[assignment]
+
+    def has_consent(self, principal_id: str) -> bool:
+        validate_principal_id(principal_id)
+        assert self.store is not None
+        return self.store.has_consent(principal_id)
 
     def grant_consent(self, principal_id: str, *, at: Optional[str] = None) -> None:
         validate_principal_id(principal_id)
         granted_at = at or _utc_now_iso()
         parse_instant("at", granted_at)
-        self._consent_at[principal_id] = granted_at
+        assert self.store is not None
+        self.store.grant_consent(principal_id, granted_at)
         self._audit(principal_id, "consent_grant", at=granted_at, detail="granted")
 
     def revoke_consent(
@@ -183,7 +347,8 @@ class PrincipalMemoryLifecycle:
         deleted = 0
         if clear_data:
             deleted = self.clear(principal_id, at=revoked_at, _from_revoke=True)
-        self._consent_at.pop(principal_id, None)
+        assert self.store is not None
+        self.store.revoke_consent(principal_id)
         self._audit(
             principal_id,
             "consent_revoke",
@@ -202,16 +367,25 @@ class PrincipalMemoryLifecycle:
         now_iso = now or _utc_now_iso()
         parse_instant("now", now_iso)
         stored = self._apply_retention_stamp(observation)
-        bucket = self._records.setdefault(principal_id, {})
         self._drop_expired_in_bucket(principal_id, now_iso)
+        assert self.store is not None
         if (
-            stored.analysis_history_id not in bucket
-            and len(bucket) >= self.policy.max_records_per_principal
+            not self.store.contains(principal_id, stored.analysis_history_id)
+            and self.store.count_records(principal_id) >= self.policy.max_records_per_principal
         ):
             raise ValueError("principal memory panel exceeds hard cap")
         if parse_instant("observed_at", stored.observed_at) > parse_instant("now", now_iso):
             raise ValueError("cannot collect a future observation")
-        bucket[stored.analysis_history_id] = stored
+        stamp = stamp_memory_provenance(
+            provenance_source=PROVENANCE_SOURCE_SYSTEM_RESOLVE,
+            actor_id=None,
+        )
+        stored = replace(
+            stored,
+            provenance_source=stamp["provenance_source"],
+            actor_id=stamp["actor_id"],
+        )
+        stored = self.store.upsert_observation(stored)
         self._audit(
             principal_id,
             "collect",
@@ -224,9 +398,18 @@ class PrincipalMemoryLifecycle:
     def expire_due(self, *, now: Optional[str] = None) -> int:
         now_iso = now or _utc_now_iso()
         parse_instant("now", now_iso)
+        assert self.store is not None
+        expired = self.store.expire_all_due(now_iso)
         total = 0
-        for principal_id in list(self._records):
-            total += self._drop_expired_in_bucket(principal_id, now_iso)
+        for principal_id, count in expired.items():
+            total += count
+            self._audit(
+                principal_id,
+                "expire",
+                at=now_iso,
+                detail="retention-expiry",
+                resource_count=count,
+            )
         return total
 
     def list_records(
@@ -241,15 +424,24 @@ class PrincipalMemoryLifecycle:
         as_of_iso = as_of or _utc_now_iso()
         parse_instant("as_of", as_of_iso)
         self._drop_expired_in_bucket(principal_id, as_of_iso)
-        rows = list(self._records.get(principal_id, {}).values())
-        rows.sort(
+        assert self.store is not None
+        rows = list(self.store.list_records(principal_id))
+        cutoff = parse_instant("as_of", as_of_iso)
+        visible = []
+        for row in rows:
+            if parse_instant("observed_at", row.observed_at) > cutoff:
+                continue
+            if row.expires_at is not None and parse_instant("expires_at", row.expires_at) <= cutoff:
+                continue
+            visible.append(row)
+        visible.sort(
             key=lambda row: (
                 parse_instant("observed_at", row.observed_at),
                 row.analysis_history_id,
             ),
             reverse=True,
         )
-        return rows
+        return visible
 
     def delete(
         self,
@@ -261,8 +453,8 @@ class PrincipalMemoryLifecycle:
         validate_principal_id(principal_id)
         if type(analysis_history_id) is not int or analysis_history_id <= 0:
             raise ValueError("analysis_history_id must be a positive int")
-        bucket = self._records.get(principal_id, {})
-        removed = bucket.pop(analysis_history_id, None) is not None
+        assert self.store is not None
+        removed = self.store.delete(principal_id, analysis_history_id)
         if removed:
             self._audit(
                 principal_id,
@@ -281,8 +473,8 @@ class PrincipalMemoryLifecycle:
         _from_revoke: bool = False,
     ) -> int:
         validate_principal_id(principal_id)
-        bucket = self._records.pop(principal_id, {})
-        count = len(bucket)
+        assert self.store is not None
+        count = self.store.clear(principal_id)
         if count and not _from_revoke:
             self._audit(
                 principal_id,
@@ -352,29 +544,17 @@ class PrincipalMemoryLifecycle:
         return replace(observation, expires_at=expires_at)
 
     def _drop_expired_in_bucket(self, principal_id: str, now_iso: str) -> int:
-        bucket = self._records.get(principal_id)
-        if not bucket:
-            return 0
-        now = parse_instant("now", now_iso)
-        expired_ids = [
-            history_id
-            for history_id, row in bucket.items()
-            if row.expires_at is not None
-            and parse_instant("expires_at", row.expires_at) <= now
-        ]
-        for history_id in expired_ids:
-            del bucket[history_id]
-        if expired_ids:
+        assert self.store is not None
+        expired = self.store.drop_expired(principal_id, now_iso)
+        if expired:
             self._audit(
                 principal_id,
                 "expire",
                 at=now_iso,
                 detail="retention-expiry",
-                resource_count=len(expired_ids),
+                resource_count=expired,
             )
-        if not bucket:
-            self._records.pop(principal_id, None)
-        return len(expired_ids)
+        return expired
 
     def _audit(
         self,

@@ -354,7 +354,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `KRONOS_MODEL_SIZE` | `mini` | 是 |  |
 | `KRONOS_WEIGHTS_DIR` | `/absolute/path/to/kronos-weights` | 是 | 模板中注释 |
 | `LAYERED_MEMORY_AUDIT_ENABLED` | `true` | 是 | 模板中注释 |
-| `LAYERED_MEMORY_COLLECTION_ENABLED` | `false` | 是 | 模板中注释; Principal-scoped layered memory lifecycle (Issue #250 / #198 foundation) |
+| `LAYERED_MEMORY_COLLECTION_ENABLED` | `false` | 是 | 模板中注释; Principal-scoped layered memory durable observation store (Issue #1118); default off, consent required, fail-soft |
 | `LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL` | `200` | 是 | 模板中注释 |
 | `LAYERED_MEMORY_RETENTION_DAYS` | `90` | 是 | 模板中注释 |
 | `LAYERED_MEMORY_VECTOR_ENABLED` | `false` | 是 | 模板中注释 |
