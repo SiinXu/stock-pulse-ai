@@ -5,14 +5,20 @@
 from __future__ import annotations
 
 import json
+import statistics
 
 import pytest
 
 from scripts.ci_test_shard import (
+    BACKEND_FIRST_SHARD_OVERHEAD_SECONDS,
     discover_test_files,
     load_durations,
     partition_test_files,
 )
+
+# Committed weights must stay useful, but new modules may use median fallback
+# until a hosted run refreshes .github/ci-test-durations.json.
+MIN_KNOWN_DURATION_COVERAGE = 0.95
 
 
 def test_partition_covers_all_modules_exactly_once() -> None:
@@ -69,15 +75,37 @@ def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
     assert "tests/test_broad_exception_guard.py" in shard_one
 
 
+def test_unknown_module_receives_median_weight_and_is_assigned_once() -> None:
+    files = [
+        "tests/test_a.py",
+        "tests/test_b.py",
+        "tests/test_c.py",
+        "tests/test_unknown_new.py",
+    ]
+    durations = {
+        "tests/test_a.py": 10.0,
+        "tests/test_b.py": 20.0,
+        "tests/test_c.py": 30.0,
+    }
+    median = statistics.median(durations.values())
+    groups, totals = partition_test_files(files, durations, splits=4)
+    explicit_groups, explicit_totals = partition_test_files(
+        files, {**durations, "tests/test_unknown_new.py": median}, splits=4
+    )
+    assigned = [path for group in groups for path in group]
+    assert assigned.count("tests/test_unknown_new.py") == 1
+    assert sorted(assigned) == sorted(files)
+    assert groups == explicit_groups
+    assert totals == explicit_totals
+
+
 def test_committed_durations_cover_modules_and_fit_backend_job_bound() -> None:
     files = discover_test_files()
     durations = load_durations()
-    assert durations
-    missing = [path for path in files if path not in durations]
-    assert missing == []
+    assert durations, "empty duration weights regress to the equal-1.0 shard-1 timeout"
+    known = [path for path in files if path in durations]
+    assert len(known) / len(files) >= MIN_KNOWN_DURATION_COVERAGE
     assert durations["tests/test_exception_log_callsite_guard.py"] >= 600.0
-
-    from scripts.ci_test_shard import BACKEND_FIRST_SHARD_OVERHEAD_SECONDS
 
     groups, totals = partition_test_files(
         files,
