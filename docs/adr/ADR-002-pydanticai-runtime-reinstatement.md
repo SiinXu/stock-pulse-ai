@@ -38,7 +38,7 @@ ADR 审批。本 ADR 同时完成该审批（见 D3）。
 以 RT-01 删除前基线适配当前 main 恢复以下资产：
 
 - `src/agent/runtime/pydantic_ai_adapter.py`、`src/agent/runtime/pydantic_ai_toolset.py`
-- `requirements-pydanticai.txt`（`pydantic-ai-slim` 及其传递闭包的精确版本集合，不进入默认 requirements）
+- `requirements/pydanticai.txt`（`pydantic-ai-slim` 及其传递闭包的精确版本集合，不进入默认 requirements）
 - `src/agent/factory.build_agent_runtime()` 装配 seam 与 executor 内部注入点
 - 实验测试与 conformance：`tests/agent/runtime/_pydantic_ai_dependency.py`、
   `test_pydantic_ai_adapter.py`、`test_pydantic_ai_real_bridge.py`、
@@ -87,7 +87,7 @@ ADR 审批。本 ADR 同时完成该审批（见 D3）。
 
 - adoption decision 第 4 章缺口（真实 provider benchmark、Desktop 多平台打包、
   其余泄漏面、双环境可复现依赖净增量）仍未收集，证据状态保持
-  `Historical / Partial`。安装兼容窗口已由 `requirements-pydanticai.txt` 的完整
+  `Historical / Partial`。安装兼容窗口已由 `requirements/pydanticai.txt` 的完整
   精确传递闭包和 Python 3.11 安装态 CI `pip check` 固化，但这不等同于双环境净
   增量、artifact hash 或多平台打包证据。
 - 本 ADR 只恢复可执行资产与离线门禁，不宣称 RF-06 完成，不重写历史裁决记录。

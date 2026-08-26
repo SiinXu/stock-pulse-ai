@@ -5,7 +5,7 @@
 # Install only to exercise the test/evidence PydanticAI POC path:
 #
 #   python -m pip install --upgrade --constraint constraints.txt pip
-#   python -m pip install --build-constraint build-constraints.txt -r requirements-pydanticai.txt
+#   python -m pip install --build-constraint build-constraints.txt -r requirements/pydanticai.txt
 #   python -m pip check
 #
 # This file is the complete version-locked dependency closure for the slim POC

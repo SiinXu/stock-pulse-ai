@@ -3111,7 +3111,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "description": (
             "Opt-in bounded Tesseract OCR Agent Tool (issue #196). Default is off. "
             "When enabled with OCR_FILE_ROOT or MULTIMODAL_FILE_ROOT and optional "
-            "requirements-ocr.txt + system Tesseract, Agents may call "
+            "requirements/ocr.txt + system Tesseract, Agents may call "
             "extract_image_text after a process restart. Image bytes stay local; "
             "redacted, untrusted OCR text enters Agent context and may reach a remote "
             "model unless LOCAL_ONLY_MODE=true. Supports screenshot, filing_page, "

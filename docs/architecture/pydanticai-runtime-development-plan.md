@@ -319,7 +319,7 @@ Spike 必须验证:
   - Internal-only 注入点(测试构造/内部工厂参数),**不新增用户设置与环境变量开关文档**。
   - 第一版只做**一条最小代表性路径**(推荐 Single Agent run,见第 14 章审批点 4),不同时迁移 Single/Multi/Research 与所有 API。
 - 前置:AR-PY-03 合入;方案 A/B 由维护者依 Spike 证据裁决。
-- 预计文件:`src/agent/runtime/pydantic_ai_adapter.py`(新,惰性 import);可选依赖清单文件(如 `requirements-pydanticai.txt`,具体形式在 PR 中与维护者确认);`tests/agent/runtime/test_pydantic_ai_adapter.py`(新,含依赖缺失路径)。
+- 预计文件:`src/agent/runtime/pydantic_ai_adapter.py`(新,惰性 import);可选依赖清单文件(如 `requirements/pydanticai.txt`,具体形式在 PR 中与维护者确认);`tests/agent/runtime/test_pydantic_ai_adapter.py`(新,含依赖缺失路径)。
 - 测试:第 10.1 节全量 + 依赖缺失/版本不兼容用例;PydanticAI 路径用 deterministic fake model 驱动。
 - 验收:未安装可选依赖时全套件绿;安装后 POC 路径能以 fake model 跑通并产出 StockPulse 契约结果;不触碰任何禁区(第 5.4 节)。
 - 风险:PydanticAI 版本演进破坏 Adapter——版本 pin + 升级走独立 PR。

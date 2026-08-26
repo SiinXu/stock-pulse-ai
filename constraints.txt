@@ -1,7 +1,7 @@
 # StockPulse universal Python dependency constraints
 # Generated file; do not edit by hand.
 # Resolver: uv==0.11.31
-# Source-SHA256: 5be397c12e687164973528529e7865006cf0db9ebd608f467d6f016c385d39bd
+# Source-SHA256: fdf62fbd86781516c4d6793b95009bfcfab23a282c48657b9ab5a21cb2ac442c
 # Python-Minimum: 3.10
 # Exclude-Newer: 2026-07-27T04:06:13Z
 # Exclude-Newer-Packages: cryptography=2026-07-31T14:25:11Z,mcp=2026-07-29T00:00:00Z,mcp-types=2026-07-29T00:00:00Z,pip=2026-08-04T22:51:15Z

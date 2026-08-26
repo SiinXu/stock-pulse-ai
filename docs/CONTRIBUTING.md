@@ -122,7 +122,7 @@ docs: update the README deployment guide
 | backend-gate | PR：path-selective offline pytest；mapping 为 FULL 时复用 `backend-tests` 四分片（必需检查名仍为 `backend-gate`）；push-to-main：分片完整 suite + coverage floor | ✅ |
 | python-minimum | PR：Python 3.10 import/schema smoke；push-to-main：在 Python 3.10 上运行分片完整 offline suite（必需检查名仍为 `python-minimum`） | ✅ |
 | pydanticai-installed | 安装可选 PydanticAI 依赖并执行不允许跳过的实验运行时测试 | ✅ |
-| ocr-stock-extractor | 始终给出结论；OCR / 图片股票提取路径变更时安装 `requirements-ocr.txt` 与 Tesseract，并执行不允许跳过的既有提取测试；无相关变更时记录摘要；变更检测不可用时 fail closed | ✅ |
+| ocr-stock-extractor | 始终给出结论；OCR / 图片股票提取路径变更时安装 `requirements/ocr.txt` 与 Tesseract，并执行不允许跳过的既有提取测试；无相关变更时记录摘要；变更检测不可用时 fail closed | ✅ |
 | docker-build | Docker 镜像构建与关键模块导入 smoke | ✅ |
 | openapi-types-gate | 重新生成后端 OpenAPI 快照与 Web TypeScript 类型并拒绝已提交产物漂移 | ✅ |
 | web-gate | 始终给出结论；Web 变更时执行 `npm run lint` + `npm run test:i18n` + `npm run test:coverage`，再按场景运行运行时性能预算（阻断型结构指标失败关闭，观察只告警，跳过表示不可用），然后 `npm run build` 并阻断 bundle size budget；无 Web 变更时记录摘要；变更检测不可用时 fail closed | ✅ |
@@ -182,7 +182,7 @@ cd ../..
 
 # 可选 OCR + 图片股票提取（CI job ocr-stock-extractor）
 # 需要系统 Tesseract（`tesseract-ocr` + `tesseract-ocr-eng`）
-python -m pip install --build-constraint build-constraints.txt -r requirements-ocr.txt
+python -m pip install --build-constraint build-constraints.txt -r requirements/ocr.txt
 python -m pytest -m "not network" \
   tests/services/test_image_stock_extractor_litellm.py \
   tests/services/test_image_stock_extractor_contract.py \
