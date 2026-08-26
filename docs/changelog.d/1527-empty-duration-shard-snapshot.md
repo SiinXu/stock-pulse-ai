@@ -1,0 +1,1 @@
+- [Tests] Lock the empty-duration shard-1 hotspot counterexample to the committed duration snapshot so new median-fallback modules cannot shift that assignment.

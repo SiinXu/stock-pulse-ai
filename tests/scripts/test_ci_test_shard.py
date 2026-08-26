@@ -64,15 +64,31 @@ def test_greedy_partition_isolates_a_dominant_module() -> None:
 
 
 def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
-    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment."""
+    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment.
 
-    files = discover_test_files()
+    Lock the counterexample to the committed duration snapshot. Unknown
+    modules may use median fallback before a hosted refresh; they must not
+    shift this empty-map assignment. An alphabetically early extra file is
+    the deterministic counterexample (PR #1527 ``tests/agent/test_red_team.py``).
+    """
+
+    snapshot = load_durations()
+    assert snapshot, "empty duration weights regress to the equal-1.0 shard-1 timeout"
+    files = [path for path in discover_test_files() if path in snapshot]
     groups, _totals = partition_test_files(
         files, {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
     )
     shard_one = set(groups[0])
     assert "tests/test_exception_log_callsite_guard.py" in shard_one
     assert "tests/test_broad_exception_guard.py" in shard_one
+
+    shifted_groups, _shifted_totals = partition_test_files(
+        [*files, "tests/agent/test_unknown_new.py"],
+        {},
+        splits=4,
+        initial_totals=[30.0, 0.0, 0.0, 0.0],
+    )
+    assert "tests/test_exception_log_callsite_guard.py" not in set(shifted_groups[0])
 
 
 def test_unknown_module_receives_median_weight_and_is_assigned_once() -> None:
