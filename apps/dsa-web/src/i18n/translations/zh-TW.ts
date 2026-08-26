@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "不會從網頁介面自動下載權重。詳見 docs/kronos-local-model.md。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "可選的本機 Kronos K 線預測 Agent Tool（不是聊天 LLM）。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "啟用 Kronos 本機預測",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "先安裝 requirements-kronos.txt，用 scripts/download_kronos_weights.py 下載權重並設定 KRONOS_WEIGHTS_DIR，再啟用並重啟。可在「本機模型」頁的 Kronos 狀態面板核對。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "先安裝 requirements/kronos.txt，用 scripts/download_kronos_weights.py 下載權重並設定 KRONOS_WEIGHTS_DIR，再啟用並重啟。可在「本機模型」頁的 Kronos 狀態面板核對。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "預設關閉；未就緒時不影響主分析流程。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "啟用後需要重啟進程，內建外掛才會註冊工具。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "預建桌面版不支援 Kronos。",

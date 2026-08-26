@@ -123,7 +123,9 @@ from src.services.prediction_extractor import (
 )
 from src.agent.orchestrator_parts.chat import (
     _ChatMethods,
+    _aggregate_mode_budget_fields,
     _build_dashboard_run_router_facts,
+    _public_agent_result,
 )
 from src.agent.orchestrator_parts.dashboard import (
     _DashboardMethods,
@@ -164,7 +166,9 @@ _ORCHESTRATOR_COMPAT_EXPORTS = (
     build_agent_chat_tool_registry,
     build_agent_tool_history_context,
     build_agent_disagreement_summary,
+    _aggregate_mode_budget_fields,
     _build_dashboard_run_router_facts,
+    _public_agent_result,
     build_agent_runtime_facts,
     _build_approved_risk_bypass_application,
     build_risk_override_application,

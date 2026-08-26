@@ -179,7 +179,7 @@ Default application installs must use both `constraints.txt` and
 `build-constraints.txt`. Do not omit either constraint file. Optional
 capabilities (Kronos, desktop packaging, CI/dev tooling, experimental
 PydanticAI) install **after** the default set via the matching
-`requirements-*.txt` or `.github/requirements-ci.txt`, still under the same
+`requirements/*.txt` or `.github/requirements-ci.txt`, still under the same
 constraints—see [Full Guide · Install Dependencies](full-guide_EN.md#install-dependencies).
 `pyproject.toml` extras only expose group names; the lock remains authoritative.
 

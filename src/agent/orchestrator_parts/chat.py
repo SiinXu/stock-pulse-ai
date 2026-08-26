@@ -40,6 +40,72 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("src.agent.orchestrator")
 
+_HARD_BUDGET_FAILURE_REASONS = frozenset({
+    "budget_turns",
+    "budget_tools",
+    "budget_cost",
+    "budget_tokens",
+})
+
+
+def _failure_reason_value(reason: Any) -> Optional[str]:
+    """Normalize enum or string failure reasons onto the public AgentResult."""
+    if reason is None:
+        return None
+    value = getattr(reason, "value", reason)
+    if isinstance(value, str) and value:
+        return value
+    return None
+
+
+def _aggregate_mode_budget_fields(
+    *results: Any,
+) -> tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """Keep a mode-budget snapshot/reason when Multi-symbol legs are combined.
+
+    Prefers a snapshot that records a breach. Hard-budget reasons stay
+    observable; callers decide whether a successful aggregate publishes them.
+    """
+    snapshots: List[Dict[str, Any]] = []
+    hard_reasons: List[str] = []
+    for result in results:
+        if result is None:
+            continue
+        snap = getattr(result, "budget_snapshot", None)
+        if isinstance(snap, dict):
+            snapshots.append(snap)
+        reason = _failure_reason_value(getattr(result, "failure_reason", None))
+        if reason in _HARD_BUDGET_FAILURE_REASONS:
+            hard_reasons.append(reason)
+    breached = [item for item in snapshots if isinstance(item.get("breach"), dict)]
+    snapshot = (breached or snapshots)[-1] if (breached or snapshots) else None
+    failure_reason = hard_reasons[-1] if hard_reasons else None
+    return snapshot, failure_reason
+
+
+def _public_agent_result(orch_result: Any) -> "AgentResult":
+    """Copy Multi pipeline fields onto the public ``AgentResult`` contract."""
+    from src.agent.executor import AgentResult
+
+    return AgentResult(
+        success=orch_result.success,
+        content=orch_result.content,
+        dashboard=orch_result.dashboard,
+        tool_calls_log=orch_result.tool_calls_log,
+        total_steps=orch_result.total_steps,
+        total_tokens=orch_result.total_tokens,
+        provider=orch_result.provider,
+        model=orch_result.model,
+        error=orch_result.error,
+        runtime_facts=orch_result.runtime_facts,
+        cancelled=orch_result.cancelled,
+        timed_out=orch_result.timed_out,
+        budget_snapshot=getattr(orch_result, "budget_snapshot", None),
+        failure_reason=_failure_reason_value(
+            getattr(orch_result, "failure_reason", None)
+        ),
+    )
+
 
 def _build_dashboard_run_router_facts(
     scope_resolution: Any,
@@ -143,20 +209,7 @@ class _ChatMethods:
                 ctx, parse_dashboard=True, cancelled_check=cancelled_check
             )
 
-            return AgentResult(
-                success=orch_result.success,
-                content=orch_result.content,
-                dashboard=orch_result.dashboard,
-                tool_calls_log=orch_result.tool_calls_log,
-                total_steps=orch_result.total_steps,
-                total_tokens=orch_result.total_tokens,
-                provider=orch_result.provider,
-                model=orch_result.model,
-                error=orch_result.error,
-                runtime_facts=orch_result.runtime_facts,
-                cancelled=orch_result.cancelled,
-                timed_out=orch_result.timed_out,
-            )
+            return _public_agent_result(orch_result)
         finally:
             self.mode = configured_mode
             self.mode_budget_limits = configured_budget_limits
@@ -363,20 +416,7 @@ class _ChatMethods:
                 AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
             )
 
-        return AgentResult(
-            success=orch_result.success,
-            content=orch_result.content,
-            dashboard=orch_result.dashboard,
-            tool_calls_log=orch_result.tool_calls_log,
-            total_steps=orch_result.total_steps,
-            total_tokens=orch_result.total_tokens,
-            provider=orch_result.provider,
-            model=orch_result.model,
-            error=orch_result.error,
-            runtime_facts=orch_result.runtime_facts,
-            cancelled=orch_result.cancelled,
-            timed_out=orch_result.timed_out,
-        )
+        return _public_agent_result(orch_result)
 
     def _build_chat_pipeline_context(
         self,
@@ -434,6 +474,9 @@ class _ChatMethods:
                 ),
                 None,
             )
+        snapshot, failure_reason = _aggregate_mode_budget_fields(
+            *(result for _, result in per_symbol_results)
+        )
         return OrchestratorResult(
             success=False,
             content="",
@@ -456,6 +499,8 @@ class _ChatMethods:
             error=error or "Pipeline cancelled",
             runtime_facts=runtime_facts,
             cancelled=True,
+            budget_snapshot=snapshot,
+            failure_reason=failure_reason,
         )
 
     def _execute_multi_symbol_chat(
@@ -695,6 +740,9 @@ class _ChatMethods:
                         per_symbol_results,
                         soul_system_prompt=system_prompt,
                     )
+                snapshot, failure_reason = _aggregate_mode_budget_fields(
+                    *(result for _, result in per_symbol_results)
+                )
                 return OrchestratorResult(
                     success=False,
                     content="",
@@ -706,6 +754,8 @@ class _ChatMethods:
                     error=AGENT_CHAT_FAILURE_MESSAGE,
                     runtime_facts=soul_runtime_facts,
                     timed_out=isinstance(exc, TimeoutError),
+                    budget_snapshot=snapshot,
+                    failure_reason=failure_reason,
                 )
         if loop_result is not None and loop_result.cancelled:
             return self._build_multi_symbol_cancelled_result(
@@ -752,8 +802,13 @@ class _ChatMethods:
 
         if loop_result is not None and loop_result.model:
             models.append(loop_result.model)
+        success = bool(content) and has_usable_evidence
+        snapshot, budget_reason = _aggregate_mode_budget_fields(
+            *(result for _, result in per_symbol_results),
+            loop_result,
+        )
         return OrchestratorResult(
-            success=bool(content) and has_usable_evidence,
+            success=success,
             content=content,
             tool_calls_log=per_symbol_tool_calls_log,
             total_steps=(
@@ -785,6 +840,8 @@ class _ChatMethods:
                     )
                 )
             ),
+            budget_snapshot=snapshot,
+            failure_reason=None if success else budget_reason,
         )
 
     @staticmethod

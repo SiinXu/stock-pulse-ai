@@ -783,7 +783,7 @@ AI_MODEL_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "title": "Enable Kronos Local Forecast",
         "description": (
             "Opt-in local Kronos K-line forecasting Agent Tool. Requires optional "
-            "dependencies (requirements-kronos.txt), local weights under "
+            "dependencies (requirements/kronos.txt), local weights under "
             "KRONOS_WEIGHTS_DIR, and a process restart after enabling so the tool "
             "can register. Not available in the prebuilt desktop package. "
             "See docs/kronos-local-model.md."

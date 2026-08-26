@@ -82,4 +82,6 @@ export const WorkspaceNavigation = forwardRef<
   );
 });
 
-WorkspaceNavigation.displayName = 'WorkspaceNavigation';
+if (import.meta.env.DEV) {
+  WorkspaceNavigation.displayName = 'WorkspaceNavigation';
+}
