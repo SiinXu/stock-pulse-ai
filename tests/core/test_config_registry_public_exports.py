@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "13880e5ca058da04b82edf4c9a58833a0e3785ec8c5b26c971df3d8b90e0901b"
+    "237ed83d7b6511a306ae2e23d093b2ef162c0d2b3bae8ea4de461529cb27a9fd"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "22972640bcf1b7ef4d8c7482a202b8df80a73f251c76d187ea3c3e97731cc496"
+    "6037b055dbb435ecfbd936f93e88c62f5c94f3c41f0cde1196232992ff056259"
 )
 
 
@@ -104,8 +104,8 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for AGENT_ONLINE_ADAPTERS_ENABLED description
-    # after BaseAgent gated confidence apply (Issue #1091).
+    # Snapshot refresh for AGENT_RED_TEAM_ENABLED (Issue #1135) after
+    # merging catalog-description skill retrieval (Issue #1518 / #1123).
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256
