@@ -25,4 +25,6 @@ export const AppPage = forwardRef<HTMLDivElement, AppPageProps>(({
   );
 });
 
-AppPage.displayName = 'AppPage';
+if (import.meta.env.DEV) {
+  AppPage.displayName = 'AppPage';
+}

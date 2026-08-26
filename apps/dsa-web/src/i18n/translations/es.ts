@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "Nunca descarga pesos automáticamente desde la UI web. Vea docs/kronos-local-model.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "Herramienta Agent opcional de previsión de velas Kronos local (no es un LLM de chat).",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Activar previsión local Kronos",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Instale requirements-kronos.txt, descargue pesos con scripts/download_kronos_weights.py, configure KRONOS_WEIGHTS_DIR, active y reinicie. Verifique en Modelos locales.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Instale requirements/kronos.txt, descargue pesos con scripts/download_kronos_weights.py, configure KRONOS_WEIGHTS_DIR, active y reinicie. Verifique en Modelos locales.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "Por defecto false; el análisis continúa sin Kronos si está desactivado o no listo.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "Tras activar se requiere reiniciar el proceso para registrar la herramienta.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "Los paquetes de escritorio precompilados no admiten Kronos.",

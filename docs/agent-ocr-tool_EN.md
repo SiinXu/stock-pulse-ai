@@ -94,11 +94,11 @@ The `builtin.ocr` plugin registers `extract_image_text` only after all gates:
 
 1. `OCR_AGENT_TOOL_ENABLED=true`
 2. `OCR_FILE_ROOT` or fallback `MULTIMODAL_FILE_ROOT`
-3. optional Python packages from `requirements-ocr.txt`
+3. optional Python packages from `requirements/ocr.txt`
 4. system Tesseract binary and selected language packs
 
 ```bash
-python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements-ocr.txt
+python -m pip install --constraint constraints.txt --build-constraint build-constraints.txt -r requirements/ocr.txt
 # macOS: brew install tesseract tesseract-lang
 # Debian: apt install tesseract-ocr tesseract-ocr-chi-sim tesseract-ocr-eng
 ```
@@ -118,7 +118,7 @@ injected engine output. A real English Tesseract check remains optional when
 the host provides the binary; this phase does not claim required
 Chinese/dense-table quality.
 
-PR CI (`ocr-stock-extractor`) installs `requirements-ocr.txt` plus `tesseract-ocr`
+PR CI (`ocr-stock-extractor`) installs `requirements/ocr.txt` plus `tesseract-ocr`
 and `tesseract-ocr-eng` when extractor paths change, then runs the existing
 offline extractor tests and treats dependency skips as failures. It does not
 install `chi_sim` or make network tests blocking.

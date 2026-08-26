@@ -2314,7 +2314,7 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
   'settings.ai_model.KRONOS_ENABLED': {
     title: '启用 Kronos 本地预测',
     summary: '可选的本地 Kronos K 线预测 Agent Tool（不是聊天 LLM）。',
-    usage: '先安装 requirements-kronos.txt，用 scripts/download_kronos_weights.py 下载权重并设置 KRONOS_WEIGHTS_DIR，再启用并重启。可在「本地模型」页的 Kronos 状态面板核对就绪条件。',
+    usage: '先安装 requirements/kronos.txt，用 scripts/download_kronos_weights.py 下载权重并设置 KRONOS_WEIGHTS_DIR，再启用并重启。可在「本地模型」页的 Kronos 状态面板核对就绪条件。',
     valueNotes: [
       '默认关闭；未就绪时不影响主分析流程。',
       '启用后需要重启进程，内置插件才会注册工具。',

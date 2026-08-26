@@ -125,7 +125,7 @@ def _require_pydantic_ai() -> Any:
         raise PydanticAIRuntimeUnavailableError(
             "PydanticAI runtime requested but the optional dependency is not "
             f"installed. Install '{_PYDANTIC_AI_DIST}' (see "
-            "requirements-pydanticai.txt) or use the Native runtime."
+            "requirements/pydanticai.txt) or use the Native runtime."
         ) from exc
 
 

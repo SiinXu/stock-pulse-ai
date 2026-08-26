@@ -46,7 +46,7 @@ Install the exact optional set after the base application:
 
 ```bash
 python -m pip install --build-constraint build-constraints.txt \
-  -r requirements-report-export.txt
+  -r requirements/report-export.txt
 ```
 
 The optional file pins `fpdf2==2.8.3`, `fonttools==4.63.0`, and

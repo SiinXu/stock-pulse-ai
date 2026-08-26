@@ -37,6 +37,7 @@
 | [完整配置与部署指南](full-guide.md) | 环境准备、运行方式、配置说明、部署路径和常见问题 |
 | [环境变量清单与配置事实源](environment-variables.md) | `.env.example` / 注册表 / 文档三方清单、配置项新增流程与一致性检查 |
 | [FAQ](FAQ.md) | 常见配置、模型、通知、部署和运行问题 |
+| [第三方许可声明](legal/THIRD_PARTY_NOTICES) | 捆绑依赖（含内嵌 Ollama）的许可证与版权声明 |
 | [持久安全审计](security-audit_zh.md) / [EN](security-audit.md) | 事件合同、特权路径覆盖图（已落地/部分/缺失/延期）、剩余 DAG、管理员查询、保留与容量、篡改边界、失败语义与回滚 |
 | [数据源稳定性与故障处理图示](data-source-stability.md) | Tushare、TickFlow、AkShare、Efinance、YFinance、Longbridge 等已接入源的使用场景、fallback 链路和推荐配置 |
 | [Futu OpenD 组合持仓导入](futu-opend-portfolio-import.md) | OpenD 配置、FUTU_* 设置项、实盘持仓导入 API、降级语义与本地网关网络策略 |

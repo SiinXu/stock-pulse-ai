@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "Tidak pernah mengunduh bobot otomatis dari UI web. Lihat docs/kronos-local-model.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "Tool Agent prakiraan K-line Kronos lokal opsional (bukan LLM chat).",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Aktifkan prakiraan lokal Kronos",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Instal requirements-kronos.txt, unduh bobot dengan scripts/download_kronos_weights.py, set KRONOS_WEIGHTS_DIR, aktifkan dan mulai ulang. Verifikasi di Model lokal.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Instal requirements/kronos.txt, unduh bobot dengan scripts/download_kronos_weights.py, set KRONOS_WEIGHTS_DIR, aktifkan dan mulai ulang. Verifikasi di Model lokal.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "Default false; analisis tetap berjalan tanpa Kronos jika nonaktif atau belum siap.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "Setelah diaktifkan, proses harus dimulai ulang agar tool terdaftar.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "Paket desktop prabangun tidak mendukung Kronos.",

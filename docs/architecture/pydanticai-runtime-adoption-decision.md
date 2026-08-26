@@ -80,7 +80,7 @@ result/dashboard、公开诊断脱敏且有界，同时内部仍抛回同一个�
 平台元数据或 artifact hash。因此原先的传递闭包和净新增包数量无法从仓库重建，
 相关数字与“增量成本较低”的结论已删除。
 
-ADR-002 恢复后，`requirements-pydanticai.txt` 现精确锁定 PydanticAI slim POC 的
+ADR-002 恢复后，`requirements/pydanticai.txt` 现精确锁定 PydanticAI slim POC 的
 完整传递依赖版本，Python 3.11 `pydanticai-installed` 阻断 job 在与默认依赖联合安装
 后执行 `pip check`。这使当前安装兼容窗口可复现，但仍不是两个干净环境的净增量
 比较，也没有平台矩阵、resolver report 或 artifact hash；因此不得据此恢复历史包数

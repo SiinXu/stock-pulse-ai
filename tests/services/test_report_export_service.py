@@ -160,7 +160,7 @@ def test_html_rejects_missing_markdown_it(monkeypatch):
     with pytest.raises(ReportExportDependencyError) as exc:
         export_html_bytes("# Report")
     assert exc.value.error_code == "export_dependency_missing"
-    assert "requirements-report-export" in exc.value.install_hint
+    assert "requirements/report-export.txt" in exc.value.install_hint
 
 
 def test_capabilities_are_language_aware_and_never_expose_paths(monkeypatch, tmp_path):
@@ -203,7 +203,7 @@ def test_pdf_rejects_missing_or_conflicting_backend(monkeypatch):
     with pytest.raises(ReportExportDependencyError) as exc:
         export_pdf_bytes("# Report")
     assert exc.value.error_code == "export_dependency_missing"
-    assert "requirements-report-export" in exc.value.install_hint
+    assert "requirements/report-export.txt" in exc.value.install_hint
 
 
 def test_backend_detects_legacy_only_namespace(monkeypatch):

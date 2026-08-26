@@ -10972,7 +10972,7 @@ export const SOURCE_UI_TRANSLATIONS: Record<UiTranslationKey, string> = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "Never auto-downloads weights from the Web UI. See docs/kronos-local-model.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "Opt-in local Kronos K-line forecasting Agent Tool (not an LLM chat model).",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Enable Kronos Local Forecast",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Install requirements-kronos.txt, download weights with scripts/download_kronos_weights.py, set KRONOS_WEIGHTS_DIR, then enable and restart. Use the Kronos status panel on Local Models to verify.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "Install requirements/kronos.txt, download weights with scripts/download_kronos_weights.py, set KRONOS_WEIGHTS_DIR, then enable and restart. Use the Kronos status panel on Local Models to verify.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "Default is false; analysis continues without Kronos when disabled or not ready.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "A process restart is required after enabling so the built-in plugin can register the tool.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "Prebuilt desktop packages do not support Kronos.",

@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "Lädt Gewichte nie automatisch über die Web-UI. Siehe docs/kronos-local-model.md.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "Optionales lokales Kronos-K-Linien-Prognose-Agent-Tool (kein Chat-LLM).",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Kronos-Lokalprognose aktivieren",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "requirements-kronos.txt installieren, Gewichte mit scripts/download_kronos_weights.py laden, KRONOS_WEIGHTS_DIR setzen, aktivieren und neu starten. Status unter Lokale Modelle prüfen.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "requirements/kronos.txt installieren, Gewichte mit scripts/download_kronos_weights.py laden, KRONOS_WEIGHTS_DIR setzen, aktivieren und neu starten. Status unter Lokale Modelle prüfen.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "Standard false; die Analyse läuft ohne Kronos weiter, wenn deaktiviert oder nicht bereit.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "Nach dem Aktivieren ist ein Neustart nötig, damit das Plugin das Tool registriert.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "Vorgefertigte Desktop-Pakete unterstützen Kronos nicht.",

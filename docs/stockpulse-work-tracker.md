@@ -39,7 +39,7 @@
 | 2026-07-18 | RF-05 范围审批(recovery plan 审批点 2/3) | 维护者批准:CHAT/RESEARCH 冻结为 `unsupported_capability`、复用 native prompt 权威(`build_run_messages`)、usage 单点记录;首版 conformance 仅覆盖 Single RUN 支持矩阵 |
 | 2026-07-18 | RF-07 产品化裁决 | 维护者裁决 `Native Only`(recovery plan 默认):Native 永久默认、零 PydanticAI 依赖;实验 Runtime 休眠可删;`Continue Experimental` 因缺真实 benchmark 与 Desktop 证据未启用;见 `docs/architecture/pydanticai-runtime-adoption-decision.md`(`Accepted`) |
 | 2026-07-19 | Native Only 实施 | 删除实验 Adapter、toolset、可选依赖、注入点、cross-runtime 测试与专用 CI；保留 Native Contract、BoundToolSession、生命周期、事件、sanitizer 与 36 replay fixture |
-| 2026-07-19 | ADR-002 改判(Continue Experimental) | 维护者裁决按 ADR-002 明确记录的降低门槛恢复测试/证据 POC：恢复 Adapter、toolset、精确锁定的 `requirements-pydanticai.txt`、cross-runtime conformance(显式 fixture ID 允许清单,未知 `single_run` fixture fail closed)与 `pydanticai-installed` CI；无生产 selector，Native 是唯一生产装配；证据状态不升级；见 `docs/adr/ADR-002-pydanticai-runtime-reinstatement.md` |
+| 2026-07-19 | ADR-002 改判(Continue Experimental) | 维护者裁决按 ADR-002 明确记录的降低门槛恢复测试/证据 POC：恢复 Adapter、toolset、精确锁定的 `requirements/pydanticai.txt`、cross-runtime conformance(显式 fixture ID 允许清单,未知 `single_run` fixture fail closed)与 `pydanticai-installed` CI；无生产 selector，Native 是唯一生产装配；证据状态不升级；见 `docs/adr/ADR-002-pydanticai-runtime-reinstatement.md` |
 
 ## 4. 治理文档清单与状态
 

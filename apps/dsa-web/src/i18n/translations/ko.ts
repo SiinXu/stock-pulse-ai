@@ -3688,7 +3688,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.notes.0": "웹 UI에서 가중치를 자동 다운로드하지 않습니다. docs/kronos-local-model.md 참고.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.summary": "선택적 로컬 Kronos K선 예측 Agent Tool(채팅 LLM 아님).",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.title": "Kronos 로컬 예측 사용",
-  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "requirements-kronos.txt 설치, scripts/download_kronos_weights.py 로 가중치 다운로드, KRONOS_WEIGHTS_DIR 설정 후 사용 및 재시작. 로컬 모델 상태 패널에서 확인.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.usage": "requirements/kronos.txt 설치, scripts/download_kronos_weights.py 로 가중치 다운로드, KRONOS_WEIGHTS_DIR 설정 후 사용 및 재시작. 로컬 모델 상태 패널에서 확인.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.0": "기본 false. 비활성/미준비여도 주 분석은 계속됩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.1": "사용 후 프로세스 재시작이 있어야 플러그인이 도구를 등록합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.ai_model.KRONOS_ENABLED.valueNotes.2": "사전 빌드 데스크톱 패키지는 Kronos를 지원하지 않습니다.",
