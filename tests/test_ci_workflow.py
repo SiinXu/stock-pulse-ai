@@ -272,6 +272,16 @@ def test_pr_full_fallback_uses_sharded_backend_tests_not_unsharded_suite() -> No
     assert shards["timeout-minutes"] == 30
     assert shards["strategy"]["fail-fast"] is False
     assert shards["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
+    from scripts.ci_test_shard import BACKEND_FIRST_SHARD_OVERHEAD_SECONDS
+
+    shard_env = next(
+        step["env"]
+        for step in shards["steps"]
+        if "offline-tests-shard" in step.get("run", "")
+    )
+    assert shard_env["PYTEST_FIRST_SHARD_OVERHEAD"] == str(
+        int(BACKEND_FIRST_SHARD_OVERHEAD_SECONDS)
+    )
     _assert_job_fail_closed(selective)
     _assert_job_fail_closed(shards)
     _assert_job_fail_closed(aggregator)
@@ -434,6 +444,17 @@ def test_python_minimum_push_covers_sharded_python_310_suite() -> None:
     assert env["PYTEST_GROUP"] == "${{ matrix.shard }}"
     assert env["PYTEST_FIRST_SHARD_OVERHEAD"] == "0"
     assert "COVERAGE_SHARD_DIR" in env
+    from scripts.ci_test_shard import BACKEND_FIRST_SHARD_OVERHEAD_SECONDS
+
+    backend_env = next(
+        step["env"]
+        for step in backend_shards["steps"]
+        if "offline-tests-shard" in step.get("run", "")
+    )
+    assert backend_env["PYTEST_FIRST_SHARD_OVERHEAD"] == str(
+        int(BACKEND_FIRST_SHARD_OVERHEAD_SECONDS)
+    )
+    assert backend_env["PYTEST_FIRST_SHARD_OVERHEAD"] != env["PYTEST_FIRST_SHARD_OVERHEAD"]
 
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert not any("ci_gate.sh syntax" in command for command in runs)

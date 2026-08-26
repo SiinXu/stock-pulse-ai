@@ -5,14 +5,20 @@
 from __future__ import annotations
 
 import json
+import statistics
 
 import pytest
 
 from scripts.ci_test_shard import (
+    BACKEND_FIRST_SHARD_OVERHEAD_SECONDS,
     discover_test_files,
     load_durations,
     partition_test_files,
 )
+
+# Committed weights must stay useful, but new modules may use median fallback
+# until a hosted run refreshes .github/ci-test-durations.json.
+MIN_KNOWN_DURATION_COVERAGE = 0.95
 
 
 def test_partition_covers_all_modules_exactly_once() -> None:
@@ -34,6 +40,88 @@ def test_discover_finds_repo_tests() -> None:
     found = discover_test_files()
     assert found
     assert all(path.startswith("tests/") and path.endswith(".py") for path in found)
+
+
+def test_greedy_partition_isolates_a_dominant_module() -> None:
+    files = [
+        "tests/test_a.py",
+        "tests/test_b.py",
+        "tests/test_c.py",
+        "tests/test_hot.py",
+    ]
+    durations = {
+        "tests/test_a.py": 10.0,
+        "tests/test_b.py": 10.0,
+        "tests/test_c.py": 10.0,
+        "tests/test_hot.py": 900.0,
+    }
+    groups, totals = partition_test_files(files, durations, splits=4)
+    hot_index = next(i for i, group in enumerate(groups) if "tests/test_hot.py" in group)
+    assert groups[hot_index] == ["tests/test_hot.py"]
+    assert totals[hot_index] == 900.0
+    flat = [path for group in groups for path in group]
+    assert sorted(flat) == sorted(files)
+
+
+def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
+    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment."""
+
+    files = discover_test_files()
+    groups, _totals = partition_test_files(
+        files, {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
+    )
+    shard_one = set(groups[0])
+    assert "tests/test_exception_log_callsite_guard.py" in shard_one
+    assert "tests/test_broad_exception_guard.py" in shard_one
+
+
+def test_unknown_module_receives_median_weight_and_is_assigned_once() -> None:
+    files = [
+        "tests/test_a.py",
+        "tests/test_b.py",
+        "tests/test_c.py",
+        "tests/test_unknown_new.py",
+    ]
+    durations = {
+        "tests/test_a.py": 10.0,
+        "tests/test_b.py": 20.0,
+        "tests/test_c.py": 30.0,
+    }
+    median = statistics.median(durations.values())
+    groups, totals = partition_test_files(files, durations, splits=4)
+    explicit_groups, explicit_totals = partition_test_files(
+        files, {**durations, "tests/test_unknown_new.py": median}, splits=4
+    )
+    assigned = [path for group in groups for path in group]
+    assert assigned.count("tests/test_unknown_new.py") == 1
+    assert sorted(assigned) == sorted(files)
+    assert groups == explicit_groups
+    assert totals == explicit_totals
+
+
+def test_committed_durations_cover_modules_and_fit_backend_job_bound() -> None:
+    files = discover_test_files()
+    durations = load_durations()
+    assert durations, "empty duration weights regress to the equal-1.0 shard-1 timeout"
+    known = [path for path in files if path in durations]
+    assert len(known) / len(files) >= MIN_KNOWN_DURATION_COVERAGE
+    assert durations["tests/test_exception_log_callsite_guard.py"] >= 600.0
+
+    groups, totals = partition_test_files(
+        files,
+        durations,
+        splits=4,
+        initial_totals=[BACKEND_FIRST_SHARD_OVERHEAD_SECONDS, 0.0, 0.0, 0.0],
+    )
+    covered = [path for group in groups for path in group]
+    assert sorted(covered) == sorted(files)
+    assert len(covered) == len(set(covered))
+    assert all(group for group in groups)
+    assert max(totals) < 20 * 60
+    hot_shard = next(
+        group for group in groups if "tests/test_exception_log_callsite_guard.py" in group
+    )
+    assert hot_shard == ["tests/test_exception_log_callsite_guard.py"]
 
 
 def test_partition_is_deterministic_and_accounts_for_first_shard_overhead() -> None:

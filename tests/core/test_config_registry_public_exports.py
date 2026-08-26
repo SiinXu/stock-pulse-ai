@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "237ed83d7b6511a306ae2e23d093b2ef162c0d2b3bae8ea4de461529cb27a9fd"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "8b65a854bb24963fa1ddc6e92776b1efc73e4aeac9a6bcc2ec3c28b34533b423"
+    "d80552cff06a22d8617850a4db9e8b389c1675b50e583487ac83f6133ebd5f28"
 )
 
 
@@ -104,9 +104,9 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for AGENT_RED_TEAM_ENABLED (Issue #1135) after
-    # merging skill retrieval (#1518), Lane E extras-path description
-    # rewrites, and current origin/main.
+    # Snapshot refresh for AGENT_RED_TEAM_ENABLED (Issue #1135) after merging
+    # current origin/main: Local Only Mode copy/registry description, skill
+    # retrieval, and Lane E extras-path rewrites. Keys digest unchanged.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

@@ -724,6 +724,24 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(budget.rules.some((rule) => rule.id === 'criticalPath')).toBe(false);
   });
 
+  it('reseeds locale-de and locale-ko gzip budgets after Local Only copy honesty (Refs #218)', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const reseeds = {
+      'locale-de': 157743,
+      'locale-ko': 157613,
+    };
+
+    for (const [id, measuredGzipBytes] of Object.entries(reseeds)) {
+      const rule = budget.rules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        measuredGzipBytes,
+        maxGzipBytes: measuredGzipBytes + 400,
+      }));
+      expect(rule.note).toContain('Refs #218');
+    }
+  });
+
   it('reseeds only overflowed locale gzip budgets after reportRunFeedback keys (Refs #1105)', () => {
     const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
     const affectedAssets = {
@@ -746,8 +764,6 @@ describe('first-paint entry budget (Refs #883)', () => {
       'js-entry': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
       'ui-text-en': { measuredGzipBytes: 34893, maxGzipBytes: 38383 },
       'locale-ja': { measuredGzipBytes: 164341, maxGzipBytes: 164741 },
-      'locale-de': { measuredGzipBytes: 157314, maxGzipBytes: 157714 },
-      'locale-ko': { measuredGzipBytes: 157191, maxGzipBytes: 157591 },
       'locale-zh-TW': { measuredGzipBytes: 149591, maxGzipBytes: 149991 },
       'locale-extra': { measuredGzipBytes: 3087, maxGzipBytes: 3487 },
       'vendor-charts': { measuredGzipBytes: 111229, maxGzipBytes: 122352 },

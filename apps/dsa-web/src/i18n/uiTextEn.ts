@@ -1862,7 +1862,7 @@ export const en: Record<UiTextKey, string> = {
   'settings.outboundActivityRefresh': 'Refresh outbound activity',
   'settings.outboundActivityModeOn': 'Local Only mode is on',
   'settings.outboundActivityModeOff': 'Local Only mode is off',
-  'settings.outboundActivityModeHint': 'Block reason code: {reason}. When on, only pure loopback egress is allowed.',
+  'settings.outboundActivityModeHint': 'Block reason code: {reason}. When on, policy-owned HTTP is gated, not a sandbox.',
   'settings.outboundActivityEmptyTitle': 'No outbound decisions yet',
   'settings.outboundActivityEmptyDescription': 'Allow and block records appear here after analysis, search, notification, or model requests hit the outbound policy.',
   'settings.outboundActivityWhen': 'When',

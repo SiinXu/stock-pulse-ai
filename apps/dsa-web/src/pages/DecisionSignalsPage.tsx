@@ -1224,7 +1224,7 @@ const DecisionSignalsPage: React.FC = () => {
               <IconButton
                 type="button"
                 variant="ghost"
-                size="comfortable"
+                size="default"
                 aria-label={t('decisionSignals.refresh')}
                 onClick={() => {
                   void loadSignals();
