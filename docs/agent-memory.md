@@ -1,6 +1,6 @@
 # Principal-scoped layered Agent memory
 
-**Status**: layered foundation + lifecycle (no production layered-memory hook). Durable store/UX: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). Write admission library: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1 (forgetting / consolidation remain open).
+**Status**: layered foundation + lifecycle (no production layered-memory hook). Durable store/UX: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). Write admission library: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1. Deterministic per-symbol episode forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2 (consolidation remains open).
 
 **Chinese**: [agent-memory_CN.md](agent-memory_CN.md)
 
@@ -14,6 +14,7 @@
 | `src/agent/memory_governance.py` | Consent, retention, principal delete/clear, access audit |
 | `src/agent/memory_isolation.py` | Untrusted-data isolation for any future prompt path |
 | `src/schemas/memory_write_policy.py` | Library-only persist write admission over existing stores (#1119 Slice 1) |
+| `src/schemas/memory_forget_policy.py` | Library-only per-symbol episode forgetting over `agent_episodes` (#1119 Slice 2) |
 
 Existing `AgentMemory` numeric calibration behavior is unchanged when `AGENT_ONLINE_ADAPTERS_ENABLED` is off or missing. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` history inject is default-off; when enabled, `BaseAgent._build_memory_context` wraps history lines with `isolate_untrusted_memory_body` and canonicalizes `signal` to `buy|hold|sell` (see [Threat notes](#threat-notes)).
 
@@ -129,7 +130,31 @@ Scanned but not folded into this slice: curator-grade ingest and forward-return 
 
 Decision Memory `admit_decision_memory` is a **separate READ / inject** filter. Renderer admission is not this write policy; inject payloads include `outcome` keys by design.
 
-This slice does **not** add consolidation, forgetting, TTL / per-symbol caps, retrieval-score decay, the #1118 store, #1113 EvolutionEvent persistence, auto-promotion, or new product feedback APIs. [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) stays open.
+This write-admission slice does **not** add consolidation, retrieval-score decay, the #1118 store, #1113 EvolutionEvent persistence, auto-promotion, or new product feedback APIs. Per-symbol episode forgetting is Slice 2 below. [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) stays open.
+
+<a id="episode-forgetting-policy"></a>
+## Episode forgetting policy (#1119 Slice 2)
+
+Library-only per-symbol forgetting in `src/schemas/memory_forget_policy.py`, applied by `AgentEpisodeRepository.apply_forget` on the existing `agent_episodes` table. DELETE is allowed; UPDATE remains aborted by `trg_agent_episodes_immutable`. No new table, public API, Web, or Desktop CRUD. Existing retention/capacity keys changed from table-wide to per-symbol (no new env key).
+
+| Rule | Contract |
+| --- | --- |
+| Scope | An explicit non-empty `symbol`. Missing / blank symbol is no-policy or fail-closed unscoped — never a global purge |
+| Age | `created_at < cutoff` is deleted; `created_at == cutoff` is kept |
+| Capacity | Optional per-symbol `max_rows` keeps the newest rows of that symbol after TTL (oldest `id` first on timestamp ties) |
+| No-policy | Neither cutoff nor `max_rows` deletes nothing; `remaining_count` is a live COUNT for that symbol (or the whole table if no symbol) |
+| Clock | Cutoff from an injected datetime (`retention_days` requires `now`) |
+| Audit | `EpisodeForgetResult` counts are a live COUNT for the resolved scope (never reported as 0 unless COUNT is 0). Irreversible DELETE inserts a metadata-only `episode.forget` EvolutionEvent (`symbol`, counts, cutoff/max_rows, SHA-256 of deleted row ids) in the **same** `session_scope` before DELETE. Audit failure rolls back the delete. Dry-run and no-policy write no event and store no episode body, lessons, or trajectory. |
+| Legacy wrappers | `apply_retention` / `apply_capacity` require an explicit symbol and route through the same policy. Unscoped calls fail closed. There is no remaining table-wide episode DELETE path. |
+| Transactions | Forget itself is one SQLite writer transaction: select ids → one EvolutionEvent insert → chunked `DELETE ... id IN (...)` (each chunk reserves one bind for `symbol` and stays within `MAX_VARIABLE_NUMBER`) → commit. Chunks are not separate commits. `append` still commits first; insert+forget is **not** one transaction (#1090 fail-soft). SQLite serializes writers; this pass does not use `SELECT FOR UPDATE`. |
+| Recovery | Code revert cannot restore deleted episode rows. Recovery requires backup / point-in-time restore. `AGENT_EPISODE_LOG_ENABLED=false` only stops new writes and append-triggered forget. |
+| Not in scope | Predictions, decision-memory outcomes (except appending metadata-only EvolutionEvent audit), sidecar feedback/labels, Soul text, consolidation, retrieval-score decay |
+
+No new env key. Existing `AGENT_EPISODE_RETENTION_DAYS` (default 90) and `AGENT_EPISODE_MAX_ROWS` (default 50000, config min 100) changed from unscoped table purge/cap to **per-symbol** bounds after that symbol is appended. The explicit `forget_symbol` library allows `max_rows >= 1`. Table size can grow with symbol count. Missing symbol skips delete.
+
+After a successful episode append, `AgentEpisodeService` runs this pass for the stored symbol only. Analysis stays fail-soft: forget (including audit) failure is logged, does not delete, and does not turn a successful append into `None`. Explicit `forget_symbol(...)` is not fail-soft. Rows of other symbols, and rows with no symbol, are not deleted by that pass.
+
+This slice does **not** add consolidation, Decision Memory retrieval-score decay, the #1118 store, auto-promotion, or new product feedback APIs. [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) stays open.
 
 ## Remaining scope
 
@@ -138,13 +163,13 @@ This slice does **not** add consolidation, forgetting, TTL / per-symbol caps, re
 - Security-reviewed production prompt consumption.
 - Preference-profile layer: [#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117) (absorbs closed [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)).
 - Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). DAG-0 threat notes, DAG-1 fact/opinion lock, DAG-2 Soul/oversize write reject (`src/schemas/memory_write_guard.py`), and DAG-3 server-stamped provenance (`src/schemas/memory_provenance.py`) have landed. DAG-4 isolates default-off AgentMemory prompt inject (`src/agent/agents/base_agent.py` / `src/agent/memory.py`) as untrusted data with canonical `buy` / `hold` / `sell` signals. Do not fold in #1118 store/UX or #1105 product feedback APIs.
-- Write admission / consolidation / forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119). Slice 1 (library write admission over existing stores) is documented above. Remaining: consolidation of old episodic rows, semantic/procedural candidate promotion without Soul edits, per-symbol TTL / max rows, retrieval-score decay, and drop of rolled-back procedural flags after [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113). Keep #1119 open.
+- Write admission / consolidation / forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119). Slice 1 (library write admission) and Slice 2 (deterministic per-symbol episode forgetting) are documented above. Remaining: consolidation of old episodic rows, semantic/procedural candidate promotion without Soul edits, Decision Memory retrieval-score decay, and drop of rolled-back procedural flags after [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113). Keep #1119 open.
 
 Do not reopen #250, #198, or #150.
 
 ## Rollback
 
-Revert modules/tests/docs/config fields and changelog line. Collection default-off; no production hook.
+Revert modules/tests/docs/config-description/Settings-help edits and changelog fragments. Collection and episode log stay default-off. Slice 2 adds no migration; already-deleted episode rows cannot be restored from code — recovery requires backup / point-in-time restore. EvolutionEvent audit rows are append-only and are not deleted by episode forgetting.
 
 ## Related: error-pattern encyclopedia
 

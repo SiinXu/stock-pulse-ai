@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 import hashlib
 import logging
 import uuid
@@ -22,6 +22,11 @@ from src.schemas.agent_episode import (
     EpisodeLesson,
     EpisodeOutcomeLabels,
     TrajectoryStepSummary,
+)
+from src.schemas.memory_forget_policy import (
+    EpisodeForgetResult,
+    MemoryForgetError,
+    resolve_episode_forget_policy,
 )
 from src.services.agent_trajectory_eval_service import (
     duration_to_ms,
@@ -80,7 +85,7 @@ class AgentEpisodeService:
             )
             create = self._sanitize_create(create)
             stored = self._get_repository().append(create)
-            self._maybe_apply_retention(cfg)
+            self._maybe_apply_forgetting(cfg, symbol=stored.symbol)
             return stored
         except Exception as exc:  # broad-exception: fallback_recorded - episode append must never fail analysis
             log_safe_exception(
@@ -168,6 +173,48 @@ class AgentEpisodeService:
     def list_for_replay(self, episode_ids: Sequence[str]) -> List[AgentEpisode]:
         return self._get_repository().list_for_replay(episode_ids)
 
+    def forget_symbol(
+        self,
+        symbol: str,
+        *,
+        cutoff: Optional[datetime] = None,
+        retention_days: Optional[int] = None,
+        max_rows: Optional[int] = None,
+        now: Optional[datetime] = None,
+        dry_run: bool = False,
+    ) -> EpisodeForgetResult:
+        """Apply an explicit per-symbol forget pass.
+
+        Missing cutoff and max_rows is no-policy and deletes nothing. Invalid
+        or unscoped policy raises. Persistence failures raise; this path is
+        not fail-soft. Analysis still uses ``_maybe_apply_forgetting``.
+        """
+        repository = self._get_repository()
+        clock_now = now if now is not None else repository._clock()
+        decision = resolve_episode_forget_policy(
+            symbol=symbol,
+            cutoff=cutoff,
+            retention_days=retention_days,
+            now=clock_now,
+            max_rows=max_rows,
+            dry_run=dry_run,
+        )
+        if decision.error_code:
+            raise MemoryForgetError(
+                decision.reason or "invalid episode forget policy",
+                error_code=decision.error_code,
+            )
+        result = repository.apply_forget(decision)
+        logger.info(
+            "agent_episode_forget_applied deleted_count=%s remaining_count=%s "
+            "symbol=%s dry_run=%s",
+            result.deleted_count,
+            result.remaining_count,
+            result.symbol,
+            result.dry_run,
+        )
+        return result
+
     def _sanitize_create(self, episode: AgentEpisodeCreate) -> AgentEpisodeCreate:
         lessons: List[EpisodeLesson] = []
         for lesson in episode.lessons:
@@ -180,7 +227,9 @@ class AgentEpisodeService:
             outcome = EpisodeOutcomeLabels.model_validate(redacted) if isinstance(redacted, dict) else None
         return episode.model_copy(update={"lessons": lessons, "outcome_labels": outcome, "soul_charter": None})
 
-    def _maybe_apply_retention(self, config: Any) -> None:
+    def _maybe_apply_forgetting(self, config: Any, *, symbol: Optional[str]) -> None:
+        if not isinstance(symbol, str) or not symbol.strip():
+            return
         retention_days = _policy_int(
             config, "agent_episode_retention_days", AGENT_EPISODE_DEFAULT_RETENTION_DAYS,
             minimum=1, maximum=3650,
@@ -190,14 +239,29 @@ class AgentEpisodeService:
             minimum=100, maximum=1_000_000,
         )
         try:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=retention_days)
             repository = self._get_repository()
-            repository.apply_retention(cutoff=cutoff)
-            repository.apply_capacity(max_rows=max_rows)
-        except Exception as exc:  # broad-exception: fallback_recorded - retention is best-effort after append
+            decision = resolve_episode_forget_policy(
+                symbol=symbol,
+                retention_days=retention_days,
+                now=repository._clock(),
+                max_rows=max_rows,
+            )
+            if decision.error_code or not decision.apply:
+                return
+            result = repository.apply_forget(decision)
+            logger.info(
+                "agent_episode_forget_applied deleted_count=%s remaining_count=%s "
+                "symbol=%s dry_run=%s",
+                result.deleted_count,
+                result.remaining_count,
+                result.symbol,
+                result.dry_run,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - forgetting is fail-soft after append
             log_safe_exception(
-                logger, "agent_episode_retention_failed", exc,
-                error_code="agent_episode_retention_failed",
+                logger, "agent_episode_forget_failed", exc,
+                error_code="agent_episode_forget_failed",
+                context={"symbol": symbol},
             )
 
 

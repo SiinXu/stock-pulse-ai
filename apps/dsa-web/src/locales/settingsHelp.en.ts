@@ -1591,10 +1591,10 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     summary: 'Store compact Agent trajectories, lessons, and optional outcomes.',
   },
   'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
-    summary: 'Maximum episode age before retention cleanup.',
+    summary: 'Per-symbol maximum episode age after that symbol is appended. Missing symbol skips delete; this is not a table-wide purge.',
   },
   'settings.agent.AGENT_EPISODE_MAX_ROWS': {
-    summary: 'Episode row cap; oldest rows are removed first.',
+    summary: 'Per-symbol episode row cap after that symbol is appended; oldest same-symbol rows drop first. 50000 is not a table ceiling. Missing symbol skips delete.',
   },
   'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
   },

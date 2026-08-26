@@ -15,9 +15,11 @@ This module is not Decision Memory inject admission. ``admit_decision_memory``
 in ``src.services.decision_memory_service`` remains a separate READ-path
 renderer filter and must not be routed through this write policy.
 
-Out of slice: consolidation, forgetting, TTL / per-symbol caps, score decay,
+Out of slice for this write-admission module: consolidation, score decay,
 the #1118 layered store, #1113 EvolutionEvent, auto-promotion, new env keys,
-migrations, and public API / Web / Desktop changes.
+migrations, and public API / Web / Desktop changes. Per-symbol episode
+forgetting lives in ``memory_forget_policy`` and does not change write
+admission.
 """
 
 from __future__ import annotations

@@ -3,10 +3,12 @@
 """Append-only SQLite store for EvolutionEvent rows (Issue #1113).
 
 This repository is the only persistence boundary for ``agent_evolution_events``.
-Public methods are ``append`` and ``list_events``. There is no update/delete
-API; SQLite triggers are the immutability authority. Query misses return an
-empty list. This module does not reuse ``security_audit_events``, curator-grade
-sidecars, episode rows, or resolver process logs.
+Public methods are ``append`` and ``list_events``. ``insert_evolution_event_on_session``
+writes on a caller-owned session so irreversible episode deletes can audit in
+the same transaction. There is no update/delete API; SQLite triggers are the
+immutability authority. Query misses return an empty list. This module does
+not reuse ``security_audit_events``, curator-grade sidecars, episode rows, or
+resolver process logs.
 """
 
 from __future__ import annotations
@@ -62,6 +64,53 @@ def _as_utc_aware(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
+def evolution_event_row_values(
+    event: EvolutionEventCreate,
+    *,
+    created_at: datetime,
+) -> dict[str, Any]:
+    payload = (
+        event
+        if isinstance(event, EvolutionEventCreate)
+        else EvolutionEventCreate.model_validate(event)
+    )
+    return {
+        "schema_version": payload.schema_version or EVOLUTION_EVENT_SCHEMA_VERSION,
+        "event_id": payload.event_id,
+        "occurred_at": _as_utc_naive(payload.occurred_at),
+        "event_type": payload.event_type,
+        "actor": payload.actor,
+        "reason_refs_json": _json_dumps(payload.reason_refs.model_dump(mode="python")),
+        "before_json": _json_dumps(payload.before),
+        "after_json": _json_dumps(payload.after),
+        "created_at": created_at,
+    }
+
+
+def insert_evolution_event_on_session(
+    session: Any,
+    event: EvolutionEventCreate,
+    *,
+    created_at: datetime,
+) -> str:
+    """Insert one EvolutionEvent on a caller-owned session. Does not commit.
+
+    Used so irreversible episode deletes can audit in the same transaction.
+    Validation/insert failure must propagate so the caller can roll back.
+    """
+    payload = (
+        event
+        if isinstance(event, EvolutionEventCreate)
+        else EvolutionEventCreate.model_validate(event)
+    )
+    session.execute(
+        agent_evolution_events_table.insert().values(
+            **evolution_event_row_values(payload, created_at=created_at)
+        )
+    )
+    return str(payload.event_id)
+
+
 class AgentEvolutionEventRepository(BaseRepository):
     """Persist and query append-only EvolutionEvent rows."""
 
@@ -110,21 +159,12 @@ class AgentEvolutionEventRepository(BaseRepository):
             created_at = now.astimezone(timezone.utc).replace(tzinfo=None)
         else:
             created_at = now
-        values = {
-            "schema_version": payload.schema_version or EVOLUTION_EVENT_SCHEMA_VERSION,
-            "event_id": payload.event_id,
-            "occurred_at": _as_utc_naive(payload.occurred_at),
-            "event_type": payload.event_type,
-            "actor": payload.actor,
-            "reason_refs_json": _json_dumps(payload.reason_refs.model_dump(mode="python")),
-            "before_json": _json_dumps(payload.before),
-            "after_json": _json_dumps(payload.after),
-            "created_at": created_at,
-        }
         try:
             with self.db.get_session() as session:
                 result = session.execute(
-                    agent_evolution_events_table.insert().values(**values)
+                    agent_evolution_events_table.insert().values(
+                        **evolution_event_row_values(payload, created_at=created_at)
+                    )
                 )
                 session.flush()
                 row_id = int(result.inserted_primary_key[0])

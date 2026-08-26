@@ -1634,10 +1634,10 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     summary: '保存精简 Agent 轨迹、教训和可选结果。',
   },
   'settings.agent.AGENT_EPISODE_RETENTION_DAYS': {
-    summary: 'episode 清理前的最大保留天数。',
+    summary: '按标的 episode 最大保留天数；仅在该标的追加成功后删除更早的行。无标的不删除，不是全表清理。',
   },
   'settings.agent.AGENT_EPISODE_MAX_ROWS': {
-    summary: 'episode 行数上限；优先删除最旧行。',
+    summary: '按标的 episode 行数上限；仅删除同一标的最旧行。50000 不是全表上限。无标的不删除。',
   },
   'settings.agent.AGENT_ERROR_PATTERN_ENABLED': {
   },

@@ -1,6 +1,6 @@
 # Principal 作用域分层 Agent 记忆
 
-**状态**：分层记忆基础 + 生命周期（分层记忆尚未接入生产 prompt）。持久化存储/UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。写入准入库：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1（遗忘 / 压缩仍开放）。
+**状态**：分层记忆基础 + 生命周期（分层记忆尚未接入生产 prompt）。持久化存储/UI：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。写入准入库：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1。按标的确定性 episode 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2（压缩仍开放）。
 
 **English**: [agent-memory.md](agent-memory.md)
 
@@ -14,6 +14,7 @@
 | `src/agent/memory_governance.py` | 知情同意、保留期、按 principal 删除/清空、访问审计 |
 | `src/agent/memory_isolation.py` | 面向 prompt 的不可信数据隔离 |
 | `src/schemas/memory_write_policy.py` | 仅库层、覆盖既有存储的写入准入（#1119 Slice 1） |
+| `src/schemas/memory_forget_policy.py` | 仅库层、覆盖既有 `agent_episodes` 的按标的遗忘（#1119 Slice 2） |
 
 `AGENT_ONLINE_ADAPTERS_ENABLED` 关闭或缺失时，既有 `AgentMemory` 数值校准行为不变。分层 `PrincipalMemoryLifecycle` **尚未**接入生产 prompt。Historical Decision Reflection 是独立的生产注入路径（见下）。可选 `AGENT_MEMORY_ENABLED` 历史注入默认关闭；开启时 `BaseAgent._build_memory_context` 用 `isolate_untrusted_memory_body` 包裹历史行，并将 `signal` 规范为 `buy|hold|sell`（见[威胁注释](#threat-notes)）。
 
@@ -107,7 +108,31 @@ outcome 存储，不是 `PrincipalMemoryLifecycle`），但仍必须：
 
 Decision Memory 的 `admit_decision_memory` 是 **独立的 READ / 注入** 过滤器。渲染准入不是本写入策略；注入载荷按设计包含 `outcome` 键。
 
-本切片 **不** 增加压缩、遗忘、按标的 TTL / 行数上限、检索分数衰减、#1118 存储、#1113 EvolutionEvent 持久化、自动晋升或新的产品反馈 API。[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) 保持开放。
+本写入准入切片 **不** 增加压缩、检索分数衰减、#1118 存储、#1113 EvolutionEvent 持久化、自动晋升或新的产品反馈 API。按标的 episode 遗忘见下方 Slice 2。[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) 保持开放。
+
+<a id="episode-forgetting-policy"></a>
+## Episode 遗忘策略（#1119 Slice 2）
+
+仅库层的按标的遗忘位于 `src/schemas/memory_forget_policy.py`，由 `AgentEpisodeRepository.apply_forget` 作用于既有 `agent_episodes` 表。允许 DELETE；UPDATE 仍被 `trg_agent_episodes_immutable` 中止。没有新表、公开 API、Web 或 Desktop CRUD。既有保留/容量键从全表改为按标的（没有新环境变量）。
+
+| 规则 | 契约 |
+| --- | --- |
+| 作用域 | 必须有非空 `symbol`。缺符号 / 空白为无策略或 fail-closed 的无作用域，**绝不是**全局清理 |
+| 年龄 | `created_at < cutoff` 删除；`created_at == cutoff` 保留 |
+| 容量 | 可选的按标的 `max_rows` 在 TTL 之后保留该标的最新行（时间戳相同时先删较小 `id`） |
+| 无策略 | 既无 cutoff 也无 `max_rows` 时不删除；`remaining_count` 是该 symbol（无 symbol 时为整表）的实时 COUNT，不得用 0 撒谎 |
+| 时钟 | cutoff 来自注入的 datetime（`retention_days` 必须带 `now`） |
+| 事务 | 遗忘本身是一次 SQLite 写事务：选出 id → 一条 EvolutionEvent → 分块 `DELETE ... id IN (...)`（每块为 `symbol` 预留一个 bind，不超过 `MAX_VARIABLE_NUMBER`）→ commit。分块不是多次提交。`append` 仍先提交；insert+forget **不是**同一事务。SQLite 串行化写者；本切片不用 `SELECT FOR UPDATE` |
+| 审计 | 不可逆 DELETE 会在同一 `session_scope` 里先插入仅元数据的 `episode.forget` EvolutionEvent（symbol、计数、cutoff/max_rows、被删行 id 的 SHA-256）。审计失败则回滚删除。dry-run / 无策略不写事件，也不存 episode 正文、lessons 或轨迹 |
+| 遗留包装 | `apply_retention` / `apply_capacity` 必须带显式 symbol 并走同一策略。无作用域调用 fail-closed。不再存在全表 episode DELETE 路径 |
+| 恢复 | 代码回滚不能恢复已删 episode 行，只能靠备份 / PITR。`AGENT_EPISODE_LOG_ENABLED=false` 只停止新写入与追加后遗忘 |
+| 不在范围内 | prediction、decision-memory outcome（除追加仅元数据的 EvolutionEvent 审计外）、sidecar 反馈/标签、Soul 正文、压缩、检索分数衰减 |
+
+没有新环境变量。既有 `AGENT_EPISODE_RETENTION_DAYS`（默认 90）与 `AGENT_EPISODE_MAX_ROWS`（默认 50000，配置下限 100）从全表清理/上限改为该标的追加后的 **按标的** 边界。显式 `forget_symbol` 允许 `max_rows >= 1`。表大小可随 symbol 数量增长。无 symbol 不删除。
+
+成功追加 episode 后，`AgentEpisodeService` 只对该次写入的 symbol 运行本策略。分析路径仍 fail-soft：遗忘（含审计）失败只记日志、不删除，也不会把已成功的 append 变成 `None`。显式 `forget_symbol(...)` 不是 fail-soft。其他 symbol 的行以及无 symbol 的行不会被该次清理删除。
+
+本切片 **不** 增加压缩、Decision Memory 检索分数衰减、#1118 存储、自动晋升或新的产品反馈 API。不可逆遗忘会向既有 `agent_evolution_events` 追加仅元数据的 `episode.forget` 行。[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) 保持开放。
 
 ## 剩余范围
 
@@ -116,13 +141,13 @@ Decision Memory 的 `admit_decision_memory` 是 **独立的 READ / 注入** 过�
 - 经安全审查的生产 prompt 消费。
 - 偏好层：[#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117)（吸收已关闭的 [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)）。
 - 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。DAG-0 威胁注释、DAG-1 事实/意见锁定、DAG-2 Soul/超限写路径拒绝（`src/schemas/memory_write_guard.py`）和 DAG-3 服务端盖章 provenance（`src/schemas/memory_provenance.py`）已落地。DAG-4 将默认关闭的 AgentMemory 注入隔离为不可信数据（`src/agent/agents/base_agent.py` / `src/agent/memory.py`），`signal` 规范为 `buy` / `hold` / `sell`。不要并入 #1118 存储/UI 或 #1105 产品反馈 API。
-- 写入准入 / 压缩 / 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119)。Slice 1（覆盖既有存储的库层写入准入）见上文。仍缺：旧 episodic 行压缩、不改 Soul 的语义/程序性候选晋升、按标的 TTL / 行数上限、检索分数衰减，以及 [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113) 落地后丢弃已回滚的程序性标记。保持 #1119 开放。
+- 写入准入 / 压缩 / 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119)。Slice 1（库层写入准入）与 Slice 2（按标的确定性 episode 遗忘）见上文。仍缺：旧 episodic 行压缩、不改 Soul 的语义/程序性候选晋升、Decision Memory 检索分数衰减，以及 [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113) 落地后丢弃已回滚的程序性标记。保持 #1119 开放。
 
 不要重开 #250、#198 或 #150。
 
 ## 回滚
 
-回退新增模块/测试/文档/配置字段与 changelog 行。
+回退新增模块/测试/文档/配置描述/Settings 帮助与 changelog fragment。采集与 episode 日志默认关闭。Slice 2 无 migration；已被 DELETE 的 episode 行无法用代码恢复，只能靠备份 / PITR。EvolutionEvent 审计行是 append-only，不会被 episode 遗忘删除。
 
 ## 相关：错误模式百科
 
