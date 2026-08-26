@@ -14,7 +14,7 @@ import type {
   ReportStructuredInsights as ReportStructuredInsightsType,
 } from '../../types/analysis';
 import { EDUCATION_HELP_KEYS } from '../../locales/educationHelpKeys';
-import { Badge, Button, Card, Progress } from '../common';
+import { Badge, Button, Card, Collapsible, Progress } from '../common';
 import { HelpKeyButton } from '../help';
 import { DashboardPanelHeader } from '../dashboard';
 import { REPORT_STRUCTURED_INSIGHTS_TEXT } from '../../locales/reportStructuredInsights';
@@ -81,6 +81,19 @@ interface ReportStructuredInsightsProps {
   insights?: ReportStructuredInsightsType | null;
   language?: ReportLanguage;
 }
+
+const InsightCollapsibleSection: React.FC<{
+  title: string;
+  testId: string;
+  className?: string;
+  children: React.ReactNode;
+}> = ({ title, testId, className, children }) => (
+  <section data-testid={testId} className={className}>
+    <Collapsible title={title} defaultOpen={false}>
+      {children}
+    </Collapsible>
+  </section>
+);
 
 const readableFallback = (value: string): string => value.replaceAll('_', ' ');
 
@@ -279,10 +292,7 @@ const StrategySkillList: React.FC<{
     return null;
   }
   return (
-    <section data-testid={testId}>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
-        {title}
-      </h4>
+    <InsightCollapsibleSection title={title} testId={testId}>
       <div className="space-y-2" id={overflow.listId}>
         {skills.map((skill, index) => {
           const name = skill.skillId || skill.agentName || `#${index + 1}`;
@@ -323,7 +333,7 @@ const StrategySkillList: React.FC<{
           showLessLabel={showLessLabel}
         />
       ) : null}
-    </section>
+    </InsightCollapsibleSection>
   );
 };
 
@@ -344,10 +354,7 @@ const StrategyConflictList: React.FC<{
     return null;
   }
   return (
-    <section className="mt-4" data-testid={testId}>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
-        {title}
-      </h4>
+    <InsightCollapsibleSection title={title} testId={testId} className="mt-4">
       <ul className="space-y-2" id={overflow.listId}>
         {conflicts.map((conflict, index) => {
           const label = localizedValue(conflict.conflictType, text.conflictLabels)
@@ -385,7 +392,7 @@ const StrategyConflictList: React.FC<{
           showLessLabel={text.showLess}
         />
       ) : null}
-    </section>
+    </InsightCollapsibleSection>
   );
 };
 
@@ -483,10 +490,7 @@ const CommitteeOpinionList: React.FC<{
     return null;
   }
   return (
-    <section data-testid={testId}>
-      <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-text">
-        {title}
-      </h4>
+    <InsightCollapsibleSection title={title} testId={testId}>
       <div className="space-y-2" id={overflow.listId}>
         {items.map((item, index) => {
           const name = item.displayName || item.personaId || item.agentName || `#${index + 1}`;
@@ -531,7 +535,7 @@ const CommitteeOpinionList: React.FC<{
           showLessLabel={showLessLabel}
         />
       ) : null}
-    </section>
+    </InsightCollapsibleSection>
   );
 };
 
