@@ -37,8 +37,8 @@ describe('DecisionSignalContextChip', () => {
     const onOpen = renderChip();
     const chip = screen.getByTestId('decision-signal-context-chip');
     expect(chip).toHaveAttribute('data-selected-signal-id', '7');
-    expect(chip).toHaveAccessibleName('当前信号 600519 贵州茅台，来源 分析报告，状态 有效');
-    fireEvent.click(screen.getByRole('button', { name: '打开 600519 贵州茅台 的详情' }));
+    expect(chip).toHaveAccessibleName('600519 贵州茅台，来源 分析报告，状态 有效');
+    fireEvent.click(screen.getByRole('button', { name: '查看详情 600519 贵州茅台' }));
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
@@ -52,4 +52,3 @@ describe('DecisionSignalContextChip', () => {
     expect(screen.queryByTestId('decision-signal-context-chip')).not.toBeInTheDocument();
   });
 });
-

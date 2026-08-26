@@ -579,8 +579,6 @@ export const en: Record<UiTextKey, string> = {
   'decisionSignals.closed': 'Closed',
   'decisionSignals.confidence': 'Confidence',
   'decisionSignals.confirmStatusTitle': 'Update signal status',
-  'decisionSignals.contextChipLabel': 'Current signal {symbol}, source {source}, status {status}',
-  'decisionSignals.contextChipOpen': 'Open details for {symbol}',
   'decisionSignals.create.button': 'Create signal',
   'decisionSignals.createFirstRule': 'Create your first rule',
   'decisionSignals.createRuleFromSignal': 'Create rule from this signal',

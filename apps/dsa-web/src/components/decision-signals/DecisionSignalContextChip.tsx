@@ -32,11 +32,7 @@ export const DecisionSignalContextChip: React.FC<DecisionSignalContextChipProps>
       padding="sm"
       data-testid="decision-signal-context-chip"
       data-selected-signal-id={String(item.id)}
-      aria-label={t('decisionSignals.contextChipLabel', {
-        symbol,
-        source: sourceLabel,
-        status: statusLabel,
-      })}
+      aria-label={`${symbol}，${t('decisionSignals.source')} ${sourceLabel}，${t('decisionSignals.status')} ${statusLabel}`}
     >
       <SelectionChip
         selected
@@ -45,11 +41,10 @@ export const DecisionSignalContextChip: React.FC<DecisionSignalContextChipProps>
         description={sourceLabel}
         metadata={statusLabel}
         onClick={onOpen}
-        aria-label={t('decisionSignals.contextChipOpen', { symbol })}
+        aria-label={`${t('common.details')} ${symbol}`}
       />
     </Surface>
   );
 };
 
 export default DecisionSignalContextChip;
-

@@ -578,8 +578,6 @@ export const zh = {
   'decisionSignals.closed': '已关闭',
   'decisionSignals.confidence': '置信度',
   'decisionSignals.confirmStatusTitle': '更新信号状态',
-  'decisionSignals.contextChipLabel': '当前信号 {symbol}，来源 {source}，状态 {status}',
-  'decisionSignals.contextChipOpen': '打开 {symbol} 的详情',
   'decisionSignals.create.button': '创建信号',
   'decisionSignals.createFirstRule': '创建第一条规则',
   'decisionSignals.createRuleFromSignal': '从此信号创建规则',

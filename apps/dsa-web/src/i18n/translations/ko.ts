@@ -490,8 +490,6 @@ export const translations = {
   "i18n.uiText.UI_TEXT.decisionSignals.closed": "폐쇄",
   "i18n.uiText.UI_TEXT.decisionSignals.confidence": "신뢰도",
   "i18n.uiText.UI_TEXT.decisionSignals.confirmStatusTitle": "신호 상태 업데이트",
-  "i18n.uiText.UI_TEXT.decisionSignals.contextChipLabel": "현재 신호 {symbol}, 출처 {source}, 상태 {status}",
-  "i18n.uiText.UI_TEXT.decisionSignals.contextChipOpen": "{symbol} 상세 열기",
   "i18n.uiText.UI_TEXT.decisionSignals.create.button": "시그널 생성",
   "i18n.uiText.UI_TEXT.decisionSignals.create.confidenceHint": "0에서 1 사이의 소수, 선택 사항.",
   "i18n.uiText.UI_TEXT.decisionSignals.create.dedup": "동일한 시그널이 이미 존재합니다(#{id}). 새로 생성되지 않았습니다.",

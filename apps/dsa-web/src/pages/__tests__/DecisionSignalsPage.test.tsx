@@ -2987,7 +2987,7 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     expect(new URLSearchParams(window.location.search).get('signal')).toBe('7');
     const chip = screen.getByTestId('decision-signal-context-chip');
     expect(chip).toHaveAttribute('data-selected-signal-id', '7');
-    expect(within(chip).getByRole('button', { name: '打开 600519 贵州茅台 的详情' })).toBeInTheDocument();
+    expect(within(chip).getByRole('button', { name: '查看详情 600519 贵州茅台' })).toBeInTheDocument();
   });
 
   it('does not alias selection when two list signals share the same source', async () => {
@@ -3068,7 +3068,7 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '信号详情' })).not.toBeInTheDocument());
     const chip = screen.getByTestId('decision-signal-context-chip');
     expect(chip).toHaveAttribute('data-selected-signal-id', '7');
-    const chipButton = within(chip).getByRole('button', { name: '打开 600519 贵州茅台 的详情' });
+    const chipButton = within(chip).getByRole('button', { name: '查看详情 600519 贵州茅台' });
     expect(chipButton).not.toHaveAttribute('aria-hidden', 'true');
     fireEvent.click(chipButton);
     const dialog = await screen.findByRole('dialog', { name: '信号详情' });
@@ -3143,14 +3143,14 @@ describe('DecisionSignalsPage', { timeout: 15_000 }, () => {
     submitCurrentStock('AAPL');
     expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
     expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
-    expect(within(screen.getByTestId('decision-signal-context-chip')).getByRole('button', { name: '打开 AAPL Apple 的详情' })).toBeInTheDocument();
+    expect(within(screen.getByTestId('decision-signal-context-chip')).getByRole('button', { name: '查看详情 AAPL Apple' })).toBeInTheDocument();
 
     await act(async () => {
       pendingLatest.resolve(listResponse([refreshedLatest]));
     });
     expect(screen.getByTestId('decision-signal-context-chip')).toHaveAttribute('data-selected-signal-id', '8');
     expect(new URLSearchParams(window.location.search).get('signal')).toBe('8');
-    fireEvent.click(within(screen.getByTestId('decision-signal-context-chip')).getByRole('button', { name: '打开 AAPL Apple 的详情' }));
+    fireEvent.click(within(screen.getByTestId('decision-signal-context-chip')).getByRole('button', { name: '查看详情 AAPL Apple' }));
     expect(within(await screen.findByRole('dialog', { name: '信号详情' })).getByText('Latest refreshed risk')).toBeInTheDocument();
   });
 

@@ -490,8 +490,6 @@ export const translations = {
   "i18n.uiText.UI_TEXT.decisionSignals.closed": "Tutup",
   "i18n.uiText.UI_TEXT.decisionSignals.confidence": "Tingkat keyakinan",
   "i18n.uiText.UI_TEXT.decisionSignals.confirmStatusTitle": "Perbarui status sinyal",
-  "i18n.uiText.UI_TEXT.decisionSignals.contextChipLabel": "Sinyal saat ini {symbol}, sumber {source}, status {status}",
-  "i18n.uiText.UI_TEXT.decisionSignals.contextChipOpen": "Buka detail {symbol}",
   "i18n.uiText.UI_TEXT.decisionSignals.create.button": "Buat sinyal",
   "i18n.uiText.UI_TEXT.decisionSignals.create.confidenceHint": "Angka desimal antara 0 dan 1, opsional.",
   "i18n.uiText.UI_TEXT.decisionSignals.create.dedup": "Sinyal identik sudah ada (#{id}); tidak ada yang baru dibuat.",
