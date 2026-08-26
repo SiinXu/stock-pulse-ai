@@ -64,15 +64,30 @@ def test_greedy_partition_isolates_a_dominant_module() -> None:
 
 
 def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
-    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment."""
+    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment.
 
-    files = discover_test_files()
+    Reconstruct that packing from the seeded duration-map module set. Live
+    discovery may include newer tests/**/test_*.py files that shift the
+    equal-weight shard index without isolating the hotspot; new modules use
+    median weights until a hosted refresh and must not empty this map.
+    """
+
+    hotspot = "tests/test_exception_log_callsite_guard.py"
+    sibling = "tests/test_broad_exception_guard.py"
+    seeded = sorted(load_durations())
     groups, _totals = partition_test_files(
-        files, {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
+        seeded, {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
     )
     shard_one = set(groups[0])
-    assert "tests/test_exception_log_callsite_guard.py" in shard_one
-    assert "tests/test_broad_exception_guard.py" in shard_one
+    assert hotspot in shard_one
+    assert sibling in shard_one
+
+    live_groups, _live_totals = partition_test_files(
+        discover_test_files(), {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
+    )
+    live_hot = next(group for group in live_groups if hotspot in group)
+    assert sibling in live_hot
+    assert len(live_hot) > 1
 
 
 def test_unknown_module_receives_median_weight_and_is_assigned_once() -> None:
