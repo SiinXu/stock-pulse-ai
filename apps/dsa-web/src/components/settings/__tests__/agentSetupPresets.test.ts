@@ -93,6 +93,7 @@ describe('agentSetupPresets', () => {
     }
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_SKILLS');
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_SKILL_DIR');
+    expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_SKILL_RETRIEVAL_K');
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_EVENT_ALERT_RULES_JSON');
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_DEEP_RESEARCH_BUDGET');
     expect(AGENT_PRESET_MANAGED_KEYS).not.toContain('AGENT_DEEP_RESEARCH_TIMEOUT');
@@ -105,6 +106,7 @@ describe('agentSetupPresets', () => {
       expect(resolveAgentDisclosureLayer(key)).toBe('essentials');
     }
     expect(resolveAgentDisclosureLayer('AGENT_SKILL_ROUTING')).toBe('behavior');
+    expect(resolveAgentDisclosureLayer('AGENT_SKILL_RETRIEVAL_K')).toBe('behavior');
     expect(resolveAgentDisclosureLayer('AGENT_MEMORY_ENABLED')).toBe('behavior');
     expect(resolveAgentDisclosureLayer('AGENT_FEATURES_ACKNOWLEDGED_OFF')).toBe('behavior');
     for (const key of AGENT_GOVERNANCE_EXPERT_KEYS) {

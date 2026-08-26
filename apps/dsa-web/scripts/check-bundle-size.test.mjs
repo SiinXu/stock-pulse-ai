@@ -141,6 +141,52 @@ describe('bundle size checker', () => {
     expect(result.stderr).toContain('axios-mock-adapter');
   });
 
+  it('fails when skill retrieval help leaks into the SettingsPage family', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'SettingsPage-hash.js'),
+      'How many catalog skills automatic SkillRouter may retrieve by description\n',
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Skill retrieval help leaked');
+    expect(result.stderr).toContain('SettingsPage-hash.js');
+  });
+
+  it('accepts skill retrieval help only on the CredentialInput chunk', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'CredentialInput-hash.js'),
+      'How many catalog skills automatic SkillRouter may retrieve by description\n',
+    );
+    writeFileSync(
+      path.join(root, 'assets', 'SettingsPage-hash.js'),
+      'export const settingsPage = true;\n',
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(0);
+  });
+
+  it('fails when SettingsPage exists but the isolated help payload is missing', () => {
+    const root = createOutput();
+    writeFileSync(
+      path.join(root, 'assets', 'SettingsPage-hash.js'),
+      'export const settingsPage = true;\n',
+    );
+    const budgetPath = writeBudget(root, []);
+
+    const result = runChecker(budgetPath);
+
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Skill retrieval help marker missing');
+  });
+
   it('fails when the build output contains no JavaScript or CSS assets', () => {
     const root = createOutput();
     writeFileSync(path.join(root, 'assets', 'manifest.txt'), 'not a bundle asset');

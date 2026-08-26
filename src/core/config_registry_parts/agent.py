@@ -2309,6 +2309,39 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_SKILL_RETRIEVAL_K": {
+        "title": "Skill Retrieval Top-K",
+        "description": (
+            "Catalog-description skill retrieval size for automatic SkillRouter "
+            "selection (Issue #1123 Slice A). 0 disables retrieval and keeps "
+            "today's regime/default routing. Positive values select a bounded "
+            "subset by skill description; empty or all-zero match falls back to "
+            "the default router set, never AGENT_SKILLS=all. Hard cap 8. "
+            "Per-run skills_requested, factory/config explicit AGENT_SKILLS "
+            "(specific or all), and manual AGENT_SKILL_ROUTING still win. "
+            "This is not the #1118 procedural layer and not #1091 tool scoring."
+        ),
+        "category": "agent",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0, "max": 8},
+        "display_order": 680,
+        "help_key": "settings.agent.AGENT_SKILL_RETRIEVAL_K",
+        "examples": [
+            "AGENT_SKILL_RETRIEVAL_K=0",
+            "AGENT_SKILL_RETRIEVAL_K=2",
+        ],
+        "docs": [{
+            "label": "Agent memory",
+            "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/agent-memory.md",
+        }],
+        "warning_codes": [],
+    },
     "MARKET_REGIME_ENABLED": {
         "title": "Market Regime",
         "description": "Enable explainable rule-based market regime detection and adaptive analysis focus. When unclear, labels unknown instead of forcing a side.",
