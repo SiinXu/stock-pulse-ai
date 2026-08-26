@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "13880e5ca058da04b82edf4c9a58833a0e3785ec8c5b26c971df3d8b90e0901b"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "4a5b6d424e70884d78ee7d64bd54877df1d0daf27a042c2499732c5aa6c2add3"
+    "0a5fbd22e5a6de6c4c50e967d18d071a9a3e699e6ca8aadfe7f75b2f958a3292"
 )
 
 
@@ -104,9 +104,11 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Combined snapshot after #1518 AGENT_SKILL_RETRIEVAL_K, Lane E
+    # Combined live snapshot after merging current main: #1518 skill-retrieval
+    # key, #1513 Local Only Mode copy/registry description, Lane E
     # OCR/Kronos extras-path description rewrites, and #1118
-    # LAYERED_MEMORY_COLLECTION_ENABLED durable-store copy.
+    # LAYERED_MEMORY_COLLECTION_ENABLED durable-store copy. Keys digest
+    # unchanged.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

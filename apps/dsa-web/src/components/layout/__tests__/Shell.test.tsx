@@ -3,6 +3,11 @@ import { MemoryRouter, useLocation } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ThemeProvider } from '../../theme/ThemeProvider';
 import { Shell } from '../Shell';
+import { buildLocalOnlyModeSettingsHref } from '../localOnlyMode';
+
+const { localOnlyModeState } = vi.hoisted(() => ({
+  localOnlyModeState: { status: 'off' as 'unknown' | 'off' | 'on' },
+}));
 
 const DESKTOP_SIDEBAR_QUERY = '(min-width: 1024px)';
 const COMPACT_SIDEBAR_QUERY = '(min-width: 1024px) and (max-width: 1279px)';
@@ -52,6 +57,10 @@ vi.mock('../../../api/history', () => ({
   historyApi: {
     search: vi.fn().mockResolvedValue({ query: '', limit: 5, items: [] }),
   },
+}));
+
+vi.mock('../../../hooks/useLocalOnlyModeStatus', () => ({
+  useLocalOnlyModeStatus: () => ({ status: localOnlyModeState.status }),
 }));
 
 function LocationProbe() {
@@ -115,6 +124,7 @@ beforeEach(() => {
   mediaMatches.clear();
   mediaListeners.clear();
   localStorage.removeItem(SIDEBAR_COLLAPSED_STORAGE_KEY);
+  localOnlyModeState.status = 'off';
 });
 
 describe('Shell', () => {
@@ -125,6 +135,34 @@ describe('Shell', () => {
     expect(screen.getByRole('link', { name: 'Agent' })).toBeInTheDocument();
     expect(screen.getAllByRole('button', { name: 'StockPulse' }).length).toBeGreaterThan(0);
     expect(screen.getByText('page content')).toBeInTheDocument();
+  });
+
+  it('keeps Local Only chrome hidden unless the endpoint reports enabled', () => {
+    renderShell();
+
+    expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
+  });
+
+  it('keeps the notification bell immediate while Local Only chrome is still pending', () => {
+    localOnlyModeState.status = 'on';
+    renderShell();
+
+    expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1);
+    expect(screen.queryByTestId('shell-local-only-indicator')).not.toBeInTheDocument();
+  });
+
+  it('surfaces Local Only in the shell when enabled and opens Auth & Security', async () => {
+    localOnlyModeState.status = 'on';
+    renderShell();
+
+    expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1);
+    const indicator = await screen.findByTestId('shell-local-only-indicator');
+    expect(screen.getAllByRole('button', { name: '通知' })).toHaveLength(1);
+    expect(indicator).toHaveAttribute('href', buildLocalOnlyModeSettingsHref());
+    fireEvent.click(indicator);
+    expect(screen.getByRole('status', { name: 'current location' })).toHaveTextContent(
+      '/settings?section=system_security&view=security&field=LOCAL_ONLY_MODE',
+    );
   });
 
   it('renders exactly one Bell and moves it between the mobile header and desktop Sidebar', async () => {

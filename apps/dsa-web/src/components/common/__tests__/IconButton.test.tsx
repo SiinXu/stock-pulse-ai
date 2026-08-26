@@ -33,6 +33,18 @@ describe('IconButton', () => {
     expect(button).toHaveAttribute('aria-busy', 'true');
   });
 
+  it('uses the toolbar default geometry without caller overrides', () => {
+    render(
+      <IconButton aria-label="Refresh analysis" tooltip={false}>
+        <RefreshCw aria-hidden="true" />
+      </IconButton>,
+    );
+
+    const button = screen.getByRole('button', { name: 'Refresh analysis' });
+    expect(button).toHaveAttribute('data-size', 'default');
+    expect(button).toHaveClass('h-8', 'w-8');
+  });
+
   it('provides a stable 44px navigation size without caller geometry overrides', () => {
     render(
       <IconButton aria-label="Open navigation" size="navigation" tooltip={false}>

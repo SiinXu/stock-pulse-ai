@@ -62,6 +62,17 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
   const desktopSidebar = useMediaQuery(DESKTOP_SIDEBAR_QUERY);
   const compactSidebar = useMediaQuery(COMPACT_SIDEBAR_QUERY);
   const sidebarCollapsed = collapsedPreference ?? compactSidebar;
+  const [LocalOnlyModeIndicator, setLocalOnlyModeIndicator] = useState<React.ComponentType<{ className?: string }> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void import('./LocalOnlyModeIndicator').then((module) => {
+      if (!cancelled) setLocalOnlyModeIndicator(() => module.default);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const openCommandPalette = useCallback(() => {
     setCommandPaletteOpen(true);
@@ -159,7 +170,10 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
           {t('layout.appFallbackTitle')}
         </span>
         {!desktopSidebar ? (
-          <NotificationBell className="pointer-events-auto" placement="bottom" />
+          <>
+            {LocalOnlyModeIndicator ? <LocalOnlyModeIndicator className="pointer-events-auto" /> : null}
+            <NotificationBell className="pointer-events-auto" placement="bottom" />
+          </>
         ) : null}
         <SidebarProfile
           collapsed
@@ -189,7 +203,12 @@ export const Shell: React.FC<ShellProps> = ({ children }) => {
             onToggleCollapse={toggleCollapsed}
             onNavigate={() => setMobileNavigationOpen(false)}
             onOpenCommandPalette={openCommandPalette}
-            globalActions={desktopSidebar ? <NotificationBell placement="right" /> : null}
+            globalActions={desktopSidebar ? (
+              <div className="flex items-center gap-1">
+                {LocalOnlyModeIndicator ? <LocalOnlyModeIndicator /> : null}
+                <NotificationBell placement="right" />
+              </div>
+            ) : null}
             focusKeyPrefix="shell-nav-desktop"
             profileOpen={profilePresentation === 'desktop'}
             onProfileOpenChange={(open) => updateProfilePresentation('desktop', open)}

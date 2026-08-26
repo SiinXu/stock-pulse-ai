@@ -798,13 +798,16 @@ This matrix is the single documented rule for text buttons vs icon tools. It
 extends Button Intent and IconButton primitive contracts; it does not add new
 Button variants.
 
-| Kind | Control | Examples | Forbidden patterns |
-| --- | --- | --- | --- |
-| **Primary task** | Labeled `Button` (`primary` or one task-region primary). Optional leading icon inside the same Button | Save, Run analysis, Connect, Import, Apply filters | Icon-only for irreversible money/account destruction; multiple `primary` buttons in one task region |
-| **Secondary task command** | Labeled `Button` (`secondary` / `outline`) | Cancel, Edit, View details when the label is the task | Styling secondary tools as a second primary |
-| **Secondary chrome tool** | `IconButton` + accessible name + tooltip | Refresh, Filter, More/overflow, Close, Collapse, History, Copy, Export | Full label `Button` rows that only wrap the toolbar; icon-only without accessible name |
-| **Tertiary / inline** | Ghost `IconButton` or quiet text link | Inline dismiss affordances, low-emphasis row tools | Elevating tertiary tools to primary |
-| **Destructive** | Labeled `Button` with `danger` / `danger-subtle`, or `ConfirmDialog` with consequence copy | Delete account, remove channel | Icon-only destructive for irreversible actions unless a reviewed product pattern already confirms with a labeled dialog |
+| Kind | Control | Live size | Examples | Forbidden patterns |
+| --- | --- | --- | --- | --- |
+| **Primary task** | Labeled `Button` (`primary` or one task-region primary). Optional leading icon inside the same Button | `primary` 32px, or `comfortable` 28px when it shares a header row | Save, Run analysis, Connect, Import, Apply filters | Icon-only for irreversible money/account destruction; multiple `primary` buttons in one task region |
+| **Secondary task command** | Labeled `Button` (`secondary` / `outline`) | `comfortable` 28px (or `default` 24px when declared compact) | Cancel, Edit, View details when the label is the task | Styling secondary tools as a second primary |
+| **Secondary chrome tool** | `IconButton` + accessible name + tooltip | `default` (`h-8` / 32px) | Refresh, Filter, More/overflow, Close, Collapse, History, Copy, Export | Full label `Button` rows that only wrap the toolbar; icon-only without accessible name |
+| **Tertiary / inline** | Ghost `IconButton` or quiet text link | `compact` 28px when declared dense; otherwise `default` 32px | Inline dismiss affordances, low-emphasis row tools | Elevating tertiary tools to primary |
+| **Destructive** | Labeled `Button` with `danger` / `danger-subtle`, or `ConfirmDialog` with consequence copy | same as primary/secondary labeled sizes | Delete account, remove channel | Icon-only destructive for irreversible actions unless a reviewed product pattern already confirms with a labeled dialog |
+
+Shell/rail/overlay icon tools use `IconButton` `navigation` (44px visible) only.
+Dense field-row help already uses `IconButton` `compact` (28px).
 
 **No double frame (R2):** do not wrap each `IconButton` in its own bordered or
 padded card. Allowed: a toolbar row with gap only; one shared segmented track
@@ -905,24 +908,34 @@ variants. Icon-only actions use `IconButton`, not `Button` with an icon size.
 
 ## Visible Size And Hit Target
 
-The canonical visible tiers are:
+Named sizes are **not** shared pixel heights across primitives. Button
+`compact` (20px) is not IconButton `compact` (28px). Chrome Refresh uses
+IconButton `default` (`h-8` / 32px), not Button `primary` (also 32px).
+
+**Button** visible map (`Button.tsx`; implicit default `comfortable`):
 
 | Size | Height | Typical use |
 | --- | ---: | --- |
-| `compact` | 20px | Dense toolbars and low-frequency filters |
-| `default` | 24px | Ordinary compact commands |
+| `compact` | 20px | Declared dense tables only |
+| `default` | 24px | Ordinary compact labeled commands |
 | `comfortable` | 28px | Forms, regular submissions, and the implicit default |
 | `primary` | 32px | The unique task CTA |
+
+**IconButton** visible map (`IconButton.tsx`; implicit default `default`):
+
+| Size | Height | Typical use |
+| --- | ---: | --- |
+| `compact` | 28px | Declared dense tables and field-row help |
+| `default` | 32px | Toolbar / row icon tools (Refresh, Export, Copy, Filter) |
+| `comfortable` | 36px | Larger in-content icon commands when declared |
 | `navigation` | 44px | Shell, rail, and overlay navigation controls |
 
 `Button` defaults to `comfortable`; `Input` defaults to `comfortable`; login inputs
 resolve to `primary`. `DatePicker` preserves its 44px default touch control and
 offers an explicit 32px `compact` control for dense aligned toolbars such as
-Backtest. `IconButton` supports `compact`, `default`, and
-`comfortable` visible squares plus the 44px `navigation` square. The
-`navigation` tier is reserved for shell, rail, and overlay navigation controls
-whose visible target must remain 44px; it is not a general replacement for the
-smaller command tiers.
+Backtest. The `navigation` tier is reserved for shell, rail, and overlay
+navigation controls whose visible target must remain 44px; it is not a general
+replacement for the smaller command tiers.
 
 When any available pointer is coarse, including on hybrid touchscreen devices,
 `Button` and `IconButton` use a transparent pseudo-element to provide at least a
@@ -942,6 +955,7 @@ do not replace the primitive contract.
 The AST-backed production design guard checks:
 
 - Button style-map PR #35 rounding and the 20/24/28/32px tiers.
+- IconButton style-map must stay `h-7`/`h-8`/`h-9`/`h-11` (28/32/36/44); unresolved `className` and `{...props}` fail closed (`IconButton:dynamic:…`); `size="primary"` is Button-only.
 - Legacy `xsm`/`sm`/`md`/`lg`/`xl` Button sizes in both the shared style map
   and aliased or namespaced callers; no legacy-size allowlist remains.
 - Icon- or symbol-only shared `Button` callers that must use `IconButton`.

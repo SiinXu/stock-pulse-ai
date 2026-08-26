@@ -1,0 +1,1 @@
+- [Chore] Seed CI test-duration weights and shard-1 pre-pytest overhead so full-suite backend shards stay duration-balanced instead of equal-file fallback.

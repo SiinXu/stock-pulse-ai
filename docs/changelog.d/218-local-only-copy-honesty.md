@@ -1,0 +1,1 @@
+- [Fixed] Aligned Local Only Mode copy with the enforced HTTP surface, including the plugin_safe_* gate and Outbound Activity badge (Refs #218).

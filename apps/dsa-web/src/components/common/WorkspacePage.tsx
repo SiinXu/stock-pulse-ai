@@ -53,13 +53,17 @@ const WorkspaceLayoutBase = forwardRef<HTMLDivElement, WorkspaceLayoutBaseProps>
   </div>
 ));
 
-WorkspaceLayoutBase.displayName = 'WorkspaceLayoutBase';
+if (import.meta.env.DEV) {
+  WorkspaceLayoutBase.displayName = 'WorkspaceLayoutBase';
+}
 
 export const WorkspaceLayout = forwardRef<HTMLDivElement, WorkspaceLayoutProps>((props, ref) => (
   <WorkspaceLayoutBase {...props} ref={ref} pattern="workspace-layout" />
 ));
 
-WorkspaceLayout.displayName = 'WorkspaceLayout';
+if (import.meta.env.DEV) {
+  WorkspaceLayout.displayName = 'WorkspaceLayout';
+}
 
 export const WorkspacePage = forwardRef<HTMLDivElement, WorkspacePageProps>(({
   children,
@@ -79,4 +83,6 @@ export const WorkspacePage = forwardRef<HTMLDivElement, WorkspacePageProps>(({
   </AppPage>
 ));
 
-WorkspacePage.displayName = 'WorkspacePage';
+if (import.meta.env.DEV) {
+  WorkspacePage.displayName = 'WorkspacePage';
+}
