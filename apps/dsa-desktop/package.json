@@ -81,7 +81,7 @@
         "to": "ollama"
       },
       {
-        "from": "../../THIRD_PARTY_NOTICES",
+        "from": "../../docs/legal/THIRD_PARTY_NOTICES",
         "to": "THIRD_PARTY_NOTICES"
       }
     ],

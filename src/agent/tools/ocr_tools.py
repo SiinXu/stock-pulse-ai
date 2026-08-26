@@ -109,7 +109,7 @@ def build_ocr_tool(
         logger.debug(
             "OCR Agent Tool was not registered reason=disabled "
             "guidance=Set OCR_AGENT_TOOL_ENABLED=true, configure OCR_FILE_ROOT "
-            "(or MULTIMODAL_FILE_ROOT), install requirements-ocr.txt plus system "
+            "(or MULTIMODAL_FILE_ROOT), install requirements/ocr.txt plus system "
             "Tesseract, then restart to opt in"
         )
         return None

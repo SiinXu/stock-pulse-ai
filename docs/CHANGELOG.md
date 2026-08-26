@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 > For user-friendly release highlights, see the [GitHub Releases](https://github.com/SiinXu/stock-pulse-ai/releases) page.
 
 ## [Unreleased]
+- [Chore] Move optional `requirements-*.txt` extras into `requirements/` and third-party notices into `docs/legal/`, and slim `.env.example` comments without changing configuration keys or defaults.
 - [Added] Add an opt-in dry-run agent promotion CLI that stores sidecar review proposals and offline eval scores without activating SkillRouter or auto-promoting (Refs #1093).
 - [Added] Apply AgentRouter once per dashboard AgentOrchestrator.run() from structured StockScope facts, honor constructor/Settings depth unless an explicit per-run user_mode_override is provided, fail closed on projection or routing rejection, and restore the constructor-configured mode in finally (Refs #1120).
 - [Added] Render a small quote-trust source/confidence/gap summary in analysis reports and the Web report context panel from existing pack overview metadata (Refs #1129).

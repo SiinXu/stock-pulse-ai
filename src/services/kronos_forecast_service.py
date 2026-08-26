@@ -218,7 +218,7 @@ KRONOS_DOWNLOAD_SIZE_HINTS = MappingProxyType(
 
 KRONOS_INSTALL_COMMAND = (
     "python -m pip install --constraint constraints.txt "
-    "--build-constraint build-constraints.txt -r requirements-kronos.txt"
+    "--build-constraint build-constraints.txt -r requirements/kronos.txt"
 )
 KRONOS_DOWNLOAD_COMMAND = (
     "python scripts/download_kronos_weights.py --size {size} --weights-dir <dir>"
@@ -439,7 +439,7 @@ def assess_kronos_availability(
             reason="disabled",
             message=(
                 "Kronos agent tool is disabled. Set KRONOS_ENABLED=true only "
-                "after installing requirements-kronos.txt and placing local "
+                "after installing requirements/kronos.txt and placing local "
                 f"weights (see {KRONOS_DOCS_PATH})."
             ),
         )
@@ -473,7 +473,7 @@ def assess_kronos_availability(
             reason="dependencies_missing",
             message=(
                 "Kronos dependencies are missing: "
-                f"{', '.join(missing_dependencies)}. Install requirements-kronos.txt "
+                f"{', '.join(missing_dependencies)}. Install requirements/kronos.txt "
                 f"with: {KRONOS_INSTALL_COMMAND}"
             ),
             spec=spec,

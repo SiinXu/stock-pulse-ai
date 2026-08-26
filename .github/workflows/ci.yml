@@ -100,7 +100,7 @@ jobs:
               - 'tests/plugins/test_ocr_agent_tool.py'
               - 'tests/fixtures/ocr/**'
               - 'tests/fixtures/multimodal/sample_financial_report.pdf'
-              - 'requirements-ocr.txt'
+              - 'requirements/ocr.txt'
               - '.github/workflows/ci.yml'
             # desktop-gate: Electron unit tests (not packaging / network download)
             desktop:
@@ -114,8 +114,8 @@ jobs:
               - 'scripts/build-backend-macos.sh'
               - 'scripts/verify-desktop-updater-artifacts.ps1'
               - 'scripts/prepare-embedded-ollama.js'
-              - 'requirements-desktop.txt'
-              - 'THIRD_PARTY_NOTICES'
+              - 'requirements/desktop.txt'
+              - 'docs/legal/THIRD_PARTY_NOTICES'
               - '.github/workflows/desktop-release.yml'
               - '.github/workflows/ci.yml'
       - name: 🧭 Filter backend-safe frontend paths
@@ -606,12 +606,12 @@ jobs:
             constraints.txt
             build-constraints.txt
             .github/requirements-ci.txt
-            requirements-pydanticai.txt
+            requirements/pydanticai.txt
       - name: 📦 Install dependencies (native + optional PydanticAI)
         run: |
           python -m pip install --upgrade --constraint constraints.txt pip
           for attempt in 1 2 3; do
-            if python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt -r requirements-pydanticai.txt; then
+            if python -m pip install --build-constraint build-constraints.txt -r .github/requirements-ci.txt -r requirements/pydanticai.txt; then
               break
             fi
             if [ "$attempt" -eq 3 ]; then
@@ -680,7 +680,7 @@ jobs:
             constraints.txt
             build-constraints.txt
             .github/requirements-ci.txt
-            requirements-report-export.txt
+            requirements/report-export.txt
       - name: 🔤 Install host fonts for glyph coverage
         run: |
           set -euo pipefail
@@ -747,7 +747,7 @@ jobs:
           for attempt in 1 2 3; do
             if python -m pip install --build-constraint build-constraints.txt \
               -r .github/requirements-ci.txt \
-              -r requirements-report-export.txt \
+              -r requirements/report-export.txt \
               'pypdf>=5,<7'; then
               break
             fi
@@ -846,7 +846,7 @@ jobs:
             constraints.txt
             build-constraints.txt
             .github/requirements-ci.txt
-            requirements-ocr.txt
+            requirements/ocr.txt
       - name: 🔤 Install Tesseract OCR engine
         if: ${{ needs.ai-governance.result == 'success' && needs.changes.result == 'success' && needs.changes.outputs.ocr_extractor == 'true' }}
         run: |
@@ -902,7 +902,7 @@ jobs:
           for attempt in 1 2 3; do
             if python -m pip install --build-constraint build-constraints.txt \
               -r .github/requirements-ci.txt \
-              -r requirements-ocr.txt; then
+              -r requirements/ocr.txt; then
               break
             fi
             if [ "$attempt" -eq 3 ]; then
