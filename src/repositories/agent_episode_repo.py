@@ -38,6 +38,7 @@ from src.schemas.agent_episode import (
     TrajectoryStepSummary,
 )
 from src.storage import DatabaseManager
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -109,11 +110,14 @@ FORGET_DELETE_EXTRA_BINDS = 1
 
 
 def sqlite_max_variable_number(session: Any) -> int:
-    """Return SQLite ``MAX_VARIABLE_NUMBER``, or the historical default of 999."""
-    try:
-        rows = session.execute(text("PRAGMA compile_options")).fetchall()
-    except Exception:  # broad-exception: fallback_recorded - unknown compile_options still chunk at the historical SQLite bind default
-        return SQLITE_DEFAULT_MAX_VARIABLE_NUMBER
+    """Return SQLite ``MAX_VARIABLE_NUMBER``, or the historical default of 999.
+
+    PRAGMA failures propagate to the forget transaction so they roll back.
+    A compile option that is missing or unparsable is not an exception path:
+    chunking then uses the historical SQLite default of 999, which cannot
+    exceed the live bind ceiling.
+    """
+    rows = session.execute(text("PRAGMA compile_options")).fetchall()
     for row in rows:
         option = str(row[0] if row is not None else "")
         if option.upper().startswith("MAX_VARIABLE_NUMBER="):
@@ -617,14 +621,20 @@ class AgentEpisodeRepository(BaseRepository):
                 )
         except MemoryForgetError:
             raise
-        except Exception as exc:
-            self._log_and_raise(
+        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
+            context = {"symbol": symbol, "dry_run": bool(decision.dry_run)}
+            log_safe_exception(
                 logger,
                 "agent_episode_forget_failed",
                 exc,
                 error_code="agent_episode_forget_failed",
-                context={"symbol": symbol, "dry_run": bool(decision.dry_run)},
+                context=context,
             )
+            raise RepositoryError(
+                "agent_episode_forget_failed",
+                error_code="agent_episode_forget_failed",
+                context=context,
+            ) from exc
 
     def apply_retention(self, *, cutoff: datetime, symbol: Optional[str] = None) -> int:
         """Compatibility wrapper. Unscoped calls fail closed; never a global purge."""

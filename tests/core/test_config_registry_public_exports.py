@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "13880e5ca058da04b82edf4c9a58833a0e3785ec8c5b26c971df3d8b90e0901b"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "22972640bcf1b7ef4d8c7482a202b8df80a73f251c76d187ea3c3e97731cc496"
+    "357463a274a28fb1b26d44919267999723bb562491642fb85b91e7429885fccb"
 )
 
 
@@ -104,8 +104,8 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Snapshot refresh for AGENT_ONLINE_ADAPTERS_ENABLED description
-    # after BaseAgent gated confidence apply (Issue #1091).
+    # Snapshot refresh for AGENT_EPISODE_RETENTION_DAYS / AGENT_EPISODE_MAX_ROWS
+    # per-symbol forgetting help (Refs #1119).
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256
