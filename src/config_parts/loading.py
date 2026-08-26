@@ -977,6 +977,10 @@ class _ConfigLoadingMethods:
                 minimum=1,
                 maximum=2,
             ),
+            agent_red_team_enabled=parse_env_bool(
+                os.getenv('AGENT_RED_TEAM_ENABLED'),
+                False,
+            ),
             agent_step_critique_enabled=parse_env_bool(
                 os.getenv('AGENT_STEP_CRITIQUE_ENABLED'),
                 False,

@@ -1,0 +1,2 @@
+- [Added] Optional default-off adversarial red-team second-opinion stage after Decision on Native Multi full/specialist runs (Refs #1135).
+- [Changed] Red-team data_limitations merge preserves existing primary limitations at the 12-item cap, deduplicates, and records overflow on dashboard.red_team instead of evicting the primary decision object.

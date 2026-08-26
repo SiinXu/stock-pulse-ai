@@ -373,6 +373,32 @@
 
 {% endif %}
 
+{% set red_team = dashboard.get('red_team') if dashboard else none %}
+{% if mode_limits.include_red_team and red_team and red_team.get('enabled') %}
+### 🛡️ {{ labels.red_team_heading }}
+
+- {{ labels.red_team_status_label }}: {{ red_team.get('status') }} | {{ labels.red_team_pressure_label }}: {{ red_team.get('suggested_confidence_pressure') or 'none' }}
+{% if red_team.get('counter_thesis') %}- {{ labels.red_team_counter_thesis_label }}: {{ red_team.get('counter_thesis') }}{% endif %}
+{% if red_team.get('challenges') %}
+**{{ labels.red_team_challenges_heading }}**
+{% for item in (red_team.get('challenges') or [])[:5] %}
+- [{{ item.get('severity') or 'medium' }}] {{ item.get('claim') }}{% if item.get('weak_evidence') %} — {{ item.get('weak_evidence') }}{% endif %}
+{% endfor %}
+{% endif %}
+{% if red_team.get('missing_evidence') %}
+**{{ labels.red_team_missing_heading }}**
+{% for item in (red_team.get('missing_evidence') or [])[:5] %}
+- {{ item }}
+{% endfor %}
+{% endif %}
+{% set merge_stats = red_team.get('data_limitations_merge') if red_team else none %}
+{% if merge_stats and merge_stats.get('omitted') %}
+- {{ labels.red_team_limitations_overflow_note.format(count=merge_stats.get('omitted')) }}
+{% endif %}
+- {{ labels.red_team_no_replace_note }}
+
+{% endif %}
+
 {% if mode_limits.include_battle_plan and battle %}
 ### 🎯 {{ labels.battle_plan_heading }}
 

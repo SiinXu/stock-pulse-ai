@@ -118,6 +118,7 @@ _LEGACY_FLAT_ATTRIBUTE_NAMES = (
     'agent_orchestrator_mode',
     'agent_orchestrator_timeout_s',
     'agent_critic_enabled',
+    'agent_red_team_enabled',
     'debate_enabled',
     'debate_max_rounds',
     'debate_temperature',

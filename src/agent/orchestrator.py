@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from src.agent import bull_bear_debate as _debate
 from src.agent import critic as _critic
+from src.agent.orchestrator_parts import red_team as _red_team
 from src.agent.chat_context import (
     build_agent_chat_market_context,
     build_agent_chat_tool_registry,
@@ -223,6 +224,7 @@ NON_CRITICAL_BASE_STAGES = frozenset({
     "risk",
     _critic.CRITIC_STAGE_NAME,
     _debate.DEBATE_STAGE_NAME,
+    _red_team.RED_TEAM_STAGE_NAME,
 })
 _PREPARED_DECISION_TYPE_INSERTED = "_prepared_dashboard_decision_type_inserted"
 

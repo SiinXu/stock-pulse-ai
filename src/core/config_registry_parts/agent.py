@@ -680,6 +680,39 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "docs": [{"label": "完整指南：Agent 配置", "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表"}],
         "warning_codes": [],
     },
+    "AGENT_RED_TEAM_ENABLED": {
+        "title": "Adversarial Red-Team Second Opinion",
+        "description": (
+            "Optional post-Decision red-team stage for Native Multi full/specialist analysis. "
+            "Runs one tool-free LLM turn after the primary decision, writes independent "
+            "challenges and evidence gaps, and never replaces decision_type, confidence_level, "
+            "or operation_advice. Existing data_limitations keep the 12 product slots first; "
+            "red-team overflow stays on dashboard.red_team. Default off. Chat, quick, and "
+            "standard runs skip unless an explicit request override is set."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 635,
+        "help_key": "settings.agent.AGENT_RED_TEAM_ENABLED",
+        "examples": [
+            "AGENT_RED_TEAM_ENABLED=false",
+            "AGENT_RED_TEAM_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "Red-team second opinion",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/environment-variables_EN.md",
+            },
+        ],
+        "warning_codes": [],
+    },
     "DEBATE_ENABLED": {
         "title": "Structured Bull-Bear Debate",
         "description": (

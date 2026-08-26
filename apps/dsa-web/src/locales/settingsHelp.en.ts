@@ -1525,6 +1525,17 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
     impact: ['Bounds optional Critic revision cost while preserving Decision budget.'],
     notes: ['Reaching the round limit without an explicit pass remains not_converged and retains the Critic limitations.'],
   },
+  'settings.agent.AGENT_RED_TEAM_ENABLED': {
+    title: 'Adversarial red-team second opinion',
+    summary: 'Run one tool-free post-Decision red-team review on Native Multi full/specialist analysis.',
+    usage: 'Keep this off unless you want an independent challenge of weak evidence and overconfidence after the primary decision.',
+    valueNotes: [
+      'Default is off. Chat never runs this stage. quick and standard skip it unless an explicit request override is set.',
+      'The stage cannot replace decision_type, confidence_level, or operation_advice. Existing data_limitations keep the 12 product slots first; overflow stays in the red-team section. Budget or provider failure fails soft.',
+    ],
+    impact: ['Adds at most one LLM turn after Decision and appends challenges to risks/gaps.'],
+    notes: ['This is not Bull-Bear debate and not a Risk veto.'],
+  },
   'settings.agent.DEBATE': {
     title: 'Bull-Bear debate',
     summary: 'Configure the optional debate stage, limits, and dedicated model.',

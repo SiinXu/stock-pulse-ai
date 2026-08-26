@@ -599,6 +599,14 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "bull_bear_no_majority_note": "辩论合成不使用多数表决，不静默抹平分歧。",
         "bull_bear_bull_label": "多方",
         "bull_bear_bear_label": "空方",
+        "red_team_heading": "红队二审",
+        "red_team_status_label": "二审状态",
+        "red_team_pressure_label": "建议置信度压力",
+        "red_team_counter_thesis_label": "独立反题",
+        "red_team_challenges_heading": "挑战",
+        "red_team_missing_heading": "证据缺口",
+        "red_team_no_replace_note": "红队二审不替换主决策对象。",
+        "red_team_limitations_overflow_note": "主决策 data_limitations 已满，另有 {count} 条红队缺口仅保留在本节。",
         "report_strata_heading": "证据分层",
         "disclaimer_heading": "非投资建议声明",
         "verified_facts_heading": "已核实事实",
@@ -847,6 +855,14 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "bull_bear_no_majority_note": "Debate synthesis does not use majority vote and does not silently smooth disagreement.",
         "bull_bear_bull_label": "Bull",
         "bull_bear_bear_label": "Bear",
+        "red_team_heading": "Red-Team Second Opinion",
+        "red_team_status_label": "Review status",
+        "red_team_pressure_label": "Suggested confidence pressure",
+        "red_team_counter_thesis_label": "Independent counter-thesis",
+        "red_team_challenges_heading": "Challenges",
+        "red_team_missing_heading": "Evidence gaps",
+        "red_team_no_replace_note": "Red-team review does not replace the primary decision object.",
+        "red_team_limitations_overflow_note": "Primary data_limitations is at capacity; omitted {count} red-team gap(s) remain in this section only.",
         "report_strata_heading": "Evidence Strata",
         "disclaimer_heading": "Non-Investment-Advice Disclaimer",
         "verified_facts_heading": "Verified Facts",
@@ -1097,6 +1113,14 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "bull_bear_no_majority_note": "토론 종합은 다수결을 사용하지 않으며 이견을 조용히 덮지 않습니다.",
         "bull_bear_bull_label": "강세",
         "bull_bear_bear_label": "약세",
+        "red_team_heading": "레드팀 재검토",
+        "red_team_status_label": "재검토 상태",
+        "red_team_pressure_label": "권장 신뢰도 압력",
+        "red_team_counter_thesis_label": "독립 반론",
+        "red_team_challenges_heading": "도전",
+        "red_team_missing_heading": "증거 공백",
+        "red_team_no_replace_note": "레드팀 재검토는 주 결정을 대체하지 않습니다.",
+        "red_team_limitations_overflow_note": "주 결정 data_limitations가 가득 차 {count}개 레드팀 공백은 이 섹션에만 남습니다.",
         "report_strata_heading": "증거 계층",
         "disclaimer_heading": "투자 권유 아님 고지",
         "verified_facts_heading": "검증된 사실",
@@ -1672,6 +1696,72 @@ def append_multi_model_comparison_lines(
                 f"{point.get('kind') or 'unknown'}"
                 f"{(' — ' + participants) if participants else ''}"
             )
+    lines.append("")
+
+
+def format_red_team_limitations_overflow_note(
+    payload: Any,
+    labels: Dict[str, str],
+) -> str:
+    """Return the data_limitations overflow note, or empty when nothing was omitted."""
+    merge = payload.get("data_limitations_merge") if isinstance(payload, dict) else None
+    if not isinstance(merge, dict):
+        return ""
+    try:
+        count = int(merge.get("omitted") or 0)
+    except (TypeError, ValueError):
+        return ""
+    if count <= 0:
+        return ""
+    template = labels.get(
+        "red_team_limitations_overflow_note",
+        "Primary data_limitations is at capacity; omitted {count} red-team gap(s) remain in this section only.",
+    )
+    try:
+        return str(template).format(count=count)
+    except (KeyError, IndexError, ValueError):
+        return f"{template}: {count}"
+
+
+def append_red_team_lines(
+    lines: List[str],
+    dashboard: Any,
+    labels: Dict[str, str],
+) -> None:
+    """Append a red-team second-opinion block. No-op when disabled."""
+    payload = dashboard.get("red_team") if dashboard else None
+    if not isinstance(payload, dict) or not payload.get("enabled"):
+        return
+    lines.append(f"### 🛡️ {labels.get('red_team_heading', 'Red-Team Second Opinion')}")
+    lines.append(
+        f"- {labels.get('red_team_status_label', 'Review status')}: {payload.get('status')} | "
+        f"{labels.get('red_team_pressure_label', 'Suggested confidence pressure')}: "
+        f"{payload.get('suggested_confidence_pressure') or 'none'}"
+    )
+    if payload.get("counter_thesis"):
+        lines.append(
+            f"- {labels.get('red_team_counter_thesis_label', 'Independent counter-thesis')}: "
+            f"{payload.get('counter_thesis')}"
+        )
+    challenges = payload.get("challenges") or []
+    if challenges:
+        lines.append(f"**{labels.get('red_team_challenges_heading', 'Challenges')}**")
+        for item in challenges[:5]:
+            if not isinstance(item, dict):
+                continue
+            claim = item.get("claim") or ""
+            weak = item.get("weak_evidence") or ""
+            severity = item.get("severity") or "medium"
+            lines.append(f"- [{severity}] {claim}" + (f" — {weak}" if weak else ""))
+    missing = payload.get("missing_evidence") or []
+    if missing:
+        lines.append(f"**{labels.get('red_team_missing_heading', 'Evidence gaps')}**")
+        for item in missing[:5]:
+            lines.append(f"- {item}")
+    overflow_note = format_red_team_limitations_overflow_note(payload, labels)
+    if overflow_note:
+        lines.append(f"- {overflow_note}")
+    lines.append(f"- {labels.get('red_team_no_replace_note', 'Red-team review does not replace the primary decision object.')}")
     lines.append("")
 
 
