@@ -20,6 +20,39 @@ from scripts.ci_test_shard import (
 # until a hosted run refreshes .github/ci-test-durations.json.
 MIN_KNOWN_DURATION_COVERAGE = 0.95
 
+# Immutable equal-weight model of hosted run 32963128085 empty-duration packing.
+# Not live discovery and not .github/ci-test-durations.json keys.
+_EMPTY_DURATION_HOTSPOT = "tests/test_exception_log_callsite_guard.py"
+_EMPTY_DURATION_SIBLING = "tests/test_broad_exception_guard.py"
+_EMPTY_DURATION_HISTORICAL_FILES = (
+    "tests/frozen_empty_duration/test_early_a.py",
+    "tests/frozen_empty_duration/test_early_b.py",
+    "tests/frozen_empty_duration/test_early_c.py",
+    _EMPTY_DURATION_SIBLING,
+    "tests/test_core_placeholder_a.py",
+    "tests/test_core_placeholder_b.py",
+    "tests/test_core_placeholder_c.py",
+    _EMPTY_DURATION_HOTSPOT,
+)
+_EMPTY_DURATION_HISTORICAL_OVERHEAD = 1.0
+_EMPTY_DURATION_REFRESH_EXTRAS = (
+    "tests/repositories/test_layered_memory_repo.py",
+    "tests/schemas/test_layered_memory_persist.py",
+    "tests/services/test_layered_memory_collection_service.py",
+)
+_EMPTY_DURATION_HOTSPOT_ADJACENT = (
+    "tests/test_exception_aaa.py",
+    "tests/test_exception_bbb.py",
+    "tests/test_exception_ccc.py",
+)
+
+
+def _empty_duration_groups(files, overhead: float = _EMPTY_DURATION_HISTORICAL_OVERHEAD):
+    groups, _totals = partition_test_files(
+        files, {}, splits=4, initial_totals=[overhead, 0.0, 0.0, 0.0]
+    )
+    return groups
+
 
 def test_partition_covers_all_modules_exactly_once() -> None:
     files = ["tests/a/test_a.py", "tests/b/test_b.py", "tests/c/test_c.py", "tests/d/test_d.py"]
@@ -64,29 +97,49 @@ def test_greedy_partition_isolates_a_dominant_module() -> None:
 
 
 def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
-    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment.
+    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment."""
 
-    Reconstruct that packing from the seeded duration-map module set. Live
-    discovery may include newer tests/**/test_*.py files that shift the
-    equal-weight shard index without isolating the hotspot; new modules use
-    median weights until a hosted refresh and must not empty this map.
-    """
-
-    hotspot = "tests/test_exception_log_callsite_guard.py"
-    sibling = "tests/test_broad_exception_guard.py"
-    seeded = sorted(load_durations())
-    groups, _totals = partition_test_files(
-        seeded, {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
-    )
+    groups = _empty_duration_groups(_EMPTY_DURATION_HISTORICAL_FILES)
     shard_one = set(groups[0])
-    assert hotspot in shard_one
-    assert sibling in shard_one
+    assert _EMPTY_DURATION_HOTSPOT in shard_one
+    assert _EMPTY_DURATION_SIBLING in shard_one
+    assert len(groups[0]) > 1
 
+
+def test_empty_duration_refresh_inventory_does_not_change_frozen_reconstruction() -> None:
+    """Duration-key refresh must not become the historical packing source."""
+
+    frozen = _empty_duration_groups(_EMPTY_DURATION_HISTORICAL_FILES)
+    assert _EMPTY_DURATION_HOTSPOT in frozen[0]
+    assert _EMPTY_DURATION_SIBLING in frozen[0]
+
+    shifted = _empty_duration_groups(
+        [*_EMPTY_DURATION_HISTORICAL_FILES, *_EMPTY_DURATION_REFRESH_EXTRAS]
+    )
+    shifted_hot = next(group for group in shifted if _EMPTY_DURATION_HOTSPOT in group)
+    assert _EMPTY_DURATION_HOTSPOT not in shifted[0]
+    assert len(shifted_hot) > 1
+
+    assert _empty_duration_groups(_EMPTY_DURATION_HISTORICAL_FILES) == frozen
+
+
+def test_empty_duration_hotspot_adjacent_names_keep_hotspot_packed() -> None:
+    """Sibling colocation is not a live empty-map invariant."""
+
+    groups = _empty_duration_groups(
+        [*_EMPTY_DURATION_HISTORICAL_FILES, *_EMPTY_DURATION_HOTSPOT_ADJACENT]
+    )
+    hot = next(group for group in groups if _EMPTY_DURATION_HOTSPOT in group)
+    assert len(hot) > 1
+    assert _EMPTY_DURATION_SIBLING not in hot
+    assert _EMPTY_DURATION_HOTSPOT not in groups[0]
+
+
+def test_empty_duration_live_hotspot_is_not_isolated() -> None:
     live_groups, _live_totals = partition_test_files(
         discover_test_files(), {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
     )
-    live_hot = next(group for group in live_groups if hotspot in group)
-    assert sibling in live_hot
+    live_hot = next(group for group in live_groups if _EMPTY_DURATION_HOTSPOT in group)
     assert len(live_hot) > 1
 
 
