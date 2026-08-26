@@ -36,6 +36,66 @@ def test_discover_finds_repo_tests() -> None:
     assert all(path.startswith("tests/") and path.endswith(".py") for path in found)
 
 
+def test_greedy_partition_isolates_a_dominant_module() -> None:
+    files = [
+        "tests/test_a.py",
+        "tests/test_b.py",
+        "tests/test_c.py",
+        "tests/test_hot.py",
+    ]
+    durations = {
+        "tests/test_a.py": 10.0,
+        "tests/test_b.py": 10.0,
+        "tests/test_c.py": 10.0,
+        "tests/test_hot.py": 900.0,
+    }
+    groups, totals = partition_test_files(files, durations, splits=4)
+    hot_index = next(i for i, group in enumerate(groups) if "tests/test_hot.py" in group)
+    assert groups[hot_index] == ["tests/test_hot.py"]
+    assert totals[hot_index] == 900.0
+    flat = [path for group in groups for path in group]
+    assert sorted(flat) == sorted(files)
+
+
+def test_empty_duration_fallback_colocates_hosted_shard_one_hotspots() -> None:
+    """Equal 1.0 weights recreate the 32963128085 shard-1 timeout assignment."""
+
+    files = discover_test_files()
+    groups, _totals = partition_test_files(
+        files, {}, splits=4, initial_totals=[30.0, 0.0, 0.0, 0.0]
+    )
+    shard_one = set(groups[0])
+    assert "tests/test_exception_log_callsite_guard.py" in shard_one
+    assert "tests/test_broad_exception_guard.py" in shard_one
+
+
+def test_committed_durations_cover_modules_and_fit_backend_job_bound() -> None:
+    files = discover_test_files()
+    durations = load_durations()
+    assert durations
+    missing = [path for path in files if path not in durations]
+    assert missing == []
+    assert durations["tests/test_exception_log_callsite_guard.py"] >= 600.0
+
+    from scripts.ci_test_shard import BACKEND_FIRST_SHARD_OVERHEAD_SECONDS
+
+    groups, totals = partition_test_files(
+        files,
+        durations,
+        splits=4,
+        initial_totals=[BACKEND_FIRST_SHARD_OVERHEAD_SECONDS, 0.0, 0.0, 0.0],
+    )
+    covered = [path for group in groups for path in group]
+    assert sorted(covered) == sorted(files)
+    assert len(covered) == len(set(covered))
+    assert all(group for group in groups)
+    assert max(totals) < 20 * 60
+    hot_shard = next(
+        group for group in groups if "tests/test_exception_log_callsite_guard.py" in group
+    )
+    assert hot_shard == ["tests/test_exception_log_callsite_guard.py"]
+
+
 def test_partition_is_deterministic_and_accounts_for_first_shard_overhead() -> None:
     files = ["tests/test_c.py", "tests/test_a.py", "tests/test_b.py"]
     durations = {path: 10.0 for path in files}

@@ -387,7 +387,7 @@ jobs:
         env:
           PYTEST_SPLITS: '4'
           PYTEST_GROUP: ${{ matrix.shard }}
-          PYTEST_FIRST_SHARD_OVERHEAD: '30'
+          PYTEST_FIRST_SHARD_OVERHEAD: '165'
           COVERAGE_SHARD_DIR: ${{ runner.temp }}/cov
         run: |
           mkdir -p "${COVERAGE_SHARD_DIR}"

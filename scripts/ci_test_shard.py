@@ -8,6 +8,9 @@ whole-module partitions) without copying that repository's files.
 
 When ``.github/ci-test-durations.json`` is missing or incomplete, unknown
 modules receive a median fallback weight so partitioning remains deterministic.
+An empty durations map is valid JSON but equal 1.0 weights are *not* balanced:
+hosted main run 32963128085 attempt 3 cancelled backend-tests shard 1 at the
+30-minute job bound after colocating ``test_exception_log_callsite_guard``.
 """
 
 from __future__ import annotations
@@ -24,6 +27,10 @@ from typing import Mapping, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_DURATIONS_PATH = REPO_ROOT / ".github" / "ci-test-durations.json"
+# Shard-1-only pre-pytest work on backend-tests (supply-chain, native isolation,
+# syntax, flake8, deterministic). Measured on main run 32963128085 attempt 3
+# job 98171256271: exclusive steps 12:08:55Z → offline suite 12:11:40Z.
+BACKEND_FIRST_SHARD_OVERHEAD_SECONDS = 165.0
 
 
 def discover_test_files(repo_root: Path = REPO_ROOT) -> list[str]:
