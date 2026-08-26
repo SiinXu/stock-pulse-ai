@@ -1,0 +1,2 @@
+- [Fixed] Multi Agent `run()` / `chat()` now forward `budget_snapshot` and `failure_reason` onto the public `AgentResult`, including Multi-symbol cancelled and synthesized aggregates, so hard-budget exhaustion stays observable after aggregation (Refs #1121).
+- [Tests] Refresh the AgentOrchestrator `_ChatMethods` AST pin after forwarding mode-budget fields on the public Multi `AgentResult` (Refs #1121).
