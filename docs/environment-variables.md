@@ -174,6 +174,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
 | `AGENT_SKILL_AUTOWEIGHT` | `true` | 是 | 模板中注释; Automatically weight strategy opinions based on backtesting performance. |
 | `AGENT_SKILL_DIR` | `./strategies` | 是 | 模板中注释; Custom strategy directory (optional, place custom YAML strategy files; environment variable name follows internal ski... |
+| `AGENT_SKILL_RETRIEVAL_K` | `0` | 是 | 模板中注释 |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
 | `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; Multi-level reflection (#1094): immediate step critique / trajectory / meta-review |
