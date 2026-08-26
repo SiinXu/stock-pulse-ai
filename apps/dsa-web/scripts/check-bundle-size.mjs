@@ -41,6 +41,23 @@ const FORBIDDEN_PRODUCTION_ASSET_GLOBS = Object.freeze([
   'assets/PlaygroundRenderPage-*.js',
   'assets/ComponentPlaygroundPage-*.js',
 ]);
+const SKILL_RETRIEVAL_HELP_MARKER = 'How many catalog skills automatic SkillRouter may retrieve by description';
+const SKILL_RETRIEVAL_HELP_ALLOWED_GLOB = 'assets/CredentialInput-*.js';
+const SKILL_RETRIEVAL_HELP_FORBIDDEN_GLOBS = Object.freeze([
+  'assets/SettingsPage-*.js',
+  'assets/settings-*.js',
+  'assets/settingsPage-*.js',
+  'assets/settingsTranslations-*.js',
+  'assets/extra-locale-*.js',
+  'assets/ja-*.js',
+  'assets/de-*.js',
+  'assets/ko-*.js',
+  'assets/fr-*.js',
+  'assets/es-*.js',
+  'assets/id-*.js',
+  'assets/ms-*.js',
+  'assets/zh-TW-*.js',
+]);
 const INDEX_HTML_MODULEPRELOAD_SOURCE = 'indexHtmlModulepreload';
 const CRITICAL_PATH_FAMILY_ID = 'criticalPath';
 
@@ -400,6 +417,48 @@ function main() {
       fail(`  ${finding.relativePath} matches ${finding.pattern}`);
     }
     return;
+  }
+
+  const skillRetrievalHits = [];
+  let hasSettingsOrCredentialChunk = false;
+  for (const filePath of files) {
+    if (!filePath.endsWith('.js')) continue;
+    const relativePath = path.relative(outDir, filePath).split(path.sep).join('/');
+    if (
+      globToRegExp('assets/SettingsPage-*.js').test(relativePath)
+      || globToRegExp(SKILL_RETRIEVAL_HELP_ALLOWED_GLOB).test(relativePath)
+    ) {
+      hasSettingsOrCredentialChunk = true;
+    }
+    const contents = readFileSync(filePath, 'utf8');
+    if (contents.includes(SKILL_RETRIEVAL_HELP_MARKER)) {
+      skillRetrievalHits.push(relativePath);
+    }
+  }
+  if (skillRetrievalHits.length === 0) {
+    if (hasSettingsOrCredentialChunk) {
+      fail(
+        `Skill retrieval help marker missing from production chunks; expected ${SKILL_RETRIEVAL_HELP_ALLOWED_GLOB}`,
+      );
+      return;
+    }
+  } else {
+    const leaked = skillRetrievalHits.filter((relativePath) => (
+      SKILL_RETRIEVAL_HELP_FORBIDDEN_GLOBS.some((pattern) => globToRegExp(pattern).test(relativePath))
+    ));
+    const allowedHits = skillRetrievalHits.filter((relativePath) => (
+      globToRegExp(SKILL_RETRIEVAL_HELP_ALLOWED_GLOB).test(relativePath)
+    ));
+    if (leaked.length > 0) {
+      fail(`Skill retrieval help leaked into Settings/locale families: ${leaked.join(', ')}`);
+      return;
+    }
+    if (allowedHits.length === 0) {
+      fail(
+        `Skill retrieval help must live on ${SKILL_RETRIEVAL_HELP_ALLOWED_GLOB}, found: ${skillRetrievalHits.join(', ')}`,
+      );
+      return;
+    }
   }
 
   const results = [];

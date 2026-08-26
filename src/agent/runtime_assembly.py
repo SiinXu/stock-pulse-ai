@@ -754,6 +754,8 @@ def build_agent_executor(
             llm_adapter,
             skill_manager,
             technical_skill_policy=prompt_state.technical_skill_policy,
+            skill_instructions=prompt_state.skill_instructions,
+            explicit_skill_selection=prompt_state.explicit_skill_selection,
         )
 
     from src.agent.executor import AgentExecutor
@@ -767,6 +769,8 @@ def build_agent_executor(
         skill_instructions=prompt_state.skill_instructions,
         default_skill_policy=prompt_state.default_skill_policy,
         use_legacy_default_prompt=prompt_state.use_legacy_default_prompt,
+        skill_manager=skill_manager,
+        explicit_skill_selection=prompt_state.explicit_skill_selection,
         max_steps=_coerce_config_int(
             getattr(config, "agent_max_steps", AGENT_MAX_STEPS_DEFAULT),
             AGENT_MAX_STEPS_DEFAULT,
@@ -788,6 +792,8 @@ def _build_orchestrator(
     skill_manager,
     *,
     technical_skill_policy: str = "",
+    skill_instructions: str = "",
+    explicit_skill_selection: bool = False,
 ):
     """Build and return an :class:`AgentOrchestrator` (multi-agent mode).
 
@@ -802,7 +808,7 @@ def _build_orchestrator(
     return AgentOrchestrator(
         tool_registry=registry,
         llm_adapter=llm_adapter,
-        skill_instructions=skill_manager.get_skill_instructions(),
+        skill_instructions=skill_instructions,
         technical_skill_policy=technical_skill_policy,
         max_steps=_coerce_config_int(
             getattr(config, "agent_max_steps", AGENT_MAX_STEPS_DEFAULT),
@@ -812,6 +818,7 @@ def _build_orchestrator(
         mode=mode,
         skill_manager=skill_manager,
         config=config,
+        explicit_skill_selection=explicit_skill_selection,
     )
 
 

@@ -27,4 +27,9 @@ describe('categoryFieldGroups', () => {
       expect(getCategoryFieldGroupId('data_source', key), key).toBe('providerReliability');
     }
   });
+
+  it('places skill retrieval K with the Agent skills group', () => {
+    expect(getCategoryFieldGroupId('agent', 'AGENT_SKILL_RETRIEVAL_K')).toBe('skills');
+    expect(getCategoryFieldGroupId('agent', 'AGENT_SKILL_ROUTING')).toBe('skills');
+  });
 });

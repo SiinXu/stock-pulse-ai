@@ -146,6 +146,27 @@ This slice does **not** add consolidation, forgetting, TTL / per-symbol caps, re
 
 Do not reopen #250, #198, or #150.
 
+## Catalog-description skill retrieval (#1123 Slice A)
+
+Default-off consumer over the **existing** skill catalog. `retrieve_skills` returns ranked IDs; `SkillRouter.select_skills` owns automatic/regime/default selection; `SkillManager.get_skill_instructions(skill_ids)` renders that subset. This is **not** a second SkillRouter, **not** the #1118 procedural layer, and **not** #1091 tool scoring.
+
+| Control | Default | Behavior |
+| --- | --- | --- |
+| `AGENT_SKILL_RETRIEVAL_K` | `0` | `0` keeps today's regime/default SkillRouter. A positive int (hard cap 8) ranks catalog `description` / `display_name` / aliases with `HashingVectorIndex`. `bool` / `float` / strings are rejected (disabled), not coerced. |
+
+When enabled on the automatic path:
+
+- Empty catalog, empty query, or all-zero cosine scores fall back to `get_default_router_skill_ids` (today `bull_trend`, `shrink_pullback`), **never** the full catalog and **never** `AGENT_SKILLS=all`.
+- Hierarchy matches SkillRouter: per-run/per-chat `skills_requested` wins; otherwise an immutable `explicit_skill_selection` flag keeps the factory `skill_instructions` dump verbatim and builds SkillAgents from the already-activated SkillManager set (existing specialist cap, no retrieve, no retrieved label); only implicit auto uses description retrieval. Config IDs are not reconstructed.
+- Effective K is `min(select_skills max_count, AGENT_SKILL_RETRIEVAL_K)` (default consumer cap remains 3).
+- Pipeline/multi-agent: `SkillRouter.select_skills` on the **shared** run `AgentContext` yields IDs; `SkillManager.get_skill_instructions(ids)` is passed through local agent kwargs only. `AgentOrchestrator.skill_instructions` is not overwritten (overlapping runs must not contaminate each other).
+- Native run/chat: description retrieval uses the **real** task/query at prompt assembly time and a per-call context. Factory assembly has no query, so it still dumps the activated set; it does not pretend empty-context routing is description retrieval.
+- Run-local `ctx.meta["retrieved_skill_ids"]` is written only when `SkillRouter.select_skills` takes the retrieval path on that context. Pipeline uses the shared ctx. Native local ctx is not an episode field. Explicit/manual paths do not write this key. This slice does not add episode columns.
+
+Optional `AgentMemory` performance is used only when a memory instance is **injected** into `SkillRouter` and a skill has sufficient finite samples. Production construction does not allocate `AgentMemory` / BacktestService on every selection; without an injected lifecycle the prior is empty (neutral).
+
+Remaining for later #1123 slices: planner tool-effectiveness ordering, adversarial denied-tool AC2 on a retrieval path, durable episode retrieval logging, and real #1091 priors. Keep #1123 **OPEN**.
+
 ## Rollback
 
 Set `LAYERED_MEMORY_COLLECTION_ENABLED=false` (the default) so collection is a no-op. Then run this slice's migration `downgrade`, which drops only `layered_memory_observations`, `layered_memory_consent`, `layered_memory_access_audit`, and their indexes/triggers. Episode, evolution-event, prediction, and decision-memory tables are untouched. Revert the PR to remove the collection helper. No production prompt path is wired, so analysis output is unchanged when the flag is off.

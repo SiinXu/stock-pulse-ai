@@ -126,6 +126,27 @@ Decision Memory 的 `admit_decision_memory` 是 **独立的 READ / 注入** 过�
 
 不要重开 #250、#198 或 #150。
 
+## 目录描述技能检索（#1123 Slice A）
+
+默认关闭的消费者，覆盖**既有**技能目录。`retrieve_skills` 只返回排序后的 ID；`SkillRouter.select_skills` 负责 automatic/regime/default 选择；`SkillManager.get_skill_instructions(skill_ids)` 渲染该子集。这**不是**第二个 SkillRouter、**不是** #1118 程序性层，也**不是** #1091 工具打分。
+
+| 控制项 | 默认值 | 行为 |
+| --- | --- | --- |
+| `AGENT_SKILL_RETRIEVAL_K` | `0` | `0` 保持今日的 regime/default SkillRouter。正整数（硬顶 8）用 `HashingVectorIndex` 按目录 `description` / `display_name` / aliases 排序。`bool` / `float` / 字符串拒绝（关闭），不做 `int()` 强制转换。 |
+
+automatic 路径开启时：
+
+- 空目录、空查询或全零余弦分回退到 `get_default_router_skill_ids`（今日为 `bull_trend`、`shrink_pullback`），**绝不**回退到全量目录或 `AGENT_SKILLS=all`。
+- 优先级与 SkillRouter 一致：当次 run/chat 的 `skills_requested` 最高；否则不可变的 `explicit_skill_selection` 原样保留工厂 `skill_instructions` dump，并从已激活的 SkillManager 集合构建 SkillAgent（沿用既有 specialist 上限，不检索、不标记 retrieved）；仅隐式 auto 走描述检索。不回放/重建配置 ID。
+- 有效 K 为 `min(select_skills 的 max_count, AGENT_SKILL_RETRIEVAL_K)`（消费者默认上限仍是 3）。
+- Pipeline/multi-agent：在**共享**运行期 `AgentContext` 上调用 `SkillRouter.select_skills` 得到 ID，再用 `SkillManager.get_skill_instructions(ids)` 作为**局部** agent kwargs。不改写 `AgentOrchestrator.skill_instructions`，避免并发 run 互相污染。
+- Native run/chat：在组装 prompt 时用**真实** task/query 做描述检索（每次调用独立 context）。工厂组装没有 query，仍 dump 已激活集合；不会把空 context 路由假装成描述检索。
+- 仅当 `SkillRouter.select_skills` 走检索路径时写入该 context 的 `ctx.meta["retrieved_skill_ids"]`。Pipeline 用共享 ctx。Native 的局部 ctx 不是 episode 字段。显式/手动路径不写该键。本切片不新增 episode 列。
+
+可选 `AgentMemory` 表现先验只在向 `SkillRouter` **注入** memory 实例、且样本充分且有限时使用。生产路径不会在每次选择时构造 `AgentMemory` / BacktestService；没有注入的生命周期时先验为空（中性）。
+
+后续 #1123 切片仍包括：planner 工具有效性排序、检索路径上的对抗性 denied-tool AC2、episode 持久化检索日志，以及真正的 #1091 先验。保持 #1123 **OPEN**。
+
 ## 回滚
 
 将 `LAYERED_MEMORY_COLLECTION_ENABLED=false`（默认值）关闭收集。然后执行本切片 migration `downgrade`，仅 DROP `layered_memory_observations`、`layered_memory_consent`、`layered_memory_access_audit` 及其索引/trigger。不得触碰 episode / evolution-event / prediction / decision-memory 表。回退 PR 以移除收集助手。未接线生产 prompt，关闭开关后分析输出不变。
