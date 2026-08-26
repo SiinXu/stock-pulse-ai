@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager realtime quote orchestration (`get_realtime_quote` and its local helpers) into `src/data_provider/manager_parts/realtime_quote_methods.py` behind the existing ADR-006 facade without changing provider order, Longbridge versus YFinance routing, validation wrapping, or public imports (Refs #1067, Refs #1088).
