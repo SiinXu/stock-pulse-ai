@@ -186,9 +186,8 @@ class _RealtimeQuoteMethods:
 
         from .akshare_fetcher import _is_us_code
         from .us_index_mapping import is_us_index_code
-        from src.config import get_config
 
-        config = get_config()
+        config = self._get_fundamental_config()
 
         # If real-time market data functionality is disabled, return None directly.
         if not config.enable_realtime_quote:
