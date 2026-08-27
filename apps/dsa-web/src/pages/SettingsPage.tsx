@@ -2,7 +2,7 @@ import type React from 'react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useBlocker, useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
-import { CheckCircle2, ChevronDown, CircleAlert, Clock, RefreshCw } from 'lucide-react';
+import { CheckCircle2, CircleAlert, Clock, RefreshCw } from 'lucide-react';
 import { useAuth, useBeginnerMode, useSystemConfig } from '../hooks';
 import { useProviderCatalog } from '../hooks/useProviderCatalog';
 import { useAvailableModels } from '../hooks/useAvailableModels';
@@ -19,7 +19,7 @@ import { getParsedApiError, type ParsedApiError } from '../api/error';
 import type { SetupSmokeOutcome } from '../utils/setupSmokeTask';
 import { alphasiftApi, notifyAlphaSiftConfigChanged, notifySystemConfigChanged } from '../api/alphasift';
 import { systemConfigApi } from '../api/systemConfig';
-import { ApiErrorAlert, AppPage, Button, ConfirmDialog, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
+import { ApiErrorAlert, AppPage, Button, Collapsible, ConfirmDialog, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
   InvestmentFrameworkSettingsCard,
@@ -1825,21 +1825,17 @@ const SettingsPage: React.FC = () => {
                         </form>
                       ) : null}
                       {eventExpertJson.length ? (
-                        <details
-                          className="group/event-expert overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
-                          data-testid="event-monitor-expert-json"
-                        >
-                          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
-                            <span>{SETTINGS_MISC_TEXT[uiLanguage].showAdvanced}</span>
-                            <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open/event-expert:rotate-180" aria-hidden="true" />
-                          </summary>
-                          <form
-                            className="border-t border-[var(--settings-border-soft)] p-1"
-                            onSubmit={(event) => event.preventDefault()}
+                        <div data-testid="event-monitor-expert-json">
+                          <Collapsible
+                            title={SETTINGS_MISC_TEXT[uiLanguage].showAdvanced}
+                            defaultOpen={false}
+                            className="rounded-lg border-[var(--settings-border)] bg-[var(--settings-surface)] shadow-none hover:border-[var(--settings-border)]"
                           >
-                            {eventExpertJson.map(renderEventField)}
-                          </form>
-                        </details>
+                            <form onSubmit={(event) => event.preventDefault()}>
+                              {eventExpertJson.map(renderEventField)}
+                            </form>
+                          </Collapsible>
+                        </div>
                       ) : null}
                     </div>
                   );
