@@ -7,7 +7,9 @@ import {
   APP_ROUTE_PATHS,
   RUN_FLOW_ROUTE_QUERY_VALUES,
 } from '../src/routing/routes';
+import { REPORT_CHROME_TEXT } from '../src/locales/reportChrome';
 import { loginAsE2eAdmin } from './auth-fixture';
+import { expandCollapsible } from './collapsible';
 import {
   expectAnalyzeButtonReady,
   openAnalysisHistoryPopover,
@@ -1047,7 +1049,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await page.setViewportSize({ width: 320, height: 844 });
     await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
     await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
-    await page.getByTestId('run-diagnostics').locator('summary').first().click();
+    await expandCollapsible(page.getByTestId('run-diagnostics'), REPORT_CHROME_TEXT.en.title);
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
@@ -1078,7 +1080,7 @@ test.describe('Legacy Home redirect and Analysis Workbench URL-owned contract', 
     await page.setViewportSize({ width: 390, height: 844 });
     await openFixtureHome(page, `${APP_ROUTE_PATHS.researchAnalysis}?segment=history&recordId=2`);
     await expect(reportSummaryText(page, REPORT_B_SUMMARY)).toBeVisible();
-    await page.getByTestId('run-diagnostics').locator('summary').first().click();
+    await expandCollapsible(page.getByTestId('run-diagnostics'), REPORT_CHROME_TEXT.en.title);
     const trigger = page.getByRole('button', { name: 'View run flow for history record 2' });
     await trigger.click();
 
@@ -1130,7 +1132,7 @@ test.describe('Analysis Workbench interaction contract', () => {
     await page.getByRole('button', { name: 'Back to current report' }).click();
     await expect(reportSummaryText(page, REPORT_A_SUMMARY)).toBeVisible();
 
-    await page.getByTestId('run-diagnostics').locator('summary').first().click();
+    await expandCollapsible(page.getByTestId('run-diagnostics'), REPORT_CHROME_TEXT.en.title);
     await page.getByRole('button', { name: 'View run flow for history record 1' }).click();
     await expect(page.getByTestId('run-flow-panel')).toBeVisible();
     await expectSearchParams(page, {
