@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ComponentProps } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
 import type { SystemConfigCategory, SystemConfigItem } from '../../../types/systemConfig';
@@ -247,6 +247,42 @@ describe('SettingsActiveConfigPanel group disclosure', () => {
     expect(await groupToggle('routing')).toHaveAttribute('aria-expanded', 'true');
     expect(await groupToggle('report')).toHaveAttribute('aria-expanded', 'true');
     expect(await groupToggle('other')).toHaveAttribute('aria-expanded', 'true');
+  });
+
+  it('keeps provider prompt-cache fields behind a default-closed Collapsible', async () => {
+    const cacheItems = [
+      configItem('LLM_PROMPT_CACHE_TELEMETRY_ENABLED', 'ai_model', 'Prompt cache telemetry'),
+    ];
+    renderPanel({
+      panelKey: 'ai_models:reliability',
+      title: 'AI models',
+      description: 'Models',
+      activeCategory: 'ai_model',
+      subFilteredItems: [],
+      visibleActiveItems: [],
+      activeSubPromptCacheItems: cacheItems,
+      activeFieldGroupOrder: getCategoryFieldGroupOrder('ai_model'),
+      fieldGroupIdOf: (key) => getCategoryFieldGroupId('ai_model', key),
+      fieldGroupOrderOf: (key) => getCategoryFieldOrder('ai_model', key),
+      allValuesByKey: Object.fromEntries(cacheItems.map((item) => [item.key, item.value])),
+      persistedValuesByKey: Object.fromEntries(cacheItems.map((item) => [item.key, item.value])),
+    });
+
+    const chrome = await screen.findByTestId('settings-prompt-cache-advanced');
+    const toggle = within(chrome).getByRole('button', { name: 'Provider Prompt Cache advanced settings' });
+    expect(toggle).toHaveAttribute('type', 'button');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const panelId = toggle.getAttribute('aria-controls');
+    expect(panelId).toBeTruthy();
+    const panel = document.getElementById(panelId!);
+    expect(panel).toHaveAttribute('hidden');
+    expect(panel).toHaveAttribute('inert');
+    expect(screen.getByText(/Defaults are suitable for normal use/)).toBeVisible();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('settings-field-LLM_PROMPT_CACHE_TELEMETRY_ENABLED')).toBeInTheDocument();
   });
 
   it('exposes aria-expanded and aria-controls on each group toggle', async () => {

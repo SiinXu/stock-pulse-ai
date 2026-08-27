@@ -171,4 +171,76 @@ export function registerSettingsPageDisclosureTests(): void {
     expect(logLevel.closest('[hidden]')).toBeNull();
     expect(logLevel.closest('[inert]')).toBeNull();
   });
+
+  it('keeps Event Monitor expert JSON behind a default-closed Collapsible', async () => {
+    const configState = buildSystemConfigState();
+    useSystemConfigMock.mockReturnValue(buildSystemConfigState({
+      activeCategory: 'agent',
+      itemsByCategory: {
+        ...configState.itemsByCategory,
+        agent: [
+          {
+            key: 'AGENT_EVENT_MONITOR_ENABLED',
+            value: 'false',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'AGENT_EVENT_MONITOR_ENABLED',
+              title: 'Event monitor enabled',
+              category: 'agent' as const,
+              dataType: 'boolean' as const,
+              uiControl: 'switch' as const,
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 1,
+            },
+          },
+          {
+            key: 'AGENT_EVENT_ALERT_RULES_JSON',
+            value: '{}',
+            rawValueExists: true,
+            isMasked: false,
+            schema: {
+              key: 'AGENT_EVENT_ALERT_RULES_JSON',
+              title: 'Event alert rules JSON',
+              category: 'agent' as const,
+              dataType: 'string' as const,
+              uiControl: 'textarea' as const,
+              isSensitive: false,
+              isRequired: false,
+              isEditable: true,
+              options: [],
+              validation: {},
+              displayOrder: 2,
+            },
+          },
+        ],
+      },
+    }));
+    routerSearchParamsMock.params = new URLSearchParams({
+      section: 'alerts',
+      view: 'events',
+    });
+    render(<SettingsPage />);
+
+    const chrome = await screen.findByTestId('event-monitor-expert-json');
+    const toggle = chrome.querySelector('button[aria-expanded]') as HTMLElement;
+    expect(toggle).toHaveAttribute('type', 'button');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    const panelId = toggle.getAttribute('aria-controls');
+    expect(panelId).toBeTruthy();
+    const panel = document.getElementById(panelId!);
+    expect(panel).toHaveAttribute('hidden');
+    expect(panel).toHaveAttribute('inert');
+    expect(screen.getByTestId('event-monitor-essentials')).toBeInTheDocument();
+    expect(screen.getByTestId('settings-field-AGENT_EVENT_ALERT_RULES_JSON').closest('[hidden]')).toBeTruthy();
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(panel).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('settings-field-AGENT_EVENT_ALERT_RULES_JSON').closest('[hidden]')).toBeNull();
+  });
 }

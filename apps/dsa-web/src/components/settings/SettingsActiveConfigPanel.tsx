@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { lazy, Suspense } from 'react';
 import type React from 'react';
-import { ChevronDown } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import type { ConfigValidationIssue, SystemConfigItem } from '../../types/systemConfig';
 import {
   isFieldEnabledByContract,
   resolveFieldRequirement,
 } from '../../utils/configConditions';
-import { EmptyState } from '../common';
+import { Collapsible, EmptyState } from '../common';
 import type { FieldGroupDescriptor } from './settingsFieldGroupDisclosure';
 // Import via the settings barrel so SettingsPage.testHarness mocks apply.
 import {
@@ -258,37 +257,30 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
         </form>
       ) : null}
       {activeSubPromptCacheItems.length ? (
-        <details className="group/prompt-cache overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] transition-colors duration-200 hover:bg-[var(--settings-surface-hover)]">
-          <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-            <div className="min-w-0 space-y-1">
-              <p className="text-sm font-semibold text-foreground">
-                {t('settings.promptCacheAdvancedTitle')}
-              </p>
-              <p className="text-xs leading-5 text-muted-text">
-                {t('settings.promptCacheAdvancedDescription')}
-              </p>
-            </div>
-            <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/prompt-cache:rotate-180" aria-hidden="true" />
-          </summary>
-          <form
-            className="border-t border-[var(--settings-border-soft)]"
-            onSubmit={(event) => event.preventDefault()}
+        <div data-testid="settings-prompt-cache-advanced">
+          <Collapsible
+            title={t('settings.promptCacheAdvancedTitle')}
+            description={t('settings.promptCacheAdvancedDescription')}
+            defaultOpen={false}
+            className="rounded-lg border-[var(--settings-border)] bg-[var(--settings-surface)] shadow-none hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)]"
           >
-            {activeSubPromptCacheItems.map((item) => (
-              <SettingsField
-                key={item.key}
-                item={item}
-                value={item.value}
-                disabled={isSaving}
-                onChange={setDraftValue}
-                issues={issueByKey[item.key] || []}
-                requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
-                dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
-                readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
-              />
-            ))}
-          </form>
-        </details>
+            <form onSubmit={(event) => event.preventDefault()}>
+              {activeSubPromptCacheItems.map((item) => (
+                <SettingsField
+                  key={item.key}
+                  item={item}
+                  value={item.value}
+                  disabled={isSaving}
+                  onChange={setDraftValue}
+                  issues={issueByKey[item.key] || []}
+                  requirement={resolveFieldRequirement(item.schema?.contract, allValuesByKey)}
+                  dependencyLocked={!isFieldEnabledByContract(item.schema?.contract, allValuesByKey)}
+                  readOnlyDiagnostic={readOnlyDiagnosticForItem(item, activeCategory)}
+                />
+              ))}
+            </form>
+          </Collapsible>
+        </div>
       ) : null}
     </>
   );

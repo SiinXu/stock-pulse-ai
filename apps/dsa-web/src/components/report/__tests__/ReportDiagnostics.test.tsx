@@ -1,5 +1,5 @@
 import { StrictMode } from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../../api/history';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
@@ -63,16 +63,26 @@ describe('ReportDiagnostics', () => {
     expect(historyApi.getDiagnostics).toHaveBeenCalledWith(1);
     expect(await screen.findByText('运行状态')).toBeInTheDocument();
     const panel = screen.getByTestId('run-diagnostics');
-    expect(panel).not.toHaveAttribute('open');
+    const toggle = within(panel).getByRole('button', { name: '运行状态' });
+    expect(toggle).toHaveAttribute('type', 'button');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls');
+    expect(toggle).toHaveClass('min-h-11');
     expect(screen.getByText('部分降级')).toBeInTheDocument();
-    expect(screen.getByText('运行状态').closest('summary')).toHaveClass('min-h-11');
+    const disclosurePanel = document.getElementById(toggle.getAttribute('aria-controls')!);
+    expect(disclosurePanel).toHaveAttribute('hidden');
+    expect(disclosurePanel).toHaveAttribute('inert');
 
-    fireEvent.click(screen.getByText('运行状态'));
+    fireEvent.click(toggle);
 
-    expect(panel).toHaveAttribute('open');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(disclosurePanel).not.toHaveAttribute('hidden');
     expect(screen.getByText('最近失败后已降级')).toBeInTheDocument();
     expect(screen.getByText('未配置')).toBeInTheDocument();
-    expect(screen.getByText('高级字段').closest('summary')).toHaveClass('min-h-11');
+    const advanced = screen.getByRole('button', { name: '高级字段' });
+    expect(advanced).toHaveClass('min-h-11');
+    expect(advanced).toHaveAttribute('aria-expanded', 'false');
+    expect(advanced).toHaveAttribute('aria-controls');
     expect(container.querySelector('.home-subpanel')).toBeNull();
     expect(container.querySelector('.home-accent-chip')).toBeNull();
     expect(container.querySelector('.report-trace-pre')).toBeInTheDocument();

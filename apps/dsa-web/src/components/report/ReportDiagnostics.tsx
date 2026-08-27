@@ -1,6 +1,6 @@
 import type React from 'react';
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Check, ChevronDown, Copy, Workflow } from 'lucide-react';
+import { Activity, Check, Copy, Workflow } from 'lucide-react';
 import { historyApi } from '../../api/history';
 import { formatUiText, UI_TEXT } from '../../i18n/uiText';
 import type {
@@ -14,6 +14,7 @@ import {
   Badge,
   Button,
   Card,
+  Collapsible,
   InlineAlert,
   Spinner,
   StatusDot,
@@ -218,35 +219,32 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
 
   return (
     <Card level="interactive" padding="none" className="text-left">
-      <details data-testid="run-diagnostics" className="group">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
+      <div data-testid="run-diagnostics">
+        <Collapsible
+          title={text.title}
+          defaultOpen={false}
+          className="rounded-none border-0 bg-transparent shadow-none hover:border-transparent"
+          icon={(
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Activity className="h-4 w-4" aria-hidden="true" />
             </span>
-            <span className="min-w-0">
-              <span className="label-uppercase">{text.eyebrow}</span>
-              <span className="mt-0.5 block truncate text-base font-semibold text-foreground">
-                {text.title}
-              </span>
-            </span>
-          </div>
-          <span className="flex shrink-0 items-center gap-2">
-            {isLoading ? (
-              <Spinner size="sm" label={text.loading} className="h-3.5 w-3.5" />
-            ) : null}
-            <Badge variant={statusStyle.variant} className="gap-1.5 shadow-none">
-              <StatusDot tone={statusStyle.tone} className="h-1.5 w-1.5" />
-              {statusLabel}
-            </Badge>
-            <Badge variant="default" className="hidden md:inline-flex">
-              {text.scope}
-            </Badge>
-            <ChevronDown className="h-4 w-4 text-muted-text transition-transform group-open:rotate-180" aria-hidden="true" />
-          </span>
-        </summary>
-
-        <div className="space-y-4 border-t border-border px-4 pb-4 pt-3">
+          )}
+          trailing={(
+            <>
+              {isLoading ? (
+                <Spinner size="sm" label={text.loading} className="h-3.5 w-3.5" />
+              ) : null}
+              <Badge variant={statusStyle.variant} className="gap-1.5 shadow-none">
+                <StatusDot tone={statusStyle.tone} className="h-1.5 w-1.5" />
+                {statusLabel}
+              </Badge>
+              <Badge variant="default" className="hidden md:inline-flex">
+                {text.scope}
+              </Badge>
+            </>
+          )}
+        >
+        <div className="space-y-4">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div className="min-w-0 space-y-2">
               <p className="text-sm leading-6 text-foreground">
@@ -347,18 +345,19 @@ export const ReportDiagnostics: React.FC<ReportDiagnosticsProps> = ({
           </div>
 
           {hasAdvancedPayload ? (
-            <details className="group/advanced rounded-lg border border-border bg-card p-3">
-              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3">
-                <span className="text-sm font-medium text-foreground">{text.advanced}</span>
-                <ChevronDown className="h-4 w-4 text-muted-text transition-transform group-open/advanced:rotate-180" aria-hidden="true" />
-              </summary>
-              <pre className="report-trace-pre report-trace-pre-content mt-3 max-h-80 overflow-auto rounded-lg bg-base p-3 text-left font-mono text-xs text-foreground">
+            <Collapsible
+              title={text.advanced}
+              defaultOpen={false}
+              className="rounded-lg border border-border bg-card shadow-none hover:border-border"
+            >
+              <pre className="report-trace-pre report-trace-pre-content max-h-80 overflow-auto rounded-lg bg-base p-3 text-left font-mono text-xs text-foreground">
                 {JSON.stringify(advancedPayload, null, 2)}
               </pre>
-            </details>
+            </Collapsible>
           ) : null}
         </div>
-      </details>
+        </Collapsible>
+      </div>
     </Card>
   );
 };

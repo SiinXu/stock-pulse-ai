@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useMemo } from 'react';
-import { ChevronDown, ListOrdered } from 'lucide-react';
-import { Card } from '../common';
+import { ListOrdered } from 'lucide-react';
+import { Card, Collapsible } from '../common';
 import { useRunFlowSnapshot } from '../../hooks/useRunFlowSnapshot';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { ProcessTimeline } from '../run-flow/ProcessTimeline';
@@ -41,35 +41,32 @@ export const ReportProcessTimeline: React.FC<ReportProcessTimelineProps> = ({
 
   return (
     <Card level="interactive" padding="none" className="text-left">
-      <details data-testid="report-process-timeline" className="group">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
-          <div className="flex min-w-0 items-center gap-3">
+      <div data-testid="report-process-timeline">
+        <Collapsible
+          title={t('chat.thinkingProcess')}
+          defaultOpen={false}
+          className="rounded-none border-0 bg-transparent shadow-none hover:border-transparent"
+          icon={(
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <ListOrdered className="h-4 w-4" aria-hidden="true" />
             </span>
-            <span className="min-w-0">
-              <span className="label-uppercase">{t('runFlow.eyebrow')}</span>
-              <span className="mt-0.5 block truncate text-base font-semibold text-foreground">
-                {t('chat.thinkingProcess')}
-              </span>
-            </span>
-          </div>
-          <span className="flex shrink-0 items-center gap-2">
+          )}
+          trailing={(
             <span className="text-xs text-muted-text">
               {t('runFlow.events.count', { count: model.items.length })}
             </span>
-            <ChevronDown className="h-4 w-4 text-muted-text transition-transform group-open:rotate-180" aria-hidden="true" />
-          </span>
-        </summary>
-        <div className="space-y-3 border-t border-border px-4 pb-4 pt-3">
-          <ProcessTimeline snapshot={snapshot} hideWhenEmpty />
-          {onOpenRunFlow ? (
-            <button type="button" className="text-xs text-primary hover:underline" onClick={() => onOpenRunFlow(recordId)}>
-              {t('runFlow.open')}
-            </button>
-          ) : null}
-        </div>
-      </details>
+          )}
+        >
+          <div className="space-y-3">
+            <ProcessTimeline snapshot={snapshot} hideWhenEmpty />
+            {onOpenRunFlow ? (
+              <button type="button" className="text-xs text-primary hover:underline" onClick={() => onOpenRunFlow(recordId)}>
+                {t('runFlow.open')}
+              </button>
+            ) : null}
+          </div>
+        </Collapsible>
+      </div>
     </Card>
   );
 };

@@ -9,6 +9,10 @@ interface CollapsibleProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   icon?: React.ReactNode;
+  /** Optional subtitle kept visible while collapsed. */
+  description?: React.ReactNode;
+  /** Optional collapsed-header extras such as status badges. */
+  trailing?: React.ReactNode;
   className?: string;
 }
 
@@ -22,6 +26,8 @@ export const Collapsible: React.FC<CollapsibleProps> = ({
   open,
   onOpenChange,
   icon,
+  description,
+  trailing,
   className = '',
 }) => {
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
@@ -49,21 +55,30 @@ export const Collapsible: React.FC<CollapsibleProps> = ({
         onClick={() => setOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-controls={panelId}
-        className="flex min-h-11 w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-hover"
+        aria-label={title}
+        className="flex min-h-11 w-full items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-hover"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex min-w-0 items-center gap-3">
           {icon && <span className="text-primary">{icon}</span>}
-          <span className="font-medium text-foreground">{title}</span>
+          <span className="min-w-0">
+            <span className="font-medium text-foreground">{title}</span>
+            {description ? (
+              <span className="mt-1 block text-xs leading-5 text-muted-text">{description}</span>
+            ) : null}
+          </span>
         </div>
-        <svg
-          className={cn('h-5 w-5 text-secondary-text transition-transform duration-300', isOpen && 'rotate-180')}
-          aria-hidden="true"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </svg>
+        <span className="flex shrink-0 items-center gap-2">
+          {trailing}
+          <svg
+            className={cn('h-5 w-5 text-secondary-text transition-transform duration-300', isOpen && 'rotate-180')}
+            aria-hidden="true"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        </span>
       </button>
 
       <div
