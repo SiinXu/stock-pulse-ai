@@ -181,12 +181,12 @@ describe('ReportSummary report-strata expansion identity', () => {
     const { rerender } = renderWithClient(<ReportSummary data={reportA} />);
     expect(await screen.findByTestId('report-strata-risks')).toHaveTextContent('Report A risk.');
     fireEvent.click(screen.getByTestId('report-strata-toggle'));
+    expect(await screen.findByTestId('report-strata-facts')).toHaveTextContent('Report A close was 1680.');
     expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'false');
-    expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Report A close was 1680.');
 
     rerender(<ReportSummary data={reportB} />);
 
-    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent('Report B risk.');
+    expect(await screen.findByTestId('report-strata-risks')).toHaveTextContent('Report B risk.');
     expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'true');
     expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
   });

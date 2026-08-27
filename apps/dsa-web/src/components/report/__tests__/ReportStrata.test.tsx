@@ -362,6 +362,12 @@ describe('ReportStrata', () => {
     expect(collapsedVisible).toBeLessThan(expandedVisible);
     expect(collapsedTotal / expandedTotal).toBeLessThanOrEqual(0.5);
     expect(expandedTotal - collapsedTotal).toBeGreaterThanOrEqual(40);
+    // Measured 2026-08-27 against this fixture: collapsed 24/22 vs expanded 179/179.
+    // Origin/main mounted the hidden evidence wall, so first-paint descendants ≈ expanded.
+    expect(collapsedTotal).toBe(24);
+    expect(collapsedVisible).toBe(22);
+    expect(expandedTotal).toBe(179);
+    expect(expandedVisible).toBe(179);
   });
 
   it('does not leak expansion from one report identity into another', () => {
