@@ -17,6 +17,7 @@ from src.config import Config
 from src.migrations.registry import (
     AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
     AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION,
+    LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION,
     AGENT_FEEDBACK_SCHEMA_MIGRATION,
     AGENT_FORWARD_RETURN_SCHEMA_MIGRATION,
     AGENT_PREDICTION_SCHEMA_MIGRATION,
@@ -160,7 +161,7 @@ def test_fresh_database_manager_applies_prediction_schema(isolated_db) -> None:
     assert AGENT_PREDICTION_SCHEMA_MIGRATION.id in {
         migration.id for migration in get_migrations()
     }
-    assert get_migrations()[-1].id == AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id
+    assert get_migrations()[-1].id == LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id
 
 
 def test_due_query_uses_status_resolve_after_index(isolated_db) -> None:
@@ -266,6 +267,31 @@ def test_migration_applies_on_existing_database_without_predictions(
                 "DELETE FROM schema_migrations WHERE version = :version",
                 {"version": AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id},
             )
+            connection.exec_driver_sql(
+                "DROP TRIGGER IF EXISTS trg_layered_memory_access_audit_no_delete"
+            )
+            connection.exec_driver_sql(
+                "DROP TRIGGER IF EXISTS trg_layered_memory_access_audit_no_update"
+            )
+            connection.exec_driver_sql(
+                "DROP INDEX IF EXISTS ix_layered_memory_access_audit_principal_at"
+            )
+            connection.exec_driver_sql(
+                "DROP INDEX IF EXISTS ix_layered_memory_observations_principal_stock"
+            )
+            connection.exec_driver_sql(
+                "DROP INDEX IF EXISTS ix_layered_memory_observations_principal_expires"
+            )
+            connection.exec_driver_sql(
+                "DROP INDEX IF EXISTS ix_layered_memory_observations_principal_observed"
+            )
+            connection.exec_driver_sql("DROP TABLE IF EXISTS layered_memory_access_audit")
+            connection.exec_driver_sql("DROP TABLE IF EXISTS layered_memory_consent")
+            connection.exec_driver_sql("DROP TABLE IF EXISTS layered_memory_observations")
+            connection.exec_driver_sql(
+                "DELETE FROM schema_migrations WHERE version = :version",
+                {"version": LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id},
+            )
             tables = {
                 row[0]
                 for row in connection.exec_driver_sql(
@@ -283,6 +309,7 @@ def test_migration_applies_on_existing_database_without_predictions(
         assert AGENT_FORWARD_RETURN_SCHEMA_MIGRATION.id in result.executed_ids
         assert AGENT_CURATOR_GRADE_SCHEMA_MIGRATION.id in result.executed_ids
         assert AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id in result.executed_ids
+        assert LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id in result.executed_ids
         inspector = inspect(engine)
         assert "agent_predictions" in inspector.get_table_names()
         assert "ix_agent_prediction_status_resolve_after" in _index_names(
@@ -295,7 +322,7 @@ def test_migration_applies_on_existing_database_without_predictions(
         assert count == 1
         verification = MigrationRunner().verify(engine)
         assert verification.success is True
-        assert verification.current_version == AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id
+        assert verification.current_version == LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id
     finally:
         engine.dispose()
         DatabaseManager.reset_instance()

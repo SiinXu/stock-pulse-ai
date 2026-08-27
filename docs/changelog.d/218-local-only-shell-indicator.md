@@ -1,0 +1,1 @@
+- [Added] Surfaced Local Only Mode in the app shell (Refs #218).

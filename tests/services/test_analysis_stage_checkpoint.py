@@ -50,6 +50,7 @@ def _config(**overrides):
         "agent_arch": "multi",
         "agent_orchestrator_mode": "full",
         "agent_critic_enabled": False,
+        "agent_red_team_enabled": False,
         "agent_multi_strategy_deliberation": False,
         "agent_investment_committee_mode": False,
         "agent_risk_override": True,

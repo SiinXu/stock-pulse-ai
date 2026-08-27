@@ -1,0 +1,1 @@
+- [Changed] Collapse ReportStructuredInsights strategy and committee list sections behind shared Collapsible panels by default, keeping top-3 Show all / Show less and Phase / Attribution fully open (Refs #1332).

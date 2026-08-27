@@ -16,6 +16,7 @@ from src.config import Config
 from src.migrations.registry import (
     AGENT_CURATOR_GRADE_SCHEMA_MIGRATION,
     AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION,
+    LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION,
     get_migrations,
 )
 from src.migrations.versions import (
@@ -117,7 +118,7 @@ def test_fresh_database_applies_curator_grade_schema(isolated_db) -> None:
         )
     assert "ck_agent_episode_curator_grades_grade" in ddl
     assert "uix_agent_episode_curator_grades_episode" in ddl
-    assert get_migrations()[-1].id == AGENT_EVOLUTION_EVENT_SCHEMA_MIGRATION.id
+    assert get_migrations()[-1].id == LAYERED_MEMORY_OBSERVATION_SCHEMA_MIGRATION.id
     with isolated_db.get_session() as session:
         applied = session.execute(
             text("SELECT COUNT(*) FROM schema_migrations WHERE version = :version"),

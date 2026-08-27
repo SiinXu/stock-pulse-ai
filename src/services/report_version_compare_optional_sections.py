@@ -40,6 +40,7 @@ MAX_OPTIONAL_SECTION_ITEM_LENGTH = 512
 _MULTI_AGENT_KEYS: Tuple[str, ...] = (
     "bull_bear_debate",
     "committee_deliberation",
+    "red_team",
 )
 
 

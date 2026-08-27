@@ -81,6 +81,7 @@ LOCAL_ONLY_MODE=true
 | Status API | `GET /api/v1/security/local-only` |
 | Activity API | `GET /api/v1/security/outbound-activity` |
 | Web panel | Settings → Auth & Security → Outbound activity |
+| Web app shell | Compact indicator in authenticated chrome when `GET /api/v1/security/local-only` reports enabled; opens Settings → Auth & Security on `LOCAL_ONLY_MODE`. Unknown or failed status shows nothing. |
 | Automated proof | `tests/security/test_local_only_mode.py` (analysis-walk fixture: zero non-loopback allows) |
 | Plugin HTTP contract | `tests/plugins/test_plugin_outbound_http.py` (sanctioned helper blocked; direct-client guard; analysis isolation) |
 

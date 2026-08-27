@@ -938,6 +938,25 @@ class _DashboardMethods:
         payload["key_points"] = key_points
         payload["risk_warning"] = risk_warning
         payload["dashboard"] = dashboard_block
+        try:
+            from src.agent.red_team import (
+                RED_TEAM_META_KEY,
+                get_red_team_record,
+                merge_red_team_findings,
+            )
+
+            merge_red_team_findings(
+                payload,
+                get_red_team_record(ctx) or ctx.meta.get(RED_TEAM_META_KEY),
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - Additive red-team merge must not rewrite the primary decision.
+            log_safe_exception(
+                logger,
+                "[Orchestrator] red-team report merge failed",
+                exc,
+                error_code="agent_red_team_report_section_failed",
+                level=logging.WARNING,
+            )
         if signal_constrained:
             for opinion in reversed(ctx.opinions):
                 if opinion.agent_name == "decision":

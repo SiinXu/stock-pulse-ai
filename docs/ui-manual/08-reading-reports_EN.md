@@ -74,9 +74,9 @@ New synchronous reports, completed task results, and history details share one o
 | --- | --- |
 | Phase Decision | market phase, immediate action, action window, watch conditions, rationale, phase warnings, and data limitations |
 | Signal Attribution | visible technical / news / fundamental / market percentages plus the strongest bullish and bearish evidence; percentages are not return probabilities |
-| Strategy Synthesis | final signal, weighted score, confidence, consensus, conflict severity, supporting and opposing strategies, conflict participants, and excluded-opinion count. Supporting / opposing strategies and conflict rows show the first 3 items by default, with Show all / Show less for the rest; Phase Decision and Signal Attribution stay fully open |
+| Strategy Synthesis | final signal, weighted score, confidence, consensus, conflict severity, supporting and opposing strategies, conflict participants, and excluded-opinion count. Supporting / opposing strategies and conflict rows start behind a collapsed section; after expanding, they show the first 3 items, with Show all / Show less for the rest. Phase Decision and Signal Attribution stay fully open |
 
-These sections consume structured fields only; they do not infer meaning from Chinese, English, or Korean narrative text. Older, single-strategy, and partial reports may omit any unavailable section. Raw JSON, Markdown, and evidence strata remain available for traceability. A malformed optional section is ignored rather than replaced with an invented conclusion. Skill, committee, and conflict lists fold independently.
+These sections consume structured fields only; they do not infer meaning from Chinese, English, or Korean narrative text. Older, single-strategy, and partial reports may omit any unavailable section. Raw JSON, Markdown, and evidence strata remain available for traceability. A malformed optional section is ignored rather than replaced with an invented conclusion. Skill, committee, and conflict lists use independent Collapsible sections plus independent Show all / Show less controls.
 
 ## Report evidence strata (shipped on main)
 

@@ -37,4 +37,22 @@ describe('resolveSettingsFieldTitle', () => {
       language: 'de',
     })).toBe('Skill-Abruf Top-K');
   });
+
+  it('keeps AGENT_RED_TEAM_ENABLED titles aligned on the public Settings path', () => {
+    expect(resolveSettingsFieldTitle({
+      itemKey: 'AGENT_RED_TEAM_ENABLED',
+      fallbackTitle: 'Adversarial Red-Team Second Opinion',
+      language: 'en',
+    })).toBe('Adversarial Red-Team Second Opinion');
+    expect(resolveSettingsFieldTitle({
+      itemKey: 'AGENT_RED_TEAM_ENABLED',
+      fallbackTitle: 'Adversarial Red-Team Second Opinion',
+      language: 'zh',
+    })).toBe('对抗性红队二审');
+    expect(resolveSettingsFieldTitle({
+      itemKey: 'AGENT_RED_TEAM_ENABLED',
+      fallbackTitle: 'Adversarial Red-Team Second Opinion',
+      language: 'de',
+    })).toBe('Adversariale Red-Team-Zweitmeinung');
+  });
 });

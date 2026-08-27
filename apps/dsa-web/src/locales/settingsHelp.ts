@@ -11,6 +11,10 @@ import {
   isEpisodeForgetHelpKey,
 } from './episodeForgetSettingsHelp';
 import {
+  getRedTeamSettingsHelp,
+  isRedTeamHelpKey,
+} from './redTeamSettingsHelp';
+import {
   getSkillRetrievalSettingsHelp,
   isSkillRetrievalHelpKey,
 } from './skillRetrievalSettingsHelp';
@@ -49,9 +53,11 @@ export function getSettingsHelpContent(
     ? getSkillRetrievalSettingsHelp(language)
     : isEpisodeForgetHelpKey(helpKey)
       ? getEpisodeForgetSettingsHelp(language, helpKey)
-      : SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY[helpKey]
-        ?? SETTINGS_HELP_MAPS[language][helpKey]
-        ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
+      : isRedTeamHelpKey(helpKey)
+        ? getRedTeamSettingsHelp(language)
+        : SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY[helpKey]
+          ?? SETTINGS_HELP_MAPS[language][helpKey]
+          ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
   if (localized && Object.keys(localized).length > 0) {
     const fieldKey = helpKey.split('.').pop() ?? helpKey;
     return {

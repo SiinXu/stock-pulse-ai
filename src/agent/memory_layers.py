@@ -24,6 +24,11 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
+from src.schemas.memory_provenance import (
+    ACTOR_ID_MAX_LENGTH,
+    PROVENANCE_SOURCE_VALUES,
+)
+
 MAX_AUTHORIZED_RECORDS = 200
 MAX_EPISODIC_INJECTION = 3
 MAX_OUTCOME_PATTERN_INJECTION = 3
@@ -89,6 +94,8 @@ class MemoryObservation:
     outcome_horizon_days: Optional[int] = None
     evaluated_at: Optional[str] = None
     was_correct: Optional[bool] = None
+    provenance_source: Optional[str] = None
+    actor_id: Optional[str] = None
 
     def __post_init__(self) -> None:
         validate_principal_id(self.principal_id)
@@ -113,6 +120,17 @@ class MemoryObservation:
             value is None for value in outcome_fields
         ):
             raise ValueError("evaluated outcome provenance must be complete")
+        if self.provenance_source is not None:
+            if (
+                type(self.provenance_source) is not str
+                or self.provenance_source not in PROVENANCE_SOURCE_VALUES
+            ):
+                raise ValueError("provenance_source must be a server stamp")
+        if self.actor_id is not None:
+            if type(self.actor_id) is not str or not self.actor_id.strip():
+                raise ValueError("actor_id must be a non-empty string")
+            if len(self.actor_id) > ACTOR_ID_MAX_LENGTH:
+                raise ValueError("actor_id exceeds column width")
         if self.outcome_id is None:
             return
         _validate_record_id("outcome_id", self.outcome_id)

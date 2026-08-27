@@ -271,6 +271,27 @@ class _PersistenceStageMixin:
                             level=logging.WARNING,
                             context={"analysis_history_id": saved_history_id},
                         )
+                    # Default-off layered memory collection (#1118). Fail-soft:
+                    # storage or admission failure must never abort analysis.
+                    try:
+                        from src.services.layered_memory_collection_service import (
+                            try_collect_layered_memory_observation,
+                        )
+
+                        try_collect_layered_memory_observation(
+                            result=result,
+                            analysis_history_id=int(saved_history_id),
+                            config=getattr(self, "config", None),
+                        )
+                    except Exception as layered_exc:  # broad-exception: fallback_recorded - Layered memory collection must never fail history persistence.
+                        log_safe_exception(
+                            logger,
+                            "Layered memory collection after history save failed",
+                            layered_exc,
+                            error_code="layered_memory_after_history_failed",
+                            level=logging.WARNING,
+                            context={"analysis_history_id": saved_history_id},
+                        )
                     # High-disagreement alerts (#134): consume structured
                     # disagreement_handling from #1205; never recompute score.
                     # Failures must not interrupt history persistence.

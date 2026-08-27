@@ -1,6 +1,6 @@
 # Principal-scoped layered Agent memory
 
-**Status**: layered foundation + lifecycle (no production layered-memory hook). Durable store/UX: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). Write admission library: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1. Deterministic per-symbol episode forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2 (consolidation remains open).
+**Status**: layered foundation + lifecycle + default-off durable observation store (no production layered-memory prompt hook, no user CRUD). Remaining #1118 UX/prompt/semantic-fact/procedural persist: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). Write admission library: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1. Deterministic per-symbol episode forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2 (consolidation remains open).
 
 **Chinese**: [agent-memory_CN.md](agent-memory_CN.md)
 
@@ -11,12 +11,15 @@
 | `src/agent/memory_layers.py` | Strict typed records and projection types |
 | `src/agent/memory_retrieval.py` | Structured episodic + **outcome-pattern** retrieval; optional hashing-vector re-rank |
 | `src/agent/memory_vector.py` | Dependency-free coarse ranking |
-| `src/agent/memory_governance.py` | Consent, retention, principal delete/clear, access audit |
+| `src/agent/memory_governance.py` | Consent, retention, principal delete/clear, access audit; optional durable store |
 | `src/agent/memory_isolation.py` | Untrusted-data isolation for any future prompt path |
 | `src/schemas/memory_write_policy.py` | Library-only persist write admission over existing stores (#1119 Slice 1) |
 | `src/schemas/memory_forget_policy.py` | Library-only per-symbol episode forgetting over `agent_episodes` (#1119 Slice 2) |
+| `src/schemas/layered_memory_persist.py` | Observation mapping admission: server provenance, secret/PII reject, fact/opinion lock |
+| `src/repositories/layered_memory_repo.py` | SQLite observations + consent + append-only access audit |
+| `src/services/layered_memory_collection_service.py` | Default-off fail-soft collection after analysis-history save |
 
-Existing `AgentMemory` numeric calibration behavior is unchanged when `AGENT_ONLINE_ADAPTERS_ENABLED` is off or missing. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` history inject is default-off; when enabled, `BaseAgent._build_memory_context` wraps history lines with `isolate_untrusted_memory_body` and canonicalizes `signal` to `buy|hold|sell` (see [Threat notes](#threat-notes)).
+Existing `AgentMemory` numeric calibration behavior is unchanged when `AGENT_ONLINE_ADAPTERS_ENABLED` is off or missing. Layered `PrincipalMemoryLifecycle` has **no production prompt hook**. The durable store persists existing `MemoryObservation` rows only when `LAYERED_MEMORY_COLLECTION_ENABLED` is true **and** the operator principal (`local_admin`) has granted consent. Storage failure is fail-soft and cannot abort analysis. Historical Decision Reflection is a separate production inject path (below). Optional `AGENT_MEMORY_ENABLED` history inject is default-off; when enabled, `BaseAgent._build_memory_context` wraps history lines with `isolate_untrusted_memory_body` and canonicalizes `signal` to `buy|hold|sell` (see [Threat notes](#threat-notes)).
 
 ## Online evolution adapters (gated, default off)
 
@@ -63,15 +66,15 @@ Payload keys use `outcome_patterns`. A deprecated `semantic` alias remains for o
 
 | Control | Default | Behavior |
 | --- | --- | --- |
-| `LAYERED_MEMORY_COLLECTION_ENABLED` | `false` | Global collection master switch |
-| Per-principal consent | absent | Required for collect / list / project / export |
+| `LAYERED_MEMORY_COLLECTION_ENABLED` | `false` | Global collection master switch. When false, the analysis collection helper does not open a repository |
+| Per-principal consent | absent | Required for collect / list / project / export. Production collection uses the single operator principal `local_admin` |
 | `LAYERED_MEMORY_RETENTION_DAYS` | `90` | Stamps `expires_at` when missing; `expire_due` drops past rows |
-| Principal delete / clear | — | `delete` / `clear`; revoke clears by default |
-| `LAYERED_MEMORY_AUDIT_ENABLED` | `true` | Append-only access audit |
+| Principal delete / clear | — | Library `delete` / `clear`; revoke clears by default. No HTTP/Web CRUD in this slice |
+| `LAYERED_MEMORY_AUDIT_ENABLED` | `true` | Append-only access audit (SQLite triggers reject UPDATE/DELETE) |
 | `LAYERED_MEMORY_VECTOR_ENABLED` | `false` | Coarse re-rank only |
 | `LAYERED_MEMORY_MAX_RECORDS_PER_PRINCIPAL` | `200` | Hard panel cap |
 
-Policy via `LayeredMemoryPolicy.from_config(config)` (constructor injection).
+Policy via `LayeredMemoryPolicy.from_config(config)` (constructor injection). Durable tables: `layered_memory_observations`, `layered_memory_consent`, `layered_memory_access_audit`. This is not `agent_episodes` and does not persist semantic-fact or procedural-weight rows.
 
 ## Injection protection
 
@@ -159,8 +162,9 @@ This slice does **not** add consolidation, Decision Memory retrieval-score decay
 ## Remaining scope
 
 - Authoritative principal assignment across API/bot/CLI/scheduled runs; legacy migration.
-- Durable DB-backed lifecycle store and user-facing UI controls: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118) (absorbs closed [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) and [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)).
+- User-facing view/edit/delete/export UI and HTTP CRUD: still [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118) (absorbs closed [#250](https://github.com/SiinXu/stock-pulse-ai/issues/250) and [#198](https://github.com/SiinXu/stock-pulse-ai/issues/198)). The durable observation/consent/audit store has landed; keep the issue open.
 - Security-reviewed production prompt consumption.
+- Semantic-fact table persist and procedural-weight persist (still fail-closed `persist=False` under #1119).
 - Preference-profile layer: [#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117) (absorbs closed [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)).
 - Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). DAG-0 threat notes, DAG-1 fact/opinion lock, DAG-2 Soul/oversize write reject (`src/schemas/memory_write_guard.py`), and DAG-3 server-stamped provenance (`src/schemas/memory_provenance.py`) have landed. DAG-4 isolates default-off AgentMemory prompt inject (`src/agent/agents/base_agent.py` / `src/agent/memory.py`) as untrusted data with canonical `buy` / `hold` / `sell` signals. Do not fold in #1118 store/UX or #1105 product feedback APIs.
 - Write admission / consolidation / forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119). Slice 1 (library write admission) and Slice 2 (deterministic per-symbol episode forgetting) are documented above. Remaining: consolidation of old episodic rows, semantic/procedural candidate promotion without Soul edits, Decision Memory retrieval-score decay, and drop of rolled-back procedural flags after [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113). Keep #1119 open.
@@ -190,7 +194,7 @@ Remaining for later #1123 slices: planner tool-effectiveness ordering, adversari
 
 ## Rollback
 
-Revert modules/tests/docs/config-description/Settings-help edits and changelog fragments. Collection and episode log stay default-off. Slice 2 adds no migration; already-deleted episode rows cannot be restored from code — recovery requires backup / point-in-time restore. EvolutionEvent audit rows are append-only and are not deleted by episode forgetting.
+Set `LAYERED_MEMORY_COLLECTION_ENABLED=false` (the default) so collection is a no-op. Then run this slice's migration `downgrade`, which drops only `layered_memory_observations`, `layered_memory_consent`, `layered_memory_access_audit`, and their indexes/triggers. Episode, evolution-event, prediction, and decision-memory tables are untouched. Revert the PR to remove the collection helper. No production prompt path is wired, so analysis output is unchanged when the flag is off. Revert modules/tests/docs/config-description/Settings-help edits and changelog fragments for episode forgetting. Collection and episode log stay default-off. Slice 2 adds no migration; already-deleted episode rows cannot be restored from code — recovery requires backup / point-in-time restore. EvolutionEvent audit rows are append-only and are not deleted by episode forgetting.
 
 ## Related: error-pattern encyclopedia
 

@@ -85,7 +85,13 @@ export type PendingStatusChange = {
 
 export type SelectedSignal = {
   item: DecisionSignalItem;
+  /** Last list/latest/timeline/outcome entry point. Selection identity is `item.id`. */
   source: 'list' | 'latest' | 'timeline' | 'persisted' | 'outcome';
+};
+
+export type DecisionSignalSelectionCandidateGroup = {
+  source: Extract<SelectedSignal['source'], 'list' | 'latest' | 'timeline'>;
+  items: readonly DecisionSignalItem[];
 };
 
 export function isRecord(value: unknown): value is Record<string, unknown> {
@@ -296,22 +302,39 @@ export function mergeWatchlistSignalResponses(
   };
 }
 
+export function findSignalInCandidates(
+  signalId: number,
+  candidates: readonly DecisionSignalSelectionCandidateGroup[],
+): SelectedSignal | null {
+  for (const group of candidates) {
+    const item = group.items.find((candidate) => candidate.id === signalId);
+    if (item) return { source: group.source, item };
+  }
+  return null;
+}
+
+export function refreshOwnedSelectionFromItems(
+  current: SelectedSignal | null,
+  items: readonly DecisionSignalItem[],
+  source: SelectedSignal['source'],
+): SelectedSignal | null {
+  if (!current || current.source !== source) return current;
+  const refreshed = items.find((item) => item.id === current.item.id);
+  return refreshed ? { source, item: refreshed } : null;
+}
+
 export function refreshLatestSelection(
   current: SelectedSignal | null,
   latestItems: DecisionSignalItem[],
 ): SelectedSignal | null {
-  if (!current || current.source !== 'latest') return current;
-  const refreshed = latestItems.find((item) => item.id === current.item.id);
-  return refreshed ? { source: 'latest', item: refreshed } : null;
+  return refreshOwnedSelectionFromItems(current, latestItems, 'latest');
 }
 
 export function refreshTimelineSelection(
   current: SelectedSignal | null,
   timelineItems: DecisionSignalItem[],
 ): SelectedSignal | null {
-  if (!current || current.source !== 'timeline') return current;
-  const refreshed = timelineItems.find((item) => item.id === current.item.id);
-  return refreshed ? { source: 'timeline', item: refreshed } : null;
+  return refreshOwnedSelectionFromItems(current, timelineItems, 'timeline');
 }
 
 export function normalizeDecisionSignalMarket(value: unknown): DecisionSignalMarket | undefined {

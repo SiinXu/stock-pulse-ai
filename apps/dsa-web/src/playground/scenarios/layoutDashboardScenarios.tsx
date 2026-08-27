@@ -12,6 +12,7 @@ import {
   RouteOutletBoundary,
   StandaloneRouteBoundary,
 } from '../../components/layout/RouteBoundary';
+import { LocalOnlyModeIndicator } from '../../components/layout/LocalOnlyModeIndicator';
 import { Shell } from '../../components/layout/Shell';
 import { SidebarNav } from '../../components/layout/SidebarNav';
 import { SidebarProfile } from '../../components/layout/SidebarProfile';
@@ -66,6 +67,15 @@ const NotificationBellStory = () => (
     <NotificationBell />
   </div>
 );
+
+const LocalOnlyModeIndicatorStory = () => {
+  const { scenario } = usePlaygroundScenario();
+  return (
+    <div className="flex min-h-48 items-start justify-center rounded-lg border border-border bg-card p-6">
+      <LocalOnlyModeIndicator previewStatus={scenario === 'states' ? 'off' : 'on'} />
+    </div>
+  );
+};
 
 const SidebarNavStory = () => {
   const { scenario } = usePlaygroundScenario();
@@ -226,6 +236,7 @@ export const LAYOUT_DASHBOARD_SCENARIOS: Record<string, PlaygroundScenarioRender
   shell: ShellStory,
   'command-palette': CommandPaletteStory,
   'notification-bell': NotificationBellStory,
+  'local-only-mode-indicator': LocalOnlyModeIndicatorStory,
   'sidebar-nav': SidebarNavStory,
   'sidebar-profile': SidebarProfileStory,
   'page-loading-fallback': PageLoadingFallback,

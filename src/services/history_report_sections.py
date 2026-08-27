@@ -5,6 +5,8 @@ from __future__ import annotations
 from typing import Any
 
 from src.report_language import (
+    append_bull_bear_debate_lines,
+    append_red_team_lines,
     format_strategy_skill_items,
     localize_conflict_severity,
     localize_consensus_level,
@@ -94,4 +96,14 @@ def append_strategy_synthesis_lines(
         report_lines.append("")
 
 
-__all__ = ["append_strategy_synthesis_lines"]
+def append_debate_and_red_team_lines(
+    report_lines: list[str],
+    dashboard: Any,
+    labels: dict[str, str],
+) -> None:
+    """Append debate then the additive red-team second-opinion section."""
+    append_bull_bear_debate_lines(report_lines, dashboard, labels)
+    append_red_team_lines(report_lines, dashboard, labels)
+
+
+__all__ = ["append_debate_and_red_team_lines", "append_strategy_synthesis_lines"]
