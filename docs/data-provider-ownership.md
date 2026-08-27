@@ -17,7 +17,7 @@ priority, circuit, or fallback policy (ADR-005).
 
 | Public path | Role |
 | --- | --- |
-| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache / daily-execution / realtime field-trust / realtime quote orchestration / money-flow cache / fundamental cache / belong-board descriptors. |
+| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache / daily-execution / realtime field-trust / realtime quote orchestration / money-flow cache / fundamental cache / fundamental context aggregation / belong-board descriptors. |
 | `src.data_provider` package (`__init__.py`) | Stable package exports for plugins and callers. |
 
 Production and test code import public names from `src.data_provider.base`.
@@ -41,7 +41,7 @@ and `reset_fetcher_manager()` still observe or clear **only** that fallback
 singleton. Ad-hoc `DataFetcherManager()` constructors elsewhere stay out of
 this identity.
 
-## Ownership Map (after realtime quote orchestration extraction)
+## Ownership Map (after fundamental context aggregation extraction)
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
@@ -58,7 +58,8 @@ this identity.
 | `src/data_provider/manager_parts/realtime_field_trust_methods.py` | Manager-owned realtime quote attempt and field-trust bookkeeping rebound onto `DataFetcherManager` | Realtime routing policy, fallback order, and `get_realtime_quote` |
 | `src/data_provider/manager_parts/realtime_quote_methods.py` | Manager-owned realtime quote orchestration rebound onto `DataFetcherManager`: timestamp parse/enrich, plugin realtime fallback, `get_realtime_quote` routing, quote supplement helpers, and Longbridge preference | Field-trust attempt bookkeeping (`realtime_field_trust_methods`), `prefetch_realtime_quotes`, Local Only / outbound HTTP policy, chip / money-flow / stock-name / fundamental / rankings workflows |
 | `src/data_provider/manager_parts/money_flow_cache_methods.py` | Manager-owned money-flow cache lookup, store, invalidate, and stats rebound onto `DataFetcherManager` | `get_money_flow` routing, circuit policy, TTL/size class attributes, cache/circuit instance state, and hit/miss increments |
-| `src/data_provider/manager_parts/fundamental_cache_methods.py` | Manager-owned fundamental aggregation cache key, prune, and in-flight get-or-load rebound onto `DataFetcherManager` (instance-local; key is symbol + market + budget + as_of). TTL/max-entries resolve from injected `config` or manager `_get_fundamental_config()` | CN/offshore aggregation loaders, `FUNDAMENTAL_CACHE_TTL_SECONDS` env default, `_should_cache_fundamental_context`, the 5s realtime/chip `pull_coalesce` singleton, daily L1/L2, and TW institutional inflight |
+| `src/data_provider/manager_parts/fundamental_cache_methods.py` | Manager-owned fundamental aggregation cache key, prune, and in-flight get-or-load rebound onto `DataFetcherManager` (instance-local; key is symbol + market + budget + as_of). TTL/max-entries resolve from injected `config` or manager `_get_fundamental_config()` | CN/offshore aggregation loaders (`fundamental_context_methods`), `FUNDAMENTAL_CACHE_TTL_SECONDS` env default, `_should_cache_fundamental_context` (rebound from the context owner), the 5s realtime/chip `pull_coalesce` singleton, daily L1/L2, and TW institutional inflight |
+| `src/data_provider/manager_parts/fundamental_context_methods.py` | Manager-owned fundamental context aggregation rebound onto `DataFetcherManager`: source-chain normalization, block builders, CN/offshore loaders, failed/validation-rejected payloads, and `get_fundamental_context` | Fundamental cache key/prune/inflight (`fundamental_cache_methods`), capital-flow / dragon-tiger / board fetch implementations, health/circuit policy, and `_normalize_source_chain` ordering changes |
 | `src/data_provider/manager_parts/belong_board_methods.py` | Manager-owned belong-board missing-value and normalization helpers rebound onto `DataFetcherManager` (`_try_scalar_isna`, `_is_missing_board_value`, `_normalize_belong_boards`) | `get_belong_boards` routing, capability probing, provider fallback, and fundamental payload helpers that only *call* `_try_scalar_isna` |
 | `src/data_provider/plugin_registry.py` | Plugin provider registration and discovery seams | Built-in fetcher implementations |
 | `src/data_provider/_capability_catalog.py` | Built-in capability inventory and the mechanics that apply manager-owned ordering inputs, maintain indexes, synchronize plugin providers, filter by capability/market/availability, and look up fetchers | Priority values or policy, daily/realtime/fundamental execution, cache, health, circuit, fallback, or plugin routing policy |
@@ -66,7 +67,7 @@ this identity.
 | `src/data_provider/akshare_fetcher.py` | Compatibility facade for the AkShare provider: public class, constants, re-exports, and ADR-006 method rebinding / timeout clone seams | New capability-domain bodies (add under `akshare_parts/`) |
 | `src/data_provider/akshare_parts/` | AkShare implementation ownership by capability domain: `symbols`, `timeout_client`, `parse_tencent`, `realtime_errors`, `history`, `realtime_quotes`, `market_boards`, `enhanced`, `realtime_cache`, plus `facade_bind` helpers | Cross-provider manager policy (ADR-005) |
 | `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
-| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, fundamental/money-flow/chip/stock-name/rankings workflows still co-located, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | New pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/money-flow-cache/fundamental-cache/belong-board descriptors |
+| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, money-flow/chip/stock-name/rankings workflows still co-located, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | New pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/money-flow-cache/fundamental-cache/fundamental-context/belong-board descriptors |
 
 The private catalog receives and mutates only manager-owned state through
 `DataFetcherManager` descriptors. It does not introduce an independent policy
@@ -147,9 +148,10 @@ Slice 8 rebinds belong-board missing-value and normalization descriptors from
 
 - `_try_scalar_isna`, `_is_missing_board_value`, `_normalize_belong_boards`
 
-`get_belong_boards` routing, capability probing, provider fallback, and
-`_has_meaningful_payload` stay on the facade. `_has_meaningful_payload` still
-calls the rebound `_try_scalar_isna` through `DataFetcherManager`.
+`get_belong_boards` routing, capability probing, and provider fallback stay
+on the facade. `_has_meaningful_payload` is rebound from
+`fundamental_context_methods` and still calls `_try_scalar_isna` through
+`DataFetcherManager`.
 
 Slice 9 rebinds daily provider execution descriptors from
 `manager_parts/daily_provider_execution.py` while preserving their
@@ -172,10 +174,30 @@ Slice 10 rebinds realtime quote orchestration descriptors from
 
 Field-trust (`realtime_field_trust_methods`) remains a separate owner.
 `prefetch_realtime_quotes`, `_SUPPLEMENT_FIELDS`, chip, money-flow, stock-name,
-fundamental, and rankings stay on the facade. `get_realtime_quote` is rebound
+and rankings stay on the facade. `get_realtime_quote` is rebound
 after field-trust and then wrapped by `install_facade_validation_wrappers`.
 Import the facade (`src.data_provider.base` / `src.data_provider`), not
 `manager_parts.realtime_quote_methods`.
+
+Slice 11 rebinds fundamental context aggregation descriptors from
+`manager_parts/fundamental_context_methods.py` while preserving their
+`src.data_provider.base` module, qualname, signature, globals, and patch behavior:
+
+- `_get_fundamental_config`, `_normalize_source_chain`
+- `_block_status`, `_build_fundamental_block`, `_has_meaningful_payload`
+- `_infer_block_status`, `_should_cache_fundamental_context`
+- `_build_market_not_supported`, `_build_offshore_fundamental_context`
+- `build_failed_fundamental_context`, `build_validation_rejected_fundamental_context`
+- `get_fundamental_context`
+
+Cache key/prune/inflight (`fundamental_cache_methods`) remains a separate
+owner. `get_capital_flow_context`, `get_dragon_tiger_context`, and
+`get_board_context` stay on the facade and are still invoked from rebound
+`get_fundamental_context`. `_normalize_source_chain` order is unchanged.
+`get_fundamental_context` is rebound and then wrapped by
+`install_facade_validation_wrappers`. Import the facade
+(`src.data_provider.base` / `src.data_provider`), not
+`manager_parts.fundamental_context_methods`.
 
 ## How To Add The Next Extraction Slice
 

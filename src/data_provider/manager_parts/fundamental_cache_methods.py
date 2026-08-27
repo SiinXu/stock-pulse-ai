@@ -3,8 +3,9 @@
 """Manager-owned fundamental aggregation cache key, prune, and in-flight coalesce.
 
 These descriptors are rebound onto ``DataFetcherManager`` by the compatibility
-facade. Cache maps, locks, and CN/offshore aggregation loaders remain on the
-facade. This is instance-local and is not the 5s realtime/chip process helper.
+facade. Cache maps and locks remain manager instance state on the facade.
+CN/offshore aggregation loaders live in ``fundamental_context_methods``.
+This is instance-local and is not the 5s realtime/chip process helper.
 """
 
 from __future__ import annotations
