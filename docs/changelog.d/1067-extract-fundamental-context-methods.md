@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager fundamental context aggregation (`get_fundamental_context` and its local builders) into `src/data_provider/manager_parts/fundamental_context_methods.py` behind the existing ADR-006 facade without changing source-chain order, cache TTL, fail-open status, or public imports (Refs #1067, Refs #1088).
