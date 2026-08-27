@@ -1066,137 +1066,8 @@ class DataFetcherManager:
         'iopv', 'nav',
     ]
 
-    # Rebound from manager_parts.realtime_field_trust_methods after class build.
-
-    def get_chip_distribution(self, stock_code: str):
-        """
-        获取筹码分布数据（带熔断和多数据源降级）
-
-        策略：
-        1. 检查配置开关
-        2. 检查熔断器状态
-        3. 依次尝试多个数据源：数据源优先级与获取daily的数据优先级一致
-        4. 所有数据源失败则返回 None（降级兜底）
-
-        Args:
-            stock_code: 股票代码
-
-        Returns:
-            ChipDistribution 对象，失败则返回 None
-        """
-        # Normalize code (strip SH/SZ prefix etc.)
-        stock_code = normalize_stock_code(stock_code)
-        if _market_tag(stock_code) == "crypto":
-            logger.debug("[chip distribution] not applicable to crypto asset %s", stock_code)
-            return None
-
-        from .realtime_types import get_chip_circuit_breaker
-        from src.config import get_config
-
-        config = get_config()
-
-        # Return None immediately when chip distribution is disabled.
-        if not config.enable_chip_distribution:
-            logger.debug(f"[筹码分布] 功能已禁用，跳过 {stock_code}")
-            return None
-
-        circuit_breaker = get_chip_circuit_breaker()
-
-        candidate_fetchers = []
-        # Iterate through the manager's capability-filtered priority order.
-        for fetcher in self._get_fetchers_for_capability(
-            "chip_distribution",
-            market=_market_tag(stock_code),
-        ):
-            # Use only data sources that implement chip-distribution logic.
-            if not hasattr(fetcher, 'get_chip_distribution'):
-                continue
-
-            fetcher_name = fetcher.name
-            # Dynamically generate the key for the circuit breaker, e.g., "TushareFetcher" -> "tushare_chip"
-            source_key = f"{fetcher_name.replace('Fetcher', '').lower()}_chip"
-
-            # Check the circuit breaker status
-            if not circuit_breaker.is_available(source_key):
-                logger.debug(f"[熔断] {fetcher_name} 筹码接口处于熔断状态，尝试下一个")
-                continue
-
-            candidate_fetchers.append((fetcher, fetcher_name, source_key))
-
-        for index, (fetcher, fetcher_name, source_key) in enumerate(candidate_fetchers):
-            fallback_to = (
-                candidate_fetchers[index + 1][1]
-                if index + 1 < len(candidate_fetchers)
-                else None
-            )
-            attempt_start = time.time()
-            try:
-                record_provider_run_started(
-                    data_type="chip",
-                    provider=fetcher_name,
-                    operation="get_chip_distribution",
-                )
-                chip = self._call_fetcher_method(fetcher, 'get_chip_distribution', stock_code)
-                latency_ms = int((time.time() - attempt_start) * 1000)
-                if _is_meaningful_chip_distribution(chip):
-                    record_provider_run(
-                        data_type="chip",
-                        provider=fetcher_name,
-                        operation="get_chip_distribution",
-                        success=True,
-                        latency_ms=latency_ms,
-                        record_count=1,
-                    )
-                    circuit_breaker.record_success(source_key)
-                    logger.info(f"[筹码分布] {stock_code} 成功获取 (来源: {fetcher_name})")
-                    return chip
-                else:
-                    record_provider_run(
-                        data_type="chip",
-                        provider=fetcher_name,
-                        operation="get_chip_distribution",
-                        success=False,
-                        latency_ms=latency_ms,
-                        error_type="empty",
-                        error_message="empty or incomplete chip distribution",
-                        fallback_to=fallback_to,
-                        record_count=0,
-                    )
-                    if chip is not None:
-                        logger.warning(
-                            "[筹码分布] %s 返回字段不完整或占位值，继续尝试下一个数据源",
-                            fetcher_name,
-                        )
-                    # Empty result or placeholder: Release HALF_OPEN probe slot, avoid getting stuck.
-                    circuit_breaker.record_inconclusive(source_key)
-            except Exception as e:  # broad-exception: fallback_recorded - diagnostics precede chip fallback
-                error_type, error_reason = summarize_exception(e)
-                record_provider_run(
-                    data_type="chip",
-                    provider=fetcher_name,
-                    operation="get_chip_distribution",
-                    success=False,
-                    latency_ms=int((time.time() - attempt_start) * 1000),
-                    error_type=error_type,
-                    error_message=error_reason,
-                    fallback_to=fallback_to,
-                )
-                log_safe_exception(
-                    logger,
-                    "Data provider chip distribution fetch failed",
-                    e,
-                    error_code="data_provider_chip_distribution_failed",
-                    level=logging.WARNING,
-                    context={"symbol": stock_code, "provider": fetcher_name},
-                )
-                circuit_breaker.record_failure(
-                    source_key,
-                    "data_provider_chip_distribution_failed",
-                )
-                continue
-
-        logger.warning(f"[筹码分布] {stock_code} 所有数据源均失败")
-        return None
+    # Rebound from manager_parts.chip_distribution_methods after class build.
+    get_chip_distribution = None
 
     _MONEY_FLOW_CACHE_TTL_SECONDS = 600.0
     _MONEY_FLOW_STALE_TTL_SECONDS = 86400.0
@@ -2348,9 +2219,9 @@ class DataFetcherManager:
 # compatibility facade while focused parts own inventory/selection, daily
 # health/circuit, daily-cache orchestration, daily provider execution,
 # realtime field-trust bookkeeping, realtime quote orchestration,
-# money-flow cache lookup/store, money-flow orchestration, fundamental
-# cache lookup/inflight, fundamental CN/offshore loaders, and belong-board
-# normalization.
+# chip-distribution orchestration, money-flow cache lookup/store,
+# money-flow orchestration, fundamental cache lookup/inflight,
+# fundamental CN/offshore loaders, and belong-board normalization.
 # Rebinding preserves method globals so existing patches against this
 # module continue to intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
@@ -2358,6 +2229,7 @@ from .manager_parts import daily_cache_methods as _daily_cache_methods_module  #
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
 from .manager_parts import (  # noqa: E402
     belong_board_methods as _belong_board_methods_module,
+    chip_distribution_methods as _chip_distribution_methods_module,
     daily_provider_execution as _daily_provider_execution_module,
     fundamental_cache_methods as _fundamental_cache_methods_module,
     fundamental_loader_methods as _fundamental_loader_methods_module,
@@ -2490,6 +2362,20 @@ def _assemble_realtime_quote_methods_facade(
         )
 
 
+def _assemble_chip_distribution_methods_facade(
+    chip_module=_chip_distribution_methods_module,
+) -> None:
+    bound_method_names = chip_module.bind_chip_distribution_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != chip_module.EXPECTED_CHIP_DISTRIBUTION_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager chip-distribution methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_money_flow_cache_methods_facade(
     cache_module=_money_flow_cache_methods_module,
 ) -> None:
@@ -2567,6 +2453,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_daily_execution=_assemble_daily_provider_execution_facade,
     assemble_realtime=_assemble_realtime_field_trust_methods_facade,
     assemble_realtime_quote=_assemble_realtime_quote_methods_facade,
+    assemble_chip=_assemble_chip_distribution_methods_facade,
     assemble_money_flow=_assemble_money_flow_cache_methods_facade,
     assemble_money_flow_methods=_assemble_money_flow_methods_facade,
     assemble_fundamental=_assemble_fundamental_cache_methods_facade,
@@ -2579,6 +2466,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_daily_execution()
     assemble_realtime()
     assemble_realtime_quote()
+    assemble_chip()
     assemble_money_flow()
     assemble_money_flow_methods()
     assemble_fundamental()
@@ -2607,6 +2495,9 @@ _realtime_field_trust_methods_module._install_facade_reload_hook(
 _realtime_quote_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_chip_distribution_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _money_flow_cache_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -2631,6 +2522,7 @@ del (
     _assemble_daily_provider_execution_facade,
     _assemble_realtime_field_trust_methods_facade,
     _assemble_realtime_quote_methods_facade,
+    _assemble_chip_distribution_methods_facade,
     _assemble_money_flow_cache_methods_facade,
     _assemble_money_flow_methods_facade,
     _assemble_fundamental_cache_methods_facade,
@@ -2643,6 +2535,7 @@ del (
     _daily_provider_execution_module,
     _realtime_field_trust_methods_module,
     _realtime_quote_methods_module,
+    _chip_distribution_methods_module,
     _money_flow_cache_methods_module,
     _money_flow_methods_module,
     _fundamental_cache_methods_module,
