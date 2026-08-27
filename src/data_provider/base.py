@@ -1657,6 +1657,17 @@ class DataFetcherManager:
             return None, str(error_holder["value"]), int((time.time() - start) * 1000)
         return result_holder.get("value"), None, int((time.time() - start) * 1000)
 
+    def _get_fundamental_config(self):
+        """Return process Config for fundamental timeouts, retries, and cache TTL.
+
+        Kept on the facade rather than moved into
+        ``manager_parts/fundamental_context_methods.py`` so the extraction adds
+        no new direct-config module under the config-access ratchet. Tests keep
+        patching ``src.config.get_config``.
+        """
+        from src.config import get_config
+        return get_config()
+
     def _run_with_retry(
         self,
         task: Callable[[], Any],

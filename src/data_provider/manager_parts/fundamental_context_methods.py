@@ -55,15 +55,6 @@ _FACADE_RELOAD_HOOK: Optional[Callable[[], None]] = globals().get(
 class _FundamentalContextMethods:
     """Source descriptors rebound onto ``DataFetcherManager`` by its facade."""
 
-    def _get_fundamental_config(self):
-        """Return process Config for fundamental timeouts, retries, and cache TTL.
-
-        CN/offshore aggregation and the rebound cache helper share this owner so
-        tests can keep patching ``src.config.get_config``.
-        """
-        from src.config import get_config
-        return get_config()
-
     @staticmethod
     def _normalize_source_chain(
         entries: Any,
@@ -886,7 +877,6 @@ class _FundamentalContextMethods:
 
 
 EXPECTED_FUNDAMENTAL_CONTEXT_METHOD_NAMES = (
-    "_get_fundamental_config",
     "_normalize_source_chain",
     "_block_status",
     "_build_fundamental_block",
