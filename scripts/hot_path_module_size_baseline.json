@@ -13,14 +13,14 @@
   "hard_ceiling_max_lines": 4659,
   "module_count": 9,
   "modules": {
-    "src/agent/orchestrator_parts/pipeline.py": 1564,
-    "src/data_provider/base.py": 3177,
+    "src/agent/orchestrator_parts/pipeline.py": 1561,
+    "src/data_provider/base.py": 2651,
     "src/data_provider/data_validation.py": 1715,
     "src/market/analyzer.py": 1633,
-    "src/services/history_service.py": 1581,
-    "src/services/local_model_service.py": 1548,
+    "src/services/history_service.py": 1580,
+    "src/services/local_model_service.py": 1536,
     "src/services/reasoning_trace_export_service.py": 1730,
-    "src/services/run_flow.py": 1759,
+    "src/services/run_flow.py": 1558,
     "src/services/scheduled_task_service.py": 1985
   },
   "cleanup_plan": [
