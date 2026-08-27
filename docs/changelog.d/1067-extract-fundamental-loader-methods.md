@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager fundamental CN/offshore loaders (`get_fundamental_context`, `_build_offshore_fundamental_context`) into `src/data_provider/manager_parts/fundamental_loader_methods.py` behind the existing ADR-006 facade without changing cache TTL, fail-open status, validation wrapping, or public imports (Refs #1067, Refs #1088).
