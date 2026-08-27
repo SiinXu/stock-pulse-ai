@@ -1872,207 +1872,14 @@ class DataFetcherManager:
             [err or "boards failed"],
         )
 
-    def _get_sector_rankings_with_meta(
-            self,
-            n: int = 5,
-        ) -> Tuple[List[Dict], List[Dict], List[Dict[str, Any]], str]:
-            """Get sector rankings with ordered fallback chain metadata."""
-            source_chain: List[Dict[str, Any]] = []
-            last_error = ""
-
-            # Iterate through the manager's capability-filtered priority order.
-            for fetcher in self._get_fetchers_for_capability(
-                "sector_rankings",
-                market="cn",
-            ):
-                if not hasattr(fetcher, 'get_sector_rankings'):
-                    continue
-
-                start = time.time()
-                try:
-                    data = fetcher.get_sector_rankings(n)
-                    duration_ms = int((time.time() - start) * 1000)
-                    if data and data[0] is not None and data[1] is not None:
-                        source_chain.append(
-                            {
-                                "provider": fetcher.name,
-                                "result": "ok",
-                                "duration_ms": duration_ms,
-                            }
-                        )
-                        logger.info(f"[{fetcher.name}] 获取板块排行成功")
-                        return data[0], data[1], source_chain, ""
-
-                    last_error = f"{fetcher.name}返回空结果"
-                    source_chain.append(
-                        {
-                            "provider": fetcher.name,
-                            "result": "empty",
-                            "duration_ms": duration_ms,
-                            "error": last_error,
-                        }
-                    )
-                except Exception as e:  # broad-exception: fallback_recorded - source chain records ranking fallback
-                    error_type, error_reason = summarize_exception(e)
-                    last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                    duration_ms = int((time.time() - start) * 1000)
-                    source_chain.append(
-                        {
-                            "provider": fetcher.name,
-                            "result": "failed",
-                            "duration_ms": duration_ms,
-                            "error": error_reason,
-                        }
-                    )
-                    log_safe_exception(
-                        logger,
-                        "Data provider sector ranking fetch failed",
-                        e,
-                        error_code="data_provider_sector_ranking_failed",
-                        level=logging.WARNING,
-                        context={"provider": fetcher.name},
-                    )
-
-            return [], [], source_chain, last_error
-
-    def get_sector_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:
-        """获取板块涨跌榜（自动切换数据源）"""
-        # Preserve the required fallback order: AkShare (EM) -> AkShare (Sina) -> Tushare -> efinance.
-        top, bottom, _, last_error = self._get_sector_rankings_with_meta(n)
-        if top or bottom:
-            return top, bottom
-        logger.warning("All data providers returned no sector rankings")
-        return [], []
-
-    @staticmethod
-    def _copy_ranking_rows(rows: List[Dict]) -> List[Dict]:
-        return [dict(row) if isinstance(row, dict) else row for row in rows or []]
-
-    @classmethod
-    def clear_concept_rankings_cache_for_tests(cls) -> None:
-        with cls._concept_rankings_cache_lock:
-            cls._concept_rankings_cache.clear()
-
-    def get_concept_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:
-        """获取概念/题材涨跌榜（自动切换数据源）。"""
-        try:
-            normalized_n = int(n)
-        except (TypeError, ValueError):
-            normalized_n = 5
-        if normalized_n <= 0:
-            normalized_n = 5
-
-        last_error = ""
-        now = time.monotonic()
-
-        with self.__class__._concept_rankings_cache_lock:
-            cached = self.__class__._concept_rankings_cache.get(normalized_n)
-            if cached and cached[0] > now:
-                logger.debug("[概念排行] 命中共享缓存 n=%s", normalized_n)
-                return self._copy_ranking_rows(cached[1]), self._copy_ranking_rows(cached[2])
-
-            top: List[Dict] = []
-            bottom: List[Dict] = []
-            for fetcher in self._get_fetchers_for_capability(
-                "concept_rankings",
-                market="cn",
-            ):
-                try:
-                    data = fetcher.get_concept_rankings(normalized_n)
-                    if data and (data[0] or data[1]):
-                        top = data[0] or []
-                        bottom = data[1] or []
-                        logger.info(f"[{fetcher.name}] 获取概念排行成功")
-                        break
-                    last_error = f"{fetcher.name}返回空结果"
-                except Exception as e:  # broad-exception: fallback_recorded - safe log precedes concept fallback
-                    error_type, error_reason = summarize_exception(e)
-                    last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                    log_safe_exception(
-                        logger,
-                        "Data provider concept ranking fetch failed",
-                        e,
-                        error_code="data_provider_concept_ranking_failed",
-                        level=logging.WARNING,
-                        context={"provider": fetcher.name},
-                    )
-
-            if not top and not bottom and last_error:
-                logger.warning("All data providers returned no concept rankings")
-
-            ttl = (
-                self.__class__._CONCEPT_RANKINGS_CACHE_TTL_SECONDS
-                if top or bottom
-                else self.__class__._CONCEPT_RANKINGS_EMPTY_CACHE_TTL_SECONDS
-            )
-            cached_top = self._copy_ranking_rows(top)
-            cached_bottom = self._copy_ranking_rows(bottom)
-            self.__class__._concept_rankings_cache[normalized_n] = (
-                time.monotonic() + ttl,
-                cached_top,
-                cached_bottom,
-            )
-            return self._copy_ranking_rows(cached_top), self._copy_ranking_rows(cached_bottom)
-
-    def get_hot_stocks(self, n: int = 10) -> List[Dict[str, Any]]:
-        """获取市场人气股榜（自动切换数据源）。"""
-        last_error = ""
-        for fetcher in self._get_fetchers_for_capability(
-            "hot_stocks",
-            market="cn",
-        ):
-            try:
-                data = fetcher.get_hot_stocks(n)
-                if data:
-                    logger.info(f"[{fetcher.name}] 获取人气股成功")
-                    return data[:n]
-                last_error = f"{fetcher.name}返回空结果"
-            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes hot-stock fallback
-                error_type, error_reason = summarize_exception(e)
-                last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                log_safe_exception(
-                    logger,
-                    "Data provider hot stock fetch failed",
-                    e,
-                    error_code="data_provider_hot_stock_fetch_failed",
-                    level=logging.WARNING,
-                    context={"provider": fetcher.name},
-                )
-        if last_error:
-            logger.warning("All data providers returned no hot stocks")
-        return []
-
-    def get_limit_up_pool(
-        self,
-        date: Optional[str] = None,
-        n: int = 20,
-    ) -> List[Dict[str, Any]]:
-        """获取涨停池与连板梯队（自动切换数据源）。"""
-        last_error = ""
-        for fetcher in self._get_fetchers_for_capability(
-            "limit_up_pool",
-            market="cn",
-        ):
-            try:
-                data = fetcher.get_limit_up_pool(date=date, n=n)
-                if data:
-                    logger.info(f"[{fetcher.name}] 获取涨停池成功")
-                    return data[:n]
-                last_error = f"{fetcher.name}返回空结果"
-            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes limit-up fallback
-                error_type, error_reason = summarize_exception(e)
-                last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                log_safe_exception(
-                    logger,
-                    "Data provider limit-up pool fetch failed",
-                    e,
-                    error_code="data_provider_limit_up_pool_failed",
-                    level=logging.WARNING,
-                    context={"provider": fetcher.name},
-                )
-        if last_error:
-            logger.warning("All data providers returned no limit-up pool data")
-        return []
+    # Rebound from manager_parts.rankings_methods after the class is built.
+    _get_sector_rankings_with_meta = None
+    get_sector_rankings = None
+    _copy_ranking_rows = None
+    clear_concept_rankings_cache_for_tests = None
+    get_concept_rankings = None
+    get_hot_stocks = None
+    get_limit_up_pool = None
 
 
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006
@@ -2080,8 +1887,8 @@ class DataFetcherManager:
 # health/circuit, daily-cache orchestration, daily provider execution,
 # realtime field-trust bookkeeping, realtime quote orchestration,
 # money-flow cache lookup/store, money-flow orchestration, fundamental
-# cache lookup/inflight, fundamental context aggregation, and belong-board
-# normalization.
+# cache lookup/inflight, fundamental context aggregation, belong-board
+# normalization, and rankings orchestration.
 # Rebinding preserves method globals so existing patches against this
 # module continue to intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
@@ -2094,6 +1901,7 @@ from .manager_parts import (  # noqa: E402
     fundamental_context_methods as _fundamental_context_methods_module,
     money_flow_cache_methods as _money_flow_cache_methods_module,
     money_flow_methods as _money_flow_methods_module,
+    rankings_methods as _rankings_methods_module,
     realtime_field_trust_methods as _realtime_field_trust_methods_module,
     realtime_quote_methods as _realtime_quote_methods_module,
 )
@@ -2291,6 +2099,20 @@ def _assemble_belong_board_methods_facade(
         )
 
 
+def _assemble_rankings_methods_facade(
+    rankings_module=_rankings_methods_module,
+) -> None:
+    bound_method_names = rankings_module.bind_rankings_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != rankings_module.EXPECTED_RANKINGS_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager rankings methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_data_fetcher_manager_facades(
     assemble_capability=_assemble_capability_catalog_facade,
     assemble_health=_assemble_daily_source_health_facade,
@@ -2303,6 +2125,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental=_assemble_fundamental_cache_methods_facade,
     assemble_fundamental_context=_assemble_fundamental_context_methods_facade,
     assemble_belong_board=_assemble_belong_board_methods_facade,
+    assemble_rankings=_assemble_rankings_methods_facade,
 ) -> None:
     assemble_capability()
     assemble_health()
@@ -2315,6 +2138,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental()
     assemble_fundamental_context()
     assemble_belong_board()
+    assemble_rankings()
     from .manager_parts.data_validation_wiring import install_facade_validation_wrappers
     install_facade_validation_wrappers(DataFetcherManager)
 
@@ -2353,6 +2177,9 @@ _fundamental_context_methods_module._install_facade_reload_hook(
 _belong_board_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_rankings_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 
 del (
     _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
@@ -2367,6 +2194,7 @@ del (
     _assemble_fundamental_cache_methods_facade,
     _assemble_fundamental_context_methods_facade,
     _assemble_belong_board_methods_facade,
+    _assemble_rankings_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
     _daily_source_health_module,
@@ -2379,4 +2207,5 @@ del (
     _fundamental_cache_methods_module,
     _fundamental_context_methods_module,
     _belong_board_methods_module,
+    _rankings_methods_module,
 )

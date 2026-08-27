@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager rankings orchestration (`get_sector_rankings`, `get_concept_rankings`, `get_hot_stocks`, `get_limit_up_pool`, and their local helpers) into `src/data_provider/manager_parts/rankings_methods.py` behind the existing ADR-006 facade without changing fallback order, cache TTL, or public imports (Refs #1067, Refs #1088).
