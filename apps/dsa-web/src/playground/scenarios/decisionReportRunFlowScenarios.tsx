@@ -20,6 +20,7 @@ import {
   DecisionSignalCard,
   DecisionSignalOutcomeBadge,
 } from '../../components/decision-signals/DecisionSignalDisplay';
+import { DecisionSignalContextChip } from '../../components/decision-signals/DecisionSignalContextChip';
 import { DecisionSignalDetails } from '../../components/decision-signals/DecisionSignalDetails';
 import { PortfolioSignalSummary } from '../../components/decision-signals/PortfolioSignalSummary';
 import { DecisionSignalMemoryControls } from '../../components/decision-signals/DecisionSignalMemoryControls';
@@ -100,6 +101,13 @@ const DecisionSignalCardStory = () => {
     </div>
   );
 };
+
+const DecisionSignalContextChipStory = () => (
+  <DecisionSignalContextChip
+    selected={{ source: 'list', item: fixtureDecisionSignal }}
+    onOpen={() => undefined}
+  />
+);
 
 const DecisionSignalDetailsStory = () => {
   const text = useSamples();
@@ -937,6 +945,7 @@ const MarketReviewRegionSelectorStory = () => {
 
 export const DECISION_REPORT_RUN_FLOW_SCENARIOS: Record<string, PlaygroundScenarioRenderer> = {
   'decision-signal-card': DecisionSignalCardStory,
+  'decision-signal-context-chip': DecisionSignalContextChipStory,
   'decision-signal-details': DecisionSignalDetailsStory,
   'decision-signal-memory-controls': DecisionSignalMemoryControlsStory,
   'decision-signal-outcome-badge': DecisionSignalOutcomeBadgeStory,

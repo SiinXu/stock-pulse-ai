@@ -38,6 +38,7 @@ import {
 
 export type DecisionSignalDetailDrawerProps = {
   selected: SelectedSignal | null;
+  isOpen: boolean;
   onClose: () => void;
   statusError: ParsedApiError | null;
   onDismissStatusError: () => void;
@@ -60,6 +61,7 @@ export type DecisionSignalDetailDrawerProps = {
 
 const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProps> = ({
   selected,
+  isOpen,
   onClose,
   statusError,
   onDismissStatusError,
@@ -87,7 +89,7 @@ const DecisionSignalDetailDrawer: React.FC<DecisionSignalDetailDrawerProps> = ({
 
   return (
     <Drawer
-      isOpen={Boolean(selected)}
+      isOpen={isOpen}
       onClose={onClose}
       title={t('decisionSignals.detailTitle')}
       variant="detail"

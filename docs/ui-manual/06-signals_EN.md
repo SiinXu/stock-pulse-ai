@@ -63,6 +63,10 @@ flowchart LR
 
 The primary tabs stay directly below the page header. Inside **Signals**, a compact segmented control switches between All signals, Current stock, and Stock signal timeline. **History** uses the same lower-emphasis control for trigger history and notification attempts. All / Holdings / Watchlist scope appears only inside the Signals or Rules content it affects, so primary navigation does not move when the active view changes.
 
+Selecting a signal uses `?signal=<id>` as the single selection identity. List, latest, and timeline are only entry points; two signals that share a source do not replace each other. While a signal is selected, a fixed Context Chip under the page header shows its symbol, source, and status. Browser Back/Forward restores that same id. Deep links still fetch by id when the row is not on the current page.
+
+Closing the detail drawer does not clear `?signal=` or the Context Chip. The chip stays visible and accessible so you can reopen the same id without changing identity. List, latest, and timeline refreshes look up that id and do not drop a newer selection from another entry point.
+
 ## Signals: daily drawer
 
 **Beginner filters**
