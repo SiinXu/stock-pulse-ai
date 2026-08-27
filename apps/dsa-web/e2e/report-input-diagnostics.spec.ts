@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { expect, test, type Page } from './playwright-test';
+import { ANALYSIS_CONTEXT_CONTENT_TEXT } from '../src/locales/reportContent';
+import { expandCollapsible } from './collapsible';
 
 const VIEWPORTS = [
   { width: 1280, height: 900 },
@@ -12,9 +14,7 @@ async function openExpandedFixture(page: Page, width: number, height: number) {
   await page.setViewportSize({ width, height });
   await page.goto('/e2e/analysis-context-summary-fixture.html');
   const summary = page.getByTestId('analysis-context-summary');
-  await expect(summary).not.toHaveAttribute('open', '');
-  await summary.locator('summary').click();
-  await expect(summary).toHaveAttribute('open', '');
+  await expandCollapsible(summary, ANALYSIS_CONTEXT_CONTENT_TEXT.en.title);
   return summary;
 }
 
