@@ -3,8 +3,9 @@
 """Manager-owned money-flow cache lookup, store, invalidate, and stats.
 
 These descriptors are rebound onto ``DataFetcherManager`` by the compatibility
-facade. Cache TTL/size class attributes, cache/circuit instance state, hit/miss
-increments, and ``get_money_flow`` routing remain on the facade.
+facade. Cache TTL/size class attributes and cache/circuit instance state
+remain on the facade. ``get_money_flow`` routing and hit/miss accounting are
+owned by ``money_flow_methods``.
 """
 
 from __future__ import annotations
