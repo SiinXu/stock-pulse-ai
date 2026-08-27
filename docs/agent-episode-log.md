@@ -16,4 +16,4 @@ Issue #1096 第一片的研究用前向收益分桶（`1d_up` / `1d_down` / `1d_
 
 Issue #1096 评测 fixture 的策展等级语义槽仍是 `EpisodeOutcomeLabels.manual_grade`，但 **episode 行本身不收紧该字段**：历史 append-time 值（例如 `wrong`）读回仍合法。后置写入只走 sidecar `agent_episode_curator_grades`（按 `episode_id` upsert，复制 episode 的 `run_id`），允许值为 `pass` / `fail` / `partial` / `harmful`，不得 `UPDATE` `agent_episodes`。入口是显式 CLI：`python scripts/label_curator_grades.py --fixture path.json`（可选 `--episode-id`、`--dry-run`）。没有配置注册表键，也没有调度器。缺失或空白 fixture `manual_grade` 视为缺席，不写中性占位；CLI/sidecar 未知 token 会 fail-closed 且不落库。适配器消费仍属 #1106。
 
-配置、模块与回滚说明见英文版（与实现保持一致）。
+追加成功后的遗忘是按标的的：只删除本次写入 symbol 上、严格早于 cutoff 的行，以及超出按标的行数上限的最旧行。无 symbol 不删除。无 cutoff 且无 max_rows 是无策略，保留数据，并且 `remaining_count` 必须是实时 COUNT。不可逆 DELETE 会在同一事务里先写入一条仅元数据的 EvolutionEvent，再按 SQLite bind 上限分块 `DELETE ... id IN (...)`（为 `symbol` 预留一个 bind）；分块不是多次提交，审计失败则整笔回滚。代码回滚不能恢复已删行，只能靠备份 / PITR。无作用域的 `apply_retention` / `apply_capacity` fail-closed。仓库层事务失败会抛出并回滚；分析路径仍 fail-soft。配置、模块与回滚说明见英文版（与实现保持一致）。

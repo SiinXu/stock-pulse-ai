@@ -113,8 +113,8 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释 |
 | `AGENT_DISAGREEMENT_MEDIUM_CONFIDENCE_THRESHOLD` | `0.55` | 是 | 模板中注释 |
 | `AGENT_EPISODE_LOG_ENABLED` | `false` | 是 | 模板中注释; Agent evolution episode log (Issue #1090) |
-| `AGENT_EPISODE_MAX_ROWS` | `50000` | 是 | 模板中注释 |
-| `AGENT_EPISODE_RETENTION_DAYS` | `90` | 是 | 模板中注释 |
+| `AGENT_EPISODE_MAX_ROWS` | `50000` | 是 | 模板中注释; 追加后按标的容量上限（Refs #1119） |
+| `AGENT_EPISODE_RETENTION_DAYS` | `90` | 是 | 模板中注释; 追加后按标的 TTL（Refs #1119） |
 | `AGENT_ERROR_PATTERN_ENABLED` | `false` | 是 | 模板中注释; Persisted error-pattern encyclopedia injected into analysis (Issue #1138); default off |
 | `AGENT_ERROR_PATTERN_INJECT_CHAR_BUDGET` | `2000` | 是 | 模板中注释 |
 | `AGENT_ERROR_PATTERN_INJECT_TOP_K` | `3` | 是 | 模板中注释 |

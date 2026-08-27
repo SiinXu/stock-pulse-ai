@@ -7,6 +7,10 @@ import settingsHelpZhCN from './settingsHelp.zh';
 import type { SettingsHelpDefinition, SettingsHelpSourceMap } from './settingsHelpSourceTypes';
 import type { SettingsHelpContent } from './settingsHelpTypes';
 import {
+  getEpisodeForgetSettingsHelp,
+  isEpisodeForgetHelpKey,
+} from './episodeForgetSettingsHelp';
+import {
   getRedTeamSettingsHelp,
   isRedTeamHelpKey,
 } from './redTeamSettingsHelp';
@@ -47,11 +51,13 @@ export function getSettingsHelpContent(
   const language = getPreferredHelpLanguage(locale);
   const localized = isSkillRetrievalHelpKey(helpKey)
     ? getSkillRetrievalSettingsHelp(language)
-    : isRedTeamHelpKey(helpKey)
-      ? getRedTeamSettingsHelp(language)
-      : SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY[helpKey]
-        ?? SETTINGS_HELP_MAPS[language][helpKey]
-        ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
+    : isEpisodeForgetHelpKey(helpKey)
+      ? getEpisodeForgetSettingsHelp(language, helpKey)
+      : isRedTeamHelpKey(helpKey)
+        ? getRedTeamSettingsHelp(language)
+        : SETTINGS_HELP_SCHEMA_DESCRIPTION_ONLY[helpKey]
+          ?? SETTINGS_HELP_MAPS[language][helpKey]
+          ?? (!helpKey.includes('.') ? findSettingsHelpByFieldKey(helpKey, language) : null);
   if (localized && Object.keys(localized).length > 0) {
     const fieldKey = helpKey.split('.').pop() ?? helpKey;
     return {

@@ -5,15 +5,27 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import hashlib
 import json
 import logging
 from typing import Any, Callable, List, Optional, Sequence
 
-from sqlalchemy import and_, delete, desc, func, select
+from sqlalchemy import and_, delete, desc, func, select, text
 from sqlalchemy.exc import IntegrityError
 
 from src.repositories.agent_episode_tables import agent_episodes_table
+from src.repositories.agent_evolution_event_repo import insert_evolution_event_on_session
 from src.repositories.base import BaseRepository, RepositoryError
+from src.schemas.evolution_event import EvolutionEventCreate
+from src.schemas.memory_forget_policy import (
+    EPISODE_FORGET_EVENT_TYPE,
+    ERROR_FORGET_INVALID_POLICY,
+    ERROR_FORGET_UNSCOPED,
+    EpisodeForgetDecision,
+    EpisodeForgetResult,
+    MemoryForgetError,
+    require_episode_forget_policy,
+)
 from src.schemas.memory_write_policy import require_episodic_write
 from src.schemas.agent_episode import (
     AGENT_EPISODE_MAX_PAGE_SIZE,
@@ -26,6 +38,7 @@ from src.schemas.agent_episode import (
     TrajectoryStepSummary,
 )
 from src.storage import DatabaseManager
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -92,6 +105,52 @@ def _bounded_int(name: str, value: Any, *, minimum: int, maximum: int) -> int:
     return value
 
 
+SQLITE_DEFAULT_MAX_VARIABLE_NUMBER = 999
+FORGET_DELETE_EXTRA_BINDS = 1
+
+
+def sqlite_max_variable_number(session: Any) -> int:
+    """Return SQLite ``MAX_VARIABLE_NUMBER``, or the historical default of 999.
+
+    PRAGMA failures propagate to the forget transaction so they roll back.
+    A compile option that is missing or unparsable is not an exception path:
+    chunking then uses the historical SQLite default of 999, which cannot
+    exceed the live bind ceiling.
+    """
+    rows = session.execute(text("PRAGMA compile_options")).fetchall()
+    for row in rows:
+        option = str(row[0] if row is not None else "")
+        if option.upper().startswith("MAX_VARIABLE_NUMBER="):
+            try:
+                value = int(option.split("=", 1)[1])
+            except (IndexError, ValueError):
+                break
+            if value >= 2:
+                return value
+            break
+    return SQLITE_DEFAULT_MAX_VARIABLE_NUMBER
+
+
+def forget_id_in_chunk_size(
+    session: Any,
+    *,
+    configured: Optional[int] = None,
+) -> int:
+    """Max ids per ``DELETE ... id IN (...)`` while reserving one bind for symbol.
+
+    Never exceeds the live SQLite variable ceiling. A configured test bound may
+    only shrink the chunk; it cannot raise the SQLite limit.
+    """
+    detected = sqlite_max_variable_number(session) - FORGET_DELETE_EXTRA_BINDS
+    if detected < 1:
+        detected = 1
+    if configured is None:
+        return detected
+    if type(configured) is not int or configured < 1:
+        raise ValueError("forget_id_chunk_size must be a positive integer")
+    return configured if configured <= detected else detected
+
+
 class AgentEpisodeRepository(BaseRepository):
     """The only persistence boundary for the append-oriented episode table."""
 
@@ -100,9 +159,14 @@ class AgentEpisodeRepository(BaseRepository):
         db_manager: Optional[DatabaseManager] = None,
         *,
         clock: Callable[[], datetime] = _utc_naive_now,
+        forget_id_chunk_size: Optional[int] = None,
     ) -> None:
         super().__init__(db_manager)
         self._clock = clock
+        if forget_id_chunk_size is not None:
+            if type(forget_id_chunk_size) is not int or forget_id_chunk_size < 1:
+                raise ValueError("forget_id_chunk_size must be a positive integer")
+        self._forget_id_chunk_size = forget_id_chunk_size
 
     @staticmethod
     def _row_to_episode(row: Any) -> AgentEpisode:
@@ -328,48 +392,261 @@ class AgentEpisodeRepository(BaseRepository):
             items = [self._row_to_episode(row) for row in rows]
         return AgentEpisodePage(items=items, total=total, offset=safe_offset, limit=safe_limit)
 
-    def apply_retention(self, *, cutoff: datetime) -> int:
-        cutoff_naive = _as_utc_naive(cutoff)
-        with self.db.get_session() as session:
-            result = session.execute(
-                delete(agent_episodes_table).where(
-                    agent_episodes_table.c.created_at < cutoff_naive
+    @staticmethod
+    def _count_remaining(session: Any, symbol: Optional[str]) -> int:
+        stmt = select(func.count()).select_from(agent_episodes_table)
+        if symbol:
+            stmt = stmt.where(agent_episodes_table.c.symbol == symbol)
+        return int(session.execute(stmt).scalar() or 0)
+
+    def _collect_forget_ids(
+        self,
+        session: Any,
+        *,
+        symbol: str,
+        cutoff_naive: Optional[datetime],
+        max_rows: Optional[int],
+    ) -> tuple[list[int], list[int]]:
+        scoped = agent_episodes_table.c.symbol == symbol
+        id_rows = list(
+            session.execute(
+                select(
+                    agent_episodes_table.c.id,
+                    agent_episodes_table.c.created_at,
+                )
+                .where(scoped)
+                .order_by(
+                    agent_episodes_table.c.created_at.asc(),
+                    agent_episodes_table.c.id.asc(),
                 )
             )
-            session.commit()
-            return int(result.rowcount or 0)
+        )
+        delete_ids: list[int] = []
+        kept_ids: list[int] = []
+        for row in id_rows:
+            created = row.created_at
+            if cutoff_naive is not None:
+                try:
+                    created_naive = _as_utc_naive(created)
+                except ValueError:
+                    kept_ids.append(int(row.id))
+                    continue
+                if created_naive is not None and created_naive < cutoff_naive:
+                    delete_ids.append(int(row.id))
+                    continue
+            kept_ids.append(int(row.id))
+        if max_rows is not None and len(kept_ids) > max_rows:
+            overflow = len(kept_ids) - max_rows
+            delete_ids.extend(kept_ids[:overflow])
+            kept_ids = kept_ids[overflow:]
+        return delete_ids, kept_ids
 
-    def apply_capacity(self, *, max_rows: int) -> int:
-        if isinstance(max_rows, bool) or not isinstance(max_rows, int):
-            raise ValueError("agent episode capacity must be an integer")
-        bound = max_rows
-        if bound < 1:
-            raise ValueError("agent episode capacity must be at least one row")
-        with self.db.get_session() as session:
-            total = int(
-                session.execute(select(func.count()).select_from(agent_episodes_table)).scalar()
-                or 0
-            )
-            excess = total - bound
-            if excess <= 0:
-                return 0
-            oldest_ids = list(
-                session.execute(
-                    select(agent_episodes_table.c.id)
-                    .order_by(
-                        agent_episodes_table.c.created_at.asc(),
-                        agent_episodes_table.c.id.asc(),
-                    )
-                    .limit(excess)
-                ).scalars()
-            )
-            if not oldest_ids:
-                return 0
+    def _audit_forget_on_session(
+        self,
+        session: Any,
+        *,
+        symbol: str,
+        before_count: int,
+        after_count: int,
+        deleted_ids: list[int],
+        cutoff: Optional[datetime],
+        max_rows: Optional[int],
+    ) -> str:
+        fingerprint = hashlib.sha256(
+            ",".join(str(item) for item in sorted(deleted_ids)).encode("utf-8")
+        ).hexdigest()
+        after: dict[str, Any] = {
+            "count": after_count,
+            "deleted_count": len(deleted_ids),
+            "deleted_id_sha256": fingerprint,
+            "symbol": symbol,
+        }
+        if cutoff is not None:
+            after["cutoff"] = cutoff.replace(tzinfo=timezone.utc).isoformat()
+        if max_rows is not None:
+            after["max_rows"] = max_rows
+        occurred = self._clock()
+        if occurred.tzinfo is None or occurred.utcoffset() is None:
+            occurred_at = occurred.replace(tzinfo=timezone.utc)
+            created_at = occurred
+        else:
+            occurred_at = occurred.astimezone(timezone.utc)
+            created_at = occurred_at.replace(tzinfo=None)
+        event = EvolutionEventCreate.model_validate(
+            {
+                "event_type": EPISODE_FORGET_EVENT_TYPE,
+                "actor": "system",
+                "occurred_at": occurred_at,
+                "before": {"count": before_count, "symbol": symbol},
+                "after": after,
+            }
+        )
+        return insert_evolution_event_on_session(session, event, created_at=created_at)
+
+    def _delete_symbol_ids(
+        self,
+        session: Any,
+        *,
+        symbol: str,
+        delete_ids: list[int],
+    ) -> int:
+        if not delete_ids:
+            return 0
+        chunk_size = forget_id_in_chunk_size(
+            session, configured=self._forget_id_chunk_size
+        )
+        deleted = 0
+        scoped = agent_episodes_table.c.symbol == symbol
+        for offset in range(0, len(delete_ids), chunk_size):
+            chunk = delete_ids[offset : offset + chunk_size]
             result = session.execute(
-                delete(agent_episodes_table).where(agent_episodes_table.c.id.in_(list(oldest_ids)))
+                delete(agent_episodes_table).where(
+                    and_(
+                        scoped,
+                        agent_episodes_table.c.id.in_(list(chunk)),
+                    )
+                )
             )
-            session.commit()
-            return int(result.rowcount or 0)
+            deleted += int(result.rowcount or 0)
+        return deleted
+
+    def apply_forget(self, decision: EpisodeForgetDecision) -> EpisodeForgetResult:
+        """Delete in-scope episode rows for one symbol in a single transaction.
+
+        Age uses a strict ``created_at < cutoff`` boundary (equality is kept).
+        Capacity keeps the newest ``max_rows`` rows of that symbol after TTL.
+        No-policy decisions delete nothing and still return a live remaining
+        COUNT. Invalid or unscoped decisions raise and do not write. Dry-run
+        counts without deleting and does not write an EvolutionEvent. Real
+        deletes insert one metadata-only EvolutionEvent in the same
+        ``session_scope`` before DELETE. Id lists are chunked so each
+        ``DELETE ... id IN (...)`` stays within SQLite's bind limit (one extra
+        bind is reserved for ``symbol``). Chunks do not commit separately;
+        audit or chunk failure rolls back the whole pass. SQLite serializes
+        writers; this pass does not use SELECT FOR UPDATE.
+        """
+        if not isinstance(decision, EpisodeForgetDecision):
+            raise MemoryForgetError(
+                "episode forget requires a resolved policy decision",
+                error_code=ERROR_FORGET_INVALID_POLICY,
+            )
+        if decision.error_code:
+            raise MemoryForgetError(
+                decision.reason or "invalid episode forget policy",
+                error_code=decision.error_code,
+            )
+        symbol = str(decision.symbol or "").strip() or None
+        if decision.apply and not symbol:
+            raise MemoryForgetError(
+                "forgetting requires an explicit symbol scope",
+                error_code=ERROR_FORGET_UNSCOPED,
+            )
+        cutoff_naive = (
+            _as_utc_naive(decision.cutoff) if decision.cutoff is not None else None
+        )
+        try:
+            if not decision.apply:
+                with self.db.get_session() as session:
+                    remaining = self._count_remaining(session, symbol)
+                return EpisodeForgetResult(
+                    applied=False,
+                    symbol=symbol,
+                    deleted_count=0,
+                    remaining_count=remaining,
+                    cutoff=decision.cutoff,
+                    max_rows=decision.max_rows,
+                    dry_run=bool(decision.dry_run),
+                )
+            assert symbol is not None
+            if decision.dry_run:
+                with self.db.get_session() as session:
+                    delete_ids, kept_ids = self._collect_forget_ids(
+                        session,
+                        symbol=symbol,
+                        cutoff_naive=cutoff_naive,
+                        max_rows=decision.max_rows,
+                    )
+                return EpisodeForgetResult(
+                    applied=True,
+                    symbol=symbol,
+                    deleted_count=len(delete_ids),
+                    remaining_count=len(kept_ids),
+                    cutoff=cutoff_naive,
+                    max_rows=decision.max_rows,
+                    dry_run=True,
+                )
+            with self.db.session_scope() as session:
+                delete_ids, kept_ids = self._collect_forget_ids(
+                    session,
+                    symbol=symbol,
+                    cutoff_naive=cutoff_naive,
+                    max_rows=decision.max_rows,
+                )
+                before_count = len(delete_ids) + len(kept_ids)
+                audit_event_id = None
+                deleted_count = 0
+                if delete_ids:
+                    audit_event_id = self._audit_forget_on_session(
+                        session,
+                        symbol=symbol,
+                        before_count=before_count,
+                        after_count=len(kept_ids),
+                        deleted_ids=delete_ids,
+                        cutoff=cutoff_naive,
+                        max_rows=decision.max_rows,
+                    )
+                    deleted_count = self._delete_symbol_ids(
+                        session, symbol=symbol, delete_ids=delete_ids
+                    )
+                    if deleted_count != len(delete_ids):
+                        raise RepositoryError(
+                            "episode forget deleted a different row set than selected",
+                            error_code="agent_episode_forget_conflict",
+                            context={
+                                "symbol": symbol,
+                                "selected": len(delete_ids),
+                                "deleted": deleted_count,
+                            },
+                        )
+                remaining = self._count_remaining(session, symbol)
+                return EpisodeForgetResult(
+                    applied=True,
+                    symbol=symbol,
+                    deleted_count=deleted_count,
+                    remaining_count=remaining,
+                    cutoff=cutoff_naive,
+                    max_rows=decision.max_rows,
+                    dry_run=False,
+                    audit_event_id=audit_event_id,
+                )
+        except MemoryForgetError:
+            raise
+        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
+            context = {"symbol": symbol, "dry_run": bool(decision.dry_run)}
+            log_safe_exception(
+                logger,
+                "agent_episode_forget_failed",
+                exc,
+                error_code="agent_episode_forget_failed",
+                context=context,
+            )
+            raise RepositoryError(
+                "agent_episode_forget_failed",
+                error_code="agent_episode_forget_failed",
+                context=context,
+            ) from exc
+
+    def apply_retention(self, *, cutoff: datetime, symbol: Optional[str] = None) -> int:
+        """Compatibility wrapper. Unscoped calls fail closed; never a global purge."""
+        return self.apply_forget(
+            require_episode_forget_policy(symbol=symbol, cutoff=cutoff)
+        ).deleted_count
+
+    def apply_capacity(self, *, max_rows: int, symbol: Optional[str] = None) -> int:
+        """Compatibility wrapper. Unscoped calls fail closed; never a global purge."""
+        return self.apply_forget(
+            require_episode_forget_policy(symbol=symbol, max_rows=max_rows)
+        ).deleted_count
 
     def list_for_replay(self, episode_ids: Sequence[str]) -> List[AgentEpisode]:
         if isinstance(episode_ids, (str, bytes, bytearray)):

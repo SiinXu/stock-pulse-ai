@@ -1770,7 +1770,12 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "AGENT_EPISODE_RETENTION_DAYS": {
         "title": "Agent Episode Retention Days",
-        "description": "Maximum age for agent evolution episode rows before retention purge.",
+        "description": (
+            "Per-symbol maximum age for agent evolution episode rows. After a "
+            "successful append, rows of that same symbol with created_at older "
+            "than this many days are deleted. Missing symbol skips forgetting. "
+            "Default 90."
+        ),
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",
@@ -1791,7 +1796,11 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "AGENT_EPISODE_MAX_ROWS": {
         "title": "Agent Episode Max Rows",
-        "description": "Hard capacity for agent evolution episode rows; oldest rows are dropped first.",
+        "description": (
+            "Per-symbol hard capacity for agent evolution episode rows after a "
+            "successful append for that symbol; oldest rows of the same symbol "
+            "are dropped first. Other symbols are not deleted. Default 50000."
+        ),
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",

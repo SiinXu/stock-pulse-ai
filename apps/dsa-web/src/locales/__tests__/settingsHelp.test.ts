@@ -102,6 +102,47 @@ describe('fallback model settings help', () => {
     expect(copy).toContain('budget_skipped');
   });
 
+  it.each(UI_LANGUAGES)('keeps per-symbol episode-forget help for %s', (language) => {
+    const retention = getSettingsHelpContent(
+      'settings.agent.AGENT_EPISODE_RETENTION_DAYS',
+      undefined,
+      language,
+    );
+    const maxRows = getSettingsHelpContent(
+      'settings.agent.AGENT_EPISODE_MAX_ROWS',
+      undefined,
+      language,
+    );
+    const retentionByField = getSettingsHelpContent('AGENT_EPISODE_RETENTION_DAYS', undefined, language);
+    const maxRowsByField = getSettingsHelpContent('AGENT_EPISODE_MAX_ROWS', undefined, language);
+
+    expect(retention?.summary?.trim(), `${language}:retention`).not.toBe('');
+    expect(maxRows?.summary?.trim(), `${language}:maxRows`).not.toBe('');
+    expect(retentionByField?.summary).toBe(retention?.summary);
+    expect(maxRowsByField?.summary).toBe(maxRows?.summary);
+
+    const copy = `${retention?.summary ?? ''}\n${maxRows?.summary ?? ''}`;
+    expect(copy).not.toMatch(/Episode row cap; oldest rows are removed first/);
+    expect(copy).not.toMatch(/episode 行数上限；优先删除最旧行/);
+    if (language === 'en') {
+      expect(retention?.summary).toContain('Per-symbol');
+      expect(retention?.summary).toContain('Missing symbol skips delete');
+      expect(maxRows?.summary).toContain('Per-symbol');
+      expect(maxRows?.summary).toContain('50000 is not a table ceiling');
+    }
+    if (language === 'zh') {
+      expect(retention?.summary).toContain('按标的');
+      expect(retention?.summary).toContain('无标的不删除');
+      expect(maxRows?.summary).toContain('按标的');
+      expect(maxRows?.summary).toContain('50000 不是全表上限');
+    }
+    if (language !== 'en' && language !== 'zh') {
+      expect(retention?.summary).not.toBe(
+        getSettingsHelpContent('settings.agent.AGENT_EPISODE_RETENTION_DAYS', undefined, 'en')?.summary,
+      );
+    }
+  });
+
   it.each(UI_LANGUAGES)('keeps full catalog-description skill retrieval help for %s', (language) => {
     const content = getSettingsHelpContent('settings.agent.AGENT_SKILL_RETRIEVAL_K', undefined, language);
     const fieldContent = getSettingsHelpContent('AGENT_SKILL_RETRIEVAL_K', undefined, language);

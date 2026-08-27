@@ -23,6 +23,18 @@ describe('settings-help examples literal contract', () => {
     await loadAllUiLanguageTranslations();
   });
 
+  it('keeps per-symbol episode-forget help out of extra-locale inventories', () => {
+    const marker = 'Per-symbol episode row cap after that symbol is appended';
+    for (const language of ADDITIONAL_UI_LANGUAGES) {
+      const bundle = getLoadedUiLanguageTranslations(language);
+      expect(bundle, language).toBeTruthy();
+      const serialized = JSON.stringify(bundle);
+      expect(serialized, language).not.toContain(marker);
+      expect(serialized, language).not.toContain('50000 is not a table ceiling');
+    }
+    expect(JSON.stringify(SOURCE_UI_TRANSLATIONS)).not.toContain(marker);
+  });
+
   it('keeps catalog-description skill retrieval help out of extra-locale inventories', () => {
     const marker = 'How many catalog skills automatic SkillRouter may retrieve by description';
     for (const language of ADDITIONAL_UI_LANGUAGES) {

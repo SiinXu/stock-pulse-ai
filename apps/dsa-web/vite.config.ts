@@ -125,6 +125,12 @@ const getVendorChunkName = (id: string): string | undefined => {
   if (normalizedId.endsWith('/src/locales/skillRetrievalSettingsHelp.ts')) {
     return 'CredentialInput'
   }
+  // Per-symbol episode-forget Settings help (Refs #1119). Same CredentialInput
+  // lazy chunk as skill retrieval so SettingsPage / locale-* gzip stay at the
+  // short core-pack inventory. Do not add a new filename here.
+  if (normalizedId.endsWith('/src/locales/episodeForgetSettingsHelp.ts')) {
+    return 'CredentialInput'
+  }
   if (normalizedId.endsWith('/src/locales/redTeamSettingsHelp.ts')) {
     return 'CredentialInput'
   }
