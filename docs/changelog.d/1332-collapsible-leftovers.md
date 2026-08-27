@@ -1,0 +1,1 @@
+- [Changed] Convert leftover report and Settings raw details (analysis context, run diagnostics, process timeline, prompt-cache advanced, and Event Monitor expert JSON) to the shared Collapsible while keeping each surface default-closed (Refs #1332).

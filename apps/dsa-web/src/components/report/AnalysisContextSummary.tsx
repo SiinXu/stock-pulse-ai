@@ -1,5 +1,5 @@
 import type React from 'react';
-import { ChevronDown, Database } from 'lucide-react';
+import { Database } from 'lucide-react';
 import type {
   AnalysisContextPackBlockStatus,
   AnalysisContextPackOverview,
@@ -13,7 +13,7 @@ import {
   formatDataQualityLimitation,
 } from '../../utils/dataQualityFormat/analysis';
 import { normalizeReportLanguage } from '../../utils/reportLanguage';
-import { Badge, InlineAlert, StatusDot, Surface } from '../common';
+import { Badge, Collapsible, InlineAlert, StatusDot, Surface } from '../common';
 import { DashboardPanelHeader } from '../dashboard';
 
 interface AnalysisContextSummaryProps {
@@ -145,51 +145,45 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
 
   return (
     <Surface level="interactive" padding="none" className="overflow-hidden">
-      <details data-testid="analysis-context-summary" className="group">
-        <summary className="flex cursor-pointer list-none flex-col items-stretch gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 items-center gap-3">
+      <div data-testid="analysis-context-summary">
+        <Collapsible
+          title={text.title}
+          description={text.evidenceScope}
+          defaultOpen={false}
+          className="rounded-none border-0 bg-transparent shadow-none hover:border-transparent"
+          icon={(
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Database className="h-4 w-4" aria-hidden="true" />
             </span>
-            <span className="min-w-0">
-              <span className="label-uppercase">{text.eyebrow}</span>
-              <span className="mt-0.5 block truncate text-base font-semibold text-foreground">
-                {text.title}
-              </span>
-              <span className="mt-1 block text-xs leading-5 text-muted-text">
-                {text.evidenceScope}
-              </span>
-            </span>
-          </div>
-          <span className="flex min-w-0 flex-wrap items-center justify-start gap-2 sm:justify-end">
-            {typeof quality?.overallScore === 'number' ? (
-              <Badge variant={qualityStyle?.variant || 'default'} className="gap-1.5 shadow-none">
-                {qualityStyle ? <StatusDot tone={qualityStyle.tone} className="h-1.5 w-1.5" /> : null}
-                {text.qualityScore} {quality.overallScore}/100{qualityLabel ? ` ${qualityLabel}` : ''}
-              </Badge>
-            ) : null}
-            {summaryCounts.map(({ status, value }) => {
-              const style = STATUS_STYLE[status];
-              return (
-                <Badge key={status} variant={style.variant} className="gap-1.5 shadow-none">
-                  <StatusDot tone={style.tone} className="h-1.5 w-1.5" />
-                  {text.status[status]} {value}
+          )}
+          trailing={(
+            <span className="flex min-w-0 flex-wrap items-center justify-end gap-2">
+              {typeof quality?.overallScore === 'number' ? (
+                <Badge variant={qualityStyle?.variant || 'default'} className="gap-1.5 shadow-none">
+                  {qualityStyle ? <StatusDot tone={qualityStyle.tone} className="h-1.5 w-1.5" /> : null}
+                  {text.qualityScore} {quality.overallScore}/100{qualityLabel ? ` ${qualityLabel}` : ''}
                 </Badge>
-              );
-            })}
-            {triggerSource ? (
+              ) : null}
+              {summaryCounts.map(({ status, value }) => {
+                const style = STATUS_STYLE[status];
+                return (
+                  <Badge key={status} variant={style.variant} className="gap-1.5 shadow-none">
+                    <StatusDot tone={style.tone} className="h-1.5 w-1.5" />
+                    {text.status[status]} {value}
+                  </Badge>
+                );
+              })}
+              {triggerSource ? (
+                <Badge variant="default" size="sm">
+                  {text.triggerSource}: {triggerSource}
+                </Badge>
+              ) : null}
               <Badge variant="default" size="sm">
-                {text.triggerSource}: {triggerSource}
+                {text.inputScope}
               </Badge>
-            ) : null}
-            <Badge variant="default" size="sm">
-              {text.inputScope}
-            </Badge>
-            <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open:rotate-180" aria-hidden="true" />
-          </span>
-        </summary>
-
-        <div className="border-t border-border px-4 pb-4 pt-3">
+            </span>
+          )}
+        >
           <DashboardPanelHeader
             eyebrow={text.eyebrow}
             title={text.title}
@@ -337,8 +331,8 @@ export const AnalysisContextSummary: React.FC<AnalysisContextSummaryProps> = ({
               </Badge>
             </div>
           ) : null}
-        </div>
-      </details>
+        </Collapsible>
+      </div>
     </Surface>
   );
 };

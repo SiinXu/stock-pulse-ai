@@ -32,6 +32,26 @@ describe('Collapsible', () => {
     expect(openPanel).not.toHaveAttribute('hidden');
   });
 
+  it('keeps description and trailing visible while collapsed without changing the accessible name', () => {
+    render(
+      <Collapsible
+        title="Search sources"
+        description="Optional subtitle"
+        trailing={<span>3 ready</span>}
+        defaultOpen={false}
+      >
+        <p>Hidden field</p>
+      </Collapsible>,
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Search sources' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-label', 'Search sources');
+    expect(screen.getByText('Optional subtitle')).toBeVisible();
+    expect(screen.getByText('3 ready')).toBeVisible();
+    expect(screen.getByText('Hidden field')).not.toBeVisible();
+  });
+
   it('marks collapsed content hidden and inert so fields are not keyboard or find-in-page reachable', () => {
     render(
       <Collapsible title="Search sources" defaultOpen={false}>

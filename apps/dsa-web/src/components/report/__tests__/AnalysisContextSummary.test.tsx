@@ -148,6 +148,12 @@ const marketStructure: MarketStructureContext = {
   },
 };
 
+function contextDisclosure(name = '输入数据块') {
+  const panel = screen.getByTestId('analysis-context-summary');
+  const toggle = within(panel).getByRole('button', { name });
+  return { panel, toggle };
+}
+
 describe('AnalysisContextSummary', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -156,10 +162,15 @@ describe('AnalysisContextSummary', () => {
   it('renders a collapsed summary and expands overview details on demand', () => {
     const { container } = render(<AnalysisContextSummary overview={overview} />);
 
-    const panel = screen.getByTestId('analysis-context-summary');
+    const { panel, toggle } = contextDisclosure();
     expect(container.querySelector('[data-surface-level="interactive"]')).toBeTruthy();
     expect(container.querySelector('.home-subpanel')).toBeNull();
-    expect(panel).not.toHaveAttribute('open');
+    expect(toggle).toHaveAttribute('type', 'button');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(toggle).toHaveAttribute('aria-controls');
+    const disclosurePanel = document.getElementById(toggle.getAttribute('aria-controls')!);
+    expect(disclosurePanel).toHaveAttribute('hidden');
+    expect(disclosurePanel).toHaveAttribute('inert');
     expect(within(panel).getAllByText('输入数据块')[0]).toBeVisible();
     expect(screen.getAllByText('可用 1')[0]).toBeVisible();
     expect(screen.getAllByText('缺失 1')[0]).toBeVisible();
@@ -168,9 +179,10 @@ describe('AnalysisContextSummary', () => {
     expect(screen.getByText('触发来源: api')).toBeVisible();
     expect(screen.getByText('来源: mock_quote')).not.toBeVisible();
 
-    fireEvent.click(within(panel).getAllByText('输入数据块')[0]);
+    fireEvent.click(toggle);
 
-    expect(panel).toHaveAttribute('open');
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    expect(disclosurePanel).not.toHaveAttribute('hidden');
     expect(screen.getByText('行情')).toBeInTheDocument();
     expect(screen.getByText('来源: mock_quote')).toBeVisible();
     expect(screen.getAllByText('告警').length).toBeGreaterThan(0);
@@ -193,8 +205,8 @@ describe('AnalysisContextSummary', () => {
   it('localizes the collapsed summary for english reports', () => {
     render(<AnalysisContextSummary overview={overview} language="en" />);
 
-    const panel = screen.getByTestId('analysis-context-summary');
-    expect(panel).not.toHaveAttribute('open');
+    const { panel, toggle } = contextDisclosure('Input Blocks');
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(screen.getAllByText('Input Blocks')[0]).toBeVisible();
     expect(screen.getByText('Shows inputs included in this LLM run, not provider run success')).toBeVisible();
     expect(screen.getAllByText('Available 1')[0]).toBeVisible();
@@ -379,8 +391,8 @@ describe('AnalysisContextSummary', () => {
 
     render(<AnalysisContextSummary overview={degradedOverview} />);
 
-    const panel = screen.getByTestId('analysis-context-summary');
-    expect(panel).not.toHaveAttribute('open');
+    const { panel, toggle } = contextDisclosure();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
     expect(within(panel).getByText('可用 0')).toBeVisible();
     expect(within(panel).getByText('缺失 0')).toBeVisible();
     expect(within(panel).getAllByText('降级 1')[0]).toBeVisible();
@@ -653,8 +665,8 @@ describe('ReportSummary analysis context placement', () => {
     const diagnostics = screen.getByTestId('run-diagnostics');
     const contextSummary = screen.getByTestId('analysis-context-summary');
     const feedback = screen.getByTestId('report-run-feedback');
-    expect(contextSummary).not.toHaveAttribute('open');
-    expect(diagnostics).not.toHaveAttribute('open');
+    expect(within(contextSummary).getByRole('button', { name: '输入数据块' })).toHaveAttribute('aria-expanded', 'false');
+    expect(within(diagnostics).getByRole('button', { name: '运行状态' })).toHaveAttribute('aria-expanded', 'false');
     const traceability = screen.getByText('数据追溯');
 
     expect(strategy.compareDocumentPosition(news) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
