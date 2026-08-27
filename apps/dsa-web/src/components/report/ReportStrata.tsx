@@ -12,13 +12,18 @@ import { Button, Card, Collapsible } from '../common';
 import { HelpKeyButton } from '../help';
 import { DashboardPanelHeader } from '../dashboard';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
-import { resolveReportStrataFromDetails } from './reportStrataUtils';
+import {
+  resolveReportStrataExpansionIdentity,
+  resolveReportStrataFromDetails,
+} from './reportStrataUtils';
 
 interface ReportStrataProps {
   details?: ReportDetailsType;
   language?: ReportLanguage;
   alwaysShowDisclaimer?: boolean;
   defaultCollapsed?: boolean;
+  /** Report record/query id. Expansion resets when this identity changes. */
+  expansionKey?: string | number | null;
 }
 
 const asStringList = (value: unknown): string[] => {
@@ -103,12 +108,24 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
   language = 'zh',
   alwaysShowDisclaimer = true,
   defaultCollapsed = true,
+  expansionKey,
 }) => {
   const reportLanguage = normalizeReportLanguage(language);
   const text = getReportText(reportLanguage);
   const strata = resolveReportStrataFromDetails(details);
   const rawResult = details?.rawResult;
-  const [isExpanded, setIsExpanded] = useState(!defaultCollapsed);
+  const identity = resolveReportStrataExpansionIdentity(details, expansionKey);
+  const [expansion, setExpansion] = useState(() => ({
+    identity,
+    isExpanded: !defaultCollapsed,
+  }));
+  if (expansion.identity !== identity) {
+    setExpansion({
+      identity,
+      isExpanded: !defaultCollapsed,
+    });
+  }
+  const isExpanded = expansion.isExpanded;
   const beforeId = useId();
   const afterId = useId();
 
@@ -204,7 +221,10 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
             aria-expanded={isExpanded}
             aria-controls={ariaControls}
             data-testid="report-strata-toggle"
-            onClick={() => setIsExpanded((prev) => !prev)}
+            onClick={() => setExpansion((prev) => ({
+              identity: prev.identity,
+              isExpanded: !prev.isExpanded,
+            }))}
           >
             {isExpanded ? text.evidenceDetailsCollapse : text.evidenceDetails}
             <ChevronDown
@@ -215,13 +235,17 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
         ) : undefined}
       />
 
+      {/* Evidence sits above and below always-visible risks so expanded order stays 1–6.
+          Shared Collapsible always paints a header, so raw fallback uses it; this split uses Button. */}
       {hasStructuredSecondary ? (
         <div
           id={beforeId}
           hidden={!showSecondary}
+          inert={showSecondary ? undefined : true}
           data-testid="report-strata-secondary-before"
         >
-          <div className="space-y-4 text-sm text-foreground">
+          {showSecondary ? (
+            <div className="space-y-4 text-sm text-foreground">
             <section data-testid="report-strata-facts">
               <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
                 1. {text.verifiedFacts}
@@ -301,7 +325,8 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
                 <EmptyPlaceholder label={text.noValue} />
               )}
             </section>
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -333,9 +358,11 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
         <div
           id={afterId}
           hidden={!showSecondary}
+          inert={showSecondary ? undefined : true}
           data-testid="report-strata-secondary-after"
         >
-          <div className="mt-4 space-y-4 text-sm text-foreground">
+          {showSecondary ? (
+            <div className="mt-4 space-y-4 text-sm text-foreground">
             {hasStructuredSecondary ? (
               <section data-testid="report-strata-framework">
                 <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-text">
@@ -350,7 +377,8 @@ export const ReportStrata: React.FC<ReportStrataProps> = ({
               </section>
             ) : null}
             {renderRawFallback()}
-          </div>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
