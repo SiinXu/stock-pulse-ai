@@ -742,6 +742,31 @@ describe('first-paint entry budget (Refs #883)', () => {
     }
   });
 
+  it('reseeds only locale-zh-TW gzip budget after reassess lock copy (Refs #1332)', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const rule = budget.rules.find((entry) => entry.id === 'locale-zh-TW');
+    const family = budget.aggregateRules.find((entry) => entry.id === 'locale-zh-TW-family');
+
+    expect(rule).toEqual(expect.objectContaining({
+      id: 'locale-zh-TW',
+      match: 'assets/zh-TW-*.js',
+      measuredGzipBytes: 150083,
+      maxGzipBytes: 150483,
+    }));
+    expect(rule.note).toContain('Refs #1332');
+    expect(rule.maxGzipBytes).toBe(rule.measuredGzipBytes + 400);
+    expect(family).toEqual(expect.objectContaining({
+      id: 'locale-zh-TW-family',
+      match: ['assets/zh-TW-*.js'],
+      measuredGzipBytes: 158702,
+      maxGzipBytes: 159102,
+    }));
+    expect(family.maxGzipBytes).toBe(family.measuredGzipBytes + 400);
+    expect(family.maxGzipBytes).toBeGreaterThan(rule.maxGzipBytes);
+    expect(budget.baselineNote).toContain('PR #1544');
+    expect(budget.baselineNote).toContain('locale-zh-TW');
+  });
+
   it('reseeds only overflowed locale gzip budgets after reportRunFeedback keys (Refs #1105)', () => {
     const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
     const affectedAssets = {
@@ -764,7 +789,6 @@ describe('first-paint entry budget (Refs #883)', () => {
       'js-entry': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
       'ui-text-en': { measuredGzipBytes: 34893, maxGzipBytes: 38383 },
       'locale-ja': { measuredGzipBytes: 164341, maxGzipBytes: 164741 },
-      'locale-zh-TW': { measuredGzipBytes: 149591, maxGzipBytes: 149991 },
       'locale-extra': { measuredGzipBytes: 3087, maxGzipBytes: 3487 },
       'vendor-charts': { measuredGzipBytes: 111229, maxGzipBytes: 122352 },
       'vendor-react': { measuredGzipBytes: 60605, maxGzipBytes: 66666 },

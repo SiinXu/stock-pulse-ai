@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-25",
-  "baselineNote": "Already-split aggregate families use measured zlib-9 sum + 400 B (Refs #1451). PR #1496 (Refs #1105) reseeded only the locale per-asset caps that overflowed after eleven reportRunFeedback.* keys (locale-fr/es/id/ms) and the eight extra-locale same-pattern families (ja/de/ko/fr/es/zh-TW/ms/id); each cap is current zlib-9 measured + 400 B on SHA 5a2fb65d. Defaults, matching rules, checker behavior, criticalPath, locale-extra, vendor/route families, and non-overflowing locale per-asset caps (ja/de/ko/zh-TW) are unchanged.",
+  "baselineNote": "Already-split aggregate families use measured zlib-9 sum + 400 B (Refs #1451). PR #1496 (Refs #1105) reseeded only the locale per-asset caps that overflowed after eleven reportRunFeedback.* keys (locale-fr/es/id/ms) and the eight extra-locale same-pattern families (ja/de/ko/fr/es/zh-TW/ms/id); each cap is current zlib-9 measured + 400 B on SHA 5a2fb65d. PR #1544 (Refs #1332) later reseeded only per-asset locale-zh-TW after honest reassess-lock Traditional Chinese copy; locale-zh-TW-family and every other locale cap stayed under budget. Defaults, matching rules, checker behavior, criticalPath, locale-extra, vendor/route families, and the remaining non-overflowing locale per-asset caps (ja/de/ko) are unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -62,9 +62,9 @@
     {
       "id": "locale-zh-TW",
       "match": "assets/zh-TW-*.js",
-      "maxGzipBytes": 149991,
-      "measuredGzipBytes": 149591,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 149591 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 150483,
+      "measuredGzipBytes": 150083,
+      "note": "Reseeded after PR #1544 added decisionSignals.reassessLockedTitle/Message Traditional Chinese copy (Refs #1332). Hosted Linux zlib-9 150083 B on ed8c27061 (run 33065987651) and local macOS zlib-9 identical + 400 B headroom. locale-zh-TW-family stayed under its existing cap (158902 vs 159102) and is unchanged. Match glob unchanged."
     },
     {
       "id": "locale-ms",
@@ -284,7 +284,7 @@
       ],
       "maxGzipBytes": 159102,
       "measuredGzipBytes": 158702,
-      "note": "Already-split same-pattern family for locale-zh-TW. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 158702 B on 5a2fb65d + 400 B headroom. Per-asset locale-zh-TW cap is unchanged because that asset stayed under budget."
+      "note": "Already-split same-pattern family for locale-zh-TW. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 158702 B on 5a2fb65d + 400 B headroom. Per-asset locale-zh-TW was later reseeded in PR #1544 (Refs #1332); this family cap is unchanged because the unique sum stayed under budget."
     },
     {
       "id": "locale-ms-family",
