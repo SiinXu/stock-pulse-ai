@@ -8,6 +8,7 @@ import {
   Button,
   InlineAlert,
   Select,
+  StatePanel,
   Surface,
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -23,8 +24,14 @@ import {
   REASSESS_PROFILES,
   STATUS_LABEL_KEYS,
 } from './decisionSignalsPageModel';
+import type {
+  ReassessLockedContext,
+  ReassessSessionStatus,
+} from './useDecisionSignalReassessState';
 
 export type DecisionSignalReassessPanelProps = {
+  sessionStatus: ReassessSessionStatus;
+  lockedContext: ReassessLockedContext | null;
   sourceReportId: number | undefined;
   profile: DecisionProfile;
   onProfileChange: (profile: DecisionProfile) => void;
@@ -33,11 +40,15 @@ export type DecisionSignalReassessPanelProps = {
   persisting: boolean;
   persistBlocked: DecisionSignalReassessBlockedError | null;
   error: ParsedApiError | null;
+  onEnter: () => void;
+  onExit: () => void;
   onPreview: () => void;
   onRequestPersist: () => void;
 };
 
 const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = ({
+  sessionStatus,
+  lockedContext,
   sourceReportId,
   profile,
   onProfileChange,
@@ -46,11 +57,14 @@ const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = 
   persisting,
   persistBlocked,
   error,
+  onEnter,
+  onExit,
   onPreview,
   onRequestPersist,
 }) => {
   const { t } = useUiLanguage();
   const actionLabels = buildDecisionActionLabelMap(t);
+  const sessionActive = sessionStatus === 'active';
   const preview = response?.preview ?? null;
   const persistedItem = response?.item ?? null;
   const persistStatus = response?.persistStatus ?? null;
@@ -81,7 +95,14 @@ const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = 
   const passed = typeof guardrail?.passed === 'boolean' ? guardrail.passed : null;
 
   return (
-    <Surface level="interactive" padding="sm">
+    <Surface
+      level="interactive"
+      padding="sm"
+      data-testid="decision-signal-reassess-session"
+      data-session-status={sessionStatus}
+      data-locked-signal-id={lockedContext?.signalId ?? ''}
+      data-locked-stock-code={lockedContext?.stockCode ?? ''}
+    >
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <div className="flex items-center gap-2">
@@ -95,28 +116,48 @@ const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = 
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
-          <Select
-            value={profile}
-            onChange={(value) => onProfileChange(value as DecisionProfile)}
-            ariaLabel={t('decisionSignals.reassessProfile')}
-            disabled={!sourceReportId || loading || persisting}
-            options={REASSESS_PROFILES.map((option) => ({
-              value: option,
-              label: t(`decisionSignals.profile.${option}` as UiTextKey),
-            }))}
-          />
-          <Button
-            type="button"
-            variant="secondary"
-            size="comfortable"
-            onClick={onPreview}
-            disabled={!sourceReportId || loading || persisting}
-            isLoading={loading}
-            loadingText={t('decisionSignals.reassessPreview')}
-          >
-            <RefreshCw className="h-4 w-4" />
-            {t('decisionSignals.reassessPreview')}
-          </Button>
+          {sessionActive ? (
+            <>
+              <Select
+                value={profile}
+                onChange={(value) => onProfileChange(value as DecisionProfile)}
+                ariaLabel={t('decisionSignals.reassessProfile')}
+                disabled={!sourceReportId || loading || persisting}
+                options={REASSESS_PROFILES.map((option) => ({
+                  value: option,
+                  label: t(`decisionSignals.profile.${option}` as UiTextKey),
+                }))}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="comfortable"
+                onClick={onPreview}
+                disabled={!sourceReportId || loading || persisting}
+              >
+                <RefreshCw className="h-4 w-4" />
+                {t('decisionSignals.reassessPreview')}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="comfortable"
+                onClick={onExit}
+              >
+                {t('decisionSignals.reassessExit')}
+              </Button>
+            </>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="comfortable"
+              onClick={onEnter}
+              disabled={!sourceReportId}
+            >
+              {t('decisionSignals.reassessEnter')}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -126,6 +167,33 @@ const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = 
           variant="warning"
           title={t('decisionSignals.reassessUnsupportedTitle')}
           message={t('decisionSignals.reassessUnsupported')}
+        />
+      ) : null}
+      {sessionActive ? (
+        <InlineAlert
+          className="mt-3"
+          variant="info"
+          title={t('decisionSignals.reassessLockedTitle')}
+          message={t('decisionSignals.reassessLockedMessage')}
+        />
+      ) : null}
+      {sessionActive && loading ? (
+        <StatePanel
+          className="mt-3"
+          state="loading"
+          size="compact"
+          titleAs="p"
+          title={t('common.loading')}
+          description={t('decisionSignals.reassessPreview')}
+        />
+      ) : null}
+      {sessionActive && persisting ? (
+        <StatePanel
+          className="mt-3"
+          state="loading"
+          size="compact"
+          titleAs="p"
+          title={t('decisionSignals.reassessPersisting')}
         />
       ) : null}
       {error ? <ApiErrorAlert className="mt-3" error={error} /> : null}
@@ -238,8 +306,6 @@ const DecisionSignalReassessPanel: React.FC<DecisionSignalReassessPanelProps> = 
                 size="primary"
                 onClick={onRequestPersist}
                 disabled={loading || persisting}
-                isLoading={persisting}
-                loadingText={t('decisionSignals.reassessPersisting')}
               >
                 <ShieldCheck className="h-4 w-4" />
                 {t('decisionSignals.reassessPersist')}

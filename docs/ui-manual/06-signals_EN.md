@@ -131,7 +131,7 @@ Weekend honesty tool, not a face-slap machine.
 - New rows may still be in a **cooling window**.  
 - Stats are often **global reviewed** even if the feed filter is holdings—believe the on-page “global” note.
 
-Run outcomes with safe defaults; inspect hit / miss / unable buckets; and use the global outcome table to filter by horizon, result, evaluation status, engine version, or signal ID. The table paginates through the server result set and each row can open its related signal. Style reassess may need a source report or may be risk-blocked.
+Run outcomes with safe defaults; inspect hit / miss / unable buckets; and use the global outcome table to filter by horizon, result, evaluation status, engine version, or signal ID. The table paginates through the server result set and each row can open its related signal. Style reassess is an explicit enter/exit session: while it is active, list / latest / timeline clicks cannot swap the locked stock or signal. It may need a source report or may be risk-blocked.
 
 ---
 
