@@ -7,9 +7,17 @@ import { fileURLToPath } from 'node:url';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ReportStrata } from '../ReportStrata';
-import { resolveReportStrataFromDetails } from '../reportStrataUtils';
+import {
+  resolveReportStrataExpansionIdentity,
+  resolveReportStrataFromDetails,
+} from '../reportStrataUtils';
 import type { ReportDetails } from '../../../types/analysis';
 import { getReportText } from '../../../utils/reportLanguage';
+
+const descendantCount = (element: HTMLElement): number => element.querySelectorAll('*').length;
+
+const visibleDescendantCount = (element: HTMLElement): number =>
+  [...element.querySelectorAll('*')].filter((node) => !node.closest('[hidden]')).length;
 
 const expandStrata = () => {
   const toggle = screen.getByTestId('report-strata-toggle');
@@ -87,10 +95,14 @@ describe('ReportStrata', () => {
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent(
       'Not investment advice',
     );
-    expect(screen.getByTestId('report-strata-facts')).not.toBeVisible();
-    expect(screen.getByTestId('report-strata-gaps')).not.toBeVisible();
-    expect(screen.getByTestId('report-strata-inference')).not.toBeVisible();
-    expect(screen.getByTestId('report-strata-framework')).not.toBeVisible();
+    expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-strata-gaps')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-strata-inference')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('report-strata-framework')).not.toBeInTheDocument();
+    expect(screen.getByTestId('report-strata-secondary-before')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-secondary-after')).not.toBeVisible();
+    expect(screen.getByTestId('report-strata-secondary-before')).toHaveAttribute('inert');
+    expect(screen.getByTestId('report-strata-secondary-after')).toHaveAttribute('inert');
     expect(screen.queryByText('ohlcv:daily')).not.toBeInTheDocument();
     expect(screen.queryByText('2026-07-25T15:00:00+08:00')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-strata-toggle')).toHaveAttribute('aria-expanded', 'false');
@@ -149,11 +161,11 @@ describe('ReportStrata', () => {
 
     expect(screen.getByTestId('report-strata-risks')).toBeVisible();
     expect(screen.getByTestId('report-strata-risks')).toHaveTextContent('跌破支撑位');
-    expect(screen.getByTestId('report-strata-facts')).not.toBeVisible();
+    expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
     expect(screen.getByTestId('report-strata-secondary-after')).not.toBeVisible();
-    expect(screen.getByTestId('report-strata-facts')).not.toHaveTextContent('价格位于主要均线上方');
-    expect(screen.getByTestId('report-strata-gaps')).not.toHaveTextContent('关键财务数据缺失');
-    expect(screen.getByTestId('report-strata-inference')).not.toHaveTextContent('等待量价确认');
+    expect(screen.queryByText('价格位于主要均线上方。')).not.toBeInTheDocument();
+    expect(screen.queryByText('关键财务数据缺失。')).not.toBeInTheDocument();
+    expect(screen.queryByText('等待量价确认。')).not.toBeInTheDocument();
 
     expandStrata();
     expect(screen.getByTestId('report-strata-facts')).toBeVisible();
@@ -315,5 +327,120 @@ describe('ReportStrata', () => {
     expect(screen.getByTestId('report-strata-facts')).toHaveTextContent('Close was 1680');
     expect(screen.getByTestId('report-strata-inference')).toHaveTextContent('Momentum may improve');
     expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('Not investment advice');
+  });
+
+  it('drops default first-paint descendant count versus the expanded evidence wall', () => {
+    const details: ReportDetails = {
+      reportStrata: {
+        ...strataPayload,
+        verifiedFacts: Array.from({ length: 12 }, (_, index) => ({
+          statement: `Verified fact ${index + 1} with enough text to render as its own list item.`,
+          sourceId: `source:${index + 1}`,
+          asOf: '2026-07-25T15:00:00+08:00',
+        })),
+        missingOrConflicts: Array.from({ length: 8 }, (_, index) => ({
+          kind: index % 2 === 0 ? 'conflict' as const : 'missing' as const,
+          description: `Gap or conflict ${index + 1}.`,
+          sourceIds: [`src-a-${index}`, `src-b-${index}`],
+        })),
+        modelInference: Array.from({ length: 8 }, (_, index) => `Inference ${index + 1}.`),
+      },
+    };
+    render(<ReportStrata details={details} language="en" />);
+
+    const root = screen.getByTestId('report-strata');
+    const collapsedTotal = descendantCount(root);
+    const collapsedVisible = visibleDescendantCount(root);
+    expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
+
+    expandStrata();
+    const expandedTotal = descendantCount(root);
+    const expandedVisible = visibleDescendantCount(root);
+
+    expect(screen.getByTestId('report-strata-facts')).toBeVisible();
+    expect(collapsedTotal).toBeLessThan(expandedTotal);
+    expect(collapsedVisible).toBeLessThan(expandedVisible);
+    expect(collapsedTotal / expandedTotal).toBeLessThanOrEqual(0.5);
+    expect(expandedTotal - collapsedTotal).toBeGreaterThanOrEqual(40);
+    // Measured 2026-08-27 against this fixture: collapsed 24/22 vs expanded 179/179.
+    // Origin/main mounted the hidden evidence wall, so first-paint descendants ≈ expanded.
+    expect(collapsedTotal).toBe(24);
+    expect(collapsedVisible).toBe(22);
+    expect(expandedTotal).toBe(179);
+    expect(expandedVisible).toBe(179);
+  });
+
+  it('does not leak expansion from one report identity into another', () => {
+    const detailsA: ReportDetails = { reportStrata: strataPayload };
+    const detailsB: ReportDetails = {
+      reportStrata: {
+        ...strataPayload,
+        verifiedFacts: [{ statement: 'Other report close was 12.' }],
+        risksCounterEvidence: ['Other report risk.'],
+        disclaimer: 'Other report disclaimer.',
+      },
+    };
+    const { rerender } = render(
+      <ReportStrata details={detailsA} language="en" expansionKey="report-a" />,
+    );
+    expandStrata();
+    expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'false');
+    expect(screen.getByTestId('report-strata-facts')).toBeVisible();
+
+    rerender(<ReportStrata details={detailsB} language="en" expansionKey="report-b" />);
+    expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'true');
+    expect(screen.getByTestId('report-strata-risks')).toHaveTextContent('Other report risk.');
+    expect(screen.getByTestId('report-strata-disclaimer')).toHaveTextContent('Other report disclaimer.');
+    expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
+    expect(screen.queryByText('Close was 1680')).not.toBeInTheDocument();
+  });
+
+  it('keeps expansion when the same report identity re-renders', () => {
+    const detailsA: ReportDetails = { reportStrata: strataPayload };
+    const detailsARefresh: ReportDetails = {
+      reportStrata: { ...strataPayload },
+    };
+    const { rerender } = render(
+      <ReportStrata details={detailsA} language="en" expansionKey={42} />,
+    );
+    expandStrata();
+    expect(screen.getByTestId('report-strata-facts')).toBeVisible();
+
+    rerender(<ReportStrata details={detailsARefresh} language="en" expansionKey={42} />);
+    expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'false');
+    expect(screen.getByTestId('report-strata-facts')).toBeVisible();
+  });
+
+  it('resets expansion from a strata fingerprint when expansionKey is omitted', () => {
+    const { rerender } = render(
+      <ReportStrata details={{ reportStrata: strataPayload }} language="en" />,
+    );
+    expandStrata();
+    expect(screen.getByTestId('report-strata-facts')).toBeVisible();
+
+    rerender(
+      <ReportStrata
+        details={{
+          reportStrata: {
+            ...strataPayload,
+            disclaimer: 'Fingerprint-changing disclaimer.',
+          },
+        }}
+        language="en"
+      />,
+    );
+    expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'true');
+    expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
+  });
+
+  it('prefers an explicit expansionKey over the payload fingerprint', () => {
+    expect(resolveReportStrataExpansionIdentity({ reportStrata: strataPayload }, 'rec-9')).toBe(
+      'rec-9',
+    );
+    expect(resolveReportStrataExpansionIdentity({ reportStrata: strataPayload }, 12)).toBe('12');
+    expect(resolveReportStrataExpansionIdentity({ reportStrata: strataPayload }, '  ')).toMatch(
+      /^report-strata:/,
+    );
+    expect(resolveReportStrataExpansionIdentity({})).toBe('report-strata:none');
   });
 });

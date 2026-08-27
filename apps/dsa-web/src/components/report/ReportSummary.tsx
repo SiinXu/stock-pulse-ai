@@ -105,7 +105,12 @@ export const ReportSummary: React.FC<ReportSummaryProps> = ({
       <ReportStrategy strategy={strategy} language={reportLanguage} />
 
       {/* Issue #616: evidence strata (facts / gaps / inference / risks / framework / disclaimer) */}
-      <ReportStrata details={details} language={reportLanguage} alwaysShowDisclaimer />
+      <ReportStrata
+        details={details}
+        language={reportLanguage}
+        alwaysShowDisclaimer
+        expansionKey={recordId ?? meta.queryId}
+      />
 
       {/* News section */}
       <ReportNews recordId={recordId} limit={8} language={reportLanguage} />

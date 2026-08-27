@@ -115,3 +115,26 @@ export const resolveReportStrataFromDetails = (
   }
   return null;
 };
+
+/**
+ * Identity used to reset evidence expansion when the viewed report changes.
+ * Prefer an explicit report id (`expansionKey`). Fall back to a fingerprint of
+ * the resolved strata payload so callers that omit the key still cannot leak
+ * one report's expansion into another report with different evidence.
+ */
+export const resolveReportStrataExpansionIdentity = (
+  details?: ReportDetailsType | null,
+  expansionKey?: string | number | null,
+): string => {
+  if (expansionKey !== undefined && expansionKey !== null) {
+    const trimmed = String(expansionKey).trim();
+    if (trimmed) {
+      return trimmed;
+    }
+  }
+  const strata = resolveReportStrataFromDetails(details);
+  if (!strata) {
+    return 'report-strata:none';
+  }
+  return `report-strata:${JSON.stringify(strata)}`;
+};

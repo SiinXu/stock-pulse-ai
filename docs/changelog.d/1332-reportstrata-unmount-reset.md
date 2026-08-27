@@ -1,0 +1,1 @@
+- [Changed] Unmount ReportStrata evidence layers while collapsed so default first-paint node count drops, and reset expansion when the viewed report identity changes (Refs #1332).

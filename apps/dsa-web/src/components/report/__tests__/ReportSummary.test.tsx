@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentFeedbackApi } from '../../../api/agentFeedback';
@@ -63,11 +63,16 @@ function renderWithClient(ui: ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, refetchOnWindowFocus: false } },
   });
-  return render(
+  const wrap = (node: ReactElement) => (
     <QueryClientProvider client={client}>
-      <UiLanguageProvider>{ui}</UiLanguageProvider>
-    </QueryClientProvider>,
+      <UiLanguageProvider>{node}</UiLanguageProvider>
+    </QueryClientProvider>
   );
+  const view = render(wrap(ui));
+  return {
+    ...view,
+    rerender: (next: ReactElement) => view.rerender(wrap(next)),
+  };
 }
 
 describe('ReportSummary run feedback mount', () => {
@@ -142,5 +147,47 @@ describe('ReportSummary run feedback mount', () => {
       expect(screen.queryByTestId('report-run-feedback')).not.toBeInTheDocument();
     });
     expect(screen.queryByText('Analysis run not found.')).not.toBeInTheDocument();
+  });
+});
+
+describe('ReportSummary report-strata expansion identity', () => {
+  const strataA = {
+    schemaVersion: 'report-strata-v1',
+    verifiedFacts: [{ statement: 'Report A close was 1680.' }],
+    missingOrConflicts: [],
+    modelInference: ['Report A inference.'],
+    risksCounterEvidence: ['Report A risk.'],
+    disclaimer: 'Report A disclaimer.',
+  };
+  const strataB = {
+    schemaVersion: 'report-strata-v1',
+    verifiedFacts: [{ statement: 'Report B close was 12.' }],
+    missingOrConflicts: [],
+    modelInference: ['Report B inference.'],
+    risksCounterEvidence: ['Report B risk.'],
+    disclaimer: 'Report B disclaimer.',
+  };
+
+  it('collapses evidence again when the selected report id changes', async () => {
+    const reportA: AnalysisReport = {
+      ...stockReport,
+      details: { reportStrata: strataA },
+    };
+    const reportB: AnalysisReport = {
+      ...stockReport,
+      meta: { ...stockReport.meta, id: 2, queryId: 'q2' },
+      details: { reportStrata: strataB },
+    };
+    const { rerender } = renderWithClient(<ReportSummary data={reportA} />);
+    expect(await screen.findByTestId('report-strata-risks')).toHaveTextContent('Report A risk.');
+    fireEvent.click(screen.getByTestId('report-strata-toggle'));
+    expect(await screen.findByTestId('report-strata-facts')).toHaveTextContent('Report A close was 1680.');
+    expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'false');
+
+    rerender(<ReportSummary data={reportB} />);
+
+    expect(await screen.findByTestId('report-strata-risks')).toHaveTextContent('Report B risk.');
+    expect(screen.getByTestId('report-strata')).toHaveAttribute('data-collapsed', 'true');
+    expect(screen.queryByTestId('report-strata-facts')).not.toBeInTheDocument();
   });
 });

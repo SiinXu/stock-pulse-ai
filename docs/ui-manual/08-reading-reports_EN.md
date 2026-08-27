@@ -84,7 +84,9 @@ On current main, the **full report** Web view can show fixed evidence strata (ve
 
 | What you see | How to read it |
 | --- | --- |
+| First paint | Decision Card (conclusion) plus strata **risks** and **disclaimer**. Facts, gaps, inference, and framework alignment stay collapsed until you open evidence details |
 | Strata sections present | Read by block; do **not** treat model inference as verified fact |
+| Switching reports | Evidence details collapse again; expansion from the previous report does not carry over |
 | Older reports without strata | Expected; disclaimer should still be visible |
 | Engineering contract | `docs/report-strata-contract_EN.md` |
 
