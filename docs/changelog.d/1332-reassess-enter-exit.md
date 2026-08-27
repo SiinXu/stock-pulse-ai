@@ -1,0 +1,1 @@
+- [Changed] Lock Decision Signals stock and signal identity during an explicit reassess enter/exit session (Refs #1332).

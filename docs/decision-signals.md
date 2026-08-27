@@ -237,7 +237,7 @@ Web 的唯一信号中心入口位于 `/signals`。旧 `/decision-signals` 会�
 - market filter 在 API / 服务层与 Web 前端均已支持 `cn/hk/us/jp/kr/tw`；`jp/kr/tw` 的前端本地化标签均已补齐，`tw` 信号可经 API 正常写入、按 `market=tw` 查询，并可在 Web DecisionSignal 页面通过市场筛选项选择台股（tw）；告警（大盘红绿灯）市场支持 `cn/hk/us/jp/kr`。
 - 详情抽屉展示动作、状态、评分、置信度、周期、计划质量、市场阶段、价格计划、风险、观察条件、证据、数据质量和 metadata。打开详情时还会从服务端加载“重点记忆”和“忽略”两个独立开关，保存期间串行化修改并以响应为准；切换信号时旧请求不能覆盖新信号。两者同时开启时界面明确提示“忽略”优先，加载或保存失败均提供可见重试。
 - 详情在 `sourceReportId` 为正整数时复用报告 Markdown 面板的同一组 Markdown/HTML/PDF 下载控件和 `reportExportApi.download`；没有来源报告时不渲染导出控件，也不新增独立导出端点。
-- 详情抽屉或已有来源报告 ID 的页面上下文可以发起 reassess preview；没有可用来源报告 ID 时入口禁用。Preview 本身不加入列表、latest 或时间线；通过 guardrail 后可由用户二次确认保存。保存会重新请求 `persist=true`，成功后只使用响应中的后端 `item`；`created`、`existing`、`refreshed` 使用不同反馈，existing 不会被描述为新建，终态 existing 不会被乐观注入 active latest/时间线，created/refreshed 才按返回状态更新并刷新相关视图。Web 不会把 preview 拼成本地信号。
+- 详情抽屉或已有来源报告 ID 的页面上下文可以显式进入 reassess 会话；没有可用来源报告 ID 时进入入口禁用。会话期间锁定当前股票和信号身份，列表 / 最新 / 时间线点击不会切换上下文；退出后恢复可切换，并取消未完成的 preview/persist。进入后才可发起 reassess preview。Preview 本身不加入列表、latest 或时间线；通过 guardrail 后可由用户二次确认保存。保存会重新请求 `persist=true`，成功后只使用响应中的后端 `item`；`created`、`existing`、`refreshed` 使用不同反馈，existing 不会被描述为新建，终态 existing 不会被乐观注入 active latest/时间线，created/refreshed 才按返回状态更新并刷新相关视图。Web 不会把 preview 拼成本地信号。Preview 与 persist 的进行中状态走共享 `StatePanel`。
 - 保存时的 guardrail 调整 warning 会保留显示。如果 persist 重算被 guardrail 阻断，Web 会显示 `blocked_reason` 和结构化 warning，保留 preview 供用户理解，且不会把失败结果加入时间线。
 - 分析工作台发起表单不提供 `decision_profile`；默认自动生成路径仍只使用 `balanced`。
 - Web 只能把信号标记为 `closed`、`invalidated` 或 `archived`，不提供 terminal 状态恢复为 active。

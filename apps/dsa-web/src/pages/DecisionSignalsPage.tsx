@@ -306,6 +306,8 @@ const DecisionSignalsPage: React.FC = () => {
   } = useDecisionSignalTimelineState();
   const [feedbackSaving, setFeedbackSaving] = useState(false);
   const {
+    sessionStatus: reassessSessionStatus,
+    lockedContext: reassessLockedContext,
     profile: reassessProfile,
     response: reassessResponse,
     loading: reassessLoading,
@@ -314,11 +316,17 @@ const DecisionSignalsPage: React.FC = () => {
     persistBlocked: reassessPersistBlocked,
     error: reassessError,
     dispatch: reassessDispatch,
+    enterSession: enterReassessSession,
+    exitSession: exitReassessSession,
     setProfile: setReassessProfile,
     resetForContext: resetReassessForContext,
     requestPersistConfirm,
     cancelPersistConfirm,
+    shouldAcceptIdentityChange: shouldAcceptReassessIdentityChange,
   } = useDecisionSignalReassessState();
+  const reassessSessionActive = reassessSessionStatus === 'active';
+  const reassessSessionActiveRef = useRef(reassessSessionActive);
+  reassessSessionActiveRef.current = reassessSessionActive;
   const requestIdRef = useRef(0);
   const signalListQueueRef = useRef<RequestSlotQueue>({ active: 0, waiters: [] });
   const statsRequestIdRef = useRef(0);
@@ -380,8 +388,11 @@ const DecisionSignalsPage: React.FC = () => {
   const selectedFeedbackError = feedbackWriteError ?? selectedFeedbackLoadError;
 
   const handleSelectSignal = useCallback((source: SelectedSignal['source'], item: DecisionSignalItem) => {
+    if (!shouldAcceptReassessIdentityChange({ signalId: item.id, stockCode: item.stockCode })) {
+      return;
+    }
     selectSignal(item, source);
-  }, [selectSignal]);
+  }, [selectSignal, shouldAcceptReassessIdentityChange]);
   const handleOpenOutcomeSignal = useCallback(async (signalId: number) => {
     const item = await decisionSignalsApi.get(signalId);
     if (!mountedRef.current) return;
@@ -575,7 +586,9 @@ const DecisionSignalsPage: React.FC = () => {
         error: responseError,
       });
       syncListSearchParams(appliedFilters, response.page);
-      reconcileOwnedSelection('list', response.items);
+      if (!reassessSessionActiveRef.current) {
+        reconcileOwnedSelection('list', response.items);
+      }
     } catch (err) {
       if (requestIdRef.current !== requestId) return;
       listDispatch({ type: 'loadFailure', error: getParsedApiError(err) });
@@ -670,7 +683,10 @@ const DecisionSignalsPage: React.FC = () => {
 
   const appliedSourceReportId = parseSourceReportId(appliedFilters.sourceReportId);
   const selectedSourceReportId = selected?.item.sourceReportId ?? undefined;
-  const reassessSourceReportId = selected ? selectedSourceReportId : appliedSourceReportId;
+  const liveReassessSourceReportId = selected ? selectedSourceReportId : appliedSourceReportId;
+  const reassessSourceReportId = reassessSessionActive
+    ? reassessLockedContext?.sourceReportId ?? undefined
+    : liveReassessSourceReportId;
   const reassessContextKey = [
     reassessSourceReportId ?? '',
     reassessProfile,
@@ -681,8 +697,27 @@ const DecisionSignalsPage: React.FC = () => {
     resetReassessForContext();
   }, [reassessContextKey, resetReassessForContext]);
 
+  const handleEnterReassess = useCallback(() => {
+    if (!liveReassessSourceReportId) return;
+    enterReassessSession({
+      signalId: selected?.item.id ?? null,
+      stockCode: selected?.item.stockCode ?? activeStockContext?.code ?? null,
+      sourceReportId: liveReassessSourceReportId,
+    });
+  }, [
+    activeStockContext?.code,
+    enterReassessSession,
+    liveReassessSourceReportId,
+    selected,
+  ]);
+
+  const handleExitReassess = useCallback(() => {
+    reassessRequestIdRef.current += 1;
+    exitReassessSession();
+  }, [exitReassessSession]);
+
   const handleReassess = useCallback(async () => {
-    if (!reassessSourceReportId) return;
+    if (!reassessSessionActive || !reassessSourceReportId) return;
     const requestId = reassessRequestIdRef.current + 1;
     reassessRequestIdRef.current = requestId;
     reassessDispatch({ type: 'previewStart' });
@@ -702,7 +737,7 @@ const DecisionSignalsPage: React.FC = () => {
         reassessDispatch({ type: 'previewEnd' });
       }
     }
-  }, [reassessDispatch, reassessProfile, reassessSourceReportId]);
+  }, [reassessDispatch, reassessProfile, reassessSessionActive, reassessSourceReportId]);
 
   const handleApplyFilters = () => {
     applyFilters(filters);
@@ -740,7 +775,9 @@ const DecisionSignalsPage: React.FC = () => {
       });
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems(response.items);
-      reconcileOwnedSelection('latest', response.items);
+      if (!reassessSessionActiveRef.current) {
+        reconcileOwnedSelection('latest', response.items);
+      }
     } catch (err) {
       if (latestRequestIdRef.current !== requestId) return;
       setLatestItems([]);
@@ -781,7 +818,9 @@ const DecisionSignalsPage: React.FC = () => {
         truncated: response.total > response.items.length,
         appliedContext: nextAppliedContext,
       });
-      reconcileOwnedSelection('timeline', response.items);
+      if (!reassessSessionActiveRef.current) {
+        reconcileOwnedSelection('timeline', response.items);
+      }
     } catch (err) {
       if (timelineRequestIdRef.current !== requestId) return;
       timelineDispatch({ type: 'loadFailure', error: getParsedApiError(err) });
@@ -793,7 +832,7 @@ const DecisionSignalsPage: React.FC = () => {
     const guardrail = preview && isRecord(preview.metadata.guardrail_result)
       ? preview.metadata.guardrail_result
       : null;
-    if (!reassessSourceReportId || !preview || guardrail?.passed !== true) return;
+    if (!reassessSessionActive || !reassessSourceReportId || !preview || guardrail?.passed !== true) return;
 
     const requestId = reassessRequestIdRef.current + 1;
     reassessRequestIdRef.current = requestId;
@@ -861,6 +900,7 @@ const DecisionSignalsPage: React.FC = () => {
     reassessDispatch,
     reassessProfile,
     reassessResponse,
+    reassessSessionActive,
     reassessSourceReportId,
     adoptSelected,
     setTimelineItems,
@@ -888,6 +928,7 @@ const DecisionSignalsPage: React.FC = () => {
   ]);
 
   const applyStockContext = useCallback((nextContext: StockContext) => {
+    if (!shouldAcceptReassessIdentityChange({ stockCode: nextContext.code })) return;
     const nextTimeline = buildNextTimelineFilters(
       timelineFilters,
       activeStockContext,
@@ -896,7 +937,12 @@ const DecisionSignalsPage: React.FC = () => {
     );
     pendingStockNavigationRef.current = { context: nextContext, timeline: nextTimeline };
     syncStockContextSearchParams(nextContext.code, nextTimeline.filters);
-  }, [activeStockContext, syncStockContextSearchParams, timelineFilters]);
+  }, [
+    activeStockContext,
+    shouldAcceptReassessIdentityChange,
+    syncStockContextSearchParams,
+    timelineFilters,
+  ]);
 
   const handleStockSubmit = useCallback((
     code: string,
@@ -941,8 +987,9 @@ const DecisionSignalsPage: React.FC = () => {
   }, [resetLatestView, resetTimelineView, setTimelineFilters, syncStockContextSearchParams]);
 
   const handleClearStockContext = useCallback(() => {
+    if (!shouldAcceptReassessIdentityChange({ stockCode: null })) return;
     clearStockContext(true);
-  }, [clearStockContext]);
+  }, [clearStockContext, shouldAcceptReassessIdentityChange]);
 
   // The URL entry is authoritative. User commands stage metadata, then commit
   // local context only after React Router observes the corresponding entry.
@@ -1094,6 +1141,8 @@ const DecisionSignalsPage: React.FC = () => {
 
   const reassessPanel = (
     <DecisionSignalReassessPanel
+      sessionStatus={reassessSessionStatus}
+      lockedContext={reassessLockedContext}
       sourceReportId={reassessSourceReportId}
       profile={reassessProfile}
       onProfileChange={setReassessProfile}
@@ -1102,6 +1151,8 @@ const DecisionSignalsPage: React.FC = () => {
       persisting={reassessPersisting}
       persistBlocked={reassessPersistBlocked}
       error={reassessError}
+      onEnter={handleEnterReassess}
+      onExit={handleExitReassess}
       onPreview={() => void handleReassess()}
       onRequestPersist={requestPersistConfirm}
     />
