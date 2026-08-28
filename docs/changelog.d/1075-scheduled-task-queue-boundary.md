@@ -1,0 +1,1 @@
+- [Tests] Pin scheduled-task execution to the AnalysisTaskQueue facade with an AST import ratchet that forbids pipeline, stages, contracts, readiness, AnalysisService, data_provider, llm, and analyzer imports (Fixes #1075).
