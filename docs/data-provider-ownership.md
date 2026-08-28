@@ -17,7 +17,7 @@ priority, circuit, or fallback policy (ADR-005).
 
 | Public path | Role |
 | --- | --- |
-| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache / daily-execution / realtime field-trust / realtime quote orchestration / chip-distribution orchestration / money-flow cache / money-flow orchestration / fundamental cache / fundamental loaders / belong-board descriptors. |
+| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache / daily-execution / realtime field-trust / realtime quote orchestration / chip-distribution orchestration / stock-name lookup / money-flow cache / money-flow orchestration / fundamental cache / fundamental loaders / belong-board descriptors. |
 | `src.data_provider` package (`__init__.py`) | Stable package exports for plugins and callers. |
 
 Production and test code import public names from `src.data_provider.base`.
@@ -41,7 +41,7 @@ and `reset_fetcher_manager()` still observe or clear **only** that fallback
 singleton. Ad-hoc `DataFetcherManager()` constructors elsewhere stay out of
 this identity.
 
-## Ownership Map (after chip-distribution extraction)
+## Ownership Map (after stock-name extraction)
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
@@ -57,7 +57,8 @@ this identity.
 | `src/data_provider/manager_parts/daily_provider_execution.py` | Manager-owned daily execution rebound onto `DataFetcherManager`: `get_daily_data` cache-resolve entry, `_call_daily_data_provider`, and `_get_daily_data_from_providers` fallback loop | Health/circuit state machine (`daily_source_health`), layered cache storage (`daily_cache.py`), cache helpers (`daily_cache_methods`), capability inventory, realtime routing |
 | `src/data_provider/manager_parts/realtime_field_trust_methods.py` | Manager-owned realtime quote attempt and field-trust bookkeeping rebound onto `DataFetcherManager` | Realtime routing policy, fallback order, and `get_realtime_quote` |
 | `src/data_provider/manager_parts/realtime_quote_methods.py` | Manager-owned realtime quote orchestration rebound onto `DataFetcherManager`: timestamp parse/enrich, plugin realtime fallback, `get_realtime_quote` routing, quote supplement helpers, and Longbridge preference | Field-trust attempt bookkeeping (`realtime_field_trust_methods`), `prefetch_realtime_quotes`, Local Only / outbound HTTP policy, chip / money-flow / stock-name / fundamental / rankings workflows |
-| `src/data_provider/manager_parts/chip_distribution_methods.py` | Manager-owned chip-distribution orchestration rebound onto `DataFetcherManager`: `get_chip_distribution` routing, provider priority, fallback/error behavior, and chip-circuit success/failure/inconclusive accounting | Pure chip metric helpers (`chip_helpers.py`), `pull_coalesce` chip call locks (`daily_source_health`), stock-name / rankings / loader/cache / prefetch, BaseFetcher methods |
+| `src/data_provider/manager_parts/chip_distribution_methods.py` | Manager-owned chip-distribution orchestration rebound onto `DataFetcherManager`: `get_chip_distribution` routing, provider priority, fallback/error behavior, and chip-circuit success/failure/inconclusive accounting | Pure chip metric helpers (`chip_helpers.py`), `pull_coalesce` chip call locks (`daily_source_health`), stock-name lookup (`stock_name_methods`), rankings / loader/cache / prefetch, BaseFetcher methods |
+| `src/data_provider/manager_parts/stock_name_methods.py` | Manager-owned single-code stock-name lookup rebound onto `DataFetcherManager`: `get_stock_name` cache/static/index precedence, the market-data Local Only short circuit, the optional realtime probe, provider capability ordering with the US-capable allow-list, and the all-sources-failed fallback | Stock-name memory cache helpers (`daily_cache_methods`), `STOCK_NAME_MAP` / `is_meaningful_stock_name` / `get_index_stock_name` facade seams, `prefetch_stock_names` / `batch_get_stock_names`, realtime quote orchestration, rankings, loader/cache, BaseFetcher methods |
 | `src/data_provider/manager_parts/money_flow_cache_methods.py` | Manager-owned money-flow cache lookup, store, invalidate, and stats rebound onto `DataFetcherManager` | `get_money_flow` routing and hit/miss accounting (`money_flow_methods`), circuit policy, TTL/size class attributes, and cache/circuit instance state |
 | `src/data_provider/manager_parts/money_flow_methods.py` | Manager-owned money-flow orchestration rebound onto `DataFetcherManager`: `_money_flow_timestamp`, `get_money_flow` routing, circuit failure/success, `source_chain`, `fallback_to`, the stale-cache return path, and hit/miss accounting | Cache lookup/store/invalidate/stats (`money_flow_cache_methods`), TTL/size class attributes, cache/circuit instance state including hit/miss counters, fundamental loaders, daily/realtime/Local Only behavior, and other rankings |
 | `src/data_provider/manager_parts/fundamental_cache_methods.py` | Manager-owned fundamental aggregation cache key, prune, and in-flight get-or-load rebound onto `DataFetcherManager` (instance-local; key is symbol + market + budget + as_of). TTL/max-entries resolve from injected `config` or manager `_get_fundamental_config()` | CN/offshore aggregation loaders (`fundamental_loader_methods`), `FUNDAMENTAL_CACHE_TTL_SECONDS` env default, `_should_cache_fundamental_context`, the 5s realtime/chip `pull_coalesce` singleton, daily L1/L2, and TW institutional inflight |
@@ -217,10 +218,29 @@ Slice 13 rebinds chip-distribution orchestration descriptors from
 - `get_chip_distribution`
 
 Pure chip metric helpers (`chip_helpers.py`) and the chip `pull_coalesce`
-call lock (`daily_source_health`) remain separate owners. Stock-name,
-rankings, loader/cache, and prefetch stay on the facade. Import the facade
+call lock (`daily_source_health`) remain separate owners. Rankings,
+loader/cache, and prefetch stay on the facade. Import the facade
 (`src.data_provider.base` / `src.data_provider`), not
 `manager_parts.chip_distribution_methods`.
+
+Slice 14 rebinds stock-name lookup descriptors from
+`manager_parts/stock_name_methods.py` while preserving their
+`src.data_provider.base` module, qualname, signature, globals, and patch behavior:
+
+- `get_stock_name`
+
+Stock-name memory cache helpers (`_get_cached_stock_name` /
+`_cache_stock_name`, owned by `daily_cache_methods`) remain a separate
+owner. The static `STOCK_NAME_MAP`, `is_meaningful_stock_name`, and
+`get_index_stock_name` module-level seams stay on the facade, so
+`src.data_provider.base.get_index_stock_name` remains the patch target.
+Bulk/prefetch entry points (`prefetch_stock_names`,
+`batch_get_stock_names`), rankings, and loader/cache stay on the facade.
+The in-body `from .akshare_fetcher import _is_us_code` seam resolves
+through the facade package because rebound descriptors keep
+`src.data_provider.base` globals. Import the facade
+(`src.data_provider.base` / `src.data_provider`), not
+`manager_parts.stock_name_methods`.
 
 ## How To Add The Next Extraction Slice
 
