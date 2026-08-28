@@ -3,9 +3,18 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 """Ratcheting guard: ban new bidirectional package import cycles.
 
-Scans production Python under ``src/`` plus top-level entrypoints. Computes package-level dependency edges from
-**module-level** imports only (lazy imports inside functions are ignored), then
-detects bidirectional package pairs.
+Scans production Python under ``src/`` plus top-level entrypoints. Computes
+package-level dependency edges from **import-time** imports, then detects
+bidirectional package pairs.
+
+"Import-time" means every import statement that runs when the module object is
+built: the module body plus any statement body nested in it that executes
+eagerly (``try``/``except``/``else``/``finally``, ``if``/``else``,
+``with``/``async with``, ``for``/``while`` bodies and their ``else`` clauses,
+``match`` cases, and class bodies). Imports inside ``def`` / ``async def``
+bodies are lazy and are **not** edges, and imports guarded by
+``if TYPE_CHECKING:`` never execute, so they are excluded too. See
+``classify_import_modules`` for the exact traversal.
 
 A package is:
 
@@ -154,8 +163,251 @@ def top_level_import_modules(root: Path, path: Path) -> list[str]:
     return modules
 
 
+TYPE_CHECKING_MODULES = frozenset({"typing", "typing_extensions"})
+
+_FUNCTION_NODES: tuple[type, ...] = (ast.FunctionDef, ast.AsyncFunctionDef)
+_TRY_NODES: tuple[type, ...] = tuple(
+    node for node in (ast.Try, getattr(ast, "TryStar", None)) if node is not None
+)
+
+
+@dataclass(frozen=True)
+class ImportPlacement:
+    """Absolute module names imported by one file, split by execution placement."""
+
+    import_time: tuple[str, ...]
+    function_local: tuple[str, ...]
+
+
+def _pattern_bound_names(pattern: ast.AST) -> Iterable[str]:
+    """Yield names bound by a ``match`` case pattern (capture, star, or rest)."""
+
+    for node in ast.walk(pattern):
+        for attribute in ("name", "rest"):
+            value = getattr(node, attribute, None)
+            if isinstance(value, str) and value:
+                yield value
+
+
+def _target_bound_names(target: ast.AST) -> Iterable[str]:
+    """Yield names bound (or deleted) by an assignment / loop / ``with`` target.
+
+    Only ``Store``/``Del`` contexts count, so ``typing.X = 1`` does not look like
+    a rebinding of the ``typing`` alias itself.
+    """
+
+    for node in ast.walk(target):
+        if isinstance(node, ast.Name) and isinstance(node.ctx, (ast.Store, ast.Del)):
+            yield node.id
+
+
+class _ImportPlacementVisitor:
+    """Split a module's imports into import-time and function-local buckets.
+
+    Traversal rules:
+
+    - Recurse into every statement body that executes while the module is being
+      imported, including class bodies, so nested-but-eager imports are real
+      package edges.
+    - Never treat ``def`` / ``async def`` bodies as import-time; their imports go
+      to the function-local bucket instead (lambdas cannot contain statements).
+    - Drop ``if TYPE_CHECKING:`` bodies entirely. Resolution is binding-aware:
+      only the names actually bound to ``typing``/``typing_extensions``
+      ``TYPE_CHECKING`` in this file count, and rebinding such a name clears it.
+    """
+
+    def __init__(self, root: Path, path: Path) -> None:
+        self._root = root
+        self._path = path
+        self._type_checking_names: Set[str] = set()
+        self._typing_aliases: Set[str] = set()
+        self.import_time: list[str] = []
+        self.function_local: list[str] = []
+
+    # -- binding tracking -------------------------------------------------
+
+    def _unbind(self, name: str) -> None:
+        self._type_checking_names.discard(name)
+        self._typing_aliases.discard(name)
+
+    def _snapshot(self) -> Tuple[Set[str], Set[str]]:
+        return set(self._type_checking_names), set(self._typing_aliases)
+
+    def _restore(self, snapshot: Tuple[Set[str], Set[str]]) -> None:
+        self._type_checking_names, self._typing_aliases = snapshot
+
+    def _record_statement_bindings(self, node: ast.stmt) -> None:
+        """Clear tracked aliases that this statement rebinds or deletes."""
+
+        targets: list[ast.AST] = []
+        if isinstance(node, ast.Assign):
+            targets.extend(node.targets)
+        elif isinstance(node, (ast.AugAssign, ast.AnnAssign)):
+            targets.append(node.target)
+        elif isinstance(node, (ast.For, ast.AsyncFor)):
+            targets.append(node.target)
+        elif isinstance(node, (ast.With, ast.AsyncWith)):
+            targets.extend(
+                item.optional_vars
+                for item in node.items
+                if item.optional_vars is not None
+            )
+        elif isinstance(node, ast.Delete):
+            targets.extend(node.targets)
+        elif isinstance(node, _TRY_NODES):
+            for handler in node.handlers:
+                if handler.name:
+                    self._unbind(handler.name)
+        elif isinstance(node, (*_FUNCTION_NODES, ast.ClassDef)):
+            self._unbind(node.name)
+            return
+        elif isinstance(node, ast.Match):
+            for case in node.cases:
+                for name in _pattern_bound_names(case.pattern):
+                    self._unbind(name)
+            return
+        for target in targets:
+            for name in _target_bound_names(target):
+                self._unbind(name)
+
+    def _record_import_bindings(self, node: ast.Import | ast.ImportFrom) -> None:
+        """Track (or clear) ``TYPE_CHECKING`` aliases introduced by an import."""
+
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if not alias.name:
+                    continue
+                bound = alias.asname or alias.name.split(".")[0]
+                self._unbind(bound)
+                if alias.name in TYPE_CHECKING_MODULES:
+                    self._typing_aliases.add(bound)
+            return
+        for alias in node.names:
+            if not alias.name:
+                continue
+            if alias.name == "*":
+                # A star import from typing brings TYPE_CHECKING into scope.
+                if node.level == 0 and node.module in TYPE_CHECKING_MODULES:
+                    self._type_checking_names.add("TYPE_CHECKING")
+                continue
+            bound = alias.asname or alias.name
+            self._unbind(bound)
+            if (
+                node.level == 0
+                and node.module in TYPE_CHECKING_MODULES
+                and alias.name == "TYPE_CHECKING"
+            ):
+                self._type_checking_names.add(bound)
+
+    # -- TYPE_CHECKING resolution ----------------------------------------
+
+    def _type_checking_polarity(self, test: ast.expr) -> bool | None:
+        """Return True for ``TYPE_CHECKING``, False for ``not TYPE_CHECKING``."""
+
+        if isinstance(test, ast.UnaryOp) and isinstance(test.op, ast.Not):
+            inner = self._type_checking_polarity(test.operand)
+            return None if inner is None else not inner
+        if isinstance(test, ast.Name):
+            return True if test.id in self._type_checking_names else None
+        if (
+            isinstance(test, ast.Attribute)
+            and test.attr == "TYPE_CHECKING"
+            and isinstance(test.value, ast.Name)
+            and test.value.id in self._typing_aliases
+        ):
+            return True
+        return None
+
+    # -- traversal --------------------------------------------------------
+
+    def _emit(self, node: ast.Import | ast.ImportFrom, in_function: bool) -> None:
+        bucket = self.function_local if in_function else self.import_time
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name:
+                    bucket.append(alias.name)
+            return
+        resolved = _resolve_from_import(self._root, self._path, node)
+        if resolved:
+            bucket.append(resolved)
+
+    def visit_body(self, body: Sequence[ast.stmt], in_function: bool) -> None:
+        """Walk one statement list, keeping the import-time/lazy split."""
+
+        for node in body:
+            if isinstance(node, (ast.Import, ast.ImportFrom)):
+                self._record_import_bindings(node)
+                self._emit(node, in_function)
+                continue
+            self._record_statement_bindings(node)
+            if isinstance(node, _FUNCTION_NODES):
+                snapshot = self._snapshot()
+                self.visit_body(node.body, True)
+                self._restore(snapshot)
+            elif isinstance(node, ast.ClassDef):
+                snapshot = self._snapshot()
+                self.visit_body(node.body, in_function)
+                self._restore(snapshot)
+            elif isinstance(node, _TRY_NODES):
+                self.visit_body(node.body, in_function)
+                for handler in node.handlers:
+                    self.visit_body(handler.body, in_function)
+                self.visit_body(node.orelse, in_function)
+                self.visit_body(node.finalbody, in_function)
+            elif isinstance(node, ast.If):
+                polarity = self._type_checking_polarity(node.test)
+                if polarity is not True:
+                    self.visit_body(node.body, in_function)
+                if polarity is not False:
+                    self.visit_body(node.orelse, in_function)
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                self.visit_body(node.body, in_function)
+            elif isinstance(node, (ast.For, ast.AsyncFor, ast.While)):
+                self.visit_body(node.body, in_function)
+                self.visit_body(node.orelse, in_function)
+            elif isinstance(node, ast.Match):
+                for case in node.cases:
+                    self.visit_body(case.body, in_function)
+
+
+def classify_import_modules(root: Path, path: Path) -> ImportPlacement:
+    """Split one file's absolute import targets by execution placement.
+
+    ``import_time`` holds imports that run while the module is imported
+    (module body plus eagerly executed nested bodies and class bodies), with
+    ``if TYPE_CHECKING:`` branches excluded. ``function_local`` holds imports
+    deferred inside function bodies. Both preserve source order and may contain
+    duplicates; callers deduplicate at the package-edge level.
+    """
+
+    try:
+        source = path.read_text(encoding="utf-8")
+    except OSError:
+        return ImportPlacement((), ())
+    try:
+        tree = ast.parse(source, filename=_relative_to_root(root, path))
+    except SyntaxError:
+        return ImportPlacement((), ())
+
+    visitor = _ImportPlacementVisitor(root, path)
+    visitor.visit_body(tree.body, False)
+    return ImportPlacement(tuple(visitor.import_time), tuple(visitor.function_local))
+
+
+def import_time_import_modules(root: Path, path: Path) -> list[str]:
+    """Collect absolute module names imported at import time."""
+
+    return list(classify_import_modules(root, path).import_time)
+
+
+def function_local_import_modules(root: Path, path: Path) -> list[str]:
+    """Collect absolute module names imported lazily inside function bodies."""
+
+    return list(classify_import_modules(root, path).function_local)
+
+
 def build_package_edges(root: Path) -> Dict[str, Set[str]]:
-    """Build directed package edges from production module-level imports."""
+    """Build directed package edges from production import-time imports."""
 
     edges: Dict[str, Set[str]] = {}
     for path in _iter_production_python(root):
@@ -163,7 +415,7 @@ def build_package_edges(root: Path) -> Dict[str, Set[str]]:
         source_package = package_of_module(source_module)
         if not source_package:
             continue
-        for imported in top_level_import_modules(root, path):
+        for imported in import_time_import_modules(root, path):
             target_package = package_of_module(imported)
             if not target_package or target_package == source_package:
                 continue
@@ -254,10 +506,13 @@ def serialize_baseline(pairs: Sequence[Pair]) -> str:
     payload = {
         "version": BASELINE_VERSION,
         "description": (
-            "Allowlisted bidirectional package import pairs (module-level "
-            "imports only). New pairs are banned; shrink this list by breaking "
-            "cycles and running --write-baseline. Growth requires an explicit "
-            "PR justification and is refused by --write-baseline."
+            "Allowlisted bidirectional package import pairs (import-time "
+            "imports: the module body plus nested bodies that execute during "
+            "import, including class bodies; function-body and "
+            "`if TYPE_CHECKING:` imports are excluded). New pairs are banned; "
+            "shrink this list by breaking cycles and running --write-baseline. "
+            "Growth requires an explicit PR justification and is refused by "
+            "--write-baseline."
         ),
         "pair_count": len(ordered),
         "pairs": [[a, b] for a, b in ordered],
@@ -330,6 +585,312 @@ def write_baseline(root: Path, baseline_path: Path) -> int:
         f"{baseline_path}"
     )
     return 0
+
+
+def _run_placement_self_tests() -> int:
+    """Check import placement classification: eager nesting vs lazy vs typing-only."""
+
+    cases = 0
+    with tempfile.TemporaryDirectory(prefix="import-placement-") as tmp:
+        root = Path(tmp)
+        (root / "src" / "alpha").mkdir(parents=True)
+        (root / "src" / "beta").mkdir(parents=True)
+        (root / "src" / "beta" / "leaf.py").write_text("VALUE = 1\n", encoding="utf-8")
+
+        eager_variants = {
+            "try": (
+                "try:\n"
+                "    from src.beta.leaf import VALUE\n"
+                "except ImportError:\n"
+                "    VALUE = None\n"
+            ),
+            "except": (
+                "try:\n"
+                "    VALUE = 0\n"
+                "except ImportError:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "try-else": (
+                "try:\n"
+                "    VALUE = 0\n"
+                "except ImportError:\n"
+                "    pass\n"
+                "else:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "try-finally": (
+                "try:\n"
+                "    VALUE = 0\n"
+                "finally:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "if": (
+                "import os\n"
+                "if os.environ.get('X'):\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "if-else": (
+                "import os\n"
+                "if os.environ.get('X'):\n"
+                "    VALUE = 0\n"
+                "else:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "with": (
+                "from contextlib import suppress\n"
+                "with suppress(ImportError):\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "for": (
+                "for _ in range(1):\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "for-else": (
+                "for _ in range(1):\n"
+                "    pass\n"
+                "else:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "while-else": (
+                "while False:\n"
+                "    pass\n"
+                "else:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "match": (
+                "MODE = 'a'\n"
+                "match MODE:\n"
+                "    case 'a':\n"
+                "        from src.beta.leaf import VALUE\n"
+                "    case _:\n"
+                "        VALUE = None\n"
+            ),
+            "class-body": (
+                "class Loader:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "nested-class-in-try": (
+                "try:\n"
+                "    class Loader:\n"
+                "        if True:\n"
+                "            from src.beta.leaf import VALUE\n"
+                "except ImportError:\n"
+                "    pass\n"
+            ),
+        }
+        module_path = root / "src" / "alpha" / "probe.py"
+        for label, source in eager_variants.items():
+            module_path.write_text(source, encoding="utf-8")
+            placement = classify_import_modules(root, module_path)
+            if "src.beta.leaf" not in placement.import_time:
+                raise AssertionError(f"eager import missed for placement {label!r}")
+            if placement.function_local:
+                raise AssertionError(
+                    f"eager import leaked into lazy bucket for {label!r}"
+                )
+            cases += 1
+
+        lazy_variants = {
+            "def": (
+                "def load():\n"
+                "    from src.beta.leaf import VALUE\n"
+                "    return VALUE\n"
+            ),
+            "async-def": (
+                "async def load():\n"
+                "    from src.beta.leaf import VALUE\n"
+                "    return VALUE\n"
+            ),
+            "method": (
+                "class Loader:\n"
+                "    def load(self):\n"
+                "        from src.beta.leaf import VALUE\n"
+                "        return VALUE\n"
+            ),
+            "nested-def": (
+                "def outer():\n"
+                "    def inner():\n"
+                "        from src.beta.leaf import VALUE\n"
+                "        return VALUE\n"
+                "    return inner\n"
+            ),
+            "class-in-def": (
+                "def outer():\n"
+                "    class Inner:\n"
+                "        from src.beta.leaf import VALUE\n"
+                "    return Inner\n"
+            ),
+            "def-in-try": (
+                "try:\n"
+                "    def load():\n"
+                "        from src.beta.leaf import VALUE\n"
+                "        return VALUE\n"
+                "except ImportError:\n"
+                "    load = None\n"
+            ),
+        }
+        for label, source in lazy_variants.items():
+            module_path.write_text(source, encoding="utf-8")
+            placement = classify_import_modules(root, module_path)
+            if placement.import_time:
+                raise AssertionError(f"lazy import treated as eager for {label!r}")
+            if "src.beta.leaf" not in placement.function_local:
+                raise AssertionError(f"lazy import missed for placement {label!r}")
+            cases += 1
+
+        typing_variants = {
+            "plain": (
+                "from typing import TYPE_CHECKING\n"
+                "if TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "alias": (
+                "from typing import TYPE_CHECKING as TC\n"
+                "if TC:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "module-attribute": (
+                "import typing\n"
+                "if typing.TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "module-alias-attribute": (
+                "import typing as t\n"
+                "if t.TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "typing-extensions": (
+                "from typing_extensions import TYPE_CHECKING\n"
+                "if TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "not-branch": (
+                "from typing import TYPE_CHECKING\n"
+                "if not TYPE_CHECKING:\n"
+                "    VALUE = 0\n"
+                "else:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "nested-in-try": (
+                "from typing import TYPE_CHECKING\n"
+                "try:\n"
+                "    if TYPE_CHECKING:\n"
+                "        from src.beta.leaf import VALUE\n"
+                "except ImportError:\n"
+                "    pass\n"
+            ),
+        }
+        for label, source in typing_variants.items():
+            module_path.write_text(source, encoding="utf-8")
+            placement = classify_import_modules(root, module_path)
+            if "src.beta.leaf" in placement.import_time:
+                raise AssertionError(f"TYPE_CHECKING import counted for {label!r}")
+            cases += 1
+
+        # `if not TYPE_CHECKING:` bodies DO run at import time.
+        module_path.write_text(
+            "from typing import TYPE_CHECKING\n"
+            "if not TYPE_CHECKING:\n"
+            "    from src.beta.leaf import VALUE\n",
+            encoding="utf-8",
+        )
+        if "src.beta.leaf" not in classify_import_modules(root, module_path).import_time:
+            raise AssertionError("`if not TYPE_CHECKING:` body was dropped")
+        cases += 1
+
+        # A locally rebound TYPE_CHECKING name is no longer the typing sentinel.
+        rebinding_variants = {
+            "assignment": (
+                "from typing import TYPE_CHECKING\n"
+                "TYPE_CHECKING = True\n"
+                "if TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "unrelated-import": (
+                "from src.beta.flags import TYPE_CHECKING\n"
+                "if TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "shadowed-module-alias": (
+                "import typing\n"
+                "typing = object()\n"
+                "if typing.TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+            "no-binding": (
+                "if TYPE_CHECKING:\n"
+                "    from src.beta.leaf import VALUE\n"
+            ),
+        }
+        for label, source in rebinding_variants.items():
+            module_path.write_text(source, encoding="utf-8")
+            if (
+                "src.beta.leaf"
+                not in classify_import_modules(root, module_path).import_time
+            ):
+                raise AssertionError(
+                    f"rebound TYPE_CHECKING name still excluded imports for {label!r}"
+                )
+            cases += 1
+
+        # A class-body TYPE_CHECKING rebinding must not leak into module scope.
+        module_path.write_text(
+            "from typing import TYPE_CHECKING\n"
+            "class Shadow:\n"
+            "    TYPE_CHECKING = True\n"
+            "if TYPE_CHECKING:\n"
+            "    from src.beta.leaf import VALUE\n",
+            encoding="utf-8",
+        )
+        if "src.beta.leaf" in classify_import_modules(root, module_path).import_time:
+            raise AssertionError("class-body rebinding leaked into module scope")
+        cases += 1
+
+        # Nested eager placement still produces a real package edge end to end.
+        (root / "src" / "alpha" / "probe.py").write_text(
+            "try:\n"
+            "    from src.beta.leaf import VALUE\n"
+            "except ImportError:\n"
+            "    VALUE = None\n",
+            encoding="utf-8",
+        )
+        (root / "src" / "beta" / "leaf.py").write_text(
+            "class Holder:\n"
+            "    from src.alpha.probe import VALUE\n",
+            encoding="utf-8",
+        )
+        if scan_pairs(root) != [("src.alpha", "src.beta")]:
+            raise AssertionError(
+                f"nested eager imports did not form a pair: {scan_pairs(root)!r}"
+            )
+        cases += 1
+
+        # The same edges behind `def` bodies stay invisible to the cycle ratchet.
+        (root / "src" / "alpha" / "probe.py").write_text(
+            "def load():\n"
+            "    from src.beta.leaf import VALUE\n"
+            "    return VALUE\n",
+            encoding="utf-8",
+        )
+        (root / "src" / "beta" / "leaf.py").write_text(
+            "def load():\n"
+            "    from src.alpha.probe import load as other\n"
+            "    return other\n",
+            encoding="utf-8",
+        )
+        if scan_pairs(root):
+            raise AssertionError("function-body imports formed a pair")
+        cases += 1
+
+        # Unparsable files degrade to "no imports" instead of raising.
+        (root / "src" / "alpha" / "probe.py").write_text("def broken(\n", encoding="utf-8")
+        if classify_import_modules(root, root / "src" / "alpha" / "probe.py") != (
+            ImportPlacement((), ())
+        ):
+            raise AssertionError("syntax error did not degrade to empty placement")
+        cases += 1
+
+    return cases
 
 
 def run_self_tests() -> None:
@@ -470,6 +1031,8 @@ def run_self_tests() -> None:
         if scan_pairs(root):
             raise AssertionError(f"tests leaked into scan: {scan_pairs(root)!r}")
         cases += 1
+
+    cases += _run_placement_self_tests()
 
     print(f"Import-layer self-tests passed ({cases} cases).")
 

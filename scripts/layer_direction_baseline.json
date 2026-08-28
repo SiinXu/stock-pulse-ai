@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Allowlisted reverse layer-import edges (module-level imports only). New reverse edges are banned; shrink this list after breaking a dependency and running --write-baseline. Growth is refused. Never raise hard_ceiling to green CI \u2014 fix the reverse import.",
+  "description": "Allowlisted reverse layer-import edges (import-time imports: the module body plus nested bodies that execute during import, including class bodies; function-body and `if TYPE_CHECKING:` imports are excluded). New reverse edges are banned; shrink this list after breaking a dependency and running --write-baseline. Growth is refused. Never raise hard_ceiling to green CI \u2014 fix the reverse import.",
   "rules": [
     [
       "src.data_provider",
@@ -127,6 +127,35 @@
     },
     {
       "path": "src/data_provider/yfinance_fetcher.py",
+      "from_package": "src.data_provider",
+      "to_package": "src.services"
+    }
+  ],
+  "lazy_description": "Advisory inventory of reverse imports that exist only inside function bodies (deferred loads). These are NOT enforced and NOT counted against hard_ceiling; they are recorded so growth in the uncounted escape hatch stays observable. Drift here never fails CI; it only prints NOTE lines. Entries whose (path, from_package, to_package) triple is also a currently scanned import-time reverse edge are omitted as duplicates.",
+  "lazy_exception_count": 5,
+  "lazy_exceptions": [
+    {
+      "path": "src/data_provider/data_validation.py",
+      "from_package": "src.data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/data_provider/fundamental_adapter.py",
+      "from_package": "src.data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/data_provider/manager_parts/money_flow_methods.py",
+      "from_package": "src.data_provider",
+      "to_package": "src.core"
+    },
+    {
+      "path": "src/data_provider/manager_parts/provider_run_wiring.py",
+      "from_package": "src.data_provider",
+      "to_package": "src.services"
+    },
+    {
+      "path": "src/data_provider/yfinance_fundamental_adapter.py",
       "from_package": "src.data_provider",
       "to_package": "src.services"
     }
