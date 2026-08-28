@@ -118,8 +118,11 @@ the FastAPI surface **must**:
   `index.ts`)
 
 If a backend route cannot be anchored because OpenAPI emits an empty response
-schema (example: historical `/api/v1/auth/status`), keep runtime validation and
-file a backend schema fix; do not reintroduce unchecked casts.
+schema, keep runtime validation and file a backend schema fix; do not
+reintroduce unchecked casts. Historical `/api/v1/auth/status` was this case;
+generated `AuthStatusResponse` is now the Web client export (`auth.ts` binds
+`components['schemas']['AuthStatusResponse']`, requires all five fields, and
+accepts only `enabled` / `password_retained` / `no_password`).
 
 ## Suggested optional guard (owner decides whether to gate)
 
@@ -158,11 +161,14 @@ Additional modules completed in the remaining-module batch:
   demo-analysis. Omitted collection fields default to `[]` after a successful
   parse so wizard `.map` / `.length` call sites stay defined. Extra server keys
   remain via `.passthrough()`.
-- Anchors on already-validated clients: `auth` (runtime validation present;
-  generated `AuthStatusResponse` now exists on camelCase wire, but the client
-  still anchors the request model), `notificationInbox`, `outboundActivity`,
-  `todaysFocus`, `watchlistGroups`, `watchlistScores`, `portfolioRiskMetrics`,
-  `eventCalendar` (alert-trigger list composition)
+- Anchors on already-validated clients: `auth` (exported `AuthStatusResponse`
+  binds generated `components['schemas']['AuthStatusResponse']`; `authEnabled`,
+  `loggedIn`, `passwordSet`, `passwordChangeable`, and `setupState` are required;
+  `setupState` accepts only `enabled` / `password_retained` / `no_password`; GET
+  `/status` and POST `/settings` share the same passthrough parser),
+  `notificationInbox`, `outboundActivity`, `todaysFocus`, `watchlistGroups`,
+  `watchlistScores`, `portfolioRiskMetrics`, `eventCalendar` (alert-trigger list
+  composition)
 
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
