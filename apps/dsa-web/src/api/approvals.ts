@@ -8,8 +8,7 @@ import type {
   ApprovalStatus,
 } from '../types/approvals';
 import apiClient from './index';
-import { createApiError, createParsedApiError } from './error';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { components } from '../types/api.generated';
 
 type OpenApiApprovalRule = components['schemas']['ApprovalRule'];
@@ -60,27 +59,6 @@ const approvalProposalPageSchema = z.object({
   total: z.number(),
 }).passthrough();
 
-function parseCamelCasePayload<T>(data: unknown, schema: z.ZodTypeAny, label: string): T {
-  const camel = toCamelCase<unknown>(data);
-  const result = schema.safeParse(camel);
-  if (!result.success) {
-    const issueSummary = result.error.issues.slice(0, 5).map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`).join('; ');
-    if (import.meta.env.DEV) {
-      console.error(`[approvals] response validation failed (${label})`, result.error.issues);
-    }
-    throw createApiError(createParsedApiError({
-      title: '响应校验失败',
-      message: `接口响应未通过校验（${label}）。${issueSummary}`,
-      rawMessage: result.error.message,
-      category: 'unknown',
-      code: 'api_response_validation_failed',
-      params: { label, issues: issueSummary },
-      details: result.error.issues,
-    }));
-  }
-  return camel as T;
-}
-
 function toSnakeRule(rule: ApprovalRuleUpdate) {
   return {
     enabled: rule.enabled,
@@ -93,27 +71,52 @@ function toSnakeRule(rule: ApprovalRuleUpdate) {
 export const approvalsApi = {
   async getRule(): Promise<ApprovalRule> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/approvals/rules/risk-control-bypass');
-    return parseCamelCasePayload<ApprovalRule>(response.data, approvalRuleSchema, 'ApprovalRule');
+    return parseCamelCasePayload<ApprovalRule>(
+      response.data,
+      approvalRuleSchema,
+      'ApprovalRule',
+      'approvals',
+    );
   },
   async updateRule(rule: ApprovalRuleUpdate): Promise<ApprovalRule> {
     const response = await apiClient.put<Record<string, unknown>>('/api/v1/approvals/rules/risk-control-bypass', toSnakeRule(rule));
-    return parseCamelCasePayload<ApprovalRule>(response.data, approvalRuleSchema, 'ApprovalRule');
+    return parseCamelCasePayload<ApprovalRule>(
+      response.data,
+      approvalRuleSchema,
+      'ApprovalRule',
+      'approvals',
+    );
   },
   async list(params: { page?: number; pageSize?: number; status?: ApprovalStatus } = {}): Promise<ApprovalProposalPage> {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/approvals', {
       params: { page: params.page, page_size: params.pageSize, status: params.status },
     });
-    return parseCamelCasePayload<ApprovalProposalPage>(response.data, approvalProposalPageSchema, 'ApprovalProposalPage');
+    return parseCamelCasePayload<ApprovalProposalPage>(
+      response.data,
+      approvalProposalPageSchema,
+      'ApprovalProposalPage',
+      'approvals',
+    );
   },
   async get(proposalId: string): Promise<ApprovalProposal> {
     const response = await apiClient.get<Record<string, unknown>>(`/api/v1/approvals/${encodeURIComponent(proposalId)}`);
-    return parseCamelCasePayload<ApprovalProposal>(response.data, approvalProposalSchema, 'ApprovalProposal');
+    return parseCamelCasePayload<ApprovalProposal>(
+      response.data,
+      approvalProposalSchema,
+      'ApprovalProposal',
+      'approvals',
+    );
   },
   async decide(proposalId: string, decision: ApprovalDecision, expectedVersion: number): Promise<ApprovalProposal> {
     const response = await apiClient.post<Record<string, unknown>>(
       `/api/v1/approvals/${encodeURIComponent(proposalId)}/decision`,
       { decision, expected_version: expectedVersion },
     );
-    return parseCamelCasePayload<ApprovalProposal>(response.data, approvalProposalSchema, 'ApprovalProposal');
+    return parseCamelCasePayload<ApprovalProposal>(
+      response.data,
+      approvalProposalSchema,
+      'ApprovalProposal',
+      'approvals',
+    );
   },
 };

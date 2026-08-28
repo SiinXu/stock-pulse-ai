@@ -1,7 +1,6 @@
 import { z } from 'zod';
 import apiClient from './index';
-import { createApiError, createParsedApiError } from './error';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { components } from '../types/api.generated';
 
 type OpenApiUsageDashboard = components['schemas']['UsageDashboardResponse'];
@@ -112,32 +111,16 @@ const usageDashboardSchema = z.object({
   recentCalls: z.array(usageCallRecordSchema),
 }).passthrough();
 
-function parseCamelCasePayload<T>(data: unknown, schema: z.ZodTypeAny, label: string): T {
-  const camel = toCamelCase<unknown>(data);
-  const result = schema.safeParse(camel);
-  if (!result.success) {
-    const issueSummary = result.error.issues.slice(0, 5).map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`).join('; ');
-    if (import.meta.env.DEV) {
-      console.error(`[usage] response validation failed (${label})`, result.error.issues);
-    }
-    throw createApiError(createParsedApiError({
-      title: '响应校验失败',
-      message: `接口响应未通过校验（${label}）。${issueSummary}`,
-      rawMessage: result.error.message,
-      category: 'unknown',
-      code: 'api_response_validation_failed',
-      params: { label, issues: issueSummary },
-      details: result.error.issues,
-    }));
-  }
-  return camel as T;
-}
-
 export const usageApi = {
   getDashboard: async (params: { period?: UsagePeriod; limit?: number } = {}): Promise<UsageDashboard> => {
     const response = await apiClient.get<Record<string, unknown>>('/api/v1/usage/dashboard', {
       params: { period: params.period ?? 'month', limit: params.limit ?? 50 },
     });
-    return parseCamelCasePayload<UsageDashboard>(response.data, usageDashboardSchema, 'UsageDashboardResponse');
+    return parseCamelCasePayload<UsageDashboard>(
+      response.data,
+      usageDashboardSchema,
+      'UsageDashboardResponse',
+      'usage',
+    );
   },
 };
