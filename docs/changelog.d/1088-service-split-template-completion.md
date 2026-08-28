@@ -1,0 +1,1 @@
+- [Docs] Record merged PR #1547 as the first independently accepted end-to-end service-split template evidence, preserving the #1352 deviation audit and #1402 non-accepted history (Fixes #1088).
