@@ -1,51 +1,41 @@
 import { z } from 'zod';
 import apiClient from './index';
 import type { components } from '../types/api.generated';
-// Auth status response schema is currently empty `{}` in OpenAPI (backend gap).
-// Anchor the known request model so renames still surface at compile time.
+import { parseCamelCasePayload } from './parseCamelCasePayload';
+
 type OpenApiAuthSettingsRequest = components['schemas']['AuthSettingsRequest'];
+type OpenApiAuthStatusResponse = components['schemas']['AuthStatusResponse'];
+
+export type AuthStatusResponse = OpenApiAuthStatusResponse;
+
 type _AssertAuthSettings = keyof OpenApiAuthSettingsRequest;
 const _authSettingsAnchor: _AssertAuthSettings = 'authEnabled';
 void _authSettingsAnchor;
 
-import { createApiError, createParsedApiError } from './error';
-import { toCamelCase } from './utils';
+type _AssertAuthStatus = keyof OpenApiAuthStatusResponse;
+const _authStatusAnchor: _AssertAuthStatus = 'passwordChangeable';
+void _authStatusAnchor;
 
-export type AuthStatusResponse = {
-  authEnabled: boolean;
-  loggedIn: boolean;
-  passwordSet?: boolean;
-  passwordChangeable?: boolean;
-  setupState: 'enabled' | 'password_retained' | 'no_password';
-};
+const AUTH_SETUP_STATES = ['enabled', 'password_retained', 'no_password'] as const;
+type AuthSetupState = AuthStatusResponse['setupState'];
+type _AssertSetupStateExhaustive = Exclude<AuthSetupState, (typeof AUTH_SETUP_STATES)[number]> extends never
+  ? Exclude<(typeof AUTH_SETUP_STATES)[number], AuthSetupState> extends never
+    ? true
+    : never
+  : never;
+const _setupStateExhaustive: _AssertSetupStateExhaustive = true;
+void _setupStateExhaustive;
 
 const authStatusSchema = z.object({
   authEnabled: z.boolean(),
   loggedIn: z.boolean(),
-  passwordSet: z.boolean().optional(),
-  passwordChangeable: z.boolean().optional(),
-  setupState: z.string(),
+  passwordSet: z.boolean(),
+  passwordChangeable: z.boolean(),
+  setupState: z.enum(AUTH_SETUP_STATES),
 }).passthrough();
 
 function parseAuthStatusPayload(data: unknown, label: string): AuthStatusResponse {
-  const camel = toCamelCase<unknown>(data);
-  const result = authStatusSchema.safeParse(camel);
-  if (!result.success) {
-    const issueSummary = result.error.issues.slice(0, 5).map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`).join('; ');
-    if (import.meta.env.DEV) {
-      console.error(`[auth] response validation failed (${label})`, result.error.issues);
-    }
-    throw createApiError(createParsedApiError({
-      title: '响应校验失败',
-      message: `接口响应未通过校验（${label}）。${issueSummary}`,
-      rawMessage: result.error.message,
-      category: 'unknown',
-      code: 'api_response_validation_failed',
-      params: { label, issues: issueSummary },
-      details: result.error.issues,
-    }));
-  }
-  return camel as AuthStatusResponse;
+  return parseCamelCasePayload<AuthStatusResponse>(data, authStatusSchema, label, 'auth');
 }
 
 /** Auth client: login/session cookie behavior unchanged; only status-shaped bodies are validated. */

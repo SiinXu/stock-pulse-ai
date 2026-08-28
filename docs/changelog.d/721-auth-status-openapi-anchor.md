@@ -1,0 +1,1 @@
+- [Changed] Anchor the Web auth status client on generated OpenAPI AuthStatusResponse with required password fields and a closed setupState enum (Refs #721).
