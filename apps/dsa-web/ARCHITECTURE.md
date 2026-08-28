@@ -159,6 +159,7 @@ than a line-count-driven file split.
 | `StockDetailsPage` quote + history | `hooks/useStockDetailsQueries.ts` | Code/days key; no poll/focus; `retry: false` | Wave 1 |
 | Analysis Workbench dashboard data refresh | `hooks/useDashboardDataRefreshQuery.ts` (via `useDashboardLifecycle`) | First run **per mount** (mount-scoped query key + cache miss) non-silent history + stock-bar + active tasks; initial-loader identity change re-runs non-silent path; later ticks silent at **30s**; explicit `visibilitychange` refetch (`refetchOnWindowFocus: false`); unmount removes schedule cache entry; SSE + 2s disconnected task poll stay custom; `retry: false` | Wave 2 (#789) |
 | `HomePage` attention / Today's Focus / setup-status | `hooks/useHomePageQueries.ts` | Mount + manual refresh only; no poll; no window-focus refetch; Today's Focus key includes language; attention pack uses allSettled so one failed source does not wipe the pack; last-known signal totals stay marked stale; setup silent refresh stays onboarding-owned; unmount removes cache rows; `retry: false`; `staleTime: 0` | Wave 2 (#789) |
+| Header notification bell preview + unread count | `hooks/useUnreadNotifications.ts` | **60s** poll (`pollMs` default 60000, `pageSize` 10, `enabled` true); query key includes `pageSize` only; `list({ pageSize })` + `unreadCount()` via `Promise.allSettled`; last-good per side from live cache after settlement; independent flags; hard error only when both fail; bounded `sourceStatuses` degradation; `retry: false`; `refetchOnWindowFocus: false`; `refetchIntervalInBackground: true`; `networkMode: 'always'` (previous effect always fetched while offline); `staleTime: 0` + unmount/disable/key-change silent cancel + `removeQueries` (no hidden remount or disable-period cache; not `gcTime: 0`); `refresh` void-facing (silent cancel then `refetchQueries` so an initial pending pair is replaced); `markAllSeen` keeps `markAllRead` success/failure/rethrow. Notification Center page stays hand-rolled. | #789 |
 
 ### Rollout rules for the next pages
 
@@ -172,7 +173,7 @@ than a line-count-driven file split.
    until a later dedicated slice.
 6. Tests that render a Query consumer must wrap with a test `QueryClientProvider` (`retry: false`).
 
-Suggested remaining migration order (issue #789): Portfolio projection session → Notification Center + unread 60s poll → Settings system-config loads → Screening → Chat/agent status → Backtest / calculators / report compare / event calendar / token usage. Defer surfaces owned by concurrent open PRs.
+Suggested remaining migration order (issue #789): Portfolio projection session → Notification Center page (cursor pagination; header bell preview is migrated) → Settings system-config loads → Screening → Chat/agent status → Backtest / calculators / report compare / event calendar / token usage. Defer surfaces owned by concurrent open PRs.
 
 ## Change Checklist
 

@@ -1,0 +1,1 @@
+- [Changed] Schedule header notification-bell preview and unread-count reads through TanStack Query while preserving last-good per side, independent failure flags, and the 60s poll (Refs #789).
