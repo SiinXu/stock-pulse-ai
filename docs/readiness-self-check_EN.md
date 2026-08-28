@@ -36,7 +36,7 @@ Overall status aggregation:
 | --- | --- |
 | Data providers | `build_data_provider_runtime_status` |
 | LLM | `SystemConfigService.get_setup_status` (`llm_primary`) + generation-backend cheap status |
-| Task queue | `AnalysisTaskQueue.get_task_stats` / `max_workers` |
+| Task queue | Injected `ApplicationServices` queue, else an already fully initialized `AnalysisTaskQueue` singleton (`get_task_stats` / `max_workers`). Never `get_task_queue()`. |
 | Dependencies | Setup projection (`storage`, `stock_list`, `notification`, `llm_agent`) |
 
 First-run readiness (`GET /api/v1/onboarding/first-run`) and setup status (`GET /api/v1/system/config/setup/status`) keep their existing payloads. This module is the shared structured composition layer for diagnostics and operators.
@@ -70,6 +70,28 @@ Registered in the shared config registry and loaded into `Config.readiness_check
 - Configured backend unavailable → LLM check `failed`
 - Task queue missing, shut down, zero workers, or stats failure → `failed`
 - Check timeout → `failed` for required checks (`reason_code=check_timeout`)
+
+## Task queue probe
+
+The default task-queue check is **observational**. Explicit `queue=` /
+`queue_factory=` seams are unchanged. When neither is supplied, readiness
+calls `resolve_existing_task_queue()`:
+
+1. Return a constructor-injected queue from an **already installed**
+   `ApplicationServices` root. Do not touch the lazy `task_queue` property
+   (that would call operational `get_task_queue()`).
+2. Otherwise return `get_existing_initialized_task_queue()`, which reads
+   `AnalysisTaskQueue._instance` under `_instance_lock` only when it is
+   already fully initialized.
+3. Never install a default composition root.
+
+`get_task_queue()` remains the operational accessor: it may construct the
+singleton, read config, `sync_max_workers`, and shut down or replace an idle
+executor. Readiness must not use it. If no owner exists, the check is
+`failed` with `reason_code=task_queue_missing` and the overall report is
+`failed` because the check is required. Live and shutdown queues are observed
+in place; readiness never constructs, config-syncs, shuts down, or replaces
+queue state.
 
 Generation-backend status payload fields and test-double obligations:
 [Shared runtime session contract owners](runtime-session-contract-owners.md).

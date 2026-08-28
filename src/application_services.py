@@ -911,6 +911,26 @@ def resolve_process_data_fetcher_manager() -> Any:
     return _get_fallback_fetcher_manager()
 
 
+def resolve_existing_task_queue() -> Optional["AnalysisTaskQueue"]:
+    """Return an existing task queue without installing or lazily creating one.
+
+    Prefer a constructor-injected queue on an already installed
+    ``ApplicationServices`` root. Never touch the lazy ``task_queue``
+    property (that would call ``get_task_queue``) and never install a
+    default root. If the installed root has no injected queue, fall back
+    to the already fully initialized process singleton when one exists.
+    """
+
+    services = get_installed_application_services()
+    if services is not None:
+        injected = services._task_queue
+        if injected is not None:
+            return injected
+    from src.services.task_queue import get_existing_initialized_task_queue
+
+    return get_existing_initialized_task_queue()
+
+
 def get_application_services() -> ApplicationServices:
     """Return the installed composition root, creating a default one lazily."""
     while True:

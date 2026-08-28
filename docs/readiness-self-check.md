@@ -22,6 +22,8 @@ src/core/readiness.py
 
 复用既有观测探针（setup status、data provider runtime status、generation backend cheap status、task queue stats），不另造并行健康体系。首启 / setup 原有 API 契约保持不变。
 
+任务队列默认探测是**观测性**的：优先读取已安装 `ApplicationServices` 根上构造时注入的队列（不触达会调用 `get_task_queue()` 的惰性 `task_queue` 属性，也不安装默认根）；否则只读取已经完全初始化的 `AnalysisTaskQueue` 单例。不得走会构造单例、读配置、`sync_max_workers` 或替换/关闭 executor 的 `get_task_queue()`。没有 owner 时检查为 `failed` 且 `reason_code=task_queue_missing`（该检查为 required，整体报告亦为 `failed`）。已有 live / shutdown 状态就地观测，探测不得构造、同步配置、关闭或替换队列状态。`queue=` / `queue_factory=` 注入缝保持不变。
+
 ## API
 
 ```http

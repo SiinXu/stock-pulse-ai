@@ -1,0 +1,1 @@
+- [Fixed] Keep the structured readiness task-queue probe observational: it reads an injected composition-root queue or an already initialized singleton and no longer constructs, config-syncs, or shuts down the executor (Refs #1071).
