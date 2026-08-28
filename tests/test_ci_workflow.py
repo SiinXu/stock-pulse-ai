@@ -86,10 +86,75 @@ def _assert_job_fail_closed(job: dict) -> None:
     assert all(step.get("continue-on-error", False) is False for step in job["steps"])
 
 
-def test_ci_uses_supported_pull_request_and_push_events_only() -> None:
+REQUIRED_CHECK_DISPLAY_NAMES = {
+    "changes": "🔎 Change Detection",
+    "ai-governance": "ai-governance",
+    "backend-gate": "backend-gate",
+    "backend-gate-main": "backend-gate",
+    "python-minimum": "python-minimum",
+    "pydanticai-installed": "pydanticai-installed",
+    "docker-build": "docker-build",
+    "openapi-types-gate": "openapi-types-gate",
+    "web-gate": "web-gate",
+}
+EXISTING_JOB_IDS = (
+    "changes",
+    "ai-governance",
+    "agent-eval-gate",
+    "backend-gate",
+    "backend-tests",
+    "backend-gate-main",
+    "python-minimum-tests",
+    "python-minimum",
+    "pydanticai-installed",
+    "report-export-stack",
+    "ocr-stock-extractor",
+    "docker-build",
+    "openapi-types-gate",
+    "web-gate",
+    "desktop-gate",
+    "web-e2e",
+    "api-real-client",
+)
+FULL_BACKEND_EVENT_CONDITION = (
+    "needs.changes.outputs.backend == 'true' && "
+    "(github.event_name == 'push' || "
+    "github.event_name == 'merge_group' || "
+    "(github.event_name == 'pull_request' && "
+    "needs.changes.outputs.backend_full == 'true'))"
+)
+
+
+def test_ci_uses_supported_pull_request_push_and_merge_group_events() -> None:
     workflow = _workflow()
     # PyYAML loads the bare key `on:` as boolean True.
-    assert set(workflow[True]) == {"pull_request", "push"}
+    triggers = workflow[True]
+    assert set(triggers) == {"pull_request", "push", "merge_group"}
+    assert triggers["pull_request"] == {"branches": ["main"]}
+    assert triggers["push"] == {"branches": ["main"]}
+    assert triggers["merge_group"] == {"types": ["checks_requested"]}
+
+
+def test_ci_concurrency_is_event_ref_scoped_without_ungated_pull_request_payload() -> None:
+    workflow = _workflow()
+    concurrency = workflow["concurrency"]
+    assert concurrency["cancel-in-progress"] is True
+    assert concurrency["group"] == (
+        "ci-${{ (github.event_name == 'pull_request' && "
+        "github.event.pull_request.number) || github.ref }}"
+    )
+    assert "github.sha" not in concurrency["group"]
+    assert "github.run_id" not in concurrency["group"]
+
+
+def test_required_check_display_names_and_job_ids_are_unchanged() -> None:
+    workflow = _workflow()
+    jobs = workflow["jobs"]
+    assert tuple(jobs) == EXISTING_JOB_IDS
+    for job_id, display_name in REQUIRED_CHECK_DISPLAY_NAMES.items():
+        assert jobs[job_id]["name"] == display_name
+    assert jobs["backend-gate"]["name"] == jobs["backend-gate-main"]["name"] == "backend-gate"
+    assert jobs["python-minimum"]["name"] == "python-minimum"
 
 
 def test_backend_gate_pr_is_selective() -> None:
@@ -174,12 +239,7 @@ def test_backend_tests_are_sharded_for_full_prs_and_push_to_main() -> None:
     job = workflow["jobs"]["backend-tests"]
 
     assert job["needs"] == ["changes", "ai-governance"]
-    assert job["if"] == (
-        "needs.changes.outputs.backend == 'true' && "
-        "(github.event_name == 'push' || "
-        "(github.event_name == 'pull_request' && "
-        "needs.changes.outputs.backend_full == 'true'))"
-    )
+    assert job["if"] == FULL_BACKEND_EVENT_CONDITION
     assert job["strategy"]["matrix"]["shard"] == [1, 2, 3, 4]
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert sum("offline-tests-shard" in command for command in runs) == 1
@@ -245,12 +305,7 @@ def test_backend_gate_summary_combines_coverage_after_all_shards() -> None:
 
     assert job["name"] == "backend-gate"
     assert job["needs"] == ["changes", "ai-governance", "backend-tests"]
-    assert job["if"] == (
-        "always() && needs.changes.outputs.backend == 'true' && "
-        "(github.event_name == 'push' || "
-        "(github.event_name == 'pull_request' && "
-        "needs.changes.outputs.backend_full == 'true'))"
-    )
+    assert job["if"] == f"always() && {FULL_BACKEND_EVENT_CONDITION}"
     _assert_job_fail_closed(job)
     runs = [step.get("run", "") for step in job["steps"] if "run" in step]
     assert sum("offline-tests-combine" in command for command in runs) == 1
@@ -399,7 +454,7 @@ def test_python_minimum_pr_smoke_remains_honest() -> None:
 
 
 def test_python_minimum_push_covers_sharded_python_310_suite() -> None:
-    """Push-to-main must still execute the full offline suite on Python 3.10."""
+    """Push-to-main and merge_group must still execute the full offline suite on 3.10."""
 
     workflow = _workflow()
     job = workflow["jobs"]["python-minimum-tests"]
@@ -408,7 +463,8 @@ def test_python_minimum_push_covers_sharded_python_310_suite() -> None:
     assert job["name"] == "python-minimum-tests (${{ matrix.shard }}/4)"
     assert job["needs"] == ["changes", "ai-governance"]
     assert job["if"] == (
-        "needs.changes.outputs.backend == 'true' && github.event_name == 'push'"
+        "needs.changes.outputs.backend == 'true' && "
+        "(github.event_name == 'push' || github.event_name == 'merge_group')"
     )
     assert job["permissions"] == {"contents": "read"}
     _assert_job_fail_closed(job)
@@ -470,7 +526,7 @@ def test_python_minimum_push_covers_sharded_python_310_suite() -> None:
 
 
 def test_python_minimum_shards_cover_every_offline_test_module_once() -> None:
-    """The 3.10 push matrix reuses the same 4-way partitioner as backend-tests."""
+    """The 3.10 push/merge_group matrix reuses the same 4-way partitioner as backend-tests."""
 
     from scripts.ci_test_shard import (
         discover_test_files,
@@ -539,11 +595,156 @@ def test_python_minimum_aggregator_cannot_mask_failed_or_cancelled_shard() -> No
     assert env["EVENT_NAME"] == "${{ github.event_name }}"
     script = require["run"]
     assert '[ "${EVENT_NAME}" = "push" ]' in script
+    assert '[ "${EVENT_NAME}" = "merge_group" ]' in script
     assert '[ "${TESTS_RESULT}" != "success" ]' in script
     assert "python-minimum-tests shards failed" in script
     assert "exit 1" in script
     assert "continue-on-error" not in script
     assert "|| true" not in script
+    assert "PR tier: python-minimum-tests skipped; smoke follows" in script
+
+
+def test_merge_group_fail_closes_to_full_backend_and_python_minimum_shards() -> None:
+    """Queue time uses the authoritative full 3.11/3.10 shards, not PR smoke."""
+
+    workflow = _workflow()
+    planner = next(
+        step
+        for step in workflow["jobs"]["changes"]["steps"]
+        if step.get("id") == "backend-selection"
+    )
+    selective = workflow["jobs"]["backend-gate"]
+    shards = workflow["jobs"]["backend-tests"]
+    backend_aggregator = workflow["jobs"]["backend-gate-main"]
+    py310_shards = workflow["jobs"]["python-minimum-tests"]
+    py310_aggregator = workflow["jobs"]["python-minimum"]
+
+    assert planner["if"].startswith("github.event_name == 'pull_request' &&")
+    assert "merge_group" not in planner["if"]
+    assert selective["if"] == (
+        "github.event_name == 'pull_request' && "
+        "needs.changes.outputs.backend == 'true' && "
+        "needs.changes.outputs.backend_full != 'true'"
+    )
+    assert shards["if"] == FULL_BACKEND_EVENT_CONDITION
+    assert backend_aggregator["if"] == f"always() && {FULL_BACKEND_EVENT_CONDITION}"
+    assert py310_shards["if"] == (
+        "needs.changes.outputs.backend == 'true' && "
+        "(github.event_name == 'push' || github.event_name == 'merge_group')"
+    )
+    assert "backend_full" not in py310_shards["if"]
+    assert py310_aggregator["if"] == "always() && needs.changes.outputs.backend == 'true'"
+    backend_require = next(
+        step
+        for step in backend_aggregator["steps"]
+        if step.get("name") == "✅ Require shard success"
+    )
+    assert '[ "${TESTS_RESULT}" != "success" ]' in backend_require["run"]
+    require = next(
+        step
+        for step in py310_aggregator["steps"]
+        if step.get("name") == "✅ Require python-minimum prerequisites"
+    )
+    assert '[ "${EVENT_NAME}" = "merge_group" ]' in require["run"]
+    assert '[ "${TESTS_RESULT}" != "success" ]' in require["run"]
+    smoke = next(
+        step
+        for step in py310_aggregator["steps"]
+        if step.get("run", "").strip() == "./scripts/ci_gate.sh python-min-smoke"
+    )
+    assert smoke["if"] == "github.event_name == 'pull_request'"
+
+
+def test_observation_jobs_stay_push_only_and_do_not_run_on_merge_group() -> None:
+    workflow = _workflow()
+    web_e2e = workflow["jobs"]["web-e2e"]
+    api_real_client = workflow["jobs"]["api-real-client"]
+
+    assert web_e2e["if"] == (
+        "github.event_name == 'push' && needs.changes.outputs.web_e2e == 'true'"
+    )
+    assert api_real_client["if"] == "github.event_name == 'push'"
+    assert "merge_group" not in web_e2e["if"]
+    assert "merge_group" not in api_real_client["if"]
+
+
+def _gitignore_style_match(path: str, patterns: list[str]) -> bool:
+    included = False
+    for pattern in patterns:
+        negated = pattern.startswith("!")
+        body = pattern[1:] if negated else pattern
+        if _path_filter_covers(path, {body}):
+            included = not negated
+    return included
+
+
+def _backend_non_web_patterns() -> list[str]:
+    changes = _workflow()["jobs"]["changes"]
+    step = next(item for item in changes["steps"] if item.get("id") == "backend-filter")
+    return yaml.safe_load(step["with"]["filters"])["backend_non_web"]
+
+
+def _path_backend_filter_flags(path: str) -> tuple[bool, bool]:
+    """Return (backend_non_web, backend_web_contract) before the event override."""
+
+    return (
+        _gitignore_style_match(path, _backend_non_web_patterns()),
+        _path_filter_covers(path, set(_path_filters()["backend_web_contract"])),
+    )
+
+
+def test_changes_backend_fail_closes_true_on_merge_group_only() -> None:
+    expr = _workflow()["jobs"]["changes"]["outputs"]["backend"]
+    assert expr == (
+        "${{ github.event_name == 'merge_group' || "
+        "steps.backend-filter.outputs.backend_non_web == 'true' || "
+        "steps.filter.outputs.backend_web_contract == 'true' }}"
+    )
+    assert "github.event.pull_request" not in expr
+
+
+def test_merge_group_path_filters_before_event_override() -> None:
+    """auth.ts and changelog-only stay backend-false until merge_group overrides."""
+
+    cases = (
+        ("apps/dsa-web/src/api/auth.ts", False, False),
+        ("docs/CHANGELOG.md", False, False),
+        ("src/api/app.py", True, False),
+    )
+    for path, non_web, contract in cases:
+        assert _path_backend_filter_flags(path) == (non_web, contract), path
+
+
+def test_merge_group_paths_do_not_dereference_pull_request_only_payload() -> None:
+    """Expressions that also run on merge_group must not read pull_request fields."""
+
+    workflow = _workflow()
+    concurrency_group = workflow["concurrency"]["group"]
+    assert concurrency_group.startswith(
+        "ci-${{ (github.event_name == 'pull_request' && "
+    )
+    planner = next(
+        step
+        for step in workflow["jobs"]["changes"]["steps"]
+        if step.get("id") == "backend-selection"
+    )
+    assert planner["if"].startswith("github.event_name == 'pull_request'")
+    changelog = next(
+        step
+        for step in workflow["jobs"]["ai-governance"]["steps"]
+        if step.get("name") == "🧾 Require changelog entry for product-code PRs"
+    )
+    assert changelog["if"] == "github.event_name == 'pull_request'"
+    selective = workflow["jobs"]["backend-gate"]
+    assert selective["if"].startswith("github.event_name == 'pull_request'")
+    backend_output = workflow["jobs"]["changes"]["outputs"]["backend"]
+    assert "github.event.pull_request" not in backend_output
+    assert "github.base_ref" not in backend_output
+    assert "github.head_ref" not in backend_output
+    for job_id in ("backend-tests", "backend-gate-main", "python-minimum-tests"):
+        assert "github.event.pull_request" not in workflow["jobs"][job_id].get("if", "")
+        assert "github.base_ref" not in workflow["jobs"][job_id].get("if", "")
+        assert "github.head_ref" not in workflow["jobs"][job_id].get("if", "")
 
 
 def test_docker_build_skips_when_docker_paths_unchanged():

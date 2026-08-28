@@ -1,0 +1,1 @@
+- [Changed] Add merge_group checks_requested CI readiness so queue time fail-closes into the full Python 3.11 and 3.10 shard gates even for frontend-only groups, without changing PR selective feedback or required check names (Refs #1065).
