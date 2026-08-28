@@ -10,9 +10,22 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 
-from src.api.deps import get_local_model_service, get_model_pack_import_service
+from src.api.deps import (
+    get_local_model_service,
+    get_model_pack_import_service,
+    require_security_audit_service,
+)
+from src.api.v1.services.model_pack_import_audit import (
+    ModelPackImportAuditCompletionUnavailable,
+    map_model_pack_import_audit_exception,
+    run_model_pack_import_with_audit,
+)
 from src.api.v1.services.system_config_write_audit import (
     system_config_write_audit_actor_id,
+)
+from src.services.security_audit_service import (
+    SecurityAuditRecorder,
+    SecurityAuditUnavailable,
 )
 from src.api.middlewares.model_pack_upload import (
     MAX_MODEL_PACK_UPLOAD_BYTES,
@@ -122,24 +135,49 @@ def _stage_upload(upload: UploadFile) -> tuple[Path, Path]:
         202: {"description": "Model Pack import accepted"},
         400: {"description": "Invalid upload", "model": ErrorResponse},
         413: {"description": "Upload exceeds the bounded staging limit", "model": ErrorResponse},
+        503: {
+            "description": "Security audit unavailable (operation_completed)",
+            "model": ErrorResponse,
+        },
         507: {"description": "Insufficient staging disk", "model": ErrorResponse},
     },
     summary="Import a local Model Pack",
     description=(
         "Stage a Model Pack for background validation and import. "
-        "The Ollama target is read only from server configuration."
+        "The Ollama target is read only from server configuration. "
+        "Existing 202/400/413/507 protocol is unchanged. Attempt is persisted "
+        "after a successful stage and before queue submit; attempt-store failure "
+        "returns 503 operation_completed=false without queueing. After the queue "
+        "accepts, completion-store failure returns 503 operation_completed=true "
+        "with task_id, kind, and status."
     ),
 )
 def import_model_pack(
     file: UploadFile = File(..., description="A .modelpack or ZIP archive"),
     service: ModelPackImportService = Depends(get_model_pack_import_service),
+    security_audit: SecurityAuditRecorder = Depends(require_security_audit_service),
 ) -> ModelPackImportAccepted:
     """Stage one archive and submit the canonical background import task."""
     staging_root = None
     try:
         staged_path, staging_root = _stage_upload(file)
-        task = service.start_import(staged_path, cleanup_root=staging_root)
+        task = run_model_pack_import_with_audit(
+            security_audit,
+            suffix=staged_path.suffix.lower(),
+            byte_length=staged_path.stat().st_size,
+            start_import=lambda: service.start_import(
+                staged_path, cleanup_root=staging_root
+            ),
+        )
     except HTTPException:
+        raise
+    except (
+        SecurityAuditUnavailable,
+        ModelPackImportAuditCompletionUnavailable,
+    ) as exc:
+        if isinstance(exc, SecurityAuditUnavailable) and staging_root is not None:
+            _remove_staging(staging_root)
+        map_model_pack_import_audit_exception(exc)
         raise
     except Exception as exc:
         if staging_root is not None:

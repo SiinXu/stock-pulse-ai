@@ -15,7 +15,11 @@ from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 from starlette.formparsers import MultiPartParser
 
-from src.api.deps import get_local_model_service, get_model_pack_import_service
+from src.api.deps import (
+    get_local_model_service,
+    get_model_pack_import_service,
+    require_security_audit_service,
+)
 from src.api.middlewares.model_pack_upload import (
     MODEL_PACK_IMPORT_PATH,
     ModelPackUploadLimitMiddleware,
@@ -29,6 +33,16 @@ from src.model_pack import (
 
 
 _DESKTOP_ATTESTATION_SECRET = "a" * 64
+
+
+class _NoOpSecurityAudit:
+    """Keep isolated Model Pack API tests off the process-default audit store."""
+
+    def record_attempt(self, **_fields):
+        return None
+
+    def record_completion(self, **_fields):
+        return None
 
 
 def _desktop_attestation(
@@ -137,6 +151,9 @@ def _app(
     app.include_router(model_packs.router, prefix="/model-packs")
     app.dependency_overrides[get_model_pack_import_service] = lambda: service
     app.dependency_overrides[get_local_model_service] = lambda: "local-model-service"
+    app.dependency_overrides[require_security_audit_service] = (
+        lambda: _NoOpSecurityAudit()
+    )
     return app
 
 

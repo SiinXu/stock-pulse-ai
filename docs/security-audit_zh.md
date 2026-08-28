@@ -101,9 +101,10 @@ English version: [Durable Security Audit](security-audit.md).
 | Onboarding apply | `src/services/onboarding_plan_service.py` → `SystemConfigService.update` | **已落地** | 同一写入器；`confirm=false` 仍在 `update()` 前返回 400 | DAG-5 |
 | 写入配置的本地模型注册/分配/删除 | `src/services/local_model_service.py` → `SystemConfigService.update` | **已落地** | `source=local_model`；HTTP 将 attempt/completion 不可用映射为带 `operation_completed` 的 503 | DAG-5 |
 | 自选 `STOCK_LIST` 增删 | `src/api/v1/endpoints/stocks.py` `_write_watchlist_codes` → `SystemConfigService.update` | **已落地** | 同一写入器，`source=watchlist`，共享 503 映射（`config_version` / `applied_count` / `reload_triggered`）。其余自选分组产品数据仍延期 | DAG-5 |
-| 模型包导入 / 桌面激活 | `src/api/v1/endpoints/model_packs.py` | **具名延期** | 可信制品安装（上传/暂存/解包）仍延期。桌面激活配置写入走 `update()`，已作为 `system_config.write` 落地 | DAG-5 / 具名负责人 |
+| 模型包 HTTP 导入 | `src/api/v1/endpoints/model_packs.py` `import_model_pack` | **已落地** | 仅在 HTTP `POST /api/v1/model-packs/import` 写 `model_pack.import`。fail-closed 503 `operation_completed`。worker 校验/创建/激活、GET 导入状态、原始 `TaskQueue.submit` 与桌面激活不是本事件 | DAG-7 |
+| 模型包桌面激活 | `POST /api/v1/model-packs/desktop-activations` | **已落地** | 配置写入走 `update()`，属 `system_config.write`。不是 `model_pack.import` | DAG-5 |
 | HTTP 市场复盘 / 候选发现 / AlphaSift | analysis API、`candidate_discovery.py`、`alphasift.py` 的 `submit_background_task` | **已落地** | 另一套队列 API 上的特权后台执行。**不是** DAG-1。仅在 HTTP 适配器写 `background.submit`；TaskQueue 与候选发现 cancel 不是本事件 | DAG-6 |
-| 投资框架变更 | `src/services/investment_framework_service.py` | **缺失** | 分析策略内容；除非明确视为策略控制，否则延期 | 延期，除非重新归类 |
+| 投资框架变更 | `src/services/investment_framework_service.py` | **缺失** | 分析策略内容；除非明确视为策略控制，否则延期（负责人：产品 / [#465](https://github.com/SiinXu/stock-pulse-ai/issues/465)） | 延期，除非重新归类 |
 
 DAG-1 已扩展 `AnalysisSubmissionCommand`（`query_source`、`request_context`、
 `portfolio_context`、`strict_skill_selection` 与 actor 身份），并共享
@@ -167,6 +168,24 @@ keywords、account、cookie、token、URL、prompt 或结果。
 `TaskQueue.submit_background_task`、候选发现 cancel、CLI/GHA 与
 `analysis.submit` 不是本事件。
 
+DAG-7 仅在 HTTP `POST /api/v1/model-packs/import` 写入
+`model_pack.import`。attempt 在成功暂存之后、
+`ModelPackImportService.start_import` 之前提交。Actor 为
+`administrator` / `authenticated_admin` / `local_operator` /
+`desktop_operator`（与 DAG-5 配置写入相同）。Target 为
+`model_pack_import_task` / 已入队 `task_id`，入队前使用有界
+`unknown-import` token。现有 202/400/413/507 协议不变。attempt
+写入失败的 `503` 为 `operation_completed=false`，会清理暂存且不入队。
+入队已被接受但 completion 失败的 `503` 为
+`operation_completed=true` 并带 `task_id`/`kind`/`status`，不回滚队列。
+队列异常尽力记录 failure，并保持脱敏后的 `500`
+`model_pack_import_submission_failed`。metadata 仅含 kind、suffix、
+byte_length 与成功/接受时的 status，不含文件名、暂存路径、归档字节、
+cookie、token、Authorization、manifest/模型 id、显示名、许可证、哈希、
+Modelfile、prompt 或 Ollama URL。桌面激活仍是 `system_config.write`。
+GET 导入状态、worker 完成 `ollama create`、以及原始
+`TaskQueue.submit` 不是本事件。不要把本事件折进 `background.submit`。
+
 ### 延期（不在本 DAG）
 
 | 操作 | 状态 | 原因 |
@@ -189,6 +208,8 @@ prompt、stdout 或密钥。
 不要把剩余具名后续行折进更早切片。不要纳入组合 CRUD 或告警。自选
 `STOCK_LIST` 写入已在 DAG-5 落地。HTTP 市场复盘 / 候选发现 / AlphaSift
 入队已在 DAG-6 落地；不要把这些适配器折进 DAG-1。
+HTTP 模型包可信制品导入已在 DAG-7 落地；不要把它折进 DAG-5 或 DAG-6。
+投资框架变更仍延期，除非产品将其重新归类为分析策略（#465）。
 
 ```text
 DAG-0  本覆盖图（仅文档；无运行时行为）
@@ -215,11 +236,15 @@ DAG-5  SystemConfigService.update 写入（已落地）
          HTTP PUT、预设、onboarding、本地模型配置写入、
          自选 STOCK_LIST、legacy 迁移；
          服务层一次审计，HTTP 路径不得双写；
-         模型包可信制品安装仍延期
+         桌面模型包激活的配置写入属本事件
 
 DAG-6  HTTP background.submit（已落地）
          市场复盘、候选发现、AlphaSift 入队；
          仅 HTTP 适配器；不是 TaskQueue，也不是候选发现 cancel
+
+DAG-7  HTTP model_pack.import（已落地）
+         仅 POST /api/v1/model-packs/import；
+         不是 worker、不是桌面激活、不是 GET 状态、不是 TaskQueue
 ```
 
 后续建议标题（英文，无工具前缀）：
@@ -231,9 +256,11 @@ DAG-6  HTTP background.submit（已落地）
 5. `feat: audit report export and history deletion`（DAG-4，已落地）
 6. `feat: audit SystemConfigService.update config writes`（DAG-5，已落地）
 7. `feat: audit HTTP market-review candidate discovery and AlphaSift admission`（DAG-6，已落地）
+8. `feat: audit HTTP model-pack trusted artifact import`（DAG-7，已落地）
 
 在范围内剩余行变为 **已落地** 或带负责人的 **延期** 之前，保持 #1062 开放。
-不要用关闭 #535 代替本覆盖图。
+DAG-7 之后剩余具名行是投资框架变更，除非产品将其重新归类为分析策略
+（#465）。不要用关闭 #535 代替本覆盖图。
 
 ## Issue 与基线卫生
 
