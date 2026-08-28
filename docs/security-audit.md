@@ -111,9 +111,10 @@ Legend:
 | Onboarding apply | `src/services/onboarding_plan_service.py` → `SystemConfigService.update` | **Landed** | Same writer; `confirm=false` stays 400 before `update()` | DAG-5 |
 | Local model register/assign/delete that writes config | `src/services/local_model_service.py` → `SystemConfigService.update` | **Landed** | `source=local_model`; HTTP maps attempt/completion unavailability to 503 `operation_completed` | DAG-5 |
 | Watchlist `STOCK_LIST` add/remove | `src/api/v1/endpoints/stocks.py` `_write_watchlist_codes` → `SystemConfigService.update` | **Landed** | Same writer with `source=watchlist` and the shared 503 mapper (`config_version` / `applied_count` / `reload_triggered`). Remaining watchlist-group product data stays Deferred | DAG-5 |
-| Model pack import / desktop activation | `src/api/v1/endpoints/model_packs.py` | **Deferred with owner** | Trusted artifact install (upload/stage/extract) remains deferred. Desktop activation config writes through `update()` are Landed as `system_config.write` | DAG-5 / named owner |
+| Model pack HTTP import | `src/api/v1/endpoints/model_packs.py` `import_model_pack` | **Landed** | `model_pack.import` at HTTP `POST /api/v1/model-packs/import` only. Fail-closed 503 `operation_completed`. Worker inspect/create/activate, GET import status, raw `TaskQueue.submit`, and desktop activation are not this event | DAG-7 |
+| Model pack desktop activation | `POST /api/v1/model-packs/desktop-activations` | **Landed** | Config writes through `update()` are `system_config.write`. Not `model_pack.import` | DAG-5 |
 | HTTP market-review / candidate discovery / AlphaSift | `submit_background_task` in analysis API, `candidate_discovery.py`, `alphasift.py` | **Landed** | Privileged background execution on a different queue API. **Not** DAG-1. `background.submit` at the HTTP adapters only; TaskQueue and discovery cancel are not this event | DAG-6 |
-| Investment-framework mutations | `src/services/investment_framework_service.py` | **Missing** | Analysis-policy content; defer unless framed as policy | Deferred unless reclassified |
+| Investment-framework mutations | `src/services/investment_framework_service.py` | **Missing** | Analysis-policy content; defer unless framed as policy (owner: product / [#465](https://github.com/SiinXu/stock-pulse-ai/issues/465)) | Deferred unless reclassified |
 
 DAG-1 extended `AnalysisSubmissionCommand` with `query_source`, `request_context`, `portfolio_context`, `strict_skill_selection`, and actor identity, and shares `record_audit` plus attempt-before-protected-operation fail-closed order. HTTP async / MCP / event-trigger keep `api_client` / `analysis_submitter`. Do not fold market-review, candidate discovery, or AlphaSift into this event.
 
@@ -182,6 +183,27 @@ never query, codes, criteria, keywords, account, cookies, tokens, URLs,
 prompts, or results. `TaskQueue.submit_background_task`, discovery cancel,
 CLI/GHA, and `analysis.submit` are not this event.
 
+DAG-7 records `model_pack.import` at HTTP
+`POST /api/v1/model-packs/import` only. Attempt is committed after a
+successful stage and before `ModelPackImportService.start_import`.
+Actor is `administrator` / `authenticated_admin` /
+`local_operator` / `desktop_operator` (the same tokens as DAG-5 config
+writes). Target is `model_pack_import_task` / the queued `task_id`, or
+the bounded `unknown-import` token before the queue assigns an id.
+Existing 202/400/413/507 protocol is unchanged. Attempt-store `503`
+uses `operation_completed=false`, cleans staging, and does not queue.
+After the queue accepts, completion-store `503` uses
+`operation_completed=true` plus `task_id`/`kind`/`status` and does not
+roll back. Queue exceptions record failure best-effort and keep the
+sanitized `500` `model_pack_import_submission_failed`. Metadata is
+limited to kind, suffix, byte_length, and success/accept status — never
+filename, staging path, archive bytes, cookies, tokens, Authorization,
+manifest/model id, display name, license, hashes, Modelfile, prompts,
+or Ollama URLs. Desktop activation remains `system_config.write`. GET
+import status, worker completion of `ollama create`, and raw
+`TaskQueue.submit` are not this event. Do not fold this into
+`background.submit`.
+
 ### Deferred (not in this DAG)
 
 | Operation | Status | Reason |
@@ -207,6 +229,9 @@ Do not stack remaining later-owner rows into an earlier slice. Do not
 include portfolio CRUD or alerts. Watchlist `STOCK_LIST` writes are Landed
 on DAG-5. HTTP market-review / candidate discovery / AlphaSift admission
 is Landed on DAG-6; do not fold those adapters into DAG-1.
+HTTP Model Pack trusted-artifact import is Landed on DAG-7; do not fold
+it into DAG-5 or DAG-6. Investment-framework mutations stay deferred
+unless product reclassifies them as analysis policy (#465).
 
 ```text
 DAG-0  this coverage map (docs only; no runtime behavior)
@@ -233,11 +258,15 @@ DAG-5  SystemConfigService.update writes (landed)
          HTTP PUT, profiles, onboarding, local-model config
          writes, watchlist STOCK_LIST, legacy migration;
          one service-level audit, no HTTP double-emit;
-         model-pack trusted artifact install remains Deferred
+         desktop Model Pack activation config writes are this event
 
 DAG-6  HTTP background.submit (landed)
          market-review, candidate discovery, AlphaSift admission;
          HTTP adapters only; not TaskQueue, not discovery cancel
+
+DAG-7  HTTP model_pack.import (landed)
+         POST /api/v1/model-packs/import only;
+         not worker, not desktop-activation, not GET status, not TaskQueue
 ```
 
 Suggested later titles (English, no tool prefix):
@@ -249,9 +278,12 @@ Suggested later titles (English, no tool prefix):
 5. `feat: audit report export and history deletion` (DAG-4, landed)
 6. `feat: audit SystemConfigService.update config writes` (DAG-5, landed)
 7. `feat: audit HTTP market-review candidate discovery and AlphaSift admission` (DAG-6, landed)
+8. `feat: audit HTTP model-pack trusted artifact import` (DAG-7, landed)
 
 Keep #1062 open until remaining in-scope rows are **Landed** or explicitly
-**Deferred** with an owner. Do not close #535 as a substitute for this map.
+**Deferred** with an owner. After DAG-7 the remaining named row is
+investment-framework mutations unless product reclassifies them as
+analysis policy (#465). Do not close #535 as a substitute for this map.
 
 ## Issue And Baseline Hygiene
 

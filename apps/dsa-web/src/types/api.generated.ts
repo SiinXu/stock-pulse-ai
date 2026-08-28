@@ -2396,7 +2396,7 @@ export interface paths {
         put?: never;
         /**
          * Import a local Model Pack
-         * @description Stage a Model Pack for background validation and import. The Ollama target is read only from server configuration.
+         * @description Stage a Model Pack for background validation and import. The Ollama target is read only from server configuration. Existing 202/400/413/507 protocol is unchanged. Attempt is persisted after a successful stage and before queue submit; attempt-store failure returns 503 operation_completed=false without queueing. After the queue accepts, completion-store failure returns 503 operation_completed=true with task_id, kind, and status.
          */
         post: operations["import_model_pack_api_v1_model_packs_import_post"];
         delete?: never;
@@ -27167,6 +27167,15 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Security audit unavailable (operation_completed) */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
             /** @description Insufficient staging disk */
