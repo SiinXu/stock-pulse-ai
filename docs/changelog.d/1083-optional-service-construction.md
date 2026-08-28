@@ -1,0 +1,1 @@
+- [Changed] Extract optional MarketHotspot, Search, and SocialSentiment construction from the pipeline facade into `src/core/stages/optional_services.py` while preserving fail-open init and facade patch targets (Refs #1083).

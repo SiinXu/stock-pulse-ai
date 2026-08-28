@@ -130,6 +130,23 @@ EXPECTED_ORCHESTRATION_METHODS = (
     'run',
 )
 
+EXPECTED_OPTIONAL_SERVICES_METHODS = (
+    "_init_optional_market_hotspot_service",
+    "_init_optional_search_service",
+    "_log_optional_search_service_status",
+    "_init_optional_social_sentiment_service",
+)
+
+# Constructors the optional-services stage deliberately does not import: a
+# top-level ``src.services`` import there would add a banned ``src.core ->
+# src.services`` reverse edge, so they must resolve from facade globals after
+# bind. Their facade imports read as unused to flake8 (F401) but are
+# load-bearing.
+FACADE_ONLY_OPTIONAL_SERVICE_GLOBALS = {
+    "_init_optional_market_hotspot_service": "MarketHotspotService",
+    "_init_optional_social_sentiment_service": "SocialSentimentService",
+}
+
 
 def _referenced_global_names(code: CodeType):
     """Return global-name candidates from a function and its nested code."""
@@ -185,6 +202,10 @@ def test_pipeline_legacy_entry_point_exposes_remaining_stage_methods():
 
     assert pipeline_class.__bases__ == (pipeline_module._DeliveryStageMixin,)
     assert all(callable(getattr(pipeline_class, name)) for name in expected_methods)
+    assert all(
+        callable(getattr(pipeline_class, name))
+        for name in EXPECTED_OPTIONAL_SERVICES_METHODS
+    )
 
 
 def test_pipeline_extracted_descriptors_preserve_facade_contract():
@@ -213,6 +234,11 @@ def test_pipeline_extracted_descriptors_preserve_facade_contract():
             "_ORCHESTRATION_STAGE_METHOD_NAMES",
             "_OrchestrationStageMixin",
             EXPECTED_ORCHESTRATION_METHODS,
+        ),
+        (
+            "_OPTIONAL_SERVICES_STAGE_METHOD_NAMES",
+            "_OptionalServicesStageMixin",
+            EXPECTED_OPTIONAL_SERVICES_METHODS,
         ),
     )
 
@@ -333,3 +359,76 @@ def test_pipeline_analysis_methods_resolve_legacy_facade_globals(monkeypatch):
         report_type="simple",
         previous_operation_advice=None,
     ) is sentinel
+
+
+def test_optional_services_methods_resolve_legacy_facade_globals(monkeypatch):
+    """Assert optional-service methods keep facade globals and patch targets."""
+
+    pipeline_module = importlib.import_module("src.core.pipeline")
+    pipeline_class = pipeline_module.StockAnalysisPipeline
+    pipeline_globals = vars(pipeline_module)
+
+    assert (
+        pipeline_module._OPTIONAL_SERVICES_STAGE_METHOD_NAMES
+        == EXPECTED_OPTIONAL_SERVICES_METHODS
+    )
+    for name in EXPECTED_OPTIONAL_SERVICES_METHODS:
+        descriptor = pipeline_class.__dict__[name]
+        function = (
+            descriptor.__func__
+            if isinstance(descriptor, (staticmethod, classmethod))
+            else descriptor
+        )
+        assert function.__globals__ is pipeline_globals
+        assert function.__module__ == "src.core.pipeline"
+        assert function.__qualname__ == f"StockAnalysisPipeline.{name}"
+
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError("facade-patched-search-boom")
+
+    monkeypatch.setattr(pipeline_module, "SearchService", _boom)
+
+    pipeline = pipeline_class.__new__(pipeline_class)
+    pipeline.config = type(
+        "Config",
+        (),
+        {
+            "bocha_api_keys": [],
+            "tavily_api_keys": [],
+            "anspire_api_keys": [],
+            "brave_api_keys": [],
+            "serpapi_keys": [],
+            "minimax_api_keys": [],
+            "searxng_base_urls": [],
+            "searxng_public_instances_enabled": False,
+            "rss_news_feed_urls": None,
+            "rss_news_fetch_timeout_sec": 8.0,
+            "news_max_age_days": 7,
+            "news_strategy_profile": "short",
+        },
+    )()
+
+    pipeline._init_optional_search_service()
+    assert pipeline.search_service is None
+
+
+def test_optional_services_constructors_resolve_from_facade_globals():
+    """Assert facade-only optional constructors stay importable from the facade."""
+
+    pipeline_module = importlib.import_module("src.core.pipeline")
+    stage_module = importlib.import_module("src.core.stages.optional_services")
+    pipeline_class = pipeline_module.StockAnalysisPipeline
+
+    for method_name, global_name in FACADE_ONLY_OPTIONAL_SERVICE_GLOBALS.items():
+        # Keeping the name out of the stage module preserves the layer ratchet.
+        assert global_name not in vars(stage_module)
+        # Dropping the facade import would silently disable the service instead
+        # of raising, because construction failures are fail-open.
+        assert global_name in vars(pipeline_module)
+        function = pipeline_class.__dict__[method_name]
+        assert global_name in _referenced_global_names(function.__code__)
+        # A function-local ``from src.services... import ...`` would bind the
+        # name locally and bypass ``patch("src.core.pipeline.<name>")``. The
+        # layer-direction ratchet only inspects module-level imports, so pin it
+        # here.
+        assert global_name not in function.__code__.co_varnames

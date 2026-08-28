@@ -113,6 +113,141 @@ def test_social_sentiment_init_failure_logs_safe_diagnostic(caplog):
     assert "Traceback (most recent call last)" not in caplog.text
 
 
+def test_hotspot_init_failure_is_debug_fail_open_and_does_not_skip_search(caplog):
+    config = _make_config()
+    search_service = MagicMock()
+    search_service.is_available = False
+    social_service = MagicMock()
+    social_service.is_available = False
+    canary = "hotspot-init-canary"
+    sensitive_error = (
+        f"hotspot init failed api_key={canary} at "
+        f"https://private.example.invalid/hotspot?token={canary}"
+    )
+    hotspot_ctor = MagicMock(side_effect=RuntimeError(sensitive_error))
+    search_ctor = MagicMock(return_value=search_service)
+
+    with patch("src.core.pipeline.MarketHotspotService", hotspot_ctor), patch(
+        "src.core.pipeline.SearchService", search_ctor
+    ), patch(
+        "src.core.pipeline.SocialSentimentService",
+        return_value=social_service,
+    ), caplog.at_level(logging.DEBUG, logger="src.core.pipeline"):
+        pipeline = _build_pipeline(config)
+
+    assert pipeline.market_hotspot_service is None
+    assert pipeline.search_service is search_service
+    hotspot_ctor.assert_called_once()
+    assert "fetcher_manager" in hotspot_ctor.call_args.kwargs
+    search_ctor.assert_called_once()
+
+    init_failure_records = [
+        record
+        for record in caplog.records
+        if "Market hotspot service initialization failed; continuing without hotspot data"
+        in record.message
+    ]
+    assert len(init_failure_records) == 1
+    assert init_failure_records[0].levelno == logging.DEBUG
+    assert init_failure_records[0].exc_info is None
+    assert "error_code=pipeline_market_hotspot_service_init_failed" in init_failure_records[0].message
+    assert "exception_type=RuntimeError" in init_failure_records[0].message
+    assert "[REDACTED]" in init_failure_records[0].message
+    assert "[REDACTED_URL]" in init_failure_records[0].message
+    assert canary not in caplog.text
+    assert "private.example.invalid" not in caplog.text
+    assert "Traceback (most recent call last)" not in caplog.text
+
+
+def test_search_init_failure_still_constructs_social_sentiment_service():
+    config = _make_config()
+    social_service = MagicMock()
+    social_service.is_available = False
+    social_ctor = MagicMock(return_value=social_service)
+
+    with patch(
+        "src.core.pipeline.SearchService",
+        side_effect=RuntimeError("search boom"),
+    ), patch("src.core.pipeline.SocialSentimentService", social_ctor):
+        pipeline = _build_pipeline(config)
+
+    assert pipeline.search_service is None
+    assert pipeline.social_sentiment_service is social_service
+    social_ctor.assert_called_once_with(
+        api_key=config.social_sentiment_api_key,
+        api_url=config.social_sentiment_api_url,
+    )
+
+
+def test_search_service_unavailable_when_not_configured_logs_unconfigured_state(caplog):
+    config = _make_config()
+    search_service = MagicMock()
+    search_service.is_available = False
+    social_service = MagicMock()
+    social_service.is_available = False
+
+    with patch("src.core.pipeline.SearchService", return_value=search_service) as search_ctor, \
+         patch("src.core.pipeline.SocialSentimentService", return_value=social_service), \
+         caplog.at_level(logging.INFO, logger="src.core.pipeline"):
+        pipeline = _build_pipeline(config)
+
+    assert pipeline.search_service is search_service
+    search_ctor.assert_called_once()
+    kwargs = search_ctor.call_args.kwargs
+    assert kwargs["rss_news_feed_urls"] is None
+    assert kwargs["rss_news_fetch_timeout_sec"] == 8.0
+    assert kwargs["news_strategy_profile"] == "short"
+    assert (
+        "Search service is unavailable because no search capability is configured"
+        in caplog.text
+    )
+    assert "Search service initialization failed" not in caplog.text
+    assert (
+        "Search service is unavailable because initialization or a dependency failed"
+        not in caplog.text
+    )
+
+
+def test_search_init_failure_keeps_realtime_and_chip_logs_before_search_status(caplog):
+    config = _make_config()
+    social_service = MagicMock()
+    social_service.is_available = False
+
+    with patch(
+        "src.core.pipeline.SearchService",
+        side_effect=RuntimeError("search boom"),
+    ), patch("src.core.pipeline.SocialSentimentService", return_value=social_service), \
+         caplog.at_level(logging.INFO, logger="src.core.pipeline"):
+        pipeline = _build_pipeline(config)
+
+    assert pipeline.search_service is None
+    messages = [record.message for record in caplog.records]
+    realtime_idx = messages.index(
+        "Realtime quotes disabled; historical close prices will be used"
+    )
+    chip_idx = messages.index("Chip-distribution analysis disabled")
+    status_idx = messages.index(
+        "Search service is unavailable because initialization or a dependency failed"
+    )
+    assert realtime_idx < chip_idx < status_idx
+
+
+def test_social_sentiment_available_logs_us_stocks_only(caplog):
+    config = _make_config()
+    search_service = MagicMock()
+    search_service.is_available = False
+    social_service = MagicMock()
+    social_service.is_available = True
+
+    with patch("src.core.pipeline.SearchService", return_value=search_service), \
+         patch("src.core.pipeline.SocialSentimentService", return_value=social_service), \
+         caplog.at_level(logging.INFO, logger="src.core.pipeline"):
+        pipeline = _build_pipeline(config)
+
+    assert pipeline.social_sentiment_service is social_service
+    assert "Social sentiment service enabled (Reddit/X/Polymarket, US stocks only)" in caplog.text
+
+
 def test_emit_progress_logs_safe_identifier_context_when_callback_fails(caplog):
     pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
     pipeline.query_id = "query-123"
