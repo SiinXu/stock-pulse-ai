@@ -142,6 +142,7 @@ from src.core.stages.delivery import (
     _SINGLE_STOCK_NOTIFY_LOCK_INIT_GUARD,
     _run_plugin_delivery_attempt,
 )
+from src.core.stages.optional_services import _OptionalServicesStageMixin
 from src.core.stages.orchestration import _OrchestrationStageMixin
 from src.core.stages.persistence import (
     _PersistenceStageMixin,
@@ -330,51 +331,13 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
         )
         self.notifier = NotificationService(request_context=request_context)
         self.market_structure_service = MarketStructureService(fetcher_manager=self.fetcher_manager)
-        self.market_hotspot_service: Optional[MarketHotspotService] = None
-        try:
-            self.market_hotspot_service = MarketHotspotService(
-                fetcher_manager=self.fetcher_manager,
-            )
-        except Exception as exc:  # broad-exception: fallback_recorded - Market-hotspot initialization failure is safely logged before the optional service is disabled.
-            log_safe_exception(
-                logger,
-                "Market hotspot service initialization failed; continuing without hotspot data",
-                exc,
-                error_code="pipeline_market_hotspot_service_init_failed",
-                level=logging.DEBUG,
-            )
+        self._init_optional_market_hotspot_service()
         self._single_stock_notify_lock = threading.Lock()
         self._daily_market_context_service_lock = threading.Lock()
         self._pipeline_stage_runner = PipelineStageRunner()
         self._concept_rankings_cache_lock = threading.Lock()
         self._concept_rankings_cache: Dict[str, Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]] = {}
-        # Initialize the search service (optional, failure should not block the main analysis process)
-        try:
-            self.search_service = SearchService(
-                bocha_keys=self.config.bocha_api_keys,
-                tavily_keys=self.config.tavily_api_keys,
-                anspire_keys=self.config.anspire_api_keys,
-                brave_keys=self.config.brave_api_keys,
-                serpapi_keys=self.config.serpapi_keys,
-                minimax_keys=self.config.minimax_api_keys,
-                searxng_base_urls=self.config.searxng_base_urls,
-                searxng_public_instances_enabled=self.config.searxng_public_instances_enabled,
-                rss_news_feed_urls=getattr(self.config, "rss_news_feed_urls", None),
-                rss_news_fetch_timeout_sec=getattr(
-                    self.config, "rss_news_fetch_timeout_sec", 8.0
-                ),
-                news_max_age_days=self.config.news_max_age_days,
-                news_strategy_profile=getattr(self.config, "news_strategy_profile", "short"),
-            )
-        except Exception as exc:  # broad-exception: fallback_recorded - Search initialization failure is safely logged before the optional service is disabled.
-            log_safe_exception(
-                logger,
-                "Search service initialization failed; continuing without search",
-                exc,
-                error_code="pipeline_search_service_init_failed",
-                level=logging.WARNING,
-            )
-            self.search_service = None
+        self._init_optional_search_service()
         
         logger.info("Analysis scheduler initialized: max_workers=%s", self.max_workers)
         logger.info("Technical analysis engine enabled (moving averages, trend, volume and price)")
@@ -390,30 +353,8 @@ class StockAnalysisPipeline(_DeliveryStageMixin):
             logger.info("Chip-distribution analysis enabled")
         else:
             logger.info("Chip-distribution analysis disabled")
-        if self.search_service is None:
-            logger.warning("Search service is unavailable because initialization or a dependency failed")
-        elif self.search_service.is_available:
-            logger.info("Search service enabled")
-        else:
-            logger.warning("Search service is unavailable because no search capability is configured")
-
-        # Initialize social sentiment service (for US stocks, optional)
-        try:
-            self.social_sentiment_service = SocialSentimentService(
-                api_key=self.config.social_sentiment_api_key,
-                api_url=self.config.social_sentiment_api_url,
-            )
-            if self.social_sentiment_service.is_available:
-                logger.info("Social sentiment service enabled (Reddit/X/Polymarket, US stocks only)")
-        except Exception as exc:  # broad-exception: fallback_recorded - Social-sentiment initialization failure is safely logged before the optional service is disabled.
-            log_safe_exception(
-                logger,
-                "Social sentiment service initialization failed; continuing without sentiment data",
-                exc,
-                error_code="pipeline_social_sentiment_service_init_failed",
-                level=logging.WARNING,
-            )
-            self.social_sentiment_service = None
+        self._log_optional_search_service_status()
+        self._init_optional_social_sentiment_service()
 
 
 def _clone_function_with_facade_globals(
@@ -497,3 +438,4 @@ _ANALYSIS_STAGE_METHOD_NAMES = _bind_stage_methods(_AnalysisStageMixin)
 _DELIVERY_STAGE_METHOD_NAMES = _bind_stage_methods(_DeliveryStageMixin)
 _PERSISTENCE_STAGE_METHOD_NAMES = _bind_stage_methods(_PersistenceStageMixin)
 _ORCHESTRATION_STAGE_METHOD_NAMES = _bind_stage_methods(_OrchestrationStageMixin)
+_OPTIONAL_SERVICES_STAGE_METHOD_NAMES = _bind_stage_methods(_OptionalServicesStageMixin)

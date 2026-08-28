@@ -274,5 +274,12 @@ def test_pipeline_module_remains_orchestration_facade() -> None:
     # Guard against re-depositing fat business methods into the facade file.
     assert "def generate_dashboard_report" not in source
     assert "def search_stock_news" not in source
+    # Optional enhancer constructors and their fail-open error codes live in stages.
+    assert "pipeline_search_service_init_failed" not in source
+    assert "pipeline_social_sentiment_service_init_failed" not in source
+    assert "pipeline_market_hotspot_service_init_failed" not in source
+    assert "SearchService(" not in source
+    assert "SocialSentimentService(" not in source
+    assert "MarketHotspotService(" not in source
     # Line budget: orchestration facade must stay far below historical bulk.
     assert source.count("\n") < 600
