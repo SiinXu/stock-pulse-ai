@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-25",
-  "baselineNote": "Already-split aggregate families use measured zlib-9 sum + 400 B (Refs #1451). PR #1496 (Refs #1105) reseeded only the locale per-asset caps that overflowed after eleven reportRunFeedback.* keys (locale-fr/es/id/ms) and the eight extra-locale same-pattern families (ja/de/ko/fr/es/zh-TW/ms/id); each cap is current zlib-9 measured + 400 B on SHA 5a2fb65d. PR #1544 (Refs #1332) later reseeded only per-asset locale-zh-TW after honest reassess-lock Traditional Chinese copy; locale-zh-TW-family and every other locale cap stayed under budget. Defaults, matching rules, checker behavior, criticalPath, locale-extra, vendor/route families, and the remaining non-overflowing locale per-asset caps (ja/de/ko) are unchanged.",
+  "baselineNote": "Already-split aggregate families use measured zlib-9 sum + 400 B (Refs #1451). PR #1496 (Refs #1105) reseeded only the locale per-asset caps that overflowed after eleven reportRunFeedback.* keys (locale-fr/es/id/ms) and the eight extra-locale same-pattern families (ja/de/ko/fr/es/zh-TW/ms/id); each cap is current zlib-9 measured + 400 B on SHA 5a2fb65d. PR #1544 (Refs #1332) later reseeded only per-asset locale-zh-TW after honest reassess-lock Traditional Chinese copy; locale-zh-TW-family and every other locale cap stayed under budget. The Axios 1.18.0 security upgrade (CVE-2026-25639 / GHSA-43fc-jf86-j433) then reseeded only the criticalPath aggregate family; that rule's own note records the measured before/after figures and the measurement SHA. Defaults, matching rules, checker behavior, locale-extra, vendor/route families, and the remaining non-overflowing locale per-asset caps (ja/de/ko) are unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -536,9 +536,9 @@
       "match": [
         "assets/index-*.js"
       ],
-      "maxGzipBytes": 339351,
-      "measuredGzipBytes": 338951,
-      "note": "Critical-path family. Ignores match globs and sums the type=module entry script plus every rel=modulepreload href in the built index.html so a renamed split still counts (Refs #883). Measured zlib-9 on origin/main 8df586b60 (after #1447 English UI_TEXT split and #1455 dead CSS): 338951 B and 338947 B across two production builds (11 assets). Cap = measured max + 400 B headroom, matching already-split aggregate families such as locale-ja-family and settings-route. match is required by the budget merge resolver and is not used for this source."
+      "maxGzipBytes": 342086,
+      "measuredGzipBytes": 341686,
+      "note": "Critical-path family. Ignores match globs and sums the type=module entry script plus every rel=modulepreload href in the built index.html so a renamed split still counts (Refs #883). Reseeded after Axios 1.18.0 (CVE-2026-25639 / GHSA-43fc-jf86-j433). Same-machine zlib-9 A/B on 6ad2a2132: 338679 B with Axios 1.13.4 (vendor gzip 62362 B) vs 341711 B with Axios 1.18.0 (vendor gzip 65392 B), i.e. +3032 B dominated by the +3030 B Axios vendor chunk. Re-measured on the current base origin/main 5170f3f14: 341686 B and 341681 B across two production builds (11 assets), vendor gzip 65392 B unchanged; the small drop versus 6ad2a2132 comes from #1551 shrinking src/api/auth.ts. Cap = measured max 341686 B + 400 B headroom, matching already-split aggregate families such as locale-ja-family and settings-route. match is required by the budget merge resolver and is not used for this source."
     }
   ]
 }
