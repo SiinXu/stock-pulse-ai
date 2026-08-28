@@ -1,0 +1,1 @@
+- [Changed] Extracted the no-LLM market-review template renderer from `src/market/analyzer.py` into `src/market/degradation.py` without changing report text or public analyzer signatures (Refs #1085).
