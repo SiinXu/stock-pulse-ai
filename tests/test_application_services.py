@@ -20,6 +20,7 @@ from src.application_services import (
     get_application_services,
     get_installed_application_services,
     reset_application_services,
+    resolve_existing_task_queue,
     set_application_services,
 )
 from src.plugins import ExternalPluginLoader, Plugin, PluginContext, PluginManifest
@@ -193,6 +194,73 @@ def test_get_installed_application_services_never_creates_a_default_root():
     set_application_services(isolated)
 
     assert get_installed_application_services() is isolated
+
+
+def test_resolve_existing_task_queue_absent_root_and_singleton(monkeypatch):
+    original = task_queue_mod.AnalysisTaskQueue._instance
+    task_queue_mod.AnalysisTaskQueue._instance = None
+    monkeypatch.setattr(
+        task_queue_mod,
+        "get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("get_task_queue must not run")),
+    )
+    monkeypatch.setattr(
+        application_services_mod,
+        "get_application_services",
+        lambda: (_ for _ in ()).throw(AssertionError("must not install a default root")),
+    )
+    try:
+        assert resolve_existing_task_queue() is None
+        assert get_installed_application_services() is None
+    finally:
+        task_queue_mod.AnalysisTaskQueue._instance = original
+
+
+def test_resolve_existing_task_queue_prefers_injected_root_queue(monkeypatch):
+    original = task_queue_mod.AnalysisTaskQueue._instance
+    task_queue_mod.AnalysisTaskQueue._instance = None
+    singleton = task_queue_mod.AnalysisTaskQueue(max_workers=3)
+    injected = object()
+    monkeypatch.setattr(
+        task_queue_mod,
+        "get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("get_task_queue must not run")),
+    )
+    try:
+        set_application_services(
+            ApplicationServices(
+                task_queue=injected,
+                builtin_plugins=(),
+                plugins_dir="",
+            )
+        )
+        assert resolve_existing_task_queue() is injected
+        assert singleton.max_workers == 3
+    finally:
+        task_queue_mod.AnalysisTaskQueue._instance = original
+
+
+def test_resolve_existing_task_queue_default_root_falls_back_to_singleton(monkeypatch):
+    original = task_queue_mod.AnalysisTaskQueue._instance
+    task_queue_mod.AnalysisTaskQueue._instance = None
+    singleton = task_queue_mod.AnalysisTaskQueue(max_workers=4)
+    monkeypatch.setattr(
+        task_queue_mod,
+        "get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("lazy task_queue must not run")),
+    )
+    monkeypatch.setattr(
+        application_services_mod,
+        "get_application_services",
+        lambda: (_ for _ in ()).throw(AssertionError("must not install a default root")),
+    )
+    try:
+        set_application_services(ApplicationServices(builtin_plugins=(), plugins_dir=""))
+        assert get_installed_application_services() is not None
+        assert get_installed_application_services()._task_queue is None
+        assert resolve_existing_task_queue() is singleton
+    finally:
+        task_queue_mod.AnalysisTaskQueue._instance = original
 
 
 def test_set_and_reset_isolated_root(monkeypatch):

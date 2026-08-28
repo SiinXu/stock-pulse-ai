@@ -843,9 +843,9 @@ def _default_generation_backend_status() -> Mapping[str, Any]:
 
 
 def _default_task_queue() -> Any:
-    from src.services.task_queue import get_task_queue
+    from src.application_services import resolve_existing_task_queue
 
-    return get_task_queue()
+    return resolve_existing_task_queue()
 
 
 def _summary_for(status: str, checks: Sequence[ReadinessCheck]) -> str:

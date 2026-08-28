@@ -6,10 +6,15 @@ from __future__ import annotations
 
 import time
 from types import SimpleNamespace
-from typing import Any, Dict
+from typing import Any, Dict, Iterator
 
 import pytest
 
+from src.application_services import (
+    ApplicationServices,
+    reset_application_services,
+    set_application_services,
+)
 from src.core.readiness import (
     SCHEMA_VERSION,
     ReadinessCheck,
@@ -22,6 +27,8 @@ from src.core.readiness import (
     project_setup_check_to_readiness,
     readiness_report_to_diagnostic_components,
 )
+from src.services.task_queue import AnalysisTaskQueue
+from src.task_execution import TaskStatus
 
 
 def test_schema_version_and_status_enum_stable() -> None:
@@ -409,3 +416,177 @@ def test_checks_do_not_mutate_injected_queue() -> None:
     assert stats_calls["n"] == 1
     assert queue.mutated is False
     assert queue._shutdown is False
+
+
+@pytest.fixture
+def isolated_task_queue_owners() -> Iterator[None]:
+    original = AnalysisTaskQueue._instance
+    AnalysisTaskQueue._instance = None
+    reset_application_services()
+    try:
+        yield
+    finally:
+        current = AnalysisTaskQueue._instance
+        if current is not None and current is not original:
+            executor = getattr(current, "_executor", None)
+            shutdown = getattr(executor, "shutdown", None)
+            if callable(shutdown):
+                shutdown(wait=False)
+        AnalysisTaskQueue._instance = original
+        reset_application_services()
+
+
+def _healthy_report_kwargs() -> Dict[str, Any]:
+    return {
+        "timeout_seconds": 1.0,
+        "include_dependency_checks": False,
+        "data_provider_status": {
+            "source_state": "ok",
+            "providers": [{"provider_id": "akshare", "available": True, "health_status": "ok"}],
+            "markets": [{"market": "cn", "quality": "ok"}],
+        },
+        "setup_status": {
+            "checks": [
+                {
+                    "key": "llm_primary",
+                    "status": "configured",
+                    "required": True,
+                    "message": "ok",
+                }
+            ]
+        },
+        "generation_status": {"primary": {"backend_id": "litellm", "available": True}},
+    }
+
+
+def test_default_probe_absent_root_and_singleton_is_missing_and_failed(
+    isolated_task_queue_owners: None,
+) -> None:
+    check = check_task_queue()
+    assert check.status == "failed"
+    assert check.reason_code == "task_queue_missing"
+
+    report = build_readiness_report(**_healthy_report_kwargs())
+    assert report.status == "failed"
+    by_key = {item.key: item for item in report.checks}
+    assert by_key["task_queue"].reason_code == "task_queue_missing"
+    assert by_key["task_queue"].status == "failed"
+
+
+def test_default_probe_does_not_sync_or_shutdown_idle_executor(
+    isolated_task_queue_owners: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queue = AnalysisTaskQueue(max_workers=3)
+    shutdown_calls: list[dict[str, Any]] = []
+
+    class ExecutorSpy:
+        def shutdown(self, wait=True, cancel_futures=False):
+            shutdown_calls.append({"wait": wait, "cancel_futures": cancel_futures})
+
+    executor = ExecutorSpy()
+    queue._executor = executor
+    monkeypatch.setattr(
+        "src.config.get_config",
+        lambda: SimpleNamespace(max_workers=1),
+    )
+    monkeypatch.setattr(
+        "src.services.task_queue.get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("operational get_task_queue must not run")),
+    )
+
+    check = check_task_queue()
+    assert check.status == "ok"
+    assert check.reason_code == "task_queue_ready"
+    assert queue.max_workers == 3
+    assert queue._executor is executor
+    assert shutdown_calls == []
+    assert queue._shutdown is False
+
+
+def test_default_probe_observes_live_singleton_stats(
+    isolated_task_queue_owners: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queue = AnalysisTaskQueue(max_workers=2)
+    for index in range(5):
+        queue._tasks[f"pending-{index}"] = SimpleNamespace(status=TaskStatus.PENDING)
+    queue._tasks["running-1"] = SimpleNamespace(status=TaskStatus.PROCESSING)
+    monkeypatch.setattr(
+        "src.services.task_queue.get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("operational get_task_queue must not run")),
+    )
+
+    check = check_task_queue()
+    assert check.status == "degraded"
+    assert check.reason_code == "task_queue_busy"
+    assert check.details["max_workers"] == 2
+    assert check.details["pending"] == 5
+    assert check.details["processing"] == 1
+    assert queue.max_workers == 2
+    assert queue._shutdown is False
+    assert "pending-0" in queue._tasks
+    assert "running-1" in queue._tasks
+
+
+def test_default_probe_observes_shutdown_singleton_without_mutation(
+    isolated_task_queue_owners: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queue = AnalysisTaskQueue(max_workers=2)
+    queue._shutdown = True
+    monkeypatch.setattr(
+        "src.services.task_queue.get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("operational get_task_queue must not run")),
+    )
+
+    check = check_task_queue()
+    assert check.status == "failed"
+    assert check.reason_code == "task_queue_shutdown"
+    assert queue._shutdown is True
+    assert queue.max_workers == 2
+
+
+def test_default_probe_uses_injected_root_queue_not_global_singleton(
+    isolated_task_queue_owners: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    singleton = AnalysisTaskQueue(max_workers=3)
+    injected = SimpleNamespace(
+        _shutdown=False,
+        max_workers=7,
+        get_task_stats=lambda: {"pending": 0, "processing": 0},
+    )
+    monkeypatch.setattr(
+        "src.services.task_queue.get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("operational get_task_queue must not run")),
+    )
+    set_application_services(
+        ApplicationServices(task_queue=injected, builtin_plugins=(), plugins_dir="")
+    )
+
+    check = check_task_queue()
+    assert check.status == "ok"
+    assert check.reason_code == "task_queue_ready"
+    assert check.details["max_workers"] == 7
+    assert singleton.max_workers == 3
+    assert singleton._shutdown is False
+
+
+def test_default_probe_default_root_uses_global_singleton(
+    isolated_task_queue_owners: None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    singleton = AnalysisTaskQueue(max_workers=4)
+    monkeypatch.setattr(
+        "src.services.task_queue.get_task_queue",
+        lambda: (_ for _ in ()).throw(AssertionError("lazy task_queue must not run")),
+    )
+    set_application_services(ApplicationServices(builtin_plugins=(), plugins_dir=""))
+
+    check = check_task_queue()
+    assert check.status == "ok"
+    assert check.reason_code == "task_queue_ready"
+    assert check.details["max_workers"] == 4
+    assert singleton.max_workers == 4
+    assert singleton._shutdown is False

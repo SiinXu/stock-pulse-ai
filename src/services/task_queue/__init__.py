@@ -182,6 +182,22 @@ del _bind_part_class, _TQRecovery, _TQStore, _TQWorker, _TQApi, _part
 
 # ========== Convenience Functions ==========
 
+def get_existing_initialized_task_queue() -> Optional[AnalysisTaskQueue]:
+    """Return the live singleton only when it is already fully initialized.
+
+    Observational: never constructs an instance, never reads config, and never
+    syncs, shuts down, or replaces executor/queue state. Callers that need to
+    create or resize the queue must use :func:`get_task_queue`.
+    """
+    with AnalysisTaskQueue._instance_lock:
+        instance = AnalysisTaskQueue._instance
+        if instance is None:
+            return None
+        if not getattr(instance, "_initialized", False):
+            return None
+        return instance
+
+
 def get_task_queue() -> AnalysisTaskQueue:
     """
     获取任务队列单例
@@ -272,5 +288,6 @@ __all__ = (
     "AnalysisTaskCoalescingContract",
     "DuplicateTaskError",
     "AnalysisTaskQueue",
+    "get_existing_initialized_task_queue",
     "get_task_queue",
 )

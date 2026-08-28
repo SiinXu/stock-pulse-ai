@@ -26,7 +26,12 @@ if _orig_data_provider is None:
     pkg_mod.base = sys.modules["src.data_provider.base"]
     sys.modules["src.data_provider"] = pkg_mod
 
-from src.services.task_queue import AnalysisTaskQueue, get_task_queue, _dedupe_stock_code_key
+from src.services.task_queue import (
+    AnalysisTaskQueue,
+    get_existing_initialized_task_queue,
+    get_task_queue,
+    _dedupe_stock_code_key,
+)
 
 if _orig_data_provider_base is None:
     sys.modules.pop("src.data_provider.base", None)
@@ -109,6 +114,35 @@ class TaskQueueConfigSyncTestCase(unittest.TestCase):
 
         self.assertIs(synced, queue)
         self.assertEqual(synced.max_workers, 3)
+
+    def test_existing_initialized_accessor_returns_none_when_absent(self) -> None:
+        self.assertIsNone(AnalysisTaskQueue._instance)
+        self.assertIsNone(get_existing_initialized_task_queue())
+
+    def test_existing_initialized_accessor_skips_uninitialized_instance(self) -> None:
+        placeholder = object.__new__(AnalysisTaskQueue)
+        AnalysisTaskQueue._instance = placeholder
+        self.assertFalse(getattr(placeholder, "_initialized", False))
+        self.assertIsNone(get_existing_initialized_task_queue())
+
+    def test_existing_initialized_accessor_returns_live_singleton_without_sync(self) -> None:
+        queue = AnalysisTaskQueue(max_workers=3)
+        shutdown_calls = []
+
+        class ExecutorSpy:
+            def shutdown(self, wait=True, cancel_futures=False):
+                shutdown_calls.append({"wait": wait, "cancel_futures": cancel_futures})
+
+        queue._executor = ExecutorSpy()
+
+        with patch("src.config.get_config", return_value=SimpleNamespace(max_workers=1)) as get_config:
+            observed = get_existing_initialized_task_queue()
+
+        self.assertIs(observed, queue)
+        self.assertEqual(queue.max_workers, 3)
+        self.assertIs(queue._executor, observed._executor)
+        self.assertEqual(shutdown_calls, [])
+        get_config.assert_not_called()
 
 
 if __name__ == "__main__":
