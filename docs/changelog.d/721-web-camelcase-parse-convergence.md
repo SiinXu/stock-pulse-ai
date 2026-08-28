@@ -1,0 +1,1 @@
+- [Changed] Converge the scorecard, security-audit, usage, and approvals Web API modules onto the shared camelCase response parser instead of four duplicated local copies (Refs #721).

@@ -2,8 +2,7 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 import apiClient, { locallyRecoverableResourceConfig } from './index';
-import { createApiError, createParsedApiError } from './error';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { SignalScorecardResponse } from '../types/scorecard';
 import type { components } from '../types/api.generated';
 
@@ -51,32 +50,6 @@ const signalScorecardResponseSchema = z.object({
   recentMisses: z.array(scorecardMissSchema),
 }).passthrough();
 
-function parseCamelCasePayload<T>(data: unknown, schema: z.ZodTypeAny, label: string): T {
-  const camel = toCamelCase<unknown>(data);
-  const result = schema.safeParse(camel);
-  if (!result.success) {
-    const issueSummary = result.error.issues
-      .slice(0, 5)
-      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-      .join('; ');
-    if (import.meta.env.DEV) {
-      console.error(`[scorecard] response validation failed (${label})`, result.error.issues);
-    }
-    throw createApiError(
-      createParsedApiError({
-        title: '响应校验失败',
-        message: `接口响应未通过校验（${label}）。${issueSummary}`,
-        rawMessage: result.error.message,
-        category: 'unknown',
-        code: 'api_response_validation_failed',
-        params: { label, issues: issueSummary },
-        details: result.error.issues,
-      }),
-    );
-  }
-  return camel as T;
-}
-
 export const scorecardApi = {
   async getPublic(): Promise<SignalScorecardResponse> {
     const response = await apiClient.get(
@@ -87,6 +60,7 @@ export const scorecardApi = {
       response.data,
       signalScorecardResponseSchema,
       'SignalScorecardResponse',
+      'scorecard',
     );
   },
 };
