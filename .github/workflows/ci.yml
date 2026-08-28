@@ -7,12 +7,16 @@ on:
     branches: [main]
   push:
     branches: [main]
+  merge_group:
+    types: [checks_requested]
 
-# PRs share a group by PR number; pushes to main share ci-refs/heads/main.
+# PRs share a group by PR number; pushes to main share ci-refs/heads/main;
+# merge_group uses github.ref (gh-readonly-queue/...) because the pull_request
+# clause short-circuits and never dereferences github.event.pull_request.
 # cancel-in-progress drops superseded runs (merge-burst on main or force-push-like
 # rapid PR updates) so only the newest revision keeps consuming runners.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ (github.event_name == 'pull_request' && github.event.pull_request.number) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -26,8 +30,10 @@ jobs:
     outputs:
       # Backend suite when non-web paths change, or when web paths that are
       # shared runtime/config contracts change (provider templates, help copy,
-      # public assets consumed outside the SPA).
-      backend: ${{ steps.backend-filter.outputs.backend_non_web == 'true' || steps.filter.outputs.backend_web_contract == 'true' }}
+      # public assets consumed outside the SPA). merge_group fail-closes to
+      # true so a frontend-only queue group cannot skip the full 3.11/3.10
+      # shard gates. PR and push keep the path-selective backend skip.
+      backend: ${{ github.event_name == 'merge_group' || steps.backend-filter.outputs.backend_non_web == 'true' || steps.filter.outputs.backend_web_contract == 'true' }}
       # Fail closed to the sharded full suite when the planner did not write
       # an explicit false. Empty output must not schedule the 45-minute
       # selective job, which cannot run the unsharded offline suite in time.
@@ -308,15 +314,16 @@ jobs:
         run: ./scripts/ci_gate.sh offline-tests-selective
 
   # ---------------------------------------------------------------------------
-  # Full-suite tier: sharded offline suite for push-to-main and PRs whose path
-  # mapping fails closed to FULL. Coverage floor runs once after combine.
+  # Full-suite tier: sharded offline suite for push-to-main, merge_group, and
+  # PRs whose path mapping fails closed to FULL. Coverage floor runs once after
+  # combine. merge_group never uses the PR selective planner.
   # ---------------------------------------------------------------------------
   backend-tests:
     name: backend-tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [changes, ai-governance]
-    if: needs.changes.outputs.backend == 'true' && (github.event_name == 'push' || (github.event_name == 'pull_request' && needs.changes.outputs.backend_full == 'true'))
+    if: needs.changes.outputs.backend == 'true' && (github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && needs.changes.outputs.backend_full == 'true'))
     permissions:
       contents: read
     strategy:
@@ -406,7 +413,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [changes, ai-governance, backend-tests]
-    if: always() && needs.changes.outputs.backend == 'true' && (github.event_name == 'push' || (github.event_name == 'pull_request' && needs.changes.outputs.backend_full == 'true'))
+    if: always() && needs.changes.outputs.backend == 'true' && (github.event_name == 'push' || github.event_name == 'merge_group' || (github.event_name == 'pull_request' && needs.changes.outputs.backend_full == 'true'))
     permissions:
       contents: read
     steps:
@@ -457,11 +464,12 @@ jobs:
           COVERAGE_SHARD_DIR: ${{ runner.temp }}/cov-in
         run: ./scripts/ci_gate.sh offline-tests-combine
 
-  # PR tier: 3.10 smoke (not a second full suite). Push-to-main: sharded full
-  # offline suite on 3.10 so the floor runtime stays real without a 45–50 min
-  # unsharded job that merge-burst cancel-in-progress routinely supersedes.
-  # Required check *name* remains python-minimum. Coverage floor stays on the
-  # Python 3.11 backend-gate combine; these shards only prove 3.10 execution.
+  # PR tier: 3.10 smoke (not a second full suite). Push-to-main and
+  # merge_group: sharded full offline suite on 3.10 so the floor runtime stays
+  # real without a 45–50 min unsharded job that merge-burst cancel-in-progress
+  # routinely supersedes. Required check *name* remains python-minimum.
+  # Coverage floor stays on the Python 3.11 backend-gate combine; these shards
+  # only prove 3.10 execution.
   #
   # Job bound is 45 minutes, not the 3.11 backend-tests 30-minute bound.
   # Module-level shard 2 on 3.10 is ~28-30 min (AST-heavy exception-log
@@ -474,7 +482,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: [changes, ai-governance]
-    if: needs.changes.outputs.backend == 'true' && github.event_name == 'push'
+    if: needs.changes.outputs.backend == 'true' && (github.event_name == 'push' || github.event_name == 'merge_group')
     permissions:
       contents: read
     strategy:
@@ -543,7 +551,7 @@ jobs:
             echo "ai-governance failed: ${AI_RESULT}" >&2
             exit 1
           fi
-          if [ "${EVENT_NAME}" = "push" ]; then
+          if [ "${EVENT_NAME}" = "push" ] || [ "${EVENT_NAME}" = "merge_group" ]; then
             if [ "${TESTS_RESULT}" != "success" ]; then
               echo "python-minimum-tests shards failed: ${TESTS_RESULT}" >&2
               exit 1
@@ -1272,8 +1280,9 @@ jobs:
           ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
         run: npm test
 
-  # Observation only: not in the main ruleset required checks. Skip on pull_request
-  # so PR throughput stays on the blocking gate; still run on push-to-main when paths match.
+  # Observation only: not in the main ruleset required checks. Skip on
+  # pull_request and merge_group so PR/queue throughput stays on the blocking
+  # gate; still run on push-to-main when paths match.
   web-e2e:
     name: web-e2e
     runs-on: ubuntu-latest
@@ -1366,7 +1375,7 @@ jobs:
 
   # Non-required: exercise tests/api against the real Starlette TestClient.
   # Default offline suite keeps STOCKPULSE_TEST_THREADLESS=1 (threadless client).
-  # Observation only — run on push-to-main, not on pull_request.
+  # Observation only — run on push-to-main, not on pull_request or merge_group.
   api-real-client:
     name: api-real-client
     runs-on: ubuntu-latest
