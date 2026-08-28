@@ -966,8 +966,18 @@ def test_reflection_llm_paths_do_not_double_count_via_run_agent_loop() -> None:
     assert "run_agent_loop" not in inspect.getsource(reflection.run_reflection_loop)
     assert "run_agent_loop" not in inspect.getsource(postmortem.reflect_resolved_forecast)
     assert "run_agent_loop" not in inspect.getsource(step_critique.critique_step_observations)
-    assert "run_agent_loop" not in inspect.getsource(planning_product._reflection_llm_complete)
-    assert "call_completion" in inspect.getsource(planning_product._reflection_llm_complete)
+    # The reflection provider adapter is shared by every Native call site (#1089).
+    from src.agent.evolution import multilevel as evolution_multilevel
+
+    assert "run_agent_loop" not in inspect.getsource(
+        evolution_multilevel.reflection_llm_complete
+    )
+    assert "call_completion" in inspect.getsource(
+        evolution_multilevel.reflection_llm_complete
+    )
+    assert "run_agent_loop" not in inspect.getsource(
+        planning_product._maybe_attach_end_of_run_reflection
+    )
     loop_source = inspect.getsource(runner_loop.run_agent_loop)
     assert "run_reflection_loop" not in loop_source
     assert "reflect_resolved_forecast" not in loop_source

@@ -29,6 +29,57 @@ if TYPE_CHECKING:
     )
 
 
+def _attach_run_local_reflection(
+    executor: Any,
+    result: AgentResult,
+    *,
+    config: Any,
+    context: Optional[Dict[str, Any]],
+) -> None:
+    """Attach run-local reflection to a finished classic Native run (#1089).
+
+    Default-off via ``agent_reflection_enabled``; the planning product path owns
+    its own attach, so this only covers the classic ``_run_loop`` return. The
+    reflection bag is written to ``AgentResult.planning_metadata`` (no new
+    result field) and the budget snapshot is refreshed afterwards so the
+    optional LLM turn stays visible in diagnostics. Fail-soft: nothing here may
+    change ``success``, dashboard content, or Decision fields.
+    """
+    if getattr(config, "agent_reflection_enabled", False) is not True:
+        return
+    try:
+        from src.agent.evolution.multilevel import (
+            apply_live_mode_budget_snapshot,
+            attach_end_of_run_reflection,
+        )
+
+        metadata: Dict[str, Any] = dict(result.planning_metadata or {})
+        attach_end_of_run_reflection(
+            metadata,
+            executor=executor,
+            config=config,
+            context=context,
+            success=bool(result.success),
+            tool_calls_log=result.tool_calls_log,
+        )
+        apply_live_mode_budget_snapshot(
+            result,
+            executor=executor,
+            context=context,
+            metadata=metadata,
+        )
+        if metadata:
+            result.planning_metadata = metadata
+    except Exception as exc:  # broad-exception: fallback_recorded - reflection never changes the run result
+        log_safe_exception(
+            logger,
+            "Run-local reflection attach failed",
+            exc,
+            error_code="agent_reflection_attach_failed",
+            level=logging.INFO,
+        )
+
+
 class _RunMethods:
     """Source container rebound onto ``AgentExecutor`` by the facade."""
 
@@ -96,6 +147,16 @@ class _RunMethods:
                 cancelled_check=cancelled_check,
             )
             result.runtime_facts = _build_agent_soul_runtime_facts(system_prompt)
+            # Imported locally: facade-bound methods resolve globals from
+            # ``src.agent.executor``, not this module.
+            from src.agent.executor_parts.run import _attach_run_local_reflection
+
+            _attach_run_local_reflection(
+                self,
+                result,
+                config=episode_config,
+                context=scope_resolution.effective_context,
+            )
             return result
         except Exception as exc:
             # broad-exception: optional_metadata - failure episode only

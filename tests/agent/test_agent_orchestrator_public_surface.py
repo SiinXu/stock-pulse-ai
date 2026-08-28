@@ -113,8 +113,11 @@ EXPECTED_DASHBOARD_METHODS = (
     '_merge_risk_warning',
 )
 
+# Refresh a hash only for an intentional behavior change to the moved methods.
+# ``_ChatMethods`` last changed in #1089: the dashboard ``run()`` path now calls
+# the shared end-of-run reflection attach point (default-off; Chat untouched).
 EXPECTED_AST_HASHES = {
-    '_ChatMethods': 'b7d4d5d242be667430c7f6bd00437b54b7298e571205cc691347b4756905509d',
+    '_ChatMethods': '1eb6d82eb64cb3a6ee13749137b09d26d320fc353dd0e3fc63f0d8a3a69fa41d',
     '_DashboardMethods': '61172d08c68fc42fa87b83542a2e67878b6b8e011b34b5e266d391c69fbf536b',
     '_ExecutionMethods': '1cede39401dab7083c279fd2c36a707ef143fbc67a434c0159c9644dc9200540',
     '_PipelineMethods': '5ebcaf9f18a06218ae1890950d23222f07ea12263c3150a52048fb28b63ab465',

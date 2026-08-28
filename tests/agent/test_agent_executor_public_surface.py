@@ -49,10 +49,13 @@ EXPECTED_LOOP_METHODS = (
     '_build_user_message',
 )
 
+# Refresh a hash only for an intentional behavior change to the moved methods.
+# ``_RunMethods`` last changed in #1089: the classic ``run()`` return path now
+# calls the shared end-of-run reflection attach point (default-off).
 EXPECTED_AST_HASHES = {
     '_ChatMethods': '5206e932b842c4381c7d6e5e29829eb833fe74a033078cc848059283449a4b07',
     '_LoopMethods': 'a9268921dc6f084c0edc22b22a4121ecee760124648eccf57fcbabe8be256ee0',
-    '_RunMethods': 'e6e591892e6dc72d766e3b1f210983e7b53bcf5141ee1a9d1b21f9add90d5ea2',
+    '_RunMethods': '2d42e9ace1ccf858273ca3ee16af579095cf9b88f282661c5425b54b9c6e5005',
 }
 
 

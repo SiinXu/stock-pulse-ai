@@ -12,9 +12,32 @@
 - LLM 预算耗尽必须显式记录 `budget_skipped` / `terminate_reason=budget`，语义对齐 Critic 的 `record_critic_budget_skip`，禁止静默降级。
 - 若运行上下文带有 `ctx.meta["mode_budget_account"]`，反思 / 后验 LLM 调用会计入该 run 账户；跳过仍使用 `budget_skipped`，不得越过 `max_llm_turns`。生产 Chat/单 Agent 循环会把该账户挂到 executor 上，供运行结束规划反思读取。规划产品路径会在反思后把 `AgentResult.budget_snapshot` 重写为该账户的最终快照。后验没有 `AgentResult`，诊断看 `ctx.meta["mode_budget"]`。这些调用走 `llm_complete`，不经过 `run_agent_loop`，因此不会重复计次。运行结束反思不预留 Decision 轮次；循环内可选步骤批评会预留。运行级 LLM 轮次上限是 `AGENT_MODE_BUDGET_MAX_LLM_TURNS`（没有 `AGENT_MAX_RUN_LLM_CALLS` 键）。
 
+## 运行内反思生产接线（#1089）
+
+`src.agent.evolution.multilevel.attach_end_of_run_reflection` 是**唯一**挂接点，三条 Native 路径都委派给它，不存在并行副本：
+
+| 调用点 | 位置 | 触发条件 |
+| --- | --- | --- |
+| 规划产品路径（opt-in） | `src/agent/planning/product.py` | `AGENT_PLANNING_ENABLED=true` |
+| 经典 Native Single | `src/agent/executor_parts/run.py` | 默认 `AGENT_ARCH=single` 且 planning 关闭 |
+| Native Multi 仪表盘 | `src/agent/orchestrator_parts/chat.py` `run()` | `AGENT_ARCH=multi` |
+
+三者共享的合同：
+
+- 在主分析 / 决策**之后**执行。反思失败绝不改变 `success`、仪表盘内容或 Decision 字段，只在 metadata 里记为 `status=error`。
+- 类型化结果写入 `AgentResult.planning_metadata["reflection_result"]`（不新增结果字段）；Native Multi 另外镜像到 `ctx.meta["reflection_result"]`，并由 `OrchestratorResult.planning_metadata` 经 `_public_agent_result` 透出。
+- Chat 排除在外：`AgentOrchestrator.chat` 根本不会走到挂接点，`is_reflection_enabled` 还会再拒绝投影出的 `response_mode == "chat"`。没有 `AGENT_REFLECTION_IN_CHAT` 这个环境变量。
+- Native 生产路径**不传** `revise_fn`。运行内修订仍由 Critic 负责；`AGENT_REFLECTION_MAX_REVISE` 只对显式库调用者保留硬上限。
+- 输入是有界、脱敏的投影：最多 64 条工具行、12 条 opinions、10 条风险标记；Critic trace 只保留 `verdict` / `validation_status` 与各 8 条 `reasons` / `missing_evidence`。系统提示词、Soul 章程正文、原始补全和深层 payload 一律不发送。
+- 不做任何持久化：不写 episode 行、不进决策记忆、不写预测实际值、不写 Soul 标记；持久化仍属 #1090。
+- 若 `ctx.meta["critic_trace"]` 已存在，会据此播种类型化 lesson kind（`evidence_gap` / `overconfidence` / `tool_failure` / `risk_omission`），无需额外 LLM；播种只补充缺失的 kind，不引入第二个评审声音。
+
+可观测性开启时，挂接点只发出两个有界事件（类型 `agent.reflect`）：`reflect_start`（`llm_budget_total`）与 `reflect_end`（`terminate_reason`、`status`、`lesson_count`、`llm_budget_consumed`、`llm_budget_remaining`）。lesson 文本、remedy 与 `strategy_note` 永不进入可观测性。关闭态不发任何事件，不会出现伪造的成功 `reflect_end`。
+
 ## 入口
 
 - 运行内反思：`src/agent/evolution/reflection.py`
+- 生产挂接点：`src/agent/evolution/multilevel.py` `attach_end_of_run_reflection`
 - 预测后验：`src/agent/evolution/postmortem.py`
 - 生产排空：`src/services/prediction_resolver/postmortem_drain.py`
 - 共享教训类型：`src/agent/evolution/lessons.py`

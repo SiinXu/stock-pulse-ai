@@ -104,6 +104,7 @@ def _public_agent_result(orch_result: Any) -> "AgentResult":
         failure_reason=_failure_reason_value(
             getattr(orch_result, "failure_reason", None)
         ),
+        planning_metadata=getattr(orch_result, "planning_metadata", None),
     )
 
 
@@ -145,6 +146,58 @@ def _build_dashboard_run_router_facts(
     if not explicit_override and constructor_mode is not None:
         facts["user_mode_override"] = constructor_mode
     return facts
+
+
+def _attach_run_local_reflection(
+    orchestrator: Any,
+    orch_result: Any,
+    ctx: AgentContext,
+    context: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Attach run-local reflection to a finished Native Multi dashboard run (#1089).
+
+    Runs after ``_execute_pipeline`` has produced the final dashboard, so a
+    reflection failure cannot change ``success``, dashboard content, or Decision
+    fields. Chat is excluded upstream (this is only called from ``run()``) and
+    again by ``is_reflection_enabled`` reading the projected ``response_mode``.
+    An existing ``ctx.meta["critic_trace"]`` seeds typed lessons; no second
+    revision loop is introduced — Critic revision remains apply-within-run.
+    """
+    config = getattr(orchestrator, "config", None)
+    if getattr(config, "agent_reflection_enabled", False) is not True:
+        return
+    try:
+        from src.agent.evolution.multilevel import (
+            apply_live_mode_budget_snapshot,
+            attach_end_of_run_reflection,
+        )
+
+        metadata: Dict[str, Any] = dict(getattr(orch_result, "planning_metadata", None) or {})
+        attach_end_of_run_reflection(
+            metadata,
+            executor=orchestrator,
+            config=config,
+            context=dict(context or {}),
+            success=bool(getattr(orch_result, "success", False)),
+            tool_calls_log=getattr(orch_result, "tool_calls_log", None),
+            run_ctx=ctx,
+        )
+        apply_live_mode_budget_snapshot(
+            orch_result,
+            executor=orchestrator,
+            context=ctx.meta,
+            metadata=metadata,
+        )
+        if metadata:
+            orch_result.planning_metadata = metadata
+    except Exception as exc:  # broad-exception: fallback_recorded - reflection never changes the run result
+        log_safe_exception(
+            logger,
+            "Run-local reflection attach failed",
+            exc,
+            error_code="agent_reflection_attach_failed",
+            level=logging.INFO,
+        )
 
 
 class _ChatMethods:
@@ -207,6 +260,18 @@ class _ChatMethods:
                 ctx.meta["stock_scope"] = scope_resolution.stock_scope
             orch_result = self._execute_pipeline(
                 ctx, parse_dashboard=True, cancelled_check=cancelled_check
+            )
+            # Imported locally: facade-bound methods resolve globals from
+            # ``src.agent.orchestrator``, not this module.
+            from src.agent.orchestrator_parts.chat import (
+                _attach_run_local_reflection,
+            )
+
+            _attach_run_local_reflection(
+                self,
+                orch_result,
+                ctx,
+                scope_resolution.effective_context,
             )
 
             return _public_agent_result(orch_result)
