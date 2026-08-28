@@ -1,3 +1,4 @@
 - [Added] Emit fail-closed model_pack.import security-audit events for HTTP Model Pack trusted-artifact import (Refs #1062).
 - [Tests] Cover import happy path, attempt fail-closed, persist-vs-block 503, preserved 400/413/507, secret/filename canaries, and proof that desktop activation, import status GET, and raw TaskQueue submit do not emit this event (Refs #1062).
 - [Docs] Mark model-pack HTTP import as Landed on the privileged coverage map; keep issue #1062 open for investment-framework reclassification (Refs #1062).
+- [Docs] Synchronize the static `docs/architecture/api_spec.json` audit contract for `POST /api/v1/model-packs/import` with the runtime 503 `operation_completed` response and description (Refs #1062).
