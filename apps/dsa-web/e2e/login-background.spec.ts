@@ -32,7 +32,7 @@ test.describe('login background treatment', () => {
           const headings = Array.from(root.querySelectorAll<HTMLElement>('h1, h2'));
 
           const probe = document.createElement('div');
-          probe.style.backgroundColor = 'var(--login-bg-main)';
+          probe.style.backgroundColor = 'hsl(var(--background))';
           document.body.appendChild(probe);
           const expectedRootBackground = getComputedStyle(probe).backgroundColor;
           probe.remove();

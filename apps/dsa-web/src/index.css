@@ -281,15 +281,6 @@
   --backtest-spinner-track: hsl(var(--primary) / 0.20);
   --backtest-spinner-head: hsl(var(--primary));
   --backtest-table-bg: hsl(var(--card) / 0.72);
-
-  /* Login Page Tokens (Light) */
-  --login-bg-main: hsl(120 7% 97%);
-  --login-bg-card: hsl(var(--neutral-white) / 0.86);
-  --login-border-card: hsl(80 7% 82% / 0.9);
-  --login-text-primary: hsl(60 3% 8%);
-  --login-text-secondary: hsl(74 5% 38%);
-  --login-text-muted: hsl(74 4% 52% / 0.9);
-  --login-accent-soft: hsl(var(--primary) / 0.08);
 }
 
 /*
@@ -561,15 +552,6 @@
   --backtest-spinner-track: hsl(var(--primary) / 0.25);
   --backtest-spinner-head: hsl(var(--primary));
   --backtest-table-bg: hsl(var(--card) / 0.82);
-
-  /* Login Page Tokens (Dark) */
-  --login-bg-main: hsl(60 3% 8%);
-  --login-bg-card: hsl(70 4% 11%);
-  --login-border-card: hsl(var(--neutral-white) / 0.06);
-  --login-text-primary: hsl(0 0% 100%);
-  --login-text-secondary: hsl(75 5% 72%);
-  --login-text-muted: hsl(75 4% 55%);
-  --login-accent-soft: hsl(var(--primary) / 0.08);
 }
 
 /*

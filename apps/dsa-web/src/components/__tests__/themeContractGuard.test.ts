@@ -356,8 +356,6 @@ function rawHslLiteralDebt(token: string, reason: string): TokenFormatDebt {
 
 const LIGHT_MODE_RAW_HSL_REASON =
   'At least one assignment stores a raw hsl() literal instead of hsl(var(--token)).';
-const LOGIN_RAW_HSL_REASON =
-  'Login tokens store raw hsl() literals instead of hsl(var(--Layer-1)).';
 const REPORT_STRATEGY_RAW_HSL_REASON =
   'Strategy hue is stored as a raw hsl() literal instead of hsl(var(--price-*)) or Layer 1.';
 
@@ -370,12 +368,6 @@ const TOKEN_FORMAT_DEBT: readonly TokenFormatDebt[] = [
   rawHslLiteralDebt('--home-surface-button-bg-hover', LIGHT_MODE_RAW_HSL_REASON),
   rawHslLiteralDebt('--input-surface-border', LIGHT_MODE_RAW_HSL_REASON),
   rawHslLiteralDebt('--input-surface-border-hover', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--login-bg-card', LOGIN_RAW_HSL_REASON),
-  rawHslLiteralDebt('--login-bg-main', LOGIN_RAW_HSL_REASON),
-  rawHslLiteralDebt('--login-border-card', LOGIN_RAW_HSL_REASON),
-  rawHslLiteralDebt('--login-text-muted', LOGIN_RAW_HSL_REASON),
-  rawHslLiteralDebt('--login-text-primary', LOGIN_RAW_HSL_REASON),
-  rawHslLiteralDebt('--login-text-secondary', LOGIN_RAW_HSL_REASON),
   rawHslLiteralDebt('--nav-active-bg', LIGHT_MODE_RAW_HSL_REASON),
   rawHslLiteralDebt('--nav-active-border', LIGHT_MODE_RAW_HSL_REASON),
   rawHslLiteralDebt('--report-strategy-buy', REPORT_STRATEGY_RAW_HSL_REASON),
@@ -397,7 +389,7 @@ const TOKEN_FORMAT_DEBT: readonly TokenFormatDebt[] = [
   rawHslLiteralDebt('--settings-surface-panel', LIGHT_MODE_RAW_HSL_REASON),
 ];
 
-const MAX_TOKEN_FORMAT_DEBT = 32;
+const MAX_TOKEN_FORMAT_DEBT = 26;
 
 /**
  * Tokens that are allowed to exist only on `:root` because they are not

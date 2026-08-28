@@ -146,13 +146,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--input-surface-border-focus',
   '--input-surface-border-hover',
   '--input-surface-focus-ring',
-  '--login-accent-soft',
-  '--login-bg-card',
-  '--login-bg-main',
-  '--login-border-card',
-  '--login-text-muted',
-  '--login-text-primary',
-  '--login-text-secondary',
   '--mask-opaque',
   '--muted',
   '--muted-foreground',
@@ -242,10 +235,11 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
 
 /**
  * Hard ceiling for page-scoped leftovers. Never raise this to absorb a new
- * `--home-*` / `--settings-*` / `--login-*` / `--chat-*` / `--backtest-*` /
- * `--portfolio-*` name. Shrink only when T25/T40 deletes a leftover.
+ * `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`
+ * name. Shrink only when a Phase 2 domain collapse deletes a leftover.
+ * `--login-*` reached zero; Login consumes Layer 1 plus use-site alpha.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 107;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 100;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [
