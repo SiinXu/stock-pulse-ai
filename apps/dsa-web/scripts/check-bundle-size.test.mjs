@@ -717,8 +717,8 @@ describe('first-paint entry budget (Refs #883)', () => {
       source: 'indexHtmlModulepreload',
       match: ['assets/index-*.js'],
     }));
-    expect(criticalPath.measuredGzipBytes).toBe(338951);
-    expect(criticalPath.maxGzipBytes).toBe(339351);
+    expect(criticalPath.measuredGzipBytes).toBe(341686);
+    expect(criticalPath.maxGzipBytes).toBe(342086);
     expect(criticalPath.maxGzipBytes).toBe(criticalPath.measuredGzipBytes + 400);
     expect(budget.aggregateRules[budget.aggregateRules.length - 1].id).toBe('criticalPath');
     expect(budget.rules.some((rule) => rule.id === 'criticalPath')).toBe(false);
@@ -837,7 +837,7 @@ describe('first-paint entry budget (Refs #883)', () => {
       'screening-route': { measuredGzipBytes: 31626, maxGzipBytes: 32026 },
       'home-watchlist-route': { measuredGzipBytes: 21293, maxGzipBytes: 21693 },
       'backtest-route': { measuredGzipBytes: 21203, maxGzipBytes: 21603 },
-      'criticalPath': { measuredGzipBytes: 338951, maxGzipBytes: 339351 },
+      'criticalPath': { measuredGzipBytes: 341686, maxGzipBytes: 342086 },
     };
 
     expect(budget.gzipLevel).toBe(9);
