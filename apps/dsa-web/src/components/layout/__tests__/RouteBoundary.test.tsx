@@ -1,8 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { lazy } from 'react';
 import type React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { RouteOutletBoundary } from '../RouteBoundary';
 import { Shell } from '../Shell';
 
@@ -28,6 +29,24 @@ vi.mock('../../../hooks/useLocalOnlyModeStatus', () => ({
 }));
 
 describe('RouteOutletBoundary', () => {
+  let queryClient: QueryClient;
+
+  /**
+   * The shell header renders the real `NotificationBell`, whose
+   * `useUnreadNotifications` hook calls `useQueryClient`. Mirror the production
+   * provider from `main.tsx` with a fresh, retry-free client per test.
+   */
+  beforeEach(() => {
+    queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+  });
+
+  afterEach(() => {
+    queryClient.clear();
+    queryClient.unmount();
+  });
+
   it('catches rejected lazy route imports inside the shell and resets on navigation', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     const BrokenLazyRoute = lazy(() => (
@@ -36,20 +55,22 @@ describe('RouteOutletBoundary', () => {
 
     try {
       render(
-        <MemoryRouter initialEntries={['/chat']}>
-          <Routes>
-            <Route
-              element={(
-                <Shell>
-                  <RouteOutletBoundary />
-                </Shell>
-              )}
-            >
-              <Route path="/chat" element={<BrokenLazyRoute />} />
-              <Route path="/portfolio" element={<div data-testid="portfolio-page">Portfolio</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>,
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter initialEntries={['/chat']}>
+            <Routes>
+              <Route
+                element={(
+                  <Shell>
+                    <RouteOutletBoundary />
+                  </Shell>
+                )}
+              >
+                <Route path="/chat" element={<BrokenLazyRoute />} />
+                <Route path="/portfolio" element={<div data-testid="portfolio-page">Portfolio</div>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
       );
 
       expect(screen.getByRole('navigation', { name: '主导航' })).toBeInTheDocument();
