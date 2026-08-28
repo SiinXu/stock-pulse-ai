@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager chip-distribution orchestration (`get_chip_distribution`) into `src/data_provider/manager_parts/chip_distribution_methods.py` behind the existing ADR-006 facade without changing provider priority, fallback/error behavior, chip-circuit accounting, pull-coalesce call locks, or public imports (Refs #1067, Refs #1088).
