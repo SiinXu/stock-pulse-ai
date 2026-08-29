@@ -46,6 +46,7 @@ from src.data_provider.base import DataFetcherManager
 from src.market import metrics as _market_metrics
 from src.market import prompts as _market_prompts
 from src.market import degradation as _market_degradation
+from src.market import formatters as _market_formatters
 
 build_market_light_scores = _market_metrics.build_market_light_scores
 build_market_temperature = _market_metrics.build_market_temperature
@@ -54,6 +55,15 @@ get_strategy_prompt_block = _market_prompts.get_strategy_prompt_block
 build_output_template_sections = _market_prompts.build_output_template_sections
 build_review_prompt = _market_prompts.build_review_prompt
 generate_template_review = _market_degradation.generate_template_review
+get_news_field = _market_formatters.get_news_field
+format_news_catalyst_line = _market_formatters.format_news_catalyst_line
+compact_news_text = _market_formatters.compact_news_text
+format_optional_number = _market_formatters.format_optional_number
+format_optional_pct = _market_formatters.format_optional_pct
+format_signed_pct = _market_formatters.format_signed_pct
+format_ranking_summary = _market_formatters.format_ranking_summary
+escape_markdown_link_label = _market_formatters.escape_markdown_link_label
+describe_turnover = _market_formatters.describe_turnover
 
 logger = logging.getLogger(__name__)
 
@@ -1204,79 +1214,39 @@ class MarketAnalyzer:
 
     @staticmethod
     def _get_news_field(item: Any, field: str) -> str:
-        if hasattr(item, field):
-            value = getattr(item, field, "") or ""
-        elif isinstance(item, dict):
-            value = item.get(field, "") or ""
-        else:
-            value = ""
-        return str(value).strip()
+        return get_news_field(item, field)
 
     @classmethod
     def _format_news_catalyst_line(cls, idx: int, item: Any, *, language: str = "zh") -> str:
-        fallback_title = "Untitled catalyst" if language == "en" else "未命名线索"
-        title = cls._compact_news_text(cls._get_news_field(item, "title"), limit=90) or fallback_title
-        source = cls._compact_news_text(cls._get_news_field(item, "source"), limit=40)
-        date_text = cls._compact_news_text(cls._get_news_field(item, "published_date"), limit=24)
-        url = cls._compact_news_text(cls._get_news_field(item, "url"), limit=0)
-        title_text = cls._escape_markdown_link_label(title)
-        if url:
-            title_text = f"[{title_text}]({url})"
-        meta_parts = [part for part in (source, date_text) if part]
-        if language == "en":
-            meta = f" ({' / '.join(meta_parts)})" if meta_parts else ""
-        else:
-            meta = f"（{' / '.join(meta_parts)}）" if meta_parts else ""
-        return f"- {idx}. {title_text}{meta}"
+        return format_news_catalyst_line(cls, idx, item, language=language)
 
     @staticmethod
     def _compact_news_text(value: str, *, limit: int) -> str:
-        text = " ".join(str(value or "").split())
-        if limit <= 0 or len(text) <= limit:
-            return text
-        return text[: max(0, limit - 3)].rstrip() + "..."
+        return compact_news_text(value, limit=limit)
 
     @staticmethod
     def _format_optional_number(value: float) -> str:
-        return "N/A" if value in (None, 0, 0.0) else f"{value:.2f}"
+        return format_optional_number(value)
 
     @staticmethod
     def _format_optional_pct(value: float) -> str:
-        return "N/A" if value in (None, 0, 0.0) else f"{value:.2f}%"
+        return format_optional_pct(value)
 
     @staticmethod
     def _format_signed_pct(value: Any) -> str:
-        try:
-            numeric_value = float(value)
-        except (TypeError, ValueError):
-            return "N/A"
-        return f"{numeric_value:+.2f}%"
+        return format_signed_pct(value)
 
     @classmethod
     def _format_ranking_summary(cls, rows: List[Dict], limit: int = 3) -> str:
-        parts = []
-        for item in (rows or [])[:limit]:
-            if not isinstance(item, dict):
-                continue
-            name = str(item.get("name") or "").strip()
-            if not name:
-                continue
-            parts.append(f"{name}({cls._format_signed_pct(item.get('change_pct'))})")
-        return ", ".join(parts)
+        return format_ranking_summary(cls, rows, limit)
 
     @staticmethod
     def _escape_markdown_link_label(value: str) -> str:
-        return value.replace("\\", "\\\\").replace("[", "\\[").replace("]", "\\]")
+        return escape_markdown_link_label(value)
 
     @staticmethod
     def _describe_turnover(total_amount: float) -> str:
-        if total_amount >= 15000:
-            return "高活跃度"
-        if total_amount >= 9000:
-            return "中等活跃"
-        if total_amount > 0:
-            return "缩量观望"
-        return "暂无数据"
+        return describe_turnover(total_amount)
 
     def _build_market_light_scores(self, overview: MarketOverview) -> Dict[str, Any]:
         """Build the canonical Market Light scores used by reports and alerts."""
