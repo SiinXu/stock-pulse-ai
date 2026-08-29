@@ -199,8 +199,6 @@
     {"path":"src/data_provider/tushare_fetcher.py","scope":"<module>.TushareFetcher.get_realtime_quote","caught":["Exception"],"digest":"4875ebaf53e8cb2caee34b701f07cb3bca1930ffdfec4e8149748e2b0e265462"},
     {"path":"src/data_provider/tushare_fetcher.py","scope":"<module>.TushareFetcher.get_sector_rankings","caught":["Exception"],"digest":"251f4d1a63f07962d13024d60864347da2ec86fab3bf9e62bbefaf1929ed6553"},
     {"path":"src/data_provider/tushare_fetcher.py","scope":"<module>.TushareFetcher.get_sector_rankings","caught":["Exception"],"digest":"50a154306e5cb938519c4b81337fa1bbd900adf5156c40441c44794d231bbb6f"},
-    {"path":"src/data_provider/tushare_fetcher.py","scope":"<module>.TushareFetcher.get_stock_list","caught":["Exception"],"digest":"09b667e3e19b2f519bb1bc06d4c6e03ce5b253f18d6e436b43d14217ba1e93d0"},
-    {"path":"src/data_provider/tushare_fetcher.py","scope":"<module>.TushareFetcher.get_stock_name","caught":["Exception"],"digest":"0b6e802daadbda2625b54b1766922a450204b1828d749f21bf6447f66c08cf55"},
     {"path":"src/data_provider/tushare_parts/history.py","scope":"<module>._HistoryMethods._fetch_raw_data","caught":["Exception"],"digest":"19fd1c1434938fc452a1fcdb5d9f7a36bc8764595c0a8339537c9342177db7fa"},
     {"path":"src/data_provider/tw_institutional_fetcher.py","scope":"<module>.TwInstitutionalFetcher.get_institutional_net","caught":["Exception"],"digest":"981fb035f24fb08e09f0dd732226026a41541d6776ed5da896f17c0bab08be7c"},
     {"path":"src/data_provider/yfinance_fetcher.py","scope":"<module>.YfinanceFetcher._get_hk_main_indices","caught":["Exception"],"digest":"87c6024cc7edaeda6aff6d64e9ac246a23986ac09f42729f273925dba37d8079"},

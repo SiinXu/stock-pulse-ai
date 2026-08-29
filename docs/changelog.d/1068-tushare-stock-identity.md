@@ -1,0 +1,2 @@
+- [Changed] Extracted Tushare `get_stock_name` and `get_stock_list` into `src/data_provider/tushare_parts/stock_identity.py` behind the existing `tushare_fetcher` ADR-006 facade without changing cache sharing, HK/ETF/A-share branches, rate-limit seams, fail-open `None`, or public imports (Refs #1068).
+- [Tests] Added Tushare stock-identity characterization for shared `_stock_name_cache`, list-to-name populate, HK/ETF/A-share branches, uninitialized-API `None`, exception fail-open, and reload both orders (Refs #1068).
