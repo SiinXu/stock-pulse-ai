@@ -69,6 +69,18 @@ type UsePortfolioProjectionSessionOptions = {
   setError: (error: ParsedApiError | null) => void;
 };
 
+/** Query-scope fencing input. Page is eventPageForScope, not lagging React state. */
+type PortfolioProjectionActiveParams = {
+  accountId: number | undefined;
+  costMethod: PortfolioCostMethod;
+  language: UiLanguage;
+  riskFallbackMessage: string;
+  eventType: PortfolioEventType;
+  appliedEventFilters: PortfolioEventFilters;
+  eventPageForScope: number;
+  eventRefreshKey: number;
+};
+
 const EMPTY_EVENT_FILTERS: PortfolioEventFilters = {
   dateFrom: '',
   dateTo: '',
@@ -146,7 +158,7 @@ export function usePortfolioProjectionSession({
       accountScopeKey,
       eventType,
       filters: EMPTY_EVENT_FILTERS,
-      page: eventPage,
+      page: eventPageForScope,
       refreshKey: 0,
     }),
   });
@@ -176,7 +188,7 @@ export function usePortfolioProjectionSession({
   const snapshotQueryKeyRef = useRef(snapshotQueryKey);
   snapshotQueryKeyRef.current = snapshotQueryKey;
   const inFlightEventQueryKeysRef = useRef<Array<readonly unknown[]>>([]);
-  const activeParamsRef = useRef({
+  const activeParamsRef = useRef<PortfolioProjectionActiveParams>({
     accountId,
     costMethod,
     language,
@@ -193,7 +205,7 @@ export function usePortfolioProjectionSession({
     riskFallbackMessage,
     eventType,
     appliedEventFilters,
-    eventPage: eventPageForScope,
+    eventPageForScope,
     eventRefreshKey,
   };
 
@@ -322,7 +334,7 @@ export function usePortfolioProjectionSession({
           return eventFenceRef.current === startedAt
             && active.accountId === startedAccountId
             && active.eventType === startedEventType
-            && active.eventPage === startedPage
+            && active.eventPageForScope === startedPage
             && active.eventRefreshKey === startedRefreshKey
             && active.appliedEventFilters === startedFilters;
         },

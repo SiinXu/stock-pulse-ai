@@ -749,13 +749,19 @@ describe('usePortfolioProjectionSession', () => {
     const accountOneEventsKey = eventsQueryKey(1);
     expect(queryFetchStatus(client, accountOneSnapshotKey)).toBe('idle');
 
+    act(() => hook.result.current.setEventPage(2));
+    await waitFor(() => expect(hook.result.current.eventPage).toBe(2));
+    const accountOnePageTwoEventsKey = eventsQueryKey(1, 'trade', 2);
+
     hook.rerender({ accountId: 2 });
+    expect(hook.result.current.eventPage).toBe(1);
     await waitFor(() => expect(
       hook.result.current.snapshot?.accounts[0]?.accountId,
     ).toBe(2));
     await waitFor(() => expect(hook.result.current.eventLoading).toBe(false));
     expect(client.getQueryState(accountOneSnapshotKey)).toBeUndefined();
     expect(client.getQueryState(accountOneEventsKey)).toBeUndefined();
+    expect(client.getQueryState(accountOnePageTwoEventsKey)).toBeUndefined();
     expect(queryFetchStatus(client, buildPortfolioProjectionSnapshotQueryKey(2, 'fifo', 'zh'))).toBe('idle');
     expect(queryFetchStatus(client, eventsQueryKey(2))).toBe('idle');
 
