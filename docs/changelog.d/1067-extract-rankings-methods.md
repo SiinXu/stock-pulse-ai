@@ -1,0 +1,1 @@
+- [Changed] Move DataFetcherManager rankings orchestration into `manager_parts/rankings_methods.py` behind the ADR-006 facade, keeping the public method surface and patch targets on `src.data_provider.base` (Refs #1067, Refs #1088).
