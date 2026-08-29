@@ -82,7 +82,7 @@ describe('LoginPage', () => {
     expect(screen.getByLabelText('登录密码')).toHaveAttribute('autocomplete', 'current-password');
   });
 
-  it('does not override login theme tokens inline so light mode can take effect', () => {
+  it('does not override theme tokens inline so light mode can take effect', () => {
     useAuthMock.mockReturnValue({
       login: vi.fn(),
       passwordSet: true,
@@ -93,7 +93,23 @@ describe('LoginPage', () => {
     const pageRoot = container.firstElementChild as HTMLElement | null;
 
     expect(pageRoot).not.toBeNull();
-    expect(pageRoot?.getAttribute('style') ?? '').not.toContain('--login-bg-main');
+    expect(pageRoot?.getAttribute('style') ?? '').toBe('');
+  });
+
+  it('paints login chrome from Layer 1 semantics without page-scoped tokens', () => {
+    useAuthMock.mockReturnValue({
+      login: vi.fn(),
+      passwordSet: true,
+      setupState: 'enabled',
+    });
+
+    const { container } = render(<LoginPage />);
+    const markup = container.innerHTML;
+    const card = screen.getByRole('heading', { name: 'StockPulse' }).closest('div.rounded-3xl');
+
+    expect(markup).not.toContain('--login-');
+    expect(card).toHaveClass('border-border', 'bg-card', 'shadow-soft-card');
+    expect(screen.getByRole('heading', { name: 'StockPulse' })).toHaveClass('text-foreground');
   });
 
   it('renders the tokenized grid and radial background treatment without tight heading tracking', () => {
@@ -109,8 +125,8 @@ describe('LoginPage', () => {
     const grid = screen.getByTestId('login-grid-background');
     const accents = screen.getByTestId('login-accent-background');
 
-    expect(pageRoot).toHaveClass('bg-[var(--login-bg-main)]');
-    expect(pageRoot).not.toHaveClass('bg-background');
+    expect(pageRoot).toHaveClass('bg-background');
+    expect(pageRoot).toHaveClass('selection:bg-[hsl(var(--primary)/0.08)]');
     expect(grid).toHaveAttribute('aria-hidden', 'true');
     expect(grid).toHaveClass('pointer-events-none', 'bg-[size:24px_24px]');
     expect(grid.className).toContain('linear-gradient(to_right');
@@ -159,7 +175,10 @@ describe('LoginPage', () => {
       if (isWarning) {
         expect(notice).toHaveClass('text-[hsl(var(--color-danger-alert-text))]');
         expect(notice).not.toHaveClass('text-warning');
+      } else {
+        expect(notice).toHaveClass('text-muted-text');
       }
+      expect(notice).toHaveClass('border-border');
       expect(screen.queryByText(/StockPulse-V3-TLS/)).not.toBeInTheDocument();
     },
   );

@@ -1,0 +1,2 @@
+- [Changed] Login page now paints from Layer 1 theme semantics (`background` / `card` / `border` / `foreground` / `secondary-text` / `muted-text`) instead of the seven `--login-*` page-scoped tokens, so theme packs such as `slate` recolour it (Refs #1300).
+- [Changed] Lowered the Web page-scoped token ceiling from 107 to 100 and shrank the theme token-format debt list from 32 to 26 entries after deleting the `--login-*` family (Refs #1300).

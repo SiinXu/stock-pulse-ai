@@ -29,7 +29,7 @@ Phase 0 freezes the current Web custom-property contract. It does **not** delete
 | --- | --- | --- |
 | Web runtime tokens | `apps/dsa-web/src/index.css` (`:root`, `.dark`, pack selectors, `data-price-direction`, `data-density`) | Unique defined names must match `THEME_DEFINED_TOKEN_NAMES`. New names fail CI. |
 | Classification | `classifyThemeToken()` in `src/design/theme.ts` | Layer 0 / Layer 1 stay the public API. Page-scoped leftovers are `page-scoped-debt`, not Layer 1. Compat and `--home-price-*` aliases stay aliases. |
-| Page prefixes | `--home-*`, `--settings-*`, `--login-*`, `--chat-*`, `--backtest-*`, `--portfolio-*` | Frozen. Do not add names. Do not promote them to Layer 1 to green CI. |
+| Page prefixes | `--home-*`, `--settings-*`, `--chat-*`, `--backtest-*`, `--portfolio-*` | Frozen. Do not add names. Do not promote them to Layer 1 to green CI. `--login-*` is collapsed to zero; do not reintroduce the prefix. |
 | Definitions outside `index.css` | production TS/TSX/CSS | Forbidden. Local `style` may override an inventoried token (see `Input` error ring); it may not invent a new name. |
 | Undefined `var(--*)` | `THEME_UNGOVERNED_REFERENCE_DEBT` in `themeTokenFreezeGuard.test.ts` | Shrink-only. Includes `--home-border`, chart `--info`, Tailwind `--color-purple`, and optional `.input-surface` slots. Do not add those names to the defined inventory. The list stays in the `.test.ts` file because `./themeTokenFreeze.ts` is not path-filtered as `__tests__` by the production source inventory. |
 | Desktop chrome | `apps/dsa-desktop/renderer/assistant.html` and `loading.html` | Isolated inventories in `DESKTOP_CHROME_DEFINED_TOKENS`. The embedded WebView still uses the Web contract. Do not copy desktop `--bg` / `--panel` into Web Layer 1. |
@@ -50,6 +50,22 @@ Phase 0 freezes the current Web custom-property contract. It does **not** delete
 | `desktop-token-growth` / `stale-desktop-token` | Isolated desktop chrome tokens changed. Update `DESKTOP_CHROME_DEFINED_TOKENS` only for that surface. |
 
 Guards: `themeContractGuard.test.ts` (price-direction / pack / Layer 0) and `themeTokenFreezeGuard.test.ts` (name-set ratchet and counterexamples).
+
+**Phase 2 domain collapse — Login (#1300).** The `--login-*` family is deleted; `LoginPage` reads Layer 1 directly. `THEME_PAGE_SCOPED_TOKEN_CEILING` moved 107 → 100 and six `--login-*` entries left the shrink-only `TOKEN_FORMAT_DEBT` list (32 → 26). No `--auth-*` domain token was introduced.
+
+| Deleted token | Replacement | Light | Dark |
+| --- | --- | --- | --- |
+| `--login-bg-main` | `bg-background` | exact | exact |
+| `--login-bg-card` | `bg-card` | drops the 0.86 alpha (Δ ≈ 0.4% lightness) | exact |
+| `--login-border-card` | `border-border` | card outline softens (contrast 1.42 → 1.19 against the card) | outline firms up (1.19 → 1.37) |
+| `--login-text-primary` | `text-foreground` | exact | exact |
+| `--login-text-secondary` | `text-secondary-text` | exact | exact |
+| `--login-text-muted` | `text-muted-text` | drops the 0.9 alpha; contrast 3.01 → 3.55 (improves, still below the 4.5 AA floor) | exact |
+| `--login-accent-soft` | `selection:bg-[hsl(var(--primary)/0.08)]` | exact | exact |
+
+Contrast method: WCAG 2.x relative luminance on the 8-bit sRGB colours the browser actually paints, with alpha composited source-over onto the surface underneath. The `before` light values therefore use the composited card `rgb(254,254,254)` (`hsl(var(--neutral-white) / 0.86)` over `--background`), not pure white: muted text `rgb(147,149,141)`, outline `rgb(214,216,211)`. The `before` dark outline is `hsl(var(--neutral-white) / 0.06)` over `--card`, i.e. `rgb(43,43,41)` on `rgb(29,29,27)`. Every colour in this table was confirmed as a painted pixel in rendered light and dark captures of both builds.
+
+The card-outline delta is deliberate: `--border` is already the card boundary for the app shell, Home panels, and the sidebar, so Login now follows theme packs instead of pinning its own greys. Because Login consumes Layer 1, `data-theme-pack="slate"` recolours it for the first time. Deltas are non-text decoration; every text mapping is exact or better.
 
 **WAIT_FOR density integration.** Repeating the 18 structural spacing custom-property names as string literals in `themeTokenInventory.ts` is measured by `densityAdoptionRatchet` as `new-density-aware-file` (`../../design/themeTokenInventory.ts`, `densityTokenCount=18`, `fixedSpacingCount=0`). That is a catalog-string false positive, not theme-token consumer adoption. T24 does **not** change `densityAdoptionRatchet.ts` or weaken that scanner. The inventory composes those names from `DENSITY_STRUCTURAL_CSS_VARS` instead of repeating the literals. Density implementation/review should decide whether non-`density.ts` design catalogs belong in the consumer inventory; do not raise the density baseline or add a scanner bypass on this PR.
 

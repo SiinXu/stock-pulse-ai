@@ -81,7 +81,7 @@ const LoginPage: React.FC = () => {
   return (
     <div
       data-testid="login-page"
-      className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-[var(--login-bg-main)] px-4 py-12 font-sans selection:bg-[var(--login-accent-soft)]"
+      className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-background px-4 py-12 font-sans selection:bg-[hsl(var(--primary)/0.08)]"
     >
       <div
         aria-hidden="true"
@@ -103,18 +103,18 @@ const LoginPage: React.FC = () => {
         transition={{ duration: 0.4, ease: 'easeOut' }}
         className="relative z-10 w-full max-w-sm"
       >
-        <div className="flex flex-col rounded-3xl border border-[var(--login-border-card)] bg-[var(--login-bg-card)] p-8 shadow-soft-card">
+        <div className="flex flex-col rounded-3xl border border-border bg-card p-8 shadow-soft-card">
           <div className="flex flex-col items-center text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-[var(--login-border-card)] bg-[var(--login-bg-main)]">
-              <TrendingUp className="h-6 w-6 text-[var(--login-text-primary)]" aria-hidden="true" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-full border border-border bg-background">
+              <TrendingUp className="h-6 w-6 text-foreground" aria-hidden="true" />
             </div>
-            <h1 className="mt-4 text-lg font-semibold text-[var(--login-text-primary)]">
+            <h1 className="mt-4 text-lg font-semibold text-foreground">
               StockPulse
             </h1>
-            <h2 className="mt-5 text-2xl font-semibold text-[var(--login-text-primary)]">
+            <h2 className="mt-5 text-2xl font-semibold text-foreground">
               {isFirstTime ? t('login.setupTitle') : t('login.adminLogin')}
             </h2>
-            <p className="mt-2 text-sm text-[var(--login-text-secondary)]">
+            <p className="mt-2 text-sm text-secondary-text">
               {isFirstTime ? t('login.setupDescription') : t('login.loginDescription')}
             </p>
           </div>
@@ -193,8 +193,8 @@ const LoginPage: React.FC = () => {
           <p
             className={
               isInsecureConnection
-                ? 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs font-medium text-[hsl(var(--color-danger-alert-text))]'
-                : 'mt-8 border-t border-[var(--login-border-card)] pt-5 text-center text-xs text-[var(--login-text-muted)]'
+                ? 'mt-8 border-t border-border pt-5 text-center text-xs font-medium text-[hsl(var(--color-danger-alert-text))]'
+                : 'mt-8 border-t border-border pt-5 text-center text-xs text-muted-text'
             }
             data-connection-status={connectionStatus}
             role={isInsecureConnection ? 'alert' : 'status'}
