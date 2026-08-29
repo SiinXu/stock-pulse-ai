@@ -384,6 +384,9 @@ def test_extracted_permission_helpers_match_manager_decisions() -> None:
         manager._supported_api_versions,
     ) == "plugin_manifest_invalid"
     assert issubclass(PluginManager, PluginLifecycleMixin)
+    from src.plugins.settings_update import PluginSettingsUpdateMixin
+
+    assert issubclass(PluginManager, PluginSettingsUpdateMixin)
     assert load_time_permission_error(manifest=ok, registrations=()) is None
 
 
@@ -411,6 +414,7 @@ def test_split_modules_remain_internal_host_details() -> None:
     assert "ExternalPluginLoader" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "compatibility_error" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginLifecycleMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "PluginSettingsUpdateMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "select_load_ids" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginState" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
@@ -421,6 +425,21 @@ def test_external_plugin_result_type_hints_resolve_at_runtime() -> None:
     hints = get_type_hints(ExternalPluginResult)
     assert hints["state"] == PluginState | None
     assert hints["plugin_id"] == str | None
+
+
+def test_settings_update_mixin_owner_stays_internal() -> None:
+    from src.plugins.settings_update import PluginSettingsUpdateMixin
+    from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+
+    assert issubclass(PluginManager, PluginSettingsUpdateMixin)
+    assert PluginSettingsUpdateMixin.__module__ == "src.plugins.settings_update"
+    assert PluginManager.update_settings.__module__ == "src.plugins.settings_update"
+    assert PluginManager.__module__ == "src.plugins.manager"
+    assert PluginManager.update_settings is PluginSettingsUpdateMixin.update_settings
+    assert "PluginSettingsUpdateMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert not hasattr(plugins_root, "PluginSettingsUpdateMixin")
+    assert "PluginSettingsUpdateMixin" not in manager_mod.__all__
+    assert "PluginSettingsUpdateMixin" not in getattr(plugins_root, "__all__", ())
 
 
 def test_lifecycle_and_manager_import_in_either_order() -> None:
@@ -434,22 +453,41 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
     env["PYTHONPATH"] = os.pathsep.join(
         [str(repo_root), env.get("PYTHONPATH", "")]
     ).rstrip(os.pathsep)
-    script = (
-        "import src.plugins.lifecycle as lifecycle\n"
-        "import src.plugins.manager as manager\n"
-        "import src.plugins.loader as loader\n"
+    assertions = (
         "from typing import get_type_hints\n"
         "assert issubclass(manager.PluginManager, lifecycle.PluginLifecycleMixin)\n"
+        "assert issubclass(\n"
+        "    manager.PluginManager, settings_update.PluginSettingsUpdateMixin\n"
+        ")\n"
         "assert manager.PluginState is loader.PluginState\n"
         "assert get_type_hints(loader.ExternalPluginResult)['state'] "
         "== manager.PluginState | None\n"
+        "assert manager.PluginManager.update_settings is "
+        "settings_update.PluginSettingsUpdateMixin.update_settings\n"
     )
-    completed = subprocess.run(
-        [sys.executable, "-c", script],
-        cwd=repo_root,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
+    scripts = (
+        (
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.manager as manager\n"
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.loader as loader\n"
+        )
+        + assertions,
+        (
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.manager as manager\n"
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.loader as loader\n"
+        )
+        + assertions,
     )
-    assert completed.returncode == 0, completed.stderr
+    for script in scripts:
+        completed = subprocess.run(
+            [sys.executable, "-c", script],
+            cwd=repo_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        assert completed.returncode == 0, completed.stderr
