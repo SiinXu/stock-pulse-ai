@@ -28,9 +28,17 @@ helper is pure separator logic and belongs on a leaf path.
 2. CI fails on any pair not listed in the baseline.
 3. `--write-baseline` may **shrink** the allowlist to the current measurement
    and **refuses growth**. Intentional new pairs require a manual baseline edit
-   plus PR justification.
+   plus PR justification. Repository inventory tests use subset / `<=` against
+   the introduction ceiling, not live equality with the checked-in list, so a
+   legitimate shrink does not turn pytest red before `--write-baseline`.
 4. Lazy (function-body) imports are out of scope for edge construction so
    deferred loads remain available as an escape hatch without inventing pairs.
+   "Module-level" here means **import-time**: issue
+   [#1555](https://github.com/SiinXu/stock-pulse-ai/issues/1555) later widened
+   the implementation from module-body top-level statements to every body that
+   executes during import (including `try`, `if`, `with`, loops, `match` cases,
+   and class bodies), still excluding `def` bodies and `if TYPE_CHECKING:`
+   blocks. The checked-in pair inventory was unchanged by that widening.
 5. Prefer breaking cycles by extracting stdlib-only leaf utilities or one-way
    ownership rather than expanding the baseline.
 

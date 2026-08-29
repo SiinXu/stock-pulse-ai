@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "description": "Allowlisted bidirectional package import pairs (module-level imports only). New pairs are banned; shrink this list by breaking cycles and running --write-baseline. Growth requires an explicit PR justification and is refused by --write-baseline.",
+  "description": "Allowlisted bidirectional package import pairs (import-time imports: the module body plus nested bodies that execute during import, including class bodies; function-body and `if TYPE_CHECKING:` imports are excluded). New pairs are banned; shrink this list by breaking cycles and running --write-baseline. Growth requires an explicit PR justification and is refused by --write-baseline.",
   "pair_count": 11,
   "pairs": [
     [

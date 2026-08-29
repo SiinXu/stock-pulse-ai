@@ -147,6 +147,48 @@ def test_docs_only_is_none() -> None:
     assert select_targets(["docs/CHANGELOG.md", "docs/FAQ.md"]) == []
 
 
+def test_import_ratchet_scripts_map_to_scripts_tests() -> None:
+    """Layer/cycle ratchet edits must collect tests/scripts, including inventory pins.
+
+    ``scripts/`` first-matches to the ``tests/scripts`` directory plus the CI
+    workflow suite. Collectable ``tests/scripts/test_*.py`` files map to
+    themselves. A PR-shaped union of guard + test edits must still include
+    both inventory modules so the shrink-only pins cannot drop out of
+    selective CI.
+    """
+
+    scripts_expected = ["tests/scripts", "tests/test_ci_workflow.py"]
+    for changed in (
+        "scripts/check_layer_direction.py",
+        "scripts/check_import_layers.py",
+        "scripts/layer_direction_baseline.json",
+        "scripts/import_layer_baseline.json",
+    ):
+        assert select_targets([changed]) == scripts_expected, changed
+
+    assert select_targets(
+        ["tests/scripts/test_check_layer_direction.py"]
+    ) == ["tests/scripts/test_check_layer_direction.py"]
+    assert select_targets(
+        ["tests/scripts/test_check_import_layers.py"]
+    ) == ["tests/scripts/test_check_import_layers.py"]
+
+    combined = select_targets(
+        [
+            "scripts/check_layer_direction.py",
+            "scripts/check_import_layers.py",
+            "tests/scripts/test_check_layer_direction.py",
+            "tests/scripts/test_check_import_layers.py",
+        ]
+    )
+    assert combined != "FULL"
+    assert isinstance(combined, list)
+    assert "tests/scripts" in combined
+    assert "tests/scripts/test_check_layer_direction.py" in combined
+    assert "tests/scripts/test_check_import_layers.py" in combined
+    assert "tests/test_ci_workflow.py" in combined
+
+
 def test_web_only_is_none() -> None:
     assert select_targets(["apps/dsa-web/src/main.tsx"]) == []
     assert select_targets(["apps/dsa-web/src/App.tsx"]) == []

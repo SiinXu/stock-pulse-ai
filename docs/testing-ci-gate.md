@@ -1,7 +1,7 @@
 # Offline Test Gate, Timeouts, Markers, and Coverage Floor
 
 - Status: `Living`
-- Last verified: 2026-08-28
+- Last verified: 2026-08-29
 - Related: [Contributing Guide (EN)](CONTRIBUTING_EN.md), `setup.cfg`, `scripts/ci_gate.sh`, `scripts/check_coverage_floor.py`, `.github/workflows/benchmarks.yml`
 
 ## Purpose
@@ -359,9 +359,32 @@ python scripts/check_import_layers.py
 ```
 
 This shrink-only guard fails when a **new** bidirectional package import pair
-appears (module-level edges only). See [import-cycle ratchet](import-cycle-ratchet.md)
-and [ADR-010](adr/ADR-010-import-cycle-ratchet.md) for package identity, failure
+appears. Edges are measured from **import-time** imports: the module body plus
+every nested body that executes during import (`try`/`except`/`else`/`finally`,
+`if`/`else`, `with`, loops and their `else`, `match` cases, and class bodies).
+`def` bodies and `if TYPE_CHECKING:` blocks are excluded. See
+[import-cycle ratchet](import-cycle-ratchet.md) and
+[ADR-010](adr/ADR-010-import-cycle-ratchet.md) for package identity, failure
 messages, and the legitimate shrink / intentional-growth paths.
+
+The peer [layer-direction ratchet](layer-direction-ratchet.md) shares that
+traversal and additionally records function-local reverse imports in an advisory
+`lazy_exceptions` inventory. Drift in that inventory — a deferred reverse import
+added or removed — never fails CI: the guard prints `NOTE:` lines, still exits
+`0`, and no test pins the live tree to the checked-in seed. A `lazy_exceptions`
+section the guard cannot parse is still rejected as an invalid baseline
+(`ERROR: invalid-baseline: …`, exit `1`), like every other baseline section.
+
+The enforced inventories use the same shrink-is-free convention as the guards:
+repository pins (`test_repository_inventories_are_not_inflated`,
+`test_repository_pair_inventory_is_not_inflated`,
+`test_baseline_hard_ceiling_matches_introduction_inventory`) assert `<=` /
+subset against the introduction ceilings (12 reverse edges, 11 pairs). They
+must not require live equality with the checked-in allowlist, so a later
+legitimate shrink stays green before `--write-baseline`. Growth past those
+ceilings, or a live scan that is not a subset of the allowlist, still fails.
+`scripts/` edits map through `scripts/ci_select_tests.py` to `tests/scripts`,
+so those pins run on selective PR CI.
 
 ## Related CI packaging
 

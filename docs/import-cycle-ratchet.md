@@ -1,7 +1,7 @@
 # Import-Cycle Ratchet
 
 - Status: `Living`
-- Last verified: 2026-08-05
+- Last verified: 2026-08-29
 - Related: [ADR-010](adr/ADR-010-import-cycle-ratchet.md),
   [architecture overview](architecture-overview.md),
   [layer-direction ratchet](layer-direction-ratchet.md),
@@ -17,7 +17,7 @@ boundaries hard to reason about and allow new back-edges to land silently.
 
 This ratchet:
 
-1. Measures bidirectional pairs from **module-level** imports only.
+1. Measures bidirectional pairs from **import-time** imports.
 2. Allows only pairs listed in the checked-in baseline.
 3. Fails CI when a **new** pair appears.
 4. Treats shrink as free: after you break a cycle, re-run `--write-baseline`.
@@ -29,8 +29,28 @@ This ratchet:
 | `src/<name>.py` or `src/<name>/...` | `src.<name>` |
 | `main.py`, `server.py` | `main`, `server` |
 
-Only **module body** imports count. Lazy imports inside functions or methods are
-ignored so intentional deferred loads do not create false pairs.
+## Measured scope
+
+**Import-time** imports count: the module body plus every nested body that
+executes while the module is imported — `try` / `except` / `else` / `finally`,
+`if` / `else`, `with` / `async with`, `for` / `while` bodies and their `else`
+clauses, `match` case bodies, and class bodies at any eager nesting depth.
+
+Two placements do not count:
+
+- `if TYPE_CHECKING:` bodies, which never execute. The exclusion is
+  binding-aware (see the [layer-direction ratchet](layer-direction-ratchet.md#if-type_checking-exclusion)
+  for the recognised forms).
+- `def` / `async def` bodies, so intentional deferred loads do not create false
+  pairs. A lazy import cannot create a runtime cycle, so this guard keeps no
+  advisory inventory for them; the layer-direction ratchet does.
+
+Both guards share the traversal in
+`scripts/check_import_layers.py::classify_import_modules`. Issue
+[#1555](https://github.com/SiinXu/stock-pulse-ai/issues/1555) widened it from
+"module-body top-level statements only" to the import-time scope above; the
+checked-in pair inventory was unchanged by that widening (11 pairs before and
+after).
 
 ## How to read a failure
 
@@ -39,7 +59,7 @@ ignored so intentional deferred loads do not create false pairs.
 [import-layers] HINT: break the cycle or see docs/import-cycle-ratchet.md ...
 ```
 
-Meaning: the current tree has a module-level import edge `src.foo → src.bar`
+Meaning: the current tree has an import-time import edge `src.foo → src.bar`
 **and** `src.bar → src.foo`, and that undirected pair is not in
 `scripts/import_layer_baseline.json`.
 
@@ -69,6 +89,15 @@ then live check), next to the other AST ratchets.
 | **Shrink** (break an existing cycle) | Merge the code fix, then run `--write-baseline` so the JSON drops the pair. Always allowed. |
 | **Growth** (new intentional pair) | **Not** allowed via `--write-baseline` (it refuses). Manually edit the baseline in the same PR, justify the permanent cycle in the PR body, and preferably file follow-up work to remove it. Prefer not to grow. |
 | Accidental new pair | Fix the code; do not edit the baseline. |
+
+Repository pytest pins follow the same shrink-only shape.
+`test_repository_pair_inventory_is_not_inflated` asserts `<=` / subset against
+the introduction ceiling of 11; it does **not** require the live scan to equal
+the checked-in `pairs` list. A later PR that breaks a cycle stays green without
+rewriting that test.
+`test_pair_inventory_pin_stays_green_after_legitimate_shrink` and
+`test_pair_inventory_pin_fails_on_growth` pin that the named tests plus the
+CLI stay green on shrink and fail on growth.
 
 ## Example: config → services edge
 
