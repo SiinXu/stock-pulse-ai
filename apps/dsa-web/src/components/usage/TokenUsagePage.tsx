@@ -1,11 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Activity, Clock3, Cpu, Database, Gauge, RefreshCw } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../routing';
 import {
-  usageApi,
   type UsageCallRecord,
-  type UsageDashboard,
   type UsageModelBreakdown,
   type UsagePeriod,
 } from '../../api/usage';
@@ -24,6 +22,7 @@ import {
   Surface,
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { useTokenUsageQuery } from '../../hooks/useTokenUsageQuery';
 import type { UiLanguage, UiTextKey, UiTextParams } from '../../i18n/uiText';
 import { APP_ROUTE_PATHS, LEGACY_ROUTE_PATHS } from '../../routing/routes';
 import { getUiLocale } from '../../utils/uiLocale';
@@ -35,7 +34,6 @@ import {
 } from '../../utils/urlState';
 
 type Translate = (key: UiTextKey, params?: UiTextParams) => string;
-type UsageDashboardSnapshot = { period: UsagePeriod; dashboard: UsageDashboard };
 
 const PERIOD_OPTIONS: UsagePeriod[] = ['today', 'month', 'all'];
 const DEFAULT_USAGE_PERIOD: UsagePeriod = 'month';
@@ -179,46 +177,11 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
   );
   const period = urlState.period;
 
-  const [snapshot, setSnapshot] = useState<UsageDashboardSnapshot | null>(null);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const [loading, setLoading] = useState(true);
-  const requestSeqRef = useRef(0);
-  const dashboard = snapshot?.period === period ? snapshot.dashboard : null;
-
-  const loadDashboard = useCallback(async () => {
-    const requestSeq = requestSeqRef.current + 1;
-    requestSeqRef.current = requestSeq;
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await usageApi.getDashboard({ period, limit: 50 });
-      if (requestSeq !== requestSeqRef.current) {
-        return;
-      }
-      setSnapshot({ period, dashboard: data });
-    } catch (err) {
-      if (requestSeq !== requestSeqRef.current) {
-        return;
-      }
-      setError(buildParsedError(err, t));
-    } finally {
-      if (requestSeq === requestSeqRef.current) {
-        setLoading(false);
-      }
-    }
-  }, [period, t]);
-
-  useEffect(() => {
-    void loadDashboard();
-    return () => {
-      requestSeqRef.current += 1;
-    };
-  }, [loadDashboard]);
+  const { dashboard, loading, error: loadError, load } = useTokenUsageQuery(period);
+  const error = loadError ? buildParsedError(loadError, t) : null;
 
   const handlePeriodChange = useCallback((nextPeriod: UsagePeriod) => {
     if (nextPeriod === period) return;
-    setError(null);
-    setLoading(true);
     const next = writeParams(
       tokenUsageUrlSchema,
       { period: nextPeriod },
@@ -308,7 +271,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
         type="button"
         variant="secondary"
         size="default"
-        onClick={() => void loadDashboard()}
+        onClick={() => void load()}
         disabled={loading}
         isLoading={loading}
         loadingText={t('usage.refresh')}
@@ -322,7 +285,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
   const dashboardContent = (
     <>
         {error && dashboard ? (
-          <ApiErrorAlert error={error} actionLabel={t('common.retry')} onAction={() => void loadDashboard()} />
+          <ApiErrorAlert error={error} actionLabel={t('common.retry')} onAction={() => void load()} />
         ) : null}
 
         {loading && !dashboard ? (
@@ -342,7 +305,7 @@ const TokenUsagePage: React.FC<TokenUsagePageProps> = ({ embedded = false }) => 
             titleAs={embedded ? 'h3' : 'h2'}
             surfaceLevel="section"
             action={(
-              <Button type="button" variant="secondary" size="default" onClick={() => void loadDashboard()}>
+              <Button type="button" variant="secondary" size="default" onClick={() => void load()}>
                 {t('common.retry')}
               </Button>
             )}

@@ -46,4 +46,11 @@ describe('Query consumer hosts', () => {
     expect(read('src/components/event-calendar/__tests__/EventCalendarWorkspace.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useEventCalendarQuery.test.tsx')).toContain('createAppQueryClient');
   });
+
+  it('wraps TokenUsagePage tests with the production retry-free client', () => {
+    expect(read('src/pages/__tests__/TokenUsagePage.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/pages/__tests__/TokenUsagePage.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useTokenUsageQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/pages/__tests__/SettingsPage.testHarness.tsx')).toContain('createAppQueryClient');
+  });
 });

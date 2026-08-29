@@ -1,4 +1,6 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import {
   MemoryRouter,
   Route,
@@ -6,6 +8,7 @@ import {
   useLocation,
 } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
@@ -106,6 +109,14 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   return () => {};
 });
 
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  return (
+    <QueryClientProvider client={createAppQueryClient()}>
+      {ui}
+    </QueryClientProvider>
+  );
+}
+
 function renderPage({
   embedded = false,
   initialEntry = APP_ROUTE_PATHS.settings,
@@ -113,7 +124,7 @@ function renderPage({
   embedded?: boolean;
   initialEntry?: string;
 } = {}) {
-  return render(
+  return render(wrapWithQueryClient(
     <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <UiLanguageProvider>
@@ -122,7 +133,7 @@ function renderPage({
         </UiLanguageProvider>
       </MemoryRouter>
     </RouteFocusRegistrationContext.Provider>,
-  );
+  ));
 }
 
 beforeEach(() => {
@@ -135,7 +146,7 @@ beforeEach(() => {
 describe('TokenUsagePage', () => {
   it('leaves page-shell and document-title ownership to the Settings host when embedded', async () => {
     document.title = 'Settings host';
-    const { container } = render(
+    const { container } = render(wrapWithQueryClient(
       <MemoryRouter initialEntries={[APP_ROUTE_PATHS.settings]}>
         <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <UiLanguageProvider>
@@ -146,7 +157,7 @@ describe('TokenUsagePage', () => {
         </UiLanguageProvider>
       </RouteFocusRegistrationContext.Provider>
       </MemoryRouter>,
-    );
+    ));
 
     expect(await screen.findByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeInTheDocument();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
@@ -478,7 +489,7 @@ describe('TokenUsagePage', () => {
     });
     get.mockResolvedValue({ data: todayResponse });
 
-    render(
+    render(wrapWithQueryClient(
       <MemoryRouter initialEntries={[`${LEGACY_ROUTE_PATHS.usage}?period=today&keep=yes`]}>
         <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <UiLanguageProvider>
@@ -507,7 +518,7 @@ describe('TokenUsagePage', () => {
         </UiLanguageProvider>
       </RouteFocusRegistrationContext.Provider>
       </MemoryRouter>,
-    );
+    ));
 
     expect(await screen.findByText('900')).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: '今日' })).toHaveAttribute('aria-checked', 'true');

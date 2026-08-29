@@ -1,0 +1,1 @@
+- [Changed] Schedule Token Usage dashboard loads through TanStack Query (Refs #789).
