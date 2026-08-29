@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { CancelledError, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { notificationInboxApi } from '../api/notificationInbox';
 import type {
   NotificationInboxItem,
@@ -14,10 +14,6 @@ const DEFAULT_PAGE_SIZE = 10;
 
 /** Query 5 cancelQueries defaults `revert: true`; silent+non-revert matches cancelRefetch. */
 const PREVIEW_CANCEL = { silent: true, revert: false } as const;
-
-function unreadPreviewQueryKey(pageSize: number) {
-  return ['notifications', 'unread-preview', pageSize] as const;
-}
 
 export type UnreadNotificationsState = {
   items: readonly NotificationInboxItem[];
@@ -54,36 +50,6 @@ function hasUnavailableSource(
   return statuses.some((status) => !status.available);
 }
 
-function mergeUnreadPreviewResult(
-  previous: UnreadNotificationsQueryData | undefined,
-  listResult: PromiseSettledResult<NotificationInboxPage>,
-  countResult: PromiseSettledResult<NotificationInboxUnreadCount>,
-): UnreadNotificationsQueryData {
-  const listOk = listResult.status === 'fulfilled';
-  const countOk = countResult.status === 'fulfilled';
-  return {
-    items: listOk ? listResult.value.items : (previous?.items ?? []),
-    unreadCount: countOk ? countResult.value.unreadTotal : (previous?.unreadCount ?? 0),
-    listFailed: !listOk,
-    countFailed: !countOk,
-    sourceDegraded:
-      (listOk && hasUnavailableSource(listResult.value.sourceStatuses))
-      || (countOk && hasUnavailableSource(countResult.value.sourceStatuses)),
-  };
-}
-
-async function fetchUnreadNotificationsPreview(
-  pageSize: number,
-): Promise<[
-  PromiseSettledResult<NotificationInboxPage>,
-  PromiseSettledResult<NotificationInboxUnreadCount>,
-]> {
-  return Promise.allSettled([
-    notificationInboxApi.list({ pageSize }),
-    notificationInboxApi.unreadCount(),
-  ]);
-}
-
 /**
  * TanStack Query schedule for the header notification-bell preview + unread count.
  *
@@ -105,47 +71,78 @@ async function fetchUnreadNotificationsPreview(
  *   write after the active size changes.
  * - `refresh` is void-facing. Query 5 only cancelRefetchs when `data` exists, so
  *   refresh silently cancels then `refetchQueries` (skips disabled/missing
- *   rows) instead of joining the initial pending retryer.
+ *   rows) instead of joining the initial pending retryer. After unmount the row
+ *   is gone, and `refetchQueries` never recreates a missing row.
  * - Disable/unmount/key-change share one discard path: bump generation, silent
- *   cancel, remove the row. Disabled returns empty/non-loading.
+ *   cancel, remove the row.
+ * - Disabled reports the empty preview (it owns no cache row) while `markFailed`
+ *   stays live, so the returned shape is internally consistent: `markAllSeen`
+ *   still calls the server and still sets/clears `markFailed`, but does not
+ *   write a row that the disabled shape reports as absent.
  * - `markAllSeen` keeps `markAllRead` success / failure / rethrow semantics.
  * - Notification Center page loads stay out of this hook.
+ *
+ * Two divergences from the previous `setInterval` implementation, neither
+ * reachable from the sole production consumer (`NotificationBell`, which passes
+ * no options):
+ * - Overlap cadence: a poll tick that fires while a pair is still in flight
+ *   joins that fetch instead of starting a second pair and letting the newest
+ *   generation win. Requests no longer pile up; freshness is unchanged because
+ *   the in-flight pair settles into the same render.
+ * - Runtime `pollMs` change: re-arms the Query interval without the previous
+ *   effect's immediate refetch and in-flight-generation discard.
+ *
+ * Cleanup uses `removeQueries({ exact: true })`, which is correct for a single
+ * owner but would also wipe the row of a second live instance on the same key.
+ * `Shell` mounts `NotificationBell` on mutually exclusive desktop/mobile
+ * branches, so only one instance exists; a future second owner needs a
+ * refcounted discard instead.
+ *
+ * Termination invariant: when the `queryFn` itself throws the silent
+ * `CancelledError`, `Query#fetch` returns the pending retryer promise and skips
+ * the error dispatch, so `fetchStatus` is only unstuck by the successor fetch.
+ * Every throw site here is paired with a successor `refetchQueries` or with
+ * `removeQueries`; do not add a bare throw path without one.
  */
-export function useUnreadNotifications(options: {
+export function useUnreadNotifications(options?: {
   pollMs?: number;
   pageSize?: number;
   enabled?: boolean;
-} = {}): UnreadNotificationsState {
-  const pollMs = options.pollMs ?? DEFAULT_POLL_MS;
-  const pageSize = options.pageSize ?? DEFAULT_PAGE_SIZE;
-  const enabled = options.enabled ?? true;
+}): UnreadNotificationsState {
+  const pollMs = options?.pollMs ?? DEFAULT_POLL_MS;
+  const pageSize = options?.pageSize ?? DEFAULT_PAGE_SIZE;
+  const enabled = options?.enabled ?? true;
 
   const queryClient = useQueryClient();
-  const queryKey = useMemo(() => unreadPreviewQueryKey(pageSize), [pageSize]);
-  const generationRef = useRef(0);
-  const enabledRef = useRef(enabled);
-  const pageSizeRef = useRef(pageSize);
-  const mountedRef = useRef(true);
+  const queryKey = useMemo(() => ['notifications', 'unread-preview', pageSize], [pageSize]);
+  /** One mutable cell: generation fences stale settlements, enabled fences disable-in-flight. */
+  const fence = useRef({ id: 0, enabled: true });
   const [markFailed, setMarkFailed] = useState(false);
 
   const { data, isFetching } = useQuery({
     queryKey,
     enabled,
     queryFn: async ({ client, queryKey: currentQueryKey, signal }): Promise<UnreadNotificationsQueryData> => {
-      const generation = generationRef.current + 1;
-      generationRef.current = generation;
-      const requestedPageSize = currentQueryKey[2] as number;
-      const [listResult, countResult] = await fetchUnreadNotificationsPreview(requestedPageSize);
-      if (
-        signal.aborted
-        || generationRef.current !== generation
-        || !enabledRef.current
-        || !mountedRef.current
-      ) {
+      const startedAt = fence.current.id;
+      const [listResult, countResult] = await Promise.allSettled([
+        notificationInboxApi.list({ pageSize: currentQueryKey[2] as number }),
+        notificationInboxApi.unreadCount(),
+      ]);
+      if (signal.aborted || fence.current.id !== startedAt || !fence.current.enabled) {
         throw new CancelledError(PREVIEW_CANCEL);
       }
+      const listOk = listResult.status === 'fulfilled';
+      const countOk = countResult.status === 'fulfilled';
       const previous = client.getQueryData<UnreadNotificationsQueryData>(currentQueryKey);
-      return mergeUnreadPreviewResult(previous, listResult, countResult);
+      return {
+        items: listOk ? listResult.value.items : (previous?.items ?? []),
+        unreadCount: countOk ? countResult.value.unreadTotal : (previous?.unreadCount ?? 0),
+        listFailed: !listOk,
+        countFailed: !countOk,
+        sourceDegraded:
+          (listOk && hasUnavailableSource(listResult.value.sourceStatuses))
+          || (countOk && hasUnavailableSource(countResult.value.sourceStatuses)),
+      };
     },
     retry: false,
     refetchOnWindowFocus: false,
@@ -156,53 +153,38 @@ export function useUnreadNotifications(options: {
   });
 
   useLayoutEffect(() => {
-    enabledRef.current = enabled;
-    pageSizeRef.current = pageSize;
-  }, [enabled, pageSize]);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  useLayoutEffect(() => {
+    // `fence.current` is the stable cell created once by useRef, never a node.
+    const cell = fence.current;
+    cell.enabled = enabled;
     if (!enabled) {
       return undefined;
     }
     return () => {
-      generationRef.current += 1;
+      cell.id += 1;
       void queryClient.cancelQueries({ queryKey, exact: true }, PREVIEW_CANCEL);
       queryClient.removeQueries({ queryKey, exact: true });
     };
   }, [enabled, queryClient, queryKey]);
 
   const refresh = useCallback(() => {
-    if (!enabledRef.current || !mountedRef.current) return;
-    const scheduledPageSize = pageSizeRef.current;
-    generationRef.current += 1;
+    if (!fence.current.enabled) return;
+    fence.current.id += 1;
     void queryClient.cancelQueries({ queryKey, exact: true }, PREVIEW_CANCEL);
-    if (
-      !enabledRef.current
-      || !mountedRef.current
-      || pageSizeRef.current !== scheduledPageSize
-    ) {
-      return;
-    }
     void queryClient.refetchQueries({ queryKey, exact: true });
   }, [queryClient, queryKey]);
 
   const markAllSeen = useCallback(async () => {
     try {
       const result = await notificationInboxApi.markAllRead();
-      queryClient.setQueryData<UnreadNotificationsQueryData>(queryKey, (current) => ({
-        items: (current?.items ?? []).map((item) => ({ ...item, isRead: true })),
-        unreadCount: result.unreadTotal,
-        listFailed: current?.listFailed ?? false,
-        countFailed: current?.countFailed ?? false,
-        sourceDegraded: current?.sourceDegraded ?? false,
-      }));
+      // Disabled owns no cache row; writing one here would resurrect a preview
+      // the disabled return shape reports as empty.
+      if (fence.current.enabled) {
+        queryClient.setQueryData<UnreadNotificationsQueryData>(queryKey, (current) => ({
+          ...(current ?? EMPTY_QUERY_DATA),
+          items: (current?.items ?? []).map((item) => ({ ...item, isRead: true })),
+          unreadCount: result.unreadTotal,
+        }));
+      }
       setMarkFailed(false);
     } catch (error) {
       setMarkFailed(true);
@@ -210,28 +192,14 @@ export function useUnreadNotifications(options: {
     }
   }, [queryClient, queryKey]);
 
-  if (!enabled) {
-    return {
-      items: [],
-      unreadCount: 0,
-      isLoading: false,
-      hasError: false,
-      hasPartialError: false,
-      listFailed: false,
-      countFailed: false,
-      markFailed: false,
-      markAllSeen,
-      refresh,
-    };
-  }
-
-  const snapshot = data ?? EMPTY_QUERY_DATA;
-  const hasError = snapshot.listFailed && snapshot.countFailed;
+  // Disabled reports the empty preview (its cache row is removed) while
+  // `markFailed` stays live, matching the previous hook's action-state return.
+  const snapshot = (enabled ? data : undefined) ?? EMPTY_QUERY_DATA;
   return {
     items: snapshot.items,
     unreadCount: snapshot.unreadCount,
-    isLoading: isFetching,
-    hasError,
+    isLoading: enabled && isFetching,
+    hasError: snapshot.listFailed && snapshot.countFailed,
     hasPartialError: snapshot.sourceDegraded || snapshot.listFailed !== snapshot.countFailed || markFailed,
     listFailed: snapshot.listFailed,
     countFailed: snapshot.countFailed,

@@ -289,6 +289,65 @@ describe('useUnreadNotifications', () => {
     expect(countMock).toHaveBeenCalledTimes(1);
   });
 
+  it('lets a poll tick that fires during an in-flight pair join it instead of pairing again', async () => {
+    vi.useFakeTimers();
+    const { lists, counts } = mockDeferredInbox();
+    const { wrapper } = createWrapper();
+    renderHook(() => useUnreadNotifications({ pollMs: DEFAULT_POLL_MS }), { wrapper });
+    await flushQueryMicrotasks();
+    expect(lists).toHaveLength(1);
+
+    // The first pair is still pending when the interval fires. The previous
+    // setInterval scheduler started a second pair here and let the newest
+    // generation win; the Query schedule joins the in-flight fetch instead.
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_POLL_MS);
+    });
+    await flushQueryMicrotasks();
+    expect(lists).toHaveLength(1);
+    expect(countMock).toHaveBeenCalledTimes(1);
+
+    // The interval itself is live: once the pair settles the next tick pairs again.
+    await resolvePreviewPair(lists[0]!, counts[0]!, page(), count());
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(DEFAULT_POLL_MS);
+    });
+    await flushQueryMicrotasks();
+    expect(lists).toHaveLength(2);
+    expect(countMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps markFailed live while disabled and does not recreate the removed cache row', async () => {
+    const { client, wrapper } = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useUnreadNotifications({ pollMs: 0, enabled }),
+      { wrapper, initialProps: { enabled: true } },
+    );
+    await waitFor(() => expect(result.current.unreadCount).toBe(1));
+
+    rerender({ enabled: false });
+    expect(client.getQueryData(previewQueryKey(DEFAULT_PAGE_SIZE))).toBeUndefined();
+
+    markAllMock.mockRejectedValueOnce(new Error('mark down'));
+    await act(async () => {
+      await expect(result.current.markAllSeen()).rejects.toThrow('mark down');
+    });
+    expect(result.current.markFailed).toBe(true);
+    expect(result.current.hasPartialError).toBe(true);
+
+    markAllMock.mockResolvedValueOnce({ markedCount: 1, unreadTotal: 4 });
+    await act(async () => {
+      await result.current.markAllSeen();
+    });
+    expect(result.current.markFailed).toBe(false);
+    expect(result.current.hasPartialError).toBe(false);
+    // The disabled shape reports an empty preview, so mark-all must not write a
+    // row that would contradict it or survive into the next enabled render.
+    expect(client.getQueryData(previewQueryKey(DEFAULT_PAGE_SIZE))).toBeUndefined();
+    expect(result.current.items).toEqual([]);
+    expect(result.current.unreadCount).toBe(0);
+  });
+
   it('returns empty non-loading state when disabled and does not fetch', () => {
     const { wrapper } = createWrapper();
     const { result } = renderHook(
