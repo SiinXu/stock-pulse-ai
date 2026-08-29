@@ -3,7 +3,9 @@
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { getParsedApiError } from '../error';
+import * as parseCamelCasePayloadModule from '../parseCamelCasePayload';
 import { portfolioHealthApi } from '../portfolioHealth';
+import { toCamelCase } from '../utils';
 
 const { get, post, locallyRecoverableResourceConfig } = vi.hoisted(() => ({
   get: vi.fn(),
@@ -142,6 +144,93 @@ describe('portfolioHealthApi', () => {
 
     post.mockResolvedValueOnce({ data: { ...healthPayload(), score: '85' } });
     await expect(portfolioHealthApi.refresh()).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
+  });
+
+  it('preserves extra keys and the camelCase object identity after parse', async () => {
+    const spy = vi.spyOn(parseCamelCasePayloadModule, 'parseCamelCasePayload');
+    const payload = { ...healthPayload(), unexpected_server_field: 'keep-me' };
+    get.mockResolvedValueOnce({ data: payload });
+    const result = await portfolioHealthApi.getSummary();
+    expect(result).toEqual(toCamelCase(payload));
+    expect((result as { unexpectedServerField?: string } | null)?.unexpectedServerField).toBe('keep-me');
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(result).toBe(spy.mock.results[0]?.value);
+    spy.mockRestore();
+  });
+
+  it('rejects omitted required OpenAPI fields on both GET and POST', async () => {
+    const withoutDisclaimer = (({ disclaimer: _omitted, ...rest }) => {
+      void _omitted;
+      return rest;
+    })(healthPayload());
+    const withoutAsOf = (({ as_of: _omitted, ...rest }) => {
+      void _omitted;
+      return rest;
+    })(healthPayload());
+    const withoutRiskExposure = (() => {
+      const payload = healthPayload();
+      const { risk_exposure: _omitted, ...dimensions } = payload.dimensions;
+      void _omitted;
+      return { ...payload, dimensions };
+    })();
+
+    for (const payload of [withoutDisclaimer, withoutAsOf, withoutRiskExposure]) {
+      get.mockResolvedValueOnce({ data: payload });
+      await expect(portfolioHealthApi.getSummary()).rejects.toSatisfy((error: unknown) => {
+        expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+        return true;
+      });
+      post.mockResolvedValueOnce({ data: payload });
+      await expect(portfolioHealthApi.refresh()).rejects.toSatisfy((error: unknown) => {
+        expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+        return true;
+      });
+    }
+  });
+
+  it.each([
+    { status: 'disabled' },
+    { band: 'great' },
+    { formula_version: 'portfolio_health_v1' },
+    { score: Number.NaN },
+    { score: Number.POSITIVE_INFINITY },
+    { score: Number.NEGATIVE_INFINITY },
+  ])('rejects illegal or non-finite response values %o on GET and POST', async (override) => {
+    const payload = { ...healthPayload(), ...override };
+    get.mockResolvedValueOnce({ data: payload });
+    await expect(portfolioHealthApi.getSummary()).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
+    post.mockResolvedValueOnce({ data: payload });
+    await expect(portfolioHealthApi.refresh()).rejects.toSatisfy((error: unknown) => {
+      expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
+      return true;
+    });
+  });
+
+  it('parses a legal empty_portfolio payload', async () => {
+    get.mockResolvedValueOnce({ data: healthPayload('empty_portfolio') });
+    const result = await portfolioHealthApi.getSummary();
+    expect(result?.status).toBe('empty_portfolio');
+  });
+
+  it('encodes persist false on refresh instead of dropping the query flag', async () => {
+    post.mockResolvedValueOnce({ data: healthPayload('ok') });
+    await portfolioHealthApi.refresh({ persist: false });
+    expect(post).toHaveBeenCalledWith(
+      '/api/v1/portfolio/health/refresh',
+      undefined,
+      { params: { persist: false } },
+    );
+  });
+
+  it('rejects a string score through the shared GET parser', async () => {
+    get.mockResolvedValueOnce({ data: { ...healthPayload(), score: '85' } });
+    await expect(portfolioHealthApi.getSummary()).rejects.toSatisfy((error: unknown) => {
       expect(getParsedApiError(error).code).toBe('api_response_validation_failed');
       return true;
     });
