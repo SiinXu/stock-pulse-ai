@@ -67,7 +67,7 @@ def test_owner_module_exists_for_chip_distribution_extraction() -> None:
     assert "chip_distribution_methods" in source
     assert "bind_chip_distribution_methods_facade" in source
     assert "def get_chip_distribution(" not in source
-    assert "def get_stock_name(" in source
+    assert "def get_belong_boards(" in source
     importlib.import_module("src.data_provider.manager_parts.chip_distribution_methods")
 
 

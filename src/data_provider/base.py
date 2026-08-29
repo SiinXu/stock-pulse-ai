@@ -1077,92 +1077,8 @@ class DataFetcherManager:
     _money_flow_timestamp = None
     get_money_flow = None
 
-    def get_stock_name(self, stock_code: str, allow_realtime: bool = True) -> Optional[str]:
-        """
-        获取股票中文名称（自动切换数据源）
-        
-        尝试从多个数据源获取股票名称：
-        1. 先从内存缓存中获取（如果有）
-        2. 再尝试本地维护映射与 stocks.index.json 索引
-        3. 然后按需查询实时行情
-        4. 依次尝试各个数据源的 get_stock_name 方法
-        
-        Args:
-            stock_code: 股票代码
-            allow_realtime: Whether to query realtime quote first. Set False when
-                caller only wants lightweight prefetch without triggering heavy
-                realtime source calls.
-            
-        Returns:
-            股票中文名称，所有数据源都失败则返回 None
-        """
-        raw_stock_code = (stock_code or "").strip()
-        # Normalize code (strip SH/SZ prefix etc.)
-        stock_code = normalize_stock_code(stock_code)
-        static_name = STOCK_NAME_MAP.get(stock_code)
-
-        # 1. Check cache
-        cached_name = self._get_cached_stock_name(stock_code)
-        if cached_name is not None:
-            return cached_name
-        
-        if is_meaningful_stock_name(static_name, stock_code):
-            return self._cache_stock_name(stock_code, static_name) or static_name
-
-        index_name = get_index_stock_name(stock_code)
-        if is_meaningful_stock_name(index_name, stock_code):
-            return self._cache_stock_name(stock_code, index_name) or index_name
-
-        # Stock-name fallbacks are provider-backed. In market-data local-only
-        # mode, retain local maps/caches above but never enter a provider or
-        # realtime callback merely to decorate an otherwise local analysis.
-        if self.is_market_data_local_only():
-            return ""
-
-        # 2. Attempt to fetch from real-time quotes (fastest, can be disabled on demand)
-        if allow_realtime:
-            quote = self.get_realtime_quote(raw_stock_code or stock_code, log_final_failure=False)
-            if quote and hasattr(quote, 'name') and is_meaningful_stock_name(getattr(quote, 'name', ''), stock_code):
-                name = quote.name
-                self._cache_stock_name(stock_code, name)
-                logger.info(f"[股票名称] 从实时行情获取: {stock_code} -> {name}")
-                return name
-
-        # 3. Try each data source sequentially
-        from .akshare_fetcher import _is_us_code
-        is_us = _is_us_code(stock_code)
-        _US_CAPABLE_FETCHERS = {"YfinanceFetcher", "LongbridgeFetcher", "FinnhubFetcher", "AlphaVantageFetcher"}
-        for fetcher in self._get_fetchers_for_capability(
-            "stock_name",
-            market=_market_tag(stock_code),
-        ):
-            if not hasattr(fetcher, 'get_stock_name'):
-                continue
-            is_plugin = self._provider_plugin_registration(fetcher) is not None
-            if is_us and fetcher.name not in _US_CAPABLE_FETCHERS and not is_plugin:
-                continue
-            if not self._is_fetcher_available(fetcher, capability="stock_name"):
-                continue
-            try:
-                name = self._call_fetcher_method(fetcher, 'get_stock_name', stock_code)
-                if is_meaningful_stock_name(name, stock_code):
-                    self._cache_stock_name(stock_code, name)
-                    logger.info(f"[股票名称] 从 {fetcher.name} 获取: {stock_code} -> {name}")
-                    return name
-            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes stock-name fallback
-                log_safe_exception(
-                    logger,
-                    "Data provider stock name lookup failed",
-                    e,
-                    error_code="data_provider_stock_name_lookup_failed",
-                    level=logging.DEBUG,
-                    context={"symbol": stock_code, "provider": fetcher.name},
-                )
-                continue
-
-        # 4. All data sources failed
-        logger.warning(f"[股票名称] 所有数据源都无法获取 {stock_code} 的名称")
-        return ""
+    # Rebound from manager_parts.stock_name_methods after the class is built.
+    get_stock_name = None
 
     def get_belong_boards(self, stock_code: str) -> List[Dict[str, Any]]:
         """
@@ -2220,8 +2136,8 @@ class DataFetcherManager:
 # health/circuit, daily-cache orchestration, daily provider execution,
 # realtime field-trust bookkeeping, realtime quote orchestration,
 # chip-distribution orchestration, money-flow cache lookup/store,
-# money-flow orchestration, fundamental cache lookup/inflight,
-# fundamental CN/offshore loaders, and belong-board normalization.
+# money-flow orchestration, fundamental cache lookup/inflight, fundamental
+# CN/offshore loaders, stock-name lookup, and belong-board normalization.
 # Rebinding preserves method globals so existing patches against this
 # module continue to intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
@@ -2237,6 +2153,7 @@ from .manager_parts import (  # noqa: E402
     money_flow_methods as _money_flow_methods_module,
     realtime_field_trust_methods as _realtime_field_trust_methods_module,
     realtime_quote_methods as _realtime_quote_methods_module,
+    stock_name_methods as _stock_name_methods_module,
 )
 
 _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
@@ -2376,6 +2293,20 @@ def _assemble_chip_distribution_methods_facade(
         )
 
 
+def _assemble_stock_name_methods_facade(
+    stock_name_module=_stock_name_methods_module,
+) -> None:
+    bound_method_names = stock_name_module.bind_stock_name_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != stock_name_module.EXPECTED_STOCK_NAME_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager stock-name methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_money_flow_cache_methods_facade(
     cache_module=_money_flow_cache_methods_module,
 ) -> None:
@@ -2454,6 +2385,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_realtime=_assemble_realtime_field_trust_methods_facade,
     assemble_realtime_quote=_assemble_realtime_quote_methods_facade,
     assemble_chip=_assemble_chip_distribution_methods_facade,
+    assemble_stock_name=_assemble_stock_name_methods_facade,
     assemble_money_flow=_assemble_money_flow_cache_methods_facade,
     assemble_money_flow_methods=_assemble_money_flow_methods_facade,
     assemble_fundamental=_assemble_fundamental_cache_methods_facade,
@@ -2467,6 +2399,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_realtime()
     assemble_realtime_quote()
     assemble_chip()
+    assemble_stock_name()
     assemble_money_flow()
     assemble_money_flow_methods()
     assemble_fundamental()
@@ -2498,6 +2431,9 @@ _realtime_quote_methods_module._install_facade_reload_hook(
 _chip_distribution_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_stock_name_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _money_flow_cache_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -2523,6 +2459,7 @@ del (
     _assemble_realtime_field_trust_methods_facade,
     _assemble_realtime_quote_methods_facade,
     _assemble_chip_distribution_methods_facade,
+    _assemble_stock_name_methods_facade,
     _assemble_money_flow_cache_methods_facade,
     _assemble_money_flow_methods_facade,
     _assemble_fundamental_cache_methods_facade,
@@ -2536,6 +2473,7 @@ del (
     _realtime_field_trust_methods_module,
     _realtime_quote_methods_module,
     _chip_distribution_methods_module,
+    _stock_name_methods_module,
     _money_flow_cache_methods_module,
     _money_flow_methods_module,
     _fundamental_cache_methods_module,
