@@ -57,11 +57,13 @@ Guards: `themeContractGuard.test.ts` (price-direction / pack / Layer 0) and `the
 | --- | --- | --- | --- |
 | `--login-bg-main` | `bg-background` | exact | exact |
 | `--login-bg-card` | `bg-card` | drops the 0.86 alpha (Δ ≈ 0.4% lightness) | exact |
-| `--login-border-card` | `border-border` | card outline softens (contrast 1.42 → 1.19 against the card) | outline firms up (1.23 → 1.36) |
+| `--login-border-card` | `border-border` | card outline softens (contrast 1.42 → 1.19 against the card) | outline firms up (1.19 → 1.37) |
 | `--login-text-primary` | `text-foreground` | exact | exact |
 | `--login-text-secondary` | `text-secondary-text` | exact | exact |
-| `--login-text-muted` | `text-muted-text` | drops the 0.9 alpha; contrast 3.36 → 3.95 (improves) | exact |
+| `--login-text-muted` | `text-muted-text` | drops the 0.9 alpha; contrast 3.01 → 3.55 (improves, still below the 4.5 AA floor) | exact |
 | `--login-accent-soft` | `selection:bg-[hsl(var(--primary)/0.08)]` | exact | exact |
+
+Contrast method: WCAG 2.x relative luminance on the 8-bit sRGB colours the browser actually paints, with alpha composited source-over onto the surface underneath. The `before` light values therefore use the composited card `rgb(254,254,254)` (`hsl(var(--neutral-white) / 0.86)` over `--background`), not pure white: muted text `rgb(147,149,141)`, outline `rgb(214,216,211)`. The `before` dark outline is `hsl(var(--neutral-white) / 0.06)` over `--card`, i.e. `rgb(43,43,41)` on `rgb(29,29,27)`. Every colour in this table was confirmed as a painted pixel in rendered light and dark captures of both builds.
 
 The card-outline delta is deliberate: `--border` is already the card boundary for the app shell, Home panels, and the sidebar, so Login now follows theme packs instead of pinning its own greys. Because Login consumes Layer 1, `data-theme-pack="slate"` recolours it for the first time. Deltas are non-text decoration; every text mapping is exact or better.
 
