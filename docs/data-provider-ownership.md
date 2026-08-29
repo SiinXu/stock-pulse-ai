@@ -41,7 +41,7 @@ and `reset_fetcher_manager()` still observe or clear **only** that fallback
 singleton. Ad-hoc `DataFetcherManager()` constructors elsewhere stay out of
 this identity.
 
-## Ownership Map (after market-overview extraction)
+## Ownership Map (after belong-board routing extraction)
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
@@ -66,7 +66,7 @@ this identity.
 | `src/data_provider/manager_parts/fundamental_context_methods.py` | Manager-owned `_get_fundamental_config` accessor rebound onto `DataFetcherManager`. Resolves process Config per call through `get_application_services().config` (default root still `get_config()` identity; injected `ApplicationServices.config` is authoritative). This is a behavior-adjacent #1540 conversion, not a pure #1067 mechanical extract. | Constructor/instance Config cache, CN/offshore loaders, cache TTL helpers, chip / realtime / retry callers (they keep `self._get_fundamental_config()`), other `get_config()` sites on `base.py` |
 | `src/data_provider/manager_parts/rankings_methods.py` | Manager-owned rankings orchestration rebound onto `DataFetcherManager`: sector ranking aggregation with meta, concept-rankings cache read/write, hot-stock and limit-up pool routing | `BaseFetcher` provider methods of the same names, market-overview routing (`get_main_indices`, `get_market_stats` — Slice 16), concept-rankings TTL/lock/dict class attributes, `get_board_context`, and capability inventory |
 | `src/data_provider/manager_parts/market_overview_methods.py` | Manager-owned market-overview routing rebound onto `DataFetcherManager`: TickFlow-first `get_main_indices` and `get_market_stats` capability fallback | `BaseFetcher` provider methods of the same names, TickFlow lifecycle (`_get_tickflow_fetcher`, `close`), capability inventory, rankings, CN sub-blocks, payload helpers, belong-board routing, prefetch, and timeout workers |
-| `src/data_provider/manager_parts/belong_board_methods.py` | Manager-owned belong-board missing-value and normalization helpers rebound onto `DataFetcherManager` (`_try_scalar_isna`, `_is_missing_board_value`, `_normalize_belong_boards`) | `get_belong_boards` routing, capability probing, provider fallback, and fundamental payload helpers that only *call* `_try_scalar_isna` |
+| `src/data_provider/manager_parts/belong_board_methods.py` | Manager-owned belong-board missing-value and normalization helpers plus `get_belong_boards` routing, capability probing, and provider fallback rebound onto `DataFetcherManager` | Fundamental payload helpers that only *call* `_try_scalar_isna`, stock-name bulk/prefetch, CN sub-blocks, payload helpers, timeout workers, TickFlow lifecycle |
 | `src/data_provider/plugin_registry.py` | Plugin provider registration and discovery seams | Built-in fetcher implementations |
 | `src/data_provider/_capability_catalog.py` | Built-in capability inventory and the mechanics that apply manager-owned ordering inputs, maintain indexes, synchronize plugin providers, filter by capability/market/availability, and look up fetchers | Priority values or policy, daily/realtime/fundamental execution, cache, health, circuit, fallback, or plugin routing policy |
 | `src/data_provider/*_fetcher.py` | One remote/source adapter each (history, quote, or specialty data) | Cross-provider orchestration |
@@ -75,7 +75,7 @@ this identity.
 | `src/data_provider/tushare_fetcher.py` | Compatibility facade for the Tushare provider: public class, HTTP-client / URL / symbol re-exports, and ADR-006 method rebinding / HTTP-client clone seams | New capability-domain bodies (add under `tushare_parts/`) |
 | `src/data_provider/tushare_parts/` | Tushare implementation ownership by capability domain: `client` (HTTP client, URL resolve, rate-limit wrappers), `symbols` (ETF/US classifiers and ts_code conversion), `history` (`_fetch_raw_data` / `_normalize_data`), plus `facade_bind` helpers | Cross-provider manager policy (ADR-005); Tushare stock-name / stock-list / realtime / market-boards / chip remain on the facade |
 | `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
-| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, stock-name bulk/prefetch workflows still co-located, TickFlow lifecycle (`_get_tickflow_fetcher`, `close`), timeout workers (`_run_with_timeout` / `_run_with_retry`), concept-rankings TTL/lock/dict class attributes, CN fundamental sub-blocks (`get_capital_flow_context` / `get_dragon_tiger_context` / `get_board_context`) plus payload helpers and failed/rejected builders, belong-board routing (`get_belong_boards`), money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | `_get_fundamental_config` (rebound from `fundamental_context_methods`), new pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/rankings/market-overview/belong-board descriptors |
+| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, stock-name bulk/prefetch workflows still co-located, TickFlow lifecycle (`_get_tickflow_fetcher`, `close`), timeout workers (`_run_with_timeout` / `_run_with_retry`), concept-rankings TTL/lock/dict class attributes, CN fundamental sub-blocks (`get_capital_flow_context` / `get_dragon_tiger_context` / `get_board_context`) plus payload helpers and failed/rejected builders, money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | `_get_fundamental_config` (rebound from `fundamental_context_methods`), new pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/rankings/market-overview/belong-board descriptors |
 
 The private catalog receives and mutates only manager-owned state through
 `DataFetcherManager` descriptors. It does not introduce an independent policy
@@ -157,8 +157,8 @@ Slice 8 rebinds belong-board missing-value and normalization descriptors from
 
 - `_try_scalar_isna`, `_is_missing_board_value`, `_normalize_belong_boards`
 
-`get_belong_boards` routing, capability probing, provider fallback, and
-`_has_meaningful_payload` stay on the facade. `_has_meaningful_payload` still
+`get_belong_boards` routing, capability probing, and provider fallback travel
+with Slice 17. `_has_meaningful_payload` stays on the facade and still
 calls the rebound `_try_scalar_isna` through `DataFetcherManager`.
 
 Slice 9 rebinds daily provider execution descriptors from
@@ -274,10 +274,11 @@ Slice 16 rebinds market-overview routing descriptors from
 `BaseFetcher` provider methods of the same names stay on `BaseFetcher`
 (`Optional[...]` returns; `get_market_stats` has no `purpose` kw-only).
 TickFlow lifecycle (`_get_tickflow_fetcher`, `close`), capability inventory,
-CN sub-blocks, payload helpers, belong-board routing, prefetch, and timeout
-workers stay on the facade. `purpose` is log metadata only and is not
-forwarded to providers. Import the facade (`src.data_provider.base` /
-`src.data_provider`), not `manager_parts.market_overview_methods`.
+CN sub-blocks, payload helpers, prefetch, and timeout workers stay on the
+facade. Belong-board routing travels with Slice 17. `purpose` is log metadata
+only and is not forwarded to providers. Import the facade
+(`src.data_provider.base` / `src.data_provider`), not
+`manager_parts.market_overview_methods`.
 
 Issue #1540 (behavior-adjacent leftover after Slice 16, not a pure #1067
 mechanical extract) rebinds `_get_fundamental_config` from
@@ -286,9 +287,29 @@ mechanical extract) rebinds `_get_fundamental_config` from
 `src.config.get_config` identity while an injected
 `ApplicationServices.config` is authoritative. Public patch target remains
 `src.data_provider.base.DataFetcherManager._get_fundamental_config`.
-Slice 16 leftover on the facade: CN sub-blocks, payload helpers, timeout
-workers, TickFlow lifecycle, and the remaining `base.py` `get_config()`
-sites.
+Slice 16 leftover on the facade: stock-name bulk/prefetch, CN sub-blocks,
+payload helpers, timeout workers, TickFlow lifecycle, and the remaining
+`base.py` `get_config()` sites.
+
+Slice 17 rebinds belong-board routing from
+`manager_parts/belong_board_methods.py` (extending the Slice 8 owner)
+while preserving `src.data_provider.base` module, qualname, signature,
+globals, and patch behavior:
+
+- `get_belong_boards`
+
+Missing-value and normalization helpers already rebound in Slice 8 stay
+in this owner. Routing calls `self._normalize_belong_boards`. Capability
+`"belong_boards"` plus `hasattr(..., "get_belong_board")` probe order,
+empty non-CN returns, empty-payload failed `provider_run`, and
+`except Exception` fallback are unchanged. `get_belong_boards` is not a
+validation-wrapped exit. Import the facade
+(`src.data_provider.base` / `src.data_provider`), not
+`manager_parts.belong_board_methods`.
+
+Slice 17 leftover on the facade: stock-name bulk/prefetch, CN sub-blocks,
+payload helpers, timeout workers, TickFlow lifecycle, and the remaining
+`base.py` `get_config()` sites.
 
 Tushare client / symbols / history (Issue #1068) rebinds `_init_api` /
 `_build_api_client` / `_check_rate_limit` / `_call_api_with_rate_limit`,

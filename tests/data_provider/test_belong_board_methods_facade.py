@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import ast
 import importlib
 import inspect
 import subprocess
@@ -32,10 +33,11 @@ OWNER_PATH = (
 
 def _descriptor_function(descriptor):
     if isinstance(descriptor, (staticmethod, classmethod)):
-        return descriptor.__func__
-    if isinstance(descriptor, property):
-        return descriptor.fget
-    return descriptor
+        descriptor = descriptor.__func__
+    elif isinstance(descriptor, property):
+        descriptor = descriptor.fget
+    original = getattr(descriptor, "_stockpulse_data_validation_original", None)
+    return original if original is not None else descriptor
 
 
 class _BoardFetcher:
@@ -63,9 +65,25 @@ def test_belong_board_methods_remain_on_data_fetcher_manager_facade() -> None:
         assert function.__globals__ is vars(base), name
 
 
+def test_public_get_belong_boards_signature_is_unchanged() -> None:
+    signature = inspect.signature(DataFetcherManager.get_belong_boards)
+    assert list(signature.parameters) == ["self", "stock_code"]
+    assert signature.parameters["self"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+    assert signature.parameters["stock_code"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+
+
+def test_get_belong_boards_has_no_validation_wrapper_token() -> None:
+    method = DataFetcherManager.__dict__["get_belong_boards"]
+    assert getattr(method, "_stockpulse_data_validation_wrapper_token", None) is None
+
+
 def test_owner_module_exists_for_belong_board_extraction() -> None:
     assert OWNER_PATH.is_file()
-    assert "belong_board_methods" in BASE_PATH.read_text(encoding="utf-8")
+    source = BASE_PATH.read_text(encoding="utf-8")
+    assert "belong_board_methods" in source
+    assert "bind_belong_board_methods_facade" in source
+    assert "def get_belong_boards(" not in source
+    assert "get_belong_boards = None" in source
     importlib.import_module("src.data_provider.manager_parts.belong_board_methods")
 
 
@@ -81,6 +99,19 @@ def test_belong_board_source_descriptors_share_code_not_identity() -> None:
         assert facade_function.__code__ is source_function.__code__
         assert source_function.__module__ == belong_board.__name__
     assert tuple(source_names) == belong_board.EXPECTED_BELONG_BOARD_METHOD_NAMES
+    assert belong_board.EXPECTED_BELONG_BOARD_METHOD_NAMES == (
+        "_try_scalar_isna",
+        "_is_missing_board_value",
+        "_normalize_belong_boards",
+        "get_belong_boards",
+    )
+
+
+def test_belong_board_placeholder_preserves_descriptor_order() -> None:
+    names = list(vars(DataFetcherManager))
+    assert names.index("get_stock_name") < names.index("get_belong_boards")
+    assert names.index("get_belong_boards") < names.index("prefetch_stock_names")
+    assert names.index("get_belong_boards") < names.index("batch_get_stock_names")
 
 
 def test_facade_patch_seam_intercepts_normalize_belong_boards() -> None:
@@ -89,6 +120,21 @@ def test_facade_patch_seam_intercepts_normalize_belong_boards() -> None:
     sentinel = [{"name": "patched", "type": "概念"}]
     with patch.object(
         DataFetcherManager,
+        "_normalize_belong_boards",
+        return_value=sentinel,
+    ) as mocked:
+        boards = manager.get_belong_boards("600519")
+    assert boards == sentinel
+    mocked.assert_called_once()
+    assert fetcher.calls == 1
+
+
+def test_instance_patch_seam_intercepts_normalize_belong_boards() -> None:
+    fetcher = _BoardFetcher("BoardFetcher", [{"name": "ignored"}])
+    manager = DataFetcherManager(fetchers=[fetcher])
+    sentinel = [{"name": "instance-patched"}]
+    with patch.object(
+        manager,
         "_normalize_belong_boards",
         return_value=sentinel,
     ) as mocked:
@@ -120,8 +166,13 @@ def _run_reload_contract(body: str) -> None:
                     "",
                     "def descriptor_function(descriptor):",
                     "    if isinstance(descriptor, (staticmethod, classmethod)):",
-                    "        return descriptor.__func__",
-                    "    return descriptor",
+                    "        descriptor = descriptor.__func__",
+                    "    original = getattr(",
+                    "        descriptor,",
+                    "        '_stockpulse_data_validation_original',",
+                    "        None,",
+                    "    )",
+                    "    return original if original is not None else descriptor",
                     "",
                     "def bindings():",
                     "    source = {}",
@@ -307,3 +358,60 @@ def test_has_meaningful_payload_still_uses_rebound_try_scalar_isna() -> None:
         assert DataFetcherManager._has_meaningful_payload(object()) is False
     mocked.assert_called_once()
     assert mocked.call_args.args[1] == "fundamental_payload"
+
+
+def test_cn_empty_payload_records_failed_run_and_continues() -> None:
+    empty = _BoardFetcher("EmptyBoardFetcher", [])
+    ok = _BoardFetcher("FallbackBoardFetcher", [{"name": "电力设备"}])
+    manager = DataFetcherManager(fetchers=[empty, ok])
+    boards = manager.get_belong_boards("600519")
+    assert boards == [{"name": "电力设备"}]
+    assert empty.calls == 1
+    assert ok.calls == 1
+
+
+def test_cn_exception_logs_safely_and_continues() -> None:
+    boom = _BoardFetcher("FailingBoardFetcher", RuntimeError("board source down"))
+    ok = _BoardFetcher("FallbackBoardFetcher", [{"name": "电力设备"}])
+    manager = DataFetcherManager(fetchers=[boom, ok])
+    with patch("src.data_provider.base.log_safe_exception") as log_safe:
+        boards = manager.get_belong_boards("600519")
+    assert boards == [{"name": "电力设备"}]
+    assert boom.calls == 1
+    assert ok.calls == 1
+    log_safe.assert_called_once()
+    assert log_safe.call_args.kwargs["error_code"] == (
+        "data_provider_stock_board_membership_failed"
+    )
+
+
+def test_owner_module_has_zero_bare_get_config_and_forbidden_imports() -> None:
+    source = OWNER_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    forbidden_prefixes = (
+        "src.config",
+        "src.core",
+        "src.services",
+        "src.data_provider.base",
+    )
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            assert node.func.id != "get_config"
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            assert not any(
+                node.module == prefix or node.module.startswith(prefix + ".")
+                for prefix in forbidden_prefixes
+            )
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert not any(
+                    alias.name == prefix or alias.name.startswith(prefix + ".")
+                    for prefix in forbidden_prefixes
+                )
+
+
+def test_package_export_still_exposes_data_fetcher_manager() -> None:
+    from src.data_provider import DataFetcherManager as PackageManager
+
+    assert PackageManager is DataFetcherManager
+    assert inspect.isclass(PackageManager)
