@@ -35,6 +35,7 @@ from src.report_language import (
 from src.storage import DatabaseManager
 from src.services.run_diagnostics import build_run_diagnostic_summary
 from src.services.history_report_sections import append_strategy_synthesis_lines, append_debate_and_red_team_lines
+from src.services.history_market_review_summary import extract_market_review_content, market_review_summary
 from src.market.phase_summary import (
     extract_market_phase_summary,
     rebuild_market_phase_summary_for_stock_code,
@@ -399,6 +400,12 @@ class HistoryService:
             getattr(record, "context_snapshot", None),
         )
         action_fields = self._decision_action_fields_for_record(record, raw_result)
+        analysis_summary = record.analysis_summary
+        if getattr(record, "report_type", None) == "market_review":
+            analysis_summary = market_review_summary(
+                record.analysis_summary,
+                extract_market_review_content(record, raw_result),
+            )
 
         return {
             "id": record.id,
@@ -410,7 +417,7 @@ class HistoryService:
                 getattr(record, "context_snapshot", None)
             ),
             "trend_prediction": record.trend_prediction,
-            "analysis_summary": record.analysis_summary,
+            "analysis_summary": analysis_summary,
             "sentiment_score": record.sentiment_score,
             "operation_advice": record.operation_advice,
             "action": action_fields["action"],
@@ -639,20 +646,6 @@ class HistoryService:
             display_points[field] = str(db_value) if db_value is not None else None
         return display_points
 
-    @staticmethod
-    def _extract_market_review_content(record, raw_result: Any) -> Optional[str]:
-        """Return persisted market review content from raw_result or news_content."""
-        if isinstance(raw_result, dict):
-            for field in ("raw_response", "market_review_report"):
-                content = raw_result.get(field)
-                if isinstance(content, str) and content.strip():
-                    return content
-
-        news_content = getattr(record, "news_content", None)
-        if isinstance(news_content, str) and news_content.strip():
-            return news_content
-        return None
-
     def _record_to_detail_dict(self, record) -> Dict[str, Any]:
         """
         Convert an AnalysisHistory ORM record to a detail response dict.
@@ -671,8 +664,13 @@ class HistoryService:
                 context_snapshot = record.context_snapshot
 
         market_review_content = None
+        analysis_summary = record.analysis_summary
         if getattr(record, "report_type", None) == "market_review":
-            market_review_content = self._extract_market_review_content(record, raw_result)
+            market_review_content = extract_market_review_content(record, raw_result)
+            analysis_summary = market_review_summary(
+                record.analysis_summary,
+                market_review_content,
+            )
 
         action_fields = self._decision_action_fields_for_record(record, raw_result)
         display_code = self._display_stock_code(record.code)
@@ -686,7 +684,7 @@ class HistoryService:
             "report_type": record.report_type,
             "created_at": self._serialize_created_at(record.created_at),
             "model_used": model_used,
-            "analysis_summary": market_review_content or record.analysis_summary,
+            "analysis_summary": analysis_summary,
             "operation_advice": record.operation_advice,
             "action": action_fields["action"],
             "action_label": action_fields["action_label"],
@@ -916,7 +914,7 @@ class HistoryService:
             )
 
         if getattr(record, "report_type", None) == "market_review":
-            markdown_report = self._extract_market_review_content(record, raw_result)
+            markdown_report = extract_market_review_content(record, raw_result)
             if markdown_report:
                 return markdown_report
             logger.error(f"get_markdown_report: market review report is empty for {record_id}")
