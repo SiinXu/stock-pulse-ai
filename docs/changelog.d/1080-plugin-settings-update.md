@@ -1,0 +1,2 @@
+- [Changed] Extract PluginManager settings update behind the existing facade (Refs #1080).
+- [Tests] Characterize PluginManager.update_settings facade counterexamples for the settings-update extract (Refs #1080).
