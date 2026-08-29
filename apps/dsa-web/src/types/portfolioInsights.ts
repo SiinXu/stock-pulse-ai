@@ -1,9 +1,83 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 
+import type { components, operations } from './api.generated';
 import type { PortfolioCostMethod } from './portfolio';
 
-export type PortfolioBasketRequest = {
+type CamelCase<S extends string> = S extends `${infer Head}_${infer Tail}`
+  ? `${Head}${Capitalize<CamelCase<Tail>>}`
+  : S;
+
+type CamelizeKeys<T> = T extends readonly (infer U)[]
+  ? CamelizeKeys<U>[]
+  : T extends object
+    ? { [K in keyof T as CamelCase<K & string>]: CamelizeKeys<T[K]> }
+    : T;
+
+type Override<T, U> = Omit<T, keyof U> & U;
+
+type OpenApiBasketRequest = components['schemas']['PortfolioLevelAnalysisRequest'];
+type OpenApiBasketResponse = components['schemas']['PortfolioLevelAnalysisResponse'];
+type OpenApiScenarioList = components['schemas']['StressScenarioListResponse'];
+type OpenApiScenarioSummary = components['schemas']['StressScenarioSummary'];
+type OpenApiScenarioBlock = components['schemas']['StressScenarioBlock'];
+type OpenApiStressRequest = components['schemas']['PortfolioStressTestRequest'];
+type OpenApiStressResponse = components['schemas']['PortfolioStressTestResponse'];
+type OpenApiRebalanceResponse = components['schemas']['PortfolioRebalancingResponse'];
+type OpenApiMarketShock = components['schemas']['MarketStressShock'];
+type OpenApiSectorShock = components['schemas']['SectorStressShock'];
+type OpenApiFxShock = components['schemas']['FxStressShock'];
+type OpenApiRateShock = components['schemas']['RateStressShock'];
+type OpenApiImpact = components['schemas']['StressPositionImpact'];
+type OpenApiHealth = components['schemas']['PortfolioLevelHealthBlock'];
+type OpenApiCorrelation = components['schemas']['PortfolioCorrelationBlock'];
+type OpenApiConcentration = components['schemas']['PortfolioConcentrationBlock'];
+type OpenApiVaR = components['schemas']['PortfolioHistoricalVaRBlock'];
+type OpenApiStance = components['schemas']['PortfolioLevelStanceDistribution'];
+type OpenApiSuggestion = components['schemas']['PortfolioRebalanceSuggestion'];
+type OpenApiBand = components['schemas']['PortfolioPositionBand'];
+type OpenApiTarget = components['schemas']['PortfolioRebalanceTargetModel'];
+type OpenApiCurrent = components['schemas']['PortfolioRebalanceCurrent'];
+type OpenApiDrift = components['schemas']['PortfolioRebalanceDrift'];
+type OpenApiBasketPost200 = operations['analyzePortfolioLevel']['responses']['200']['content']['application/json'];
+type OpenApiScenarioGet200 = operations['listPortfolioStressScenarios']['responses']['200']['content']['application/json'];
+type OpenApiStressGet200 = operations['getPortfolioStressTest']['responses']['200']['content']['application/json'];
+type OpenApiStressPost200 = operations['postPortfolioStressTest']['responses']['200']['content']['application/json'];
+type OpenApiRebalanceGet200 = operations['getPortfolioRebalancingRecommendations']['responses']['200']['content']['application/json'];
+type OpenApiRebalanceQuery = NonNullable<operations['getPortfolioRebalancingRecommendations']['parameters']['query']>;
+
+type _Assert<T extends true> = T;
+type _BasketPostIsComponent = _Assert<OpenApiBasketPost200 extends OpenApiBasketResponse ? true : false>;
+type _BasketComponentIsPost = _Assert<OpenApiBasketResponse extends OpenApiBasketPost200 ? true : false>;
+type _ScenarioGetIsComponent = _Assert<OpenApiScenarioGet200 extends OpenApiScenarioList ? true : false>;
+type _StressGetIsComponent = _Assert<OpenApiStressGet200 extends OpenApiStressResponse ? true : false>;
+type _StressPostIsComponent = _Assert<OpenApiStressPost200 extends OpenApiStressResponse ? true : false>;
+type _StressGetPostEq = _Assert<OpenApiStressGet200 extends OpenApiStressPost200 ? true : false>;
+type _RebalanceGetIsComponent = _Assert<OpenApiRebalanceGet200 extends OpenApiRebalanceResponse ? true : false>;
+type _PinKey<T, K extends keyof T> = K;
+type _BasketFormulaKey = _PinKey<OpenApiBasketResponse, 'formula_version'>;
+type _ExtractCodesAlreadyLanded = never;
+type _BasketStockCodes = _PinKey<OpenApiBasketRequest, 'stock_codes'>;
+type _StressCustomShocks = _PinKey<OpenApiStressRequest, 'custom_shocks'>;
+type _RebalanceRiskTolerance = _PinKey<OpenApiRebalanceQuery, 'risk_tolerance'>;
+
+type _OpenApiAnchors = [
+  _BasketPostIsComponent,
+  _BasketComponentIsPost,
+  _ScenarioGetIsComponent,
+  _StressGetIsComponent,
+  _StressPostIsComponent,
+  _StressGetPostEq,
+  _RebalanceGetIsComponent,
+  _BasketFormulaKey,
+  _ExtractCodesAlreadyLanded,
+  _BasketStockCodes,
+  _StressCustomShocks,
+  _RebalanceRiskTolerance,
+];
+type _BindOpenApiAnchors<T> = [_OpenApiAnchors] extends [unknown] ? T : T;
+
+export type PortfolioBasketRequest = _BindOpenApiAnchors<{
   stockCodes: string[];
   weights?: Record<string, number>;
   asOf?: string;
@@ -15,14 +89,14 @@ export type PortfolioBasketRequest = {
   sectorMap?: Record<string, string>;
   highCorrelationThreshold?: number;
   currency?: string;
-};
+}>;
 
 export type RiskBlock = {
   status: string;
   statusMessage?: string | null;
 };
 
-export type PortfolioBasketResponse = {
+export type PortfolioBasketResponse = Override<CamelizeKeys<OpenApiBasketResponse>, {
   formulaVersion: 'portfolio_level_analysis_v1';
   analysisMode: 'portfolio_level_basket';
   snapshotKind: 'synthetic_basket_v1';
@@ -40,7 +114,13 @@ export type PortfolioBasketResponse = {
   weights: Array<{ symbol: string; weightPct: number }>;
   degradedSymbols: Array<{ stockCode: string; reason: string; detail?: string | null }>;
   annotations: string[];
-  correlation: RiskBlock & { symbols: string[]; matrix: Array<Array<number | null>>; observationCount: number };
+  correlation: Override<CamelizeKeys<OpenApiCorrelation>, {
+    status: string;
+    statusMessage?: string | null;
+    symbols: string[];
+    matrix: Array<Array<number | null>>;
+    observationCount: number;
+  }>;
   correlationHighlights: Array<{
     left: string;
     right: string;
@@ -48,20 +128,24 @@ export type PortfolioBasketResponse = {
     absCorrelation: number;
     direction: 'positive' | 'negative';
   }>;
-  concentration: RiskBlock & {
+  concentration: Override<CamelizeKeys<OpenApiConcentration>, {
+    status: string;
+    statusMessage?: string | null;
     hhi?: number | null;
     effectiveN?: number | null;
     diversificationScore?: number | null;
     topWeightPct?: number | null;
     positionCount: number;
-  };
-  var: RiskBlock & {
+  }>;
+  var: Override<CamelizeKeys<OpenApiVaR>, {
+    status: string;
+    statusMessage?: string | null;
     confidence?: number | null;
     horizonDays?: number | null;
     varPct?: number | null;
     varValue?: number | null;
     observationCount: number;
-  };
+  }>;
   sharedRiskExposures: Array<{
     kind: string;
     symbols: string[];
@@ -71,50 +155,45 @@ export type PortfolioBasketResponse = {
     topWeightPct?: number | null;
     rank?: number | null;
   }>;
-  stanceDistribution: RiskBlock & {
+  stanceDistribution: Override<CamelizeKeys<OpenApiStance>, {
+    status: string;
+    statusMessage?: string | null;
     scoredCount: number;
     unanalyzedCount: number;
     averageScore?: number | null;
     byOperationAdvice: Record<string, number>;
     items: Array<Record<string, unknown>>;
     formulaVersion?: string | null;
-  };
-  health: RiskBlock & {
+  }>;
+  health: Override<CamelizeKeys<OpenApiHealth>, {
+    status: string;
+    statusMessage?: string | null;
     score?: number | null;
     partialScore?: number | null;
     coverageRatio?: number | null;
     dataQuality?: Record<string, unknown> | null;
     disclaimer?: string | null;
-  };
+  }>;
   stress?: (RiskBlock & { scenario?: Record<string, unknown> }) | null;
   riskMetricsStatus?: string | null;
   riskHistory: Record<string, unknown>;
   assumptions: Record<string, unknown>;
   calculatedAt: string;
-};
+}>;
 
 export type StressShock =
-  | { factor: 'market' | 'sector' | 'fx'; valuePct: number }
-  | { factor: 'rate'; valueBp: number };
+  | CamelizeKeys<OpenApiMarketShock>
+  | CamelizeKeys<OpenApiSectorShock>
+  | CamelizeKeys<OpenApiFxShock>
+  | CamelizeKeys<OpenApiRateShock>;
 
-export type StressScenario = {
-  id: string;
-  name: string;
-  description: string;
-  category: 'market' | 'sector' | 'fx' | 'rate' | 'custom';
-  shocks: StressShock[];
-  requiresTargetSector: boolean;
-  availability: 'ready' | 'requires_parameters';
-  source: 'built_in' | 'yaml' | 'custom_api';
-  version: number;
-  scenarioHash: string;
-};
+export type StressScenario = CamelizeKeys<OpenApiScenarioSummary>;
 
-export type StressScenarioListResponse = {
+export type StressScenarioListResponse = Override<CamelizeKeys<OpenApiScenarioList>, {
   scenarios: StressScenario[];
   simulationMethod: 'deterministic_factor_shock';
   historicalReplayAvailable: false;
-};
+}>;
 
 export type PortfolioStressPresetQuery = {
   scenarioId: string;
@@ -135,7 +214,7 @@ export type PortfolioStressCustomRequest = {
   rateSensitivityPctPer100bp?: number;
 };
 
-export type StressPositionImpact = {
+export type StressPositionImpact = Override<Partial<CamelizeKeys<OpenApiImpact>>, {
   positionKey: string;
   accountId: number;
   symbol: string;
@@ -150,9 +229,9 @@ export type StressPositionImpact = {
   priceStale: boolean;
   dataQuality: 'ok' | 'partial';
   limitations: string[];
-};
+}>;
 
-export type PortfolioStressResponse = {
+export type PortfolioStressResponse = Override<CamelizeKeys<OpenApiStressResponse>, {
   asOf: string;
   calculatedAt: string;
   snapshotId: string;
@@ -172,7 +251,7 @@ export type PortfolioStressResponse = {
   excludedPositions: Array<Record<string, unknown>>;
   simulationMethod: 'deterministic_factor_shock';
   historicalReplayAvailable: false;
-  scenario: StressScenario & { targetSector?: string | null };
+  scenario: CamelizeKeys<OpenApiScenarioBlock>;
   assumptions: Record<string, unknown> & { simplifiedAssumptions: string[]; dataSource: string };
   snapshotFxStale: boolean;
   snapshotDataQuality: 'ok' | 'partial';
@@ -185,9 +264,9 @@ export type PortfolioStressResponse = {
   topLosers: StressPositionImpact[];
   topWinners: StressPositionImpact[];
   concentration: RiskBlock & Record<string, unknown>;
-};
+}>;
 
-export type RiskTolerance = 'conservative' | 'moderate' | 'aggressive';
+export type RiskTolerance = NonNullable<OpenApiRebalanceQuery['risk_tolerance']>;
 
 export type PortfolioRebalanceQuery = {
   accountId?: number;
@@ -200,7 +279,7 @@ export type PortfolioRebalanceQuery = {
   lookbackTradingDays?: number;
 };
 
-export type PortfolioRebalancingResponse = {
+export type PortfolioRebalancingResponse = Override<CamelizeKeys<OpenApiRebalanceResponse>, {
   asOf: string;
   accountId?: number | null;
   costMethod: PortfolioCostMethod;
@@ -211,7 +290,7 @@ export type PortfolioRebalancingResponse = {
   riskTolerance: RiskTolerance;
   isSuggestionOnly: true;
   autoExecute: false;
-  targetModel: {
+  targetModel: Override<CamelizeKeys<OpenApiTarget>, {
     name: string;
     description: string;
     maxSingleWeightPct: number;
@@ -221,8 +300,8 @@ export type PortfolioRebalancingResponse = {
     maxHhi: number;
     targetVarPctCeiling: number;
     notes: string[];
-  };
-  current: {
+  }>;
+  current: Override<CamelizeKeys<OpenApiCurrent>, {
     portfolioValue: number;
     weights: Array<{ symbol: string; weightPct: number }>;
     riskStatus?: string | null;
@@ -230,8 +309,8 @@ export type PortfolioRebalancingResponse = {
     hhi?: number | null;
     effectiveN?: number | null;
     diversificationScore?: number | null;
-  };
-  drift: {
+  }>;
+  drift: Override<CamelizeKeys<OpenApiDrift>, {
     maxAbsWeightDriftPct: number;
     breaches: Array<{
       kind: string;
@@ -240,8 +319,8 @@ export type PortfolioRebalancingResponse = {
       limitPct: number;
       driftPct: number;
     }>;
-  };
-  suggestions: Array<{
+  }>;
+  suggestions: Array<Override<CamelizeKeys<OpenApiSuggestion>, {
     action: 'trim' | 'add' | 'hold';
     symbol: string;
     fromWeightPct: number;
@@ -252,8 +331,8 @@ export type PortfolioRebalancingResponse = {
     assumptions: string[];
     isSuggestionOnly: true;
     autoExecute: false;
-  }>;
-  positionBands: Array<{
+  }>>;
+  positionBands: Array<Override<CamelizeKeys<OpenApiBand>, {
     symbol: string;
     action: 'add' | 'reduce' | 'hold' | 'exit';
     currentWeightPct: number;
@@ -267,7 +346,7 @@ export type PortfolioRebalancingResponse = {
     assumptions: string[];
     isSuggestionOnly: true;
     autoExecute: false;
-  }>;
+  }>>;
   assumptions: Record<string, unknown> & {
     method: string;
     riskMetricsSource: string;
@@ -280,4 +359,4 @@ export type PortfolioRebalancingResponse = {
     correlationStatus?: string | null;
     concentrationStatus?: string | null;
   };
-};
+}>;
