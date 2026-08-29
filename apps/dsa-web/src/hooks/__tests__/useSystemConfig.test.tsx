@@ -1,9 +1,21 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { ComponentType, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { useSystemConfig } from '../useSystemConfig';
-import { createDeferred } from '../../test-utils';
-import { THEME_STORAGE_KEYS } from '../../design/theme';
 import { ThemeAppearanceProvider } from '../../components/theme/ThemeAppearanceProvider';
+import { THEME_STORAGE_KEYS } from '../../design/theme';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
+import { createDeferred } from '../../test-utils';
+import { useSystemConfig } from '../useSystemConfig';
+
+function createSystemConfigWrapper(Extra?: ComponentType<{ children: ReactNode }>) {
+  const queryClient = createAppQueryClient();
+  function Wrapper({ children }: { children: ReactNode }) {
+    const inner = Extra ? <Extra>{children}</Extra> : children;
+    return <QueryClientProvider client={queryClient}>{inner}</QueryClientProvider>;
+  }
+  return { queryClient, wrapper: Wrapper };
+}
 
 const { getConfig, validate, update, ConflictError } = vi.hoisted(() => ({
   getConfig: vi.fn(),
@@ -143,12 +155,15 @@ const sampleLlmConfig = {
 };
 
 describe('useSystemConfig', () => {
+  let wrapper: ComponentType<{ children: ReactNode }>;
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
     getConfig.mockResolvedValue(sampleConfig);
     validate.mockResolvedValue({ valid: true, issues: [] });
     update.mockResolvedValue({ warnings: [] });
+    ({ wrapper } = createSystemConfigWrapper());
   });
 
   const sensitiveConfig = {
@@ -177,7 +192,7 @@ describe('useSystemConfig', () => {
   };
 
   it('keeps load callback stable and marks legacy notification status as unknown', async () => {
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     const firstLoad = result.current.load;
 
     await act(async () => {
@@ -221,9 +236,8 @@ describe('useSystemConfig', () => {
     document.documentElement.removeAttribute('data-price-direction');
     localStorage.removeItem(THEME_STORAGE_KEYS.priceDirection);
     getConfig.mockResolvedValue(colorConfig);
-    const { result } = renderHook(() => useSystemConfig(), {
-      wrapper: ThemeAppearanceProvider,
-    });
+    const { wrapper: themeWrapper } = createSystemConfigWrapper(ThemeAppearanceProvider);
+    const { result } = renderHook(() => useSystemConfig(), { wrapper: themeWrapper });
 
     await act(async () => {
       await result.current.load();
@@ -266,7 +280,7 @@ describe('useSystemConfig', () => {
         },
       ],
     });
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -284,7 +298,7 @@ describe('useSystemConfig', () => {
       items: sampleConfig.items.map((item) => ({ ...item, value: 'SH600519' })),
     };
     getConfig.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise);
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     let firstLoad!: Promise<boolean>;
     let secondLoad!: Promise<boolean>;
@@ -324,7 +338,7 @@ describe('useSystemConfig', () => {
       .mockResolvedValueOnce(sampleConfig)
       .mockReturnValueOnce(staleExternalRefresh.promise)
       .mockResolvedValueOnce(savedConfig);
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -365,7 +379,7 @@ describe('useSystemConfig', () => {
       .mockResolvedValueOnce(sampleConfig)
       .mockReturnValueOnce(supersededExternalRefresh.promise)
       .mockResolvedValueOnce(latestConfig);
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -400,7 +414,7 @@ describe('useSystemConfig', () => {
       .mockResolvedValueOnce(sampleConfig)
       .mockReturnValueOnce(supersededSaveRefresh.promise)
       .mockResolvedValueOnce(latestConfig);
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -445,7 +459,7 @@ describe('useSystemConfig', () => {
     getConfig
       .mockResolvedValueOnce(sampleConfig)
       .mockRejectedValueOnce(new Error('current refresh failed'));
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -467,7 +481,7 @@ describe('useSystemConfig', () => {
 
   it('reports an update POST failure without attempting a snapshot refresh', async () => {
     update.mockRejectedValueOnce(new Error('update failed'));
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -501,7 +515,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sampleConfig);
     getConfig.mockResolvedValueOnce(savedConfig);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -551,7 +565,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sampleLlmConfig);
     getConfig.mockResolvedValueOnce(savedConfig);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -602,7 +616,7 @@ describe('useSystemConfig', () => {
     const current = sampleLlmConfig;
     getConfig.mockResolvedValueOnce(current);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -633,7 +647,7 @@ describe('useSystemConfig', () => {
 
   it('resets only the requested atomic group keys', async () => {
     getConfig.mockResolvedValueOnce(sampleLlmConfig);
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -666,7 +680,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sampleLlmConfig);
     getConfig.mockResolvedValueOnce(stockUpdatedConfig);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
 
     await act(async () => {
       await result.current.load();
@@ -709,7 +723,7 @@ describe('useSystemConfig', () => {
   it('does not persist edits without an explicit save (no autosave)', async () => {
     getConfig.mockResolvedValue(sampleLlmConfig);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => {
       await result.current.load();
     });
@@ -733,7 +747,7 @@ describe('useSystemConfig', () => {
   it('keeps sensitive fields as draft until an explicit save', async () => {
     getConfig.mockResolvedValue(sensitiveConfig);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => {
       await result.current.load();
     });
@@ -761,7 +775,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sampleLlmConfig);
     getConfig.mockResolvedValueOnce(savedConfig);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => {
       await result.current.load();
     });
@@ -794,7 +808,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(savedConfig);
     update.mockReturnValueOnce(pendingUpdate);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
 
@@ -820,7 +834,7 @@ describe('useSystemConfig', () => {
     };
     getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(savedConfig);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     await act(async () => {
       await result.current.save([{ key: 'STOCK_LIST', value: 'SH600000,SH600519' }]);
@@ -843,7 +857,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(savedConfig);
     update.mockReturnValueOnce(pendingUpdate);
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
     let saving!: Promise<unknown>;
@@ -874,7 +888,7 @@ describe('useSystemConfig', () => {
       .mockResolvedValueOnce(savedConfig);
     update.mockRejectedValueOnce(new ConflictError('conflict')).mockResolvedValueOnce({ warnings: [] });
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
     await act(async () => { await result.current.save(); });
@@ -894,7 +908,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sampleConfig).mockResolvedValueOnce(latestConfig);
     update.mockRejectedValueOnce(new ConflictError('conflict'));
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     act(() => result.current.setDraftValue('STOCK_LIST', 'SH600000,SH600519'));
     await act(async () => { await result.current.save(); });
@@ -927,7 +941,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(sensitiveConfig).mockResolvedValueOnce(latestConfig);
     update.mockRejectedValueOnce(new ConflictError('conflict'));
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     act(() => result.current.setDraftValue('OPENAI_API_KEY', 'sk-local-secret'));
     await act(async () => { await result.current.save(); });
@@ -955,7 +969,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(maskedSensitiveConfig).mockResolvedValueOnce(latestConfig);
     update.mockRejectedValueOnce(new ConflictError('conflict'));
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     act(() => result.current.setDraftValue('OPENAI_API_KEY', 'sk-local-secret'));
     await act(async () => { await result.current.save(); });
@@ -1008,7 +1022,7 @@ describe('useSystemConfig', () => {
     getConfig.mockResolvedValueOnce(withChannel).mockResolvedValueOnce(latestConfig);
     update.mockRejectedValueOnce(new ConflictError('conflict'));
 
-    const { result } = renderHook(() => useSystemConfig());
+    const { result } = renderHook(() => useSystemConfig(), { wrapper });
     await act(async () => { await result.current.load(); });
     act(() => result.current.setDraftValue(channelKey, 'gpt-4o-mini,custom'));
     await act(async () => { await result.current.save(); });
