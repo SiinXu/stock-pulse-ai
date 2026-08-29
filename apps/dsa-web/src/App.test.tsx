@@ -1,8 +1,10 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as AuthContext from './contexts/AuthContext';
+import { createAppQueryClient } from './query/createAppQueryClient';
 import {
   APP_ROUTE_PATHS,
   LEGACY_ALERTS_VIEW_VALUES,
@@ -20,8 +22,8 @@ import {
   buildSignalCenterHref,
 } from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
-import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
 import { resetStockIndexCacheForTests } from './utils/stockIndexLoader';
+import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
 
 type AuthState = ReturnType<typeof AuthContext.useAuth>;
 
@@ -124,8 +126,25 @@ function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
   };
 }
 
+let queryClient: ReturnType<typeof createAppQueryClient>;
+
+/**
+ * Fresh production client per test: the real `useUnreadNotifications` in the
+ * header bell calls `useQueryClient`, so every host that renders the real
+ * `App` must supply the same retry-free factory as `main.tsx`. A per-test
+ * client prevents cache reuse across tests.
+ */
+function renderApp() {
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>,
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
+  queryClient = createAppQueryClient();
   chatPageShouldThrow.value = false;
   window.history.pushState({}, '', '/');
   localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
@@ -134,11 +153,16 @@ beforeEach(() => {
   vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState());
 });
 
+afterEach(() => {
+  queryClient.clear();
+  queryClient.unmount();
+});
+
 describe('App routing behavior', () => {
   it('shows loading fallback while auth status is initializing', () => {
     vi.mocked(AuthContext.useAuth).mockReturnValue(makeAuthState({ isLoading: true }));
 
-    const { container } = render(<App />);
+    const { container } = renderApp();
 
     expect(container.querySelector('[data-app-shell-skeleton]')).toBeInTheDocument();
     expect(container.querySelector('[data-shell-sidebar]')).toBeInTheDocument();
@@ -157,7 +181,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/portfolio');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');
@@ -177,7 +201,7 @@ describe('App routing behavior', () => {
     const discoverHref = `${APP_ROUTE_PATHS.researchDiscover}?${discoverSearch}`;
     window.history.pushState({}, '', discoverHref);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get('redirect')).toBe(discoverHref);
@@ -199,7 +223,7 @@ describe('App routing behavior', () => {
     });
     window.history.pushState({}, '', explicitDefaults);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get('redirect')).toBe(explicitDefaults);
@@ -214,7 +238,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/chat?session=private&stock=AAPL&recordId=9');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/login');
@@ -229,7 +253,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/playground?component=modal&scenario=interactive');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     expect(window.location.search).toContain('redirect=');
@@ -245,7 +269,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/playground');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('playground-page')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: '主导航' })).not.toBeInTheDocument();
@@ -259,7 +283,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/playground/render/button/default');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('playground-render-page')).toBeInTheDocument();
     expect(screen.queryByRole('navigation', { name: '主导航' })).not.toBeInTheDocument();
@@ -268,7 +292,7 @@ describe('App routing behavior', () => {
   it('renders the current route page after auth is ready', async () => {
     window.history.pushState({}, '', '/chat');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('chat-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenCalledWith('/chat');
@@ -280,7 +304,7 @@ describe('App routing behavior', () => {
     recordSessionLocation('/portfolio?account=4');
     window.history.pushState({}, '', '/portfolio');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('portfolio-page')).toBeInTheDocument();
     expect(window.location.search).toBe('?account=4');
@@ -290,7 +314,7 @@ describe('App routing behavior', () => {
     recordSessionLocation('/?stock=AAPL&workspace=watchlist');
     window.history.pushState({}, '', '/stocks/%3Cscript%3E');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('home-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
@@ -304,7 +328,7 @@ describe('App routing behavior', () => {
       `${LEGACY_ROUTE_PATHS.usage}?period=today&section=legacy#breakdown`,
     );
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.settings);
@@ -322,7 +346,7 @@ describe('App routing behavior', () => {
   it('routes the canonical market-review path after auth is ready', async () => {
     window.history.pushState({}, '', APP_ROUTE_PATHS.researchMarket);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('market-review-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.researchMarket);
@@ -331,7 +355,7 @@ describe('App routing behavior', () => {
   it('routes the canonical Research overview path after auth is ready', async () => {
     window.history.pushState({}, '', APP_ROUTE_PATHS.research);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('research-overview-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.research);
@@ -340,7 +364,7 @@ describe('App routing behavior', () => {
   it('routes the canonical Analysis Workbench path after auth is ready', async () => {
     window.history.pushState({}, '', APP_ROUTE_PATHS.researchAnalysis);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('analysis-workbench-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenLastCalledWith(APP_ROUTE_PATHS.researchAnalysis);
@@ -352,7 +376,7 @@ describe('App routing behavior', () => {
   ])('redirects %s to %s while preserving query and hash', async (legacyPath, canonicalPath, testId) => {
     window.history.pushState({}, '', `${legacyPath}?keep=yes#results`);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId(testId)).toBeInTheDocument();
     expect(window.location.pathname).toBe(canonicalPath);
@@ -364,7 +388,7 @@ describe('App routing behavior', () => {
   it('routes /signals to the Signal Center page after auth is ready', async () => {
     window.history.pushState({}, '', APP_ROUTE_PATHS.signals);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
     expect(setCurrentRoute).toHaveBeenCalledWith(APP_ROUTE_PATHS.signals);
@@ -383,7 +407,7 @@ describe('App routing behavior', () => {
       `${LEGACY_ROUTE_PATHS.decisionSignals}?${legacySearch}#review`,
     );
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.signals);
@@ -407,7 +431,7 @@ describe('App routing behavior', () => {
       `${LEGACY_ROUTE_PATHS.alerts}?${legacySearch}`,
     );
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.signals);
@@ -426,7 +450,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/login');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('home-page')).toBeInTheDocument();
     expect(screen.queryByTestId('login-page')).not.toBeInTheDocument();
@@ -440,7 +464,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/login?redirect=%2Fsettings%3Fsection%3Dai_models');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('settings-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.settings);
@@ -468,7 +492,7 @@ describe('App routing behavior', () => {
       `${APP_ROUTE_PATHS.login}?${new URLSearchParams({ redirect: explicitDefaults })}`,
     );
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('decision-signals-page')).toBeInTheDocument();
     expect(`${window.location.pathname}${window.location.search}`).toBe(explicitDefaults);
@@ -509,7 +533,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', href);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('login-page')).toBeInTheDocument();
     const loginUrl = new URL(window.location.href);
@@ -533,7 +557,7 @@ describe('App routing behavior', () => {
     const loginSearch = new URLSearchParams({ redirect: discoverHref }).toString();
     window.history.pushState({}, '', `${APP_ROUTE_PATHS.login}?${loginSearch}`);
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('screening-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe(APP_ROUTE_PATHS.researchDiscover);
@@ -550,7 +574,7 @@ describe('App routing behavior', () => {
     }));
     window.history.pushState({}, '', '/login?redirect=%2F%2Fevil.example.com');
 
-    render(<App />);
+    renderApp();
 
     expect(await screen.findByTestId('home-page')).toBeInTheDocument();
     expect(window.location.pathname).toBe('/');
@@ -562,7 +586,7 @@ describe('App routing behavior', () => {
     window.history.pushState({}, '', '/chat');
 
     try {
-      render(<App />);
+      renderApp();
 
       expect(await screen.findByRole('heading', { name: '页面加载失败' })).toBeInTheDocument();
       expect(screen.getByRole('navigation', { name: '主导航' })).toBeInTheDocument();
@@ -617,7 +641,7 @@ describe('App stock index loading', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    render(<App />);
+    renderApp();
     expect(await screen.findByTestId('home-page')).toBeInTheDocument();
     expect(stockIndexFetchCalls(fetchMock)).toHaveLength(0);
     expect(parseCount).toBe(0);
