@@ -1,7 +1,7 @@
 # Data Provider Module Ownership
 
 - Status: `Living`
-- Last verified: 2026-08-27
+- Last verified: 2026-08-29
 - Related: [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md),
   [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md),
   Issue #622, Issue #1292
@@ -70,6 +70,8 @@ this identity.
 | `src/data_provider/*_fetcher.py` | One remote/source adapter each (history, quote, or specialty data) | Cross-provider orchestration |
 | `src/data_provider/akshare_fetcher.py` | Compatibility facade for the AkShare provider: public class, constants, re-exports, and ADR-006 method rebinding / timeout clone seams | New capability-domain bodies (add under `akshare_parts/`) |
 | `src/data_provider/akshare_parts/` | AkShare implementation ownership by capability domain: `symbols`, `timeout_client`, `parse_tencent`, `realtime_errors`, `history`, `realtime_quotes`, `market_boards`, `enhanced`, `realtime_cache`, plus `facade_bind` helpers | Cross-provider manager policy (ADR-005) |
+| `src/data_provider/tushare_fetcher.py` | Compatibility facade for the Tushare provider: public class, HTTP-client / URL / symbol re-exports, and ADR-006 method rebinding / HTTP-client clone seams | New capability-domain bodies (add under `tushare_parts/`) |
+| `src/data_provider/tushare_parts/` | Tushare implementation ownership by capability domain: `client` (HTTP client, URL resolve, rate-limit wrappers), `symbols` (ETF/US classifiers and ts_code conversion), `history` (`_fetch_raw_data` / `_normalize_data`), plus `facade_bind` helpers | Cross-provider manager policy (ADR-005); Tushare stock-name / stock-list / realtime / market-boards / chip remain on the facade |
 | `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
 | `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, stock-name/prefetch workflows still co-located, concept-rankings TTL/lock/dict class attributes, CN fundamental sub-blocks (`get_capital_flow_context` / `get_dragon_tiger_context` / `get_board_context`) plus payload helpers and failed/rejected builders, money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | New pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/belong-board descriptors |
 
@@ -259,6 +261,17 @@ rebound `_get_sector_rankings_with_meta`. `_copy_ranking_rows` remains a
 `staticmethod` and `clear_concept_rankings_cache_for_tests` remains a
 `classmethod`. Import the facade (`src.data_provider.base` /
 `src.data_provider`), not `manager_parts.rankings_methods`.
+
+Tushare client / symbols / history (Issue #1068) rebinds `_init_api` /
+`_build_api_client` / `_check_rate_limit` / `_call_api_with_rate_limit`,
+`_detect_exchange_hint` / `_convert_stock_code` /
+`_convert_hk_stock_code_for_tushare`, and `_fetch_raw_data` /
+`_normalize_data` from `tushare_parts/` while preserving
+`src.data_provider.tushare_fetcher` module, qualname, and patch seams
+(`safe_post`, `requests.post`, `get_config`). Import the facade
+(`src.data_provider.tushare_fetcher` / `src.data_provider`), not
+`tushare_parts`. Stock-name, stock-list, realtime, market-boards, and chip
+stay on the Tushare facade.
 
 ## How To Add The Next Extraction Slice
 

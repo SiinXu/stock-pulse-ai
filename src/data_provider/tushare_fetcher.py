@@ -4,9 +4,15 @@
 TushareFetcher - 备用数据源 1 (Priority 2)
 ===================================
 
-数据来源：Tushare Pro API（挖地兔）
-特点：需要 Token、有请求配额限制
-优点：数据质量高、接口稳定
+Compatibility facade for the Tushare provider (ADR-006 / Issue #1068).
+
+Data source: Tushare Pro API (dig-the-rabbit)
+Requires a token and enforces a per-minute request quota.
+
+Implementation ownership lives under ``data_provider.tushare_parts`` by
+capability domain (client, symbols, history). This module remains the
+stable import and monkeypatch surface so provider registration, tests,
+fixture scripts, and diagnostics keep working without behavior changes.
 
 流控策略：
 1. 实现"每分钟调用计数器"
@@ -38,98 +44,30 @@ from src.utils.sanitize import log_safe_exception, safe_before_sleep_log
 import os
 from zoneinfo import ZoneInfo
 
+from .tushare_parts import client as _client_module
+from .tushare_parts import history as _history_module
+from .tushare_parts import symbols as _symbols_module
+from .tushare_parts.client import (
+    _ClientMethods,
+    _TUSHARE_DEFAULT_API_URL,
+    _TushareHttpClient,
+    _resolve_tushare_api_url,
+)
+from .tushare_parts.facade_bind import (
+    _clone_facade_descriptor,
+    bind_methods_from_class,
+)
+from .tushare_parts.history import _HistoryMethods
+from .tushare_parts.symbols import (
+    _ETF_ALL_PREFIXES,
+    _ETF_SH_PREFIXES,
+    _ETF_SZ_PREFIXES,
+    _SymbolMethods,
+    _is_etf_code,
+    _is_us_code,
+)
+
 logger = logging.getLogger(__name__)
-
-
-# ETF code prefixes by exchange
-# Shanghai: 51xxxx, 52xxxx, 56xxxx, 58xxxx
-# Shenzhen: 15xxxx, 16xxxx, 18xxxx
-_ETF_SH_PREFIXES = ('51', '52', '56', '58')
-_ETF_SZ_PREFIXES = ('15', '16', '18')
-_ETF_ALL_PREFIXES = _ETF_SH_PREFIXES + _ETF_SZ_PREFIXES
-
-
-# Default Tushare Pro HTTP endpoint. Overridable via TUSHARE_HTTP_URL for
-# self-hosted nodes, proxies, or internal mirrors; when the variable is unset or
-# blank the official endpoint is used so default behavior stays unchanged.
-_TUSHARE_DEFAULT_API_URL = "http://api.tushare.pro"
-
-
-def _resolve_tushare_api_url() -> str:
-    """Resolve the Tushare Pro endpoint, honoring the optional TUSHARE_HTTP_URL override.
-
-    A blank or unset TUSHARE_HTTP_URL falls back to the official endpoint, keeping the
-    default request path unchanged. Custom endpoints remain subject to the outbound
-    security policy, so private hosts still require OUTBOUND_HTTP_ALLOWLIST.
-    """
-    custom = (os.getenv("TUSHARE_HTTP_URL") or "").strip()
-    return custom or _TUSHARE_DEFAULT_API_URL
-
-
-def _is_etf_code(stock_code: str) -> bool:
-    """
-    Check if the code is an ETF fund code.
-
-    ETF code ranges:
-    - Shanghai ETF: 51xxxx, 52xxxx, 56xxxx, 58xxxx
-    - Shenzhen ETF: 15xxxx, 16xxxx, 18xxxx
-    """
-    code = normalize_stock_code(stock_code)
-    return code.startswith(_ETF_ALL_PREFIXES) and len(code) == 6
-
-
-def _is_us_code(stock_code: str) -> bool:
-    """
-    判断代码是否为美股
-    
-    美股代码规则：
-    - 1-5个大写字母，如 'AAPL', 'TSLA'
-    - 可能包含 '.'，如 'BRK.B'
-    """
-    code = stock_code.strip().upper()
-    return bool(re.match(r'^[A-Z]{1,5}(\.[A-Z])?$', code))
-
-
-class _TushareHttpClient:
-    """Lightweight Tushare Pro client that does not require the tushare SDK."""
-
-    def __init__(self, token: str, timeout: int = 30, api_url: str = _TUSHARE_DEFAULT_API_URL) -> None:
-        self._token = token
-        self._timeout = timeout
-        self._api_url = api_url
-
-    def query(self, api_name: str, fields: str = "", **kwargs) -> pd.DataFrame:
-        req_params = {
-            "api_name": api_name,
-            "token": self._token,
-            "params": kwargs,
-            "fields": fields,
-        }
-        res = safe_post(
-            self._api_url,
-            json=req_params,
-            timeout=self._timeout,
-        )
-        if res.status_code != 200:
-            raise Exception(f"Tushare API HTTP {res.status_code}")
-
-        result = _json.loads(res.text)
-        if result.get("code") != 0:
-            raise Exception(result.get("msg") or f"Tushare API error code {result.get('code')}")
-
-        data = result.get("data") or {}
-        columns = data.get("fields") or []
-        items = data.get("items") or []
-        return pd.DataFrame(items, columns=columns)
-
-    def __getattr__(self, api_name: str):
-        if api_name.startswith("_"):
-            raise AttributeError(api_name)
-
-        def caller(**kwargs) -> pd.DataFrame:
-            return self.query(api_name, **kwargs)
-
-        return caller
 
 
 class TushareFetcher(BaseFetcher):
@@ -171,52 +109,6 @@ class TushareFetcher(BaseFetcher):
 
         # Dynamically adjust priority based on API initialization results
         self.priority = self._determine_priority()
-    
-    def _init_api(self) -> None:
-        """
-        初始化 Tushare API
-
-        如果 Token 未配置，此数据源将不可用。
-        这里直接使用内置 HTTP client，避免运行时强依赖 tushare SDK，
-        从而减少 Docker / PyInstaller / 多虚拟环境场景下因缺包导致的初始化失败。
-        """
-        config = get_config()
-
-        if not config.tushare_token:
-            logger.warning("Tushare Token 未配置，此数据源不可用")
-            return
-
-        try:
-            self._api = self._build_api_client(config.tushare_token)
-            logger.info("Tushare API 初始化成功")
-        except Exception as e:
-            log_safe_exception(
-                logger,
-                "Tushare API initialization failed",
-                e,
-                error_code="tushare_api_initialization_failed",
-                level=logging.ERROR,
-            )
-            self._api = None
-
-    def _build_api_client(self, token: str) -> _TushareHttpClient:
-        """
-        Build a lightweight Tushare Pro client over direct HTTP requests.
-
-        The project already normalizes all Pro calls through the same request
-        contract, so we do not need the official tushare SDK during runtime.
-
-        The endpoint honors the optional TUSHARE_HTTP_URL override so self-hosted
-        nodes, proxies, or internal mirrors can be targeted; when it is unset the
-        official Tushare Pro endpoint is used and behavior is unchanged.
-        """
-        api_url = _resolve_tushare_api_url()
-        client = _TushareHttpClient(token=token, api_url=api_url)
-        if api_url == _TUSHARE_DEFAULT_API_URL:
-            logger.debug("Tushare API client configured for direct HTTP calls")
-        else:
-            logger.info("Tushare API endpoint overridden via TUSHARE_HTTP_URL: %s", api_url)
-        return client
 
     def _determine_priority(self) -> int:
         """
@@ -247,57 +139,6 @@ class TushareFetcher(BaseFetcher):
             True 表示可用，False 表示不可用
         """
         return self._api is not None
-
-    def _check_rate_limit(self) -> None:
-        """
-        检查并执行速率限制
-        
-        流控策略：
-        1. 检查是否进入新的一分钟
-        2. 如果是，重置计数器
-        3. 如果当前分钟调用次数超过限制，强制休眠
-        """
-        current_time = time.time()
-        
-        # Check if the counter needs to be reset (new minute)
-        if self._minute_start is None:
-            self._minute_start = current_time
-            self._call_count = 0
-        elif current_time - self._minute_start >= 60:
-            # It has been more than a minute, reset the counter
-            self._minute_start = current_time
-            self._call_count = 0
-            logger.debug("速率限制计数器已重置")
-        
-        # Check if quota limit has been exceeded.
-        if self._call_count >= self.rate_limit_per_minute:
-            # Calculate the waiting time (to the next minute)
-            elapsed = current_time - self._minute_start
-            sleep_time = max(0, 60 - elapsed) + 1  # +1 second buffer
-            
-            logger.warning(
-                f"Tushare 达到速率限制 ({self._call_count}/{self.rate_limit_per_minute} 次/分钟)，"
-                f"等待 {sleep_time:.1f} 秒..."
-            )
-            
-            time.sleep(sleep_time)
-            
-            # Reset counter
-            self._minute_start = time.time()
-            self._call_count = 0
-        
-        # Increase call count
-        self._call_count += 1
-        logger.debug(f"Tushare 当前分钟调用次数: {self._call_count}/{self.rate_limit_per_minute}")
-
-    def _call_api_with_rate_limit(self, method_name: str, **kwargs) -> pd.DataFrame:
-        """统一通过速率限制包装 Tushare API 调用。"""
-        if self._api is None:
-            raise DataFetchError("Tushare API 未初始化，请检查 Token 配置")
-
-        self._check_rate_limit()
-        method = getattr(self._api, method_name)
-        return method(**kwargs)
 
     def _get_china_now(self) -> datetime:
         """返回上海时区当前时间，方便测试覆盖跨日刷新逻辑。"""
@@ -345,18 +186,6 @@ class TushareFetcher(BaseFetcher):
             return trade_dates[0]
         return trade_dates[1]
 
-    @staticmethod
-    def _detect_exchange_hint(stock_code: str) -> Optional[str]:
-        """Return SH/SZ/BJ when the raw user input carries an explicit exchange hint."""
-        upper = (stock_code or "").strip().upper()
-        if upper.startswith(("SH", "SS")) or upper.endswith((".SH", ".SS")):
-            return "SH"
-        if upper.startswith("SZ") or upper.endswith(".SZ"):
-            return "SZ"
-        if upper.startswith("BJ") or upper.endswith(".BJ"):
-            return "BJ"
-        return None
-
     @classmethod
     def _get_legacy_realtime_symbol(cls, stock_code: str) -> str:
         """Build the legacy tushare symbol while preserving explicit SH/SZ hints."""
@@ -374,242 +203,6 @@ class TushareFetcher(BaseFetcher):
         if is_bse_code(code):
             return f"bj{code}"
         return code
-    
-    def _convert_stock_code(self, stock_code: str) -> str:
-        """
-        转换 A 股 / ETF / 北交所等为 Tushare ts_code（不含港股逻辑）。
-
-        Tushare 要求的格式示例：
-        - 沪市股票：600519.SH
-        - 深市股票：000001.SZ
-        - 沪市 ETF：510050.SH
-        - 深市 ETF：159919.SZ
-
-        Args:
-            stock_code: 原始代码，如 '600519', '000001', '563230'
-
-        Returns:
-            Tushare 格式代码，如 '600519.SH', '000001.SZ'
-        """
-        raw_code = stock_code.strip()
-        
-        # Already has suffix.
-        if '.' in raw_code:
-            upper = raw_code.upper()
-            code = normalize_stock_code(raw_code)
-            exchange_hint = self._detect_exchange_hint(raw_code)
-            if exchange_hint in ("SH", "SZ", "BJ") and code.isdigit():
-                return f"{code}.{exchange_hint}"
-
-            ts_code = upper
-            if ts_code.endswith('.SS'):
-                return f"{ts_code[:-3]}.SH"
-            return ts_code
-
-        if _is_us_code(raw_code):
-            raise DataFetchError(f"TushareFetcher 不支持美股 {raw_code}，请使用 AkshareFetcher 或 YfinanceFetcher")
-
-        if _is_hk_market(raw_code):
-            # raise DataFetchError(f"TushareFetcher 不支持港股 {raw_code}，请使用 AkshareFetcher")
-            return normalize_stock_code(raw_code)
-
-        code = normalize_stock_code(raw_code)
-        exchange_hint = self._detect_exchange_hint(raw_code)
-
-        if exchange_hint == "SH":
-            return f"{code}.SH"
-        if exchange_hint == "SZ":
-            return f"{code}.SZ"
-        if exchange_hint == "BJ":
-            return f"{code}.BJ"
-
-        # ETF: determine exchange by prefix
-        if code.startswith(_ETF_SH_PREFIXES) and len(code) == 6:
-            return f"{code}.SH"
-        if code.startswith(_ETF_SZ_PREFIXES) and len(code) == 6:
-            return f"{code}.SZ"
-        
-        # BSE (Beijing Stock Exchange): 8xxxxx, 4xxxxx, 920xxx
-        if is_bse_code(code):
-            return f"{code}.BJ"
-        
-        # Regular stocks
-        # Shanghai: 600xxx, 601xxx, 603xxx, 605xxx, 688xxx (STAR Market)
-        # Shenzhen: 000xxx, 001xxx, 002xxx, 003xxx, 300xxx, 301xxx (ChiNext)
-        if code.startswith(('600', '601', '603', '605', '688')):
-            return f"{code}.SH"
-        elif code.startswith(('000', '001', '002', '003', '300', '301')):
-            return f"{code}.SZ"
-        else:
-            logger.warning(f"无法确定股票 {code} 的市场，默认使用深市")
-            return f"{code}.SZ"
-
-    def _convert_hk_stock_code_for_tushare(self, stock_code: str) -> str:
-        """
-        将用户输入转为 Tushare Pro 接口所需的 ts_code（含港股 nnnnn.HK）。
-
-        - 非港股：委托 _convert_stock_code（A 股 / ETF / 北交所等）。
-        - 港股：从 HK00700、00700、00700.HK 等形式归一为 5 位数字 + .HK。
-        """
-        raw_code = stock_code.strip()
-        if _is_hk_market(raw_code):
-            if "." in raw_code:
-                ts_code = raw_code.upper()
-                if ts_code.endswith(".SS"):
-                    return f"{ts_code[:-3]}.SH"
-                if ts_code.endswith(".HK"):
-                    return ts_code
-            digits = re.sub(r"\D", "", raw_code)
-            if not digits:
-                raise DataFetchError(f"无法识别港股代码 {raw_code}")
-            code = digits[-5:].rjust(5, "0")
-            return f"{code}.HK"
-        return self._convert_stock_code(stock_code)
-
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=safe_before_sleep_log(
-            logger,
-            logging.WARNING,
-            event="Tushare daily data retry scheduled",
-            error_code="tushare_daily_data_retry",
-        ),
-    )
-    def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """
-        从 Tushare 获取原始数据
-        
-        根据代码类型选择不同接口：
-        - 普通股票：daily()
-        - ETF 基金：fund_daily()
-        
-        流程：
-        1. 检查 API 是否可用
-        2. 检查是否为美股（不支持）
-        3. 执行速率限制检查
-        4. 转换股票代码格式
-        5. 根据代码类型选择接口并调用
-        """
-        if self._api is None:
-            raise DataFetchError("Tushare API 未初始化，请检查 Token 配置")
-        
-        # US stocks not supported
-        if _is_us_code(stock_code):
-            raise DataFetchError(f"TushareFetcher 不支持美股 {stock_code}，请使用 AkshareFetcher 或 YfinanceFetcher")
-        
-        # Rate-limit check
-        self._check_rate_limit()
-        
-        is_hk = _is_hk_market(stock_code)
-         # Determine if it's an ETF / Hong Kong stock, to select different interfaces.
-        is_etf = _is_etf_code(stock_code)
-        if is_hk:
-            ts_code = self._convert_hk_stock_code_for_tushare(stock_code)
-            api_name = "hk_daily"
-        else:
-            ts_code = self._convert_stock_code(stock_code)
-            api_name = "fund_daily" if is_etf else "daily"
-        
-        # Convert date format (Tushare requires YYYYMMDD)
-        ts_start = start_date.replace('-', '')
-        ts_end = end_date.replace('-', '')
-        
-       
-
-        logger.debug(f"调用 Tushare {api_name}({ts_code}, {ts_start}, {ts_end})")
-        
-        try:
-            if is_hk:
-                # Hong Kong stocks uses the hk_daily interface.
-                df = self._api.hk_daily(
-                    ts_code=ts_code,
-                    start_date=ts_start,
-                    end_date=ts_end,
-                )
-            elif is_etf:
-                # ETF uses fund_daily interface
-                df = self._api.fund_daily(
-                    ts_code=ts_code,
-                    start_date=ts_start,
-                    end_date=ts_end,
-                )
-            else:
-                # Regular A-share stocks use daily interface
-                df = self._api.daily(
-                    ts_code=ts_code,
-                    start_date=ts_start,
-                    end_date=ts_end,
-                )
-            
-            return df
-            
-        except Exception as e:
-            error_msg = str(e).lower()
-            
-            # Check quota limit
-            if any(keyword in error_msg for keyword in ['quota', '配额', 'limit', '权限']):
-                log_safe_exception(
-                    logger,
-                    "Tushare rate limit detected",
-                    e,
-                    error_code="tushare_rate_limit_detected",
-                    level=logging.WARNING,
-                    context={"symbol": stock_code},
-                )
-                raise RateLimitError(f"Tushare 配额超限: {e}") from e
-            
-            raise DataFetchError(f"Tushare 获取数据失败: {e}") from e
-    
-    def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
-        """
-        标准化 Tushare 数据
-        
-        Tushare daily / fund_daily 返回的列名：
-        ts_code, trade_date, open, high, low, close, pre_close, change, pct_chg, vol, amount
-        
-        需要映射到标准列名：
-        date, open, high, low, close, volume, amount, pct_chg
-
-        单位缩放仅适用于 A 股（及 ETF 等使用同一套单位的接口）：
-        - vol 按「手」计，乘以 100 转为「股」
-        - amount 按「千元」计，乘以 1000 转为「元」
-
-        港股 hk_daily 返回的 vol / amount 已是可直接使用的量级，不做上述缩放。
-        """
-        df = df.copy()
-        is_hk = _is_hk_market(stock_code)
-
-        # Column name mapping
-        column_mapping = {
-            'trade_date': 'date',
-            'vol': 'volume',
-            # open, high, low, close, amount, pct_chg duplicate names
-        }
-        
-        df = df.rename(columns=column_mapping)
-        
-        # Convert date format (YYYYMMDD -> YYYY-MM-DD)
-        if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
-        
-        # Convert volume/trading-value units only for A-share APIs; Hong Kong hk_daily values need no conversion.
-        if 'volume' in df.columns and not is_hk:
-            df['volume'] = df['volume'] * 100
-        
-        if 'amount' in df.columns and not is_hk:
-            df['amount'] = df['amount'] * 1000
-        
-        # Add stock code column
-        df['code'] = stock_code
-        
-        # Keep only required columns.
-        keep_cols = ['code'] + STANDARD_COLUMNS
-        existing_cols = [col for col in keep_cols if col in df.columns]
-        df = df[existing_cols]
-        
-        return df
 
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         """
@@ -1384,6 +977,132 @@ class TushareFetcher(BaseFetcher):
             "70集中度": round(concentration_70/100, 4)
         }
 
+
+
+_EXPECTED_CLIENT_METHOD_NAMES = (
+    "_init_api",
+    "_build_api_client",
+    "_check_rate_limit",
+    "_call_api_with_rate_limit",
+)
+
+_EXPECTED_SYMBOL_METHOD_NAMES = (
+    "_detect_exchange_hint",
+    "_convert_stock_code",
+    "_convert_hk_stock_code_for_tushare",
+)
+
+_EXPECTED_HISTORY_METHOD_NAMES = (
+    "_fetch_raw_data",
+    "_normalize_data",
+)
+
+_HTTP_CLIENT_METHOD_NAMES = (
+    "__init__",
+    "query",
+    "__getattr__",
+)
+
+
+def _apply_history_retry(name: str, bound):
+    """Re-apply the historical tenacity policy after facade cloning."""
+
+    if name != "_fetch_raw_data":
+        return bound
+    return retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+        before_sleep=safe_before_sleep_log(
+            logger,
+            logging.WARNING,
+            event="Tushare daily data retry scheduled",
+            error_code="tushare_daily_data_retry",
+        ),
+    )(bound)
+
+
+def _bind_http_client_facade() -> None:
+    """Clone HTTP client methods so patches on this module intercept them."""
+
+    global _TushareHttpClient
+    _TushareHttpClient = _client_module._TushareHttpClient
+    ns = globals()
+    for name in _HTTP_CLIENT_METHOD_NAMES:
+        descriptor = vars(_TushareHttpClient)[name]
+        bound = _clone_facade_descriptor(
+            descriptor,
+            ns,
+            owner_qualname=_TushareHttpClient.__qualname__,
+        )
+        setattr(_TushareHttpClient, name, bound)
+
+
+def _assemble_tushare_fetcher_facade() -> None:
+    """Bind capability-domain method bodies onto the public fetcher class."""
+
+    global _ClientMethods, _HistoryMethods, _SymbolMethods
+    _ClientMethods = _client_module._ClientMethods
+    _SymbolMethods = _symbols_module._SymbolMethods
+    _HistoryMethods = _history_module._HistoryMethods
+    _bind_http_client_facade()
+    bind_methods_from_class(
+        _ClientMethods,
+        TushareFetcher,
+        globals(),
+        expected_names=_EXPECTED_CLIENT_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _SymbolMethods,
+        TushareFetcher,
+        globals(),
+        expected_names=_EXPECTED_SYMBOL_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _HistoryMethods,
+        TushareFetcher,
+        globals(),
+        expected_names=_EXPECTED_HISTORY_METHOD_NAMES,
+        post_bind=_apply_history_retry,
+    )
+    # Rebound methods are assigned after class body evaluation; clear ABC
+    # abstracts that are now implemented so instantiation matches the legacy
+    # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
+    abstracts = set(getattr(TushareFetcher, "__abstractmethods__", ()))
+    if abstracts:
+        abstracts.difference_update(
+            {
+                name
+                for name in (
+                    "_fetch_raw_data",
+                    "_normalize_data",
+                    "get_daily_data",
+                )
+                if callable(getattr(TushareFetcher, name, None))
+            }
+        )
+        abstracts = {
+            name
+            for name in abstracts
+            if name not in TushareFetcher.__dict__
+            or getattr(TushareFetcher.__dict__[name], "__isabstractmethod__", False)
+        }
+        TushareFetcher.__abstractmethods__ = frozenset(abstracts)
+
+
+_assemble_tushare_fetcher_facade()
+
+
+def _install_part_reload_hooks() -> None:
+    for module in (
+        _client_module,
+        _symbols_module,
+        _history_module,
+    ):
+        module._FACADE_RELOAD_HOOK = _assemble_tushare_fetcher_facade  # type: ignore[attr-defined]
+
+
+_install_part_reload_hooks()
 
 
 if __name__ == "__main__":

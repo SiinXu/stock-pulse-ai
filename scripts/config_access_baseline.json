@@ -2,7 +2,7 @@
   "version": 1,
   "description": "Per-module counts of bare get_config() call sites in production code (AST Name callees only). Attribute calls such as service.get_config(...) are out of scope. src/config.py and src/application_services.py are excluded. New modules or higher counts are banned; shrink this map by converting callers to constructor/param injection or get_application_services().config and running --write-baseline. Growth requires an explicit PR justification and is refused by --write-baseline.",
   "total_sites": 92,
-  "module_count": 61,
+  "module_count": 62,
   "modules": {
     "main.py": 1,
     "server.py": 1,
@@ -43,7 +43,8 @@
     "src/data_provider/longbridge_fetcher.py": 2,
     "src/data_provider/tencent_fetcher.py": 1,
     "src/data_provider/tickflow_fetcher.py": 1,
-    "src/data_provider/tushare_fetcher.py": 2,
+    "src/data_provider/tushare_fetcher.py": 1,
+    "src/data_provider/tushare_parts/client.py": 1,
     "src/feishu_doc.py": 1,
     "src/market/analyzer.py": 1,
     "src/md2img.py": 1,
