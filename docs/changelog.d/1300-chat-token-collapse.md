@@ -1,0 +1,1 @@
+- [Changed] Chat avatars, bubbles, and Markdown prose now paint from Layer 1 semantic tokens with use-site alpha instead of the 17 `--chat-*` page-scoped tokens; page-scoped token ceiling 93 → 76 (Refs #1300).

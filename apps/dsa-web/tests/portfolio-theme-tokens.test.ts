@@ -83,8 +83,8 @@ describe('portfolio theme tokens', () => {
     }
   });
 
-  it('removes the collapsed names from the defined inventory and lowers the ceiling to 93', () => {
-    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBe(93);
+  it('removes the collapsed names from the defined inventory and does not raise the ceiling above 93', () => {
+    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBeLessThanOrEqual(93);
 
     const inventorySource = readInventorySource();
     for (const token of COLLAPSED_PORTFOLIO_TOKENS) {

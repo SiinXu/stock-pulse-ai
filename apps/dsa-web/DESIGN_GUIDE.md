@@ -112,7 +112,7 @@
 
 - **冻结当前自定义属性名集合**，不在本阶段删除 page-scoped 遗留、不统一格式、不引入第二套 token 系统。
 - 可执行清单：`THEME_DEFINED_TOKEN_NAMES`（`src/index.css` 的 unique 定义）+ `classifyThemeToken()`。
-- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*`、`--backtest-*` 与 `--portfolio-*` 已在 Phase 2 清零，禁止重新引入这些前缀。
+- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*`、`--backtest-*`、`--portfolio-*` 与 `--chat-*` 已在 Phase 2 清零，禁止重新引入这些前缀。
 - 新 UI 只用 Layer 1 + `components/common`；缺色用 `hsl(var(--token) / alpha)`，不要为每个透明度再开 token。
 - 未定义的 `var(--*)`（如 `--home-border`、`--info`、`--color-purple`、`.input-surface` 可选槽）登记在 freeze 守卫测试里的 `THEME_UNGOVERNED_REFERENCE_DEBT`（`themeTokenFreezeGuard.test.ts`），只减不增，且**不得**写进已定义清单冒充合法 token。
 - Desktop 嵌入的 WebView 走同一套 Web token。`apps/dsa-desktop/renderer/assistant.html` / `loading.html` 是独立 chrome 清单，禁止把 `--bg` / `--panel` 并进 Web Layer 1。
@@ -142,6 +142,17 @@
 - dark 赋值原先等于 `--border`（`75 4% 20%`），且没有 `.dark .portfolio-page .btn-secondary` 消费者，因此随定义一起删除，不另加 dark 覆盖。
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 94 降到 93；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 26（该名字不在格式债清单中）。
 - 当前 `slate` pack 覆盖 `--border`、不覆盖 `--foreground`，所以目前不会给这条 leftover 描边换色。
+
+### 2.10 Phase 2 域收敛：Chat（#1300）
+
+- 17 个 `--chat-*` 定义已删除：10 个 avatar / bubble 名字（`:root` + `.dark`），7 个 `--chat-prose-*` 名字（定义在 `.chat-prose` 规则内）。未新增页面级或领域 token，`THEME_PAGE_SCOPED_PREFIXES` 仍永久禁止 `--chat-*`。
+- 调用点改为 Layer 1 + use-site alpha，基础规则保留原 light 值：`.chat-avatar-user` = `hsl(var(--primary) / 0.5)` / `hsl(var(--foreground))` / `hsl(var(--primary) / 0.3)`；`.chat-avatar-ai` = `hsl(var(--primary) / 0.1)` / `hsl(var(--foreground) / 0.8)` / `hsl(var(--primary) / 0.2)`；`.chat-bubble-user` = `hsl(var(--primary) / 0.1)` 底 + `hsl(var(--primary) / 0.2)` 描边；`.chat-bubble-ai` = `hsl(var(--card) / 0.85)` 底。
+- 真正存在差异的 dark 赋值改为显式 `.dark .chat-avatar-user`、`.dark .chat-avatar-ai`，以及在既有 `.dark .chat-bubble-ai` 上补 `background-color`，选择条件仍是同一个 `.dark` 祖先。`--chat-bubble-user-bg` / `--chat-bubble-user-border` 的 light 与 dark 取值相同，因此不加 dark 覆盖。
+- `--chat-bubble-ai-border` 无任何消费者（`.chat-bubble-ai` 是 `border: 0`），随定义一起删除，不做替换。
+- Prose：`--chat-prose-fg` 在三处调用点内联为 `hsl(var(--foreground) / 0.86)`，原 `.dark .chat-prose { --chat-prose-fg }` 改为覆盖 `.chat-prose` / `h1`–`h4` / `strong` 的显式 `.dark` 分组；后面的 `.dark .chat-prose h2`（`--secondary-text`）仍按源码顺序胜出，行为不变。`--chat-prose-border` / `--chat-prose-border-strong` 原本就是 `--home-prose-border(-strong)` 的别名，现直接引用后者，与相邻 `.prose` 规则一致。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 93 降到 76；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 26（这 17 个名字不在格式债清单中）；`TOKEN_FORMAT_OVERRIDES` 中两条 prose 描边别名同步删除，因为该守卫要求 override key 必须仍有定义。
+- `themeContractGuard` / `themeTokenFreezeGuard` 的非空下界由 200 降到 190：它们只是「清单被截断」的兜底断言，四次 Phase 2 收敛已把已定义清单从 210 降到 196。
+- 主题包行为不变：被删除的名字原本就定义在 `:root` 上且以 `--primary` / `--card` / `--foreground` / `--background` 表达，因此收敛前后 Chat 都会跟随 pack 换色。渲染对比显示 `data-theme-pack="slate"` 在前后两个构建里换色的是同样 8 个元素（`chat-avatar-ai`、`chat-avatar-user`、`chat-bubble-ai`、`chat-bubble-user`，以及 prose 的 link / code / pre / blockquote）。
 
 ## 3. 字体阶（全部 Geist）
 

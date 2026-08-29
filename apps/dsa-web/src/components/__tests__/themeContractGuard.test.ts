@@ -313,8 +313,6 @@ const TOKEN_FORMAT_OVERRIDES = {
   '--border-default': 'var-ref',
   '--border-dim-raw': 'var-ref',
   '--border-subtle-raw': 'var-ref',
-  '--chat-prose-border': 'var-ref',
-  '--chat-prose-border-strong': 'var-ref',
   '--color-danger-alert-bg': 'hsl-triplet',
   '--color-danger-alert-border': 'hsl-triplet',
   '--color-danger-alert-text': 'hsl-triplet',
@@ -777,7 +775,9 @@ export function changeColorToCss(color: ChangeColor): string {
     const frozenCount = uniqueNames.length - measuredDebt.length;
 
     it('declares a format for every defined custom property', () => {
-      expect(uniqueNames.length).toBeGreaterThan(200);
+      // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
+      // portfolio/chat) shrank the defined inventory below the original 200.
+      expect(uniqueNames.length).toBeGreaterThan(190);
       for (const token of uniqueNames) {
         expect(TOKEN_FORMATS, token).toContain(declaredTokenFormat(token));
       }

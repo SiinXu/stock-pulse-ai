@@ -43,23 +43,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--border-subtle-raw',
   '--card',
   '--card-foreground',
-  '--chat-avatar-ai-bg',
-  '--chat-avatar-ai-border',
-  '--chat-avatar-ai-fg',
-  '--chat-avatar-user-bg',
-  '--chat-avatar-user-border',
-  '--chat-avatar-user-fg',
-  '--chat-bubble-ai-bg',
-  '--chat-bubble-ai-border',
-  '--chat-bubble-user-bg',
-  '--chat-bubble-user-border',
-  '--chat-prose-border',
-  '--chat-prose-border-strong',
-  '--chat-prose-code-bg',
-  '--chat-prose-code-fg',
-  '--chat-prose-fg',
-  '--chat-prose-link',
-  '--chat-prose-pre-bg',
   '--color-amber-400',
   '--color-danger',
   '--color-danger-alert-bg',
@@ -230,10 +213,11 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * Hard ceiling for page-scoped leftovers. Never raise this to absorb a new
  * `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`
  * name. Shrink only when a Phase 2 domain collapse deletes a leftover.
- * `--login-*`, `--backtest-*`, and `--portfolio-*` reached zero; those pages
- * consume Layer 1 plus use-site alpha. Do not reintroduce those prefixes.
+ * `--login-*`, `--backtest-*`, `--portfolio-*`, and `--chat-*` reached zero;
+ * those pages consume Layer 1 plus use-site alpha. Do not reintroduce those
+ * prefixes.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 93;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 76;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [
