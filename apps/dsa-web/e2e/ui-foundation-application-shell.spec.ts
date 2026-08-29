@@ -6,7 +6,12 @@ const COMPACT_NAVIGATION_LINK_COUNT = APPLICATION_NAVIGATION_ITEMS.filter(
   (item) => item.kind === 'link',
 ).length;
 
+const inboxStubHits = { list: 0, unreadCount: 0, markAllRead: 0 };
+
 test.beforeEach(async ({ page }) => {
+  inboxStubHits.list = 0;
+  inboxStubHits.unreadCount = 0;
+  inboxStubHits.markAllRead = 0;
   const emptyPage = { items: [], total: 0, page: 1, page_size: 20 };
   const sourceStatuses = [
     { source: 'analysis', available: true, item_count: 0 },
@@ -16,36 +21,47 @@ test.beforeEach(async ({ page }) => {
   ];
   await page.route('**/api/v1/decision-signals**', (route) => route.fulfill({ json: emptyPage }));
   await page.route('**/api/v1/alerts/triggers**', (route) => route.fulfill({ json: emptyPage }));
-  await page.route(/\/api\/v1\/notification-inbox\/items(?:\?.*)?$/, (route) => route.fulfill({
-    json: {
-      items: [],
-      page: 1,
-      page_size: 10,
-      total: 0,
-      unread_total: 0,
-      has_more: false,
-      source_statuses: sourceStatuses,
-      retention_days: 90,
-      max_items: 500,
-    },
-  }));
-  await page.route(/\/api\/v1\/notification-inbox\/unread-count(?:\?.*)?$/, (route) => route.fulfill({
-    json: {
-      unread_total: 0,
-      source_statuses: sourceStatuses,
-      retention_days: 90,
-      max_items: 500,
-    },
-  }));
-  await page.route('**/api/v1/notification-inbox/items/mark-all-read', (route) => route.fulfill({
-    json: { marked_count: 0, unread_total: 0 },
-  }));
+  await page.route(/\/api\/v1\/notification-inbox\/items(?:\?.*)?$/, (route) => {
+    inboxStubHits.list += 1;
+    return route.fulfill({
+      json: {
+        items: [],
+        page: 1,
+        page_size: 10,
+        total: 0,
+        unread_total: 0,
+        has_more: false,
+        source_statuses: sourceStatuses,
+        retention_days: 90,
+        max_items: 500,
+      },
+    });
+  });
+  await page.route(/\/api\/v1\/notification-inbox\/unread-count(?:\?.*)?$/, (route) => {
+    inboxStubHits.unreadCount += 1;
+    return route.fulfill({
+      json: {
+        unread_total: 0,
+        source_statuses: sourceStatuses,
+        retention_days: 90,
+        max_items: 500,
+      },
+    });
+  });
+  await page.route('**/api/v1/notification-inbox/items/mark-all-read', (route) => {
+    inboxStubHits.markAllRead += 1;
+    return route.fulfill({
+      json: { marked_count: 0, unread_total: 0 },
+    });
+  });
 });
 
 async function openFixture(page: Page, width: number, height = 800) {
   await page.setViewportSize({ width, height });
   await page.goto(FIXTURE_PATH);
   await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+  await expect.poll(() => inboxStubHits.list).toBeGreaterThan(0);
+  await expect.poll(() => inboxStubHits.unreadCount).toBeGreaterThan(0);
 }
 
 async function expectNoDocumentOverflow(page: Page) {

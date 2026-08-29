@@ -171,7 +171,13 @@ than a line-count-driven file split.
 4. Default `retry: false` unless the product contract explicitly wants automatic retries.
 5. Migrate one page at a time. Leave Zustand/client state for selection, drafts, and presentation
    until a later dedicated slice.
-6. Tests that render a Query consumer must wrap with a test `QueryClientProvider` (`retry: false`).
+6. Every host that mounts a Query consumer must wrap a retry-free client. Unit
+   tests use `QueryClientProvider` (`retry: false`). Standalone Playwright
+   fixtures that mount `Shell` / `NotificationBell` (they do not inherit
+   `main.tsx`) must wrap the production `QueryProvider` /
+   `createAppQueryClient`. Playground stories rendered through `App` inherit
+   the app-root provider; isolated playground unit renders still wrap a test
+   client.
 
 Suggested remaining migration order (issue #789): Portfolio projection session → Notification Center page (cursor pagination; header bell preview is migrated) → Settings system-config loads → Screening → Chat/agent status → Backtest / calculators / report compare / event calendar / token usage. Defer surfaces owned by concurrent open PRs.
 

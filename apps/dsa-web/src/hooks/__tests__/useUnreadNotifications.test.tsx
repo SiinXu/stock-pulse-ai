@@ -1,10 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { QueryClient, QueryClientProvider, onlineManager } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, focusManager, onlineManager } from '@tanstack/react-query';
 import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
 import { StrictMode, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { notificationInboxApi } from '../../api/notificationInbox';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import { createDeferred } from '../../test-utils';
 import type {
   NotificationInboxItem,
@@ -82,12 +83,9 @@ function count(overrides: Partial<NotificationInboxUnreadCount> = {}): Notificat
 }
 
 function createWrapper(client?: QueryClient) {
-  const queryClient = client ?? new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, refetchOnWindowFocus: false },
-      mutations: { retry: false },
-    },
-  });
+  // Match production `createAppQueryClient`: retry-free, refetchOnWindowFocus true.
+  // The hook must still override focus refetch to false.
+  const queryClient = client ?? createAppQueryClient();
   function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
   }
@@ -158,6 +156,7 @@ describe('useUnreadNotifications', () => {
   afterEach(() => {
     vi.useRealTimers();
     onlineManager.setOnline(true);
+    focusManager.setFocused(true);
     Object.defineProperty(document, 'hidden', { configurable: true, value: false });
     Object.defineProperty(document, 'visibilityState', {
       configurable: true,
@@ -241,6 +240,7 @@ describe('useUnreadNotifications', () => {
     const { result } = renderHook(() => useUnreadNotifications(), { wrapper });
 
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(client.getDefaultOptions().queries?.refetchOnWindowFocus).toBe(true);
     const options = queryOptions(client);
     expect(options?.retry).toBe(false);
     expect(options?.refetchOnWindowFocus).toBe(false);
@@ -275,12 +275,17 @@ describe('useUnreadNotifications', () => {
   });
 
   it('does not refetch when the window regains focus', async () => {
-    const { wrapper } = createWrapper();
+    const client = createAppQueryClient();
+    expect(client.getDefaultOptions().queries?.refetchOnWindowFocus).toBe(true);
+    const { wrapper } = createWrapper(client);
     const { result } = renderHook(() => useUnreadNotifications({ pollMs: 0 }), { wrapper });
     await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(queryOptions(client)?.refetchOnWindowFocus).toBe(false);
     expect(listMock).toHaveBeenCalledTimes(1);
 
     await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
       window.dispatchEvent(new Event('focus'));
       document.dispatchEvent(new Event('visibilitychange'));
     });

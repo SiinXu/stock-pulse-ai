@@ -1,9 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { ThemeProvider } from 'next-themes';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import { installPlaygroundApiMock } from '../mockApi';
 import { PlaygroundScenarioProvider } from '../scenarioContext';
 import { COMMON_SCENARIOS } from '../scenarios/commonScenarios';
@@ -15,12 +16,15 @@ import { getPlaygroundRenderer } from '../scenarios';
 let sandbox: ReturnType<typeof installPlaygroundApiMock> | null = null;
 
 function createPlaygroundQueryClient() {
-  return new QueryClient({
-    defaultOptions: {
-      queries: { retry: false, gcTime: 0 },
-      mutations: { retry: false },
+  const client = createAppQueryClient();
+  client.setDefaultOptions({
+    queries: {
+      ...client.getDefaultOptions().queries,
+      gcTime: 0,
     },
+    mutations: client.getDefaultOptions().mutations,
   });
+  return client;
 }
 
 function renderStory(Renderer: React.ComponentType, scenario = 'default') {

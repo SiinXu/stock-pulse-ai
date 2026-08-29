@@ -1,9 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { lazy } from 'react';
 import type React from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { RouteOutletBoundary } from '../RouteBoundary';
 import { Shell } from '../Shell';
 
@@ -29,17 +30,15 @@ vi.mock('../../../hooks/useLocalOnlyModeStatus', () => ({
 }));
 
 describe('RouteOutletBoundary', () => {
-  let queryClient: QueryClient;
+  let queryClient: ReturnType<typeof createAppQueryClient>;
 
   /**
    * The shell header renders the real `NotificationBell`, whose
-   * `useUnreadNotifications` hook calls `useQueryClient`. Mirror the production
-   * provider from `main.tsx` with a fresh, retry-free client per test.
+   * `useUnreadNotifications` hook calls `useQueryClient`. Use the same
+   * production factory as `main.tsx` with a fresh client per test.
    */
   beforeEach(() => {
-    queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    });
+    queryClient = createAppQueryClient();
   });
 
   afterEach(() => {

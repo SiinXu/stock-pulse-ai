@@ -18,6 +18,7 @@ import { RouteFocusCoordinator, useRouteFocusTarget } from '../src/components/ro
 import { ThemeProvider } from '../src/components/theme/ThemeProvider';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { UiLanguageProvider } from '../src/contexts/UiLanguageContext';
+import { QueryProvider } from '../src/query/QueryProvider';
 
 function FixturePage() {
   const location = useLocation();
@@ -72,12 +73,15 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <ThemeProvider>
-      <UiLanguageProvider initialLanguage="en">
-        <AuthProvider>
-          <RouterProvider router={router} />
-        </AuthProvider>
-      </UiLanguageProvider>
-    </ThemeProvider>
+    {/* Standalone Shell host: does not inherit main.tsx QueryProvider. */}
+    <QueryProvider>
+      <ThemeProvider>
+        <UiLanguageProvider initialLanguage="en">
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </UiLanguageProvider>
+      </ThemeProvider>
+    </QueryProvider>
   </StrictMode>,
 );

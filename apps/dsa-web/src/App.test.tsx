@@ -1,9 +1,10 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from './App';
 import * as AuthContext from './contexts/AuthContext';
+import { createAppQueryClient } from './query/createAppQueryClient';
 import {
   APP_ROUTE_PATHS,
   LEGACY_ALERTS_VIEW_VALUES,
@@ -21,8 +22,8 @@ import {
   buildSignalCenterHref,
 } from './routing/routes';
 import { recordSessionLocation } from './utils/sessionContinuity';
-import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
 import { resetStockIndexCacheForTests } from './utils/stockIndexLoader';
+import { UI_LANGUAGE_STORAGE_KEY } from './utils/uiLanguage';
 
 type AuthState = ReturnType<typeof AuthContext.useAuth>;
 
@@ -125,14 +126,13 @@ function makeAuthState(overrides: Partial<AuthState> = {}): AuthState {
   };
 }
 
-let queryClient: QueryClient;
+let queryClient: ReturnType<typeof createAppQueryClient>;
 
 /**
- * Fresh client per test: the real `useUnreadNotifications` in the header bell
- * calls `useQueryClient`, so every host that renders the real `App` must supply
- * a provider exactly like production `main.tsx` does. `retry: false` keeps the
- * offline inbox reads deterministic, and a per-test client prevents cache reuse
- * across tests.
+ * Fresh production client per test: the real `useUnreadNotifications` in the
+ * header bell calls `useQueryClient`, so every host that renders the real
+ * `App` must supply the same retry-free factory as `main.tsx`. A per-test
+ * client prevents cache reuse across tests.
  */
 function renderApp() {
   return render(
@@ -144,9 +144,7 @@ function renderApp() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-  });
+  queryClient = createAppQueryClient();
   chatPageShouldThrow.value = false;
   window.history.pushState({}, '', '/');
   localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'zh');
