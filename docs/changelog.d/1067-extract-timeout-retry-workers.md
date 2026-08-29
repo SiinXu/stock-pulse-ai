@@ -1,0 +1,1 @@
+- [Chore] Extract DataFetcherManager timeout/retry workers (`_run_with_timeout`, `_run_with_retry`) into `src/data_provider/manager_parts/fundamental_timeout_methods.py` behind the ADR-006 facade without changing thread timeout, slot-pool, or retry-budget semantics (Refs #1067).

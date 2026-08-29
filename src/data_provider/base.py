@@ -1091,86 +1091,9 @@ class DataFetcherManager:
     get_main_indices = None
     get_market_stats = None
 
-    def _run_with_timeout(
-        self,
-        task: Callable[[], Any],
-        timeout_seconds: float,
-        task_name: str,
-    ) -> Tuple[Optional[Any], Optional[str], int]:
-        """
-        Execute a task in a short-lived thread and enforce a timeout.
-
-        Returns:
-            (result, error, duration_ms)
-        """
-        start = time.time()
-        timeout_value = max(0.0, timeout_seconds)
-        if timeout_value <= 0:
-            return None, f"{task_name} timeout", 0
-        result_holder: Dict[str, Any] = {}
-        error_holder: Dict[str, Exception] = {}
-
-        if not self._fundamental_timeout_slots.acquire(blocking=False):
-            return None, f"{task_name} timeout worker pool exhausted", int(timeout_value * 1000)
-
-        def runner() -> None:
-            try:
-                result_holder["value"] = task()
-            except Exception as exc:
-                error_holder["value"] = exc
-            finally:
-                try:
-                    self._fundamental_timeout_slots.release()
-                except ValueError:
-                    pass
-
-        worker = Thread(target=runner, daemon=True, name=f"fundamental-{task_name}")
-        try:
-            worker.start()
-        except Exception as exc:
-            try:
-                self._fundamental_timeout_slots.release()
-            except ValueError:
-                pass
-            return None, str(exc), int((time.time() - start) * 1000)
-        worker.join(timeout=timeout_value)
-        if worker.is_alive():
-            return None, f"{task_name} timeout", int(timeout_value * 1000)
-        if "value" in error_holder:
-            return None, str(error_holder["value"]), int((time.time() - start) * 1000)
-        return result_holder.get("value"), None, int((time.time() - start) * 1000)
-
-    def _run_with_retry(
-        self,
-        task: Callable[[], Any],
-        timeout_seconds: float,
-        task_name: str,
-    ) -> Tuple[Optional[Any], Optional[str], int]:
-        """
-        Execute a task with bounded budget and best-effort retries.
-
-        Returns:
-            (result, error, total_duration_ms)
-        """
-        config = self._get_fundamental_config()
-        attempts = max(1, int(config.fundamental_retry_max))
-        remaining_seconds = max(0.0, float(timeout_seconds))
-        total_cost_ms = 0
-        last_error: Optional[str] = None
-
-        for _ in range(attempts):
-            if remaining_seconds <= 0:
-                break
-            result, err, cost_ms = self._run_with_timeout(task, remaining_seconds, task_name)
-            total_cost_ms += cost_ms
-            remaining_seconds = max(0.0, remaining_seconds - cost_ms / 1000)
-            if err is None:
-                return result, None, total_cost_ms
-            last_error = err
-            if remaining_seconds <= 0:
-                break
-
-        return None, last_error, total_cost_ms
+    # Rebound from manager_parts.fundamental_timeout_methods after the class is built.
+    _run_with_timeout = None
+    _run_with_retry = None
 
     _get_fundamental_config = None  # rebound from manager_parts.fundamental_context_methods
 
@@ -1291,8 +1214,8 @@ class DataFetcherManager:
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006 compatibility
 # facade while focused parts own inventory, daily health/cache/execution, realtime,
 # chip, money-flow, fundamental cache/loaders/Config accessor/CN sub-blocks/
-# payload helpers, stock-name, rankings, market-overview, and belong-board.
-# Rebinding preserves method globals and patch seams.
+# payload helpers, timeout/retry workers, stock-name, rankings, market-overview,
+# and belong-board. Rebinding preserves method globals and patch seams.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
@@ -1305,6 +1228,7 @@ from .manager_parts import (  # noqa: E402
     fundamental_context_methods as _fundamental_context_methods_module,
     fundamental_loader_methods as _fundamental_loader_methods_module,
     fundamental_payload_methods as _fundamental_payload_methods_module,
+    fundamental_timeout_methods as _fundamental_timeout_methods_module,
     market_overview_methods as _market_overview_methods_module,
     money_flow_cache_methods as _money_flow_cache_methods_module,
     money_flow_methods as _money_flow_methods_module,
@@ -1569,6 +1493,20 @@ def _assemble_fundamental_payload_methods_facade(
         )
 
 
+def _assemble_fundamental_timeout_methods_facade(
+    timeout_module=_fundamental_timeout_methods_module,
+) -> None:
+    bound_method_names = timeout_module.bind_fundamental_timeout_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != timeout_module.EXPECTED_FUNDAMENTAL_TIMEOUT_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager fundamental timeout methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_rankings_methods_facade(
     rankings_module=_rankings_methods_module,
 ) -> None:
@@ -1617,6 +1555,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_cn_context=_assemble_fundamental_cn_context_methods_facade,
     assemble_belong_board=_assemble_belong_board_methods_facade,
     assemble_fundamental_payload=_assemble_fundamental_payload_methods_facade,
+    assemble_fundamental_timeout=_assemble_fundamental_timeout_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
     assemble_market_overview=_assemble_market_overview_methods_facade,
 ) -> None:
@@ -1636,6 +1575,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_cn_context()
     assemble_belong_board()
     assemble_fundamental_payload()
+    assemble_fundamental_timeout()
     assemble_rankings()
     assemble_market_overview()
     from .manager_parts.data_validation_wiring import install_facade_validation_wrappers
@@ -1689,6 +1629,9 @@ _belong_board_methods_module._install_facade_reload_hook(
 _fundamental_payload_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_fundamental_timeout_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _rankings_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -1714,6 +1657,7 @@ del (
     _assemble_fundamental_cn_context_methods_facade,
     _assemble_belong_board_methods_facade,
     _assemble_fundamental_payload_methods_facade,
+    _assemble_fundamental_timeout_methods_facade,
     _assemble_rankings_methods_facade,
     _assemble_market_overview_methods_facade,
     _assemble_data_fetcher_manager_facades,
@@ -1735,4 +1679,5 @@ del (
     _fundamental_cn_context_methods_module,
     _belong_board_methods_module,
     _fundamental_payload_methods_module,
+    _fundamental_timeout_methods_module,
 )
