@@ -5,10 +5,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type SetStateAction,
 } from 'react';
+import { CancelledError, useQueryClient } from '@tanstack/react-query';
 import { portfolioApi } from '../../api/portfolio';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
@@ -28,6 +31,12 @@ import {
   buildFxRefreshFeedback,
   type FxRefreshFeedback,
 } from '../../utils/portfolioFormat';
+import {
+  PORTFOLIO_PROJECTION_CANCEL,
+  PORTFOLIO_PROJECTION_QUERY_SCHEDULE,
+  buildPortfolioProjectionSnapshotQueryKey,
+  fetchPortfolioSnapshotAndRisk,
+} from './usePortfolioProjectionQueries';
 
 const DEFAULT_PAGE_SIZE = 20;
 
@@ -89,6 +98,14 @@ function buildEventScopeKey(
   });
 }
 
+function isCancelledError(error: unknown): boolean {
+  return error instanceof CancelledError;
+}
+
+function sameQueryKey(left: readonly unknown[], right: readonly unknown[]): boolean {
+  return left.length === right.length && left.every((item, index) => item === right[index]);
+}
+
 export function usePortfolioProjectionSession({
   accountId,
   costMethod,
@@ -98,6 +115,11 @@ export function usePortfolioProjectionSession({
   loadAccounts,
   setError,
 }: UsePortfolioProjectionSessionOptions) {
+  const queryClient = useQueryClient();
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
+  const setErrorRef = useRef(setError);
+  setErrorRef.current = setError;
   const [snapshot, setSnapshot] = useState<PortfolioSnapshotResponse | null>(null);
   const [risk, setRisk] = useState<PortfolioRiskResponse | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -149,6 +171,28 @@ export function usePortfolioProjectionSession({
     requestId: 0,
     scopeKey: snapshotScopeKey,
   });
+  const snapshotQueryKey = useMemo(
+    () => buildPortfolioProjectionSnapshotQueryKey(accountId, costMethod, language),
+    [accountId, costMethod, language],
+  );
+  const snapshotQueryKeyRef = useRef(snapshotQueryKey);
+  snapshotQueryKeyRef.current = snapshotQueryKey;
+
+  const discardExactSnapshotQuery = useCallback((key: readonly unknown[]) => {
+    const client = queryClientRef.current;
+    void client.cancelQueries(
+      { queryKey: key, exact: true },
+      PORTFOLIO_PROJECTION_CANCEL,
+    );
+    client.removeQueries({ queryKey: key, exact: true });
+  }, []);
+
+  useLayoutEffect(() => {
+    const key = snapshotQueryKey;
+    return () => {
+      discardExactSnapshotQuery(key);
+    };
+  }, [discardExactSnapshotQuery, snapshotQueryKey]);
 
   const isActiveSnapshotRequest = useCallback((request: ProjectionRequest) => (
     activeSnapshotScopeRef.current === request.scopeKey
@@ -218,6 +262,11 @@ export function usePortfolioProjectionSession({
       requestId: snapshotRequestRef.current.requestId + 1,
     };
     snapshotRequestRef.current = request;
+    const key = buildPortfolioProjectionSnapshotQueryKey(
+      accountId,
+      costMethod,
+      language,
+    );
     if (showLoading) {
       snapshotLoadingOwnerRef.current = request;
       setIsLoading(true);
@@ -228,47 +277,40 @@ export function usePortfolioProjectionSession({
     setRiskWarning(null);
 
     try {
-      const snapshotData = await portfolioApi.getSnapshot({
-        accountId,
-        costMethod,
-        includeRealtime: false,
+      // Query 5 joins a cancelled in-flight retryer unless the row is removed.
+      discardExactSnapshotQuery(key);
+      const data = await queryClientRef.current.fetchQuery({
+        queryKey: key,
+        queryFn: ({ signal }) => fetchPortfolioSnapshotAndRisk({
+          accountId,
+          costMethod,
+          language,
+          riskFallbackMessage,
+          signal,
+          stillActive: () => isActiveSnapshotRequest(request),
+        }),
+        ...PORTFOLIO_PROJECTION_QUERY_SCHEDULE,
       });
       if (!isActiveSnapshotRequest(request)) {
         return { snapshotAccepted: false, riskAccepted: false };
       }
-      setSnapshot(snapshotData);
-      setError(null);
-
-      try {
-        const riskData = await portfolioApi.getRisk({
-          accountId,
-          costMethod,
-          includeRealtime: false,
-        });
-        if (!isActiveSnapshotRequest(request)) {
-          return { snapshotAccepted: false, riskAccepted: false };
-        }
-        setRisk(riskData);
-        return { snapshotAccepted: true, riskAccepted: true };
-      } catch (riskError) {
-        if (!isActiveSnapshotRequest(request)) {
-          return { snapshotAccepted: false, riskAccepted: false };
-        }
-        setRisk(null);
-        setRiskWarning(
-          getParsedApiError(riskError, language).message || riskFallbackMessage,
-        );
-        return { snapshotAccepted: true, riskAccepted: false };
-      }
+      setSnapshot(data.snapshot);
+      setErrorRef.current(null);
+      setRisk(data.risk);
+      setRiskWarning(data.riskWarning);
+      return { snapshotAccepted: true, riskAccepted: data.riskWarning === null };
     } catch (snapshotError) {
-      if (!isActiveSnapshotRequest(request)) {
+      if (!isActiveSnapshotRequest(request) || isCancelledError(snapshotError)) {
         return { snapshotAccepted: false, riskAccepted: false };
       }
       setSnapshot(null);
       setRisk(null);
-      setError(getParsedApiError(snapshotError));
+      setErrorRef.current(getParsedApiError(snapshotError));
       return { snapshotAccepted: false, riskAccepted: false };
     } finally {
+      if (!sameQueryKey(key, snapshotQueryKeyRef.current)) {
+        discardExactSnapshotQuery(key);
+      }
       if (showLoading && snapshotLoadingOwnerRef.current === request) {
         snapshotLoadingOwnerRef.current = null;
         setIsLoading(false);
@@ -277,10 +319,10 @@ export function usePortfolioProjectionSession({
   }, [
     accountId,
     costMethod,
+    discardExactSnapshotQuery,
     isActiveSnapshotRequest,
     language,
     riskFallbackMessage,
-    setError,
     snapshotScopeKey,
   ]);
 

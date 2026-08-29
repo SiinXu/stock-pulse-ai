@@ -3,8 +3,12 @@
 // Exercises the feature-private projection session through its public hook interface.
 
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClient, QueryClientProvider, focusManager } from '@tanstack/react-query';
+import type { ReactNode } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { usePortfolioProjectionSession } from '../usePortfolioProjectionSession';
+import { buildPortfolioProjectionSnapshotQueryKey } from '../usePortfolioProjectionQueries';
 import { createDeferred } from '../../../test-utils';
 
 const {
@@ -146,6 +150,30 @@ function makeCashPage(id: number, page = 1) {
   };
 }
 
+function createWrapper(client?: QueryClient) {
+  const queryClient = client ?? new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  }
+  return { client: queryClient, wrapper: Wrapper };
+}
+
+function snapshotQueryOptions(client: QueryClient, accountId = 1) {
+  const query = client.getQueryCache().find({
+    queryKey: buildPortfolioProjectionSnapshotQueryKey(accountId, 'fifo', 'zh'),
+  });
+  return query?.options as Record<string, unknown> | undefined;
+}
+
+function queryFetchStatus(client: QueryClient, queryKey: readonly unknown[]) {
+  return client.getQueryState(queryKey)?.fetchStatus;
+}
+
 describe('usePortfolioProjectionSession', () => {
   beforeEach(() => {
     vi.resetAllMocks();
@@ -153,6 +181,10 @@ describe('usePortfolioProjectionSession', () => {
     listTrades.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
     listCashLedger.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
     listCorporateActions.mockResolvedValue({ items: [], total: 0, page: 1, pageSize: 20 });
+  });
+
+  afterEach(() => {
+    focusManager.setFocused(true);
   });
 
   it('rejects stale scope responses and resolves stable refresh calls against the active scope', async () => {
@@ -170,6 +202,7 @@ describe('usePortfolioProjectionSession', () => {
     ));
     const setError = vi.fn();
     const loadAccounts = vi.fn().mockResolvedValue(true);
+    const { wrapper } = createWrapper();
     const hook = renderHook(
       ({ accountId }) => usePortfolioProjectionSession({
         accountId,
@@ -180,7 +213,7 @@ describe('usePortfolioProjectionSession', () => {
         loadAccounts,
         setError,
       }),
-      { initialProps: { accountId: 1 } },
+      { wrapper, initialProps: { accountId: 1 } },
     );
     const refreshFromAccountOneRender = hook.result.current.refreshPortfolioData;
 
@@ -225,6 +258,7 @@ describe('usePortfolioProjectionSession', () => {
     listTrades
       .mockReturnValueOnce(staleTrades.promise)
       .mockReturnValueOnce(filteredTrades.promise);
+    const { wrapper } = createWrapper();
     const hook = renderHook(() => usePortfolioProjectionSession({
       accountId: 1,
       costMethod: 'fifo',
@@ -233,7 +267,7 @@ describe('usePortfolioProjectionSession', () => {
       riskFallbackMessage: 'risk unavailable',
       loadAccounts: vi.fn().mockResolvedValue(true),
       setError: vi.fn(),
-    }));
+    }), { wrapper });
 
     await waitFor(() => expect(listTrades).toHaveBeenCalledTimes(1));
     act(() => hook.result.current.setEventSymbol('AAPL'));
@@ -255,6 +289,7 @@ describe('usePortfolioProjectionSession', () => {
     getSnapshot.mockResolvedValue(makeSnapshot(1));
     listTrades.mockReturnValueOnce(staleTrades.promise);
     listCashLedger.mockReturnValueOnce(new Promise(() => {}));
+    const { wrapper } = createWrapper();
     const hook = renderHook(() => usePortfolioProjectionSession({
       accountId: 1,
       costMethod: 'fifo',
@@ -263,7 +298,7 @@ describe('usePortfolioProjectionSession', () => {
       riskFallbackMessage: 'risk unavailable',
       loadAccounts: vi.fn().mockResolvedValue(true),
       setError: vi.fn(),
-    }));
+    }), { wrapper });
 
     await waitFor(() => expect(listTrades).toHaveBeenCalledTimes(1));
     act(() => {
@@ -287,6 +322,7 @@ describe('usePortfolioProjectionSession', () => {
     listTrades
       .mockReturnValueOnce(staleTrades.promise)
       .mockReturnValueOnce(nextPageTrades.promise);
+    const { wrapper } = createWrapper();
     const hook = renderHook(() => usePortfolioProjectionSession({
       accountId: 1,
       costMethod: 'fifo',
@@ -295,7 +331,7 @@ describe('usePortfolioProjectionSession', () => {
       riskFallbackMessage: 'risk unavailable',
       loadAccounts: vi.fn().mockResolvedValue(true),
       setError: vi.fn(),
-    }));
+    }), { wrapper });
 
     await waitFor(() => expect(listTrades).toHaveBeenCalledTimes(1));
     act(() => {
@@ -329,6 +365,7 @@ describe('usePortfolioProjectionSession', () => {
     refreshFx.mockReturnValueOnce(fxResult.promise);
     const loadAccounts = vi.fn().mockResolvedValue(true);
     const setError = vi.fn();
+    const { wrapper } = createWrapper();
     const hook = renderHook(() => usePortfolioProjectionSession({
       accountId: 1,
       costMethod: 'fifo',
@@ -337,7 +374,7 @@ describe('usePortfolioProjectionSession', () => {
       riskFallbackMessage: 'risk unavailable',
       loadAccounts,
       setError,
-    }));
+    }), { wrapper });
 
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
     let fxRefreshPromise!: Promise<void>;
@@ -393,6 +430,7 @@ describe('usePortfolioProjectionSession', () => {
       .mockReturnValueOnce(laterCashPage.promise);
     const loadAccounts = vi.fn().mockReturnValue(accountsRefresh.promise);
     const setError = vi.fn();
+    const { wrapper } = createWrapper();
     const hook = renderHook(() => usePortfolioProjectionSession({
       accountId: 1,
       costMethod: 'fifo',
@@ -401,7 +439,7 @@ describe('usePortfolioProjectionSession', () => {
       riskFallbackMessage: 'risk unavailable',
       loadAccounts,
       setError,
-    }));
+    }), { wrapper });
 
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
     let paperRefreshPromise!: Promise<boolean>;
@@ -439,6 +477,7 @@ describe('usePortfolioProjectionSession', () => {
     getSnapshot.mockResolvedValue(makeSnapshot(1));
     getRisk.mockRejectedValue(new Error('risk timeout'));
     const setError = vi.fn();
+    const { wrapper } = createWrapper();
     const hook = renderHook(() => usePortfolioProjectionSession({
       accountId: 1,
       costMethod: 'fifo',
@@ -447,7 +486,7 @@ describe('usePortfolioProjectionSession', () => {
       riskFallbackMessage: 'risk unavailable',
       loadAccounts: vi.fn().mockResolvedValue(true),
       setError,
-    }));
+    }), { wrapper });
 
     await waitFor(() => expect(hook.result.current.riskWarning).not.toBeNull());
     expect(hook.result.current.snapshot?.accounts[0]?.accountId).toBe(1);
@@ -467,6 +506,7 @@ describe('usePortfolioProjectionSession', () => {
       staleCount: 0,
       errorCount: 0,
     });
+    const { wrapper } = createWrapper();
     const hook = renderHook(() => usePortfolioProjectionSession({
       accountId: 1,
       costMethod: 'fifo',
@@ -475,7 +515,7 @@ describe('usePortfolioProjectionSession', () => {
       riskFallbackMessage: 'risk unavailable',
       loadAccounts: vi.fn().mockResolvedValue(true),
       setError: vi.fn(),
-    }));
+    }), { wrapper });
 
     await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
     expect(hook.result.current.risk).not.toBeNull();
@@ -489,5 +529,243 @@ describe('usePortfolioProjectionSession', () => {
     expect(hook.result.current.snapshot?.accounts[0]?.accountId).toBe(1);
     expect(hook.result.current.risk).toBeNull();
     expect(hook.result.current.riskWarning).not.toBeNull();
+  });
+
+  it('clears snapshot and risk and sets a hard error when snapshot projection fails', async () => {
+    getSnapshot.mockRejectedValue(new Error('snapshot timeout'));
+    const setError = vi.fn();
+    const { wrapper } = createWrapper();
+    const hook = renderHook(() => usePortfolioProjectionSession({
+      accountId: 1,
+      costMethod: 'fifo',
+      hasAccounts: true,
+      language: 'zh',
+      riskFallbackMessage: 'risk unavailable',
+      loadAccounts: vi.fn().mockResolvedValue(true),
+      setError,
+    }), { wrapper });
+
+    await waitFor(() => expect(setError).toHaveBeenCalled());
+    expect(setError.mock.calls.at(-1)?.[0]).not.toBeNull();
+    expect(hook.result.current.snapshot).toBeNull();
+    expect(hook.result.current.risk).toBeNull();
+    expect(hook.result.current.riskWarning).toBeNull();
+    expect(getRisk).not.toHaveBeenCalled();
+  });
+
+  it('does not auto-retry a 5xx snapshot when the QueryClient default would retry', async () => {
+    getSnapshot.mockRejectedValue(Object.assign(new Error('server'), { response: { status: 500 } }));
+    const client = new QueryClient({
+      defaultOptions: {
+        queries: { retry: 3, refetchOnWindowFocus: false },
+      },
+    });
+    const { wrapper } = createWrapper(client);
+    const setError = vi.fn();
+    const hook = renderHook(() => usePortfolioProjectionSession({
+      accountId: 1,
+      costMethod: 'fifo',
+      hasAccounts: true,
+      language: 'zh',
+      riskFallbackMessage: 'risk unavailable',
+      loadAccounts: vi.fn().mockResolvedValue(true),
+      setError,
+    }), { wrapper });
+
+    await waitFor(() => expect(setError).toHaveBeenCalled());
+    expect(getSnapshot).toHaveBeenCalledTimes(1);
+    expect(snapshotQueryOptions(client)?.retry).toBe(false);
+    expect(hook.result.current.snapshot).toBeNull();
+    expect(hook.result.current.risk).toBeNull();
+  });
+
+  it('does not call setError after unmount when a snapshot later fails', async () => {
+    const staleSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
+    getSnapshot.mockReturnValueOnce(staleSnapshot.promise);
+    const setError = vi.fn();
+    const { wrapper } = createWrapper();
+    const hook = renderHook(() => usePortfolioProjectionSession({
+      accountId: 1,
+      costMethod: 'fifo',
+      hasAccounts: true,
+      language: 'zh',
+      riskFallbackMessage: 'risk unavailable',
+      loadAccounts: vi.fn().mockResolvedValue(true),
+      setError,
+    }), { wrapper });
+
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(1));
+    const callsBeforeUnmount = setError.mock.calls.length;
+    hook.unmount();
+    await act(async () => {
+      staleSnapshot.reject(Object.assign(new Error('server'), { response: { status: 500 } }));
+      await staleSnapshot.promise.catch(() => undefined);
+      await Promise.resolve();
+    });
+    expect(setError.mock.calls.length).toBe(callsBeforeUnmount);
+  });
+
+  it('does not refetch snapshot or risk when the window regains focus', async () => {
+    getSnapshot.mockResolvedValue(makeSnapshot(1));
+    const client = createAppQueryClient();
+    expect(client.getDefaultOptions().queries?.refetchOnWindowFocus).toBe(true);
+    const { wrapper } = createWrapper(client);
+    const hook = renderHook(() => usePortfolioProjectionSession({
+      accountId: 1,
+      costMethod: 'fifo',
+      hasAccounts: true,
+      language: 'zh',
+      riskFallbackMessage: 'risk unavailable',
+      loadAccounts: vi.fn().mockResolvedValue(true),
+      setError: vi.fn(),
+    }), { wrapper });
+
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    expect(snapshotQueryOptions(client)?.refetchOnWindowFocus).toBe(false);
+    expect(snapshotQueryOptions(client)?.retry).toBe(false);
+    expect(snapshotQueryOptions(client)?.staleTime).toBe(0);
+    const snapshotCalls = getSnapshot.mock.calls.length;
+    const tradeCalls = listTrades.mock.calls.length;
+    const riskCalls = getRisk.mock.calls.length;
+
+    await act(async () => {
+      focusManager.setFocused(false);
+      focusManager.setFocused(true);
+      window.dispatchEvent(new Event('focus'));
+    });
+
+    expect(getSnapshot).toHaveBeenCalledTimes(snapshotCalls);
+    expect(listTrades).toHaveBeenCalledTimes(tradeCalls);
+    expect(getRisk).toHaveBeenCalledTimes(riskCalls);
+    hook.unmount();
+  });
+
+  it('recovers snapshot fetchStatus to idle after a same-key silent cancel is followed by a successor fetch', async () => {
+    const firstSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
+    const successorSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
+    getSnapshot
+      .mockReturnValueOnce(firstSnapshot.promise)
+      .mockReturnValueOnce(successorSnapshot.promise);
+    const { client, wrapper } = createWrapper();
+    const loadAccounts = vi.fn().mockResolvedValue(true);
+    const setError = vi.fn();
+    const hook = renderHook(() => usePortfolioProjectionSession({
+      accountId: 1,
+      costMethod: 'fifo',
+      hasAccounts: true,
+      language: 'zh',
+      riskFallbackMessage: 'risk unavailable',
+      loadAccounts,
+      setError,
+    }), { wrapper });
+
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(1));
+    const snapshotKey = buildPortfolioProjectionSnapshotQueryKey(1, 'fifo', 'zh');
+    await act(async () => {
+      void hook.result.current.refreshPortfolioData();
+    });
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      firstSnapshot.resolve(makeSnapshot(1));
+      successorSnapshot.resolve(makeSnapshot(1));
+    });
+
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    expect(queryFetchStatus(client, snapshotKey)).toBe('idle');
+    hook.unmount();
+  });
+
+  it('removes snapshot queries and leaves fetchStatus idle after unmount and account-key change', async () => {
+    getSnapshot.mockImplementation(({ accountId }: { accountId?: number } = {}) => (
+      Promise.resolve(makeSnapshot(accountId ?? 1))
+    ));
+    listTrades.mockImplementation(({ accountId }: { accountId?: number } = {}) => (
+      Promise.resolve(makeTradePage(accountId ?? 1, accountId ?? 1))
+    ));
+    const { client, wrapper } = createWrapper();
+    const loadAccounts = vi.fn().mockResolvedValue(true);
+    const setError = vi.fn();
+    const hook = renderHook(
+      ({ accountId }) => usePortfolioProjectionSession({
+        accountId,
+        costMethod: 'fifo',
+        hasAccounts: true,
+        language: 'zh',
+        riskFallbackMessage: 'risk unavailable',
+        loadAccounts,
+        setError,
+      }),
+      { wrapper, initialProps: { accountId: 1 } },
+    );
+
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    const accountOneSnapshotKey = buildPortfolioProjectionSnapshotQueryKey(1, 'fifo', 'zh');
+    expect(queryFetchStatus(client, accountOneSnapshotKey)).toBe('idle');
+
+    hook.rerender({ accountId: 2 });
+    await waitFor(() => expect(
+      hook.result.current.snapshot?.accounts[0]?.accountId,
+    ).toBe(2));
+    expect(client.getQueryState(accountOneSnapshotKey)).toBeUndefined();
+    expect(queryFetchStatus(client, buildPortfolioProjectionSnapshotQueryKey(2, 'fifo', 'zh'))).toBe('idle');
+
+    hook.unmount();
+    expect(client.getQueryState(buildPortfolioProjectionSnapshotQueryKey(2, 'fifo', 'zh'))).toBeUndefined();
+  });
+
+  it('rejects a late FX snapshot after account scope changes and leaves fetchStatus idle', async () => {
+    const lateAccountOneSnapshot = createDeferred<ReturnType<typeof makeSnapshot>>();
+    getSnapshot
+      .mockResolvedValueOnce(makeSnapshot(1))
+      .mockReturnValueOnce(lateAccountOneSnapshot.promise)
+      .mockResolvedValue(makeSnapshot(2));
+    refreshFx.mockResolvedValue({
+      asOf: '2026-07-30',
+      accountCount: 1,
+      refreshEnabled: true,
+      pairCount: 1,
+      updatedCount: 1,
+      staleCount: 0,
+      errorCount: 0,
+    });
+    const setError = vi.fn();
+    const { client, wrapper } = createWrapper();
+    const hook = renderHook(
+      ({ accountId }) => usePortfolioProjectionSession({
+        accountId,
+        costMethod: 'fifo',
+        hasAccounts: true,
+        language: 'zh',
+        riskFallbackMessage: 'risk unavailable',
+        loadAccounts: vi.fn().mockResolvedValue(true),
+        setError,
+      }),
+      { wrapper, initialProps: { accountId: 1 } },
+    );
+
+    await waitFor(() => expect(hook.result.current.isLoading).toBe(false));
+    act(() => {
+      void hook.result.current.handleRefreshFx();
+    });
+    await waitFor(() => expect(getSnapshot).toHaveBeenCalledTimes(2));
+
+    hook.rerender({ accountId: 2 });
+    await waitFor(() => expect(
+      hook.result.current.snapshot?.accounts[0]?.accountId,
+    ).toBe(2));
+
+    await act(async () => {
+      lateAccountOneSnapshot.resolve(makeSnapshot(1));
+      await lateAccountOneSnapshot.promise;
+      await Promise.resolve();
+    });
+
+    expect(hook.result.current.snapshot?.accounts[0]?.accountId).toBe(2);
+    expect(client.getQueryState(buildPortfolioProjectionSnapshotQueryKey(1, 'fifo', 'zh'))).toBeUndefined();
+    expect(queryFetchStatus(client, buildPortfolioProjectionSnapshotQueryKey(2, 'fifo', 'zh'))).toBe('idle');
+    expect(hook.result.current.isLoading).toBe(false);
+    expect(setError.mock.calls.every(([error]) => error === null)).toBe(true);
+    hook.unmount();
   });
 });

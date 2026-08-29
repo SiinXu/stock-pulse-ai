@@ -1,0 +1,1 @@
+- [Changed] Schedule Portfolio snapshot and risk projection through TanStack Query while keeping ledger events on the existing hand-rolled path (Refs #789).
