@@ -1,0 +1,1 @@
+- [Changed] Extracted run-flow agent-event projection into `src/services/run_flow_parts/agent_events.py` behind the existing `src.services.run_flow` facade without changing snapshot keys, history ordering, sanitization, or public builders (Refs #1086).
