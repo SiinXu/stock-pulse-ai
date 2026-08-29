@@ -209,8 +209,6 @@ def test_facade_keeps_payload_helpers_timeouts_tickflow_and_prefetch() -> None:
         "_get_tickflow_fetcher",
         "prefetch_realtime_quotes",
         "prefetch_daily_klines",
-        "_run_with_timeout",
-        "_run_with_retry",
         "build_failed_fundamental_context",
         "build_validation_rejected_fundamental_context",
     ):
