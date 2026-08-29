@@ -330,7 +330,9 @@ describe('theme token freeze guard', () => {
 
   it('fails closed when the inventory file is missing from disk', () => {
     expect(fs.existsSync('src/design/themeTokenInventory.ts')).toBe(true);
-    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(200);
+    // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
+    // portfolio/chat) shrank the defined inventory below the original 200.
+    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(190);
     expect(() => {
       if (THEME_DEFINED_TOKEN_NAMES.length === 0) {
         throw new Error('theme token inventory is empty; refusing to pass a vacuous freeze.');
