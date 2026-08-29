@@ -1445,177 +1445,10 @@ class DataFetcherManager:
     # Rebound from manager_parts.fundamental_loader_methods after the class is built.
     get_fundamental_context = None
 
-    def get_capital_flow_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
-        """资金流向块（fail-open）。"""
-        from src.config import get_config
-
-        config = get_config()
-        stock_code = normalize_stock_code(stock_code)
-        timeout = float(budget_seconds if budget_seconds is not None else config.fundamental_fetch_timeout_seconds)
-        if _market_tag(stock_code) != "cn" or _is_etf_code(stock_code):
-            return self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported"],
-            )
-
-        if timeout <= 0:
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-                ["fundamental stage timeout"],
-            )
-        payload, err, cost_ms = self._run_with_retry(
-            lambda: self._fundamental_adapter.get_capital_flow(stock_code),
-            timeout,
-            "capital_flow",
-        )
-        if not isinstance(payload, dict):
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": cost_ms}],
-                [err or "capital_flow failed"],
-            )
-
-        stock_flow = payload.get("stock_flow") or {}
-        sector_rankings = payload.get("sector_rankings") or {}
-        has_stock_flow = False
-        if isinstance(stock_flow, dict):
-            has_stock_flow = any(v is not None for v in stock_flow.values())
-        has_sector_rankings = bool(sector_rankings.get("top")) or bool(sector_rankings.get("bottom"))
-        adapter_status = str(payload.get("status", "not_supported"))
-        if has_stock_flow or has_sector_rankings:
-            capital_flow_status = "ok"
-        elif adapter_status == "not_supported":
-            capital_flow_status = "not_supported"
-        else:
-            capital_flow_status = "partial"
-
-        return self._build_fundamental_block(
-            capital_flow_status,
-            {
-                "stock_flow": payload.get("stock_flow", {}),
-                "sector_rankings": payload.get("sector_rankings", {}),
-            },
-            self._normalize_source_chain(
-                payload.get("source_chain", []),
-                "capital_flow",
-                capital_flow_status,
-                cost_ms,
-            ),
-            list(payload.get("errors", [])) + ([err] if err else []),
-        )
-
-    def get_dragon_tiger_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
-        """龙虎榜块（fail-open）。"""
-        from src.config import get_config
-
-        config = get_config()
-        stock_code = normalize_stock_code(stock_code)
-        timeout = float(budget_seconds if budget_seconds is not None else config.fundamental_fetch_timeout_seconds)
-        if _market_tag(stock_code) != "cn" or _is_etf_code(stock_code):
-            return self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported"],
-            )
-
-        if timeout <= 0:
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-                ["fundamental stage timeout"],
-            )
-        payload, err, cost_ms = self._run_with_retry(
-            lambda: self._fundamental_adapter.get_dragon_tiger_flag(stock_code),
-            timeout,
-            "dragon_tiger",
-        )
-        if not isinstance(payload, dict):
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": cost_ms}],
-                [err or "dragon_tiger failed"],
-            )
-        return self._build_fundamental_block(
-            (payload.get("status") if isinstance(payload.get("status"), str) else "partial"),
-            {
-                "is_on_list": bool(payload.get("is_on_list", False)),
-                "recent_count": int(payload.get("recent_count", 0)),
-                "latest_date": payload.get("latest_date"),
-            },
-            self._normalize_source_chain(
-                payload.get("source_chain", []),
-                "dragon_tiger",
-                str(payload.get("status", "ok")),
-                cost_ms,
-            ),
-            list(payload.get("errors", [])) + ([err] if err else []),
-        )
-
-    def get_board_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
-        """板块榜单块（fail-open）。"""
-        from src.config import get_config
-
-        config = get_config()
-        stock_code = normalize_stock_code(stock_code)
-        timeout = float(budget_seconds if budget_seconds is not None else config.fundamental_fetch_timeout_seconds)
-        if _market_tag(stock_code) != "cn" or _is_etf_code(stock_code):
-            return self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported"],
-            )
-
-        if timeout <= 0:
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-                ["fundamental stage timeout"],
-            )
-
-        def task() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]], str]:
-            return self._get_sector_rankings_with_meta(5)
-
-        rankings, err, cost_ms = self._run_with_retry(task, timeout, "boards")
-        if isinstance(rankings, tuple) and len(rankings) == 4:
-            top, bottom, chain, chain_error = rankings
-            if chain_error and not err:
-                err = chain_error
-            if not top and not bottom:
-                return self._build_fundamental_block(
-                    "failed",
-                    {},
-                    chain if chain else [{"provider": "sector_rankings", "result": "failed", "duration_ms": cost_ms}],
-                    [err or "boards empty from all sources"],
-                )
-            board_status = "ok" if top and bottom else "partial"
-            return self._build_fundamental_block(
-                board_status,
-                {"top": top or [], "bottom": bottom or []},
-                chain if chain else self._normalize_source_chain(
-                    ["sector_rankings"],
-                    "boards",
-                    board_status,
-                    cost_ms,
-                ),
-                [err] if err else [],
-            )
-
-        return self._build_fundamental_block(
-            "failed",
-            {},
-            [{"provider": "sector_rankings", "result": "failed", "duration_ms": cost_ms}],
-            [err or "boards failed"],
-        )
+    # Rebound from manager_parts.fundamental_cn_context_methods after the class is built.
+    get_capital_flow_context = None
+    get_dragon_tiger_context = None
+    get_board_context = None
 
     # Rebound from manager_parts.rankings_methods after the class is built.
     _get_sector_rankings_with_meta = None
@@ -1629,8 +1462,9 @@ class DataFetcherManager:
 
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006 compatibility
 # facade while focused parts own inventory, daily health/cache/execution, realtime,
-# chip, money-flow, fundamental cache/loaders/Config accessor, stock-name, rankings,
-# market-overview, and belong-board. Rebinding preserves method globals and patch seams.
+# chip, money-flow, fundamental cache/loaders/Config accessor/CN sub-blocks,
+# stock-name, rankings, market-overview, and belong-board. Rebinding preserves
+# method globals and patch seams.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
@@ -1639,6 +1473,7 @@ from .manager_parts import (  # noqa: E402
     chip_distribution_methods as _chip_distribution_methods_module,
     daily_provider_execution as _daily_provider_execution_module,
     fundamental_cache_methods as _fundamental_cache_methods_module,
+    fundamental_cn_context_methods as _fundamental_cn_context_methods_module,
     fundamental_context_methods as _fundamental_context_methods_module,
     fundamental_loader_methods as _fundamental_loader_methods_module,
     market_overview_methods as _market_overview_methods_module,
@@ -1863,6 +1698,20 @@ def _assemble_fundamental_context_methods_facade(context_module=_fundamental_con
         raise ImportError(f"Unexpected DataFetcherManager fundamental context methods: {bound!r}")
 
 
+def _assemble_fundamental_cn_context_methods_facade(
+    cn_context_module=_fundamental_cn_context_methods_module,
+) -> None:
+    bound_method_names = cn_context_module.bind_fundamental_cn_context_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != cn_context_module.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager CN fundamental context methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_belong_board_methods_facade(
     board_module=_belong_board_methods_module,
 ) -> None:
@@ -1922,6 +1771,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental=_assemble_fundamental_cache_methods_facade,
     assemble_fundamental_loaders=_assemble_fundamental_loader_methods_facade,
     assemble_fundamental_context=_assemble_fundamental_context_methods_facade,
+    assemble_fundamental_cn_context=_assemble_fundamental_cn_context_methods_facade,
     assemble_belong_board=_assemble_belong_board_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
     assemble_market_overview=_assemble_market_overview_methods_facade,
@@ -1939,6 +1789,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental()
     assemble_fundamental_loaders()
     assemble_fundamental_context()
+    assemble_fundamental_cn_context()
     assemble_belong_board()
     assemble_rankings()
     assemble_market_overview()
@@ -1984,6 +1835,9 @@ _fundamental_loader_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
 _fundamental_context_methods_module._install_facade_reload_hook(_assemble_data_fetcher_manager_facades)
+_fundamental_cn_context_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _belong_board_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -2009,6 +1863,7 @@ del (
     _assemble_fundamental_cache_methods_facade,
     _assemble_fundamental_loader_methods_facade,
     _assemble_fundamental_context_methods_facade,
+    _assemble_fundamental_cn_context_methods_facade,
     _assemble_belong_board_methods_facade,
     _assemble_rankings_methods_facade,
     _assemble_market_overview_methods_facade,
@@ -2028,5 +1883,6 @@ del (
     _fundamental_cache_methods_module,
     _fundamental_loader_methods_module,
     _fundamental_context_methods_module,
+    _fundamental_cn_context_methods_module,
     _belong_board_methods_module,
 )
