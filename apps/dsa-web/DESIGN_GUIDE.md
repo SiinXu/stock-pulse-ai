@@ -112,7 +112,7 @@
 
 - **冻结当前自定义属性名集合**，不在本阶段删除 page-scoped 遗留、不统一格式、不引入第二套 token 系统。
 - 可执行清单：`THEME_DEFINED_TOKEN_NAMES`（`src/index.css` 的 unique 定义）+ `classifyThemeToken()`。
-- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*` 已在 Phase 2 清零，禁止重新引入该前缀。
+- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*` 与 `--backtest-*` 已在 Phase 2 清零，禁止重新引入这两个前缀。
 - 新 UI 只用 Layer 1 + `components/common`；缺色用 `hsl(var(--token) / alpha)`，不要为每个透明度再开 token。
 - 未定义的 `var(--*)`（如 `--home-border`、`--info`、`--color-purple`、`.input-surface` 可选槽）登记在 freeze 守卫测试里的 `THEME_UNGOVERNED_REFERENCE_DEBT`（`themeTokenFreezeGuard.test.ts`），只减不增，且**不得**写进已定义清单冒充合法 token。
 - Desktop 嵌入的 WebView 走同一套 Web token。`apps/dsa-desktop/renderer/assistant.html` / `loading.html` 是独立 chrome 清单，禁止把 `--bg` / `--panel` 并进 Web Layer 1。
@@ -126,6 +126,14 @@
 - 映射：`--login-bg-main` → `bg-background`；`--login-bg-card` → `bg-card`；`--login-border-card` → `border-border`；`--login-text-primary` → `text-foreground`；`--login-text-secondary` → `text-secondary-text`；`--login-text-muted` → `text-muted-text`；`--login-accent-soft` → `selection:bg-[hsl(var(--primary)/0.08)]`。
 - 文字色映射在两种模式下逐一等值或对比度更好；仅卡片描边是有意变化：`--border` 已经是 App 外壳 / Home 面板 / 侧栏的卡片边界，Login 不再自持一套灰阶。
 - 因为改用 Layer 1，`data-theme-pack="slate"` 首次能够为登录页换色，与 pack 契约一致。详细对比数值见 [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md)。
+
+### 2.8 Phase 2 域收敛：Backtest（#1300）
+
+- 六个 `--backtest-*` 定义（light + dark）已删除；未新增页面级 token。`BacktestPage.tsx` 仍只用既有 class name，不含 `--backtest-*`。
+- 四个无引用定义直接删除：`--backtest-border-light`、`--backtest-spinner-head`、`--backtest-spinner-track`、`--backtest-table-bg`。
+- 两个在用的描边在 Backtest Workspace 配方处内联为当前 light/dark 的 `hsl(var(--foreground) / alpha)`：`--backtest-border-dim` → `.backtest-metric-row` / `.backtest-summary` 的 `0.05`（`.dark` 下 `0.06`）；`--backtest-border-subtle` → `.backtest-status-chip` 的 `0.06`（无 tone 的 `.dark` 回退为 `0.08`）。成功 / 危险 / 中性 chip 颜色与 `.backtest-metric-footer`（仍为 `--border / 0.40`）不变。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 100 降到 94；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 26（这六个名字不在格式债清单中）。
+- 这些描边现已使用 Layer 1 既有 `--foreground` 语义 token 加透明度，因此可以跟随覆盖 `--foreground` 的主题包换色；当前 `slate` pack 覆盖 `--border`、不覆盖 `--foreground`，所以目前不会给这些描边换色。
 
 ## 3. 字体阶（全部 Geist）
 

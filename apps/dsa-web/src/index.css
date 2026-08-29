@@ -273,14 +273,6 @@
   --chat-bubble-user-border: hsl(var(--primary) / 0.2);
   --chat-bubble-ai-bg: hsl(var(--card) / 0.85);
   --chat-bubble-ai-border: hsl(var(--foreground) / 0.2);
-
-  /* Backtest only */
-  --backtest-border-dim: hsl(var(--foreground) / 0.05);
-  --backtest-border-subtle: hsl(var(--foreground) / 0.06);
-  --backtest-border-light: hsl(var(--foreground) / 0.10);
-  --backtest-spinner-track: hsl(var(--primary) / 0.20);
-  --backtest-spinner-head: hsl(var(--primary));
-  --backtest-table-bg: hsl(var(--card) / 0.72);
 }
 
 /*
@@ -544,14 +536,6 @@
   --chat-bubble-user-border: hsl(var(--primary) / 0.2);
   --chat-bubble-ai-bg: hsl(var(--card) / 0.72);
   --chat-bubble-ai-border: hsl(var(--neutral-white) / 0.12); /* Semi-transparent border for dark mode */
-
-  /* Backtest only */
-  --backtest-border-dim: hsl(var(--foreground) / 0.06);
-  --backtest-border-subtle: hsl(var(--foreground) / 0.08);
-  --backtest-border-light: hsl(var(--foreground) / 0.12);
-  --backtest-spinner-track: hsl(var(--primary) / 0.25);
-  --backtest-spinner-head: hsl(var(--primary));
-  --backtest-table-bg: hsl(var(--card) / 0.82);
 }
 
 /*
@@ -1966,7 +1950,10 @@ a {
   align-items: center;
   justify-content: space-between;
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--backtest-border-dim);
+  border-bottom: 1px solid hsl(var(--foreground) / 0.05);
+}
+.dark .backtest-metric-row {
+  border-bottom-color: hsl(var(--foreground) / 0.06);
 }
 .backtest-metric-row:last-child {
   border-bottom: none;
@@ -2038,10 +2025,13 @@ a {
   gap: 1rem;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
-  border: 1px solid var(--backtest-border-dim);
+  border: 1px solid hsl(var(--foreground) / 0.05);
   background: hsl(var(--elevated));
   font-size: 0.75rem;
   font-family: monospace;
+}
+.dark .backtest-summary {
+  border-color: hsl(var(--foreground) / 0.06);
 }
 .backtest-summary .label {
   color: var(--text-secondary-text);
@@ -2096,8 +2086,11 @@ a {
   height: 1.75rem;
   padding: 0 0.5rem;
   border-radius: 9999px;
-  border: 1px solid var(--backtest-border-subtle);
+  border: 1px solid hsl(var(--foreground) / 0.06);
   background: hsl(var(--elevated) / 0.7);
+}
+.dark .backtest-status-chip:not(.backtest-status-chip-success):not(.backtest-status-chip-danger):not(.backtest-status-chip-neutral) {
+  border-color: hsl(var(--foreground) / 0.08);
 }
 
 .backtest-status-chip-success {
