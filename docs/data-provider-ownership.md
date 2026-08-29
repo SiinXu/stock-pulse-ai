@@ -41,7 +41,7 @@ and `reset_fetcher_manager()` still observe or clear **only** that fallback
 singleton. Ad-hoc `DataFetcherManager()` constructors elsewhere stay out of
 this identity.
 
-## Ownership Map (after belong-board routing extraction)
+## Ownership Map (after stock-name bulk/prefetch extraction)
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
@@ -58,7 +58,7 @@ this identity.
 | `src/data_provider/manager_parts/realtime_field_trust_methods.py` | Manager-owned realtime quote attempt and field-trust bookkeeping rebound onto `DataFetcherManager` | Realtime routing policy, fallback order, and `get_realtime_quote` |
 | `src/data_provider/manager_parts/realtime_quote_methods.py` | Manager-owned realtime quote orchestration rebound onto `DataFetcherManager`: timestamp parse/enrich, plugin realtime fallback, `get_realtime_quote` routing, quote supplement helpers, and Longbridge preference | Field-trust attempt bookkeeping (`realtime_field_trust_methods`), `prefetch_realtime_quotes`, Local Only / outbound HTTP policy, chip / money-flow / stock-name / fundamental / rankings workflows |
 | `src/data_provider/manager_parts/chip_distribution_methods.py` | Manager-owned chip-distribution orchestration rebound onto `DataFetcherManager`: `get_chip_distribution` routing, provider priority, fallback/error behavior, and chip-circuit success/failure/inconclusive accounting | Pure chip metric helpers (`chip_helpers.py`), `pull_coalesce` chip call locks (`daily_source_health`), stock-name lookup (`stock_name_methods`), rankings / loader/cache / prefetch, BaseFetcher methods |
-| `src/data_provider/manager_parts/stock_name_methods.py` | Manager-owned single-code stock-name lookup rebound onto `DataFetcherManager`: `get_stock_name` cache/static/index precedence, the market-data Local Only short circuit, the optional realtime probe, provider capability ordering with the US-capable allow-list, and the all-sources-failed fallback | Stock-name memory cache helpers (`daily_cache_methods`), `STOCK_NAME_MAP` / `is_meaningful_stock_name` / `get_index_stock_name` facade seams, `prefetch_stock_names` / `batch_get_stock_names`, realtime quote orchestration, rankings, loader/cache, BaseFetcher methods |
+| `src/data_provider/manager_parts/stock_name_methods.py` | Manager-owned single-code stock-name lookup plus bulk/prefetch rebound onto `DataFetcherManager`: `get_stock_name` cache/static/index precedence, the market-data Local Only short circuit, the optional realtime probe, provider capability ordering with the US-capable allow-list, the all-sources-failed fallback, `prefetch_stock_names`, and `batch_get_stock_names` | Stock-name memory cache helpers (`daily_cache_methods`), `STOCK_NAME_MAP` / `is_meaningful_stock_name` / `get_index_stock_name` facade seams, realtime quote orchestration, rankings, loader/cache, BaseFetcher methods |
 | `src/data_provider/manager_parts/money_flow_cache_methods.py` | Manager-owned money-flow cache lookup, store, invalidate, and stats rebound onto `DataFetcherManager` | `get_money_flow` routing and hit/miss accounting (`money_flow_methods`), circuit policy, TTL/size class attributes, and cache/circuit instance state |
 | `src/data_provider/manager_parts/money_flow_methods.py` | Manager-owned money-flow orchestration rebound onto `DataFetcherManager`: `_money_flow_timestamp`, `get_money_flow` routing, circuit failure/success, `source_chain`, `fallback_to`, the stale-cache return path, and hit/miss accounting | Cache lookup/store/invalidate/stats (`money_flow_cache_methods`), TTL/size class attributes, cache/circuit instance state including hit/miss counters, fundamental loaders, daily/realtime/Local Only behavior, and other rankings |
 | `src/data_provider/manager_parts/fundamental_cache_methods.py` | Manager-owned fundamental aggregation cache key, prune, and in-flight get-or-load rebound onto `DataFetcherManager` (instance-local; key is symbol + market + budget + as_of). TTL/max-entries resolve from injected `config` or manager `_get_fundamental_config()` | CN/offshore aggregation loaders (`fundamental_loader_methods`), `FUNDAMENTAL_CACHE_TTL_SECONDS` env default, `_should_cache_fundamental_context`, the 5s realtime/chip `pull_coalesce` singleton, daily L1/L2, and TW institutional inflight |
@@ -75,7 +75,7 @@ this identity.
 | `src/data_provider/tushare_fetcher.py` | Compatibility facade for the Tushare provider: public class, HTTP-client / URL / symbol re-exports, and ADR-006 method rebinding / HTTP-client clone seams | New capability-domain bodies (add under `tushare_parts/`) |
 | `src/data_provider/tushare_parts/` | Tushare implementation ownership by capability domain: `client` (HTTP client, URL resolve, rate-limit wrappers), `symbols` (ETF/US classifiers and ts_code conversion), `history` (`_fetch_raw_data` / `_normalize_data`), plus `facade_bind` helpers | Cross-provider manager policy (ADR-005); Tushare stock-name / stock-list / realtime / market-boards / chip remain on the facade |
 | `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
-| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, stock-name bulk/prefetch workflows still co-located, TickFlow lifecycle (`_get_tickflow_fetcher`, `close`), timeout workers (`_run_with_timeout` / `_run_with_retry`), concept-rankings TTL/lock/dict class attributes, CN fundamental sub-blocks (`get_capital_flow_context` / `get_dragon_tiger_context` / `get_board_context`) plus payload helpers and failed/rejected builders, money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | `_get_fundamental_config` (rebound from `fundamental_context_methods`), new pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/rankings/market-overview/belong-board descriptors |
+| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, TickFlow lifecycle (`_get_tickflow_fetcher`, `close`), timeout workers (`_run_with_timeout` / `_run_with_retry`), concept-rankings TTL/lock/dict class attributes, CN fundamental sub-blocks (`get_capital_flow_context` / `get_dragon_tiger_context` / `get_board_context`) plus payload helpers and failed/rejected builders, money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | `_get_fundamental_config` (rebound from `fundamental_context_methods`), new pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/rankings/market-overview/belong-board/stock-name descriptors |
 
 The private catalog receives and mutates only manager-owned state through
 `DataFetcherManager` descriptors. It does not introduce an independent policy
@@ -241,9 +241,10 @@ owner. The static `STOCK_NAME_MAP`, `is_meaningful_stock_name`, and
 `get_index_stock_name` module-level seams stay on the facade, so
 `src.data_provider.base.get_index_stock_name` remains the patch target.
 Bulk/prefetch entry points (`prefetch_stock_names`,
-`batch_get_stock_names`) and loader/cache stay on the facade. Rankings
-travel with Slice 15. The in-body `from .akshare_fetcher import _is_us_code`
-seam resolves through the facade package because rebound descriptors keep
+`batch_get_stock_names`) travel with Slice 18. Loader/cache stay on the
+facade. Rankings travel with Slice 15. The in-body
+`from .akshare_fetcher import _is_us_code` seam resolves through the
+facade package because rebound descriptors keep
 `src.data_provider.base` globals. Import the facade
 (`src.data_provider.base` / `src.data_provider`), not
 `manager_parts.stock_name_methods`.
@@ -310,6 +311,29 @@ validation-wrapped exit. Import the facade
 Slice 17 leftover on the facade: stock-name bulk/prefetch, CN sub-blocks,
 payload helpers, timeout workers, TickFlow lifecycle, and the remaining
 `base.py` `get_config()` sites.
+
+Slice 18 rebinds stock-name bulk/prefetch from
+`manager_parts/stock_name_methods.py` (extending the Slice 14 owner)
+while preserving `src.data_provider.base` module, qualname, signature,
+globals, and patch behavior:
+
+- `prefetch_stock_names`, `batch_get_stock_names`
+
+Single-code `get_stock_name` already rebound in Slice 14 stays in this
+owner. `prefetch_stock_names` either no-ops on empty/local-only, delegates
+to `batch_get_stock_names` when `use_bulk=True`, or sequentially calls
+`get_stock_name(..., allow_realtime=False)`. Bulk lookup still seeds from
+raw codes, serializes via `_ensure_concurrency_guards` plus the cache lock,
+capability-fences `stock_list` providers, rejects cross-market rows,
+logs `data_provider_bulk_stock_name_lookup_failed` then continues, and
+falls back to `get_stock_name`. Neither method is a validation-wrapped
+exit. Import the facade (`src.data_provider.base` / `src.data_provider`),
+not `manager_parts.stock_name_methods`.
+
+Slice 18 leftover on the facade: CN sub-blocks (`get_capital_flow_context`
+/ `get_dragon_tiger_context` / `get_board_context`), payload helpers,
+timeout workers, TickFlow lifecycle, `prefetch_realtime_quotes` /
+`prefetch_daily_klines`, and the remaining `base.py` `get_config()` sites.
 
 Tushare client / symbols / history (Issue #1068) rebinds `_init_api` /
 `_build_api_client` / `_check_rate_limit` / `_call_api_with_rate_limit`,

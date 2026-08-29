@@ -4,13 +4,13 @@
 
 Extracted from ``src.data_provider.base`` behind an ADR-006 compatibility
 facade. Stock-name memory cache helpers stay in ``daily_cache_methods``.
-Bulk/prefetch entry points (``prefetch_stock_names``,
-``batch_get_stock_names``), the static ``STOCK_NAME_MAP`` / index lookup
-helpers, rankings, loader/cache, and other manager workflows stay on the
-facade. These descriptors own single-code ``get_stock_name`` routing:
-cache/static/index precedence, the local-only short circuit, the optional
-realtime probe, provider capability ordering with the US-capable
-allow-list, and the all-sources-failed fallback.
+The static ``STOCK_NAME_MAP`` / index lookup helpers, rankings,
+loader/cache, and other manager workflows stay on the facade. These
+descriptors own single-code ``get_stock_name`` routing (cache/static/index
+precedence, the local-only short circuit, the optional realtime probe,
+provider capability ordering with the US-capable allow-list, and the
+all-sources-failed fallback) plus bulk/prefetch entry points
+(``prefetch_stock_names``, ``batch_get_stock_names``).
 ``DataFetcherManager`` remains the public import and patch surface.
 """
 
@@ -21,6 +21,7 @@ from typing import (
     Any,
     Callable,
     Dict,
+    List,
     Optional,
     Tuple,
     Type,
@@ -140,9 +141,134 @@ class _StockNameMethods:
         logger.warning(f"[股票名称] 所有数据源都无法获取 {stock_code} 的名称")
         return ""
 
+    def prefetch_stock_names(self, stock_codes: List[str], use_bulk: bool = False) -> None:
+        """
+        Pre-fetch stock names into cache before parallel analysis (Issue #455).
+
+        When use_bulk=False, only calls get_stock_name per code (no get_stock_list),
+        avoiding full-market fetch. Sequential execution to avoid rate limits.
+
+        Args:
+            stock_codes: Stock codes to prefetch.
+            use_bulk: If True, may use get_stock_list (full fetch). Default False.
+        """
+        if not stock_codes or self.is_market_data_local_only():
+            return
+        stock_codes = [normalize_stock_code(c) for c in stock_codes]
+        if use_bulk:
+            self.batch_get_stock_names(stock_codes)
+            return
+        for code in stock_codes:
+            # Skip realtime lookup to avoid triggering expensive full-market quote
+            # requests during the prefetch phase.
+            self.get_stock_name(code, allow_realtime=False)
+
+    def batch_get_stock_names(self, stock_codes: List[str]) -> Dict[str, str]:
+        """
+        批量获取股票中文名称
+        
+        先尝试从支持批量查询的数据源获取股票列表，
+        然后再逐个查询缺失的股票名称。
+        
+        Args:
+            stock_codes: 股票代码列表
+            
+        Returns:
+            {股票代码: 股票名称} 字典
+        """
+        result = {}
+        missing_codes = set(stock_codes)
+        
+        # 1. Check cache
+        self._ensure_concurrency_guards()
+        with self._stock_name_cache_lock:
+            for code in stock_codes:
+                cached_name = self._stock_name_cache.get(code)
+                if cached_name is not None:
+                    result[code] = cached_name
+                    missing_codes.discard(code)
+        
+        if not missing_codes:
+            return result
+
+        if self.is_market_data_local_only():
+            return result
+        
+        # 2. Attempt to fetch stock lists in capability-filtered priority order.
+        for fetcher in self._get_fetchers_for_capability("stock_list"):
+            if not hasattr(fetcher, 'get_stock_list') or not missing_codes:
+                continue
+            missing_markets = {
+                _market_tag(normalize_stock_code(str(code)))
+                for code in missing_codes
+            }
+            if not any(
+                self._provider_supports_capability(
+                    fetcher,
+                    "stock_list",
+                    market,
+                )
+                for market in missing_markets
+            ):
+                continue
+            if not self._is_fetcher_available(fetcher, capability="stock_list"):
+                continue
+            try:
+                stock_list = self._call_fetcher_method(fetcher, 'get_stock_list')
+                if stock_list is not None and not stock_list.empty:
+                    cache_updates: Dict[str, str] = {}
+                    for _, row in stock_list.iterrows():
+                        code = row.get('code')
+                        name = row.get('name')
+                        if code and name:
+                            result_market = _market_tag(
+                                normalize_stock_code(str(code))
+                            )
+                            if not self._provider_supports_capability(
+                                fetcher,
+                                "stock_list",
+                                result_market,
+                            ):
+                                continue
+                            cache_updates[code] = name
+                            if code in missing_codes:
+                                result[code] = name
+                                missing_codes.discard(code)
+
+                    if cache_updates:
+                        with self._stock_name_cache_lock:
+                            self._stock_name_cache.update(cache_updates)
+                    
+                    if not missing_codes:
+                        break
+                    
+                    logger.info(f"[股票名称] 从 {fetcher.name} 批量获取完成，剩余 {len(missing_codes)} 个待查")
+            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes bulk-name fallback
+                log_safe_exception(
+                    logger,
+                    "Data provider bulk stock name lookup failed",
+                    e,
+                    error_code="data_provider_bulk_stock_name_lookup_failed",
+                    level=logging.DEBUG,
+                    context={"provider": fetcher.name},
+                )
+                continue
+        
+        # 3. Retrieve remaining ones individually.
+        for code in list(missing_codes):
+            name = self.get_stock_name(code)
+            if name:
+                result[code] = name
+                missing_codes.discard(code)
+        
+        logger.info(f"[股票名称] 批量获取完成，成功 {len(result)}/{len(stock_codes)}")
+        return result
+
 
 EXPECTED_STOCK_NAME_METHOD_NAMES = (
     "get_stock_name",
+    "prefetch_stock_names",
+    "batch_get_stock_names",
 )
 
 
