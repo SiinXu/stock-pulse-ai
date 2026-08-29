@@ -115,13 +115,13 @@ describe('shared-control adoption ratchet fixtures', () => {
   });
 
   it('honors documented a11y exemptions and rejects undeclared copies', () => {
-    const file = '../run-flow/ProcessTimeline.tsx';
+    const file = '../decision-signals/DecisionSignalTimeline.tsx';
     const source = `
       export function Item() {
         return (
           <>
-            <summary role="button">Owned</summary>
-            <summary role="button">Copy</summary>
+            <circle role="button">Owned</circle>
+            <circle role="button">Copy</circle>
           </>
         );
       }
@@ -129,7 +129,7 @@ describe('shared-control adoption ratchet fixtures', () => {
     const findings = scanSharedControlAdoption(file, source);
     const exemptions = SHARED_CONTROL_A11Y_EXEMPTIONS.filter((entry) => entry.file === file);
     const { remaining, diffs } = applySharedControlExemptions(findings, exemptions);
-    expect(remaining.map((finding) => finding.token)).toEqual(['summary']);
+    expect(remaining.map((finding) => finding.token)).toEqual(['circle']);
     expect(diffs.some((diff) => diff.code === 'exemption-overflow')).toBe(true);
   });
 

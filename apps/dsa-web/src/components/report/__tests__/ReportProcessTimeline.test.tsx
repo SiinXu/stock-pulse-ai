@@ -108,6 +108,12 @@ describe('ReportProcessTimeline', () => {
     expect(toggle).toHaveAttribute('aria-expanded', 'true');
     expect(panel).not.toHaveAttribute('hidden');
     expect(screen.getByTestId('process-timeline')).toBeVisible();
+
+    const innerToggle = screen.getByRole('button', { name: /View details/ });
+    expect(innerToggle).toHaveAttribute('type', 'button');
+    expect(innerToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByTestId('process-timeline-why')).not.toBeVisible();
+
     fireEvent.click(screen.getByRole('button', { name: 'View run flow' }));
     expect(onOpenRunFlow).toHaveBeenCalledWith(12);
   });
