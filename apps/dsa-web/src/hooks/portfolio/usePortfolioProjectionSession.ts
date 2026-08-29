@@ -5,11 +5,13 @@
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type SetStateAction,
 } from 'react';
-import { portfolioApi } from '../../api/portfolio';
+import { CancelledError, keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ParsedApiError } from '../../api/error';
 import { getParsedApiError } from '../../api/error';
 import type { UiLanguage } from '../../i18n/uiText';
@@ -24,23 +26,24 @@ import type {
   PortfolioSnapshotResponse,
   PortfolioTradeListItem,
 } from '../../types/portfolio';
+import { portfolioApi } from '../../api/portfolio';
 import {
   buildFxRefreshFeedback,
   type FxRefreshFeedback,
 } from '../../utils/portfolioFormat';
+import {
+  PORTFOLIO_PROJECTION_CANCEL,
+  PORTFOLIO_PROJECTION_DEFAULT_PAGE_SIZE,
+  PORTFOLIO_PROJECTION_QUERY_SCHEDULE,
+  buildPortfolioProjectionEventsQueryKey,
+  buildPortfolioProjectionSnapshotQueryKey,
+  fetchPortfolioEvents,
+  fetchPortfolioSnapshotAndRisk,
+  type PortfolioEventFilters,
+  type PortfolioEventType,
+} from './usePortfolioProjectionQueries';
 
-const DEFAULT_PAGE_SIZE = 20;
-
-export type PortfolioEventType = 'trade' | 'cash' | 'corporate';
-
-type PortfolioEventFilters = {
-  dateFrom: string;
-  dateTo: string;
-  symbol: string;
-  side: '' | PortfolioSide;
-  direction: '' | PortfolioCashDirection;
-  actionType: '' | PortfolioCorporateActionType;
-};
+export type { PortfolioEventType } from './usePortfolioProjectionQueries';
 
 type ProjectionRequest = {
   requestId: number;
@@ -75,18 +78,8 @@ const EMPTY_EVENT_FILTERS: PortfolioEventFilters = {
   actionType: '',
 };
 
-function buildEventScopeKey(
-  accountScopeKey: string,
-  eventType: PortfolioEventType,
-  filters: PortfolioEventFilters,
-  page: number,
-): string {
-  return JSON.stringify({
-    accountScopeKey,
-    eventType,
-    filters,
-    page,
-  });
+function isCancelledError(error: unknown): boolean {
+  return error instanceof CancelledError;
 }
 
 export function usePortfolioProjectionSession({
@@ -98,10 +91,9 @@ export function usePortfolioProjectionSession({
   loadAccounts,
   setError,
 }: UsePortfolioProjectionSessionOptions) {
-  const [snapshot, setSnapshot] = useState<PortfolioSnapshotResponse | null>(null);
-  const [risk, setRisk] = useState<PortfolioRiskResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [riskWarning, setRiskWarning] = useState<string | null>(null);
+  const queryClient = useQueryClient();
+
+  const [isLoading, setIsLoading] = useState(true);
   const [fxRefreshing, setFxRefreshing] = useState(false);
   const [fxRefreshFeedback, setFxRefreshFeedback] = useState<FxRefreshFeedback | null>(null);
 
@@ -116,7 +108,6 @@ export function usePortfolioProjectionSession({
   const [eventPage, setEventPageState] = useState(1);
   const [eventRefreshKey, setEventRefreshKey] = useState(0);
   const [eventTotal, setEventTotal] = useState(0);
-  const [eventLoading, setEventLoading] = useState(false);
   const [eventError, setEventError] = useState<ParsedApiError | null>(null);
   const [tradeEvents, setTradeEvents] = useState<PortfolioTradeListItem[]>([]);
   const [cashEvents, setCashEvents] = useState<PortfolioCashLedgerListItem[]>([]);
@@ -138,17 +129,57 @@ export function usePortfolioProjectionSession({
   const eventRequestRef = useRef<EventProjectionRequest>({
     requestId: 0,
     accountScopeKey,
-    scopeKey: buildEventScopeKey(
+    scopeKey: JSON.stringify({
       accountScopeKey,
       eventType,
-      EMPTY_EVENT_FILTERS,
-      eventPage,
-    ),
+      filters: EMPTY_EVENT_FILTERS,
+      page: eventPage,
+      refreshKey: 0,
+    }),
   });
   const fxRequestRef = useRef<ProjectionRequest>({
     requestId: 0,
     scopeKey: snapshotScopeKey,
   });
+  const snapshotFenceRef = useRef(0);
+  const eventFenceRef = useRef(0);
+
+  const snapshotQueryKey = useMemo(
+    () => buildPortfolioProjectionSnapshotQueryKey(accountId, costMethod, language),
+    [accountId, costMethod, language],
+  );
+  const eventsQueryKey = useMemo(
+    () => buildPortfolioProjectionEventsQueryKey(
+      accountId,
+      eventType,
+      appliedEventFilters,
+      eventPage,
+      eventRefreshKey,
+    ),
+    [accountId, appliedEventFilters, eventPage, eventRefreshKey, eventType],
+  );
+  const eventsQueryKeyRef = useRef(eventsQueryKey);
+  eventsQueryKeyRef.current = eventsQueryKey;
+  const activeParamsRef = useRef({
+    accountId,
+    costMethod,
+    language,
+    riskFallbackMessage,
+    eventType,
+    appliedEventFilters,
+    eventPage,
+    eventRefreshKey,
+  });
+  activeParamsRef.current = {
+    accountId,
+    costMethod,
+    language,
+    riskFallbackMessage,
+    eventType,
+    appliedEventFilters,
+    eventPage,
+    eventRefreshKey,
+  };
 
   const isActiveSnapshotRequest = useCallback((request: ProjectionRequest) => (
     activeSnapshotScopeRef.current === request.scopeKey
@@ -169,12 +200,17 @@ export function usePortfolioProjectionSession({
   ), []);
 
   const invalidateEventRequest = useCallback(() => {
+    eventFenceRef.current += 1;
     eventRequestRef.current = {
       ...eventRequestRef.current,
       accountScopeKey: activeAccountScopeRef.current,
       requestId: eventRequestRef.current.requestId + 1,
     };
-  }, []);
+    void queryClient.cancelQueries(
+      { queryKey: eventsQueryKeyRef.current, exact: true },
+      PORTFOLIO_PROJECTION_CANCEL,
+    );
+  }, [queryClient]);
 
   const activeEventTypeRef = useRef(eventType);
   const eventPageRef = useRef(eventPage);
@@ -210,14 +246,98 @@ export function usePortfolioProjectionSession({
     transitionEventQuery(activeEventTypeRef.current, resolvedPage);
   }, [transitionEventQuery]);
 
+  const snapshotQuery = useQuery({
+    queryKey: snapshotQueryKey,
+    queryFn: async ({ signal }) => {
+      const startedAt = snapshotFenceRef.current;
+      const requestScope = snapshotScopeKey;
+      return fetchPortfolioSnapshotAndRisk({
+        accountId,
+        costMethod,
+        language,
+        riskFallbackMessage,
+        signal,
+        stillActive: () => (
+          snapshotFenceRef.current === startedAt
+          && activeSnapshotScopeRef.current === requestScope
+        ),
+      });
+    },
+    ...PORTFOLIO_PROJECTION_QUERY_SCHEDULE,
+    placeholderData: keepPreviousData,
+  });
+
+  const eventsQuery = useQuery({
+    queryKey: eventsQueryKey,
+    queryFn: async ({ signal }) => {
+      const startedAt = eventFenceRef.current;
+      const startedAccountId = accountId;
+      const startedEventType = eventType;
+      const startedPage = eventPage;
+      const startedRefreshKey = eventRefreshKey;
+      const startedFilters = appliedEventFilters;
+      return fetchPortfolioEvents({
+        accountId: startedAccountId,
+        eventType: startedEventType,
+        filters: startedFilters,
+        page: startedPage,
+        signal,
+        stillActive: () => {
+          const active = activeParamsRef.current;
+          return eventFenceRef.current === startedAt
+            && active.accountId === startedAccountId
+            && active.eventType === startedEventType
+            && active.eventPage === startedPage
+            && active.eventRefreshKey === startedRefreshKey
+            && active.appliedEventFilters === startedFilters;
+        },
+      });
+    },
+    ...PORTFOLIO_PROJECTION_QUERY_SCHEDULE,
+  });
+
+  useLayoutEffect(() => {
+    return () => {
+      void queryClient.cancelQueries(
+        { queryKey: snapshotQueryKey, exact: true },
+        PORTFOLIO_PROJECTION_CANCEL,
+      );
+      queryClient.removeQueries({ queryKey: snapshotQueryKey, exact: true });
+    };
+  }, [queryClient, snapshotQueryKey]);
+
+  useLayoutEffect(() => {
+    return () => {
+      void queryClient.cancelQueries(
+        { queryKey: eventsQueryKey, exact: true },
+        PORTFOLIO_PROJECTION_CANCEL,
+      );
+      queryClient.removeQueries({ queryKey: eventsQueryKey, exact: true });
+    };
+  }, [eventsQueryKey, queryClient]);
+
+  useLayoutEffect(() => () => {
+    snapshotFenceRef.current += 1;
+    eventFenceRef.current += 1;
+  }, []);
+
   const loadSnapshotAndRiskForActiveScope = useCallback(async (
     showLoading: boolean,
   ): Promise<SnapshotRiskLoadOutcome> => {
     const request = {
-      scopeKey: snapshotScopeKey,
+      scopeKey: activeSnapshotScopeRef.current,
       requestId: snapshotRequestRef.current.requestId + 1,
     };
     snapshotRequestRef.current = request;
+    snapshotFenceRef.current += 1;
+    const startedAt = snapshotFenceRef.current;
+    const scope = activeParamsRef.current;
+    const key = buildPortfolioProjectionSnapshotQueryKey(
+      scope.accountId,
+      scope.costMethod,
+      scope.language,
+    );
+
     if (showLoading) {
       snapshotLoadingOwnerRef.current = request;
       setIsLoading(true);
@@ -225,48 +345,35 @@ export function usePortfolioProjectionSession({
       snapshotLoadingOwnerRef.current = null;
       setIsLoading(false);
     }
-    setRiskWarning(null);
 
     try {
-      const snapshotData = await portfolioApi.getSnapshot({
-        accountId,
-        costMethod,
-        includeRealtime: false,
+      await queryClient.cancelQueries(
+        { queryKey: key, exact: true },
+        PORTFOLIO_PROJECTION_CANCEL,
+      );
+      const data = await queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: ({ signal }) => fetchPortfolioSnapshotAndRisk({
+          accountId: scope.accountId,
+          costMethod: scope.costMethod,
+          language: scope.language,
+          riskFallbackMessage: scope.riskFallbackMessage,
+          signal,
+          stillActive: () => (
+            snapshotFenceRef.current === startedAt
+            && isActiveSnapshotRequest(request)
+          ),
+        }),
+        ...PORTFOLIO_PROJECTION_QUERY_SCHEDULE,
       });
       if (!isActiveSnapshotRequest(request)) {
         return { snapshotAccepted: false, riskAccepted: false };
       }
-      setSnapshot(snapshotData);
-      setError(null);
-
-      try {
-        const riskData = await portfolioApi.getRisk({
-          accountId,
-          costMethod,
-          includeRealtime: false,
-        });
-        if (!isActiveSnapshotRequest(request)) {
-          return { snapshotAccepted: false, riskAccepted: false };
-        }
-        setRisk(riskData);
-        return { snapshotAccepted: true, riskAccepted: true };
-      } catch (riskError) {
-        if (!isActiveSnapshotRequest(request)) {
-          return { snapshotAccepted: false, riskAccepted: false };
-        }
-        setRisk(null);
-        setRiskWarning(
-          getParsedApiError(riskError, language).message || riskFallbackMessage,
-        );
-        return { snapshotAccepted: true, riskAccepted: false };
-      }
+      return { snapshotAccepted: true, riskAccepted: data.riskWarning === null };
     } catch (snapshotError) {
-      if (!isActiveSnapshotRequest(request)) {
+      if (!isActiveSnapshotRequest(request) || isCancelledError(snapshotError)) {
         return { snapshotAccepted: false, riskAccepted: false };
       }
-      setSnapshot(null);
-      setRisk(null);
-      setError(getParsedApiError(snapshotError));
       return { snapshotAccepted: false, riskAccepted: false };
     } finally {
       if (showLoading && snapshotLoadingOwnerRef.current === request) {
@@ -274,15 +381,7 @@ export function usePortfolioProjectionSession({
         setIsLoading(false);
       }
     }
-  }, [
-    accountId,
-    costMethod,
-    isActiveSnapshotRequest,
-    language,
-    riskFallbackMessage,
-    setError,
-    snapshotScopeKey,
-  ]);
+  }, [isActiveSnapshotRequest, queryClient]);
 
   const loadSnapshotAndRisk = useCallback(async (): Promise<boolean> => {
     const outcome = await loadSnapshotAndRiskForActiveScope(true);
@@ -291,80 +390,66 @@ export function usePortfolioProjectionSession({
 
   const loadEventsPage = useCallback(async (
     page: number,
-    requestedEventType: PortfolioEventType = eventType,
+    requestedEventType?: PortfolioEventType,
   ): Promise<boolean> => {
+    const scope = activeParamsRef.current;
+    const resolvedEventType = requestedEventType ?? scope.eventType;
     const request = {
-      accountScopeKey,
-      scopeKey: buildEventScopeKey(
+      accountScopeKey: accountScopeKey,
+      scopeKey: JSON.stringify({
         accountScopeKey,
-        requestedEventType,
-        appliedEventFilters,
+        eventType: resolvedEventType,
+        filters: scope.appliedEventFilters,
         page,
-      ),
+        refreshKey: scope.eventRefreshKey,
+      }),
       requestId: eventRequestRef.current.requestId + 1,
     };
     eventRequestRef.current = request;
-    setEventLoading(true);
+    eventFenceRef.current += 1;
+    const startedAt = eventFenceRef.current;
+    const key = buildPortfolioProjectionEventsQueryKey(
+      scope.accountId,
+      resolvedEventType,
+      scope.appliedEventFilters,
+      page,
+      scope.eventRefreshKey,
+    );
     setEventError(null);
 
     try {
-      if (requestedEventType === 'trade') {
-        const response = await portfolioApi.listTrades({
-          accountId,
-          dateFrom: appliedEventFilters.dateFrom || undefined,
-          dateTo: appliedEventFilters.dateTo || undefined,
-          symbol: appliedEventFilters.symbol || undefined,
-          side: appliedEventFilters.side || undefined,
+      await queryClient.cancelQueries(
+        { queryKey: key, exact: true },
+        PORTFOLIO_PROJECTION_CANCEL,
+      );
+      const data = await queryClient.fetchQuery({
+        queryKey: key,
+        queryFn: ({ signal }) => fetchPortfolioEvents({
+          accountId: scope.accountId,
+          eventType: resolvedEventType,
+          filters: scope.appliedEventFilters,
           page,
-          pageSize: DEFAULT_PAGE_SIZE,
-        });
-        if (!isActiveEventRequest(request)) return false;
-        setTradeEvents(response.items || []);
-        setEventTotal(response.total || 0);
-      } else if (requestedEventType === 'cash') {
-        const response = await portfolioApi.listCashLedger({
-          accountId,
-          dateFrom: appliedEventFilters.dateFrom || undefined,
-          dateTo: appliedEventFilters.dateTo || undefined,
-          direction: appliedEventFilters.direction || undefined,
-          page,
-          pageSize: DEFAULT_PAGE_SIZE,
-        });
-        if (!isActiveEventRequest(request)) return false;
-        setCashEvents(response.items || []);
-        setEventTotal(response.total || 0);
-      } else {
-        const response = await portfolioApi.listCorporateActions({
-          accountId,
-          dateFrom: appliedEventFilters.dateFrom || undefined,
-          dateTo: appliedEventFilters.dateTo || undefined,
-          symbol: appliedEventFilters.symbol || undefined,
-          actionType: appliedEventFilters.actionType || undefined,
-          page,
-          pageSize: DEFAULT_PAGE_SIZE,
-        });
-        if (!isActiveEventRequest(request)) return false;
-        setCorporateEvents(response.items || []);
-        setEventTotal(response.total || 0);
-      }
+          signal,
+          stillActive: () => (
+            eventFenceRef.current === startedAt
+            && isActiveEventRequest(request)
+          ),
+        }),
+        ...PORTFOLIO_PROJECTION_QUERY_SCHEDULE,
+      });
+      if (!isActiveEventRequest(request)) return false;
+      setEventTotal(data.total);
+      if (data.eventType === 'trade') setTradeEvents(data.items);
+      else if (data.eventType === 'cash') setCashEvents(data.items);
+      else setCorporateEvents(data.items);
       return true;
     } catch (eventLoadError) {
-      if (isActiveEventRequest(request)) {
+      if (isActiveEventRequest(request) && !isCancelledError(eventLoadError)) {
         setEventError(getParsedApiError(eventLoadError));
       }
       return false;
-    } finally {
-      if (isActiveEventRequest(request)) {
-        setEventLoading(false);
-      }
     }
-  }, [
-    accountId,
-    accountScopeKey,
-    appliedEventFilters,
-    eventType,
-    isActiveEventRequest,
-  ]);
+  }, [accountScopeKey, isActiveEventRequest, queryClient]);
 
   const activeProjectionRef = useRef({
     eventPage,
@@ -465,12 +550,61 @@ export function usePortfolioProjectionSession({
   ]);
 
   useEffect(() => {
-    void loadSnapshotAndRisk();
-  }, [loadSnapshotAndRisk]);
+    if (snapshotQuery.isFetching) return;
+    if (snapshotLoadingOwnerRef.current !== null) {
+      snapshotLoadingOwnerRef.current = null;
+      setIsLoading(false);
+    }
+  }, [snapshotQuery.dataUpdatedAt, snapshotQuery.errorUpdatedAt, snapshotQuery.isFetching]);
 
   useEffect(() => {
-    void loadEventsPage(eventPage);
-  }, [eventPage, eventRefreshKey, loadEventsPage]);
+    if (snapshotQuery.isFetching) return;
+    if (snapshotQuery.isError) {
+      if (isCancelledError(snapshotQuery.error)) return;
+      setError(getParsedApiError(snapshotQuery.error));
+      return;
+    }
+    if (snapshotQuery.isSuccess) {
+      setError(null);
+    }
+  }, [
+    setError,
+    snapshotQuery.error,
+    snapshotQuery.errorUpdatedAt,
+    snapshotQuery.isError,
+    snapshotQuery.isFetching,
+    snapshotQuery.isSuccess,
+  ]);
+
+  useEffect(() => {
+    if (eventsQuery.isFetching) return;
+    if (eventsQuery.isError) {
+      if (isCancelledError(eventsQuery.error)) return;
+      setEventError(getParsedApiError(eventsQuery.error));
+      return;
+    }
+    const data = eventsQuery.data;
+    if (!eventsQuery.isSuccess || data === undefined) return;
+    setEventError(null);
+    setEventTotal(data.total);
+    if (data.eventType === 'trade') setTradeEvents(data.items);
+    else if (data.eventType === 'cash') setCashEvents(data.items);
+    else setCorporateEvents(data.items);
+  }, [
+    eventsQuery.data,
+    eventsQuery.error,
+    eventsQuery.isError,
+    eventsQuery.isFetching,
+    eventsQuery.isSuccess,
+  ]);
+
+  useEffect(() => {
+    snapshotLoadingOwnerRef.current = {
+      requestId: snapshotRequestRef.current.requestId,
+      scopeKey: snapshotScopeKey,
+    };
+    setIsLoading(true);
+  }, [snapshotScopeKey]);
 
   useEffect(() => {
     fxRequestRef.current = {
@@ -485,7 +619,17 @@ export function usePortfolioProjectionSession({
     transitionEventQuery(activeEventTypeRef.current, 1);
   }, [accountId, transitionEventQuery]);
 
-  const totalEventPages = Math.max(1, Math.ceil(eventTotal / DEFAULT_PAGE_SIZE));
+  const snapshot: PortfolioSnapshotResponse | null = snapshotQuery.isError
+    ? null
+    : (snapshotQuery.data?.snapshot ?? null);
+  const risk: PortfolioRiskResponse | null = snapshotQuery.isError
+    ? null
+    : (snapshotQuery.data?.risk ?? null);
+  const riskWarning = snapshotQuery.isFetching || snapshotQuery.isError
+    ? null
+    : (snapshotQuery.data?.riskWarning ?? null);
+
+  const totalEventPages = Math.max(1, Math.ceil(eventTotal / PORTFOLIO_PROJECTION_DEFAULT_PAGE_SIZE));
   const currentEventCount = eventType === 'trade'
     ? tradeEvents.length
     : eventType === 'cash'
@@ -519,7 +663,7 @@ export function usePortfolioProjectionSession({
     setEventPage,
     totalEventPages,
     currentEventCount,
-    eventLoading,
+    eventLoading: eventsQuery.isFetching,
     eventError,
     setEventError,
     tradeEvents,
