@@ -1,16 +1,20 @@
 import { z } from 'zod';
 import apiClient from './index';
-import { createApiError, createParsedApiError } from './error';
-import { toCamelCase } from './utils';
+import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { StockFieldTrustResponse, StockHistoryResponse, StockQuote } from '../types/stocks';
 // Generated OpenAPI components document the backend snake_case contract for
-// StockQuote / StockHistoryResponse. Runtime validation below targets the
-// camelCase shape consumers already use after toCamelCase conversion.
-import type { components } from '../types/api.generated';
+// StockQuote / StockHistoryResponse / ExtractFromImageResponse. Runtime
+// validation below targets the camelCase shape consumers already use after
+// toCamelCase conversion.
+import type { components, operations } from '../types/api.generated';
 
 type OpenApiStockQuote = components['schemas']['StockQuote'];
 type OpenApiStockHistoryResponse = components['schemas']['StockHistoryResponse'];
 type OpenApiStockFieldTrustResponse = components['schemas']['StockFieldTrustResponse'];
+type OpenApiExtractResponse = components['schemas']['ExtractFromImageResponse'];
+type OpenApiExtractItem = components['schemas']['ExtractItem'];
+type OpenApiExtractBody = operations['extract_from_image_api_v1_stocks_extract_from_image_post']['responses']['200']['content']['application/json'];
+type OpenApiParseBody = operations['parse_import_api_v1_stocks_parse_import_post']['responses']['200']['content']['application/json'];
 
 // Compile-time anchor: hand-written camelCase types stay aligned with OpenAPI
 // field sets (rename detection is structural; extra optional UI fields are fine).
@@ -20,9 +24,30 @@ type _AssertTrustFields = keyof OpenApiStockFieldTrustResponse;
 const _quoteFieldAnchor: _AssertQuoteFields = 'stock_code';
 const _historyFieldAnchor: _AssertHistoryFields = 'stock_code';
 const _trustFieldAnchor: _AssertTrustFields = 'stock_code';
+const _extractCodesAnchor: keyof OpenApiExtractResponse = 'codes';
+const _extractRawTextAnchor: keyof OpenApiExtractResponse = 'raw_text';
+const _extractItemAnchor: keyof OpenApiExtractItem = 'confidence';
 void _quoteFieldAnchor;
 void _historyFieldAnchor;
 void _trustFieldAnchor;
+void _extractCodesAnchor;
+void _extractRawTextAnchor;
+void _extractItemAnchor;
+
+type _AssertExtractIsComponent = OpenApiExtractBody extends OpenApiExtractResponse
+  ? OpenApiExtractResponse extends OpenApiExtractBody
+    ? true
+    : never
+  : never;
+type _AssertParseIsComponent = OpenApiParseBody extends OpenApiExtractResponse
+  ? OpenApiExtractResponse extends OpenApiParseBody
+    ? true
+    : never
+  : never;
+const _extractBodyIsComponent: _AssertExtractIsComponent = true;
+const _parseBodyIsComponent: _AssertParseIsComponent = true;
+void _extractBodyIsComponent;
+void _parseBodyIsComponent;
 
 function toStockCodePath(stockCode: string): string {
   const trimmed = stockCode.trim();
@@ -146,38 +171,17 @@ const stockFieldTrustResponseSchema = z.object({
   message: z.string().nullable().optional(),
 }).passthrough();
 
-function parseCamelCasePayload<T>(
-  data: unknown,
-  schema: z.ZodTypeAny,
-  label: string,
-): T {
-  const camel = toCamelCase<unknown>(data);
-  const result = schema.safeParse(camel);
-  if (!result.success) {
-    const issueSummary = result.error.issues
-      .slice(0, 5)
-      .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-      .join('; ');
-    if (import.meta.env.DEV) {
-      console.error(`[stocks] response validation failed (${label})`, result.error.issues);
-    }
-    throw createApiError(
-      createParsedApiError({
-        // Title/message are localized via STABLE_ERROR_TEXT[code] + params.
-        title: '响应校验失败',
-        message: `接口响应未通过校验（${label}）。${issueSummary}`,
-        rawMessage: result.error.message,
-        category: 'unknown',
-        code: 'api_response_validation_failed',
-        params: { label, issues: issueSummary },
-        details: result.error.issues,
-      }),
-    );
-  }
-  // Intentionally return the camelCase object produced by toCamelCase so valid
-  // payloads stay byte-identical to the pre-validation implementation.
-  return camel as T;
-}
+const extractItemSchema = z.object({
+  code: z.string().nullable().optional(),
+  name: z.string().nullable().optional(),
+  confidence: z.string().optional(),
+}).passthrough();
+
+const extractFromImageResponseSchema = z.object({
+  codes: z.array(z.string()),
+  items: z.array(extractItemSchema).optional(),
+  rawText: z.string().nullable().optional(),
+}).passthrough();
 
 export type ExtractItem = {
   code?: string | null;
@@ -188,8 +192,17 @@ export type ExtractItem = {
 export type ExtractFromImageResponse = {
   codes: string[];
   items?: ExtractItem[];
-  rawText?: string;
+  rawText?: string | null;
 };
+
+function parseExtractResponse(data: unknown): ExtractFromImageResponse {
+  return parseCamelCasePayload<ExtractFromImageResponse>(
+    data,
+    extractFromImageResponseSchema,
+    'ExtractFromImageResponse',
+    'stocks',
+  );
+}
 
 export const stocksApi = {
   async getFieldTrust(stockCode: string): Promise<StockFieldTrustResponse> {
@@ -200,6 +213,7 @@ export const stocksApi = {
       response.data,
       stockFieldTrustResponseSchema,
       'StockFieldTrustResponse',
+      'stocks',
     );
   },
 
@@ -207,7 +221,7 @@ export const stocksApi = {
     const response = await apiClient.get<Record<string, unknown>>(
       `/api/v1/stocks/${toStockCodePath(stockCode)}/quote`,
     );
-    return parseCamelCasePayload<StockQuote>(response.data, stockQuoteSchema, 'StockQuote');
+    return parseCamelCasePayload<StockQuote>(response.data, stockQuoteSchema, 'StockQuote', 'stocks');
   },
 
   // The backend only implements daily candles; weekly/monthly are aggregated
@@ -221,6 +235,7 @@ export const stocksApi = {
       response.data,
       stockHistoryResponseSchema,
       'StockHistoryResponse',
+      'stocks',
     );
     // OpenAPI marks data optional; consumers always expect an array.
     if (!Array.isArray(history.data)) {
@@ -243,12 +258,7 @@ export const stocksApi = {
       },
     );
 
-    const data = response.data as { codes?: string[]; items?: ExtractItem[]; raw_text?: string };
-    return {
-      codes: data.codes ?? [],
-      items: data.items,
-      rawText: data.raw_text,
-    };
+    return parseExtractResponse(response.data);
   },
 
   async parseImport(file?: File, text?: string): Promise<ExtractFromImageResponse> {
@@ -257,13 +267,11 @@ export const stocksApi = {
       formData.append('file', file);
       const headers: { [key: string]: string | undefined } = { 'Content-Type': undefined };
       const response = await apiClient.post('/api/v1/stocks/parse-import', formData, { headers });
-      const data = response.data as { codes?: string[]; items?: ExtractItem[] };
-      return { codes: data.codes ?? [], items: data.items };
+      return parseExtractResponse(response.data);
     }
     if (text) {
       const response = await apiClient.post('/api/v1/stocks/parse-import', { text });
-      const data = response.data as { codes?: string[]; items?: ExtractItem[] };
-      return { codes: data.codes ?? [], items: data.items };
+      return parseExtractResponse(response.data);
     }
     throw new Error('请提供文件或粘贴文本');
   },

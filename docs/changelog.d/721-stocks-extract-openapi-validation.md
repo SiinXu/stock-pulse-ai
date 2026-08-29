@@ -1,0 +1,1 @@
+- [Changed] Validate Web stock extract-from-image and parse-import JSON against generated ExtractFromImageResponse (Refs #721).

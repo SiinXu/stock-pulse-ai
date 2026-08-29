@@ -145,7 +145,14 @@ explicitly allowlisted. Existing blocking gate remains `openapi-types-gate`
 
 Clusters already on generated types + runtime validation:
 
-- Pilot: `stocks`
+- Pilot: `stocks` (`getQuote` / `getDailyHistory` / `getFieldTrust`, plus POST
+  `/stocks/extract-from-image` and POST `/stocks/parse-import` sharing generated
+  `ExtractFromImageResponse` / `ExtractItem`; both path 200 JSON bodies are
+  mutually equivalent to the component; the compile-time bind is snake_case
+  `components['schemas']`; runtime Zod is a camelCase projection through shared
+  `parseCamelCasePayload` and does not re-export the generated snake_case type
+  as the UI `ExtractFromImageResponse`; this is not the auth export-alias
+  pattern)
 - Portfolio: `portfolio`, `backtest`, `decisionSignals`, `scorecard`
 - System: `systemConfig`, `approvals`, `usage`, `securityAudit`
 - Integrations: `alerts`, `alphasift`, `intelligence`, `investmentFramework`,
