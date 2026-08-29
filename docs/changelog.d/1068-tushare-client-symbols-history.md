@@ -1,0 +1,2 @@
+- [Changed] Extracted Tushare HTTP client, symbol/ts_code helpers, and daily history fetch/normalize into `src/data_provider/tushare_parts/` behind the existing `tushare_fetcher` ADR-006 facade without changing provider priority, rate-limit semantics, history branches/scales, fallback, circuit, or public imports (Refs #1068).
+- [Tests] Added Tushare parse-helper characterization for facade identity, rebound `__module__`, `safe_post` patch seams, US-code rejection, and tenacity retry wrapping (Refs #1068).
