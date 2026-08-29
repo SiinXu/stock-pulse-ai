@@ -1,15 +1,20 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Manager-owned belong-board missing-value and normalization helpers.
+"""Manager-owned belong-board helpers and routing rebound onto DataFetcherManager.
 
-These descriptors are rebound onto ``DataFetcherManager`` by the compatibility
-facade. ``get_belong_boards`` routing, capability probing, and provider
-fallback remain on the facade.
+Extracted from ``src.data_provider.base`` behind an ADR-006 compatibility
+facade. These descriptors own missing-value / normalization helpers
+(``_try_scalar_isna``, ``_is_missing_board_value``,
+``_normalize_belong_boards``) and ``get_belong_boards`` routing,
+capability probing, and provider fallback. Fundamental payload helpers
+that only *call* ``_try_scalar_isna`` stay on the facade.
+``DataFetcherManager`` remains the public import and patch surface.
 """
 
 from __future__ import annotations
 
 import logging
+import time
 from typing import (
     Any,
     Callable,
@@ -23,6 +28,8 @@ from typing import (
 import numpy as np
 import pandas as pd
 
+from src.utils.sanitize import log_safe_exception
+
 from .daily_cache_methods import _clone_facade_descriptor, _descriptor_function
 
 # Facade-only symbols cannot be imported from ``src.data_provider.base`` while
@@ -30,6 +37,11 @@ from .daily_cache_methods import _clone_facade_descriptor, _descriptor_function
 # so flake8 F821 is clean; rebound methods resolve the real objects from the
 # ``src.data_provider.base`` global namespace.
 DataFetcherManager = None  # type: ignore[assignment,misc]
+normalize_stock_code = None  # type: ignore[assignment,misc]
+_market_tag = None  # type: ignore[assignment,misc]
+record_provider_run = None  # type: ignore[assignment,misc]
+record_provider_run_started = None  # type: ignore[assignment,misc]
+summarize_exception = None  # type: ignore[assignment,misc]
 
 logger = logging.getLogger("src.data_provider.base")
 
@@ -218,11 +230,89 @@ class _BelongBoardMethods:
             return [{"name": board_name}]
         return []
 
+    def get_belong_boards(self, stock_code: str) -> List[Dict[str, Any]]:
+        """
+        Get stock membership boards through capability probing.
+
+        Keep this at manager layer to avoid changing BaseFetcher abstraction.
+        """
+        stock_code = normalize_stock_code(stock_code)
+        if _market_tag(stock_code) != "cn":
+            return []
+        candidate_fetchers = [
+            fetcher
+            for fetcher in self._get_fetchers_for_capability(
+                "belong_boards",
+                market="cn",
+            )
+            if hasattr(fetcher, "get_belong_board")
+        ]
+        for index, fetcher in enumerate(candidate_fetchers):
+            fallback_to = (
+                candidate_fetchers[index + 1].name
+                if index + 1 < len(candidate_fetchers)
+                else None
+            )
+            start = time.time()
+            try:
+                record_provider_run_started(
+                    data_type="belong_boards",
+                    provider=fetcher.name,
+                    operation="get_belong_board",
+                )
+                raw_data = fetcher.get_belong_board(stock_code)
+                boards = self._normalize_belong_boards(raw_data)
+                if boards:
+                    record_provider_run(
+                        data_type="belong_boards",
+                        provider=fetcher.name,
+                        operation="get_belong_board",
+                        success=True,
+                        latency_ms=int((time.time() - start) * 1000),
+                        record_count=len(boards),
+                    )
+                    logger.info(f"[{fetcher.name}] 获取所属板块成功: {stock_code}, count={len(boards)}")
+                    return boards
+                record_provider_run(
+                    data_type="belong_boards",
+                    provider=fetcher.name,
+                    operation="get_belong_board",
+                    success=False,
+                    latency_ms=int((time.time() - start) * 1000),
+                    error_type="empty",
+                    error_message="empty belong boards",
+                    fallback_to=fallback_to,
+                    record_count=0,
+                )
+            except Exception as e:
+                error_type, error_reason = summarize_exception(e)
+                record_provider_run(
+                    data_type="belong_boards",
+                    provider=fetcher.name,
+                    operation="get_belong_board",
+                    success=False,
+                    latency_ms=int((time.time() - start) * 1000),
+                    error_type=error_type,
+                    error_message=error_reason,
+                    fallback_to=fallback_to,
+                )
+                log_safe_exception(
+                    logger,
+                    "Data provider stock board membership fetch failed",
+                    e,
+                    error_code="data_provider_stock_board_membership_failed",
+                    level=logging.DEBUG,
+                    context={"symbol": stock_code, "provider": fetcher.name},
+                )
+                continue
+        return []
+
 
 EXPECTED_BELONG_BOARD_METHOD_NAMES = (
     "_try_scalar_isna",
     "_is_missing_board_value",
     "_normalize_belong_boards",
+    "get_belong_boards",
 )
 
 

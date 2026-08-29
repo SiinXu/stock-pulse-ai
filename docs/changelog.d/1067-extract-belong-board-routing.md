@@ -1,0 +1,1 @@
+- [Changed] Extracted DataFetcherManager belong-board routing (`get_belong_boards`) into `src/data_provider/manager_parts/belong_board_methods.py` behind the existing ADR-006 facade without changing capability probing, provider fallback, empty non-CN returns, run-flow diagnostics, or public imports (Refs #1067).
