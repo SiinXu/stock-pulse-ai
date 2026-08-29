@@ -256,6 +256,9 @@ class OrchestratorResult:
     timed_out: bool = False
     budget_snapshot: Optional[Dict[str, Any]] = None
     failure_reason: Optional[str] = None
+    # Run-local metadata bag (end-of-run reflection, #1089). No new public field
+    # is added downstream: it maps onto ``AgentResult.planning_metadata``.
+    planning_metadata: Optional[Dict[str, Any]] = None
 
 
 class _StageProgressFence:

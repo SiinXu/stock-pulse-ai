@@ -30,19 +30,22 @@ from src.agent.planning.config import (
     PlanExecutionSettings,
     PlanningSettings,
 )
+from src.agent.evolution.multilevel import (
+    apply_live_mode_budget_snapshot as _apply_live_mode_budget_snapshot_shared,
+    reflection_error_payload as _reflection_error_payload,
+)
 from src.agent.planning.engine import PlanningEngine
 from src.agent.planning.loop import execute_plan_loop
 from src.agent.planning.observations import compact_observation_summary
 from src.agent.runtime.tool_session import BoundToolSession
 from src.agent.stock_scope import resolve_stock_scope
 from src.services.security_audit_service import get_security_audit_service
-from src.utils.sanitize import log_safe_exception, sanitize_diagnostic_text
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
 CancelledCheck = Callable[[], bool]
 ReflectionComplete = Callable[[str, str], str]
-REFLECTION_MAX_TOKENS = 800
 
 
 def _resolve_config(config: Any = None) -> Any:
@@ -390,23 +393,16 @@ def _maybe_attach_end_of_run_reflection(
     success: bool,
     tool_calls_log: Optional[Sequence[Dict[str, Any]]] = None,
 ) -> None:
-    """Attach one bounded trajectory reflection to planning metadata.
+    """Planning-path entry into the shared end-of-run reflection attach point.
 
-    Default-off via ``agent_reflection_enabled``. Fail-soft: a reflection
-    provider/validation failure is explicit in metadata but never changes the
-    already-computed Agent result. When the executor or planning context holds
-    a ``mode_budget_account``, that same object is copied onto the reflection
-    ctx so the optional LLM call charges the run account. Episode persistence
-    remains owned by #1210's single end-of-run finalizer so this hook cannot
-    create duplicate episodes.
+    Behaviour is owned by ``src.agent.evolution.multilevel``; the same helper
+    now serves the classic Native run and the Native Multi dashboard run
+    (Issue #1089), so the planning path cannot drift into a parallel copy.
     """
     if getattr(config, "agent_reflection_enabled", False) is not True:
         return
     try:
-        from src.agent.evolution.budget import budget_from_config
-        from src.agent.evolution.multilevel import run_trajectory_layer
-        from src.agent.evolution.reflection import REFLECTION_META_KEY
-        from src.agent.evolution.step_critique import STEP_CRITIQUE_META_KEY
+        from src.agent.evolution.multilevel import attach_end_of_run_reflection
     except Exception as exc:  # broad-exception: fallback_recorded - reflection is optional
         log_safe_exception(
             logger,
@@ -420,109 +416,14 @@ def _maybe_attach_end_of_run_reflection(
         )
         return
 
-    class _Ctx:
-        meta: Dict[str, Any]
-        opinions: List[Any]
-        risk_flags: List[Any]
-        stock_code: Optional[str]
-
-    ctx = _Ctx()
-    ctx.opinions = []
-    ctx.risk_flags = []
-    ctx.stock_code = None
-    run_id = None
-    episode_id = None
-    if isinstance(context, dict):
-        run_id = context.get("run_id") or context.get("analysis_history_id")
-        episode_id = context.get("episode_id")
-        ctx.stock_code = context.get("stock_code")
-        # Seed immediate-layer payload if the plan loop already wrote it.
-        step_payload = context.get(STEP_CRITIQUE_META_KEY) or planning_metadata.get(
-            STEP_CRITIQUE_META_KEY
-        )
-        ctx.meta = {
-            "run_id": run_id,
-            "episode_id": episode_id,
-            "run_success": success,
-            "planning_outcome": {
-                "status": planning_metadata.get("status"),
-                "reason": planning_metadata.get("reason"),
-                "observation_replans": planning_metadata.get(
-                    "observation_replans", 0
-                ),
-            },
-            "degraded_stages": list(context.get("degraded_stages") or []),
-        }
-        if isinstance(step_payload, dict):
-            ctx.meta[STEP_CRITIQUE_META_KEY] = step_payload
-            if step_payload.get("replan_reasons"):
-                ctx.meta["replan_reason_kinds"] = list(step_payload["replan_reasons"])
-    else:
-        ctx.meta = {
-            "run_id": run_id,
-            "episode_id": episode_id,
-            "run_success": success,
-        }
-
-    ctx.meta["trajectory_summary"] = _reflection_trajectory_summary(
-        tool_calls_log
+    attach_end_of_run_reflection(
+        planning_metadata,
+        executor=executor,
+        config=config,
+        context=context,
+        success=success,
+        tool_calls_log=tool_calls_log,
     )
-    _attach_mode_budget_account(ctx, executor=executor, context=context)
-
-    try:
-        multi = run_trajectory_layer(
-            ctx,
-            config=config,
-            seed_from_immediate=True,
-            budget=budget_from_config(
-                config,
-                attr="agent_reflection_llm_budget",
-                default=1,
-            ),
-            llm_complete=_reflection_llm_complete(executor, config),
-        )
-    except Exception as exc:  # broad-exception: fallback_recorded - optional end reflection
-        log_safe_exception(
-            logger,
-            "End-of-run trajectory reflection failed",
-            exc,
-            error_code="agent_reflection_trajectory_failed",
-            level=logging.INFO,
-        )
-        planning_metadata["reflection_result"] = _reflection_error_payload(
-            "Trajectory reflection was unavailable."
-        )
-        return
-
-    if multi.trajectory is not None:
-        planning_metadata[REFLECTION_META_KEY] = multi.trajectory
-    if multi.episode_lessons:
-        planning_metadata["episode_lessons"] = list(multi.episode_lessons)
-    if multi.replan_reason_kinds:
-        planning_metadata.setdefault(
-            "replan_reason_kinds", list(multi.replan_reason_kinds)
-        )
-
-
-def _resolve_mode_budget_account(
-    executor: Any,
-    context: Optional[Dict[str, Any]],
-) -> Any:
-    """Return the live run account from executor or planning context."""
-    if isinstance(context, dict):
-        account = context.get("mode_budget_account")
-        if account is None:
-            nested = context.get("meta")
-            if isinstance(nested, dict):
-                account = nested.get("mode_budget_account")
-        if account is not None:
-            return account
-    if executor is None:
-        return None
-    account = getattr(executor, "mode_budget_account", None)
-    if account is not None:
-        return account
-    return getattr(executor, "_mode_budget_account", None)
 
 
 def _apply_live_mode_budget_snapshot(
@@ -532,145 +433,13 @@ def _apply_live_mode_budget_snapshot(
     context: Optional[Dict[str, Any]] = None,
     planning_metadata: Optional[Dict[str, Any]] = None,
 ) -> None:
-    """Copy the post-reflection account snapshot onto the returned AgentResult.
-
-    ``_run_loop`` freezes ``budget_snapshot`` before optional reflection
-    charges the same account. Diagnostics must show the final used turns.
-    """
-    account = _resolve_mode_budget_account(executor, context)
-    snapshot_fn = getattr(account, "snapshot", None)
-    if not callable(snapshot_fn):
-        return
-    try:
-        payload = snapshot_fn()
-    except Exception as exc:  # broad-exception: fallback_recorded - snapshot is diagnostic
-        log_safe_exception(
-            logger,
-            "Could not snapshot mode budget after reflection",
-            exc,
-            error_code="agent_reflection_mode_budget_snapshot_failed",
-            level=logging.INFO,
-        )
-        return
-    if not isinstance(payload, dict):
-        return
-    if result is not None:
-        result.budget_snapshot = payload
-    if isinstance(planning_metadata, dict):
-        planning_metadata["mode_budget"] = payload
-
-
-def _attach_mode_budget_account(
-    ctx: Any,
-    *,
-    executor: Any,
-    context: Optional[Dict[str, Any]],
-) -> None:
-    """Copy the live run account onto the reflection ctx when one exists."""
-    account = _resolve_mode_budget_account(executor, context)
-    if account is None:
-        return
-    meta = getattr(ctx, "meta", None)
-    if not isinstance(meta, dict):
-        return
-    meta["mode_budget_account"] = account
-    snapshot = getattr(account, "snapshot", None)
-    if callable(snapshot):
-        try:
-            meta["mode_budget"] = snapshot()
-        except Exception as exc:  # broad-exception: fallback_recorded - snapshot is diagnostic
-            log_safe_exception(
-                logger,
-                "End-of-run reflection could not snapshot mode budget",
-                exc,
-                error_code="agent_reflection_mode_budget_snapshot_failed",
-                level=logging.INFO,
-            )
-
-
-def _reflection_error_payload(reason: str) -> Dict[str, Any]:
-    """Expose optional reflection failure without changing the run outcome."""
-    return {
-        "lessons": [],
-        "revised": False,
-        "terminate_reason": "error",
-        "status": "error",
-        "episode_id": None,
-        "prediction_id": None,
-        "run_id": None,
-        "strategy_note": None,
-        "llm_budget_total": 0,
-        "llm_budget_consumed": 0,
-        "llm_budget_remaining": 0,
-        "validation_status": "error",
-        "skip_reason": reason,
-    }
-
-
-def _reflection_trajectory_summary(
-    tool_calls_log: Optional[Sequence[Dict[str, Any]]],
-) -> List[Dict[str, Any]]:
-    """Build bounded, redacted evidence for the trajectory critic."""
-    summary: List[Dict[str, Any]] = []
-    for row in list(tool_calls_log or [])[:64]:
-        if not isinstance(row, dict):
-            continue
-        tool = row.get("tool") or row.get("tool_name")
-        if not isinstance(tool, str) or not tool.strip():
-            continue
-        raw_success = row.get("ok", row.get("success"))
-        if type(raw_success) is not bool:
-            continue
-        summary.append(
-            {
-                "tool": sanitize_diagnostic_text(tool, max_length=128),
-                "success": raw_success,
-                "error_code": sanitize_diagnostic_text(
-                    row.get("error_code"), max_length=64
-                )
-                or None,
-                "summary": sanitize_diagnostic_text(
-                    row.get("summary"), max_length=300
-                ),
-            }
-        )
-    return summary
-
-
-def _reflection_llm_complete(
-    executor: Any,
-    config: Any,
-) -> ReflectionComplete:
-    """Adapt the real executor provider to the strict reflection callback."""
-
-    def _complete(system_prompt: str, user_prompt: str) -> str:
-        adapter = getattr(executor, "llm_adapter", None)
-        call = getattr(adapter, "call_completion", None)
-        if not callable(call):
-            raise RuntimeError("reflection provider is unavailable")
-        timeout = float(
-            getattr(config, "agent_planning_proposal_timeout_seconds", 30.0)
-            or 30.0
-        )
-        timeout = max(0.1, min(timeout, 30.0))
-        response = call(
-            [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            tools=None,
-            temperature=0.0,
-            max_tokens=REFLECTION_MAX_TOKENS,
-            timeout=timeout,
-        )
-        if str(getattr(response, "provider", "") or "").lower() == "error":
-            raise RuntimeError("reflection provider returned an error")
-        content = getattr(response, "content", None)
-        if not isinstance(content, str) or not content.strip():
-            raise ValueError("reflection provider returned no text")
-        return content
-
-    return _complete
+    """Copy the post-reflection account snapshot onto the returned AgentResult."""
+    _apply_live_mode_budget_snapshot_shared(
+        result,
+        executor=executor,
+        context=context,
+        metadata=planning_metadata,
+    )
 
 
 def _open_plan_tool_session(

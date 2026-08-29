@@ -1,0 +1,5 @@
+- [Added] Attach run-local reflection on the default Native Single executor and the Native Multi orchestrator dashboard run when `AGENT_REFLECTION_ENABLED=true`; Chat stays excluded and the default stays off
+- [Changed] Reuse an existing bounded Critic trace to seed typed reflection lessons so a Critic verdict produces lessons without an extra LLM call
+- [Added] Emit bounded `reflect_start` / `reflect_end` agent observability events (`agent.reflect`) carrying counters only, never lesson text
+- [Tests] Add `tests/agent/test_reflection_native_call_sites.py` covering disabled no-op, Native Single/Multi attach, Chat no-op, budget skip, hostile critique, invalid output, Critic seeding, no fact/opinion/episode writes, and event bounds
+- [Docs] Document the Native Single/Multi reflection call sites in the bilingual reflection/post-mortem guide

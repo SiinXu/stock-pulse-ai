@@ -177,7 +177,11 @@ def run_reflection_loop(
     seed_lessons: Optional[Sequence[ReflectionLesson]] = None,
     event_sink: Optional[Callable[[str, Dict[str, Any]], None]] = None,
 ) -> ReflectionResult:
-    """Execute the bounded reflection contract and attach it to run metadata."""
+    """Execute the bounded reflection contract and attach it to run metadata.
+
+    An existing ``ctx.meta["critic_trace"]`` seeds typed lesson kinds so a
+    Critic verdict is reused even when no reflection LLM runs.
+    """
     soul_before = snapshot_soul_identity()
     tools_before = snapshot_tool_surface_denials(
         tool_surface,
@@ -216,6 +220,8 @@ def run_reflection_loop(
     _emit("reflect_start", {"llm_budget_total": call_budget.total})
 
     lessons: List[ReflectionLesson] = list(seed_lessons or [])
+    # Reuse the bounded Critic verdict instead of inventing a third voice.
+    _extend_with_critic_seed(lessons, ctx)
     terminate_reason = "ok"
     status = "completed"
     validation_status = "valid"
@@ -325,6 +331,26 @@ def run_reflection_loop(
         denial_codes=denial_codes,
     )
     return result
+
+
+def _extend_with_critic_seed(
+    lessons: List[ReflectionLesson],
+    ctx: Any,
+) -> None:
+    """Seed lesson kinds from ``ctx.meta["critic_trace"]`` without a new voice.
+
+    Kinds already present (immediate layer or explicit ``seed_lessons``) win, so
+    an existing Critic trace can only add missing typed kinds, never duplicate.
+    """
+    meta = getattr(ctx, "meta", None)
+    if not isinstance(meta, dict):
+        return
+    seen = {lesson.kind for lesson in lessons}
+    for lesson in seed_lessons_from_critic_trace(meta.get("critic_trace")):
+        if lesson.kind in seen:
+            continue
+        seen.add(lesson.kind)
+        lessons.append(lesson)
 
 
 def _attach_result(ctx: Any, result: ReflectionResult) -> None:

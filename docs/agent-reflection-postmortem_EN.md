@@ -55,6 +55,54 @@ Entry: `src/agent/evolution/reflection.py` (`run_reflection_loop`, etc.).
    `AGENT_MAX_RUN_LLM_CALLS` key).
 5. Optional in-run revise limited by `AGENT_REFLECTION_MAX_REVISE` (default 1).
 6. Soul / ToolSurface identity is snapshotted and re-asserted after the path.
+7. An existing `ctx.meta["critic_trace"]` seeds typed lesson kinds
+   (`evidence_gap`, `overconfidence`, `tool_failure`, `risk_omission`) so a
+   Critic verdict produces lessons even when no reflection LLM runs. Seeding
+   only adds kinds that are not already present; it never opens a second
+   critic voice.
+
+### Production call sites
+
+`src.agent.evolution.multilevel.attach_end_of_run_reflection` is the single
+attach point. All three Native call sites delegate to it, so there is no
+parallel copy:
+
+| Call site | Where | Trigger |
+| --- | --- | --- |
+| Planning product path (opt-in) | `src/agent/planning/product.py` | `AGENT_PLANNING_ENABLED=true` |
+| Classic Native Single | `src/agent/executor_parts/run.py` | default `AGENT_ARCH=single` with planning off |
+| Native Multi dashboard | `src/agent/orchestrator_parts/chat.py` `run()` | `AGENT_ARCH=multi` |
+
+Contract shared by all three:
+
+- Runs **after** the primary analysis/decision. A reflection failure never
+  changes `success`, dashboard content, or Decision fields — the failure is
+  recorded as `status=error` in metadata instead.
+- The typed result is written to `AgentResult.planning_metadata["reflection_result"]`
+  (no new result field) and, on Native Multi, mirrored onto
+  `ctx.meta["reflection_result"]`. `OrchestratorResult.planning_metadata`
+  carries it through `_public_agent_result`.
+- Chat is excluded. `AgentOrchestrator.chat` never reaches the attach point, and
+  `is_reflection_enabled` also rejects a projected `response_mode == "chat"`.
+  There is no `AGENT_REFLECTION_IN_CHAT` env key.
+- No `revise_fn` is passed on Native production paths. Critic revision remains
+  the apply-within-run mechanism; `AGENT_REFLECTION_MAX_REVISE` stays a hard cap
+  for explicit library callers.
+- Input is a bounded, redacted projection: at most 64 tool rows, 12 opinions,
+  10 risk flags, and a Critic trace reduced to `verdict` / `validation_status`
+  plus 8 `reasons` / `missing_evidence` entries. System prompts, Soul charter
+  text, raw completions and deep payloads are never sent.
+- Nothing is persisted. No episode row, decision-memory admission, prediction
+  actual, or Soul marker is written here — persistence stays with #1090.
+
+### Observability
+
+When agent observability is enabled the attach point emits two bounded events
+of type `agent.reflect`: `reflect_start` (`llm_budget_total`) and `reflect_end`
+(`terminate_reason`, `status`, `lesson_count`, `llm_budget_consumed`,
+`llm_budget_remaining`). Lesson text, remedies and `strategy_note` never reach
+observability. The disabled path emits nothing at all — there is no fake
+successful `reflect_end`.
 
 ## Resolved-forecast post-mortem (#1103)
 

@@ -59,8 +59,9 @@ class AgentEventType(str, Enum):
 
     Planning-loop taxonomy (``plan`` / ``action`` / ``observation`` /
     ``replan`` / ``terminate``) aligns with the unified run-trace contract
-    drafted in issue #1125. ``reflect`` and evolution-side kinds are reserved
-    there and are not emitted by the planning loop.
+    drafted in issue #1125. ``reflect`` carries the bounded end-of-run
+    reflection trace (#1089); the planning loop itself still does not emit it,
+    and evolution-side kinds stay reserved.
     """
 
     PHASE_START = "agent.phase_start"
@@ -77,6 +78,8 @@ class AgentEventType(str, Enum):
     OBSERVATION = "agent.observation"
     REPLAN = "agent.replan"
     TERMINATE = "agent.terminate"
+    # Run-local end-of-run reflection trace (#1089); bounded attrs only.
+    REFLECT = "agent.reflect"
 
 
 @dataclass(frozen=True)
