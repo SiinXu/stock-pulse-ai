@@ -1174,186 +1174,14 @@ class DataFetcherManager:
 
     _get_fundamental_config = None  # rebound from manager_parts.fundamental_context_methods
 
-    @staticmethod
-    def _normalize_source_chain(
-        entries: Any,
-        provider: str,
-        result: str,
-        duration_ms: int,
-    ) -> List[Dict[str, Any]]:
-        """Normalize free-form source chain entries to structured dict list."""
-        if entries is None:
-            return [{"provider": provider, "result": result, "duration_ms": duration_ms}]
-
-        normalized: List[Dict[str, Any]] = []
-        if not isinstance(entries, (list, tuple)):
-            entries = [entries]
-
-        for item in entries:
-            if isinstance(item, dict):
-                normalized.append({
-                    "provider": str(item.get("provider") or provider),
-                    "result": str(item.get("result") or result),
-                    "duration_ms": int(item.get("duration_ms", duration_ms)),
-                })
-                continue
-
-            if item is None:
-                continue
-
-            provider_name = str(item)
-            normalized.append({
-                "provider": provider_name,
-                "result": result,
-                "duration_ms": duration_ms,
-            })
-
-        if not normalized:
-            return [{"provider": provider, "result": result, "duration_ms": duration_ms}]
-
-        return normalized
-
-    @staticmethod
-    def _block_status(payload: Dict[str, Any], available: bool = True) -> str:
-        if not available:
-            return "not_supported"
-        if not payload:
-            return "partial"
-        return "ok"
-
-    @staticmethod
-    def _build_fundamental_block(
-        status: str,
-        payload: Optional[Dict[str, Any]] = None,
-        source_chain: Optional[List[Dict[str, Any]]] = None,
-        errors: Optional[List[str]] = None,
-    ) -> Dict[str, Any]:
-        return {
-            "status": status,
-            "coverage": {"status": status},
-            "source_chain": source_chain or [],
-            "errors": errors or [],
-            "data": payload or {},
-        }
-
-    @staticmethod
-    def _has_meaningful_payload(payload: Any) -> bool:
-        if payload is None:
-            return False
-        if isinstance(payload, str):
-            normalized = payload.strip().lower()
-            return normalized not in ("", "-", "nan", "none", "null", "n/a", "na")
-        if isinstance(payload, dict):
-            return any(DataFetcherManager._has_meaningful_payload(v) for v in payload.values())
-        if isinstance(payload, pd.DataFrame):
-            if payload.empty:
-                return False
-            return any(
-                DataFetcherManager._has_meaningful_payload(v)
-                for v in payload.to_numpy().flat
-            )
-        if isinstance(payload, (pd.Series, pd.Index)):
-            return any(DataFetcherManager._has_meaningful_payload(v) for v in payload.tolist())
-        if isinstance(payload, np.ndarray):
-            if payload.ndim == 0:
-                payload = payload.item()
-            else:
-                return any(
-                    DataFetcherManager._has_meaningful_payload(v)
-                    for v in payload.flat
-                )
-        if isinstance(payload, (list, tuple, set)):
-            return any(DataFetcherManager._has_meaningful_payload(v) for v in payload)
-        if DataFetcherManager._try_scalar_isna(payload, "fundamental_payload") is True:
-            return False
-        return True
-
-    @staticmethod
-    def _infer_block_status(payload: Any, fallback_status: str) -> str:
-        if DataFetcherManager._has_meaningful_payload(payload):
-            return "ok"
-        if fallback_status in ("failed", "partial", "not_supported"):
-            return fallback_status
-        return "partial"
-
-    @staticmethod
-    def _should_cache_fundamental_context(context: Any) -> bool:
-        if not isinstance(context, dict):
-            return False
-        status = str(context.get("status", "")).strip().lower()
-        if status == "ok":
-            return True
-        if status == "failed":
-            return False
-        for block in (
-            "valuation",
-            "growth",
-            "earnings",
-            "institution",
-            "capital_flow",
-            "dragon_tiger",
-            "boards",
-        ):
-            payload = context.get(block, {})
-            if isinstance(payload, dict) and DataFetcherManager._has_meaningful_payload(payload.get("data")):
-                return True
-        return False
-
-    def _build_market_not_supported(self, market: str, reason: str) -> Dict[str, Any]:
-        blocks = {
-            "valuation": self._build_fundamental_block(
-                "partial" if market == "etf" else "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                [reason],
-            ),
-            "growth": self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                [reason],
-            ),
-            "earnings": self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                [reason],
-            ),
-            "institution": self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                [reason],
-            ),
-            "capital_flow": self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                [reason],
-            ),
-            "dragon_tiger": self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                [reason],
-            ),
-            "boards": self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                [reason],
-            ),
-        }
-        return {
-            "market": market,
-            "status": "partial" if market == "etf" else "not_supported",
-            "coverage": {
-                block: blocks[block]["status"] for block in blocks
-            },
-            "source_chain": [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-            "errors": [reason],
-            **blocks,
-        }
+    # Rebound from manager_parts.fundamental_payload_methods after the class is built.
+    _normalize_source_chain = None
+    _block_status = None
+    _build_fundamental_block = None
+    _has_meaningful_payload = None
+    _infer_block_status = None
+    _should_cache_fundamental_context = None
+    _build_market_not_supported = None
 
     # Rebound from manager_parts.fundamental_loader_methods after the class is built.
     _build_offshore_fundamental_context = None
@@ -1462,9 +1290,9 @@ class DataFetcherManager:
 
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006 compatibility
 # facade while focused parts own inventory, daily health/cache/execution, realtime,
-# chip, money-flow, fundamental cache/loaders/Config accessor/CN sub-blocks,
-# stock-name, rankings, market-overview, and belong-board. Rebinding preserves
-# method globals and patch seams.
+# chip, money-flow, fundamental cache/loaders/Config accessor/CN sub-blocks/
+# payload helpers, stock-name, rankings, market-overview, and belong-board.
+# Rebinding preserves method globals and patch seams.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
@@ -1476,6 +1304,7 @@ from .manager_parts import (  # noqa: E402
     fundamental_cn_context_methods as _fundamental_cn_context_methods_module,
     fundamental_context_methods as _fundamental_context_methods_module,
     fundamental_loader_methods as _fundamental_loader_methods_module,
+    fundamental_payload_methods as _fundamental_payload_methods_module,
     market_overview_methods as _market_overview_methods_module,
     money_flow_cache_methods as _money_flow_cache_methods_module,
     money_flow_methods as _money_flow_methods_module,
@@ -1726,6 +1555,20 @@ def _assemble_belong_board_methods_facade(
         )
 
 
+def _assemble_fundamental_payload_methods_facade(
+    payload_module=_fundamental_payload_methods_module,
+) -> None:
+    bound_method_names = payload_module.bind_fundamental_payload_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != payload_module.EXPECTED_FUNDAMENTAL_PAYLOAD_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager fundamental payload methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_rankings_methods_facade(
     rankings_module=_rankings_methods_module,
 ) -> None:
@@ -1773,6 +1616,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_context=_assemble_fundamental_context_methods_facade,
     assemble_fundamental_cn_context=_assemble_fundamental_cn_context_methods_facade,
     assemble_belong_board=_assemble_belong_board_methods_facade,
+    assemble_fundamental_payload=_assemble_fundamental_payload_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
     assemble_market_overview=_assemble_market_overview_methods_facade,
 ) -> None:
@@ -1791,6 +1635,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_context()
     assemble_fundamental_cn_context()
     assemble_belong_board()
+    assemble_fundamental_payload()
     assemble_rankings()
     assemble_market_overview()
     from .manager_parts.data_validation_wiring import install_facade_validation_wrappers
@@ -1841,6 +1686,9 @@ _fundamental_cn_context_methods_module._install_facade_reload_hook(
 _belong_board_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_fundamental_payload_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _rankings_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -1865,6 +1713,7 @@ del (
     _assemble_fundamental_context_methods_facade,
     _assemble_fundamental_cn_context_methods_facade,
     _assemble_belong_board_methods_facade,
+    _assemble_fundamental_payload_methods_facade,
     _assemble_rankings_methods_facade,
     _assemble_market_overview_methods_facade,
     _assemble_data_fetcher_manager_facades,
@@ -1885,4 +1734,5 @@ del (
     _fundamental_context_methods_module,
     _fundamental_cn_context_methods_module,
     _belong_board_methods_module,
+    _fundamental_payload_methods_module,
 )

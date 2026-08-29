@@ -128,7 +128,8 @@ def test_owner_module_exists_for_fundamental_loader_extraction() -> None:
     assert "def get_fundamental_context(" not in source
     assert "def _build_offshore_fundamental_context(" not in source
     assert "def _get_fundamental_config(" not in source
-    assert "def _normalize_source_chain(" in source
+    assert "def _normalize_source_chain(" not in source
+    assert "    _normalize_source_chain = None" in source
     importlib.import_module("src.data_provider.manager_parts.fundamental_loader_methods")
 
 
