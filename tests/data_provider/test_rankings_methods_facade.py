@@ -117,6 +117,29 @@ def test_owner_module_declares_expected_names_only() -> None:
 
 
 def test_facade_keeps_main_indices_and_market_stats() -> None:
+    """Slice 16 rebinds these names; bodies leave DataFetcherManager only."""
+
+    tree = ast.parse(BASE_PATH.read_text(encoding="utf-8"))
+    manager_defs = {
+        node.name
+        for cls in tree.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "DataFetcherManager"
+        for node in cls.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert "get_main_indices" not in manager_defs
+    assert "get_market_stats" not in manager_defs
+
+    base_fetcher_defs = {
+        node.name
+        for cls in tree.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "BaseFetcher"
+        for node in cls.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert "get_main_indices" in base_fetcher_defs
+    assert "get_market_stats" in base_fetcher_defs
+
     source = BASE_PATH.read_text(encoding="utf-8")
-    assert "    def get_main_indices(" in source
-    assert "    def get_market_stats(" in source
+    assert "    get_main_indices = None" in source
+    assert "    get_market_stats = None" in source
