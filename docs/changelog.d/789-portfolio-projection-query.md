@@ -1,1 +1,1 @@
-- [Changed] Schedule Portfolio projection snapshot, risk, and ledger-event reads through TanStack Query with mount/dependency cadence, no poll, no window-focus refetch, and retry disabled (Refs #789).
+- [Changed] Schedule Portfolio projection snapshot, risk, and ledger-event reads through TanStack Query with mount/dependency cadence, no poll, no window-focus refetch, retry disabled, and silent-cancel fetchStatus termination via a same-key successor or exact-key removeQueries (Refs #789).

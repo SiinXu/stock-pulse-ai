@@ -82,6 +82,10 @@ function isCancelledError(error: unknown): boolean {
   return error instanceof CancelledError;
 }
 
+function queryKeysEqual(left: readonly unknown[], right: readonly unknown[]): boolean {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
 export function usePortfolioProjectionSession({
   accountId,
   costMethod,
@@ -106,6 +110,15 @@ export function usePortfolioProjectionSession({
   const [eventActionType, setEventActionType] = useState<'' | PortfolioCorporateActionType>('');
   const [appliedEventFilters, setAppliedEventFilters] = useState<PortfolioEventFilters>(EMPTY_EVENT_FILTERS);
   const [eventPage, setEventPageState] = useState(1);
+  const eventPageAccountRef = useRef(accountId);
+  let eventPageForScope = eventPage;
+  if (eventPageAccountRef.current !== accountId) {
+    eventPageAccountRef.current = accountId;
+    eventPageForScope = 1;
+    if (eventPage !== 1) {
+      setEventPageState(1);
+    }
+  }
   const [eventRefreshKey, setEventRefreshKey] = useState(0);
   const [eventTotal, setEventTotal] = useState(0);
   const [eventError, setEventError] = useState<ParsedApiError | null>(null);
@@ -153,13 +166,16 @@ export function usePortfolioProjectionSession({
       accountId,
       eventType,
       appliedEventFilters,
-      eventPage,
+      eventPageForScope,
       eventRefreshKey,
     ),
-    [accountId, appliedEventFilters, eventPage, eventRefreshKey, eventType],
+    [accountId, appliedEventFilters, eventPageForScope, eventRefreshKey, eventType],
   );
   const eventsQueryKeyRef = useRef(eventsQueryKey);
   eventsQueryKeyRef.current = eventsQueryKey;
+  const snapshotQueryKeyRef = useRef(snapshotQueryKey);
+  snapshotQueryKeyRef.current = snapshotQueryKey;
+  const inFlightEventQueryKeysRef = useRef<Array<readonly unknown[]>>([]);
   const activeParamsRef = useRef({
     accountId,
     costMethod,
@@ -167,7 +183,7 @@ export function usePortfolioProjectionSession({
     riskFallbackMessage,
     eventType,
     appliedEventFilters,
-    eventPage,
+    eventPageForScope,
     eventRefreshKey,
   });
   activeParamsRef.current = {
@@ -177,7 +193,7 @@ export function usePortfolioProjectionSession({
     riskFallbackMessage,
     eventType,
     appliedEventFilters,
-    eventPage,
+    eventPage: eventPageForScope,
     eventRefreshKey,
   };
 
@@ -199,6 +215,14 @@ export function usePortfolioProjectionSession({
     && fxRequestRef.current.scopeKey === request.scopeKey
   ), []);
 
+  const terminateExactEventQuery = useCallback((key: readonly unknown[]) => {
+    void queryClient.cancelQueries(
+      { queryKey: key, exact: true },
+      PORTFOLIO_PROJECTION_CANCEL,
+    );
+    queryClient.removeQueries({ queryKey: key, exact: true });
+  }, [queryClient]);
+
   const invalidateEventRequest = useCallback(() => {
     eventFenceRef.current += 1;
     eventRequestRef.current = {
@@ -206,16 +230,27 @@ export function usePortfolioProjectionSession({
       accountScopeKey: activeAccountScopeRef.current,
       requestId: eventRequestRef.current.requestId + 1,
     };
-    void queryClient.cancelQueries(
-      { queryKey: eventsQueryKeyRef.current, exact: true },
-      PORTFOLIO_PROJECTION_CANCEL,
-    );
-  }, [queryClient]);
+    // Never silent-cancel the live observer key here: Query 5 returns the
+    // pending retryer and skips error dispatch, so fetchStatus sticks unless a
+    // same-key successor or exact-key removeQueries follows. Key-changing
+    // transitions rely on the observer layout cleanup. Off-key fetchQuery
+    // (paper-trade page-1 while cash is current) must be exact-removed now.
+    const observerKey = eventsQueryKeyRef.current;
+    const remaining: Array<readonly unknown[]> = [];
+    inFlightEventQueryKeysRef.current.forEach((key) => {
+      if (queryKeysEqual(key, observerKey)) {
+        remaining.push(key);
+        return;
+      }
+      terminateExactEventQuery(key);
+    });
+    inFlightEventQueryKeysRef.current = remaining;
+  }, [terminateExactEventQuery]);
 
   const activeEventTypeRef = useRef(eventType);
-  const eventPageRef = useRef(eventPage);
+  const eventPageRef = useRef(eventPageForScope);
   activeEventTypeRef.current = eventType;
-  eventPageRef.current = eventPage;
+  eventPageRef.current = eventPageForScope;
 
   const transitionEventQuery = useCallback((
     nextEventType: PortfolioEventType,
@@ -273,7 +308,7 @@ export function usePortfolioProjectionSession({
       const startedAt = eventFenceRef.current;
       const startedAccountId = accountId;
       const startedEventType = eventType;
-      const startedPage = eventPage;
+      const startedPage = eventPageForScope;
       const startedRefreshKey = eventRefreshKey;
       const startedFilters = appliedEventFilters;
       return fetchPortfolioEvents({
@@ -316,10 +351,21 @@ export function usePortfolioProjectionSession({
     };
   }, [eventsQueryKey, queryClient]);
 
-  useLayoutEffect(() => () => {
-    snapshotFenceRef.current += 1;
-    eventFenceRef.current += 1;
-  }, []);
+  useLayoutEffect(() => {
+    const client = queryClient;
+    return () => {
+      snapshotFenceRef.current += 1;
+      eventFenceRef.current += 1;
+      inFlightEventQueryKeysRef.current.forEach((key) => {
+        void client.cancelQueries(
+          { queryKey: key, exact: true },
+          PORTFOLIO_PROJECTION_CANCEL,
+        );
+        client.removeQueries({ queryKey: key, exact: true });
+      });
+      inFlightEventQueryKeysRef.current = [];
+    };
+  }, [queryClient]);
 
   const loadSnapshotAndRiskForActiveScope = useCallback(async (
     showLoading: boolean,
@@ -376,6 +422,13 @@ export function usePortfolioProjectionSession({
       }
       return { snapshotAccepted: false, riskAccepted: false };
     } finally {
+      if (!queryKeysEqual(key, snapshotQueryKeyRef.current)) {
+        void queryClient.cancelQueries(
+          { queryKey: key, exact: true },
+          PORTFOLIO_PROJECTION_CANCEL,
+        );
+        queryClient.removeQueries({ queryKey: key, exact: true });
+      }
       if (showLoading && snapshotLoadingOwnerRef.current === request) {
         snapshotLoadingOwnerRef.current = null;
         setIsLoading(false);
@@ -416,6 +469,7 @@ export function usePortfolioProjectionSession({
       scope.eventRefreshKey,
     );
     setEventError(null);
+    inFlightEventQueryKeysRef.current = [...inFlightEventQueryKeysRef.current, key];
 
     try {
       await queryClient.cancelQueries(
@@ -448,17 +502,24 @@ export function usePortfolioProjectionSession({
         setEventError(getParsedApiError(eventLoadError));
       }
       return false;
+    } finally {
+      inFlightEventQueryKeysRef.current = inFlightEventQueryKeysRef.current.filter(
+        (item) => !queryKeysEqual(item, key),
+      );
+      if (!queryKeysEqual(key, eventsQueryKeyRef.current)) {
+        terminateExactEventQuery(key);
+      }
     }
-  }, [accountScopeKey, isActiveEventRequest, queryClient]);
+  }, [accountScopeKey, isActiveEventRequest, queryClient, terminateExactEventQuery]);
 
   const activeProjectionRef = useRef({
-    eventPage,
+    eventPage: eventPageForScope,
     loadAccounts,
     loadEventsPage,
     loadSnapshotAndRisk,
   });
   activeProjectionRef.current = {
-    eventPage,
+    eventPage: eventPageForScope,
     loadAccounts,
     loadEventsPage,
     loadSnapshotAndRisk,
@@ -615,21 +676,28 @@ export function usePortfolioProjectionSession({
     setFxRefreshFeedback(null);
   }, [snapshotScopeKey]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
+    // Reset ledger page before page-owned URL clamp effects run. A useEffect
+    // reset left eventPage=2 with eventLoading=false (Query fetch not started
+    // yet), so PortfolioWorkspace writeParams reordered `keep=yes`.
     transitionEventQuery(activeEventTypeRef.current, 1);
   }, [accountId, transitionEventQuery]);
 
-  const snapshot: PortfolioSnapshotResponse | null = snapshotQuery.isError
+  const snapshotQueryFailed = snapshotQuery.isError && !isCancelledError(snapshotQuery.error);
+  const snapshot: PortfolioSnapshotResponse | null = snapshotQueryFailed
     ? null
     : (snapshotQuery.data?.snapshot ?? null);
-  const risk: PortfolioRiskResponse | null = snapshotQuery.isError
+  const risk: PortfolioRiskResponse | null = snapshotQueryFailed
     ? null
     : (snapshotQuery.data?.risk ?? null);
-  const riskWarning = snapshotQuery.isFetching || snapshotQuery.isError
+  const riskWarning = snapshotQuery.isFetching || snapshotQueryFailed
     ? null
     : (snapshotQuery.data?.riskWarning ?? null);
 
-  const totalEventPages = Math.max(1, Math.ceil(eventTotal / PORTFOLIO_PROJECTION_DEFAULT_PAGE_SIZE));
+  const projectedEventTotal = eventsQuery.isSuccess && eventsQuery.data !== undefined
+    ? eventsQuery.data.total
+    : eventTotal;
+  const totalEventPages = Math.max(1, Math.ceil(projectedEventTotal / PORTFOLIO_PROJECTION_DEFAULT_PAGE_SIZE));
   const currentEventCount = eventType === 'trade'
     ? tradeEvents.length
     : eventType === 'cash'
@@ -659,11 +727,11 @@ export function usePortfolioProjectionSession({
     setEventDirection,
     eventActionType,
     setEventActionType,
-    eventPage,
+    eventPage: eventPageForScope,
     setEventPage,
     totalEventPages,
     currentEventCount,
-    eventLoading: eventsQuery.isFetching,
+    eventLoading: eventsQuery.isPending || eventsQuery.isFetching,
     eventError,
     setEventError,
     tradeEvents,

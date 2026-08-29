@@ -94,6 +94,10 @@ export function buildPortfolioProjectionEventsQueryKey(
   ] as const;
 }
 
+/**
+ * Silent CancelledError skips Query error dispatch and leaves fetchStatus
+ * fetching until a same-key successor fetch or exact-key removeQueries.
+ */
 export function throwIfProjectionCancelled(signal: AbortSignal | undefined, stillActive: boolean): void {
   if (signal?.aborted || !stillActive) {
     throw new CancelledError(PORTFOLIO_PROJECTION_CANCEL);
