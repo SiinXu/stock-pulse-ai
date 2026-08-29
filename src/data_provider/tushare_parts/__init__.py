@@ -10,5 +10,6 @@ Owned domains:
 - ``client`` — HTTP client, URL resolve, and rate-limit wrappers
 - ``symbols`` — ETF/US classifiers and ts_code conversion
 - ``history`` — daily/history fetch and normalize methods
+- ``stock_identity`` — stock-name lookup and A-share stock-list methods
 - ``facade_bind`` — ADR-006 clone/bind helpers
 """

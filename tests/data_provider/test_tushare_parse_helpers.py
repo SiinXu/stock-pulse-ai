@@ -18,6 +18,7 @@ from src.data_provider.tushare_fetcher import (
     _ETF_SZ_PREFIXES,
     _EXPECTED_CLIENT_METHOD_NAMES,
     _EXPECTED_HISTORY_METHOD_NAMES,
+    _EXPECTED_STOCK_IDENTITY_METHOD_NAMES,
     _EXPECTED_SYMBOL_METHOD_NAMES,
     _TUSHARE_DEFAULT_API_URL,
     _TushareHttpClient,
@@ -25,7 +26,7 @@ from src.data_provider.tushare_fetcher import (
     _is_us_code,
     _resolve_tushare_api_url,
 )
-from src.data_provider.tushare_parts import client, symbols
+from src.data_provider.tushare_parts import client, stock_identity, symbols
 
 
 def test_symbol_and_client_helpers_match_facade_and_parts_identity() -> None:
@@ -75,6 +76,7 @@ def test_facade_rebound_methods_keep_tushare_fetcher_module() -> None:
         *_EXPECTED_CLIENT_METHOD_NAMES,
         *_EXPECTED_SYMBOL_METHOD_NAMES,
         *_EXPECTED_HISTORY_METHOD_NAMES,
+        *_EXPECTED_STOCK_IDENTITY_METHOD_NAMES,
     )
     for name in required:
         bound = getattr(TushareFetcher, name)
@@ -99,6 +101,15 @@ def test_frozen_expected_names_match_bound_inventory() -> None:
         "_fetch_raw_data",
         "_normalize_data",
     )
+    assert _EXPECTED_STOCK_IDENTITY_METHOD_NAMES == (
+        "get_stock_name",
+        "get_stock_list",
+    )
+    assert tuple(
+        name
+        for name, descriptor in vars(stock_identity._StockIdentityMethods).items()
+        if not name.startswith("__") and callable(descriptor)
+    ) == _EXPECTED_STOCK_IDENTITY_METHOD_NAMES
 
 
 def test_convert_stock_code_rejects_us_via_facade_class() -> None:
@@ -135,7 +146,10 @@ def test_importlib_reload_keeps_public_surface() -> None:
     assert reloaded.TushareFetcher is not None
     assert callable(reloaded.TushareFetcher._fetch_raw_data)
     assert callable(reloaded.TushareFetcher.get_stock_name)
+    assert callable(reloaded.TushareFetcher.get_stock_list)
     assert reloaded._TushareHttpClient is reloaded._client_module._TushareHttpClient
+    assert reloaded.TushareFetcher.get_stock_name.__module__ == "src.data_provider.tushare_fetcher"
+    assert reloaded.TushareFetcher.get_stock_list.__module__ == "src.data_provider.tushare_fetcher"
     with patch.object(reloaded.TushareFetcher, "_init_api", return_value=None):
         fetcher = reloaded.TushareFetcher()
     assert fetcher.name == "TushareFetcher"
