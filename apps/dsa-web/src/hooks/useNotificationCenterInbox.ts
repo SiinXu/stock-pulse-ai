@@ -22,6 +22,9 @@ export const NOTIFICATION_CENTER_LIST_QUERY_KEY_ROOT = [
   'list',
 ] as const;
 
+/** Readonly query-key tuple. `readonly unknown[][]` is ReadonlyArray<unknown[]>, not this. */
+type NotificationCenterListQueryKey = readonly unknown[];
+
 export const NOTIFICATION_CENTER_PAGE_SIZE = 50;
 
 /** Previous page effect never retried, never polled, never focus-refetched, and always called axios offline. */
@@ -58,7 +61,7 @@ export function buildNotificationCenterListQueryKey(
   kind: '' | NotificationInboxKind,
   unreadOnly: boolean,
   cursor?: string,
-): readonly unknown[] {
+): NotificationCenterListQueryKey {
   return [
     ...NOTIFICATION_CENTER_LIST_QUERY_KEY_ROOT,
     kind || 'all',
@@ -85,7 +88,10 @@ function isCancelledError(error: unknown): boolean {
   return error instanceof CancelledError;
 }
 
-function sameQueryKey(left: readonly unknown[], right: readonly unknown[]): boolean {
+function sameQueryKey(
+  left: NotificationCenterListQueryKey,
+  right: NotificationCenterListQueryKey,
+): boolean {
   return left.length === right.length && left.every((item, index) => item === right[index]);
 }
 
@@ -134,11 +140,11 @@ export function useNotificationCenterInbox(): UseNotificationCenterInboxResult {
   const requestIdRef = useRef(0);
   const kindRef = useRef(kind);
   const readFilterRef = useRef(readFilter);
-  const liveKeysRef = useRef<readonly unknown[][]>([]);
+  const liveKeysRef = useRef<NotificationCenterListQueryKey[]>([]);
   kindRef.current = kind;
   readFilterRef.current = readFilter;
 
-  const discardExactQuery = useCallback((key: readonly unknown[]) => {
+  const discardExactQuery = useCallback((key: NotificationCenterListQueryKey) => {
     const client = queryClientRef.current;
     void client.cancelQueries(
       { queryKey: key, exact: true },
@@ -149,7 +155,7 @@ export function useNotificationCenterInbox(): UseNotificationCenterInboxResult {
   }, []);
 
   const discardLiveKeys = useCallback((
-    predicate: (key: readonly unknown[]) => boolean,
+    predicate: (key: NotificationCenterListQueryKey) => boolean,
   ) => {
     for (const live of [...liveKeysRef.current]) {
       if (predicate(live)) discardExactQuery(live);
