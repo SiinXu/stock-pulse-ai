@@ -314,6 +314,61 @@ class _FailingCompletionAudit(SecurityAuditRecorderStub):
         raise SecurityAuditUnavailable()
 
 
+def test_settings_query_unknown_id_returns_none(tmp_path: Path) -> None:
+    manager, _, _ = _manager(tmp_path)
+    assert manager.settings_schema("missing-plugin") is None
+    assert manager.settings_values("missing-plugin") is None
+
+
+def test_settings_query_returns_schema_defaults_and_overrides(tmp_path: Path) -> None:
+    manager, _, _ = _manager(tmp_path)
+    schema = manager.settings_schema("configurable-plugin")
+    assert schema is not None
+    assert [field.key for field in schema] == [
+        "threshold",
+        "mode",
+        "enabled",
+        "api_token",
+    ]
+    assert manager.settings_values("configurable-plugin") == {
+        "threshold": 0.5,
+        "mode": "safe",
+        "enabled": True,
+    }
+    created = manager.update_settings("configurable-plugin", _valid_values())
+    assert created.success is True
+    assert manager.settings_values("configurable-plugin") == {
+        "threshold": 0.8,
+        "mode": "fast",
+        "enabled": False,
+        "api_token": "super-secret-token",
+    }
+
+
+def test_settings_query_ignores_invalid_persisted_value(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    manager, _, _ = _manager(tmp_path)
+    manager.settings_store.replace(
+        "configurable-plugin",
+        {"threshold": 99.0, "mode": "safe", "enabled": True},
+    )
+    with caplog.at_level("WARNING"):
+        values = manager.settings_values("configurable-plugin")
+    assert values == {
+        "threshold": 0.5,
+        "mode": "safe",
+        "enabled": True,
+    }
+    assert any(
+        record.levelname == "WARNING"
+        and getattr(record, "error_code", None)
+        == "plugin_setting_persisted_value_invalid"
+        for record in caplog.records
+    )
+
+
 def test_update_settings_unknown_plugin_raises_key_error(tmp_path: Path) -> None:
     manager, _, _ = _manager(tmp_path)
     with pytest.raises(KeyError) as exc:

@@ -384,9 +384,11 @@ def test_extracted_permission_helpers_match_manager_decisions() -> None:
         manager._supported_api_versions,
     ) == "plugin_manifest_invalid"
     assert issubclass(PluginManager, PluginLifecycleMixin)
+    from src.plugins.settings_query import PluginSettingsQueryMixin
     from src.plugins.settings_update import PluginSettingsUpdateMixin
 
     assert issubclass(PluginManager, PluginSettingsUpdateMixin)
+    assert issubclass(PluginManager, PluginSettingsQueryMixin)
     assert load_time_permission_error(manifest=ok, registrations=()) is None
 
 
@@ -415,6 +417,7 @@ def test_split_modules_remain_internal_host_details() -> None:
     assert "compatibility_error" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginLifecycleMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginSettingsUpdateMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "PluginSettingsQueryMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "select_load_ids" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginState" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
@@ -442,6 +445,30 @@ def test_settings_update_mixin_owner_stays_internal() -> None:
     assert "PluginSettingsUpdateMixin" not in getattr(plugins_root, "__all__", ())
 
 
+def test_settings_query_mixin_owner_stays_internal() -> None:
+    from src.plugins.lifecycle import PluginLifecycleMixin
+    from src.plugins.settings_query import PluginSettingsQueryMixin
+    from src.plugins.settings_update import PluginSettingsUpdateMixin
+    from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+
+    assert issubclass(PluginManager, PluginSettingsQueryMixin)
+    assert PluginManager.__bases__ == (
+        PluginSettingsUpdateMixin,
+        PluginSettingsQueryMixin,
+        PluginLifecycleMixin,
+    )
+    assert PluginSettingsQueryMixin.__module__ == "src.plugins.settings_query"
+    assert PluginManager.settings_schema.__module__ == "src.plugins.settings_query"
+    assert PluginManager.settings_values.__module__ == "src.plugins.settings_query"
+    assert PluginManager.__module__ == "src.plugins.manager"
+    assert PluginManager.settings_schema is PluginSettingsQueryMixin.settings_schema
+    assert PluginManager.settings_values is PluginSettingsQueryMixin.settings_values
+    assert "PluginSettingsQueryMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert not hasattr(plugins_root, "PluginSettingsQueryMixin")
+    assert "PluginSettingsQueryMixin" not in manager_mod.__all__
+    assert "PluginSettingsQueryMixin" not in getattr(plugins_root, "__all__", ())
+
+
 def test_lifecycle_and_manager_import_in_either_order() -> None:
     import os
     import subprocess
@@ -459,17 +486,25 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
         "assert issubclass(\n"
         "    manager.PluginManager, settings_update.PluginSettingsUpdateMixin\n"
         ")\n"
+        "assert issubclass(\n"
+        "    manager.PluginManager, settings_query.PluginSettingsQueryMixin\n"
+        ")\n"
         "assert manager.PluginState is loader.PluginState\n"
         "assert get_type_hints(loader.ExternalPluginResult)['state'] "
         "== manager.PluginState | None\n"
         "assert manager.PluginManager.update_settings is "
         "settings_update.PluginSettingsUpdateMixin.update_settings\n"
+        "assert manager.PluginManager.settings_schema is "
+        "settings_query.PluginSettingsQueryMixin.settings_schema\n"
+        "assert manager.PluginManager.settings_values is "
+        "settings_query.PluginSettingsQueryMixin.settings_values\n"
     )
     scripts = (
         (
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.manager as manager\n"
             "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -477,6 +512,23 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.manager as manager\n"
             "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.loader as loader\n"
+        )
+        + assertions,
+        (
+            "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.manager as manager\n"
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.loader as loader\n"
+        )
+        + assertions,
+        (
+            "import src.plugins.manager as manager\n"
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
