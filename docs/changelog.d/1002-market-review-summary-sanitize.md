@@ -1,0 +1,1 @@
+- [Fixed] Market-review history list and detail cards now show a persisted short summary, or a sanitized plain-text excerpt when older rows lack one, without changing stored Markdown or the full report download (Refs #1002).
