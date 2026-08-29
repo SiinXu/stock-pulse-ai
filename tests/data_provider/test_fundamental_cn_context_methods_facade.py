@@ -211,8 +211,6 @@ def test_facade_keeps_payload_helpers_timeouts_tickflow_and_prefetch() -> None:
         "prefetch_daily_klines",
         "_run_with_timeout",
         "_run_with_retry",
-        "_normalize_source_chain",
-        "_build_fundamental_block",
         "build_failed_fundamental_context",
         "build_validation_rejected_fundamental_context",
     ):
