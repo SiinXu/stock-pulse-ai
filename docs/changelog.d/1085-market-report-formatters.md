@@ -1,0 +1,1 @@
+- [Changed] Extracted pure market-review text and number formatters from `src/market/analyzer.py` into `src/market/formatters.py` without changing report text, prompt text, or public analyzer signatures (Refs #1085).
