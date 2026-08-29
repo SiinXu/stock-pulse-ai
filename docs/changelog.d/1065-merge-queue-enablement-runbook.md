@@ -1,0 +1,1 @@
+- [Docs] Document the maintainer-only steps and rollback order for activating the dormant `merge_group` CI path, and guard the documented required-check names against workflow drift (Refs #1065).

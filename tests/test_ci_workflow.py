@@ -9,6 +9,7 @@ import yaml
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW_PATH = REPOSITORY_ROOT / ".github" / "workflows" / "ci.yml"
+CI_GATE_DOC_PATH = REPOSITORY_ROOT / "docs" / "testing-ci-gate.md"
 FRONTEND_EXECUTION_CONDITION = (
     "${{ needs.ai-governance.result == 'success' && "
     "needs.changes.result == 'success' && "
@@ -155,6 +156,31 @@ def test_required_check_display_names_and_job_ids_are_unchanged() -> None:
         assert jobs[job_id]["name"] == display_name
     assert jobs["backend-gate"]["name"] == jobs["backend-gate-main"]["name"] == "backend-gate"
     assert jobs["python-minimum"]["name"] == "python-minimum"
+
+
+def test_merge_queue_enablement_doc_lists_the_current_required_check_names() -> None:
+    """The documented queue setup must name checks that ci.yml still publishes.
+
+    A merge queue blocks on required contexts that never report, so a stale name
+    in the maintainer runbook would hang the queue instead of failing a job.
+    """
+    doc = CI_GATE_DOC_PATH.read_text(encoding="utf-8")
+    section = doc.split("### Enabling the merge queue (maintainer-only, later step)", 1)
+    assert len(section) == 2, "merge queue enablement runbook is missing"
+    # Stop at the next heading of any level so a sibling section's bullets can
+    # never satisfy or break the context-name assertions below.
+    body = re.split(r"\n#{1,6} ", section[1], maxsplit=1)[0]
+
+    documented = re.findall(r"^   - `([^`]+)`$", body, flags=re.MULTILINE)
+    assert documented == sorted(set(documented), key=documented.index), documented
+    assert set(documented) == set(REQUIRED_CHECK_DISPLAY_NAMES.values())
+    assert len(documented) == 8
+
+    # Reverting the workflow before the ruleset would strand queued pull requests.
+    assert "disable the Require merge queue rule first" in body
+    assert "no merge queue is enabled on this" in body
+    # Organization ownership is why the path stays dormant here; keep it stated.
+    assert "owned by a GitHub organization" in body
 
 
 def test_backend_gate_pr_is_selective() -> None:
