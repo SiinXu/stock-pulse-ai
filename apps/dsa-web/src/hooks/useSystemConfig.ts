@@ -1,6 +1,13 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { CancelledError, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { systemConfigApi, SystemConfigConflictError, SystemConfigValidationError } from '../api/systemConfig';
+import {
+  SYSTEM_CONFIG_LOAD_QUERY_KEY,
+  SYSTEM_CONFIG_LOAD_QUERY_SCHEDULE,
+  discardSystemConfigLoadQuery,
+  fetchSystemConfigLoad,
+} from './useSystemConfigLoadQuery';
 import type {
   ConfigConflictField,
   ConfigConflictState,
@@ -75,7 +82,14 @@ function normalizeFieldValue(value: string, schema: SystemConfigItem['schema'] |
     .join(',');
 }
 
+function isCancelledError(error: unknown): boolean {
+  return error instanceof CancelledError;
+}
+
 export function useSystemConfig(initialTab?: { category: string; subCategory: string | null }) {
+  const queryClient = useQueryClient();
+  const queryClientRef = useRef(queryClient);
+  queryClientRef.current = queryClient;
   const { language, t } = useUiLanguage();
   const syncPriceDirection = usePriceDirectionSync();
   // Server state
@@ -334,6 +348,15 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     }
   }, [applyServerSnapshot, beginServerSnapshotRequest]);
 
+  const discardLoadQuery = useCallback(() => {
+    discardSystemConfigLoadQuery(queryClientRef.current);
+  }, []);
+
+  useEffect(() => () => {
+    loadRequestIdRef.current += 1;
+    discardLoadQuery();
+  }, [discardLoadQuery]);
+
   const load = useCallback(async (): Promise<boolean> => {
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
@@ -342,8 +365,18 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
     setLoadError(null);
     setRetryAction(null);
 
+    // Same-key load must cancel+remove before fetchQuery (Query 5 joins a cancelled retryer).
+    discardLoadQuery();
+
     try {
-      const config = await systemConfigApi.getConfig(true);
+      const config = await queryClientRef.current.fetchQuery({
+        queryKey: SYSTEM_CONFIG_LOAD_QUERY_KEY,
+        queryFn: ({ signal }) => fetchSystemConfigLoad({
+          signal,
+          stillActive: () => loadRequestIdRef.current === requestId,
+        }),
+        ...SYSTEM_CONFIG_LOAD_QUERY_SCHEDULE,
+      });
       if (loadRequestIdRef.current !== requestId) {
         return false;
       }
@@ -357,6 +390,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
       if (
         loadRequestIdRef.current !== requestId
         || serverSnapshotEpochRef.current !== snapshotEpoch
+        || isCancelledError(error)
       ) {
         return false;
       }
@@ -368,7 +402,7 @@ export function useSystemConfig(initialTab?: { category: string; subCategory: st
         setIsLoading(false);
       }
     }
-  }, [applyServerSnapshot, beginServerSnapshotRequest]);
+  }, [applyServerSnapshot, beginServerSnapshotRequest, discardLoadQuery]);
 
   const resetDraft = useCallback(() => {
     const next: Record<string, string> = {};

@@ -1,0 +1,1 @@
+- [Changed] Schedule Settings system-config loads through TanStack Query (Refs #789).

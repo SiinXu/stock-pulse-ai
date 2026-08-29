@@ -34,4 +34,10 @@ describe('Query consumer hosts', () => {
     expect(read('src/pages/__tests__/NotificationCenterPage.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useNotificationCenterInbox.test.tsx')).toContain('createAppQueryClient');
   });
+
+  it('wraps useSystemConfig hook tests with the production retry-free client', () => {
+    expect(read('src/hooks/__tests__/useSystemConfig.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useSystemConfig.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useSystemConfigLoadQuery.test.tsx')).toContain('createAppQueryClient');
+  });
 });
