@@ -1,0 +1,1 @@
+- [Changed] Extract DataFetcherManager stock-name bulk/prefetch into the existing stock-name owner behind the ADR-006 facade.
