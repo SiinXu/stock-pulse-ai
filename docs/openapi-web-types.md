@@ -182,6 +182,20 @@ Additional modules completed in the remaining-module batch:
   `PortfolioHealthResponse`; this is not the auth export-alias pattern),
   `eventCalendar` (alert-trigger list composition)
 
+`apps/dsa-web/src/types/portfolioInsights.ts` now CamelizeKeys-binds the four
+generated response components (`PortfolioLevelAnalysisResponse`,
+`StressScenarioListResponse`, `PortfolioStressTestResponse`,
+`PortfolioRebalancingResponse`) plus nested shock, scenario, and impact
+schemas. `Override` preserves today's public required arrays, literals
+(`autoExecute: false`, `isSuggestionOnly: true`), and the narrow
+`StressPositionImpact` / assumptions projections; extra generated keys are
+optional only. This is **not** the auth export-alias pattern: generated
+snake_case is not the UI type. Request types (`PortfolioBasketRequest`,
+`PortfolioStressPresetQuery`, `PortfolioStressCustomRequest`,
+`PortfolioRebalanceQuery`) stay handwritten optional because OpenAPI marks
+defaulted fields required. Runtime Zod in `api/portfolioInsights.ts` is
+unchanged.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),

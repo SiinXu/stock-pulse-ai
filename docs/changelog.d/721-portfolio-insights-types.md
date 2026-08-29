@@ -1,0 +1,1 @@
+- [Chore] Bind Web portfolio-insights camelCase types to generated OpenAPI response components (Refs #721).
