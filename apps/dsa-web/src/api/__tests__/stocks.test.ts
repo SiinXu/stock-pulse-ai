@@ -2,10 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import apiClient from '../index';
 import { stocksApi } from '../stocks';
 import { getParsedApiError, isApiRequestError } from '../error';
+import * as parseCamelCasePayloadModule from '../parseCamelCasePayload';
+import { toCamelCase } from '../utils';
 
 vi.mock('../index', () => ({ default: { get: vi.fn(), post: vi.fn() } }));
 
 const mockGet = vi.mocked(apiClient.get);
+const mockPost = vi.mocked(apiClient.post);
 
 describe('stocksApi.getQuote', () => {
   beforeEach(() => mockGet.mockReset());
@@ -190,5 +193,161 @@ describe('stocksApi.getDailyHistory', () => {
       expect(parsed.title).toBe('响应校验失败');
       return true;
     });
+  });
+});
+
+const imageFile = () => new File(['png'], 'shot.png', { type: 'image/png' });
+const importFile = () => new File(['AAPL'], 'codes.csv', { type: 'text/csv' });
+
+const extractCallers = [
+  { name: 'extractFromImage', call: () => stocksApi.extractFromImage(imageFile()) },
+  { name: 'parseImport file', call: () => stocksApi.parseImport(importFile()) },
+  { name: 'parseImport text', call: () => stocksApi.parseImport(undefined, 'AAPL MSFT') },
+] as const;
+
+function validExtractPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    codes: ['AAPL', '600519'],
+    items: [
+      { code: 'AAPL', name: 'Apple', confidence: 'high' },
+      { code: '600519', name: 'Kweichow Moutai', confidence: 'medium' },
+    ],
+    raw_text: 'llm raw',
+    ...overrides,
+  };
+}
+
+function expectExtractValidationFailed(error: unknown): boolean {
+  expect(isApiRequestError(error)).toBe(true);
+  const parsed = getParsedApiError(error);
+  expect(parsed.code).toBe('api_response_validation_failed');
+  expect(parsed.message).toContain('ExtractFromImageResponse');
+  return true;
+}
+
+describe('stocksApi.extractFromImage and parseImport', () => {
+  beforeEach(() => mockPost.mockReset());
+
+  it.each(extractCallers)(
+    '$name preserves extra keys and the camelCase object identity after parse',
+    async ({ call }) => {
+      const spy = vi.spyOn(parseCamelCasePayloadModule, 'parseCamelCasePayload');
+      const payload = validExtractPayload({ unexpected_server_field: 'keep-me' });
+      mockPost.mockResolvedValueOnce({ data: payload });
+      const result = await call();
+      expect(result).toEqual(toCamelCase(payload));
+      expect(result.codes).toEqual(['AAPL', '600519']);
+      expect(result.rawText).toBe('llm raw');
+      expect((result as { unexpectedServerField?: string }).unexpectedServerField).toBe('keep-me');
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(result).toBe(spy.mock.results[0]?.value);
+      spy.mockRestore();
+    },
+  );
+
+  it.each(extractCallers)(
+    '$name rejects omitted required codes ({}) as the live codes ?? [] counterexample',
+    async ({ call }) => {
+      mockPost.mockResolvedValueOnce({ data: {} });
+      await expect(call()).rejects.toSatisfy(expectExtractValidationFailed);
+    },
+  );
+
+  it.each(extractCallers)(
+    '$name rejects omitted required codes when only items is present',
+    async ({ call }) => {
+      mockPost.mockResolvedValueOnce({ data: { items: [] } });
+      await expect(call()).rejects.toSatisfy(expectExtractValidationFailed);
+    },
+  );
+
+  it.each([
+    { codes: null },
+    { codes: 'AAPL' },
+  ])('rejects non-array codes %o on extract and import', async (override) => {
+    const payload = validExtractPayload(override);
+    for (const { call } of extractCallers) {
+      mockPost.mockResolvedValueOnce({ data: payload });
+      await expect(call()).rejects.toSatisfy(expectExtractValidationFailed);
+    }
+  });
+
+  it.each(extractCallers)(
+    '$name rejects present items that is not an array',
+    async ({ call }) => {
+      mockPost.mockResolvedValueOnce({ data: validExtractPayload({ items: { code: 'AAPL' } }) });
+      await expect(call()).rejects.toSatisfy(expectExtractValidationFailed);
+      mockPost.mockResolvedValueOnce({ data: validExtractPayload({ items: null }) });
+      await expect(call()).rejects.toSatisfy(expectExtractValidationFailed);
+    },
+  );
+
+  it.each(extractCallers)(
+    '$name accepts legal empty codes: []',
+    async ({ call }) => {
+      mockPost.mockResolvedValueOnce({ data: { codes: [] } });
+      const result = await call();
+      expect(result.codes).toEqual([]);
+      expect(result.items).toBeUndefined();
+      expect(result.rawText).toBeUndefined();
+    },
+  );
+
+  it.each(extractCallers)(
+    '$name accepts omitted optional items and raw_text',
+    async ({ call }) => {
+      mockPost.mockResolvedValueOnce({ data: { codes: ['AAPL'] } });
+      const result = await call();
+      expect(result).toEqual({ codes: ['AAPL'] });
+    },
+  );
+
+  it.each(extractCallers)(
+    '$name accepts raw_text: null as rawText: null',
+    async ({ call }) => {
+      mockPost.mockResolvedValueOnce({ data: { codes: ['AAPL'], raw_text: null } });
+      const result = await call();
+      expect(result.rawText).toBeNull();
+      expect(result.codes).toEqual(['AAPL']);
+    },
+  );
+
+  it('posts extract FormData with the 60s vision timeout', async () => {
+    const file = imageFile();
+    mockPost.mockResolvedValueOnce({ data: { codes: ['AAPL'] } });
+    await stocksApi.extractFromImage(file);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [path, body, options] = mockPost.mock.calls[0] as [string, FormData, Record<string, unknown>];
+    expect(path).toBe('/api/v1/stocks/extract-from-image');
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get('file')).toBe(file);
+    expect(options).toEqual({
+      headers: { 'Content-Type': undefined },
+      timeout: 60000,
+    });
+  });
+
+  it('posts parseImport multipart file to /api/v1/stocks/parse-import', async () => {
+    const file = importFile();
+    mockPost.mockResolvedValueOnce({ data: { codes: ['AAPL'] } });
+    await stocksApi.parseImport(file);
+    expect(mockPost).toHaveBeenCalledTimes(1);
+    const [path, body, options] = mockPost.mock.calls[0] as [string, FormData, Record<string, unknown>];
+    expect(path).toBe('/api/v1/stocks/parse-import');
+    expect(body).toBeInstanceOf(FormData);
+    expect(body.get('file')).toBe(file);
+    expect(options).toEqual({ headers: { 'Content-Type': undefined } });
+  });
+
+  it('posts parseImport JSON text to /api/v1/stocks/parse-import', async () => {
+    mockPost.mockResolvedValueOnce({ data: { codes: ['AAPL'] } });
+    await stocksApi.parseImport(undefined, 'AAPL MSFT');
+    expect(mockPost).toHaveBeenCalledWith('/api/v1/stocks/parse-import', { text: 'AAPL MSFT' });
+  });
+
+  it('throws before network when parseImport is missing file and text', async () => {
+    await expect(stocksApi.parseImport()).rejects.toThrow('请提供文件或粘贴文本');
+    await expect(stocksApi.parseImport(undefined, '')).rejects.toThrow('请提供文件或粘贴文本');
+    expect(mockPost).not.toHaveBeenCalled();
   });
 });
