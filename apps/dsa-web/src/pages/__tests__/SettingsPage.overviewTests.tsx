@@ -38,7 +38,7 @@ export function registerSettingsPageOverviewTests(): void {
 
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     expect(screen.getByRole('heading', { level: 1, name: '系统设置' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 2, name: 'Token 用量监控' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '用量与成本' }))
       .toHaveAttribute('aria-current', 'page');
     expect(useSystemConfigMock).toHaveBeenCalled();
