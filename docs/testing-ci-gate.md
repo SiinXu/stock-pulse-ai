@@ -43,6 +43,42 @@ Local full gate remains:
 ./scripts/ci_gate.sh offline-tests
 ```
 
+### Enabling the merge queue (maintainer-only, later step)
+
+`ci.yml` already answers `merge_group` `checks_requested`, but no merge queue is enabled on this
+repository and no hosted `merge_group` run has ever been produced.
+
+**Eligibility precondition: the repository must be owned by a GitHub organization.** GitHub exposes
+the **Require merge queue** ruleset rule only for organization-owned repositories, so on a
+personal-account repository the rule does not exist to enable. This repository is owned by a
+personal account, which is why the queue cannot be turned on today and the `merge_group` path stays
+dormant and unproven on hosted runners. Moving the repository under an organization is therefore a
+prerequisite for every step below. The steps are repository-admin actions, not code changes, and
+they are the only thing left to activate the path.
+
+1. Open **Settings -> Rules -> Rulesets -> `Protect main with required CI`**.
+2. Add the **Require merge queue** rule and keep merge method, build concurrency, and grouping at
+   GitHub's defaults.
+3. Leave the required status checks exactly as they are. The queue reuses the same eight contexts,
+   which are the `ci.yml` job display names:
+
+   - `🔎 Change Detection`
+   - `ai-governance`
+   - `backend-gate`
+   - `python-minimum`
+   - `pydanticai-installed`
+   - `docker-build`
+   - `openapi-types-gate`
+   - `web-gate`
+
+4. Queue one low-risk pull request and confirm the resulting `merge_group` run scheduled four
+   `backend-tests` shards, the `backend-gate` coverage combine, and four `python-minimum-tests`
+   shards.
+
+Rollback order matters: **disable the Require merge queue rule first**, then revert the workflow
+change. Reverting files in this repository does not undo a remote ruleset, and a required context
+that stops reporting on `merge_group` leaves queued pull requests stuck instead of failing fast.
+
 ## Default offline selection
 
 ```bash
