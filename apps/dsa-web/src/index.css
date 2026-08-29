@@ -58,7 +58,6 @@
   --home-shadow-deep: 220 18% 8%;
   --home-cool-surface: 214 36% 97%;
   --home-cool-surface-strong: 214 38% 97%;
-  --portfolio-control-border: 218 22% 82%;
 
   --color-success: 118 50% 42%;
   --color-warning: 50 90% 42%;
@@ -359,7 +358,6 @@
   --home-shadow-deep: 220 18% 8%;
   --home-cool-surface: 72 4% 13%;
   --home-cool-surface-strong: 60 3% 8%;
-  --portfolio-control-border: 75 4% 20%;
   --color-success: 118 50% 72%;
   --color-warning: 50 88% 72%;
   --color-danger: 350 89% 72%;
@@ -1316,7 +1314,7 @@ a {
 }
 
 :root:not(.dark) .portfolio-page .btn-secondary:not(:disabled) {
-  border-color: hsl(var(--portfolio-control-border) / 0.92);
+  border-color: hsl(var(--foreground) / 0.2);
 }
 
 :root:not(.dark) .portfolio-page .btn-secondary:hover:not(:disabled) {

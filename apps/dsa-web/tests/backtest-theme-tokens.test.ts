@@ -65,8 +65,8 @@ describe('backtest theme tokens', () => {
     }
   });
 
-  it('removes the collapsed names from the defined inventory and lowers the ceiling to 94', () => {
-    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBe(94);
+  it('removes the collapsed names from the defined inventory and does not raise the ceiling above 94', () => {
+    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBeLessThanOrEqual(94);
 
     const inventorySource = readInventorySource();
     for (const token of COLLAPSED_BACKTEST_TOKENS) {

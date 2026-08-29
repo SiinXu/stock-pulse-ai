@@ -112,7 +112,7 @@
 
 - **冻结当前自定义属性名集合**，不在本阶段删除 page-scoped 遗留、不统一格式、不引入第二套 token 系统。
 - 可执行清单：`THEME_DEFINED_TOKEN_NAMES`（`src/index.css` 的 unique 定义）+ `classifyThemeToken()`。
-- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*` 与 `--backtest-*` 已在 Phase 2 清零，禁止重新引入这两个前缀。
+- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*`、`--backtest-*` 与 `--portfolio-*` 已在 Phase 2 清零，禁止重新引入这些前缀。
 - 新 UI 只用 Layer 1 + `components/common`；缺色用 `hsl(var(--token) / alpha)`，不要为每个透明度再开 token。
 - 未定义的 `var(--*)`（如 `--home-border`、`--info`、`--color-purple`、`.input-surface` 可选槽）登记在 freeze 守卫测试里的 `THEME_UNGOVERNED_REFERENCE_DEBT`（`themeTokenFreezeGuard.test.ts`），只减不增，且**不得**写进已定义清单冒充合法 token。
 - Desktop 嵌入的 WebView 走同一套 Web token。`apps/dsa-desktop/renderer/assistant.html` / `loading.html` 是独立 chrome 清单，禁止把 `--bg` / `--panel` 并进 Web Layer 1。
@@ -134,6 +134,14 @@
 - 两个在用的描边在 Backtest Workspace 配方处内联为当前 light/dark 的 `hsl(var(--foreground) / alpha)`：`--backtest-border-dim` → `.backtest-metric-row` / `.backtest-summary` 的 `0.05`（`.dark` 下 `0.06`）；`--backtest-border-subtle` → `.backtest-status-chip` 的 `0.06`（无 tone 的 `.dark` 回退为 `0.08`）。成功 / 危险 / 中性 chip 颜色与 `.backtest-metric-footer`（仍为 `--border / 0.40`）不变。
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 100 降到 94；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 26（这六个名字不在格式债清单中）。
 - 这些描边现已使用 Layer 1 既有 `--foreground` 语义 token 加透明度，因此可以跟随覆盖 `--foreground` 的主题包换色；当前 `slate` pack 覆盖 `--border`、不覆盖 `--foreground`，所以目前不会给这些描边换色。
+
+### 2.9 Phase 2 域收敛：Portfolio（#1300）
+
+- 唯一剩余的 `--portfolio-control-border` 定义（light + dark）已删除；未新增页面级或领域 token。`THEME_PAGE_SCOPED_PREFIXES` 仍永久禁止 `--portfolio-*`。
+- 唯一在用的调用点是 light 下 `.portfolio-page .btn-secondary:not(:disabled)` 的描边，现内联为 `hsl(var(--foreground) / 0.2)`，与 Backtest 的 Layer 1 + use-site alpha 配方一致。`:not(:disabled)`、hover 阴影、focus 与默认 `.btn-secondary` 的 dark 回退（`--border-subtle` = `--foreground / 0.08`）不变。
+- dark 赋值原先等于 `--border`（`75 4% 20%`），且没有 `.dark .portfolio-page .btn-secondary` 消费者，因此随定义一起删除，不另加 dark 覆盖。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 94 降到 93；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 26（该名字不在格式债清单中）。
+- 当前 `slate` pack 覆盖 `--border`、不覆盖 `--foreground`，所以目前不会给这条 leftover 描边换色。
 
 ## 3. 字体阶（全部 Geist）
 
