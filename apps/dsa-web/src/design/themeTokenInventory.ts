@@ -25,12 +25,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--accent-foreground',
   '--autocomplete-hover-bg',
   '--background',
-  '--backtest-border-dim',
-  '--backtest-border-light',
-  '--backtest-border-subtle',
-  '--backtest-spinner-head',
-  '--backtest-spinner-track',
-  '--backtest-table-bg',
   '--bg-base',
   '--bg-card',
   '--bg-elevated',
@@ -237,9 +231,10 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * Hard ceiling for page-scoped leftovers. Never raise this to absorb a new
  * `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`
  * name. Shrink only when a Phase 2 domain collapse deletes a leftover.
- * `--login-*` reached zero; Login consumes Layer 1 plus use-site alpha.
+ * `--login-*` and `--backtest-*` reached zero; those pages consume Layer 1
+ * plus use-site alpha. Do not reintroduce either prefix.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 100;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 94;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [

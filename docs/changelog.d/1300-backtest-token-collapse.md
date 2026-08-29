@@ -1,0 +1,2 @@
+- [Changed] Backtest Workspace metric-row, summary, and status-chip borders now paint from Layer 1 foreground alpha instead of the six `--backtest-*` page-scoped tokens, so theme packs such as `slate` can recolour them (Refs #1300).
+- [Changed] Lowered the Web page-scoped token ceiling from 100 to 94 after deleting the `--backtest-*` family; theme token-format debt stays at 26 (Refs #1300).
