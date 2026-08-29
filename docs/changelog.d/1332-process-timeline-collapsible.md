@@ -1,0 +1,1 @@
+- [Changed] Convert process timeline item disclosure from native details/summary to the shared Collapsible, keeping no-layer rows non-interactive and layer rows closed by default (Refs #1332).

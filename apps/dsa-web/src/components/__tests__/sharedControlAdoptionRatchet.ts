@@ -98,13 +98,6 @@ export const SHARED_CONTROL_A11Y_EXEMPTIONS: readonly SharedControlExemption[] =
     count: 1,
     reason: 'SVG scatter hit targets cannot host an HTML button; the circle keeps a named keyboard target.',
   },
-  {
-    file: '../run-flow/ProcessTimeline.tsx',
-    kind: 'role-button',
-    token: 'summary',
-    count: 1,
-    reason: 'Native details/summary is the disclosure widget; role=button preserves the custom-styled summary name.',
-  },
 ];
 
 /**

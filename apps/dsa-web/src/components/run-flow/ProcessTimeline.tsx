@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
 import { useMemo } from 'react';
-import { ChevronRight, ListOrdered } from 'lucide-react';
-import { Badge, StatusDot, Surface } from '../common';
+import { ListOrdered } from 'lucide-react';
+import { Badge, Collapsible, StatusDot, Surface } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { cn } from '../../utils/cn';
 import type { UiTextKey } from '../../i18n/uiText';
 import type { RunFlowSnapshot, RunFlowStatus } from '../../types/runFlow';
 import {
@@ -50,6 +51,15 @@ const kindLabelKey = (kind: ProcessTimelineItem['kind']): UiTextKey => {
       return 'runFlow.events.title';
   }
 };
+
+/** Flatten shared Collapsible card chrome so timeline rows keep px-3 py-2 density. */
+const TIMELINE_ITEM_COLLAPSIBLE_CLASS = cn(
+  'rounded-lg border-subtle bg-base/30 shadow-none hover:border-subtle',
+  '[&>button]:min-h-0 [&>button]:items-start [&>button]:gap-2 [&>button]:px-3 [&>button]:py-2 [&>button]:hover:bg-transparent',
+  '[&>button_span.font-medium]:sr-only',
+  '[&>button_span.mt-1]:mt-0 [&>button_span.mt-1]:text-inherit',
+  '[&>div>div>div]:border-border/60 [&>div>div>div]:px-3 [&>div>div>div]:pb-2 [&>div>div>div]:pt-2',
+);
 
 const FieldList: React.FC<{ fields: ProcessTimelineItem['what']; testId: string }> = ({
   fields,
@@ -111,6 +121,7 @@ const TimelineRow: React.FC<{
       {t('runFlow.events.openNode', { title: item.title })}
     </button>
   ) : null;
+  const detailsLabel = `${item.title} · ${t('common.details')}`;
 
   if (!hasLayers) {
     return (
@@ -121,25 +132,33 @@ const TimelineRow: React.FC<{
   }
 
   return (
-    <details className="group/timeline rounded-lg border border-subtle bg-base/30 px-3 py-2" data-testid="process-timeline-item" data-kind={item.kind}>
-      <summary role="button" aria-label={`${item.title} · ${t('common.details')}`} className="flex cursor-pointer list-none items-start gap-2">
-        <div className="min-w-0 flex-1">{summary}{body}</div>
-        <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-text/70 transition-transform group-open/timeline:rotate-90" aria-hidden="true" />
-      </summary>
-      <div className="mt-2 space-y-3 border-t border-border/60 pt-2">
-        <div>
-          <p className="label-uppercase">{t('runFlow.nodeDetails.column.name')}</p>
-          <div className="mt-1.5"><FieldList fields={item.what} testId="process-timeline-what" /></div>
-        </div>
-        {item.why.length > 0 ? (
+    <div data-testid="process-timeline-item" data-kind={item.kind}>
+      <Collapsible
+        title={detailsLabel}
+        defaultOpen={false}
+        className={TIMELINE_ITEM_COLLAPSIBLE_CLASS}
+        description={(
+          <>
+            {summary}
+            {body}
+          </>
+        )}
+      >
+        <div className="space-y-3">
           <div>
-            <p className="label-uppercase">{t('runFlow.nodeDetails.metadata')}</p>
-            <div className="mt-1.5"><FieldList fields={item.why} testId="process-timeline-why" /></div>
+            <p className="label-uppercase">{t('runFlow.nodeDetails.column.name')}</p>
+            <div className="mt-1.5"><FieldList fields={item.what} testId="process-timeline-what" /></div>
           </div>
-        ) : null}
-        {nodeLink}
-      </div>
-    </details>
+          {item.why.length > 0 ? (
+            <div>
+              <p className="label-uppercase">{t('runFlow.nodeDetails.metadata')}</p>
+              <div className="mt-1.5"><FieldList fields={item.why} testId="process-timeline-why" /></div>
+            </div>
+          ) : null}
+          {nodeLink}
+        </div>
+      </Collapsible>
+    </div>
   );
 };
 

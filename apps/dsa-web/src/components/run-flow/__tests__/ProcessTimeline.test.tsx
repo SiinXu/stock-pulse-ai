@@ -74,8 +74,15 @@ describe('ProcessTimeline', () => {
 
     const items = screen.getAllByTestId('process-timeline-item');
     const firstToggle = screen.getAllByRole('button', { name: /查看详情/ })[0];
+    expect(firstToggle.tagName).toBe('BUTTON');
+    expect(firstToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(firstToggle).toHaveAttribute('aria-controls');
+    expect(items[0].querySelector('summary')).toBeNull();
+    expect(items[0].querySelector('[data-testid="process-timeline-why"]')).not.toBeVisible();
+
     fireEvent.click(firstToggle);
 
+    expect(firstToggle).toHaveAttribute('aria-expanded', 'true');
     expect(items[0].querySelector('[data-testid="process-timeline-why"]')).toHaveTextContent('execution_timeout');
     expect(items[0].querySelector('[data-testid="process-timeline-what"]')).toHaveTextContent('event_type');
     expect(screen.queryByText(/因为模型认为/)).not.toBeInTheDocument();
