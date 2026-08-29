@@ -1,0 +1,1 @@
+- [Changed] Schedule Notification Center inbox list, cursor pagination, and mark-read refresh through TanStack Query (Refs #789).

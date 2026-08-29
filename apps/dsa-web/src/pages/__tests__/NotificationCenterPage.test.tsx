@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,6 +10,7 @@ import {
   type RouteFocusTarget,
 } from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import { chooseOption, createDeferred } from '../../test-utils';
 import type { NotificationInboxItem, NotificationInboxPage } from '../../types/notificationInbox';
 import NotificationCenterPage from '../NotificationCenterPage';
@@ -85,16 +87,19 @@ function unreadOnlyItem(): NotificationInboxItem {
 }
 
 function renderPage() {
+  const client = createAppQueryClient();
   return render(
-    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-      <UiLanguageProvider initialLanguage="en">
-        <ToastProvider>
-          <MemoryRouter>
-            <NotificationCenterPage />
-          </MemoryRouter>
-        </ToastProvider>
-      </UiLanguageProvider>
-    </RouteFocusRegistrationContext.Provider>,
+    <QueryClientProvider client={client}>
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <UiLanguageProvider initialLanguage="en">
+          <ToastProvider>
+            <MemoryRouter>
+              <NotificationCenterPage />
+            </MemoryRouter>
+          </ToastProvider>
+        </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>
+    </QueryClientProvider>,
   );
 }
 

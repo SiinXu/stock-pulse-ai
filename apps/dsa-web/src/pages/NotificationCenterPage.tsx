@@ -1,12 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef } from 'react';
 import { useRouteFocusTarget } from '../components/routing';
 import { APP_ROUTE_PATHS } from '../routing/routes';
 import { CheckCheck, RefreshCw } from 'lucide-react';
-import { notificationInboxApi } from '../api/notificationInbox';
-import { getParsedApiError, type ParsedApiError } from '../api/error';
 import {
   ApiErrorAlert,
   Badge,
@@ -18,16 +16,11 @@ import {
 } from '../components/common';
 import { NotificationInboxList } from '../components/notification-center';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { useNotificationCenterInbox } from '../hooks/useNotificationCenterInbox';
 import { formatUiText } from '../i18n/uiText';
 import { NOTIFICATION_CENTER_TEXT } from '../locales/notificationCenter';
 import { NOTIFICATIONS_TEXT } from '../locales/notifications';
-import type {
-  NotificationInboxItem,
-  NotificationInboxKind,
-  NotificationInboxPage,
-} from '../types/notificationInbox';
-
-type ReadFilter = 'all' | 'unread';
+import type { NotificationInboxKind } from '../types/notificationInbox';
 
 const KIND_OPTIONS: Array<{ value: '' | NotificationInboxKind; labelKey: keyof typeof NOTIFICATION_CENTER_TEXT['en'] }> = [
   { value: '', labelKey: 'kindAll' },
@@ -50,101 +43,23 @@ const NotificationCenterPage: React.FC = () => {
   });
   const text = NOTIFICATION_CENTER_TEXT[language];
   const notificationText = NOTIFICATIONS_TEXT[language];
-  const [pageData, setPageData] = useState<NotificationInboxPage | null>(null);
-  const [items, setItems] = useState<NotificationInboxItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const [readFilter, setReadFilter] = useState<ReadFilter>('all');
-  const [kind, setKind] = useState<'' | NotificationInboxKind>('');
-  const [markingId, setMarkingId] = useState<string | null>(null);
-  const [markingAll, setMarkingAll] = useState(false);
-  const requestIdRef = useRef(0);
-  const kindRef = useRef(kind);
-  const readFilterRef = useRef(readFilter);
-  kindRef.current = kind;
-  readFilterRef.current = readFilter;
-
-  const load = useCallback(async (
-    mode: 'initial' | 'refresh' | 'more' = 'initial',
-    cursor?: string,
-  ) => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    if (mode === 'initial') setLoading(true);
-    if (mode === 'refresh') setRefreshing(true);
-    if (mode === 'more') setLoadingMore(true);
-    setError(null);
-    try {
-      const response = await notificationInboxApi.list({
-        page: 1,
-        pageSize: 50,
-        cursor,
-        kind: kindRef.current || undefined,
-        unreadOnly: readFilterRef.current === 'unread',
-      });
-      if (requestIdRef.current !== requestId) return;
-      setPageData(response);
-      setItems((current) => {
-        if (mode !== 'more') return response.items;
-        const existingIds = new Set(current.map((item) => item.id));
-        return [...current, ...response.items.filter((item) => !existingIds.has(item.id))];
-      });
-    } catch (err) {
-      if (requestIdRef.current !== requestId) return;
-      if (mode === 'initial') {
-        setPageData(null);
-        setItems([]);
-      }
-      setError(getParsedApiError(err));
-    } finally {
-      if (requestIdRef.current === requestId) {
-        setLoading(false);
-        setRefreshing(false);
-        setLoadingMore(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    void load('initial');
-    return () => {
-      requestIdRef.current += 1;
-    };
-  }, [load, kind, readFilter]);
-
-  const handleMarkRead = async (itemId: string) => {
-    const requestId = requestIdRef.current;
-    setMarkingId(itemId);
-    setError(null);
-    try {
-      await notificationInboxApi.markRead([itemId]);
-      if (requestIdRef.current !== requestId) return;
-      await load('refresh');
-    } catch (err) {
-      if (requestIdRef.current !== requestId) return;
-      setError(getParsedApiError(err));
-    } finally {
-      setMarkingId(null);
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    const requestId = requestIdRef.current;
-    setMarkingAll(true);
-    setError(null);
-    try {
-      await notificationInboxApi.markAllRead(kindRef.current || undefined);
-      if (requestIdRef.current !== requestId) return;
-      await load('refresh');
-    } catch (err) {
-      if (requestIdRef.current !== requestId) return;
-      setError(getParsedApiError(err));
-    } finally {
-      setMarkingAll(false);
-    }
-  };
+  const {
+    items,
+    pageData,
+    loading,
+    refreshing,
+    loadingMore,
+    error,
+    readFilter,
+    setReadFilter,
+    kind,
+    setKind,
+    markingId,
+    markingAll,
+    load,
+    handleMarkRead,
+    handleMarkAllRead,
+  } = useNotificationCenterInbox();
 
   const kindSelectOptions = useMemo(
     () => KIND_OPTIONS.map((option) => ({

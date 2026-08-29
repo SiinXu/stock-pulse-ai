@@ -28,4 +28,10 @@ describe('Query consumer hosts', () => {
     expect(read('src/playground/__tests__/scenarios.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/hooks/__tests__/useUnreadNotifications.test.tsx')).toContain('createAppQueryClient');
   });
+
+  it('wraps NotificationCenterPage tests with the production retry-free client', () => {
+    expect(read('src/pages/__tests__/NotificationCenterPage.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/pages/__tests__/NotificationCenterPage.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useNotificationCenterInbox.test.tsx')).toContain('createAppQueryClient');
+  });
 });
