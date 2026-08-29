@@ -167,8 +167,13 @@ Additional modules completed in the remaining-module batch:
   `setupState` accepts only `enabled` / `password_retained` / `no_password`; GET
   `/status` and POST `/settings` share the same passthrough parser),
   `notificationInbox`, `outboundActivity`, `todaysFocus`, `watchlistGroups`,
-  `watchlistScores`, `portfolioRiskMetrics`, `eventCalendar` (alert-trigger list
-  composition)
+  `watchlistScores`, `portfolioRiskMetrics`, `portfolioHealth` (GET
+  `/portfolio/health` and POST `/portfolio/health/refresh` share generated
+  `PortfolioHealthResponse`; the compile-time bind is snake_case
+  `components['schemas']`; runtime Zod stays a camelCase projection and does
+  not re-export the generated snake_case type as the UI
+  `PortfolioHealthResponse`; this is not the auth export-alias pattern),
+  `eventCalendar` (alert-trigger list composition)
 
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker

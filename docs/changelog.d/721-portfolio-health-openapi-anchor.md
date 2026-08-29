@@ -1,0 +1,1 @@
+- [Changed] Anchor the Web portfolio health client on generated OpenAPI PortfolioHealthResponse with snake_case compile-time keys and a camelCase Zod projection (Refs #721).

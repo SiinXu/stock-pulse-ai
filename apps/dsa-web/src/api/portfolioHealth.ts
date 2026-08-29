@@ -6,19 +6,46 @@ import { z } from 'zod';
 import apiClient, { locallyRecoverableResourceConfig } from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import { createApiError, createParsedApiError } from './error';
-import type { operations } from '../types/api.generated';
+import type { components, operations } from '../types/api.generated';
 import type {
   PortfolioHealthQuery,
   PortfolioHealthRefreshQuery,
   PortfolioHealthResponse,
 } from '../types/portfolioHealth';
 
+type OpenApiHealthResponse = components['schemas']['PortfolioHealthResponse'];
+type OpenApiHealthDimensions = components['schemas']['PortfolioHealthDimensions'];
+type OpenApiHealthWeights = components['schemas']['PortfolioHealthWeights'];
+type OpenApiGetBody = operations['getPortfolioHealth']['responses']['200']['content']['application/json'];
+type OpenApiRefreshBody = operations['refreshPortfolioHealth']['responses']['200']['content']['application/json'];
 type OpenApiGetQuery = NonNullable<operations['getPortfolioHealth']['parameters']['query']>;
 type OpenApiRefreshQuery = NonNullable<operations['refreshPortfolioHealth']['parameters']['query']>;
+
+const _healthResponseAnchor: keyof OpenApiHealthResponse = 'formula_version';
+const _dimensionsAnchor: keyof OpenApiHealthDimensions = 'risk_exposure';
+const _weightsAnchor: keyof OpenApiHealthWeights = 'cash_ratio';
 const _getQueryAnchor: keyof OpenApiGetQuery = 'cost_method';
 const _refreshQueryAnchor: keyof OpenApiRefreshQuery = 'persist';
+void _healthResponseAnchor;
+void _dimensionsAnchor;
+void _weightsAnchor;
 void _getQueryAnchor;
 void _refreshQueryAnchor;
+
+type _AssertGetIsComponent = OpenApiGetBody extends OpenApiHealthResponse
+  ? OpenApiHealthResponse extends OpenApiGetBody
+    ? true
+    : never
+  : never;
+type _AssertRefreshIsComponent = OpenApiRefreshBody extends OpenApiHealthResponse
+  ? OpenApiHealthResponse extends OpenApiRefreshBody
+    ? true
+    : never
+  : never;
+const _getBodyIsComponent: _AssertGetIsComponent = true;
+const _refreshBodyIsComponent: _AssertRefreshIsComponent = true;
+void _getBodyIsComponent;
+void _refreshBodyIsComponent;
 
 const finiteNumber = z.number().refine(Number.isFinite, {
   message: 'non-finite number rejected',
@@ -177,32 +204,12 @@ function buildParams(query: PortfolioHealthRefreshQuery): Record<string, string 
 }
 
 function parseResponse(data: unknown): PortfolioHealthResponse {
-  const parsed = parseCamelCasePayload<PortfolioHealthResponse>(
+  return parseCamelCasePayload<PortfolioHealthResponse>(
     data,
     portfolioHealthResponseSchema,
     'PortfolioHealthResponse',
     'portfolioHealth',
   );
-  return {
-    ...parsed,
-    bands: Array.isArray(parsed.bands) ? parsed.bands : [],
-    dataQuality: {
-      ...parsed.dataQuality,
-      limitations: Array.isArray(parsed.dataQuality.limitations)
-        ? parsed.dataQuality.limitations
-        : [],
-      missingPriceSymbols: Array.isArray(parsed.dataQuality.missingPriceSymbols)
-        ? parsed.dataQuality.missingPriceSymbols
-        : [],
-      partialReasons: Array.isArray(parsed.dataQuality.partialReasons)
-        ? parsed.dataQuality.partialReasons
-        : [],
-    },
-    insights: Array.isArray(parsed.insights) ? parsed.insights : [],
-    unavailableDimensions: Array.isArray(parsed.unavailableDimensions)
-      ? parsed.unavailableDimensions
-      : [],
-  };
 }
 
 export const portfolioHealthApi = {
