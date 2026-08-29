@@ -1365,14 +1365,7 @@ class DataFetcherManager:
 
         return None, last_error, total_cost_ms
 
-    def _get_fundamental_config(self):
-        """Return process Config for fundamental timeouts, retries, and cache TTL.
-
-        CN/offshore aggregation and the rebound cache helper share this owner so
-        tests can keep patching ``src.config.get_config``.
-        """
-        from src.config import get_config
-        return get_config()
+    _get_fundamental_config = None  # rebound from manager_parts.fundamental_context_methods
 
     @staticmethod
     def _normalize_source_chain(
@@ -1827,16 +1820,10 @@ class DataFetcherManager:
     get_limit_up_pool = None
 
 
-# Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006
-# compatibility facade while focused parts own inventory/selection, daily
-# health/circuit, daily-cache orchestration, daily provider execution,
-# realtime field-trust bookkeeping, realtime quote orchestration,
-# chip-distribution orchestration, money-flow cache lookup/store,
-# money-flow orchestration, fundamental cache lookup/inflight, fundamental
-# CN/offshore loaders, stock-name lookup, rankings orchestration,
-# market-overview routing, and belong-board normalization.
-# Rebinding preserves method globals so existing patches against this
-# module continue to intercept moved implementations.
+# Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006 compatibility
+# facade while focused parts own inventory, daily health/cache/execution, realtime,
+# chip, money-flow, fundamental cache/loaders/Config accessor, stock-name, rankings,
+# market-overview, and belong-board. Rebinding preserves method globals and patch seams.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
@@ -1845,6 +1832,7 @@ from .manager_parts import (  # noqa: E402
     chip_distribution_methods as _chip_distribution_methods_module,
     daily_provider_execution as _daily_provider_execution_module,
     fundamental_cache_methods as _fundamental_cache_methods_module,
+    fundamental_context_methods as _fundamental_context_methods_module,
     fundamental_loader_methods as _fundamental_loader_methods_module,
     market_overview_methods as _market_overview_methods_module,
     money_flow_cache_methods as _money_flow_cache_methods_module,
@@ -2062,6 +2050,12 @@ def _assemble_fundamental_loader_methods_facade(
         )
 
 
+def _assemble_fundamental_context_methods_facade(context_module=_fundamental_context_methods_module) -> None:
+    bound = context_module.bind_fundamental_context_methods_facade(DataFetcherManager, globals())
+    if bound != context_module.EXPECTED_FUNDAMENTAL_CONTEXT_METHOD_NAMES:
+        raise ImportError(f"Unexpected DataFetcherManager fundamental context methods: {bound!r}")
+
+
 def _assemble_belong_board_methods_facade(
     board_module=_belong_board_methods_module,
 ) -> None:
@@ -2120,6 +2114,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_money_flow_methods=_assemble_money_flow_methods_facade,
     assemble_fundamental=_assemble_fundamental_cache_methods_facade,
     assemble_fundamental_loaders=_assemble_fundamental_loader_methods_facade,
+    assemble_fundamental_context=_assemble_fundamental_context_methods_facade,
     assemble_belong_board=_assemble_belong_board_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
     assemble_market_overview=_assemble_market_overview_methods_facade,
@@ -2136,6 +2131,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_money_flow_methods()
     assemble_fundamental()
     assemble_fundamental_loaders()
+    assemble_fundamental_context()
     assemble_belong_board()
     assemble_rankings()
     assemble_market_overview()
@@ -2180,6 +2176,7 @@ _fundamental_cache_methods_module._install_facade_reload_hook(
 _fundamental_loader_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_fundamental_context_methods_module._install_facade_reload_hook(_assemble_data_fetcher_manager_facades)
 _belong_board_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -2204,6 +2201,7 @@ del (
     _assemble_money_flow_methods_facade,
     _assemble_fundamental_cache_methods_facade,
     _assemble_fundamental_loader_methods_facade,
+    _assemble_fundamental_context_methods_facade,
     _assemble_belong_board_methods_facade,
     _assemble_rankings_methods_facade,
     _assemble_market_overview_methods_facade,
@@ -2222,5 +2220,6 @@ del (
     _market_overview_methods_module,
     _fundamental_cache_methods_module,
     _fundamental_loader_methods_module,
+    _fundamental_context_methods_module,
     _belong_board_methods_module,
 )

@@ -1,0 +1,1 @@
+- [Changed] Resolve DataFetcherManager._get_fundamental_config through get_application_services().config and rebind the accessor from manager_parts/fundamental_context_methods.py, keeping the public patch target on src.data_provider.base (Refs #1540, Refs #1067).
