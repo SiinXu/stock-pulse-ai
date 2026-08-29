@@ -1,0 +1,1 @@
+- [Fixed] Upgraded the universal Python lock from `nltk` 3.10.0 to 3.10.3 to close PYSEC-2026-3726 and the upstream advisory that still marks 3.10.2 affected, while preserving the reviewed cutoff for unrelated dependencies.
