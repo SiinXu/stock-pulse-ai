@@ -1,0 +1,1 @@
+- [Changed] Portfolio light secondary-button outline now paints from Layer 1 `--foreground` alpha instead of `--portfolio-control-border`; page-scoped token ceiling 94 → 93 (Refs #1300).

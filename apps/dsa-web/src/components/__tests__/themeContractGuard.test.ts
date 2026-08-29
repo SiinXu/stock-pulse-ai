@@ -340,7 +340,6 @@ const TOKEN_FORMAT_OVERRIDES = {
   '--neutral-black': 'hsl-triplet',
   '--neutral-white': 'hsl-triplet',
   '--overlay-sheet-footer-toast-offset': 'length',
-  '--portfolio-control-border': 'hsl-triplet',
   '--radius-dot': 'length',
 } as const satisfies Record<string, TokenFormat>;
 
