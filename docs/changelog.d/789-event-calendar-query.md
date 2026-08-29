@@ -1,0 +1,1 @@
+- [Changed] Schedule Event Calendar loads through TanStack Query (Refs #789).

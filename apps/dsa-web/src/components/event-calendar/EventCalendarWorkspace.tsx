@@ -2,11 +2,9 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { BellRing, CalendarDays } from 'lucide-react';
-import { eventCalendarApi } from '../../api/eventCalendar';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import {
   ApiErrorAlert,
   AppPage,
@@ -23,11 +21,12 @@ import {
   Surface,
 } from '../common';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { useEventCalendarQuery } from '../../hooks/useEventCalendarQuery';
 import { formatUiText } from '../../i18n/uiText';
 import { EVENT_ALERT_PAGE_TEXT } from '../../locales/eventAlerts';
 import { EVENT_CALENDAR_TEXT } from '../../locales/eventCalendar';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
-import type { CalendarEventItem, CorporateEventCategory, EventCalendarResponse } from '../../types/eventCalendar';
+import type { CalendarEventItem, CorporateEventCategory } from '../../types/eventCalendar';
 
 function isoDate(value: Date): string {
   const year = value.getFullYear();
@@ -50,11 +49,6 @@ function statusVariant(status: string, degraded: boolean): 'success' | 'warning'
   return 'default';
 }
 
-function isCancelled(error: unknown): boolean {
-  return Boolean(error && typeof error === 'object' && 'code' in error
-    && (error as { code?: unknown }).code === 'ERR_CANCELED');
-}
-
 const EventCalendarWorkspace: React.FC = () => {
   const { language } = useUiLanguage();
   const text = EVENT_CALENDAR_TEXT[language];
@@ -63,44 +57,11 @@ const EventCalendarWorkspace: React.FC = () => {
   const [dateFrom, setDateFrom] = useState(defaults.from);
   const [dateTo, setDateTo] = useState(defaults.to);
   const [includeImpact, setIncludeImpact] = useState(true);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const [data, setData] = useState<EventCalendarResponse | null>(null);
-  const requestRef = useRef<AbortController | null>(null);
-  const generationRef = useRef(0);
+  const { loading, error, data, load } = useEventCalendarQuery(dateFrom, dateTo);
 
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
-
-  const load = useCallback(async () => {
-    requestRef.current?.abort();
-    const controller = new AbortController();
-    requestRef.current = controller;
-    const generation = generationRef.current + 1;
-    generationRef.current = generation;
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await eventCalendarApi.getCalendar(
-        { dateFrom, dateTo },
-        { signal: controller.signal },
-      );
-      if (generation === generationRef.current) setData(response);
-    } catch (caught) {
-      if (!controller.signal.aborted && !isCancelled(caught) && generation === generationRef.current) {
-        setError(getParsedApiError(caught));
-        setData(null);
-      }
-    } finally {
-      if (generation === generationRef.current) setLoading(false);
-    }
-  }, [dateFrom, dateTo]);
-
-  useEffect(() => {
-    void load();
-    return () => requestRef.current?.abort();
-  }, [load]);
 
   const categoryLabel = useCallback((category?: CorporateEventCategory | null) => {
     if (!category) return text.categoryUnknown;

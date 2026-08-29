@@ -40,4 +40,10 @@ describe('Query consumer hosts', () => {
     expect(read('src/hooks/__tests__/useSystemConfig.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useSystemConfigLoadQuery.test.tsx')).toContain('createAppQueryClient');
   });
+
+  it('wraps EventCalendarWorkspace tests with the production retry-free client', () => {
+    expect(read('src/components/event-calendar/__tests__/EventCalendarWorkspace.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/event-calendar/__tests__/EventCalendarWorkspace.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useEventCalendarQuery.test.tsx')).toContain('createAppQueryClient');
+  });
 });

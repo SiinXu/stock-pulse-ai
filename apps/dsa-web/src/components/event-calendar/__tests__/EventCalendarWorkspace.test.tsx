@@ -1,10 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { eventCalendarApi } from '../../../api/eventCalendar';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { APP_ROUTE_PATHS } from '../../../routing/routes';
 import type { EventCalendarResponse } from '../../../types/eventCalendar';
 import EventCalendarWorkspace from '../EventCalendarWorkspace';
@@ -19,26 +21,29 @@ function LocationProbe() {
 }
 
 function renderWorkspace(initialPath = APP_ROUTE_PATHS.eventCalendar) {
+  const client = createAppQueryClient();
   return render(
-    <MemoryRouter initialEntries={[initialPath]}>
-      <UiLanguageProvider initialLanguage="en">
-        <Routes>
-          <Route
-            path={APP_ROUTE_PATHS.eventCalendar}
-            element={(
-              <>
-                <EventCalendarWorkspace />
-                <LocationProbe />
-              </>
-            )}
-          />
-          <Route
-            path={APP_ROUTE_PATHS.eventAlerts}
-            element={<LocationProbe />}
-          />
-        </Routes>
-      </UiLanguageProvider>
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialPath]}>
+        <UiLanguageProvider initialLanguage="en">
+          <Routes>
+            <Route
+              path={APP_ROUTE_PATHS.eventCalendar}
+              element={(
+                <>
+                  <EventCalendarWorkspace />
+                  <LocationProbe />
+                </>
+              )}
+            />
+            <Route
+              path={APP_ROUTE_PATHS.eventAlerts}
+              element={<LocationProbe />}
+            />
+          </Routes>
+        </UiLanguageProvider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
