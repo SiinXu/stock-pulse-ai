@@ -1,0 +1,1 @@
+- [Changed] Move DataFetcherManager market-overview routing (`get_main_indices`, `get_market_stats`) into `manager_parts/market_overview_methods.py` behind the ADR-006 facade, keeping the public method surface and patch targets on `src.data_provider.base` (Refs #1067).

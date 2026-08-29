@@ -1280,120 +1280,9 @@ class DataFetcherManager:
         logger.info(f"[股票名称] 批量获取完成，成功 {len(result)}/{len(stock_codes)}")
         return result
 
-    def get_main_indices(self, region: str = "cn") -> List[Dict[str, Any]]:
-        """获取主要指数实时行情（自动切换数据源）"""
-        if region == "cn":
-            tickflow_fetcher = self._get_tickflow_fetcher()
-            if tickflow_fetcher is not None:
-                try:
-                    data = tickflow_fetcher.get_main_indices(region=region)
-                    if data:
-                        logger.info("[TickFlowFetcher] 获取指数行情成功")
-                        return data
-                except Exception as e:  # broad-exception: fallback_recorded - safe log precedes built-in index fallback
-                    log_safe_exception(
-                        logger,
-                        "TickFlow market indices fetch failed",
-                        e,
-                        error_code="tickflow_market_indices_failed",
-                        level=logging.WARNING,
-                        context={"market": region},
-                    )
-
-        for fetcher in self._get_fetchers_for_capability(
-            "main_indices",
-            market=region if region in self._DAILY_MARKETS else None,
-        ):
-            if region == "cn" and fetcher.name == "TickFlowFetcher":
-                continue
-            try:
-                data = fetcher.get_main_indices(region=region)
-                if data:
-                    logger.info(f"[{fetcher.name}] 获取指数行情成功")
-                    return data
-            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes index fallback
-                log_safe_exception(
-                    logger,
-                    "Data provider market indices fetch failed",
-                    e,
-                    error_code="data_provider_market_indices_failed",
-                    level=logging.WARNING,
-                    context={"market": region, "provider": fetcher.name},
-                )
-                continue
-        return []
-
-    def get_market_stats(self, *, purpose: str = "unspecified") -> Dict[str, Any]:
-        """获取市场涨跌统计（自动切换数据源）"""
-        logger.info("[MarketStats] component=market_stats action=start purpose=%s", purpose)
-        tickflow_fetcher = self._get_tickflow_fetcher()
-        if tickflow_fetcher is not None:
-            started_at = time.monotonic()
-            try:
-                data = tickflow_fetcher.get_market_stats()
-                elapsed = time.monotonic() - started_at
-                if data:
-                    logger.info(
-                        "[MarketStats] component=market_stats action=provider_success "
-                        "purpose=%s provider=TickFlowFetcher elapsed=%.2fs",
-                        purpose,
-                        elapsed,
-                    )
-                    return data
-                logger.info(
-                    "[MarketStats] component=market_stats action=provider_empty "
-                    "purpose=%s provider=TickFlowFetcher elapsed=%.2fs",
-                    purpose,
-                    elapsed,
-                )
-            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes market-stats fallback
-                log_safe_exception(
-                    logger,
-                    "TickFlow market statistics fetch failed",
-                    e,
-                    error_code="tickflow_market_stats_failed",
-                    level=logging.WARNING,
-                    context={"purpose": purpose},
-                )
-
-        for fetcher in self._get_fetchers_for_capability(
-            "market_stats",
-            market="cn",
-        ):
-            if fetcher.name == "TickFlowFetcher":
-                continue
-            started_at = time.monotonic()
-            try:
-                data = fetcher.get_market_stats()
-                elapsed = time.monotonic() - started_at
-                if data:
-                    logger.info(
-                        "[MarketStats] component=market_stats action=provider_success "
-                        "purpose=%s provider=%s elapsed=%.2fs",
-                        purpose,
-                        fetcher.name,
-                        elapsed,
-                    )
-                    return data
-                logger.info(
-                    "[MarketStats] component=market_stats action=provider_empty "
-                    "purpose=%s provider=%s elapsed=%.2fs",
-                    purpose,
-                    fetcher.name,
-                    elapsed,
-                )
-            except Exception as e:  # broad-exception: fallback_recorded - safe log precedes provider fallback
-                log_safe_exception(
-                    logger,
-                    "Data provider market statistics fetch failed",
-                    e,
-                    error_code="data_provider_market_stats_failed",
-                    level=logging.WARNING,
-                    context={"purpose": purpose, "provider": fetcher.name},
-                )
-                continue
-        logger.warning("[MarketStats] component=market_stats action=complete status=empty purpose=%s", purpose)
-        return {}
+    # Rebound from manager_parts.market_overview_methods after the class is built.
+    get_main_indices = None
+    get_market_stats = None
 
     def _run_with_timeout(
         self,
@@ -1944,8 +1833,8 @@ class DataFetcherManager:
 # realtime field-trust bookkeeping, realtime quote orchestration,
 # chip-distribution orchestration, money-flow cache lookup/store,
 # money-flow orchestration, fundamental cache lookup/inflight, fundamental
-# CN/offshore loaders, stock-name lookup, rankings orchestration, and
-# belong-board normalization.
+# CN/offshore loaders, stock-name lookup, rankings orchestration,
+# market-overview routing, and belong-board normalization.
 # Rebinding preserves method globals so existing patches against this
 # module continue to intercept moved implementations.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
@@ -1957,6 +1846,7 @@ from .manager_parts import (  # noqa: E402
     daily_provider_execution as _daily_provider_execution_module,
     fundamental_cache_methods as _fundamental_cache_methods_module,
     fundamental_loader_methods as _fundamental_loader_methods_module,
+    market_overview_methods as _market_overview_methods_module,
     money_flow_cache_methods as _money_flow_cache_methods_module,
     money_flow_methods as _money_flow_methods_module,
     rankings_methods as _rankings_methods_module,
@@ -2200,6 +2090,23 @@ def _assemble_rankings_methods_facade(
         )
 
 
+def _assemble_market_overview_methods_facade(
+    market_overview_module=_market_overview_methods_module,
+) -> None:
+    bound_method_names = market_overview_module.bind_market_overview_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if (
+        bound_method_names
+        != market_overview_module.EXPECTED_MARKET_OVERVIEW_METHOD_NAMES
+    ):
+        raise ImportError(
+            "Unexpected DataFetcherManager market-overview methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_data_fetcher_manager_facades(
     assemble_capability=_assemble_capability_catalog_facade,
     assemble_health=_assemble_daily_source_health_facade,
@@ -2215,6 +2122,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_loaders=_assemble_fundamental_loader_methods_facade,
     assemble_belong_board=_assemble_belong_board_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
+    assemble_market_overview=_assemble_market_overview_methods_facade,
 ) -> None:
     assemble_capability()
     assemble_health()
@@ -2230,6 +2138,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_loaders()
     assemble_belong_board()
     assemble_rankings()
+    assemble_market_overview()
     from .manager_parts.data_validation_wiring import install_facade_validation_wrappers
     install_facade_validation_wrappers(DataFetcherManager)
 
@@ -2277,6 +2186,9 @@ _belong_board_methods_module._install_facade_reload_hook(
 _rankings_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_market_overview_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 
 del (
     _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES,
@@ -2294,6 +2206,7 @@ del (
     _assemble_fundamental_loader_methods_facade,
     _assemble_belong_board_methods_facade,
     _assemble_rankings_methods_facade,
+    _assemble_market_overview_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
     _daily_source_health_module,
@@ -2306,6 +2219,7 @@ del (
     _money_flow_cache_methods_module,
     _money_flow_methods_module,
     _rankings_methods_module,
+    _market_overview_methods_module,
     _fundamental_cache_methods_module,
     _fundamental_loader_methods_module,
     _belong_board_methods_module,
