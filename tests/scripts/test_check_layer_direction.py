@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import json
+import sys
+from collections.abc import Sequence
 from pathlib import Path
 
 import pytest
@@ -31,6 +33,33 @@ from scripts.check_layer_direction import (
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / "scripts" / "layer_direction_baseline.json"
 
+# Introduction inventory (issue #1082). Shrink is free; never raise this ceiling.
+INTRODUCTION_REVERSE_EDGE_CEILING = 12
+
+
+def _guard_argv() -> list[str]:
+    """Point the CLI at the same ROOT/BASELINE the repository tests read.
+
+    Using the test-module globals (instead of ``main([])`` defaults) lets the
+    shrink/growth counterexamples monkeypatch them without scanning the live
+    tree.
+    """
+
+    return ["--root", str(ROOT), "--baseline", str(BASELINE)]
+
+
+def _assert_enforced_inventory_is_not_inflated(
+    live: Sequence[object],
+    baseline: Sequence[object],
+    ceiling: int,
+) -> None:
+    """Shrink-only pin: live may be a subset of baseline; neither may exceed the ceiling."""
+
+    extra = set(live) - set(baseline)
+    assert len(baseline) <= ceiling
+    assert len(live) <= ceiling
+    assert not extra, extra
+
 
 def _write_module(root: Path, relative_path: str, source: str) -> Path:
     path = root / relative_path
@@ -40,10 +69,15 @@ def _write_module(root: Path, relative_path: str, source: str) -> Path:
 
 
 def test_repository_layer_direction_guard() -> None:
-    """Keep the checked-in production tree aligned with its reverse-edge baseline."""
+    """Keep the checked-in production tree aligned with its reverse-edge baseline.
+
+    Alignment here is the guard contract: no *new* reverse edge. A live scan
+    that is a strict subset of the allowlist (legitimate shrink, baseline not
+    yet rewritten) must stay green.
+    """
 
     assert collect_violations(ROOT, BASELINE) == []
-    assert main([]) == 0
+    assert main(_guard_argv()) == 0
 
 
 def test_detects_new_reverse_data_provider_to_services(tmp_path: Path) -> None:
@@ -150,10 +184,17 @@ def test_write_baseline_allows_shrink_refuses_growth(tmp_path: Path) -> None:
 
 
 def test_baseline_hard_ceiling_matches_introduction_inventory() -> None:
-    """Hard ceiling pins introduction debt; never raise it to green CI."""
+    """Hard ceiling pins introduction debt; never raise it to green CI.
 
+    ``<=`` is deliberate: shrinking the allowlist (or later lowering the
+    ceiling to match) must not turn this suite red.
+    """
+
+    payload = json.loads(BASELINE.read_text(encoding="utf-8"))
     payload_edges = load_baseline(BASELINE)
-    assert len(payload_edges) <= 12
+    assert payload["hard_ceiling"] <= INTRODUCTION_REVERSE_EDGE_CEILING
+    assert len(payload_edges) <= INTRODUCTION_REVERSE_EDGE_CEILING
+    assert payload["hard_ceiling"] >= len(payload_edges)
 
 
 # --- issue #1555: import-time placement, TYPE_CHECKING, lazy inventory ----------
@@ -680,13 +721,24 @@ def test_diff_lazy_inventory_is_pure_set_arithmetic() -> None:
 
 
 def test_repository_inventories_are_not_inflated() -> None:
-    """Recursion must not grow the shipped enforced inventory or its ceiling."""
+    """Recursion must not grow the shipped enforced inventory or its ceiling.
+
+    This is a shrink-only pin, matching ``test_baseline_hard_ceiling_matches_introduction_inventory``
+    and the guard itself. Live equality (``scan == baseline`` / ``exception_count == 12``)
+    would turn a later legitimate shrink red before ``--write-baseline`` ran.
+    """
 
     payload = json.loads(BASELINE.read_text(encoding="utf-8"))
-    assert payload["hard_ceiling"] == 12
-    assert payload["exception_count"] == 12
-    assert len(load_baseline(BASELINE)) == 12
-    assert scan_reverse_edges(ROOT) == load_baseline(BASELINE)
+    baseline_edges = load_baseline(BASELINE)
+    live_edges = scan_reverse_edges(ROOT)
+    assert payload["hard_ceiling"] <= INTRODUCTION_REVERSE_EDGE_CEILING
+    assert payload["exception_count"] <= INTRODUCTION_REVERSE_EDGE_CEILING
+    assert payload["exception_count"] == len(baseline_edges)
+    _assert_enforced_inventory_is_not_inflated(
+        live_edges, baseline_edges, INTRODUCTION_REVERSE_EDGE_CEILING
+    )
+    assert collect_violations(ROOT, BASELINE) == []
+    assert main(_guard_argv()) == 0
 
 
 def test_repository_lazy_inventory_seed_is_well_formed() -> None:
@@ -714,4 +766,85 @@ def test_repository_lazy_drift_stays_advisory() -> None:
 
     added, removed = lazy_inventory_drift(ROOT, BASELINE)
     assert isinstance(added, list) and isinstance(removed, list)
-    assert main([]) == 0
+    assert main(_guard_argv()) == 0
+
+
+def _enforced_edge_fixture(tmp_path: Path) -> Path:
+    """One allowlisted ``data_provider -> services`` reverse edge at the introduction ceiling."""
+
+    _write_module(tmp_path, "src/services/svc.py", "VALUE = 1\n")
+    _write_module(
+        tmp_path,
+        "src/data_provider/a.py",
+        "from src.services.svc import VALUE\n",
+    )
+    edges = scan_reverse_edges(tmp_path)
+    assert edges == [("src/data_provider/a.py", "src.data_provider", "src.services")]
+    baseline = tmp_path / "scripts" / "layer_direction_baseline.json"
+    baseline.parent.mkdir(parents=True, exist_ok=True)
+    baseline.write_text(
+        serialize_baseline(edges, hard_ceiling=INTRODUCTION_REVERSE_EDGE_CEILING),
+        encoding="utf-8",
+    )
+    return baseline
+
+
+def test_enforced_inventory_pin_stays_green_after_legitimate_shrink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reviewer counterexample: removing an allowlisted reverse edge must not redden the suite.
+
+    The live scan becomes a strict subset of the still-checked-in allowlist.
+    The guard prints a shrink note and exits 0; the repository inventory pin
+    uses subset / ``<=``, so it stays green without ``--write-baseline``.
+    """
+
+    baseline = _enforced_edge_fixture(tmp_path)
+    _write_module(tmp_path, "src/data_provider/a.py", "VALUE = 0\n")
+    this_module = sys.modules[__name__]
+    monkeypatch.setattr(this_module, "ROOT", tmp_path)
+    monkeypatch.setattr(this_module, "BASELINE", baseline)
+
+    live = scan_reverse_edges(tmp_path)
+    recorded = load_baseline(baseline)
+    assert live == []
+    assert recorded
+    _assert_enforced_inventory_is_not_inflated(
+        live, recorded, INTRODUCTION_REVERSE_EDGE_CEILING
+    )
+    assert collect_violations(tmp_path, baseline) == []
+    assert main(["--root", str(tmp_path), "--baseline", str(baseline)]) == 0
+    test_repository_inventories_are_not_inflated()
+    test_repository_layer_direction_guard()
+    test_baseline_hard_ceiling_matches_introduction_inventory()
+
+
+def test_enforced_inventory_pin_fails_on_growth(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The same pin, plus the guard, must still fail when a new reverse edge appears."""
+
+    baseline = _enforced_edge_fixture(tmp_path)
+    _write_module(
+        tmp_path,
+        "src/data_provider/b.py",
+        "from src.services.svc import VALUE\n",
+    )
+    this_module = sys.modules[__name__]
+    monkeypatch.setattr(this_module, "ROOT", tmp_path)
+    monkeypatch.setattr(this_module, "BASELINE", baseline)
+
+    live = scan_reverse_edges(tmp_path)
+    recorded = load_baseline(baseline)
+    extra = set(live) - set(recorded)
+    assert extra
+    with pytest.raises(AssertionError):
+        _assert_enforced_inventory_is_not_inflated(
+            live, recorded, INTRODUCTION_REVERSE_EDGE_CEILING
+        )
+    with pytest.raises(AssertionError):
+        test_repository_inventories_are_not_inflated()
+    with pytest.raises(AssertionError):
+        test_repository_layer_direction_guard()
+    assert collect_violations(tmp_path, baseline)
+    assert main(["--root", str(tmp_path), "--baseline", str(baseline)]) == 1

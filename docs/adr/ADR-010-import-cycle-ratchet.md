@@ -28,7 +28,9 @@ helper is pure separator logic and belongs on a leaf path.
 2. CI fails on any pair not listed in the baseline.
 3. `--write-baseline` may **shrink** the allowlist to the current measurement
    and **refuses growth**. Intentional new pairs require a manual baseline edit
-   plus PR justification.
+   plus PR justification. Repository inventory tests use subset / `<=` against
+   the introduction ceiling, not live equality with the checked-in list, so a
+   legitimate shrink does not turn pytest red before `--write-baseline`.
 4. Lazy (function-body) imports are out of scope for edge construction so
    deferred loads remain available as an escape hatch without inventing pairs.
    "Module-level" here means **import-time**: issue

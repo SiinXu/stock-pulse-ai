@@ -375,6 +375,17 @@ added or removed — never fails CI: the guard prints `NOTE:` lines, still exits
 section the guard cannot parse is still rejected as an invalid baseline
 (`ERROR: invalid-baseline: …`, exit `1`), like every other baseline section.
 
+The enforced inventories use the same shrink-is-free convention as the guards:
+repository pins (`test_repository_inventories_are_not_inflated`,
+`test_repository_pair_inventory_is_not_inflated`,
+`test_baseline_hard_ceiling_matches_introduction_inventory`) assert `<=` /
+subset against the introduction ceilings (12 reverse edges, 11 pairs). They
+must not require live equality with the checked-in allowlist, so a later
+legitimate shrink stays green before `--write-baseline`. Growth past those
+ceilings, or a live scan that is not a subset of the allowlist, still fails.
+`scripts/` edits map through `scripts/ci_select_tests.py` to `tests/scripts`,
+so those pins run on selective PR CI.
+
 ## Related CI packaging
 
 `pytest-timeout` and `pytest-cov` are listed in `.github/requirements-ci.txt` and locked through `constraints.txt` via `scripts/check_dependency_locks.py`. Do not hand-edit `constraints.txt`.

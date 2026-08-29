@@ -90,6 +90,15 @@ then live check), next to the other AST ratchets.
 | **Growth** (new intentional pair) | **Not** allowed via `--write-baseline` (it refuses). Manually edit the baseline in the same PR, justify the permanent cycle in the PR body, and preferably file follow-up work to remove it. Prefer not to grow. |
 | Accidental new pair | Fix the code; do not edit the baseline. |
 
+Repository pytest pins follow the same shrink-only shape.
+`test_repository_pair_inventory_is_not_inflated` asserts `<=` / subset against
+the introduction ceiling of 11; it does **not** require the live scan to equal
+the checked-in `pairs` list. A later PR that breaks a cycle stays green without
+rewriting that test.
+`test_pair_inventory_pin_stays_green_after_legitimate_shrink` and
+`test_pair_inventory_pin_fails_on_growth` pin that the named tests plus the
+CLI stay green on shrink and fail on growth.
+
 ## Example: config → services edge
 
 Historically `src.config` / `src.config_parts` imported

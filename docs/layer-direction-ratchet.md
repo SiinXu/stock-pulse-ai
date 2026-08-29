@@ -192,6 +192,17 @@ check), next to the import-cycle ratchet.
 | **Growth** (new reverse edge) | **Not** allowed via `--write-baseline`. Fix the code. Manual baseline expansion requires explicit PR justification and must not raise `hard_ceiling`. Prefer not to grow. |
 | Accidental new reverse edge | Fix the code; do not edit the baseline. |
 
+Repository pytest pins follow the same shrink-only shape as the guard.
+`test_repository_inventories_are_not_inflated` and
+`test_baseline_hard_ceiling_matches_introduction_inventory` assert `<=` /
+subset against the introduction ceiling of 12; they do **not** require the
+live scan to equal the checked-in `exceptions` list. A later PR that removes
+a reverse edge stays green without rewriting those tests.
+`test_enforced_inventory_pin_stays_green_after_legitimate_shrink` and
+`test_enforced_inventory_pin_fails_on_growth` pin that the named tests plus
+the CLI stay green on shrink and fail on growth. Growth of the live scan past
+the allowlist, or of the allowlist / `hard_ceiling` past 12, still fails.
+
 ## Relationship to the import-cycle ratchet
 
 | Guard | Blocks |
