@@ -133,7 +133,7 @@
 - 四个无引用定义直接删除：`--backtest-border-light`、`--backtest-spinner-head`、`--backtest-spinner-track`、`--backtest-table-bg`。
 - 两个在用的描边在 Backtest Workspace 配方处内联为当前 light/dark 的 `hsl(var(--foreground) / alpha)`：`--backtest-border-dim` → `.backtest-metric-row` / `.backtest-summary` 的 `0.05`（`.dark` 下 `0.06`）；`--backtest-border-subtle` → `.backtest-status-chip` 的 `0.06`（无 tone 的 `.dark` 回退为 `0.08`）。成功 / 危险 / 中性 chip 颜色与 `.backtest-metric-footer`（仍为 `--border / 0.40`）不变。
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 100 降到 94；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 26（这六个名字不在格式债清单中）。
-- 因为改用 Layer 1 / `--foreground`，`data-theme-pack="slate"` 可以通过 pack 给这些描边换色，与 pack 契约一致。
+- 这些描边现已使用 Layer 1 既有 `--foreground` 语义 token 加透明度，因此可以跟随覆盖 `--foreground` 的主题包换色；当前 `slate` pack 覆盖 `--border`、不覆盖 `--foreground`，所以目前不会给这些描边换色。
 
 ## 3. 字体阶（全部 Geist）
 

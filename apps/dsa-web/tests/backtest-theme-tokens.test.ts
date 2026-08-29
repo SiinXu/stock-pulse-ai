@@ -10,8 +10,9 @@ import {
 
 /**
  * Phase 2 domain collapse (#1300). The `--backtest-*` family is deleted; Backtest
- * Workspace recipes inline Layer 1 foreground alpha so theme packs recolour the
- * leftover borders. This guard keeps the prefix from coming back and pins the
+ * Workspace recipes inline Layer 1 `--foreground` alpha. Packs that override
+ * `--foreground` could recolour those leftover borders; the current slate pack
+ * does not. This guard keeps the prefix from coming back and pins the
  * replacements plus the lowered page-scoped ceiling.
  */
 const COLLAPSED_BACKTEST_TOKENS = [
@@ -87,6 +88,25 @@ describe('backtest theme tokens', () => {
     expect(indexCss).toContain('.dark .backtest-summary');
     expect(indexCss).toContain('border: 1px solid hsl(var(--foreground) / 0.06)');
     expect(indexCss).toContain('border-top: 1px solid hsl(var(--border) / 0.40)');
+  });
+
+  it('does not treat the current slate pack as a foreground override for leftover borders', () => {
+    const indexCss = readIndexCss();
+    const slateMatch = indexCss.match(/\[data-theme-pack="slate"\]\s*\{([\s\S]*?)\n\}/);
+    const darkSlateMatch = indexCss.match(/\.dark\[data-theme-pack="slate"\]\s*\{([\s\S]*?)\n\}/);
+
+    expect(slateMatch).not.toBeNull();
+    expect(darkSlateMatch).not.toBeNull();
+
+    const slateBlock = slateMatch?.[1] ?? '';
+    const darkSlateBlock = darkSlateMatch?.[1] ?? '';
+    const foregroundDeclaration = /(?:^|\n)\s*--foreground\s*:/;
+    const borderDeclaration = /(?:^|\n)\s*--border\s*:/;
+
+    expect(slateBlock).toMatch(borderDeclaration);
+    expect(slateBlock).not.toMatch(foregroundDeclaration);
+    expect(darkSlateBlock).toMatch(borderDeclaration);
+    expect(darkSlateBlock).not.toMatch(foregroundDeclaration);
   });
 
   it('does not introduce page-scoped backtest tokens on BacktestPage', () => {
