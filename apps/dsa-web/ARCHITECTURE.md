@@ -67,7 +67,8 @@ needed to assemble the application.
 under the behavior/state layer but are not a shared cross-feature facade:
 
 - `usePortfolioProjectionSession` owns account/cost scope acceptance, stale-response rejection,
-  snapshot-to-risk projection, ledger query dispatch, and the refresh surfaces used after writes.
+  snapshot-to-risk projection (TanStack Query schedule), hand-rolled ledger query dispatch, and the
+  refresh surfaces used after writes.
 - `usePortfolioLedgerMutationWorkflow` owns operation identity for the five idempotent ledger
   writes, commit-before-refresh sequencing, paper-trade refresh-only retry, and CSV partial-result
   attempt rotation.
@@ -160,6 +161,7 @@ than a line-count-driven file split.
 | Analysis Workbench dashboard data refresh | `hooks/useDashboardDataRefreshQuery.ts` (via `useDashboardLifecycle`) | First run **per mount** (mount-scoped query key + cache miss) non-silent history + stock-bar + active tasks; initial-loader identity change re-runs non-silent path; later ticks silent at **30s**; explicit `visibilitychange` refetch (`refetchOnWindowFocus: false`); unmount removes schedule cache entry; SSE + 2s disconnected task poll stay custom; `retry: false` | Wave 2 (#789) |
 | `HomePage` attention / Today's Focus / setup-status | `hooks/useHomePageQueries.ts` | Mount + manual refresh only; no poll; no window-focus refetch; Today's Focus key includes language; attention pack uses allSettled so one failed source does not wipe the pack; last-known signal totals stay marked stale; setup silent refresh stays onboarding-owned; unmount removes cache rows; `retry: false`; `staleTime: 0` | Wave 2 (#789) |
 | Header notification bell preview + unread count | `hooks/useUnreadNotifications.ts` | **60s** poll (`pollMs` default 60000, `pageSize` 10, `enabled` true); query key includes `pageSize` only; `list({ pageSize })` + `unreadCount()` via `Promise.allSettled`; last-good per side from live cache after settlement; independent flags; hard error only when both fail; bounded `sourceStatuses` degradation; `retry: false`; `refetchOnWindowFocus: false`; `refetchIntervalInBackground: true`; `networkMode: 'always'` (previous effect always fetched while offline); `staleTime: 0` + unmount/disable/key-change silent cancel + `removeQueries` (no hidden remount or disable-period cache; not `gcTime: 0`); `refresh` void-facing (silent cancel then `refetchQueries` so an initial pending pair is replaced); `markAllSeen` keeps `markAllRead` success/failure/rethrow and, while disabled, updates only `markFailed` so it cannot resurrect the removed row; the disabled shape reports the empty preview with live `markFailed`. Two disclosed divergences from the previous `setInterval` scheduler, both unreachable from the sole consumer: a tick during an in-flight pair joins that fetch instead of starting a second pair, and a runtime `pollMs` change re-arms the interval without an immediate refetch. Cleanup is `removeQueries({ exact: true })`, correct for a **single owner** only — `Shell` mounts the bell on mutually exclusive desktop/mobile branches; a second concurrent owner of this key would need a refcounted discard. Notification Center page stays hand-rolled. | #789 |
+| Portfolio projection snapshot + risk | `hooks/portfolio/usePortfolioProjectionQueries.ts` + `usePortfolioProjectionSession` | Mount + filter-driven / refresh / silent FX follow-up snapshot-then-risk; `retry: false`; no poll; `refetchOnWindowFocus: false`; `staleTime: 0`; snapshot fail clears snapshot+risk and the page hard-error surface; silent `CancelledError` does not clear; risk fail keeps snapshot, sets `riskWarning`, and clears hard error; owner-based `isLoading`; exact-key cancel + `removeQueries` on unmount/account scope. Ledger events stay hand-rolled in the same session hook. | #789 |
 
 ### Rollout rules for the next pages
 
@@ -179,7 +181,7 @@ than a line-count-driven file split.
    the app-root provider; isolated playground unit renders still wrap a test
    client.
 
-Suggested remaining migration order (issue #789): Portfolio projection session → Notification Center page (cursor pagination; header bell preview is migrated) → Settings system-config loads → Screening → Chat/agent status → Backtest / calculators / report compare / event calendar / token usage. Defer surfaces owned by concurrent open PRs.
+Suggested remaining migration order (issue #789): Portfolio projection ledger events (snapshot + risk Query is migrated; events stay hand-rolled) → Notification Center page (cursor pagination; header bell preview is migrated) → Settings system-config loads → Screening → Chat/agent status → Backtest / calculators / report compare / event calendar / token usage. Defer surfaces owned by concurrent open PRs.
 
 ## Change Checklist
 
