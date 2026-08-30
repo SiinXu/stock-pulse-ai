@@ -123,3 +123,8 @@ export type {
   UseTaskStreamOptions,
   UseTaskStreamResult,
 } from './useTaskStream';
+export {
+  SCREEN_TASK_POLL_QUERY_KEY_ROOT,
+  useScreenTaskPollQuery,
+} from './useScreenTaskPollQuery';
+export type { ScreenTaskPollResult } from './useScreenTaskPollQuery';

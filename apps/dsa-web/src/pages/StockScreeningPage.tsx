@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useScreenTaskPollQuery } from '../hooks';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -388,11 +389,14 @@ const StockScreeningPage: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!activeTaskId) return undefined;
+  // Poll body unchanged; only the schedule moved to TanStack Query (Issue
+  // #789). The two `window.setTimeout(pollTask, ...)` continue branches are
+  // now the hook's `refetchInterval`; every terminal branch still ends the
+  // loop through `finishTask()` clearing the task id, which disables the
+  // query. `isActive()` replaces the previous `let active = true` guard.
+  const pollScreenTask = useCallback(async (isActive: () => boolean) => {
+    if (!activeTaskId) return;
     const pollingTaskId = activeTaskId;
-    let active = true;
-    let timer: number | undefined;
 
     function finishTask() {
       clearPersistedScreenTask();
@@ -431,7 +435,6 @@ const StockScreeningPage: React.FC = () => {
       if (isRunningScreenTask(task.status)) {
         setAttemptState('running');
         setError('');
-        timer = window.setTimeout(pollTask, SCREEN_TASK_POLL_INTERVAL_MS);
         return;
       }
 
@@ -441,33 +444,30 @@ const StockScreeningPage: React.FC = () => {
       finishTask();
     }
 
-    async function pollTask() {
-      try {
-        const task = await alphasiftApi.getScreenTask(pollingTaskId);
-        if (!active) return;
-        applyTaskStatus(task);
-      } catch (err) {
-        if (!active) return;
-        const parsedError = getParsedApiError(err, language);
-        if (isUnrecoverableScreenTaskError(parsedError)) {
-          setError(formatParsedApiError(parsedError) || text.taskUnrecoverable);
-          setAttemptResult(null);
-          setAttemptState('failed');
-          finishTask();
-          return;
-        }
-        setError(formatRecoverableScreenTaskPollingError(parsedError, text));
-        setAttemptState('recoverable_poll_error');
-        timer = window.setTimeout(pollTask, SCREEN_TASK_POLL_INTERVAL_MS);
+    try {
+      const task = await alphasiftApi.getScreenTask(pollingTaskId);
+      if (!isActive()) return;
+      applyTaskStatus(task);
+    } catch (err) {
+      if (!isActive()) return;
+      const parsedError = getParsedApiError(err, language);
+      if (isUnrecoverableScreenTaskError(parsedError)) {
+        setError(formatParsedApiError(parsedError) || text.taskUnrecoverable);
+        setAttemptResult(null);
+        setAttemptState('failed');
+        finishTask();
+        return;
       }
+      setError(formatRecoverableScreenTaskPollingError(parsedError, text));
+      setAttemptState('recoverable_poll_error');
     }
-
-    void pollTask();
-    return () => {
-      active = false;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [activeTaskId, applyScreenResult, language, setExpandedCode, text]);
+  }, [activeTaskId, applyScreenResult, language, text]);
+  useScreenTaskPollQuery({
+    taskId: activeTaskId,
+    restartKey: [language],
+    poll: pollScreenTask,
+    intervalMs: SCREEN_TASK_POLL_INTERVAL_MS,
+  });
 
   const handleStrategyChange = (nextStrategy: string) => {
     if (nextStrategy !== strategy) clearScreeningResults();
