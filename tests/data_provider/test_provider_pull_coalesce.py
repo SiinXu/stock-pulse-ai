@@ -5,9 +5,10 @@
 from __future__ import annotations
 
 import threading
+import time
 from datetime import datetime, timezone
 from types import SimpleNamespace
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 from unittest.mock import patch
 
 from src.data_provider.base import DataFetcherManager
@@ -56,6 +57,38 @@ def _freeze_provider_pull_clocks(*, clock: Optional[_Clock] = None) -> _Clock:
         wall_clock=_frozen_wall,
     )
     return injected
+
+
+def _wait_for_provider_pull_coalesced(
+    *,
+    min_count: int = 1,
+    timeout: float = 2.0,
+    extra: Optional[Callable[[], str]] = None,
+) -> None:
+    """Wait until waiters have joined in-flight work before releasing the owner.
+
+    Wired overlap tests block the owner inside the provider loader. Releasing
+    that owner before a waiter claims the shared slot lets the waiter become a
+    second owner of an uncached failure. Poll singleton stats with a bounded
+    Event yield so a timeout reports the last observed counts.
+    """
+    deadline = time.monotonic() + timeout
+    last_stats: dict[str, int] = {}
+    probe = threading.Event()
+    while True:
+        last_stats = get_provider_pull_coalesce().stats()
+        if last_stats.get("coalesced", 0) >= min_count:
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            break
+        probe.wait(timeout=min(0.01, remaining))
+    detail = extra() if extra is not None else ""
+    extra_text = f"; {detail}" if detail else ""
+    raise AssertionError(
+        "timed out waiting for provider pull coalesced>="
+        f"{min_count}; last stats={last_stats}{extra_text}"
+    )
 
 
 class _RecordingLoader:
@@ -526,6 +559,10 @@ def test_wired_realtime_path_coalesces_and_keeps_fallback(mock_get_config) -> No
     )
     backup = _DummyFetcher("AkshareFetcher", 1, result=_quote())
     manager = _manager([primary, backup])
+    # Prime composition-root config on this thread. Isolated cold runs otherwise
+    # spend the started.wait budget inside the first get_application_services()
+    # call and never enter the dummy primary.
+    assert manager._get_fundamental_config().enable_realtime_quote is True
 
     results: List[Any] = [None, None]
     errors: List[BaseException] = []
@@ -543,6 +580,14 @@ def test_wired_realtime_path_coalesces_and_keeps_fallback(mock_get_config) -> No
     for thread in threads:
         thread.start()
     assert started.wait(timeout=2.0)
+    _wait_for_provider_pull_coalesced(
+        min_count=1,
+        extra=lambda: (
+            f"primary.calls={primary.calls} backup.calls={backup.calls} "
+            f"started={started.is_set()} release={release.is_set()} "
+            f"alive={[thread.is_alive() for thread in threads]}"
+        ),
+    )
     release.set()
     for thread in threads:
         thread.join(timeout=5.0)
@@ -554,6 +599,7 @@ def test_wired_realtime_path_coalesces_and_keeps_fallback(mock_get_config) -> No
     assert results[0].fallback_from == "efinance"
     assert primary.calls == 1
     assert backup.calls == 1
+    assert get_provider_pull_coalesce().stats()["coalesced"] >= 1
 
     sequential = manager.get_realtime_quote("600519")
     assert sequential is not None
