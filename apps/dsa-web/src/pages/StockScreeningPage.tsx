@@ -1,4 +1,5 @@
 import type React from 'react';
+import { useScreenTaskPollQuery } from '../hooks/useScreenTaskPollQuery';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -388,11 +389,10 @@ const StockScreeningPage: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
-    if (!activeTaskId) return undefined;
+  // Schedule-only migration: poll body unchanged; continuation is refetchInterval.
+  const pollScreenTask = async (isActive: () => boolean): Promise<true> => {
+    if (!activeTaskId) return true;
     const pollingTaskId = activeTaskId;
-    let active = true;
-    let timer: number | undefined;
 
     function finishTask() {
       clearPersistedScreenTask();
@@ -431,7 +431,6 @@ const StockScreeningPage: React.FC = () => {
       if (isRunningScreenTask(task.status)) {
         setAttemptState('running');
         setError('');
-        timer = window.setTimeout(pollTask, SCREEN_TASK_POLL_INTERVAL_MS);
         return;
       }
 
@@ -441,33 +440,31 @@ const StockScreeningPage: React.FC = () => {
       finishTask();
     }
 
-    async function pollTask() {
-      try {
-        const task = await alphasiftApi.getScreenTask(pollingTaskId);
-        if (!active) return;
-        applyTaskStatus(task);
-      } catch (err) {
-        if (!active) return;
-        const parsedError = getParsedApiError(err, language);
-        if (isUnrecoverableScreenTaskError(parsedError)) {
-          setError(formatParsedApiError(parsedError) || text.taskUnrecoverable);
-          setAttemptResult(null);
-          setAttemptState('failed');
-          finishTask();
-          return;
-        }
-        setError(formatRecoverableScreenTaskPollingError(parsedError, text));
-        setAttemptState('recoverable_poll_error');
-        timer = window.setTimeout(pollTask, SCREEN_TASK_POLL_INTERVAL_MS);
+    try {
+      const task = await alphasiftApi.getScreenTask(pollingTaskId);
+      if (!isActive()) return true;
+      applyTaskStatus(task);
+    } catch (err) {
+      if (!isActive()) return true;
+      const parsedError = getParsedApiError(err, language);
+      if (isUnrecoverableScreenTaskError(parsedError)) {
+        setError(formatParsedApiError(parsedError) || text.taskUnrecoverable);
+        setAttemptResult(null);
+        setAttemptState('failed');
+        finishTask();
+        return true;
       }
+      setError(formatRecoverableScreenTaskPollingError(parsedError, text));
+      setAttemptState('recoverable_poll_error');
     }
-
-    void pollTask();
-    return () => {
-      active = false;
-      if (timer) window.clearTimeout(timer);
-    };
-  }, [activeTaskId, applyScreenResult, language, setExpandedCode, text]);
+    return true;
+  };
+  useScreenTaskPollQuery({
+    taskId: activeTaskId,
+    restartKey: [language],
+    poll: pollScreenTask,
+    intervalMs: SCREEN_TASK_POLL_INTERVAL_MS,
+  });
 
   const handleStrategyChange = (nextStrategy: string) => {
     if (nextStrategy !== strategy) clearScreeningResults();

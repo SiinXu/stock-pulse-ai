@@ -1,0 +1,2 @@
+- [Changed] Schedule the AlphaSift screen-task poll loop through TanStack Query `refetchInterval` instead of a self-chained `setTimeout`, keeping the poll body, status machine, error classification, and 2000ms cadence unchanged (Refs #789).
+- [Docs] Record the StockScreeningPage screen-task poll in the Web architecture TanStack Query migration ledger without closing Issue #789 (Refs #789).

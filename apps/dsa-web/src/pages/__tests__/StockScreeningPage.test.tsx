@@ -1,4 +1,26 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render as baseRender, screen, waitFor, within, type RenderOptions } from '@testing-library/react';
+import { useState } from 'react';
+import type React from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+
+/**
+ * The screen-task poll is scheduled through TanStack Query (Issue #789), so
+ * every render in this file needs a client. Wrapping the local `render`
+ * covers all direct call sites without touching them.
+ */
+function QueryHarness({ children }: { children: React.ReactNode }) {
+  const [client] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  }));
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+
+function render(ui: React.ReactElement, options?: RenderOptions) {
+  return baseRender(ui, { wrapper: QueryHarness, ...options });
+}
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   RouteFocusRegistrationContext,

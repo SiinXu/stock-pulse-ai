@@ -153,6 +153,12 @@ const getVendorChunkName = (id: string): string | undefined => {
   // oversized common-controls chunk. Isolate async-only modules that do not
   // import the first-paint graph so each unnamed JS chunk stays under
   // defaults.jsMaxGzipBytes (Refs #883). Do not add named budget entries.
+  if (normalizedId.endsWith('/src/hooks/useScreenTaskPollQuery.ts')) {
+    // Keep the poll adapter off the StockScreeningPage per-asset glob. The
+    // ScreeningTaskPoll filename is billed to screening-route (Screening*-*.js)
+    // so this is not a budget-hide split (Refs #789 / #883).
+    return 'ScreeningTaskPoll'
+  }
   if (normalizedId.endsWith('/src/components/common/DataTable.tsx')) {
     return 'DataTable'
   }
