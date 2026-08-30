@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { useChatSkillsQuery, useChatContextCompressionQuery } from '../hooks';
+import { useChatMountLoad } from '../hooks/useChatMountLoadsQuery';
 import { useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
 import { History } from 'lucide-react';
@@ -419,7 +419,7 @@ const ChatPage: React.FC = () => {
   }, [loadInitialSession]);
   // Bodies unchanged; only the schedule moved to TanStack Query (Issue #789).
   // `isActive()` replaces the previous `let active = true` unmount guard.
-  const loadSkills = useCallback(async (isActive: () => boolean) => {
+  useChatMountLoad(['chat', 'skills'], async (isActive) => {
     try {
       const res = await agentApi.getSkills();
       if (!isActive()) return;
@@ -431,10 +431,8 @@ const ChatPage: React.FC = () => {
     } finally {
       if (isActive()) setIsSkillsLoading(false);
     }
-  }, []);
-  useChatSkillsQuery(loadSkills);
-
-  const loadContextCompression = useCallback(async (isActive: () => boolean) => {
+  });
+  useChatMountLoad(['chat', 'context-compression'], async (isActive) => {
     try {
       const config = await systemConfigApi.getConfig(false);
       if (!isActive()) return;
@@ -451,8 +449,7 @@ const ChatPage: React.FC = () => {
       setContextCompressionError(parsed.message || t('chat.contextCompressionLoadFailed'));
       console.error('Failed to load context compression setting:', error);
     }
-  }, [t]);
-  useChatContextCompressionQuery(loadContextCompression);
+  });
   const updateContextCompressionEnabled = useCallback(
     async (nextEnabled: boolean) => {
       if (!contextCompressionLoaded || contextCompressionSaving) {
