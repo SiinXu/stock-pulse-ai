@@ -1,5 +1,6 @@
 import type React from 'react';
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render as baseRender, screen, waitFor, within , type RenderOptions } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { StrictMode, useState } from 'react';
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -261,6 +262,25 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   void target;
   return () => {};
 });
+
+/**
+ * The two mount loads are scheduled through TanStack Query (Issue #789), so
+ * every render in this file needs a client. Wrapping the local `render`
+ * covers the six direct `render(...)` call sites as well as `renderChat`.
+ */
+function QueryHarness({ children }: { children: React.ReactNode }) {
+  const [client] = useState(() => new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  }));
+  return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+}
+
+function render(ui: React.ReactElement, options?: RenderOptions) {
+  return baseRender(ui, { wrapper: QueryHarness, ...options });
+}
 
 function renderChat(ui: React.ReactElement, initialEntries: string[] = ['/chat']) {
   return render(

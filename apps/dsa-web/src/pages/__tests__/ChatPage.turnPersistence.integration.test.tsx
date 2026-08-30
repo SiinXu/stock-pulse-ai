@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -140,7 +141,17 @@ describe('ChatPage turn persistence integration', () => {
       [{ path: '/chat', element: <ChatPage /> }],
       { initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=3'] },
     );
-    render(<RouterProvider router={router} />);
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false, refetchOnWindowFocus: false },
+        mutations: { retry: false },
+      },
+    });
+    render(
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} />
+      </QueryClientProvider>,
+    );
 
     const draft = await screen.findByDisplayValue('请深入分析 Apple(AAPL)');
     await waitFor(() => expect(screen.getByRole('button', { name: '发送' })).not.toBeDisabled());
