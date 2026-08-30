@@ -9,4 +9,6 @@ surfaces and test patch targets stay stable (ADR-006 / Issue #1068).
 Owned domains:
 - ``etf`` — ETF history fetch and ETF realtime-quote orchestration methods
 - ``realtime`` — stock-path realtime quote method
+- ``market_boards`` — main indices, market statistics, and sector rankings
+- ``facade_bind`` — ADR-006 clone/bind helpers
 """

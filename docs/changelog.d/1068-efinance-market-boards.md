@@ -1,0 +1,1 @@
+- [Changed] Move efinance main indices, market statistics, and sector rankings into `src/data_provider/efinance_parts/market_boards.py` behind the ADR-006 facade, keeping `EfinanceFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
