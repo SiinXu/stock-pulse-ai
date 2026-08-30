@@ -82,6 +82,11 @@ export {
 } from './useSkillOutcomesQuery';
 export type { SkillOutcomesQueryResult } from './useSkillOutcomesQuery';
 export {
+  BACKTEST_INITIAL_LOAD_QUERY_KEY,
+  useBacktestInitialLoadQuery,
+} from './useBacktestInitialLoadQuery';
+export type { BacktestInitialLoadQueryResult } from './useBacktestInitialLoadQuery';
+export {
   ALERT_NOTIFICATIONS_QUERY_KEY_ROOT,
   ALERT_RULES_QUERY_KEY_ROOT,
   ALERT_TRIGGERS_QUERY_KEY_ROOT,
