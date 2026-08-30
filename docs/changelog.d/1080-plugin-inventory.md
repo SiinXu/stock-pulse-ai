@@ -1,0 +1,2 @@
+- [Chore] Extract PluginManager inventory snapshots into a private mixin (Refs #1080).
+- [Tests] Characterize PluginManager inventory snapshot counterexamples (Refs #1080).
