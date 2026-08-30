@@ -1,6 +1,6 @@
 # Copyright (c) 2026 SiinXu / StockPulse contributors
 # SPDX-License-Identifier: AGPL-3.0-only
-"""Facade identity, reload, and characterization for CN fundamental sub-blocks."""
+"""Facade identity, reload, and characterization for fundamental outcome builders."""
 
 from __future__ import annotations
 
@@ -16,13 +16,7 @@ from unittest.mock import patch
 import pytest
 
 import src.data_provider.base as base
-import src.data_provider.manager_parts.fundamental_cn_context_methods as cn_context
-import src.data_provider.manager_parts.rankings_methods as rankings
-from src.application_services import (
-    ApplicationServices,
-    reset_application_services,
-    set_application_services,
-)
+import src.data_provider.manager_parts.fundamental_outcome_methods as outcome_methods
 from src.data_provider.base import DataFetcherManager
 
 
@@ -33,15 +27,22 @@ OWNER_PATH = (
     / "src"
     / "data_provider"
     / "manager_parts"
-    / "fundamental_cn_context_methods.py"
+    / "fundamental_outcome_methods.py"
 )
 
-
-@pytest.fixture(autouse=True)
-def _reset_application_services() -> None:
-    reset_application_services()
-    yield
-    reset_application_services()
+INSTANCE_NAMES = (
+    "build_failed_fundamental_context",
+    "build_validation_rejected_fundamental_context",
+)
+BLOCK_NAMES = (
+    "valuation",
+    "growth",
+    "earnings",
+    "institution",
+    "capital_flow",
+    "dragon_tiger",
+    "boards",
+)
 
 
 def _descriptor_function(descriptor):
@@ -53,8 +54,8 @@ def _descriptor_function(descriptor):
     return original if original is not None else descriptor
 
 
-def test_cn_context_methods_remain_on_data_fetcher_manager_facade() -> None:
-    for name in cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES:
+def test_outcome_methods_remain_on_data_fetcher_manager_facade() -> None:
+    for name in outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES:
         method = getattr(DataFetcherManager, name)
         assert callable(method), name
         function = _descriptor_function(vars(DataFetcherManager)[name])
@@ -63,35 +64,47 @@ def test_cn_context_methods_remain_on_data_fetcher_manager_facade() -> None:
         assert function.__globals__ is vars(base), name
 
 
-def test_public_cn_context_signatures_are_unchanged() -> None:
-    for name in cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES:
+def test_outcome_signatures_and_descriptor_kinds_are_unchanged() -> None:
+    expected = {
+        "build_failed_fundamental_context": ["self", "stock_code", "reason"],
+        "build_validation_rejected_fundamental_context": [
+            "self",
+            "stock_code",
+            "rejection",
+        ],
+    }
+    for name in outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES:
+        descriptor = vars(DataFetcherManager)[name]
+        source_descriptor = vars(outcome_methods._FundamentalOutcomeMethods)[name]
+        assert name in INSTANCE_NAMES
+        assert not isinstance(descriptor, (staticmethod, classmethod)), name
+        assert not isinstance(source_descriptor, (staticmethod, classmethod)), name
         signature = inspect.signature(getattr(DataFetcherManager, name))
-        assert list(signature.parameters) == ["self", "stock_code", "budget_seconds"]
+        assert list(signature.parameters) == expected[name], name
         for parameter in signature.parameters.values():
-            assert parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
-        assert signature.parameters["budget_seconds"].default is None
+            assert parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD, name
 
 
 def test_moved_names_are_not_validation_wrapped() -> None:
-    for name in cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES:
+    for name in outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES:
         method = DataFetcherManager.__dict__[name]
         assert getattr(method, "_stockpulse_data_validation_wrapper_token", None) is None
 
 
-def test_owner_module_exists_for_cn_context_extraction() -> None:
+def test_owner_module_exists_for_outcome_extraction() -> None:
     assert OWNER_PATH.is_file()
     source = BASE_PATH.read_text(encoding="utf-8")
-    assert "fundamental_cn_context_methods" in source
-    assert "bind_fundamental_cn_context_methods_facade" in source
-    for name in cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES:
+    assert "fundamental_outcome_methods" in source
+    assert "bind_fundamental_outcome_methods_facade" in source
+    for name in outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES:
         assert f"def {name}(" not in source
         assert f"    {name} = None" in source
     importlib.import_module(
-        "src.data_provider.manager_parts.fundamental_cn_context_methods"
+        "src.data_provider.manager_parts.fundamental_outcome_methods"
     )
 
 
-def test_cn_context_bodies_leave_manager_and_stay_callable_on_facade() -> None:
+def test_outcome_bodies_leave_manager_and_stay_callable_on_facade() -> None:
     tree = ast.parse(BASE_PATH.read_text(encoding="utf-8"))
     manager_defs = {
         node.name
@@ -100,14 +113,16 @@ def test_cn_context_bodies_leave_manager_and_stay_callable_on_facade() -> None:
         for node in cls.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    for name in cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES:
+    for name in outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES:
         assert name not in manager_defs, name
         assert callable(getattr(DataFetcherManager, name)), name
 
 
-def test_cn_context_source_descriptors_share_code_not_identity() -> None:
+def test_outcome_source_descriptors_share_code_not_identity() -> None:
     source_names = []
-    for name, source_descriptor in vars(cn_context._FundamentalCnContextMethods).items():
+    for name, source_descriptor in vars(
+        outcome_methods._FundamentalOutcomeMethods
+    ).items():
         source_function = _descriptor_function(source_descriptor)
         if name.startswith("__") or not inspect.isfunction(source_function):
             continue
@@ -115,48 +130,53 @@ def test_cn_context_source_descriptors_share_code_not_identity() -> None:
         facade_function = _descriptor_function(vars(DataFetcherManager)[name])
         assert facade_function is not source_function
         assert facade_function.__code__ is source_function.__code__
-        assert source_function.__module__ == cn_context.__name__
-    assert tuple(source_names) == cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES
+        assert source_function.__module__ == outcome_methods.__name__
+    assert tuple(source_names) == outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES
 
 
-def test_cn_context_placeholders_preserve_descriptor_order() -> None:
+def test_outcome_placeholders_preserve_descriptor_order() -> None:
     names = list(vars(DataFetcherManager))
-    assert names.index("get_fundamental_context") < names.index("get_capital_flow_context")
-    assert names.index("get_capital_flow_context") < names.index("get_dragon_tiger_context")
-    assert names.index("get_dragon_tiger_context") < names.index("get_board_context")
-    assert names.index("get_board_context") < names.index("_get_sector_rankings_with_meta")
+    expected = outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES
+    assert names.index("_build_offshore_fundamental_context") < names.index(
+        "build_failed_fundamental_context"
+    )
+    for left, right in zip(expected, expected[1:]):
+        assert names.index(left) < names.index(right)
+    assert names.index(
+        "build_validation_rejected_fundamental_context"
+    ) < names.index("get_fundamental_context")
 
 
 def test_bind_returns_expected_names_in_class_body_order() -> None:
     dummy = type("DummyDataFetcherManager", (), {})
-    bound = cn_context.bind_fundamental_cn_context_methods_facade(
+    bound = outcome_methods.bind_fundamental_outcome_methods_facade(
         dummy,
         vars(base),
     )
-    assert bound == cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES
+    assert bound == outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES
 
 
 def test_assemble_raises_import_error_on_expected_name_mismatch() -> None:
     dummy = type("DummyDataFetcherManager", (), {})
-    extra = staticmethod(lambda self: {})
-    cn_context._FundamentalCnContextMethods._extra_cn_context = extra
+    extra = lambda self: None  # noqa: E731
+    outcome_methods._FundamentalOutcomeMethods._extra_outcome = extra
     try:
-        bound = cn_context.bind_fundamental_cn_context_methods_facade(
+        bound = outcome_methods.bind_fundamental_outcome_methods_facade(
             dummy,
             vars(base),
         )
         with pytest.raises(
             ImportError,
-            match="Unexpected DataFetcherManager CN fundamental context methods",
+            match="Unexpected DataFetcherManager fundamental outcome methods",
         ):
-            if bound != cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES:
+            if bound != outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES:
                 raise ImportError(
-                    "Unexpected DataFetcherManager CN fundamental context methods: "
+                    "Unexpected DataFetcherManager fundamental outcome methods: "
                     f"{bound!r}"
                 )
-        assert "_extra_cn_context" in bound
+        assert "_extra_outcome" in bound
     finally:
-        delattr(cn_context._FundamentalCnContextMethods, "_extra_cn_context")
+        delattr(outcome_methods._FundamentalOutcomeMethods, "_extra_outcome")
 
 
 def test_owner_module_declares_expected_names_only() -> None:
@@ -164,11 +184,11 @@ def test_owner_module_declares_expected_names_only() -> None:
     defined = {
         node.name
         for cls in tree.body
-        if isinstance(cls, ast.ClassDef) and cls.name == "_FundamentalCnContextMethods"
+        if isinstance(cls, ast.ClassDef) and cls.name == "_FundamentalOutcomeMethods"
         for node in cls.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert defined == set(cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES)
+    assert defined == set(outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES)
 
 
 def test_owner_module_has_zero_bare_get_config_and_forbidden_imports() -> None:
@@ -196,25 +216,6 @@ def test_owner_module_has_zero_bare_get_config_and_forbidden_imports() -> None:
                 )
 
 
-def test_facade_keeps_payload_helpers_timeouts_tickflow_and_prefetch() -> None:
-    tree = ast.parse(BASE_PATH.read_text(encoding="utf-8"))
-    manager_defs = {
-        node.name
-        for cls in tree.body
-        if isinstance(cls, ast.ClassDef) and cls.name == "DataFetcherManager"
-        for node in cls.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-    for name in (
-        "_get_tickflow_fetcher",
-        "prefetch_realtime_quotes",
-        "prefetch_daily_klines",
-    ):
-        assert name in manager_defs, name
-    for name in rankings.EXPECTED_RANKINGS_METHOD_NAMES:
-        assert name not in manager_defs, name
-
-
 def _run_reload_contract(body: str) -> None:
     completed = subprocess.run(
         [
@@ -224,9 +225,9 @@ def _run_reload_contract(body: str) -> None:
                 (
                     "import importlib",
                     "import src.data_provider.base as base",
-                    "import src.data_provider.manager_parts.fundamental_cn_context_methods as cn_context",
+                    "import src.data_provider.manager_parts.fundamental_outcome_methods as outcome_methods",
                     "",
-                    "names = cn_context.EXPECTED_FUNDAMENTAL_CN_CONTEXT_METHOD_NAMES",
+                    "names = outcome_methods.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES",
                     "",
                     "def descriptor_function(descriptor):",
                     "    if isinstance(descriptor, (staticmethod, classmethod)):",
@@ -243,7 +244,7 @@ def _run_reload_contract(body: str) -> None:
                     "    facade = {}",
                     "    for name in names:",
                     "        source[name] = descriptor_function(",
-                    "            vars(cn_context._FundamentalCnContextMethods)[name]",
+                    "            vars(outcome_methods._FundamentalOutcomeMethods)[name]",
                     "        )",
                     "        facade[name] = descriptor_function(",
                     "            vars(base.DataFetcherManager)[name]",
@@ -253,6 +254,11 @@ def _run_reload_contract(body: str) -> None:
                     "        assert facade[name].__globals__ is vars(base)",
                     "        assert facade[name].__module__ == 'src.data_provider.base'",
                     "        assert facade[name].__qualname__ == f'DataFetcherManager.{name}'",
+                    "        assert getattr(",
+                    "            vars(base.DataFetcherManager)[name],",
+                    "            '_stockpulse_data_validation_wrapper_token',",
+                    "            None,",
+                    "        ) is None",
                     "    return source, facade",
                     "",
                     body,
@@ -271,7 +277,7 @@ def test_owner_reload_rebinds_loaded_facade() -> None:
         """
 old_class = base.DataFetcherManager
 before_source, before_facade = bindings()
-cn_context = importlib.reload(cn_context)
+outcome_methods = importlib.reload(outcome_methods)
 assert base.DataFetcherManager is old_class
 after_source, after_facade = bindings()
 for name in names:
@@ -294,7 +300,7 @@ for name in names:
     assert after_base_source[name] is before_source[name]
     assert after_base_facade[name] is not before_facade[name]
 reloaded_class = base.DataFetcherManager
-cn_context = importlib.reload(cn_context)
+outcome_methods = importlib.reload(outcome_methods)
 assert base.DataFetcherManager is reloaded_class
 after_owner_source, after_owner_facade = bindings()
 for name in names:
@@ -312,84 +318,75 @@ def test_package_export_still_exposes_data_fetcher_manager() -> None:
     assert inspect.isclass(PackageManager)
 
 
-def test_facade_patch_object_seam_still_intercepts_capital_flow() -> None:
+def test_failed_payload_status_coverage_and_source_chain() -> None:
     manager = DataFetcherManager(fetchers=[])
-    sentinel = {"status": "ok", "patched": True}
+    context = manager.build_failed_fundamental_context("600519", "provider timeout")
+    assert context["market"] == "cn"
+    assert context["status"] == "failed"
+    assert context["coverage"] == {block: "failed" for block in BLOCK_NAMES}
+    assert context["source_chain"] == [
+        {"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}
+    ]
+    assert context["errors"] == ["provider timeout"]
+    for block in BLOCK_NAMES:
+        assert context[block]["status"] == "failed"
+        assert context[block]["source_chain"] == context["source_chain"]
+
+
+def test_failed_builder_honors_facade_build_fundamental_block_patch() -> None:
+    manager = DataFetcherManager(fetchers=[])
+    sentinel = {"status": "sentinel"}
     with patch.object(
         DataFetcherManager,
-        "get_capital_flow_context",
+        "_build_fundamental_block",
         return_value=sentinel,
-    ) as patched:
-        assert manager.get_capital_flow_context("600519") is sentinel
-    patched.assert_called_once_with("600519")
-
-
-def test_default_root_get_config_patch_still_feeds_cn_timeout() -> None:
-    manager = DataFetcherManager(fetchers=[])
-    cfg = SimpleNamespace(fundamental_fetch_timeout_seconds=0)
-    with patch("src.config.get_config", return_value=cfg), patch.object(
-        manager,
-        "_run_with_retry",
-        side_effect=AssertionError("timeout<=0 must not call retry"),
-    ):
-        capital = manager.get_capital_flow_context("600519")
-        dragon = manager.get_dragon_tiger_context("600519")
-        boards = manager.get_board_context("600519")
-    assert capital["status"] == "failed"
-    assert dragon["status"] == "failed"
-    assert boards["status"] == "failed"
-
-
-def test_injected_application_services_config_wins_over_get_config_patch() -> None:
-    manager = DataFetcherManager(fetchers=[])
-    injected = SimpleNamespace(fundamental_fetch_timeout_seconds=0)
-    patched = SimpleNamespace(fundamental_fetch_timeout_seconds=30)
-    set_application_services(
-        ApplicationServices(
-            config=injected,
-            builtin_plugins=(),
-            plugins_dir="",
-        )
-    )
-    with patch("src.config.get_config", return_value=patched), patch.object(
-        manager,
-        "_run_with_retry",
-        side_effect=AssertionError("injected timeout 0 must not call retry"),
-    ):
-        ctx = manager.get_capital_flow_context("600519")
-    assert ctx["status"] == "failed"
-
-
-def test_get_board_context_calls_rebound_sector_rankings_with_meta() -> None:
-    manager = DataFetcherManager(fetchers=[])
-    facade_rankings = _descriptor_function(
-        vars(DataFetcherManager)["_get_sector_rankings_with_meta"]
-    )
-    owner_rankings = _descriptor_function(
-        vars(rankings._RankingsMethods)["_get_sector_rankings_with_meta"]
-    )
-    assert facade_rankings is not owner_rankings
-    assert facade_rankings.__code__ is owner_rankings.__code__
-    with patch.object(
-        manager,
-        "_get_sector_rankings_with_meta",
-        return_value=([], [], [], "all failed"),
     ) as spy:
-        ctx = manager.get_board_context("600519", budget_seconds=0.5)
-    spy.assert_called_once_with(5)
-    assert ctx["status"] == "failed"
+        context = manager.build_failed_fundamental_context("600519", "boom")
+    assert spy.call_count == len(BLOCK_NAMES)
+    for block in BLOCK_NAMES:
+        assert context[block] is sentinel
 
 
-def test_non_cn_and_etf_remain_not_supported_without_retry() -> None:
+def test_validation_rejected_sanitizes_reason_codes_copies_evidence_and_does_not_claim_provider_failed() -> None:
     manager = DataFetcherManager(fetchers=[])
-    with patch.object(
-        manager,
-        "_run_with_retry",
-        side_effect=AssertionError("not_supported must not call retry"),
-    ):
-        us_ctx = manager.get_capital_flow_context("AAPL", budget_seconds=0.5)
-        etf_ctx = manager.get_dragon_tiger_context("510300", budget_seconds=0.5)
-        hk_boards = manager.get_board_context("hk00700", budget_seconds=0.5)
-    assert us_ctx["status"] == "not_supported"
-    assert etf_ctx["status"] == "not_supported"
-    assert hk_boards["status"] == "not_supported"
+    evidence = {"field": "pe_ratio", "note": "bad"}
+    dirty_code = "https://evil.example/token?k=secret"
+    rejection = SimpleNamespace(
+        reason_codes=("dv_fund_pe_invalid_type", "   ", dirty_code),
+        evidence=evidence,
+    )
+    context = manager.build_validation_rejected_fundamental_context("600519", rejection)
+    sanitized_dirty = base.sanitize_diagnostic_text(dirty_code, max_length=96)
+    assert context["market"] == "cn"
+    assert context["status"] == "validation_rejected"
+    assert context["data_quality"] == "rejected"
+    assert context["source_chain"] == [
+        {"provider": "data_validation", "result": "rejected", "duration_ms": 0}
+    ]
+    assert context["source_chain"][0]["result"] != "failed"
+    assert context["source_chain"][0]["provider"] != "fundamental_pipeline"
+    assert context["coverage"] == {
+        block: "validation_rejected" for block in BLOCK_NAMES
+    }
+    reason_codes = context["validation_rejection"]["reason_codes"]
+    assert "dv_fund_pe_invalid_type" in reason_codes
+    assert "   " not in reason_codes
+    assert dirty_code not in reason_codes
+    assert sanitized_dirty in reason_codes
+    assert context["errors"] == reason_codes
+    assert context["data_quality_evidence"] == [evidence]
+    assert context["data_quality_evidence"][0] is not evidence
+    evidence["note"] = "mutated"
+    assert context["data_quality_evidence"][0]["note"] == "bad"
+
+
+def test_validation_rejected_without_reason_codes_uses_default_and_skips_non_dict_evidence() -> None:
+    manager = DataFetcherManager(fetchers=[])
+    rejection = SimpleNamespace(reason_codes=(), evidence=["not-a-dict"])
+    context = manager.build_validation_rejected_fundamental_context("AAPL", rejection)
+    assert context["market"] == "us"
+    assert context["status"] == "validation_rejected"
+    assert context["errors"] == ["data_validation_rejected"]
+    assert context["validation_rejection"]["reason_codes"] == []
+    assert context["data_quality_evidence"] == []
+    assert context["source_chain"][0]["result"] == "rejected"

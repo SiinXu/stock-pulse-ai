@@ -1109,89 +1109,9 @@ class DataFetcherManager:
     # Rebound from manager_parts.fundamental_loader_methods after the class is built.
     _build_offshore_fundamental_context = None
 
-    def build_failed_fundamental_context(self, stock_code: str, reason: str) -> Dict[str, Any]:
-        """Build a consistent failed-context payload for caller-side fallback."""
-        market = _market_tag(stock_code)
-        block_names = (
-            "valuation",
-            "growth",
-            "earnings",
-            "institution",
-            "capital_flow",
-            "dragon_tiger",
-            "boards",
-        )
-        blocks = {
-            block: self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-                [reason],
-            )
-            for block in block_names
-        }
-        return {
-            "market": market,
-            "status": "failed",
-            "coverage": {block: "failed" for block in block_names},
-            "source_chain": [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-            "errors": [reason],
-            **blocks,
-        }
-
-    def build_validation_rejected_fundamental_context(
-        self,
-        stock_code: str,
-        rejection: Any,
-    ) -> Dict[str, Any]:
-        """Build a typed upper-layer policy outcome without claiming provider failure."""
-        market = _market_tag(stock_code)
-        reason_codes = [
-            sanitize_diagnostic_text(code, max_length=96)
-            for code in getattr(rejection, "reason_codes", ())
-            if sanitize_diagnostic_text(code, max_length=96)
-        ][:24]
-        evidence = getattr(rejection, "evidence", None)
-        evidence_list = [dict(evidence)] if isinstance(evidence, dict) else []
-        source_chain = [
-            {
-                "provider": "data_validation",
-                "result": "rejected",
-                "duration_ms": 0,
-            }
-        ]
-        block_names = (
-            "valuation",
-            "growth",
-            "earnings",
-            "institution",
-            "capital_flow",
-            "dragon_tiger",
-            "boards",
-        )
-        blocks = {
-            block: self._build_fundamental_block(
-                "validation_rejected",
-                {},
-                source_chain,
-                reason_codes or ["data_validation_rejected"],
-            )
-            for block in block_names
-        }
-        return {
-            "market": market,
-            "status": "validation_rejected",
-            "data_quality": "rejected",
-            "coverage": {block: "validation_rejected" for block in block_names},
-            "source_chain": source_chain,
-            "errors": reason_codes or ["data_validation_rejected"],
-            "validation_rejection": {
-                "outcome": "rejected",
-                "reason_codes": reason_codes,
-            },
-            "data_quality_evidence": evidence_list,
-            **blocks,
-        }
+    # Rebound from manager_parts.fundamental_outcome_methods after the class is built.
+    build_failed_fundamental_context = None
+    build_validation_rejected_fundamental_context = None
 
     # Rebound from manager_parts.fundamental_loader_methods after the class is built.
     get_fundamental_context = None
@@ -1214,8 +1134,9 @@ class DataFetcherManager:
 # Keep ``src.data_provider.base.DataFetcherManager`` as the ADR-006 compatibility
 # facade while focused parts own inventory, daily health/cache/execution, realtime,
 # chip, money-flow, fundamental cache/loaders/Config accessor/CN sub-blocks/
-# payload helpers, timeout/retry workers, stock-name, rankings, market-overview,
-# and belong-board. Rebinding preserves method globals and patch seams.
+# payload helpers, timeout/retry workers, failed/rejected outcome builders,
+# stock-name, rankings, market-overview, and belong-board. Rebinding preserves
+# method globals and patch seams.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
@@ -1227,6 +1148,7 @@ from .manager_parts import (  # noqa: E402
     fundamental_cn_context_methods as _fundamental_cn_context_methods_module,
     fundamental_context_methods as _fundamental_context_methods_module,
     fundamental_loader_methods as _fundamental_loader_methods_module,
+    fundamental_outcome_methods as _fundamental_outcome_methods_module,
     fundamental_payload_methods as _fundamental_payload_methods_module,
     fundamental_timeout_methods as _fundamental_timeout_methods_module,
     market_overview_methods as _market_overview_methods_module,
@@ -1507,6 +1429,20 @@ def _assemble_fundamental_timeout_methods_facade(
         )
 
 
+def _assemble_fundamental_outcome_methods_facade(
+    outcome_module=_fundamental_outcome_methods_module,
+) -> None:
+    bound_method_names = outcome_module.bind_fundamental_outcome_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != outcome_module.EXPECTED_FUNDAMENTAL_OUTCOME_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager fundamental outcome methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_rankings_methods_facade(
     rankings_module=_rankings_methods_module,
 ) -> None:
@@ -1556,6 +1492,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_belong_board=_assemble_belong_board_methods_facade,
     assemble_fundamental_payload=_assemble_fundamental_payload_methods_facade,
     assemble_fundamental_timeout=_assemble_fundamental_timeout_methods_facade,
+    assemble_fundamental_outcome=_assemble_fundamental_outcome_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
     assemble_market_overview=_assemble_market_overview_methods_facade,
 ) -> None:
@@ -1576,6 +1513,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_belong_board()
     assemble_fundamental_payload()
     assemble_fundamental_timeout()
+    assemble_fundamental_outcome()
     assemble_rankings()
     assemble_market_overview()
     from .manager_parts.data_validation_wiring import install_facade_validation_wrappers
@@ -1632,6 +1570,9 @@ _fundamental_payload_methods_module._install_facade_reload_hook(
 _fundamental_timeout_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_fundamental_outcome_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _rankings_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -1658,6 +1599,7 @@ del (
     _assemble_belong_board_methods_facade,
     _assemble_fundamental_payload_methods_facade,
     _assemble_fundamental_timeout_methods_facade,
+    _assemble_fundamental_outcome_methods_facade,
     _assemble_rankings_methods_facade,
     _assemble_market_overview_methods_facade,
     _assemble_data_fetcher_manager_facades,
@@ -1680,4 +1622,5 @@ del (
     _belong_board_methods_module,
     _fundamental_payload_methods_module,
     _fundamental_timeout_methods_module,
+    _fundamental_outcome_methods_module,
 )
