@@ -318,6 +318,29 @@ List and unread GET `requestBody` is `never`. This is **not** the auth
 object export-alias pattern: generated snake_case is not the UI type.
 Runtime Zod in `api/notificationInbox.ts` is unchanged.
 
+`apps/dsa-web/src/types/configProfiles.ts` now CamelizeKeys-binds the nine
+generated ConfigProfile/ConfigPreset object components (`ConfigProfileChange`,
+`ConfigProfileDetection`, `ConfigPresetItem`, `ConfigPresetListResponse`,
+`ConfigPresetPreviewResponse`, `ConfigPresetApplyResponse`,
+`ConfigProfileExportResponse`, `ConfigProfileImportPreviewResponse`,
+`ConfigProfileImportApplyResponse`). No enum aliases exist on these schemas;
+do not invent unions. `Override` keeps today's required arrays / `detection` /
+`recommendedPresetId: string | null` versus generated optional `tags` /
+`presets` / `detection` / `recommended_preset_id?` (generated fact; not fixed
+by regenerating OpenAPI). `ConfigPresetApplyRequest` and
+`ConfigProfileImportRequest` are internal only; `configProfilesApi` keeps
+inline camelCase payloads with optional `reloadNow`. Path 200 JSON for GET
+`/api/v1/config-profiles/presets`, POST
+`/api/v1/config-profiles/presets/{preset_id}/preview`, POST
+`/api/v1/config-profiles/presets/{preset_id}/apply`, GET
+`/api/v1/config-profiles/export`, POST `/api/v1/config-profiles/import/preview`,
+and POST `/api/v1/config-profiles/import/apply` is mutually equivalent to those
+components; preview and apply request bodies share `ConfigPresetApplyRequest`;
+import preview and apply request bodies share `ConfigProfileImportRequest`;
+GET `requestBody` is `never`. This is **not** the auth object export-alias
+pattern: generated snake_case is not the UI type. Runtime Zod in
+`api/configProfiles.ts` is unchanged. The module is runtime-empty.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
