@@ -7,11 +7,9 @@
 import { useQuery } from '@tanstack/react-query';
 
 /** Stable query key root for screen-task polling. */
-export const SCREEN_TASK_POLL_QUERY_KEY_ROOT = ['screening', 'task-poll'] as const;
+export const SCREEN_TASK_POLL_QUERY_KEY_ROOT = ['screen', 'poll'] as const;
 
-export type ScreenTaskPollResult = {
-  ok: true;
-};
+export type ScreenTaskPollResult = true;
 
 type UseScreenTaskPollQueryOptions = {
   /** Null disables polling entirely — the previous `if (!activeTaskId) return`. */
@@ -23,7 +21,7 @@ type UseScreenTaskPollQueryOptions = {
    */
   restartKey: readonly unknown[];
   /** One poll step. Must swallow recoverable errors, as the effect body did. */
-  poll: (isActive: () => boolean) => Promise<void>;
+  poll: (isActive: () => boolean) => Promise<true>;
   /**
    * Passed in by the page (``SCREEN_TASK_POLL_INTERVAL_MS``) so this hook does
    * not import from ``components/`` against the architecture direction guard.
@@ -34,17 +32,11 @@ type UseScreenTaskPollQueryOptions = {
 /**
  * Parity with the previous self-scheduling `setTimeout` chain:
  * - First poll fires immediately on task start (query mounts enabled).
- * - Each subsequent poll fires `intervalMs` after the
- *   previous one settles; TanStack schedules `refetchInterval` after a fetch
- *   completes, so polls never overlap, matching the chained timeout.
- * - The loop ends when the page clears the task id (`enabled` drops), which is
- *   the same teardown path `finishTask()` always drove via `setActiveTaskId`.
- * - Recoverable poll errors are swallowed inside `poll`, so the query stays
- *   "successful" and the interval keeps running — the previous catch branch.
- * - `refetchIntervalInBackground: true` keeps hidden-tab polling, matching
- *   `window.setTimeout`. `retry: false`, `staleTime: 0`, and
- *   `networkMode: 'always'` preserve single-attempt, always-fetch behavior.
- * - The `let active = true` unmount guard becomes the abort signal.
+ * - Each subsequent poll fires `intervalMs` after the previous one settles.
+ * - Terminal `finishTask()` nulls the task id and drops `enabled`.
+ * - Recoverable errors are swallowed inside `poll` so the interval continues.
+ * - Hidden-tab, no retry, no focus refetch, always-fetch, abort = unmount guard.
+ * - `staleTime` is left at the TanStack default of 0 (no TTL widening).
  */
 export function useScreenTaskPollQuery({
   taskId,
@@ -52,18 +44,15 @@ export function useScreenTaskPollQuery({
   poll,
   intervalMs,
 }: UseScreenTaskPollQueryOptions) {
+  'use no memo';
   return useQuery({
     queryKey: [...SCREEN_TASK_POLL_QUERY_KEY_ROOT, taskId, ...restartKey],
     enabled: taskId !== null,
-    queryFn: async ({ signal }): Promise<ScreenTaskPollResult> => {
-      await poll(() => !signal.aborted);
-      return { ok: true };
-    },
+    queryFn: ({ signal }) => poll(() => !signal.aborted),
     refetchInterval: intervalMs,
     refetchIntervalInBackground: true,
     retry: false,
     refetchOnWindowFocus: false,
-    staleTime: 0,
     networkMode: 'always',
   });
 }
