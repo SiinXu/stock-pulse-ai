@@ -1,6 +1,8 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { portfolioApi } from '../../api/portfolio';
@@ -9,10 +11,16 @@ import {
   type RouteFocusTarget,
 } from '../../contexts/routeFocusContext';
 import { UiLanguageProvider, useUiLanguage } from '../../contexts/UiLanguageContext';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
+import { chooseOption } from '../../test-utils';
 import { UI_LANGUAGE_STORAGE_KEY } from '../../utils/uiLanguage';
 import type { PaperDecisionQualityResponse } from '../../types/portfolio';
 import PersonalPerformancePage from '../PersonalPerformancePage';
+
+if (!HTMLElement.prototype.scrollIntoView) {
+  HTMLElement.prototype.scrollIntoView = () => {};
+}
 
 vi.mock('../../api/portfolio', () => ({
   portfolioApi: {
@@ -117,8 +125,16 @@ const report: PaperDecisionQualityResponse = {
   },
 };
 
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  return (
+    <QueryClientProvider client={createAppQueryClient()}>
+      {ui}
+    </QueryClientProvider>
+  );
+}
+
 function renderPage(language: 'zh' | 'en' = 'en') {
-  return render(
+  return render(wrapWithQueryClient(
     <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
       <UiLanguageProvider initialLanguage={language}>
         <MemoryRouter initialEntries={[APP_ROUTE_PATHS.portfolioPerformance]}>
@@ -126,7 +142,7 @@ function renderPage(language: 'zh' | 'en' = 'en') {
         </MemoryRouter>
       </UiLanguageProvider>
     </RouteFocusRegistrationContext.Provider>,
-  );
+  ));
 }
 
 describe('PersonalPerformancePage virtualization fallback', () => {
@@ -149,7 +165,7 @@ describe('PersonalPerformancePage virtualization fallback', () => {
   });
 
   it('keeps stacked reason lists on the full DataTable path', async () => {
-    render(
+    render(wrapWithQueryClient(
       <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <MemoryRouter>
           <UiLanguageProvider initialLanguage="en">
@@ -157,7 +173,7 @@ describe('PersonalPerformancePage virtualization fallback', () => {
           </UiLanguageProvider>
         </MemoryRouter>
       </RouteFocusRegistrationContext.Provider>,
-    );
+    ));
 
     expect(await screen.findByText('SYM030')).toBeInTheDocument();
     const table = screen.getByRole('table', { name: 'Trade process breakdown' });
@@ -195,7 +211,7 @@ describe('PersonalPerformancePage presentation', () => {
   });
 
   it('updates reason copy immediately after a language switch', async () => {
-    render(
+    render(wrapWithQueryClient(
       <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
         <UiLanguageProvider initialLanguage="en">
           <MemoryRouter initialEntries={[APP_ROUTE_PATHS.portfolioPerformance]}>
@@ -203,11 +219,54 @@ describe('PersonalPerformancePage presentation', () => {
           </MemoryRouter>
         </UiLanguageProvider>
       </RouteFocusRegistrationContext.Provider>,
-    );
+    ));
     await waitFor(() => expect(screen.getByText('No DecisionSignal or analysis plan was linked to this trade.')).toBeInTheDocument());
     fireEvent.click(screen.getByRole('button', { name: 'switch-language' }));
     await waitFor(() => expect(screen.getByText('这笔成交没有关联的 DecisionSignal 或分析计划。')).toBeInTheDocument());
     expect(screen.queryByText('No DecisionSignal or analysis plan was linked to this trade.')).not.toBeInTheDocument();
+  });
+
+  it('shows the empty paper-account state and does not call quality', async () => {
+    vi.mocked(portfolioApi.getAccounts).mockResolvedValue({
+      accounts: [{ id: 1, name: 'Broker', market: 'us', baseCurrency: 'USD', isActive: true, accountType: 'real' }],
+    });
+    renderPage('en');
+    expect(await screen.findByText('No paper accounts')).toBeInTheDocument();
+    expect(portfolioApi.getPaperDecisionQuality).not.toHaveBeenCalled();
+    expect(screen.queryByText('AAPL')).not.toBeInTheDocument();
+  });
+
+  it('clears the scored report when a refresh hard-errors', async () => {
+    renderPage('en');
+    await waitFor(() => expect(screen.getByText('AAPL')).toBeInTheDocument());
+    vi.mocked(portfolioApi.getPaperDecisionQuality).mockRejectedValueOnce(
+      Object.assign(new Error('server'), { response: { status: 500 } }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh paper decision process quality' }));
+    expect(await screen.findByText('Failed to load process scores')).toBeInTheDocument();
+    expect(screen.queryByText('AAPL')).not.toBeInTheDocument();
+  });
+
+  it('account change fetches quality only', async () => {
+    vi.mocked(portfolioApi.getAccounts).mockResolvedValue({
+      accounts: [
+        { id: 7, name: 'Paper', market: 'us', baseCurrency: 'USD', isActive: true, accountType: 'paper' },
+        { id: 8, name: 'Paper two', market: 'us', baseCurrency: 'USD', isActive: true, accountType: 'paper' },
+      ],
+    });
+    vi.mocked(portfolioApi.getPaperDecisionQuality).mockImplementation(async (accountId: number) => ({
+      ...report,
+      accountId,
+      items: [{ ...report.items[0], symbol: accountId === 7 ? 'AAPL' : 'MSFT' }],
+    }));
+    renderPage('en');
+    await waitFor(() => expect(screen.getByText('AAPL')).toBeInTheDocument());
+    expect(portfolioApi.getAccounts).toHaveBeenCalledTimes(1);
+    chooseOption(screen.getByRole('combobox', { name: 'Paper account' }), '8');
+    expect(await screen.findByText('MSFT')).toBeInTheDocument();
+    expect(screen.queryByText('AAPL')).not.toBeInTheDocument();
+    expect(portfolioApi.getAccounts).toHaveBeenCalledTimes(1);
+    expect(portfolioApi.getPaperDecisionQuality).toHaveBeenLastCalledWith(8, { limit: 50 });
   });
 });
 

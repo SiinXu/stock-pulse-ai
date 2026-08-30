@@ -1,11 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
-import { portfolioApi } from '../api/portfolio';
-import { getParsedApiError, type ParsedApiError } from '../api/error';
 import {
   ApiErrorAlert,
   AppPage,
@@ -22,6 +20,7 @@ import {
 } from '../components/common';
 import { useRouteFocusTarget } from '../components/routing';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import { usePersonalPerformanceQuery } from '../hooks/usePersonalPerformanceQuery';
 import { formatUiText } from '../i18n/uiText';
 import { PERSONAL_PERFORMANCE_TEXT } from '../locales/personalPerformance';
 import {
@@ -30,24 +29,22 @@ import {
 } from '../utils/dataQualityFormat/personalPerformance';
 import { formatEmptyDisplay } from '../utils/dataQualityFormat/unknownCode';
 import { APP_ROUTE_PATHS } from '../routing/routes';
-import type {
-  PaperDecisionQualityItem,
-  PaperDecisionQualityResponse,
-  PortfolioAccountItem,
-} from '../types/portfolio';
+import type { PaperDecisionQualityItem } from '../types/portfolio';
 
 const PersonalPerformancePage: React.FC = () => {
   const { language } = useUiLanguage();
   const text = PERSONAL_PERFORMANCE_TEXT[language];
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
-  const requestIdRef = useRef(0);
-
-  const [accounts, setAccounts] = useState<PortfolioAccountItem[]>([]);
-  const [accountId, setAccountId] = useState<number | null>(null);
-  const [report, setReport] = useState<PaperDecisionQualityResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<ParsedApiError | null>(null);
+  const {
+    accounts,
+    accountId,
+    report,
+    loading,
+    refreshing,
+    error,
+    load,
+    onAccountChange,
+  } = usePersonalPerformanceQuery();
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.portfolioPerformance,
     headingRef: pageHeadingRef,
@@ -62,71 +59,6 @@ const PersonalPerformancePage: React.FC = () => {
     () => accounts.filter((item) => (item.accountType || 'real') === 'paper'),
     [accounts],
   );
-
-  const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    if (mode === 'initial') {
-      setLoading(true);
-    } else {
-      setRefreshing(true);
-    }
-    setError(null);
-    try {
-      const accountList = await portfolioApi.getAccounts(false);
-      if (requestIdRef.current !== requestId) return;
-      const nextAccounts = accountList.accounts ?? [];
-      setAccounts(nextAccounts);
-      const papers = nextAccounts.filter((item) => (item.accountType || 'real') === 'paper');
-      const selected =
-        accountId != null && papers.some((item) => item.id === accountId)
-          ? accountId
-          : papers[0]?.id ?? null;
-      setAccountId(selected);
-      if (selected == null) {
-        setReport(null);
-        return;
-      }
-      const quality = await portfolioApi.getPaperDecisionQuality(selected, { limit: 50 });
-      if (requestIdRef.current !== requestId) return;
-      setReport(quality);
-    } catch (cause) {
-      if (requestIdRef.current !== requestId) return;
-      setReport(null);
-      setError(getParsedApiError(cause));
-    } finally {
-      if (requestIdRef.current === requestId) {
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }
-  }, [accountId]);
-
-  useEffect(() => {
-    void load('initial');
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only initial load
-  }, []);
-
-  const onAccountChange = async (nextId: number) => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    setAccountId(nextId);
-    setRefreshing(true);
-    setError(null);
-    try {
-      const quality = await portfolioApi.getPaperDecisionQuality(nextId, { limit: 50 });
-      if (requestIdRef.current !== requestId) return;
-      setReport(quality);
-    } catch (cause) {
-      if (requestIdRef.current !== requestId) return;
-      setReport(null);
-      setError(getParsedApiError(cause));
-    } finally {
-      if (requestIdRef.current === requestId) {
-        setRefreshing(false);
-      }
-    }
-  };
 
   const aggregateScore = report?.aggregate?.processScore;
   const dims = report?.aggregate?.dimensions ?? {};
