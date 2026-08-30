@@ -4,6 +4,19 @@ import axios from 'axios';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
 
+import type { operations } from '../types/api.generated';
+
+/** Query shape of the generated ``exportResearchPack`` operation. */
+type OpenApiResearchPackQuery = NonNullable<operations['exportResearchPack']['parameters']['query']>;
+/** Fails to compile if the OpenAPI ``format`` enum stops matching this module. */
+type _AssertResearchPackFormat = ResearchPackExportFormat extends NonNullable<OpenApiResearchPackQuery['format']>
+  ? NonNullable<OpenApiResearchPackQuery['format']> extends ResearchPackExportFormat
+    ? true
+    : never
+  : never;
+const _researchPackFormatAnchor: _AssertResearchPackFormat = true;
+void _researchPackFormatAnchor;
+
 export type ResearchPackExportFormat = 'zip' | 'json';
 export type ResearchPackDownloadResult = {
   filename: string; truncated: boolean; contentType: string; byteLength: number; progressHeader: string;

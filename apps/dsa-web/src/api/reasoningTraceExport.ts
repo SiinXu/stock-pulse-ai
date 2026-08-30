@@ -4,6 +4,19 @@ import axios from 'axios';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
 
+import type { operations } from '../types/api.generated';
+
+/** Query shape of the generated ``exportReasoningTrace`` operation. */
+type OpenApiReasoningTraceQuery = NonNullable<operations['exportReasoningTrace']['parameters']['query']>;
+/** Fails to compile if the OpenAPI ``format`` enum stops matching this module. */
+type _AssertReasoningTraceFormat = ReasoningTraceExportFormat extends NonNullable<OpenApiReasoningTraceQuery['format']>
+  ? NonNullable<OpenApiReasoningTraceQuery['format']> extends ReasoningTraceExportFormat
+    ? true
+    : never
+  : never;
+const _reasoningTraceFormatAnchor: _AssertReasoningTraceFormat = true;
+void _reasoningTraceFormatAnchor;
+
 export type ReasoningTraceExportFormat = 'json' | 'markdown';
 
 export type ReasoningTraceDownloadResult = {

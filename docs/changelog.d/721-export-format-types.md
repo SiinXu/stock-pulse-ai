@@ -1,0 +1,1 @@
+- [Changed] Bind the evidence-pack, research-pack, and reasoning-trace export `format` unions in `apps/dsa-web/src/api/` to their generated OpenAPI operation types, so a backend enum change breaks the Web build instead of drifting silently (Refs #721).

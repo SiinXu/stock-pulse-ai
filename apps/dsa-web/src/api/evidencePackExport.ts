@@ -4,6 +4,19 @@ import axios from 'axios';
 import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
 
+import type { operations } from '../types/api.generated';
+
+/** Query shape of the generated ``exportAuditPackage`` operation. */
+type OpenApiEvidencePackQuery = NonNullable<operations['exportAuditPackage']['parameters']['query']>;
+/** Fails to compile if the OpenAPI ``format`` enum stops matching this module. */
+type _AssertEvidencePackFormat = EvidencePackFormat extends NonNullable<OpenApiEvidencePackQuery['format']>
+  ? NonNullable<OpenApiEvidencePackQuery['format']> extends EvidencePackFormat
+    ? true
+    : never
+  : never;
+const _evidencePackFormatAnchor: _AssertEvidencePackFormat = true;
+void _evidencePackFormatAnchor;
+
 export type EvidencePackFormat = 'zip' | 'json';
 export type EvidencePackDownloadResult = {
   filename: string; truncated: boolean; contentType: string; byteLength: number;
