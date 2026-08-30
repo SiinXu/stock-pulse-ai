@@ -123,3 +123,10 @@ export type {
   UseTaskStreamOptions,
   UseTaskStreamResult,
 } from './useTaskStream';
+export {
+  WORKBENCH_SETUP_STATUS_QUERY_KEY,
+  WORKBENCH_ANALYSIS_SKILLS_QUERY_KEY,
+  useWorkbenchSetupStatusQuery,
+  useWorkbenchAnalysisSkillsQuery,
+} from './useWorkbenchMountLoadsQuery';
+export type { WorkbenchMountLoadResult } from './useWorkbenchMountLoadsQuery';
