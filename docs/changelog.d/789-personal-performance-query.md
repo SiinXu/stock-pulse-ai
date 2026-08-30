@@ -1,0 +1,1 @@
+- [Changed] Schedule Personal Performance loads through TanStack Query (Refs #789).
