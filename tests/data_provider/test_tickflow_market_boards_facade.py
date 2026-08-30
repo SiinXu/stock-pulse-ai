@@ -9,15 +9,19 @@ public ``TickFlowFetcher`` class.
 from __future__ import annotations
 
 import ast
-import importlib
 import inspect
+import subprocess
+import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
 import src.data_provider.tickflow_fetcher as tickflow_mod
 import src.data_provider.tickflow_parts.market_boards as boards_mod
 from src.data_provider.tickflow_fetcher import TickFlowFetcher
+from src.data_provider.tickflow_parts.facade_bind import _descriptor_function
+from tests.test_tickflow_fetcher import _FakeClient, _quote
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FACADE_PATH = REPO_ROOT / "src" / "data_provider" / "tickflow_fetcher.py"
@@ -72,6 +76,33 @@ def test_free_names_resolve_through_the_facade_globals(name) -> None:
 def test_signatures_are_unchanged(name) -> None:
     signature = inspect.signature(getattr(TickFlowFetcher, name))
     assert list(signature.parameters) == METHOD_SIGNATURES[name]
+    if name == "get_main_indices":
+        assert signature.parameters["region"].default == "cn"
+    if name == "get_sector_rankings":
+        assert signature.parameters["n"].default == 5
+
+
+def test_source_and_facade_descriptors_share_code_not_identity() -> None:
+    source_names = []
+    for name, source_descriptor in vars(boards_mod._MarketBoardsMethods).items():
+        source_function = _descriptor_function(source_descriptor)
+        if name.startswith("__") or not inspect.isfunction(source_function):
+            continue
+        source_names.append(name)
+        facade_function = _descriptor_function(vars(TickFlowFetcher)[name])
+        assert facade_function is not source_function
+        assert facade_function.__code__ is source_function.__code__
+        assert source_function.__module__ == boards_mod.__name__
+    assert tuple(source_names) == boards_mod.EXPECTED_MARKET_BOARD_METHOD_NAMES == MOVED
+
+
+def test_tickflow_facade_bind_is_the_shared_helper() -> None:
+    from src.data_provider._facade_bind import bind_methods_from_class as shared
+    from src.data_provider.tickflow_parts.facade_bind import (
+        bind_methods_from_class as shim,
+    )
+
+    assert shim is shared
 
 
 def test_owner_module_declares_exactly_the_slice() -> None:
@@ -120,15 +151,28 @@ def test_sector_rankings_cache_attributes_stay_on_the_facade() -> None:
     assert "_sector_rankings_cache_lock" in source
 
 
-def test_moved_bodies_still_reach_a_patched_facade_global() -> None:
-    sentinel = object()
+def test_get_market_stats_calls_patched_facade_normalize_stock_code() -> None:
+    """Moved get_market_stats must hit the facade patch seam in the quote loop."""
+
+    fetcher = TickFlowFetcher(api_key="sk-test")
+    fetcher._client = _FakeClient(universe_data=[_quote("600519.SH", amount=2000.0)])
     original = tickflow_mod.normalize_stock_code
-    try:
-        tickflow_mod.normalize_stock_code = lambda code: sentinel
-        method = TickFlowFetcher.__dict__["get_sector_rankings"]
-        assert method.__globals__["normalize_stock_code"]("600519") is sentinel
-    finally:
-        tickflow_mod.normalize_stock_code = original
+    seen: list[str] = []
+
+    def recording(code):
+        seen.append(code)
+        return original(code)
+
+    with patch(
+        "src.data_provider.tickflow_fetcher.normalize_stock_code",
+        side_effect=recording,
+    ):
+        stats = fetcher.get_market_stats()
+
+    assert stats is not None
+    assert stats["up_count"] == 1
+    loop_calls = [code for code in seen if code == "600519.SH"]
+    assert len(loop_calls) >= 2, seen
 
 
 def test_owner_module_does_not_import_the_facade() -> None:
@@ -142,12 +186,71 @@ def test_owner_module_does_not_import_the_facade() -> None:
     assert not any("tickflow_fetcher" in module for module in imported)
 
 
-def test_owner_reload_rebinds_onto_the_facade() -> None:
-    importlib.reload(boards_mod)
-    for name in MOVED:
-        method = TickFlowFetcher.__dict__[name]
-        assert method.__globals__ is vars(tickflow_mod), name
-        assert method.__qualname__ == f"TickFlowFetcher.{name}", name
+def _run_reload_contract(body: str) -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                (
+                    "import importlib",
+                    "import src.data_provider.tickflow_fetcher as facade",
+                    "import src.data_provider.tickflow_parts.market_boards as boards",
+                    "",
+                    "boards_names = boards.EXPECTED_MARKET_BOARD_METHOD_NAMES",
+                    "",
+                    "def descriptor_function(descriptor):",
+                    "    if isinstance(descriptor, (staticmethod, classmethod)):",
+                    "        descriptor = descriptor.__func__",
+                    "    return descriptor",
+                    "",
+                    "def bindings():",
+                    "    source = {}",
+                    "    bound = {}",
+                    "    owner = boards._MarketBoardsMethods",
+                    "    for name in boards_names:",
+                    "        source[name] = descriptor_function(vars(owner)[name])",
+                    "        bound[name] = descriptor_function(",
+                    "            vars(facade.TickFlowFetcher)[name]",
+                    "        )",
+                    "        assert bound[name] is not source[name]",
+                    "        assert bound[name].__code__ is source[name].__code__",
+                    "        assert bound[name].__globals__ is vars(facade)",
+                    "        assert bound[name].__module__ == (",
+                    "            'src.data_provider.tickflow_fetcher'",
+                    "        )",
+                    "        assert bound[name].__qualname__ == (",
+                    "            f'TickFlowFetcher.{name}'",
+                    "        )",
+                    "    return source, bound",
+                    "",
+                    body,
+                )
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_reloading_boards_rereads_and_rebinds_the_owner() -> None:
+    _run_reload_contract(
+        """
+old_class = facade.TickFlowFetcher
+before_source, before_bound = bindings()
+boards = importlib.reload(boards)
+assert facade.TickFlowFetcher is old_class
+after_source, after_bound = bindings()
+for name in boards_names:
+    assert after_source[name] is not before_source[name]
+    assert after_bound[name] is not before_bound[name]
+    assert after_bound[name].__code__ is after_source[name].__code__
+    assert after_bound[name].__globals__ is vars(facade)
+    assert after_bound[name].__module__ == 'src.data_provider.tickflow_fetcher'
+"""
+    )
 
 
 def test_expected_names_mismatch_is_an_import_error() -> None:

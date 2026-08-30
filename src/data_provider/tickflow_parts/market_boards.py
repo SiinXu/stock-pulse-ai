@@ -19,6 +19,8 @@ import math
 from time import monotonic
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
+from src.utils.sanitize import log_safe_exception
+
 from .facade_bind import bind_methods_from_class
 
 # Facade free-name anchors for flake8 F821. Rebound methods resolve these from
@@ -117,7 +119,15 @@ class _MarketBoardsMethods:
         try:
             quotes = client.quotes.get(universes=[_CN_UNIVERSE_ID])
             self._mark_capability("universe_quotes", True)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Permission denials failover after a top-level record; other errors re-raise.
+            log_safe_exception(
+                logger,
+                "TickFlow universe quotes failed",
+                exc,
+                error_code="tickflow_universe_quotes_failed",
+                level=logging.ERROR,
+                context={"capability": "universe_quotes"},
+            )
             if self._is_universe_permission_error(exc):
                 self._mark_capability("universe_quotes", False)
                 logger.info(
@@ -217,7 +227,15 @@ class _MarketBoardsMethods:
             details = client.universes.batch(sw1_ids)
             quotes = client.quotes.get(universes=[_CN_UNIVERSE_ID])
             self._mark_capability("universe_quotes", True)
-        except Exception as exc:
+        except Exception as exc:  # broad-exception: fallback_recorded - Permission denials failover after a top-level record; other errors re-raise.
+            log_safe_exception(
+                logger,
+                "TickFlow sector rankings fetch failed",
+                exc,
+                error_code="tickflow_sector_rankings_failed",
+                level=logging.ERROR,
+                context={"capability": "universe_quotes"},
+            )
             if self._is_universe_permission_error(exc):
                 self._mark_capability("universe_quotes", False)
                 logger.info("[TickFlowFetcher] SW1 sector rankings are unavailable for current plan")

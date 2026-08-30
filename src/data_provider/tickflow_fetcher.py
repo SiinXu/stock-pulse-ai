@@ -1053,6 +1053,8 @@ from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 def _assemble_tickflow_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
+    global _MarketBoardsMethods
+    _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
     bind_methods_from_class(
         _MarketBoardsMethods,
         TickFlowFetcher,
