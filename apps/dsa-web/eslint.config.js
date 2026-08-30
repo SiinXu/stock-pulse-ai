@@ -13,7 +13,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 // default is error@800; treat 500 as the review soft target.
 const pageLineBaselines = {
   'src/pages/BacktestPage.tsx': 1163,
-  'src/pages/ChatPage.tsx': 1110,
+  'src/pages/ChatPage.tsx': 1084,
   'src/pages/DecisionSignalsPage.tsx': 1513,
   'src/pages/HomePage.tsx': 833,
   'src/pages/ResearchAnalysisWorkbenchPage.tsx': 1406,

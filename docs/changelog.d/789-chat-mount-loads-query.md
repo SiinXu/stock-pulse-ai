@@ -1,0 +1,1 @@
+- [Changed] Schedule the Chat page skills and context-compression mount loads through TanStack Query instead of bare `useEffect` guards, keeping both load bodies, state writes, and error surfaces unchanged (Refs #789).

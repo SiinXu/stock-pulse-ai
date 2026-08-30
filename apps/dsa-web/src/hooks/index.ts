@@ -82,6 +82,13 @@ export {
 } from './useSkillOutcomesQuery';
 export type { SkillOutcomesQueryResult } from './useSkillOutcomesQuery';
 export {
+  CHAT_SKILLS_QUERY_KEY,
+  CHAT_CONTEXT_COMPRESSION_QUERY_KEY,
+  useChatSkillsQuery,
+  useChatContextCompressionQuery,
+} from './useChatMountLoadsQuery';
+export type { ChatMountLoadResult } from './useChatMountLoadsQuery';
+export {
   ALERT_NOTIFICATIONS_QUERY_KEY_ROOT,
   ALERT_RULES_QUERY_KEY_ROOT,
   ALERT_TRIGGERS_QUERY_KEY_ROOT,

@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useChatSkillsQuery, useChatContextCompressionQuery } from '../hooks';
 import { useSearchParams } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
 import { History } from 'lucide-react';
@@ -416,65 +417,42 @@ const ChatPage: React.FC = () => {
   useEffect(() => {
     void loadInitialSession(initialUrlSessionIdRef.current);
   }, [loadInitialSession]);
-  useEffect(() => {
-    let active = true;
-
-    void agentApi.getSkills()
-      .then((res) => {
-        if (!active) {
-          return;
-        }
-        setSkills(res.skills);
-        const defaultId =
-          res.default_skill_id ||
-          res.skills[0]?.id ||
-          '';
-        setDefaultSkillIds(defaultId ? [defaultId] : []);
-      })
-      .catch((error) => {
-        if (active) {
-          console.error('Failed to load chat skills:', error);
-        }
-      })
-      .finally(() => {
-        if (active) {
-          setIsSkillsLoading(false);
-        }
-      });
-
-    return () => {
-      active = false;
-    };
+  // Bodies unchanged; only the schedule moved to TanStack Query (Issue #789).
+  // `isActive()` replaces the previous `let active = true` unmount guard.
+  const loadSkills = useCallback(async (isActive: () => boolean) => {
+    try {
+      const res = await agentApi.getSkills();
+      if (!isActive()) return;
+      setSkills(res.skills);
+      const defaultId = res.default_skill_id || res.skills[0]?.id || '';
+      setDefaultSkillIds(defaultId ? [defaultId] : []);
+    } catch (error) {
+      if (isActive()) console.error('Failed to load chat skills:', error);
+    } finally {
+      if (isActive()) setIsSkillsLoading(false);
+    }
   }, []);
-  useEffect(() => {
-    let active = true;
+  useChatSkillsQuery(loadSkills);
 
-    void systemConfigApi.getConfig(false)
-      .then((config) => {
-        if (!active) {
-          return;
-        }
-        const enabledItem = config.items.find((item) => item.key === CONTEXT_COMPRESSION_CONFIG_KEY);
-        setContextCompressionEnabled(String(enabledItem?.value ?? '').trim().toLowerCase() === 'true');
-        setContextCompressionConfigVersion(config.configVersion);
-        setContextCompressionMaskToken(config.maskToken || '******');
-        setContextCompressionLoaded(true);
-        setContextCompressionError(null);
-      })
-      .catch((error) => {
-        if (!active) {
-          return;
-        }
-        const parsed = getParsedApiError(error);
-        setContextCompressionLoaded(false);
-        setContextCompressionError(parsed.message || t('chat.contextCompressionLoadFailed'));
-        console.error('Failed to load context compression setting:', error);
-      });
-
-    return () => {
-      active = false;
-    };
+  const loadContextCompression = useCallback(async (isActive: () => boolean) => {
+    try {
+      const config = await systemConfigApi.getConfig(false);
+      if (!isActive()) return;
+      const enabledItem = config.items.find((item) => item.key === CONTEXT_COMPRESSION_CONFIG_KEY);
+      setContextCompressionEnabled(String(enabledItem?.value ?? '').trim().toLowerCase() === 'true');
+      setContextCompressionConfigVersion(config.configVersion);
+      setContextCompressionMaskToken(config.maskToken || '******');
+      setContextCompressionLoaded(true);
+      setContextCompressionError(null);
+    } catch (error) {
+      if (!isActive()) return;
+      const parsed = getParsedApiError(error);
+      setContextCompressionLoaded(false);
+      setContextCompressionError(parsed.message || t('chat.contextCompressionLoadFailed'));
+      console.error('Failed to load context compression setting:', error);
+    }
   }, [t]);
+  useChatContextCompressionQuery(loadContextCompression);
   const updateContextCompressionEnabled = useCallback(
     async (nextEnabled: boolean) => {
       if (!contextCompressionLoaded || contextCompressionSaving) {
