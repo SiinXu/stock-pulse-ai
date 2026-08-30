@@ -15,8 +15,11 @@ Caller / import / patch inventory (must stay stable):
 
 from __future__ import annotations
 
+import inspect
+import logging
 from dataclasses import dataclass
 from pathlib import Path
+from unittest.mock import patch
 
 import src.plugins as plugins_root
 import src.plugins.manager as manager_mod
@@ -396,6 +399,9 @@ def test_extracted_permission_helpers_match_manager_decisions() -> None:
     assert issubclass(PluginManager, PluginSettingsUpdateMixin)
     assert issubclass(PluginManager, PluginSettingsQueryMixin)
     assert issubclass(PluginManager, PluginSnapshotMixin)
+    from src.plugins.registration import PluginRegistrationMixin
+
+    assert issubclass(PluginManager, PluginRegistrationMixin)
     assert load_time_permission_error(manifest=ok, registrations=()) is None
 
 
@@ -426,6 +432,7 @@ def test_split_modules_remain_internal_host_details() -> None:
     assert "PluginSettingsUpdateMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginSettingsQueryMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginSnapshotMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "PluginRegistrationMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "select_load_ids" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginState" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
@@ -460,12 +467,14 @@ def test_settings_query_mixin_owner_stays_internal() -> None:
     from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
     assert issubclass(PluginManager, PluginSettingsQueryMixin)
+    from src.plugins.registration import PluginRegistrationMixin
     from src.plugins.snapshot import PluginSnapshotMixin
 
     assert PluginManager.__bases__ == (
         PluginSettingsUpdateMixin,
         PluginSettingsQueryMixin,
         PluginSnapshotMixin,
+        PluginRegistrationMixin,
         PluginLifecycleMixin,
     )
     assert PluginSettingsQueryMixin.__module__ == "src.plugins.settings_query"
@@ -490,6 +499,7 @@ def test_snapshot_mixin_owner_stays_internal() -> None:
     from src.plugins.lifecycle import PluginLifecycleMixin
     from src.plugins.settings_query import PluginSettingsQueryMixin
     from src.plugins.settings_update import PluginSettingsUpdateMixin
+    from src.plugins.registration import PluginRegistrationMixin
     from src.plugins.snapshot import PluginSnapshotMixin
     from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
@@ -498,6 +508,7 @@ def test_snapshot_mixin_owner_stays_internal() -> None:
         PluginSettingsUpdateMixin,
         PluginSettingsQueryMixin,
         PluginSnapshotMixin,
+        PluginRegistrationMixin,
         PluginLifecycleMixin,
     )
     assert PluginSnapshotMixin.__module__ == "src.plugins.snapshot"
@@ -518,11 +529,17 @@ def test_snapshot_mixin_owner_stays_internal() -> None:
 
 
 def test_register_and_contains_remain_manager_owned() -> None:
-    assert PluginManager.register.__module__ == "src.plugins.manager"
-    assert PluginManager.contains.__module__ == "src.plugins.manager"
     assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.manager"
     assert PluginManager.health_check.__module__ == "src.plugins.manager"
     assert PluginManager.bind_lifecycle_auditor.__module__ == "src.plugins.manager"
+    assert PluginManager.registrations.__module__ == "src.plugins.manager"
+    assert PluginManager.enabled_registrations.__module__ == "src.plugins.manager"
+    assert PluginManager.enabled_registrations_snapshot.__module__ == "src.plugins.manager"
+    assert PluginManager.enabled_native_owner_registrations_snapshot.__module__ == (
+        "src.plugins.manager"
+    )
+    assert PluginManager.registration_snapshot_generation.__module__ == "src.plugins.manager"
+    assert PluginManager.compatibility_error.__module__ == "src.plugins.manager"
 
 
 def test_snapshot_reloadable_matrix(tmp_path: Path) -> None:
@@ -615,10 +632,14 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
         "assert issubclass(\n"
         "    manager.PluginManager, snapshot.PluginSnapshotMixin\n"
         ")\n"
+        "assert issubclass(\n"
+        "    manager.PluginManager, registration.PluginRegistrationMixin\n"
+        ")\n"
         "assert manager.PluginManager.__bases__ == (\n"
         "    settings_update.PluginSettingsUpdateMixin,\n"
         "    settings_query.PluginSettingsQueryMixin,\n"
         "    snapshot.PluginSnapshotMixin,\n"
+        "    registration.PluginRegistrationMixin,\n"
         "    lifecycle.PluginLifecycleMixin,\n"
         ")\n"
         "assert manager.PluginState is loader.PluginState\n"
@@ -638,9 +659,19 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
         "snapshot.PluginSnapshotMixin.plugin_ids\n"
         "assert manager.PluginManager._build_snapshot is "
         "snapshot.PluginSnapshotMixin._build_snapshot\n"
+        "assert manager.PluginManager.register is "
+        "registration.PluginRegistrationMixin.register\n"
+        "assert manager.PluginManager.contains is "
+        "registration.PluginRegistrationMixin.contains\n"
         "assert manager.PluginManager.register.__module__ == "
-        "'src.plugins.manager'\n"
+        "'src.plugins.registration'\n"
         "assert manager.PluginManager.contains.__module__ == "
+        "'src.plugins.registration'\n"
+        "assert manager.PluginManager.capability_inventory_snapshot."
+        "__module__ == 'src.plugins.manager'\n"
+        "assert manager.PluginManager.health_check.__module__ == "
+        "'src.plugins.manager'\n"
+        "assert manager.PluginManager.bind_lifecycle_auditor.__module__ == "
         "'src.plugins.manager'\n"
     )
     scripts = (
@@ -650,6 +681,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.registration as registration\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -659,6 +691,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.snapshot as snapshot\n"
+            "import src.plugins.registration as registration\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -668,6 +701,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.snapshot as snapshot\n"
+            "import src.plugins.registration as registration\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -677,6 +711,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.snapshot as snapshot\n"
+            "import src.plugins.registration as registration\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -686,6 +721,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.registration as registration\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -695,7 +731,18 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.registration as registration\n"
             "import src.plugins.manager as manager\n"
+        )
+        + assertions,
+        (
+            "import src.plugins.registration as registration\n"
+            "import src.plugins.manager as manager\n"
+            "import src.plugins.snapshot as snapshot\n"
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.loader as loader\n"
         )
         + assertions,
     )
@@ -709,3 +756,227 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             env=env,
         )
         assert completed.returncode == 0, completed.stderr
+
+
+class _RaisingManifestPlugin(Plugin):
+    @property
+    def manifest(self):  # type: ignore[override]
+        raise RuntimeError("manifest boom")
+
+
+class _NonManifestPlugin(Plugin):
+    @property
+    def manifest(self):  # type: ignore[override]
+        return object()
+
+
+def test_registration_mixin_owner_stays_internal() -> None:
+    from src.plugins.lifecycle import PluginLifecycleMixin
+    from src.plugins.registration import PluginRegistrationMixin
+    from src.plugins.settings_query import PluginSettingsQueryMixin
+    from src.plugins.settings_update import PluginSettingsUpdateMixin
+    from src.plugins.snapshot import PluginSnapshotMixin
+    from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+
+    assert issubclass(PluginManager, PluginRegistrationMixin)
+    assert PluginManager.__bases__ == (
+        PluginSettingsUpdateMixin,
+        PluginSettingsQueryMixin,
+        PluginSnapshotMixin,
+        PluginRegistrationMixin,
+        PluginLifecycleMixin,
+    )
+    assert PluginRegistrationMixin.__module__ == "src.plugins.registration"
+    assert PluginManager.register.__module__ == "src.plugins.registration"
+    assert PluginManager.contains.__module__ == "src.plugins.registration"
+    assert PluginManager.__module__ == "src.plugins.manager"
+    assert PluginManager.register is PluginRegistrationMixin.register
+    assert PluginManager.contains is PluginRegistrationMixin.contains
+    assert "PluginRegistrationMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert not hasattr(plugins_root, "PluginRegistrationMixin")
+    assert "PluginRegistrationMixin" not in manager_mod.__all__
+    assert "PluginRegistrationMixin" not in getattr(plugins_root, "__all__", ())
+    assert plugins_root.PluginManager is manager_mod.PluginManager
+
+    register_params = inspect.signature(PluginManager.register).parameters
+    assert register_params["plugin"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+    assert register_params["source"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert register_params["package_root"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert register_params["package_root"].default is None
+    assert register_params["module_name"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert register_params["module_name"].default is None
+    contains_params = inspect.signature(PluginManager.contains).parameters
+    assert tuple(contains_params) == ("self", "plugin_id")
+    assert contains_params["plugin_id"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+    assert contains_params["plugin_id"].default is inspect.Parameter.empty
+
+
+def test_register_rejects_invalid_source_on_facade() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("source-plugin"), "source")
+    invalid = manager.register(plugin, source="invalid")  # type: ignore[arg-type]
+    assert invalid.success is False
+    assert invalid.plugin_id == "unknown"
+    assert invalid.state == "failed"
+    assert invalid.error_code == "plugin_source_invalid"
+    non_str = manager.register(plugin, source=[])  # type: ignore[arg-type]
+    assert non_str.error_code == "plugin_source_invalid"
+    assert non_str.plugin_id == "unknown"
+    assert non_str.state == "failed"
+    assert manager.contains("source-plugin") is False
+    assert manager.plugin_ids() == ()
+
+
+def test_register_rejects_non_plugin_object_without_occupancy() -> None:
+    manager = _manager()
+    before = manager.capability_inventory_snapshot()[0]
+    result = manager.register(object(), source="builtin")  # type: ignore[arg-type]
+    assert result.success is False
+    assert result.plugin_id == "unknown"
+    assert result.state == "failed"
+    assert result.error_code == "plugin_type_invalid"
+    assert manager.contains("unknown") is False
+    assert manager.plugin_ids() == ()
+    assert manager.capability_inventory_snapshot()[0] == before
+    assert before.split(",")[0] == "lifecycle:0"
+
+
+def test_register_rejects_manifest_access_exception_and_logs(caplog) -> None:
+    from src.utils.sanitize import log_safe_exception as real_log_safe_exception
+
+    manager = _manager()
+    plugin = _RaisingManifestPlugin(_manifest("boom-plugin"))
+    with caplog.at_level(logging.ERROR, logger="src.plugins.manager"):
+        with patch(
+            "src.plugins.registration.log_safe_exception",
+            wraps=real_log_safe_exception,
+        ) as logged:
+            result = manager.register(plugin, source="builtin")
+    assert result.success is False
+    assert result.plugin_id == "unknown"
+    assert result.state == "failed"
+    assert result.error_code == "plugin_manifest_invalid"
+    assert manager.contains("boom-plugin") is False
+    assert manager.plugin_ids() == ()
+    logged.assert_called_once()
+    assert logged.call_args.args[0].name == "src.plugins.manager"
+    assert logged.call_args.args[1] == "Plugin manifest access failed"
+    assert logged.call_args.kwargs["error_code"] == "plugin_manifest_invalid"
+    assert any(
+        record.name == "src.plugins.manager"
+        and "Plugin manifest access failed" in record.getMessage()
+        and "plugin_manifest_invalid" in record.getMessage()
+        for record in caplog.records
+    )
+
+
+def test_register_rejects_non_manifest_without_insert() -> None:
+    manager = _manager()
+    plugin = _NonManifestPlugin(_manifest("bad-manifest-plugin"))
+    result = manager.register(plugin, source="builtin")
+    assert result.success is False
+    assert result.plugin_id == "unknown"
+    assert result.state == "failed"
+    assert result.error_code == "plugin_manifest_invalid"
+    assert manager.contains("bad-manifest-plugin") is False
+    assert manager.plugin_ids() == ()
+    assert manager.capability_inventory_snapshot()[0].split(",")[0] == "lifecycle:0"
+
+
+def test_register_rejects_incompatible_versions_without_occupancy() -> None:
+    manager = PluginManager(application_version="1.5.0", supported_api_versions=("1",))
+    future = manager.register(
+        _RecordingPlugin(_manifest("future-plugin", min_app_version="2.0.0")),
+        source="builtin",
+    )
+    api = manager.register(
+        _RecordingPlugin(_manifest("api-plugin", api_version="2")),
+        source="builtin",
+    )
+    assert future.error_code == "plugin_app_version_unsupported"
+    assert api.error_code == "plugin_api_version_unsupported"
+    assert future.state == "failed"
+    assert api.state == "failed"
+    assert manager.plugin_ids() == ()
+    assert manager.contains("future-plugin") is False
+    assert manager.contains("api-plugin") is False
+
+
+def test_register_duplicate_keeps_existing_registered_state() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("dup-registered"), "dup-registered")
+    first = manager.register(plugin, source="builtin")
+    assert first.success is True
+    assert first.state == "registered"
+    duplicate = manager.register(
+        _RecordingPlugin(_manifest("dup-registered"), "dup-registered-2"),
+        source="external",
+    )
+    assert duplicate.success is False
+    assert duplicate.error_code == "plugin_id_conflict"
+    assert duplicate.state == "registered"
+    assert manager.contains("dup-registered") is True
+    assert manager.plugin_ids() == ("dup-registered",)
+
+
+def test_register_duplicate_after_enable_keeps_existing_state() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("dup-enabled"), "dup-enabled")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("dup-enabled").success is True
+    snapshot = manager.snapshot("dup-enabled")
+    assert snapshot is not None
+    assert snapshot.state == "enabled"
+    duplicate = manager.register(
+        _RecordingPlugin(_manifest("dup-enabled"), "dup-enabled-2"),
+        source="external",
+    )
+    assert duplicate.success is False
+    assert duplicate.error_code == "plugin_id_conflict"
+    assert duplicate.state == "enabled"
+    assert manager.contains("dup-enabled") is True
+    enabled = manager.snapshot("dup-enabled")
+    assert enabled is not None
+    assert enabled.state == "enabled"
+
+
+def test_register_success_contains_and_generation_counterexamples() -> None:
+    manager = _manager()
+    rejected = manager.register(
+        _RecordingPlugin(_manifest("future-gen", min_app_version="9.0.0")),
+        source="builtin",
+    )
+    assert rejected.success is False
+    assert rejected.error_code == "plugin_app_version_unsupported"
+    failed_generation = manager.capability_inventory_snapshot()[0]
+    assert failed_generation.split(",")[0] == "lifecycle:0"
+    assert manager.contains("future-gen") is False
+
+    plugin = _RecordingPlugin(_manifest("ok-plugin"), "ok")
+    result = manager.register(plugin, source="builtin")
+    assert result.success is True
+    assert result.state == "registered"
+    assert result.operation == "register"
+    assert plugin.load_count == 0
+    assert manager.contains("ok-plugin") is True
+    assert manager.contains("missing") is False
+    success_generation, lifecycle, _ = manager.capability_inventory_snapshot()
+    assert success_generation.split(",")[0] == "lifecycle:1"
+    assert all(isinstance(item, manager_mod.PluginSnapshot) for item in lifecycle)
+    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.manager"
+    assert PluginManager._build_snapshot.__module__ == "src.plugins.snapshot"
+
+
+def test_registration_source_keeps_classified_marker_and_bans_manager_import() -> None:
+    import src.plugins.registration as registration_mod
+
+    source_path = Path(registration_mod.__file__).read_text(encoding="utf-8")
+    assert (
+        "except Exception as exc:  # broad-exception: fallback_recorded - "
+        "Manifest access failure is safely logged and rejected before registration."
+    ) in source_path
+    assert 'logging.getLogger("src.plugins.manager")' in source_path
+    assert "from .manager import" not in source_path
+    assert "from src.plugins.manager" not in source_path
+    assert "import src.plugins.manager" not in source_path
+    assert registration_mod.logger.name == "src.plugins.manager"

@@ -210,7 +210,7 @@ External plugins should import only:
 
 Do not import `PluginManager`, `ExternalPluginLoader`, private
 `src.plugins.*` modules (`permissions`, `lifecycle`, `loader`, `settings_update`,
-`settings_query`, `snapshot` internals), or invent a seventh extension point name. Host composition continues
+`settings_query`, `snapshot`, `registration` internals), or invent a seventh extension point name. Host composition continues
 to use the `PluginManager` facade; the split modules are not an author API.
 
 Lifecycle is always:

@@ -1,0 +1,2 @@
+- [Chore] Extract PluginManager register occupancy into a private mixin (Refs #1080).
+- [Tests] Characterize PluginManager.register occupancy counterexamples (Refs #1080).
