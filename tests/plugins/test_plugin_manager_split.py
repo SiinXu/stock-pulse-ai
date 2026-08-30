@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 import src.plugins as plugins_root
 import src.plugins.manager as manager_mod
 from src.plugins import (
@@ -433,6 +435,7 @@ def test_split_modules_remain_internal_host_details() -> None:
     assert "PluginSettingsQueryMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginSnapshotMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginRegistrationMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "PluginInventoryMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "select_load_ids" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginState" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
@@ -467,6 +470,7 @@ def test_settings_query_mixin_owner_stays_internal() -> None:
     from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
     assert issubclass(PluginManager, PluginSettingsQueryMixin)
+    from src.plugins.inventory import PluginInventoryMixin
     from src.plugins.registration import PluginRegistrationMixin
     from src.plugins.snapshot import PluginSnapshotMixin
 
@@ -475,6 +479,7 @@ def test_settings_query_mixin_owner_stays_internal() -> None:
         PluginSettingsQueryMixin,
         PluginSnapshotMixin,
         PluginRegistrationMixin,
+        PluginInventoryMixin,
         PluginLifecycleMixin,
     )
     assert PluginSettingsQueryMixin.__module__ == "src.plugins.settings_query"
@@ -496,6 +501,7 @@ def test_snapshot_unknown_id_returns_none() -> None:
 
 
 def test_snapshot_mixin_owner_stays_internal() -> None:
+    from src.plugins.inventory import PluginInventoryMixin
     from src.plugins.lifecycle import PluginLifecycleMixin
     from src.plugins.settings_query import PluginSettingsQueryMixin
     from src.plugins.settings_update import PluginSettingsUpdateMixin
@@ -509,6 +515,7 @@ def test_snapshot_mixin_owner_stays_internal() -> None:
         PluginSettingsQueryMixin,
         PluginSnapshotMixin,
         PluginRegistrationMixin,
+        PluginInventoryMixin,
         PluginLifecycleMixin,
     )
     assert PluginSnapshotMixin.__module__ == "src.plugins.snapshot"
@@ -529,17 +536,23 @@ def test_snapshot_mixin_owner_stays_internal() -> None:
 
 
 def test_register_and_contains_remain_manager_owned() -> None:
-    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.manager"
     assert PluginManager.health_check.__module__ == "src.plugins.manager"
     assert PluginManager.bind_lifecycle_auditor.__module__ == "src.plugins.manager"
-    assert PluginManager.registrations.__module__ == "src.plugins.manager"
-    assert PluginManager.enabled_registrations.__module__ == "src.plugins.manager"
-    assert PluginManager.enabled_registrations_snapshot.__module__ == "src.plugins.manager"
-    assert PluginManager.enabled_native_owner_registrations_snapshot.__module__ == (
-        "src.plugins.manager"
-    )
-    assert PluginManager.registration_snapshot_generation.__module__ == "src.plugins.manager"
     assert PluginManager.compatibility_error.__module__ == "src.plugins.manager"
+    assert PluginManager.registrations.__module__ == "src.plugins.inventory"
+    assert PluginManager.enabled_registrations.__module__ == "src.plugins.inventory"
+    assert PluginManager.enabled_registrations_snapshot.__module__ == (
+        "src.plugins.inventory"
+    )
+    assert PluginManager.enabled_native_owner_registrations_snapshot.__module__ == (
+        "src.plugins.inventory"
+    )
+    assert PluginManager.registration_snapshot_generation.__module__ == (
+        "src.plugins.inventory"
+    )
+    assert PluginManager.capability_inventory_snapshot.__module__ == (
+        "src.plugins.inventory"
+    )
 
 
 def test_snapshot_reloadable_matrix(tmp_path: Path) -> None:
@@ -605,7 +618,7 @@ def test_capability_inventory_snapshot_stays_facade_owned() -> None:
     assert all(isinstance(item, manager_mod.PluginSnapshot) for item in lifecycle)
     assert tuple(item.manifest.id for item in lifecycle) == ("inventory-plugin",)
     assert registrations != ()
-    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.manager"
+    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.inventory"
     assert PluginManager._build_snapshot.__module__ == "src.plugins.snapshot"
 
 
@@ -635,11 +648,15 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
         "assert issubclass(\n"
         "    manager.PluginManager, registration.PluginRegistrationMixin\n"
         ")\n"
+        "assert issubclass(\n"
+        "    manager.PluginManager, inventory.PluginInventoryMixin\n"
+        ")\n"
         "assert manager.PluginManager.__bases__ == (\n"
         "    settings_update.PluginSettingsUpdateMixin,\n"
         "    settings_query.PluginSettingsQueryMixin,\n"
         "    snapshot.PluginSnapshotMixin,\n"
         "    registration.PluginRegistrationMixin,\n"
+        "    inventory.PluginInventoryMixin,\n"
         "    lifecycle.PluginLifecycleMixin,\n"
         ")\n"
         "assert manager.PluginState is loader.PluginState\n"
@@ -667,11 +684,25 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
         "'src.plugins.registration'\n"
         "assert manager.PluginManager.contains.__module__ == "
         "'src.plugins.registration'\n"
+        "assert manager.PluginManager.registrations is "
+        "inventory.PluginInventoryMixin.registrations\n"
+        "assert manager.PluginManager.enabled_registrations is "
+        "inventory.PluginInventoryMixin.enabled_registrations\n"
+        "assert manager.PluginManager.enabled_registrations_snapshot is "
+        "inventory.PluginInventoryMixin.enabled_registrations_snapshot\n"
+        "assert manager.PluginManager.capability_inventory_snapshot is "
+        "inventory.PluginInventoryMixin.capability_inventory_snapshot\n"
+        "assert manager.PluginManager.enabled_native_owner_registrations_snapshot is "
+        "inventory.PluginInventoryMixin.enabled_native_owner_registrations_snapshot\n"
+        "assert manager.PluginManager.registration_snapshot_generation is "
+        "inventory.PluginInventoryMixin.registration_snapshot_generation\n"
         "assert manager.PluginManager.capability_inventory_snapshot."
-        "__module__ == 'src.plugins.manager'\n"
+        "__module__ == 'src.plugins.inventory'\n"
         "assert manager.PluginManager.health_check.__module__ == "
         "'src.plugins.manager'\n"
         "assert manager.PluginManager.bind_lifecycle_auditor.__module__ == "
+        "'src.plugins.manager'\n"
+        "assert manager.PluginManager.compatibility_error.__module__ == "
         "'src.plugins.manager'\n"
     )
     scripts = (
@@ -682,6 +713,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.registration as registration\n"
+            "import src.plugins.inventory as inventory\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -692,6 +724,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.snapshot as snapshot\n"
             "import src.plugins.registration as registration\n"
+            "import src.plugins.inventory as inventory\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -702,6 +735,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.snapshot as snapshot\n"
             "import src.plugins.registration as registration\n"
+            "import src.plugins.inventory as inventory\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -712,6 +746,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.snapshot as snapshot\n"
             "import src.plugins.registration as registration\n"
+            "import src.plugins.inventory as inventory\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -722,6 +757,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.registration as registration\n"
+            "import src.plugins.inventory as inventory\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -732,6 +768,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.registration as registration\n"
+            "import src.plugins.inventory as inventory\n"
             "import src.plugins.manager as manager\n"
         )
         + assertions,
@@ -742,6 +779,18 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.inventory as inventory\n"
+            "import src.plugins.loader as loader\n"
+        )
+        + assertions,
+        (
+            "import src.plugins.inventory as inventory\n"
+            "import src.plugins.manager as manager\n"
+            "import src.plugins.snapshot as snapshot\n"
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.registration as registration\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -771,6 +820,7 @@ class _NonManifestPlugin(Plugin):
 
 
 def test_registration_mixin_owner_stays_internal() -> None:
+    from src.plugins.inventory import PluginInventoryMixin
     from src.plugins.lifecycle import PluginLifecycleMixin
     from src.plugins.registration import PluginRegistrationMixin
     from src.plugins.settings_query import PluginSettingsQueryMixin
@@ -784,6 +834,7 @@ def test_registration_mixin_owner_stays_internal() -> None:
         PluginSettingsQueryMixin,
         PluginSnapshotMixin,
         PluginRegistrationMixin,
+        PluginInventoryMixin,
         PluginLifecycleMixin,
     )
     assert PluginRegistrationMixin.__module__ == "src.plugins.registration"
@@ -963,7 +1014,7 @@ def test_register_success_contains_and_generation_counterexamples() -> None:
     success_generation, lifecycle, _ = manager.capability_inventory_snapshot()
     assert success_generation.split(",")[0] == "lifecycle:1"
     assert all(isinstance(item, manager_mod.PluginSnapshot) for item in lifecycle)
-    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.manager"
+    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.inventory"
     assert PluginManager._build_snapshot.__module__ == "src.plugins.snapshot"
 
 
@@ -980,3 +1031,265 @@ def test_registration_source_keeps_classified_marker_and_bans_manager_import() -
     assert "from src.plugins.manager" not in source_path
     assert "import src.plugins.manager" not in source_path
     assert registration_mod.logger.name == "src.plugins.manager"
+
+
+class _NativeTokenBackend:
+    def __init__(self) -> None:
+        self._owned: dict[str, object] = {}
+
+    def contains(self, registration_id: str) -> bool:
+        return registration_id in self._owned
+
+    def register(self, registration_id: str, implementation: object) -> object:
+        token = object()
+        self._owned[registration_id] = token
+        return token
+
+    def unregister(self, registration_id: str, implementation: object) -> None:
+        del implementation
+        self._owned.pop(registration_id, None)
+
+
+def _native_manager() -> PluginManager:
+    backend = _NativeTokenBackend()
+    registry = ExtensionRegistry(
+        {
+            "report_template": ExtensionContract(
+                identity_resolver=lambda implementation: implementation.template_id,
+                validator=lambda implementation: isinstance(implementation, _Template),
+                backend=backend,
+            )
+        }
+    )
+    return PluginManager(application_version="2.0.0", registry=registry)
+
+
+def test_inventory_mixin_owner_stays_internal() -> None:
+    from src.plugins.inventory import PluginInventoryMixin
+    from src.plugins.lifecycle import PluginLifecycleMixin
+    from src.plugins.registration import PluginRegistrationMixin
+    from src.plugins.settings_query import PluginSettingsQueryMixin
+    from src.plugins.settings_update import PluginSettingsUpdateMixin
+    from src.plugins.snapshot import PluginSnapshotMixin
+    from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+
+    assert issubclass(PluginManager, PluginInventoryMixin)
+    assert PluginManager.__bases__ == (
+        PluginSettingsUpdateMixin,
+        PluginSettingsQueryMixin,
+        PluginSnapshotMixin,
+        PluginRegistrationMixin,
+        PluginInventoryMixin,
+        PluginLifecycleMixin,
+    )
+    assert PluginInventoryMixin.__module__ == "src.plugins.inventory"
+    assert PluginManager.registrations.__module__ == "src.plugins.inventory"
+    assert PluginManager.enabled_registrations.__module__ == "src.plugins.inventory"
+    assert PluginManager.enabled_registrations_snapshot.__module__ == (
+        "src.plugins.inventory"
+    )
+    assert PluginManager.capability_inventory_snapshot.__module__ == (
+        "src.plugins.inventory"
+    )
+    assert PluginManager.enabled_native_owner_registrations_snapshot.__module__ == (
+        "src.plugins.inventory"
+    )
+    assert PluginManager.registration_snapshot_generation.__module__ == (
+        "src.plugins.inventory"
+    )
+    assert PluginManager.__module__ == "src.plugins.manager"
+    assert PluginManager.registrations is PluginInventoryMixin.registrations
+    assert PluginManager.enabled_registrations is (
+        PluginInventoryMixin.enabled_registrations
+    )
+    assert PluginManager.enabled_registrations_snapshot is (
+        PluginInventoryMixin.enabled_registrations_snapshot
+    )
+    assert PluginManager.capability_inventory_snapshot is (
+        PluginInventoryMixin.capability_inventory_snapshot
+    )
+    assert PluginManager.enabled_native_owner_registrations_snapshot is (
+        PluginInventoryMixin.enabled_native_owner_registrations_snapshot
+    )
+    assert PluginManager.registration_snapshot_generation is (
+        PluginInventoryMixin.registration_snapshot_generation
+    )
+    assert PluginManager._build_snapshot is PluginSnapshotMixin._build_snapshot
+    assert PluginManager._build_snapshot.__module__ == "src.plugins.snapshot"
+    assert "PluginInventoryMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert not hasattr(plugins_root, "PluginInventoryMixin")
+    assert "PluginInventoryMixin" not in manager_mod.__all__
+    assert "PluginInventoryMixin" not in getattr(plugins_root, "__all__", ())
+    assert plugins_root.PluginManager is manager_mod.PluginManager
+    assert plugins_root.PluginSnapshot is manager_mod.PluginSnapshot
+    assert PluginManager.health_check.__module__ == "src.plugins.manager"
+    assert PluginManager.bind_lifecycle_auditor.__module__ == "src.plugins.manager"
+    assert PluginManager.compatibility_error.__module__ == "src.plugins.manager"
+
+    for name in (
+        "registrations",
+        "enabled_registrations",
+        "enabled_registrations_snapshot",
+        "enabled_native_owner_registrations_snapshot",
+    ):
+        params = inspect.signature(getattr(PluginManager, name)).parameters
+        assert tuple(params) == ("self", "extension_point")
+        assert params["extension_point"].kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+        assert params["extension_point"].default is None
+    inventory_params = inspect.signature(
+        PluginManager.capability_inventory_snapshot
+    ).parameters
+    assert tuple(inventory_params) == ("self",)
+    generation_params = inspect.signature(
+        PluginManager.registration_snapshot_generation
+    ).parameters
+    assert tuple(generation_params) == ("self", "extension_point")
+    assert generation_params["extension_point"].kind is (
+        inspect.Parameter.POSITIONAL_OR_KEYWORD
+    )
+    assert generation_params["extension_point"].default is inspect.Parameter.empty
+
+
+def test_registrations_unfiltered_before_load_and_enabled_empty() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("pre-load-plugin"), "pre-load")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.registrations() == manager.registry.registrations()
+    assert manager.enabled_registrations() == ()
+    assert manager.enabled_registrations_snapshot() == ()
+    assert manager.load("pre-load-plugin").success is True
+    assert manager.registrations() != ()
+    assert manager.enabled_registrations() != ()
+    assert tuple(
+        item.plugin_id for item in manager.enabled_registrations()
+    ) == ("pre-load-plugin",)
+
+
+def test_enabled_registrations_exclude_in_transition_plugin() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("transition-plugin"), "transition")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("transition-plugin").success is True
+    assert manager.enabled_registrations() != ()
+    record = manager._plugins["transition-plugin"]
+    record.transition = "disable"
+    assert manager.enabled_registrations() == ()
+    assert manager.registrations() != ()
+    record.transition = None
+    assert manager.enabled_registrations() != ()
+
+
+def test_activation_allowed_false_gates_live_enabled_not_snapshot() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("gated-plugin"), "gated")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("gated-plugin").success is True
+    assert manager.enabled_registrations() != ()
+    assert manager.enabled_registrations_snapshot() != ()
+    snapshot = manager.snapshot("gated-plugin")
+    assert snapshot is not None
+    assert snapshot.state == "enabled"
+    manager._activation_allowed = lambda: False
+    assert manager.enabled_registrations() == ()
+    assert manager.enabled_registrations_snapshot() != ()
+    assert manager.registrations() != ()
+    still_enabled = manager.snapshot("gated-plugin")
+    assert still_enabled is not None
+    assert still_enabled.state == "enabled"
+
+
+def test_capability_inventory_snapshot_generation_format() -> None:
+    from src.plugins.registry import EXTENSION_POINTS
+
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("format-plugin"), "format")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("format-plugin").success is True
+    generation, lifecycle, registrations = manager.capability_inventory_snapshot()
+    assert isinstance(generation, str)
+    assert generation.startswith("lifecycle:")
+    segments = generation.split(",")
+    assert segments[0].startswith("lifecycle:")
+    point_names = [part.split(":", 1)[0] for part in segments[1:]]
+    assert point_names == sorted(EXTENSION_POINTS)
+    assert all(":" in part for part in segments)
+    assert all(isinstance(item, manager_mod.PluginSnapshot) for item in lifecycle)
+    enabled_ids = manager._stable_enabled_plugin_ids
+    assert tuple(item.manifest.id for item in lifecycle) == ("format-plugin",)
+    assert registrations != ()
+    assert all(item.plugin_id in enabled_ids for item in registrations)
+
+
+def test_capability_inventory_snapshot_raises_on_generation_drift() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("drift-plugin"), "drift")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("drift-plugin").success is True
+    calls = {"n": 0}
+
+    def drifting(extension_point: object) -> int:
+        del extension_point
+        calls["n"] += 1
+        return calls["n"]
+
+    with patch.object(
+        manager._registry,
+        "registration_snapshot_generation",
+        side_effect=drifting,
+    ):
+        with pytest.raises(RuntimeError, match="^extension registry generation drift$"):
+            manager.capability_inventory_snapshot()
+    assert calls["n"] >= 3
+
+
+def test_enabled_native_owner_snapshot_filters_stable_ids_and_instance_patch() -> None:
+    manager = _native_manager()
+    plugin = _RecordingPlugin(_manifest("native-plugin"), "native")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.enabled_native_owner_registrations_snapshot() == ()
+    assert manager.load("native-plugin").success is True
+    enabled = manager.enabled_native_owner_registrations_snapshot("report_template")
+    assert enabled != ()
+    assert all(registration.plugin_id == "native-plugin" for registration, _ in enabled)
+    assert all(owner_token is not None for _, owner_token in enabled)
+    assert manager.disable("native-plugin").success is True
+    assert manager.enabled_native_owner_registrations_snapshot() == ()
+
+    sentinel = ((object(), object()),)
+    manager.enabled_native_owner_registrations_snapshot = (
+        lambda extension_point=None: sentinel
+    )
+    assert manager.enabled_native_owner_registrations_snapshot() is sentinel
+    assert (
+        manager.enabled_native_owner_registrations_snapshot("report_template")
+        is sentinel
+    )
+
+
+def test_registration_snapshot_generation_matches_registry_and_requires_point() -> None:
+    manager = _manager()
+    assert manager.registration_snapshot_generation(
+        "report_template"
+    ) == manager.registry.registration_snapshot_generation("report_template")
+    plugin = _RecordingPlugin(_manifest("gen-plugin"), "gen")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("gen-plugin").success is True
+    assert manager.registration_snapshot_generation(
+        "report_template"
+    ) == manager.registry.registration_snapshot_generation("report_template")
+    params = inspect.signature(
+        PluginManager.registration_snapshot_generation
+    ).parameters
+    assert params["extension_point"].default is inspect.Parameter.empty
+
+
+def test_inventory_source_bans_manager_import_and_logger() -> None:
+    import src.plugins.inventory as inventory_mod
+
+    source_path = Path(inventory_mod.__file__).read_text(encoding="utf-8")
+    assert "from .manager import" not in source_path
+    assert "from src.plugins.manager" not in source_path
+    assert "import src.plugins.manager" not in source_path
+    assert "logging.getLogger" not in source_path
+    assert "except Exception" not in source_path
+    assert inventory_mod.PluginInventoryMixin.__module__ == "src.plugins.inventory"
