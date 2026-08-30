@@ -206,6 +206,11 @@ def test_load_all_follows_registration_order_and_disable_all_reverses() -> None:
     assert manager.register(second, source="builtin").success is True
     assert manager.register(third, source="builtin").success is True
     assert manager.plugin_ids() == ("first-plugin", "second-plugin", "third-plugin")
+    assert tuple(item.manifest.id for item in manager.list_snapshots()) == (
+        "first-plugin",
+        "second-plugin",
+        "third-plugin",
+    )
 
     loaded = manager.load_all()
     assert [result.plugin_id for result in loaded] == [
@@ -386,9 +391,11 @@ def test_extracted_permission_helpers_match_manager_decisions() -> None:
     assert issubclass(PluginManager, PluginLifecycleMixin)
     from src.plugins.settings_query import PluginSettingsQueryMixin
     from src.plugins.settings_update import PluginSettingsUpdateMixin
+    from src.plugins.snapshot import PluginSnapshotMixin
 
     assert issubclass(PluginManager, PluginSettingsUpdateMixin)
     assert issubclass(PluginManager, PluginSettingsQueryMixin)
+    assert issubclass(PluginManager, PluginSnapshotMixin)
     assert load_time_permission_error(manifest=ok, registrations=()) is None
 
 
@@ -418,6 +425,7 @@ def test_split_modules_remain_internal_host_details() -> None:
     assert "PluginLifecycleMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginSettingsUpdateMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginSettingsQueryMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert "PluginSnapshotMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "select_load_ids" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
     assert "PluginState" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
@@ -452,9 +460,12 @@ def test_settings_query_mixin_owner_stays_internal() -> None:
     from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
 
     assert issubclass(PluginManager, PluginSettingsQueryMixin)
+    from src.plugins.snapshot import PluginSnapshotMixin
+
     assert PluginManager.__bases__ == (
         PluginSettingsUpdateMixin,
         PluginSettingsQueryMixin,
+        PluginSnapshotMixin,
         PluginLifecycleMixin,
     )
     assert PluginSettingsQueryMixin.__module__ == "src.plugins.settings_query"
@@ -467,6 +478,118 @@ def test_settings_query_mixin_owner_stays_internal() -> None:
     assert not hasattr(plugins_root, "PluginSettingsQueryMixin")
     assert "PluginSettingsQueryMixin" not in manager_mod.__all__
     assert "PluginSettingsQueryMixin" not in getattr(plugins_root, "__all__", ())
+
+
+def test_snapshot_unknown_id_returns_none() -> None:
+    manager = _manager()
+    assert manager.snapshot("missing") is None
+    assert manager.contains("missing") is False
+
+
+def test_snapshot_mixin_owner_stays_internal() -> None:
+    from src.plugins.lifecycle import PluginLifecycleMixin
+    from src.plugins.settings_query import PluginSettingsQueryMixin
+    from src.plugins.settings_update import PluginSettingsUpdateMixin
+    from src.plugins.snapshot import PluginSnapshotMixin
+    from src.plugins.surface import PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+
+    assert issubclass(PluginManager, PluginSnapshotMixin)
+    assert PluginManager.__bases__ == (
+        PluginSettingsUpdateMixin,
+        PluginSettingsQueryMixin,
+        PluginSnapshotMixin,
+        PluginLifecycleMixin,
+    )
+    assert PluginSnapshotMixin.__module__ == "src.plugins.snapshot"
+    assert PluginManager.snapshot.__module__ == "src.plugins.snapshot"
+    assert PluginManager.list_snapshots.__module__ == "src.plugins.snapshot"
+    assert PluginManager.plugin_ids.__module__ == "src.plugins.snapshot"
+    assert PluginManager._build_snapshot.__module__ == "src.plugins.snapshot"
+    assert PluginManager.__module__ == "src.plugins.manager"
+    assert PluginManager.snapshot is PluginSnapshotMixin.snapshot
+    assert PluginManager.list_snapshots is PluginSnapshotMixin.list_snapshots
+    assert PluginManager.plugin_ids is PluginSnapshotMixin.plugin_ids
+    assert PluginManager._build_snapshot is PluginSnapshotMixin._build_snapshot
+    assert "PluginSnapshotMixin" not in PLUGIN_EXTENSION_SURFACE_V1_AUTHOR_EXPORTS
+    assert not hasattr(plugins_root, "PluginSnapshotMixin")
+    assert "PluginSnapshotMixin" not in manager_mod.__all__
+    assert "PluginSnapshotMixin" not in getattr(plugins_root, "__all__", ())
+    assert plugins_root.PluginSnapshot is manager_mod.PluginSnapshot
+
+
+def test_register_and_contains_remain_manager_owned() -> None:
+    assert PluginManager.register.__module__ == "src.plugins.manager"
+    assert PluginManager.contains.__module__ == "src.plugins.manager"
+    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.manager"
+    assert PluginManager.health_check.__module__ == "src.plugins.manager"
+    assert PluginManager.bind_lifecycle_auditor.__module__ == "src.plugins.manager"
+
+
+def test_snapshot_reloadable_matrix(tmp_path: Path) -> None:
+    manager = _manager()
+    builtin = _RecordingPlugin(_manifest("builtin-plugin"), "builtin")
+    assert manager.register(builtin, source="builtin").success is True
+    builtin_snapshot = manager.snapshot("builtin-plugin")
+    assert builtin_snapshot is not None
+    assert builtin_snapshot.reloadable is False
+    assert builtin_snapshot.package_root is None
+
+    external_root = tmp_path / "ext"
+    external_root.mkdir()
+    external = _RecordingPlugin(_manifest("external-plugin"), "external")
+    assert manager.register(
+        external,
+        source="external",
+        package_root=external_root,
+    ).success is True
+    external_snapshot = manager.snapshot("external-plugin")
+    assert external_snapshot is not None
+    assert external_snapshot.reloadable is True
+    assert external_snapshot.package_root == str(external_root.resolve())
+    assert type(external_snapshot.package_root) is str
+
+    no_root = _RecordingPlugin(_manifest("external-no-root"), "no-root")
+    assert manager.register(no_root, source="external").success is True
+    no_root_snapshot = manager.snapshot("external-no-root")
+    assert no_root_snapshot is not None
+    assert no_root_snapshot.reloadable is False
+    assert no_root_snapshot.package_root is None
+
+    gated = _RecordingPlugin(_manifest("external-gated"), "gated")
+    assert manager.register(
+        gated,
+        source="external",
+        package_root=external_root,
+    ).success is True
+    record = manager._plugins["external-gated"]
+    record.transition = "load"
+    transitioning = manager.snapshot("external-gated")
+    assert transitioning is not None
+    assert transitioning.reloadable is False
+    record.transition = None
+    record.cleanup_pending = True
+    pending = manager.snapshot("external-gated")
+    assert pending is not None
+    assert pending.reloadable is False
+    record.cleanup_pending = False
+    restored = manager.snapshot("external-gated")
+    assert restored is not None
+    assert restored.reloadable is True
+
+
+def test_capability_inventory_snapshot_stays_facade_owned() -> None:
+    manager = _manager()
+    plugin = _RecordingPlugin(_manifest("inventory-plugin"), "inventory")
+    assert manager.register(plugin, source="builtin").success is True
+    assert manager.load("inventory-plugin").success is True
+    generation, lifecycle, registrations = manager.capability_inventory_snapshot()
+    assert isinstance(generation, str)
+    assert generation.startswith("lifecycle:")
+    assert all(isinstance(item, manager_mod.PluginSnapshot) for item in lifecycle)
+    assert tuple(item.manifest.id for item in lifecycle) == ("inventory-plugin",)
+    assert registrations != ()
+    assert PluginManager.capability_inventory_snapshot.__module__ == "src.plugins.manager"
+    assert PluginManager._build_snapshot.__module__ == "src.plugins.snapshot"
 
 
 def test_lifecycle_and_manager_import_in_either_order() -> None:
@@ -489,6 +612,15 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
         "assert issubclass(\n"
         "    manager.PluginManager, settings_query.PluginSettingsQueryMixin\n"
         ")\n"
+        "assert issubclass(\n"
+        "    manager.PluginManager, snapshot.PluginSnapshotMixin\n"
+        ")\n"
+        "assert manager.PluginManager.__bases__ == (\n"
+        "    settings_update.PluginSettingsUpdateMixin,\n"
+        "    settings_query.PluginSettingsQueryMixin,\n"
+        "    snapshot.PluginSnapshotMixin,\n"
+        "    lifecycle.PluginLifecycleMixin,\n"
+        ")\n"
         "assert manager.PluginState is loader.PluginState\n"
         "assert get_type_hints(loader.ExternalPluginResult)['state'] "
         "== manager.PluginState | None\n"
@@ -498,13 +630,35 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
         "settings_query.PluginSettingsQueryMixin.settings_schema\n"
         "assert manager.PluginManager.settings_values is "
         "settings_query.PluginSettingsQueryMixin.settings_values\n"
+        "assert manager.PluginManager.snapshot is "
+        "snapshot.PluginSnapshotMixin.snapshot\n"
+        "assert manager.PluginManager.list_snapshots is "
+        "snapshot.PluginSnapshotMixin.list_snapshots\n"
+        "assert manager.PluginManager.plugin_ids is "
+        "snapshot.PluginSnapshotMixin.plugin_ids\n"
+        "assert manager.PluginManager._build_snapshot is "
+        "snapshot.PluginSnapshotMixin._build_snapshot\n"
+        "assert manager.PluginManager.register.__module__ == "
+        "'src.plugins.manager'\n"
+        "assert manager.PluginManager.contains.__module__ == "
+        "'src.plugins.manager'\n"
     )
     scripts = (
         (
+            "import src.plugins.snapshot as snapshot\n"
+            "import src.plugins.manager as manager\n"
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.loader as loader\n"
+        )
+        + assertions,
+        (
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.manager as manager\n"
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.snapshot as snapshot\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -513,6 +667,7 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.manager as manager\n"
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.snapshot as snapshot\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
@@ -521,15 +676,26 @@ def test_lifecycle_and_manager_import_in_either_order() -> None:
             "import src.plugins.manager as manager\n"
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.snapshot as snapshot\n"
             "import src.plugins.loader as loader\n"
         )
         + assertions,
         (
             "import src.plugins.manager as manager\n"
+            "import src.plugins.snapshot as snapshot\n"
             "import src.plugins.lifecycle as lifecycle\n"
             "import src.plugins.settings_update as settings_update\n"
             "import src.plugins.settings_query as settings_query\n"
             "import src.plugins.loader as loader\n"
+        )
+        + assertions,
+        (
+            "import src.plugins.loader as loader\n"
+            "import src.plugins.snapshot as snapshot\n"
+            "import src.plugins.settings_query as settings_query\n"
+            "import src.plugins.settings_update as settings_update\n"
+            "import src.plugins.lifecycle as lifecycle\n"
+            "import src.plugins.manager as manager\n"
         )
         + assertions,
     )
