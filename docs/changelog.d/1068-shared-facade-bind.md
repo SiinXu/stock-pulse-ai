@@ -1,0 +1,1 @@
+- [Changed] Consolidate the byte-identical ADR-006 rebind helpers from `akshare_parts`, `efinance_parts`, and `tushare_parts` into `src/data_provider/_facade_bind.py`; the per-package modules are now re-exports so existing imports are unchanged (Refs #1068).
