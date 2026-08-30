@@ -218,6 +218,28 @@ is mutually equivalent to `SignalScorecardResponse`. This is **not** the auth
 export-alias pattern: generated snake_case is not the UI type. Runtime Zod in
 `api/scorecard.ts` is unchanged.
 
+`apps/dsa-web/src/types/approvals.ts` now CamelizeKeys-binds the six
+generated Approval object components (`ApprovalContext`, `ApprovalProposal`,
+`ApprovalProposalPage`, `ApprovalRule`, `ApprovalRuleUpdateRequest`,
+`ApprovalDecisionRequest`) plus three closed string-enum aliases
+(`ApprovalRiskSource`, `ApprovalStatus`, `ApprovalDecision`). Enum aliases
+are allowed (string enums, not objects). `Override` preserves today's
+optional `stockCode`, optional widened `action` (`'risk_control_bypass' |
+string`), closed signal/status/decision/risk-source unions, optional
+`consumedAt` / `updatedAt`, overridden nested `items` / `context` arrays,
+and mixed-alias `expectedVersion` on the rule-update request (generated
+key is already `expectedVersion`, not `expected_version`; `expires_in_seconds`
+/ `risk_sources` stay snake on the generated schema; this is documented as
+generated fact, not fixed). Path 200 JSON for GET `/api/v1/approvals`, GET
+and PUT `/api/v1/approvals/rules/risk-control-bypass`, GET
+`/api/v1/approvals/{proposal_id}`, and POST
+`/api/v1/approvals/{proposal_id}/decision` is mutually equivalent to those
+components; PUT and decision request bodies pin `ApprovalRuleUpdateRequest`
+/ `ApprovalDecisionRequest`. This is **not** the auth object export-alias
+pattern: generated snake_case is not the UI type, and
+`ApprovalDecisionRequest` is not a public export (`approvalsApi.decide`
+stays three arguments). Runtime Zod in `api/approvals.ts` is unchanged.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
