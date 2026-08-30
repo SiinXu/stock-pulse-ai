@@ -124,7 +124,9 @@ export type {
   UseTaskStreamResult,
 } from './useTaskStream';
 export {
-  SCREEN_TASK_POLL_QUERY_KEY_ROOT,
-  useScreenTaskPollQuery,
-} from './useScreenTaskPollQuery';
-export type { ScreenTaskPollResult } from './useScreenTaskPollQuery';
+  WORKBENCH_SETUP_STATUS_QUERY_KEY,
+  WORKBENCH_ANALYSIS_SKILLS_QUERY_KEY,
+  useWorkbenchSetupStatusQuery,
+  useWorkbenchAnalysisSkillsQuery,
+} from './useWorkbenchMountLoadsQuery';
+export type { WorkbenchMountLoadResult } from './useWorkbenchMountLoadsQuery';

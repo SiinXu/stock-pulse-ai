@@ -1,5 +1,5 @@
 import type React from 'react';
-import { useScreenTaskPollQuery } from '../hooks';
+import { useScreenTaskPollQuery } from '../hooks/useScreenTaskPollQuery';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -389,13 +389,9 @@ const StockScreeningPage: React.FC = () => {
     };
   }, []);
 
-  // Poll body unchanged; only the schedule moved to TanStack Query (Issue
-  // #789). The two `window.setTimeout(pollTask, ...)` continue branches are
-  // now the hook's `refetchInterval`; every terminal branch still ends the
-  // loop through `finishTask()` clearing the task id, which disables the
-  // query. `isActive()` replaces the previous `let active = true` guard.
-  const pollScreenTask = useCallback(async (isActive: () => boolean) => {
-    if (!activeTaskId) return;
+  // Schedule-only migration: poll body unchanged; continuation is refetchInterval.
+  const pollScreenTask = async (isActive: () => boolean): Promise<true> => {
+    if (!activeTaskId) return true;
     const pollingTaskId = activeTaskId;
 
     function finishTask() {
@@ -446,22 +442,23 @@ const StockScreeningPage: React.FC = () => {
 
     try {
       const task = await alphasiftApi.getScreenTask(pollingTaskId);
-      if (!isActive()) return;
+      if (!isActive()) return true;
       applyTaskStatus(task);
     } catch (err) {
-      if (!isActive()) return;
+      if (!isActive()) return true;
       const parsedError = getParsedApiError(err, language);
       if (isUnrecoverableScreenTaskError(parsedError)) {
         setError(formatParsedApiError(parsedError) || text.taskUnrecoverable);
         setAttemptResult(null);
         setAttemptState('failed');
         finishTask();
-        return;
+        return true;
       }
       setError(formatRecoverableScreenTaskPollingError(parsedError, text));
       setAttemptState('recoverable_poll_error');
     }
-  }, [activeTaskId, applyScreenResult, language, text]);
+    return true;
+  };
   useScreenTaskPollQuery({
     taskId: activeTaskId,
     restartKey: [language],

@@ -14,9 +14,9 @@
   "module_count": 7,
   "modules": {
     "src/agent/orchestrator_parts/pipeline.py": 1561,
-    "src/data_provider/base.py": 1626,
+    "src/data_provider/base.py": 1559,
     "src/data_provider/data_validation.py": 1715,
-    "src/services/history_service.py": 1580,
+    "src/services/history_service.py": 1578,
     "src/services/local_model_service.py": 1536,
     "src/services/reasoning_trace_export_service.py": 1730,
     "src/services/scheduled_task_service.py": 1985

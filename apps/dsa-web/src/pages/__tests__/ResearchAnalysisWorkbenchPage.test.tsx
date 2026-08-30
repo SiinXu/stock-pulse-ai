@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { agentApi } from '../../api/agent';
@@ -209,8 +210,19 @@ function LocationProbe() {
   return <output data-testid="location">{`${location.pathname}${location.search}${location.hash}`}</output>;
 }
 
+/** The two mount loads are scheduled through TanStack Query (Issue #789). */
+function newTestQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+}
+
 function renderWorkbench(initialEntry: string = APP_ROUTE_PATHS.researchAnalysis) {
   return render(
+    <QueryClientProvider client={newTestQueryClient()}>
     <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
       <UiLanguageProvider initialLanguage="zh">
         <ToastProvider>
@@ -225,7 +237,8 @@ function renderWorkbench(initialEntry: string = APP_ROUTE_PATHS.researchAnalysis
           </MemoryRouter>
         </ToastProvider>
       </UiLanguageProvider>
-    </RouteFocusRegistrationContext.Provider>,
+    </RouteFocusRegistrationContext.Provider>
+    </QueryClientProvider>,
   );
 }
 

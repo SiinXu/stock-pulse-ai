@@ -1,0 +1,1 @@
+- [Chore] Extract DataFetcherManager TickFlow lifecycle (`_get_tickflow_fetcher`, `close`) into `src/data_provider/manager_parts/tickflow_lifecycle_methods.py` behind the ADR-006 facade without changing TickFlow create/replace/release or fallback semantics (Refs #1067).
