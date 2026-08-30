@@ -207,6 +207,17 @@ pattern: generated snake_case is not the UI type. `OutboundActivityListQuery`
 stays handwritten optional `{ limit?: number }` because there is no generated
 query schema. Runtime Zod in `api/outboundActivity.ts` is unchanged.
 
+`apps/dsa-web/src/types/scorecard.ts` now CamelizeKeys-binds the five
+generated response components (`SignalScorecardResponse`, `ScorecardBucket`,
+`ScorecardOverall`, `ScorecardReturnBand`, `ScorecardMiss`). `Override`
+preserves today's required-nullable nested metrics (`hitRatePct`,
+`avgReturnPct`, `sharePct`, `returnPct`, `anchorDate`) and the handwritten
+`ScorecardBucketStatus` `'ok' | 'insufficient_data' | string` documentation
+union. Path 200 JSON for GET `/api/v1/scorecard` (`getPublicSignalScorecard`)
+is mutually equivalent to `SignalScorecardResponse`. This is **not** the auth
+export-alias pattern: generated snake_case is not the UI type. Runtime Zod in
+`api/scorecard.ts` is unchanged.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
