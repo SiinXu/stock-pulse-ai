@@ -268,6 +268,24 @@ pattern: generated snake_case is not the UI type.
 `api/watchlistScores.ts` is unchanged, including the local `toCamelCase`
 helper and `.strict()` schemas.
 
+`apps/dsa-web/src/types/securityAudit.ts` now CamelizeKeys-binds the four
+generated SecurityAudit object components (`SecurityAuditActor`,
+`SecurityAuditTarget`, `SecurityAuditEvent`, `SecurityAuditEventPage`) plus
+closed string-enum aliases (`SecurityAuditPhase`, `SecurityAuditOutcome`).
+Enum aliases are allowed (string enums, not objects). `Override` keeps
+`schemaVersion` optional+widened (`'security-audit-v1' | string`) versus the
+generated required constant `schema_version: "security-audit-v1"` (generated
+fact; not fixed by regenerating OpenAPI). `occurredAt` and `metadata` stay
+optional. Closed `phase` / `outcome` unions stay closed. `SecurityAuditListQuery`
+stays handwritten optional-without-null camelCase (generated query uses snake
+keys and `| null`; do not CamelizeKeys it). Runtime const
+`SECURITY_AUDIT_MAX_PAGE_SIZE = 100` is kept (module is not runtime-empty).
+Path 200 JSON for GET `/api/v1/security/audit-events`
+(`list_security_audit_events_api_v1_security_audit_events_get`) is mutually
+equivalent to `SecurityAuditEventPage`; `requestBody` is `never`. This is
+**not** the auth object export-alias pattern: generated snake_case is not the
+UI type. Runtime Zod in `api/securityAudit.ts` is unchanged.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
