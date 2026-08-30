@@ -63,14 +63,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--home-accent-border',
   '--home-accent-border-hover',
   '--home-accent-text',
-  '--home-action-ai-bg',
-  '--home-action-ai-border',
-  '--home-action-ai-hover-bg',
-  '--home-action-ai-text',
-  '--home-action-report-bg',
-  '--home-action-report-border',
-  '--home-action-report-hover-bg',
-  '--home-action-report-text',
   '--home-cool-surface',
   '--home-cool-surface-strong',
   '--home-divider-border',
@@ -193,11 +185,13 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * Hard ceiling for page-scoped leftovers. Never raise this to absorb a new
  * `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`
  * name. Shrink only when a Phase 2 domain collapse deletes a leftover.
- * `--login-*`, `--backtest-*`, `--portfolio-*`, `--chat-*`, and `--settings-*`
- * reached zero; those pages consume Layer 1 plus use-site alpha. Do not
- * reintroduce those prefixes. `settings` stays in `THEME_PAGE_SCOPED_PREFIXES`.
+ * `--login-*`, `--backtest-*`, `--portfolio-*`, `--chat-*`, `--settings-*`,
+ * and `--home-action-*` reached zero; those families consume Layer 1 plus
+ * use-site alpha. Do not reintroduce those prefixes or the action family.
+ * Remaining leftover `--home-*` names stay page-scoped. `home` and
+ * `settings` stay in `THEME_PAGE_SCOPED_PREFIXES`.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 56;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 48;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [

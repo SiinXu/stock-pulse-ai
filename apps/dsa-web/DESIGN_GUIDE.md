@@ -164,6 +164,15 @@
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 76 降到 56；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 由 26 条降到 12 条（删除 14 条 Settings raw `hsl()` 债）。非空下界由 190 降到 170。
 - 因为改用 Layer 1，`data-theme-pack="slate"` 首次能够为 Settings 卡片与描边换色。Layer 0 涨跌色与 `--home-price-*` 别名不变。亮色卡片描边从旧 `--settings-border`（`80 7% 82%`）软化为 Layer 1 `--border`（`80 7% 92%`），与 Login 相同，属于非文字装饰差；详细对比方法见 [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md)。
 
+### 2.12 Phase 2 域收敛：Home-action（#1300）
+
+- 八个 `--home-action-*` 定义（light + dark）已删除；未新增页面级或领域 token，也未新增 `--chat-jump-*` / `--chat-copy-*`。`THEME_PAGE_SCOPED_PREFIXES` 仍永久禁止 `--home-*`。
+- 四个无引用定义直接删除：`--home-action-report-bg`、`--home-action-report-border`、`--home-action-report-text`、`--home-action-report-hover-bg`。
+- 唯一在用调用点是 Chat「最新消息」跳转按钮 `.chat-copy-btn`（`ChatPage.tsx` 的 `showJumpToBottom`；class 名是历史遗留）。消息复制 / 下载仍走 `IconButton`，不使用该 class。配方改为 Layer 1 `--primary` + use-site alpha：底 `hsl(var(--primary) / 0.1)`、描边 `hsl(var(--primary) / 0.2)`、文字 `hsl(var(--primary))`；light hover `0.18`，dark hover 用显式 `.dark .chat-copy-btn:hover` 保持 `0.2`，二者不得抹平。
+- `:active` 位移、与 `.session-item` / `.delete-btn` 共用的 `:focus-visible` 主色环（`box-shadow: 0 0 0 3px hsl(var(--primary) / 0.16)`）、以及 `min-height: 2.75rem` 均保持不变。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 56 降到 48；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（这八个名字不在格式债清单中）。非空下界由 170 降到 160。
+- 这些值原本就包装 `--primary`，因此 `data-theme-pack="slate"` 在收敛前后都会给跳转按钮换色，**不是**首次换色。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余 `--home-*` 族（prose / cool / shadow / panel / surface）不在本切片。
+
 ## 3. 字体阶（全部 Geist）
 
 | 用途 | 字号 | 字重 |
