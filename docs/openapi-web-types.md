@@ -196,6 +196,17 @@ snake_case is not the UI type. Request types (`PortfolioBasketRequest`,
 defaulted fields required. Runtime Zod in `api/portfolioInsights.ts` is
 unchanged.
 
+`apps/dsa-web/src/types/outboundActivity.ts` now CamelizeKeys-binds the three
+generated response components (`LocalOnlyModeStatus`, `OutboundActivityItem`,
+`OutboundActivityPage`). `Override` preserves today's required
+`allowedDestinationClasses` / `items` arrays and the handwritten
+`OutboundDecision` `'allowed' | 'blocked'` union. Path 200 JSON for GET
+`/api/v1/security/local-only` and GET `/api/v1/security/outbound-activity` is
+mutually equivalent to those components. This is **not** the auth export-alias
+pattern: generated snake_case is not the UI type. `OutboundActivityListQuery`
+stays handwritten optional `{ limit?: number }` because there is no generated
+query schema. Runtime Zod in `api/outboundActivity.ts` is unchanged.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
