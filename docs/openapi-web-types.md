@@ -341,6 +341,36 @@ GET `requestBody` is `never`. This is **not** the auth object export-alias
 pattern: generated snake_case is not the UI type. Runtime Zod in
 `api/configProfiles.ts` is unchanged. The module is runtime-empty.
 
+`apps/dsa-web/src/types/watchlist.ts` now CamelizeKeys-binds the generated
+WatchlistGroup object components (`WatchlistComputedAttrsSchema`,
+`WatchlistGroupMemberSchema`, `WatchlistGroupSchema`,
+`WatchlistGroupsResponse`) onto public UI types `WatchlistMemberAttrs`,
+`WatchlistGroupMember`, `WatchlistGroup`, and `WatchlistGroupState`.
+No enum aliases exist on these schemas; do not invent unions. `Override`
+keeps today's required `attrs` / `members` / `groups` versus generated
+optional `attrs` / `members` / `groups`, and omits `message` from
+`WatchlistGroupState` (generated `WatchlistGroupsResponse.message` stays
+on the wire; the API parser already strips it). Generated
+`schema_version: 1` matches UI `schemaVersion: 1`. There is **no** mixed-alias
+`expectedVersion` on this schema: every generated object key is snake_case
+(`stock_code`, `sort_order`, `is_default`, `created_at`, `updated_at`,
+`name_key`, `schema_version`, `ai_score`, `exclusive_codes`, `ordered_ids`).
+`HomeWatchlistRow` stays a handwritten Home UI projection (`StockBarItem` /
+`TaskInfo` from `analysis.ts`; not an OpenAPI component).
+`WatchlistGroupRestoreSnapshot` stays handwritten with
+`exclusiveMemberCodes` / `orderedGroupIds`; do not CamelizeKeys
+`WatchlistGroupRestoreRequest` (`exclusive_codes` would become
+`exclusiveCodes`, not `exclusiveMemberCodes`; `ordered_ids` would become
+`orderedIds`, not `orderedGroupIds` — generated fact, not a payload-key
+fix). Create and restore request bodies pin generated
+`WatchlistGroupCreateRequest` / `WatchlistGroupRestoreRequest` internally
+only; `watchlistGroupsApi` stays argument-shaped. Path 200 JSON for GET
+`/api/v1/stocks/watchlist/groups`, POST create, and POST restore is
+mutually equivalent to `WatchlistGroupsResponse`; list GET `requestBody`
+is `never`. This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. Runtime Zod in `api/watchlistGroups.ts` is
+unchanged. The module is runtime-empty.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),

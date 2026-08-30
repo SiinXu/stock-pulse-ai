@@ -1,0 +1,1 @@
+- [Chore] Bind Web watchlist-group camelCase types to generated OpenAPI components (Refs #721).
