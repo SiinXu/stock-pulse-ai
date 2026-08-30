@@ -206,7 +206,6 @@ def test_facade_keeps_payload_helpers_timeouts_tickflow_and_prefetch() -> None:
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     for name in (
-        "_get_tickflow_fetcher",
         "prefetch_realtime_quotes",
         "prefetch_daily_klines",
     ):

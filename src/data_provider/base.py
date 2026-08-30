@@ -652,101 +652,9 @@ class DataFetcherManager:
     _get_cached_stock_name = None
     _cache_stock_name = None
 
-    def _get_tickflow_fetcher(self):
-        """Lazily create a TickFlow fetcher for market-review-only calls."""
-        from src.config import get_config
-
-        config = get_config()
-        api_key = (getattr(config, "tickflow_api_key", None) or "").strip()
-
-        if not hasattr(self, "_tickflow_lock") or self._tickflow_lock is None:
-            self._tickflow_lock = RLock()
-
-        with self._tickflow_lock:
-            current_fetcher = getattr(self, "_tickflow_fetcher", None)
-            current_key = getattr(self, "_tickflow_api_key", None)
-
-            if not api_key:
-                if current_fetcher is not None and hasattr(current_fetcher, "close"):
-                    try:
-                        current_fetcher.close()
-                    except Exception as exc:
-                        log_safe_exception(
-                            logger,
-                            "TickFlow stale fetcher close failed",
-                            exc,
-                            error_code="tickflow_stale_fetcher_close_failed",
-                            level=logging.DEBUG,
-                        )
-                self._tickflow_fetcher = None
-                self._tickflow_api_key = None
-                return None
-
-            configured_fetcher = self._get_fetcher_by_name("TickFlowFetcher")
-            if configured_fetcher is not None:
-                return configured_fetcher
-
-            if current_fetcher is not None and current_key == api_key:
-                return current_fetcher
-
-            if current_fetcher is not None and hasattr(current_fetcher, "close"):
-                try:
-                    current_fetcher.close()
-                except Exception as exc:
-                    log_safe_exception(
-                        logger,
-                        "TickFlow fetcher close during replacement failed",
-                        exc,
-                        error_code="tickflow_replaced_fetcher_close_failed",
-                        level=logging.DEBUG,
-                    )
-
-            try:
-                from .tickflow_fetcher import TickFlowFetcher
-
-                fetcher = TickFlowFetcher(
-                    api_key=api_key,
-                    kline_adjust=getattr(config, "tickflow_kline_adjust", "none"),
-                    batch_daily_enabled=getattr(config, "tickflow_batch_daily_enabled", True),
-                    batch_size=getattr(config, "tickflow_batch_size", 100),
-                    priority=getattr(config, "tickflow_priority", 2),
-                )
-                self._tickflow_fetcher = fetcher
-                self._tickflow_api_key = api_key
-                return fetcher
-            except Exception as exc:
-                log_safe_exception(
-                    logger,
-                    "TickFlow fetcher initialization failed",
-                    exc,
-                    error_code="tickflow_fetcher_initialization_failed",
-                    level=logging.WARNING,
-                )
-                self._tickflow_fetcher = None
-                self._tickflow_api_key = None
-                return None
-
-    def close(self) -> None:
-        """Best-effort release of manager-owned resources."""
-        if not hasattr(self, "_tickflow_lock") or self._tickflow_lock is None:
-            self._tickflow_lock = RLock()
-
-        with self._tickflow_lock:
-            current_fetcher = getattr(self, "_tickflow_fetcher", None)
-            self._tickflow_fetcher = None
-            self._tickflow_api_key = None
-
-        if current_fetcher is not None and hasattr(current_fetcher, "close"):
-            try:
-                current_fetcher.close()
-            except Exception as exc:
-                log_safe_exception(
-                    logger,
-                    "TickFlow manager resource close failed",
-                    exc,
-                    error_code="tickflow_manager_resource_close_failed",
-                    level=logging.DEBUG,
-                )
+    # Rebound from manager_parts.tickflow_lifecycle_methods after the class is built.
+    _get_tickflow_fetcher = None
+    close = None
 
     def __del__(self) -> None:
         try:
@@ -1135,8 +1043,8 @@ class DataFetcherManager:
 # facade while focused parts own inventory, daily health/cache/execution, realtime,
 # chip, money-flow, fundamental cache/loaders/Config accessor/CN sub-blocks/
 # payload helpers, timeout/retry workers, failed/rejected outcome builders,
-# stock-name, rankings, market-overview, and belong-board. Rebinding preserves
-# method globals and patch seams.
+# stock-name, rankings, TickFlow lifecycle, market-overview, and belong-board.
+# Rebinding preserves method globals and patch seams.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
@@ -1158,6 +1066,7 @@ from .manager_parts import (  # noqa: E402
     realtime_field_trust_methods as _realtime_field_trust_methods_module,
     realtime_quote_methods as _realtime_quote_methods_module,
     stock_name_methods as _stock_name_methods_module,
+    tickflow_lifecycle_methods as _tickflow_lifecycle_methods_module,
 )
 
 _EXPECTED_CAPABILITY_CATALOG_METHOD_NAMES = (
@@ -1457,6 +1366,23 @@ def _assemble_rankings_methods_facade(
         )
 
 
+def _assemble_tickflow_lifecycle_methods_facade(
+    tickflow_lifecycle_module=_tickflow_lifecycle_methods_module,
+) -> None:
+    bound_method_names = tickflow_lifecycle_module.bind_tickflow_lifecycle_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if (
+        bound_method_names
+        != tickflow_lifecycle_module.EXPECTED_TICKFLOW_LIFECYCLE_METHOD_NAMES
+    ):
+        raise ImportError(
+            "Unexpected DataFetcherManager TickFlow lifecycle methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_market_overview_methods_facade(
     market_overview_module=_market_overview_methods_module,
 ) -> None:
@@ -1494,6 +1420,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_timeout=_assemble_fundamental_timeout_methods_facade,
     assemble_fundamental_outcome=_assemble_fundamental_outcome_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
+    assemble_tickflow_lifecycle=_assemble_tickflow_lifecycle_methods_facade,
     assemble_market_overview=_assemble_market_overview_methods_facade,
 ) -> None:
     assemble_capability()
@@ -1515,6 +1442,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_timeout()
     assemble_fundamental_outcome()
     assemble_rankings()
+    assemble_tickflow_lifecycle()
     assemble_market_overview()
     from .manager_parts.data_validation_wiring import install_facade_validation_wrappers
     install_facade_validation_wrappers(DataFetcherManager)
@@ -1576,6 +1504,9 @@ _fundamental_outcome_methods_module._install_facade_reload_hook(
 _rankings_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_tickflow_lifecycle_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _market_overview_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -1601,6 +1532,7 @@ del (
     _assemble_fundamental_timeout_methods_facade,
     _assemble_fundamental_outcome_methods_facade,
     _assemble_rankings_methods_facade,
+    _assemble_tickflow_lifecycle_methods_facade,
     _assemble_market_overview_methods_facade,
     _assemble_data_fetcher_manager_facades,
     _capability_catalog_module,
@@ -1614,6 +1546,7 @@ del (
     _money_flow_cache_methods_module,
     _money_flow_methods_module,
     _rankings_methods_module,
+    _tickflow_lifecycle_methods_module,
     _market_overview_methods_module,
     _fundamental_cache_methods_module,
     _fundamental_loader_methods_module,
