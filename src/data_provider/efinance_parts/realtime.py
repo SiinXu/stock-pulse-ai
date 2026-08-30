@@ -155,7 +155,7 @@ class _RealtimeMethods:
             logger.info(f"[超时] ef.stock.get_realtime_quotes() 超过 {_EF_CALL_TIMEOUT}s，跳过 {stock_code}")
             circuit_breaker.record_failure(source_key, "timeout")
             return None
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics and circuit failure are recorded before quote failover.
             log_safe_exception(
                 logger,
                 "Efinance realtime quote failed",

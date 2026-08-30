@@ -153,7 +153,6 @@
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher.get_enhanced_data","caught":["Exception"],"digest":"2d4342f4e1b93ec86368f123904290f93cb052055a83b6d632010699c0393054"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher.get_main_indices","caught":["Exception"],"digest":"f0243a77bc566882239cdaa16658a7a773d8deb183828fdf5f611b0d826adbc7"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher.get_market_stats","caught":["Exception"],"digest":"4f657894bf9319954365e3c78a055638a24d98744a68daf3698eb2925788273e"},
-    {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher.get_realtime_quote","caught":["Exception"],"digest":"023ea874830a58d9fcccc8917936eddbc1027fc0dc53a2e77f04e9a4b050ab9b"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher.get_sector_rankings","caught":["Exception"],"digest":"d9f754418f836142188c9aeedb7ee7ca7787911d676f9c11c9110b70f59a0c66"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"2ce4dd372ce91d9e8fcb7924d0db740875da9ba7f061eae836c407a51f1a0f85"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"3d08df0ccaec74c4a07839c0c63d2cbe287f9b3dd3340ffbb13733fda3af3304"},
