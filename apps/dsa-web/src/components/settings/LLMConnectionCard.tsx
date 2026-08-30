@@ -112,13 +112,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
     <div
       data-testid={`connection-card-${channel.name}`}
       data-source-availability={availability}
-      className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-3 transition-[background-color,border-color] duration-200 hover:border-[var(--settings-border-strong)]"
+      className="rounded-xl border border-border bg-card px-4 py-3 transition-[background-color,border-color] duration-200 hover:border-foreground/20"
     >
       <div className="flex items-start gap-3">
         <span
           aria-hidden="true"
           data-testid={`provider-avatar-${channel.providerId || 'custom'}`}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-sm font-semibold text-foreground"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-hover text-sm font-semibold text-foreground"
         >
           {(displayLabel.trim()[0] || '?').toUpperCase()}
         </span>
@@ -156,7 +156,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({
               {selectedModels.slice(0, 4).map((model) => (
                 <span
                   key={model}
-                  className="max-w-48 truncate rounded-full border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-1.5 py-0.5 text-xs text-secondary-text"
+                  className="max-w-48 truncate rounded-full border border-border bg-hover px-1.5 py-0.5 text-xs text-secondary-text"
                 >
                   {model}
                 </span>

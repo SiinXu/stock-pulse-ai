@@ -132,9 +132,9 @@ export const LLMConfigModeBanner: React.FC<LLMConfigModeBannerProps> = ({ status
           <p className="text-xs text-muted-text">
             {text.migrationDescription}
           </p>
-          <div className="overflow-hidden rounded-lg border border-[var(--settings-border)]">
+          <div className="overflow-hidden rounded-lg border border-border">
             {(preview?.channels ?? []).map((channel) => (
-              <div key={channel.name} className="flex flex-wrap items-center gap-2 border-b border-[var(--settings-border)] px-3 py-2 text-xs last:border-b-0">
+              <div key={channel.name} className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-xs last:border-b-0">
                 <span className="font-medium text-foreground">{channel.name}</span>
                 <Badge variant="default" size="sm">{channel.protocol}</Badge>
                 <span className="text-muted-text">{channel.model}</span>

@@ -46,7 +46,7 @@ describe('SettingsConfigurationSummary', () => {
       'overflow-hidden',
       'rounded-lg',
       'border',
-      'bg-[var(--settings-surface)]',
+      'bg-card',
       'p-1',
     );
     expect(modeRow).toHaveClass(

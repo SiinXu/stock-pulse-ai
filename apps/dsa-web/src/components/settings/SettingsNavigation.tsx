@@ -107,7 +107,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
         id="settings-section-select"
         ariaLabel={navLabel}
         className="w-full [&>div]:w-full"
-        triggerClassName="min-h-11 rounded-md border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2.5 text-sm"
+        triggerClassName="min-h-11 rounded-md border-border bg-card px-3 py-2.5 text-sm"
         value={activeSection}
         onChange={(value) => (onMobileSelectSection ?? onSelectSection)(value as SettingsSectionId)}
         options={visibleSections.map((section) => {
@@ -121,7 +121,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
       {showRevealAdvanced ? (
         <button
           type="button"
-          className="min-h-11 w-full rounded-md border border-dashed border-[var(--settings-border)] px-3 py-2 text-left text-sm text-secondary-text hover:bg-[var(--settings-surface-hover)]"
+          className="min-h-11 w-full rounded-md border border-dashed border-border px-3 py-2 text-left text-sm text-secondary-text hover:bg-hover"
           onClick={onRevealAdvanced}
         >
           {revealLabel}
@@ -144,7 +144,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
                 'flex min-h-11 w-full items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-[background-color,border-color] duration-200',
                 isActive
                   ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] font-medium text-foreground'
-                  : 'border-transparent bg-transparent text-secondary-text hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)]',
+                  : 'border-transparent bg-transparent text-secondary-text hover:border-border hover:bg-hover',
               )}
               aria-current={isActive ? 'page' : undefined}
               onClick={() => onSelectSection(section.id)}
@@ -161,7 +161,7 @@ export const SettingsSectionNav: React.FC<SettingsSectionNavProps> = ({
         <li>
           <button
             type="button"
-            className="flex min-h-11 w-full items-center rounded-lg border border-dashed border-[var(--settings-border)] px-3 py-2.5 text-left text-sm text-secondary-text transition-[background-color,border-color] duration-200 hover:bg-[var(--settings-surface-hover)]"
+            className="flex min-h-11 w-full items-center rounded-lg border border-dashed border-border px-3 py-2.5 text-left text-sm text-secondary-text transition-[background-color,border-color] duration-200 hover:bg-hover"
             onClick={onRevealAdvanced}
           >
             <span className="min-w-0 flex-1 truncate">{revealLabel}</span>

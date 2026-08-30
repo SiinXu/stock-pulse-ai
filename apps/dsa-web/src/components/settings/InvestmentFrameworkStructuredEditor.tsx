@@ -308,7 +308,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
             ]}
           />
         ) : (
-          <p className="rounded-lg border border-dashed settings-border px-3 py-4 text-xs text-muted-text">
+          <p className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-text">
             {t('settings.frameworkDecisionTreeEmpty')}
           </p>
         )}
@@ -319,7 +319,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
             return (
               <article
                 key={nodeIndex}
-                className="rounded-xl border settings-border bg-background/35 p-4"
+                className="rounded-xl border border-border bg-background/35 p-4"
                 data-testid={`framework-node-${nodeIndex}`}
                 data-validation-error={nodeIssues.length ? 'true' : undefined}
               >
@@ -545,7 +545,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
           />
         ) : null}
         {dimensions.length === 0 ? (
-          <p className="rounded-lg border border-dashed settings-border px-3 py-4 text-xs text-muted-text">
+          <p className="rounded-lg border border-dashed border-border px-3 py-4 text-xs text-muted-text">
             {t('settings.frameworkDimensionsEmpty')}
           </p>
         ) : null}
@@ -557,7 +557,7 @@ const InvestmentFrameworkStructuredEditor: React.FC<
             return (
               <article
                 key={index}
-                className="rounded-xl border settings-border bg-background/35 p-4"
+                className="rounded-xl border border-border bg-background/35 p-4"
                 data-testid={`framework-dimension-${index}`}
                 data-validation-error={currentDimensionIssues.length ? 'true' : undefined}
               >

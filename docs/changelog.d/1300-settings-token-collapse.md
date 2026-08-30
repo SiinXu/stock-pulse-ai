@@ -1,0 +1,1 @@
+- [Changed] Settings surfaces, borders, skeletons, and input rest states now paint from Layer 1 semantic tokens with use-site alpha instead of the 20 `--settings-*` page-scoped tokens, so theme packs such as `slate` recolour the page; page-scoped token ceiling 76 → 56 and token-format debt 26 → 12 (Refs #1300).

@@ -281,7 +281,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
         <div key={group.id} className="space-y-2">
           <h4 className="px-1 text-sm font-medium text-secondary-text">{t(group.titleKey)}</h4>
           <form
-            className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-background/25 p-1"
+            className="overflow-hidden rounded-lg border border-border bg-background/25 p-1"
             onSubmit={(event) => event.preventDefault()}
           >
             {groupItems.map(renderField)}
@@ -303,7 +303,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
 
   return (
     <div className="space-y-4" data-testid="agent-behavior-panel">
-      <section className="space-y-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4" data-testid="agent-active-summary">
+      <section className="space-y-3 rounded-lg border border-border bg-card p-4" data-testid="agent-active-summary">
         <div className="flex flex-wrap items-start justify-between gap-2">
           <h3 className="text-sm font-semibold text-foreground">{copy.summaryTitle}</h3>
           <Badge variant={statusVariant} size="sm" data-testid="agent-preset-status">{statusLabel}</Badge>
@@ -318,7 +318,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
         ) : null}
       </section>
 
-      <section className="space-y-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4" data-testid="agent-setup-presets" aria-labelledby="agent-setup-presets-title">
+      <section className="space-y-3 rounded-lg border border-border bg-card p-4" data-testid="agent-setup-presets" aria-labelledby="agent-setup-presets-title">
         <div className="space-y-1">
           <h3 id="agent-setup-presets-title" className="text-sm font-semibold text-foreground">{copy.presetsTitle}</h3>
           <p className="text-xs leading-5 text-muted-text">{copy.presetsDescription}</p>
@@ -328,7 +328,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
             const isExact = fullySupported && persistedStatus.kind === 'exact' && persistedStatus.presetId === preset.id;
             const isPreview = previewPresetId === preset.id;
             return (
-              <div key={preset.id} role="listitem" className={cn('flex flex-col gap-2 rounded-lg border px-3 py-3', isExact ? 'border-success/40 bg-success/5' : 'border-[var(--settings-border)] bg-background/35')} data-testid={`agent-preset-card-${preset.id}`}>
+              <div key={preset.id} role="listitem" className={cn('flex flex-col gap-2 rounded-lg border px-3 py-3', isExact ? 'border-success/40 bg-success/5' : 'border-border bg-background/35')} data-testid={`agent-preset-card-${preset.id}`}>
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1"><p className="text-sm font-medium text-foreground">{copy[preset.id].name}</p><p className="text-xs leading-5 text-muted-text">{copy[preset.id].description}</p></div>
                   {preset.recommended ? <Badge variant="info" size="sm">{copy.recommended}</Badge> : null}
@@ -337,7 +337,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
                   {isExact ? copy.active : copy.apply}
                 </Button>
                 {isPreview && !isExact ? (
-                  <div className="rounded-md border border-[var(--settings-border-soft)] bg-background/50 px-2 py-2" data-testid={`agent-preset-preview-${preset.id}`}>
+                  <div className="rounded-md border border-border/60 bg-background/50 px-2 py-2" data-testid={`agent-preset-preview-${preset.id}`}>
                     <p className="text-xxs font-medium uppercase tracking-wide text-muted-text">{copy.changesTitle}</p>
                     {previewChanges.length ? renderChanges(previewChanges) : <p className="mt-1 text-xs text-secondary-text">{copy.noChanges}</p>}
                   </div>
@@ -363,7 +363,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
               <Link
                 to={modelSourcesHref}
                 className={cn(
-                  'inline-flex items-center justify-center rounded-md border border-[var(--settings-border)] bg-background px-3 py-1.5 text-sm font-medium text-foreground',
+                  'inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-1.5 text-sm font-medium text-foreground',
                   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40',
                 )}
                 data-testid="agent-configure-model-cta"
@@ -389,13 +389,13 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
 
       <section className="space-y-2" data-testid="agent-essentials-fields">
         <h3 className="px-1 text-sm font-medium text-secondary-text">{copy.essentialsTitle}</h3>
-        <form className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1" onSubmit={(event) => event.preventDefault()}>{essentialItems.map(renderField)}</form>
+        <form className="overflow-hidden rounded-lg border border-border bg-card p-1" onSubmit={(event) => event.preventDefault()}>{essentialItems.map(renderField)}</form>
       </section>
 
       {(() => {
         const behaviorSection = behaviorItems.length ? (
           <details
-            className="group/agent-behavior overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+            className="group/agent-behavior overflow-hidden rounded-lg border border-border bg-card"
             data-testid="agent-behavior-fields"
           >
             <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
@@ -405,7 +405,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
               </div>
               <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-behavior:rotate-180" aria-hidden="true" />
             </summary>
-            <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
+            <div className="space-y-4 border-t border-border/60 p-3">
               {renderGroupedFields(behaviorItems)}
             </div>
           </details>
@@ -413,7 +413,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
 
         const governanceSection = governanceItems.length ? (
           <details
-            className="group/agent-governance overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+            className="group/agent-governance overflow-hidden rounded-lg border border-border bg-card"
             data-testid="agent-governance-fields"
           >
             <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
@@ -423,7 +423,7 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
               </div>
               <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-governance:rotate-180" aria-hidden="true" />
             </summary>
-            <div className="space-y-4 border-t border-[var(--settings-border-soft)] p-3">
+            <div className="space-y-4 border-t border-border/60 p-3">
               {renderGroupedFields(governanceItems)}
             </div>
           </details>
@@ -438,14 +438,14 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
         if (essentialsFocus) {
           return (
             <details
-              className="group/agent-essentials-focus overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+              className="group/agent-essentials-focus overflow-hidden rounded-lg border border-border bg-card"
               data-testid="agent-essentials-focus-advanced"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
                 <span>{SETTINGS_MISC_TEXT[language].showAdvanced}</span>
                 <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-essentials-focus:rotate-180" aria-hidden="true" />
               </summary>
-              <div className="space-y-3 border-t border-[var(--settings-border-soft)] p-3">
+              <div className="space-y-3 border-t border-border/60 p-3">
                 {behaviorSection}
                 {governanceSection}
               </div>

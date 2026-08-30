@@ -197,7 +197,7 @@ const ScheduledTaskRunHistory: React.FC<ScheduledTaskRunHistoryProps> = ({
           {runs.map((run) => (
             <article
               key={run.id}
-              className="rounded-lg border settings-border bg-background/35 p-3"
+              className="rounded-lg border border-border bg-background/35 p-3"
               data-testid={`settings-scheduled-task-run-${run.id}`}
             >
               <div className="flex flex-wrap items-center justify-between gap-2">

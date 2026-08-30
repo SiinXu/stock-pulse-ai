@@ -823,7 +823,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
             />
           ) : null}
           <dl
-            className="space-y-2 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm"
+            className="space-y-2 rounded-lg border border-border bg-card p-3 text-sm"
             data-testid="wizard-saved-routing"
           >
             <div className="flex justify-between gap-3">
@@ -863,7 +863,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               </>
             ) : null}
           </dl>
-          <div className="flex flex-wrap justify-end gap-2 border-t border-[var(--settings-border)] pt-4">
+          <div className="flex flex-wrap justify-end gap-2 border-t border-border pt-4">
             {savedSummary.mode === 'cloud' && onViewRouting ? (
               <Button type="button" variant="secondary" size="default" onClick={onViewRouting}>
                 {text.viewRouting}
@@ -946,7 +946,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                       ? 'border-[var(--nav-active-border)] bg-[var(--nav-active-bg)] text-foreground'
                       : value === 'local_model'
                         ? 'border-primary/50 bg-primary/5 text-secondary-text hover:bg-primary/10'
-                        : 'border-[var(--settings-border)] bg-[var(--settings-surface)] text-secondary-text hover:bg-[var(--settings-surface-hover)]'
+                        : 'border-border bg-card text-secondary-text hover:bg-hover'
                   }`}
                 >
                   <span className="block font-medium text-foreground">
@@ -1159,7 +1159,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
                 {modelOptions.map((model) => (
                   <span
                     key={model}
-                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface)] px-1.5 py-0.5 text-xs text-secondary-text"
+                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-card px-1.5 py-0.5 text-xs text-secondary-text"
                   >
                     <span className="truncate">{model}</span>
                     <button
@@ -1307,7 +1307,7 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
               />
             ) : null}
             {/* User-facing summary only — no internal keys such as LLM_CHANNELS. */}
-            <dl className="space-y-1.5 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 text-sm">
+            <dl className="space-y-1.5 rounded-lg border border-border bg-card p-3 text-sm">
               <div className="flex justify-between gap-3">
                 <dt className="text-muted-text">{text.execution}</dt>
                 <dd className="font-medium text-foreground">

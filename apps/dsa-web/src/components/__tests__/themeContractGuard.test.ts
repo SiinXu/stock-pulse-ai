@@ -370,23 +370,9 @@ const TOKEN_FORMAT_DEBT: readonly TokenFormatDebt[] = [
   rawHslLiteralDebt('--report-strategy-buy', REPORT_STRATEGY_RAW_HSL_REASON),
   rawHslLiteralDebt('--report-strategy-stop', REPORT_STRATEGY_RAW_HSL_REASON),
   rawHslLiteralDebt('--report-strategy-take', REPORT_STRATEGY_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-border', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-border-overlay', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-border-soft', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-border-strong', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-input-rest-border', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-secondary-bg', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-secondary-border', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-skeleton-soft', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-skeleton-strong', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-surface-hover', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-surface-overlay', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-surface-overlay-muted', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-surface-overlay-soft', LIGHT_MODE_RAW_HSL_REASON),
-  rawHslLiteralDebt('--settings-surface-panel', LIGHT_MODE_RAW_HSL_REASON),
 ];
 
-const MAX_TOKEN_FORMAT_DEBT = 26;
+const MAX_TOKEN_FORMAT_DEBT = 12;
 
 /**
  * Tokens that are allowed to exist only on `:root` because they are not
@@ -776,8 +762,8 @@ export function changeColorToCss(color: ChangeColor): string {
 
     it('declares a format for every defined custom property', () => {
       // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
-      // portfolio/chat) shrank the defined inventory below the original 200.
-      expect(uniqueNames.length).toBeGreaterThan(190);
+      // portfolio/chat/settings) shrank the defined inventory below 190.
+      expect(uniqueNames.length).toBeGreaterThan(170);
       for (const token of uniqueNames) {
         expect(TOKEN_FORMATS, token).toContain(declaredTokenFormat(token));
       }

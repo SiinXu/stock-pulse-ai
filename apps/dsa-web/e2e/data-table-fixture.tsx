@@ -269,7 +269,7 @@ function DataTableFixture() {
             </p>
             <div
               data-testid="embedded-table-frame"
-              className="overflow-hidden rounded-xl border border-[var(--settings-border)]"
+              className="overflow-hidden rounded-xl border border-border"
             >
               <DataTable
                 caption="Embedded selected signals"

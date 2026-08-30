@@ -355,7 +355,7 @@ export const AgentOnboardingWizard: React.FC<AgentOnboardingWizardProps> = ({
               title={t('onboarding.engineRules', { engine: plan.engine })}
               message={plan.llmNote}
             />
-            <div className="rounded-lg border border-border bg-[var(--settings-surface)] p-3 text-sm">
+            <div className="rounded-lg border border-border bg-card p-3 text-sm">
               <p className="font-medium text-foreground">
                 {t('onboarding.recommendedPreset')}: {plan.recommendedPresetName}
               </p>

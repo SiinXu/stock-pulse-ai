@@ -112,7 +112,7 @@
 
 - **冻结当前自定义属性名集合**，不在本阶段删除 page-scoped 遗留、不统一格式、不引入第二套 token 系统。
 - 可执行清单：`THEME_DEFINED_TOKEN_NAMES`（`src/index.css` 的 unique 定义）+ `classifyThemeToken()`。
-- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*`、`--backtest-*`、`--portfolio-*` 与 `--chat-*` 已在 Phase 2 清零，禁止重新引入这些前缀。
+- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*`、`--backtest-*`、`--portfolio-*`、`--chat-*` 与 `--settings-*` 已在 Phase 2 清零，禁止重新引入这些前缀。
 - 新 UI 只用 Layer 1 + `components/common`；缺色用 `hsl(var(--token) / alpha)`，不要为每个透明度再开 token。
 - 未定义的 `var(--*)`（如 `--home-border`、`--info`、`--color-purple`、`.input-surface` 可选槽）登记在 freeze 守卫测试里的 `THEME_UNGOVERNED_REFERENCE_DEBT`（`themeTokenFreezeGuard.test.ts`），只减不增，且**不得**写进已定义清单冒充合法 token。
 - Desktop 嵌入的 WebView 走同一套 Web token。`apps/dsa-desktop/renderer/assistant.html` / `loading.html` 是独立 chrome 清单，禁止把 `--bg` / `--panel` 并进 Web Layer 1。
@@ -153,6 +153,16 @@
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 93 降到 76；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 26（这 17 个名字不在格式债清单中）；`TOKEN_FORMAT_OVERRIDES` 中两条 prose 描边别名同步删除，因为该守卫要求 override key 必须仍有定义。
 - `themeContractGuard` / `themeTokenFreezeGuard` 的非空下界由 200 降到 190：它们只是「清单被截断」的兜底断言，四次 Phase 2 收敛已把已定义清单从 210 降到 196。
 - 主题包行为不变：被删除的名字原本就定义在 `:root` 上且以 `--primary` / `--card` / `--foreground` / `--background` 表达，因此收敛前后 Chat 都会跟随 pack 换色。渲染对比显示 `data-theme-pack="slate"` 在前后两个构建里换色的是同样 8 个元素（`chat-avatar-ai`、`chat-avatar-user`、`chat-bubble-ai`、`chat-bubble-user`，以及 prose 的 link / code / pre / blockquote）。
+
+### 2.11 Phase 2 域收敛：Settings（#1300）
+
+- 20 个 `--settings-*` 定义（light + dark）已删除；未新增页面级或领域 token。`THEME_PAGE_SCOPED_PREFIXES` 仍永久禁止 `--settings-*`。
+- 八个无引用定义直接删除：`--settings-accent-shadow`、`--settings-border-overlay`、`--settings-primary-border`、`--settings-secondary-bg`、`--settings-secondary-bg-hover`、`--settings-secondary-border`、`--settings-secondary-border-hover`、`--settings-surface-overlay`。
+- 在用调用点改为 Layer 1 + use-site alpha：`--settings-surface` / `--settings-surface-strong` → `bg-card`；`--settings-surface-hover` → `bg-hover`；`--settings-surface-panel` → `bg-background`；`--settings-surface-overlay-soft` → `bg-muted`；`--settings-surface-overlay-muted` → `bg-[hsl(var(--background)/0.12)]`；`--settings-border` → `border-border`；`--settings-border-soft` → `border-border/60`；`--settings-border-strong` → `border-foreground/20` / `hover:border-foreground/20`；`--settings-skeleton-strong` → `bg-muted`；`--settings-skeleton-soft` → `bg-muted/50`。
+- Settings 输入框 rest 描边仍由 `.settings-page .input-surface:not(:hover):not(:focus):not(:disabled)` 覆盖，light 内联 `hsl(var(--border) / 0.72)`，dark 内联 `hsl(var(--border) / 0.58)`。hover / focus / error / disabled 仍走共享 `.input-surface`、`Input`、`border-danger` 与 disabled opacity，不新增 token。
+- 删除包装这些 token 的 helper class（`.settings-surface-strong` / `.settings-surface-panel` / `.settings-surface-overlay-soft` / `.settings-surface-overlay-muted` / `.settings-border` / `.settings-border-strong` / `.settings-skeleton-strong` / `.settings-skeleton-soft`）。`.settings-accent-text` 与 `.settings-drag-active` 已使用 Layer 1 `--primary`，予以保留。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 76 降到 56；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 由 26 条降到 12 条（删除 14 条 Settings raw `hsl()` 债）。非空下界由 190 降到 170。
+- 因为改用 Layer 1，`data-theme-pack="slate"` 首次能够为 Settings 卡片与描边换色。Layer 0 涨跌色与 `--home-price-*` 别名不变。亮色卡片描边从旧 `--settings-border`（`80 7% 82%`）软化为 Layer 1 `--border`（`80 7% 92%`），与 Login 相同，属于非文字装饰差；详细对比方法见 [`docs/web-ui-foundation.md`](../../docs/web-ui-foundation.md)。
 
 ## 3. 字体阶（全部 Geist）
 

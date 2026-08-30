@@ -119,7 +119,7 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
         {onEditRouting ? (
           <button
             type="button"
-            className="relative inline-flex h-8 min-h-8 min-w-8 items-center justify-center whitespace-nowrap rounded-lg border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text transition-colors before:absolute before:-inset-1.5 hover:border-foreground hover:text-foreground"
+            className="relative inline-flex h-8 min-h-8 min-w-8 items-center justify-center whitespace-nowrap rounded-lg border border-border px-2.5 text-xs text-secondary-text transition-colors before:absolute before:-inset-1.5 hover:border-foreground hover:text-foreground"
             onClick={onEditRouting}
           >
             {text.editRouting}
@@ -128,13 +128,13 @@ export const AiOverviewMatrix: React.FC<AiOverviewMatrixProps> = ({
       </div>
 
       {showCliCapabilityNote ? (
-        <p className="rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
+        <p className="rounded-lg border border-border bg-card px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
           {CLI_AGENT_CAPABILITY_NOTE[language]}
         </p>
       ) : null}
 
       {/* #879 B3: keep the wide task table scrollable inside the content column at 320/390. */}
-      <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-[var(--settings-border)]">
+      <div className="min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-border">
         <DataTable
           caption={text.overviewTitle}
           columns={columns}

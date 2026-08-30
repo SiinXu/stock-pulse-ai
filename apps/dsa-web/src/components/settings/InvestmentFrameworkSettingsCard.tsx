@@ -368,7 +368,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
             className={
               loadError || framework?.isActive
                 ? ''
-                : 'border-[var(--settings-border)] bg-[var(--settings-surface-hover)] text-secondary-text'
+                : 'border-border bg-hover text-secondary-text'
             }
           >
             {statusLabel}
@@ -424,9 +424,9 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                 </div>
               ) : null}
 
-              <section className="rounded-xl border settings-border bg-background/20 p-2">
+              <section className="rounded-xl border border-border bg-background/20 p-2">
                 <Pressable
-                  className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-[var(--settings-surface-hover)] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-2 text-left transition-colors hover:bg-hover disabled:cursor-not-allowed disabled:opacity-50"
                   aria-label={t('settings.frameworkBasics')}
                   aria-haspopup="dialog"
                   aria-expanded={basicsDraft !== null}
@@ -538,7 +538,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
         {isHistoryOpen ? (
           <aside
             id="investment-framework-history-drawer"
-            className="min-w-0 self-start rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] density-surface-pad-sm"
+            className="min-w-0 self-start rounded-xl border border-border bg-card density-surface-pad-sm"
             aria-label={t('settings.frameworkHistory')}
           >
             <div className="flex items-start justify-between gap-3">
@@ -611,7 +611,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
                           version: item.version,
                         })}
                         aria-pressed={selectedHistoryVersion === item.version}
-                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-[var(--settings-border)] px-3 py-2 text-left transition-colors hover:bg-[var(--settings-surface-hover)]"
+                        className="flex w-full items-center justify-between gap-2 rounded-lg border border-border px-3 py-2 text-left transition-colors hover:bg-hover"
                         onClick={() => setSelectedHistoryVersion(item.version)}
                       >
                         <span className="min-w-0">
@@ -649,7 +649,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
 
               {selectedHistory ? (
                 <section
-                  className="space-y-3 border-t border-[var(--settings-border)] pt-3"
+                  className="space-y-3 border-t border-border pt-3"
                   role="region"
                   aria-label={t('settings.frameworkHistoryDetails')}
                   data-testid={`framework-history-inspector-${selectedHistory.version}`}

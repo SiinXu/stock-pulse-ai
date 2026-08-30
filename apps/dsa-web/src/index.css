@@ -232,31 +232,11 @@
   --density-overlay-pad-x: var(--density-space-5);
   --density-overlay-pad-y: var(--density-space-4);
 
-  --settings-surface: hsl(var(--neutral-white) / 0.97);
-  --settings-surface-hover: hsl(80 7% 95% / 0.99);
-  --settings-surface-strong: hsl(var(--neutral-white) / 0.99);
-  --settings-surface-panel: hsl(80 7% 97% / 0.99);
-  --settings-surface-overlay: hsl(80 7% 94% / 0.88);
-  --settings-surface-overlay-soft: hsl(80 7% 95% / 0.94);
-  --settings-surface-overlay-muted: hsl(80 7% 93% / 0.97);
-  --settings-border: hsl(80 7% 82% / 0.94);
-  --settings-border-soft: hsl(80 7% 88% / 0.94);
-  --settings-border-strong: hsl(80 6% 72% / 0.98);
-  --settings-border-overlay: hsl(80 6% 76% / 0.92);
-  --settings-accent-shadow: hsl(var(--primary) / 0.08);
-  --settings-primary-border: hsl(var(--foreground) / 0.9);
-  --settings-secondary-border: hsl(80 7% 82% / 0.96);
-  --settings-secondary-bg: hsl(80 7% 96% / 0.98);
-  --settings-secondary-border-hover: hsl(var(--primary) / 0.42);
-  --settings-secondary-bg-hover: hsl(var(--primary) / 0.1);
-  --settings-skeleton-strong: hsl(80 7% 88% / 0.92);
-  --settings-skeleton-soft: hsl(80 7% 93% / 0.96);
   --input-surface-bg: var(--bg-card);
   --input-surface-border: hsl(80 7% 84% / 0.92);
   --input-surface-border-hover: hsl(80 6% 74% / 0.92);
   --input-surface-border-focus: hsl(var(--primary) / 0.45);
   --input-surface-focus-ring: 0 0 0 4px hsl(var(--primary) / 0.15);
-  --settings-input-rest-border: hsl(80 7% 86% / 0.72);
   --gradient-primary:
     linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--foreground) / 0.9));
 }
@@ -481,31 +461,11 @@
   --shadow-soft-card-strong: 0 2px 8px hsl(var(--neutral-black) / 0.35);
   --shadow-elevation-overlay: var(--shadow-soft-card-strong);
   --shadow-elevation-popper: var(--shadow-soft-card-strong);
-  --settings-surface: hsl(var(--neutral-white) / 0.02);
-  --settings-surface-hover: hsl(var(--neutral-white) / 0.05);
-  --settings-surface-strong: hsl(var(--card) / 0.92);
-  --settings-surface-panel: hsl(var(--elevated) / 0.62);
-  --settings-surface-overlay: hsl(var(--background) / 0.22);
-  --settings-surface-overlay-soft: hsl(var(--background) / 0.15);
-  --settings-surface-overlay-muted: hsl(var(--background) / 0.12);
-  --settings-border: hsl(var(--neutral-white) / 0.1);
-  --settings-border-soft: hsl(var(--neutral-white) / 0.08);
-  --settings-border-strong: hsl(var(--neutral-white) / 0.2);
-  --settings-border-overlay: hsl(var(--neutral-white) / 0.45);
-  --settings-accent-shadow: hsl(var(--primary) / 0.1);
-  --settings-primary-border: hsl(var(--foreground) / 0.9);
-  --settings-secondary-border: hsl(var(--neutral-white) / 0.08);
-  --settings-secondary-bg: hsl(var(--neutral-white) / 0.03);
-  --settings-secondary-border-hover: hsl(var(--primary) / 0.34);
-  --settings-secondary-bg-hover: hsl(var(--primary) / 0.1);
-  --settings-skeleton-strong: hsl(var(--neutral-white) / 0.1);
-  --settings-skeleton-soft: hsl(var(--neutral-white) / 0.06);
   --input-surface-bg: var(--bg-card);
   --input-surface-border: hsl(var(--border) / 0.82);
   --input-surface-border-hover: hsl(var(--neutral-white) / 0.18);
   --input-surface-border-focus: hsl(var(--primary) / 0.45);
   --input-surface-focus-ring: 0 0 0 4px hsl(var(--primary) / 0.18);
-  --settings-input-rest-border: hsl(var(--border) / 0.58);
   --gradient-primary:
     linear-gradient(135deg, hsl(var(--foreground)), hsl(var(--foreground) / 0.9));
 }
@@ -625,7 +585,11 @@ body:has(> [data-overlay-root="sheet"]) > [data-overlay-root="toast"] {
 }
 
 .settings-page .input-surface:not(:hover):not(:focus):not(:disabled) {
-  border-color: var(--settings-input-rest-border);
+  border-color: hsl(var(--border) / 0.72);
+}
+
+.dark .settings-page .input-surface:not(:hover):not(:focus):not(:disabled) {
+  border-color: hsl(var(--border) / 0.58);
 }
 
 .input-surface:disabled {
@@ -1383,30 +1347,6 @@ a {
   padding-bottom: var(--density-overlay-pad-y);
 }
 
-.settings-surface-strong {
-  background: var(--settings-surface-strong);
-}
-
-.settings-surface-panel {
-  background: var(--settings-surface-panel);
-}
-
-.settings-surface-overlay-soft {
-  background: var(--settings-surface-overlay-soft);
-}
-
-.settings-surface-overlay-muted {
-  background: var(--settings-surface-overlay-muted);
-}
-
-.settings-border {
-  border-color: var(--settings-border);
-}
-
-.settings-border-strong {
-  border-color: var(--settings-border-strong);
-}
-
 .settings-accent-text {
   color: hsl(var(--primary));
 }
@@ -1514,14 +1454,6 @@ a {
 
 .price-up { color: var(--price-up); }
 .price-down { color: var(--price-down); }
-
-.settings-skeleton-strong {
-  background: var(--settings-skeleton-strong);
-}
-
-.settings-skeleton-soft {
-  background: var(--settings-skeleton-soft);
-}
 
 /* Touch action utilities */
 .touch-pan-y {

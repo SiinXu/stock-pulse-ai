@@ -411,7 +411,7 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
                 </div>
               </dl>
               {event.metadata && Object.keys(event.metadata).length > 0 ? (
-                <details className="rounded-lg border border-border/60 bg-[var(--settings-surface)] p-2">
+                <details className="rounded-lg border border-border/60 bg-card p-2">
                   <summary className="cursor-pointer text-xs font-medium text-secondary-text">
                     {t('settings.securityAuditMetadata')}
                   </summary>

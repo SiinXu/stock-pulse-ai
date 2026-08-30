@@ -257,7 +257,7 @@ export const NotificationTestPanel: React.FC<NotificationTestPanelProps> = ({
                 return (
                   <div
                     key={`${attempt.channel}-${index}-${attempt.target || 'target'}`}
-                    className="rounded-xl border settings-border bg-background/35 px-4 py-3"
+                    className="rounded-xl border border-border bg-background/35 px-4 py-3"
                   >
                     <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                       <div className="min-w-0">

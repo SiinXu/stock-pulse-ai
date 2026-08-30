@@ -399,7 +399,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
       {eventRoutes ? (
         <section
           aria-labelledby="notification-event-routing-heading"
-          className="rounded-lg border settings-border bg-background/25 px-3 py-3"
+          className="rounded-lg border border-border bg-background/25 px-3 py-3"
           data-testid="notification-event-routing"
         >
           <h3 id="notification-event-routing-heading" className="text-sm font-semibold text-foreground">
@@ -505,7 +505,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
               data-channel-health={channelHealth}
               onClick={() => setOpenChannelId(channel.id)}
               className={cn(
-                'flex flex-col gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
+                'flex flex-col gap-2 rounded-lg border border-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-hover',
               )}
             >
               <span className="flex min-w-0 items-center justify-between gap-2">
@@ -588,7 +588,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                   data-testid={`notification-plugin-channel-card-${entry.channelId}`}
                   data-plugin-id={entry.pluginId}
                   className={cn(
-                    'flex flex-col gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left',
+                    'flex flex-col gap-2 rounded-lg border border-border bg-background/35 px-3 py-3 text-left',
                     focused && 'ring-1 ring-inset ring-primary/35 bg-primary/10',
                   )}
                 >
@@ -708,7 +708,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
             </form>
 
             {maskToken && openTestChannel ? (
-              <div className="space-y-3 border-t border-[var(--settings-border-soft)] pt-4">
+              <div className="space-y-3 border-t border-border/60 pt-4">
                 <Button
                   type="button"
                   variant="primary"
@@ -745,7 +745,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
                     {modalFeedback.attempts.map((attempt, index) => (
                       <div
                         key={`${attempt.channel}-${attempt.target ?? index}`}
-                        className="rounded-md border settings-border bg-background/35 px-3 py-2 text-xs"
+                        className="rounded-md border border-border bg-background/35 px-3 py-2 text-xs"
                       >
                         <div className="flex flex-wrap items-center gap-2">
                           <Badge variant={attempt.success ? 'success' : 'danger'} size="sm">
@@ -772,7 +772,7 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
               && eventRoutes
               && onBindEvents ? (
               <section
-                className="space-y-3 border-t border-[var(--settings-border-soft)] pt-4"
+                className="space-y-3 border-t border-border/60 pt-4"
                 aria-labelledby="notification-bind-events-heading"
               >
                 <div>

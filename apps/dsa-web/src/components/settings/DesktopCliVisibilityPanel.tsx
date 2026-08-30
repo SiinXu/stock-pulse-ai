@@ -102,7 +102,7 @@ export default function DesktopCliVisibilityPanel({ language }: DesktopCliVisibi
 
   return (
     <section
-      className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
+      className="space-y-2 rounded-xl border border-border bg-card p-4"
       data-testid="desktop-cli-visibility-panel"
       aria-labelledby="desktop-cli-visibility-heading"
     >
