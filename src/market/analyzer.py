@@ -47,6 +47,7 @@ from src.market import metrics as _market_metrics
 from src.market import prompts as _market_prompts
 from src.market import degradation as _market_degradation
 from src.market import formatters as _market_formatters
+from src.market import blocks as _market_blocks
 
 build_market_light_scores = _market_metrics.build_market_light_scores
 build_market_temperature = _market_metrics.build_market_temperature
@@ -64,6 +65,11 @@ format_signed_pct = _market_formatters.format_signed_pct
 format_ranking_summary = _market_formatters.format_ranking_summary
 escape_markdown_link_label = _market_formatters.escape_markdown_link_label
 describe_turnover = _market_formatters.describe_turnover
+build_stats_block = _market_blocks.build_stats_block
+build_indices_block = _market_blocks.build_indices_block
+build_sector_block = _market_blocks.build_sector_block
+build_sector_analysis_block = _market_blocks.build_sector_analysis_block
+build_news_block = _market_blocks.build_news_block
 
 logger = logging.getLogger(__name__)
 
@@ -996,42 +1002,7 @@ class MarketAnalyzer:
         return text[:insert_pos].rstrip() + '\n\n' + block + '\n\n' + text[insert_pos:].lstrip('\n')
 
     def _build_stats_block(self, overview: MarketOverview) -> str:
-        """Build market statistics block."""
-        has_stats = overview.up_count or overview.down_count or overview.total_amount
-        if not has_stats:
-            return ""
-        if self._get_review_language() == "en":
-            light = self.build_market_light_snapshot(overview)
-            return "\n".join(
-                [
-                    f"- **Market Signal**: {light['score']}/100 "
-                    f"({light['temperature_label']}, {light['label']})",
-                    f"- **Drivers**: {'; '.join(light['reasons'])}",
-                    f"- **Guidance**: {light['guidance']}",
-                    "",
-                    f"- **Breadth**: Advancers {overview.up_count} / Decliners {overview.down_count} / "
-                    f"Flat {overview.flat_count}; "
-                    f"Limit-up {overview.limit_up_count} / Limit-down {overview.limit_down_count}; "
-                    f"Turnover {overview.total_amount:.0f} ({self._get_turnover_unit_label()})",
-                ]
-            )
-        light = self.build_market_light_snapshot(overview)
-        score, label = light["score"], light["temperature_label"]
-        participation = overview.up_count + overview.down_count
-        up_ratio = overview.up_count / participation if participation else 0.0
-        limit_spread = overview.limit_up_count - overview.limit_down_count
-        lines = [
-            f"- **盘面信号**：{score}/100（{label}，{light['label']}）",
-            f"- **信号依据**：{'；'.join(light['reasons'])}",
-            f"- **操作建议**：{light['guidance']}",
-            "",
-            "| 指标 | 数值 | 观察 |",
-            "|------|------|------|",
-            f"| 上涨/下跌/平盘 | {overview.up_count} / {overview.down_count} / {overview.flat_count} | 上涨占比(不含平盘) {up_ratio:.1%} |",
-            f"| 涨停/跌停 | {overview.limit_up_count} / {overview.limit_down_count} | 涨跌停差 {limit_spread:+d} |",
-            f"| 两市成交额 | {overview.total_amount:.0f} 亿 | {self._describe_turnover(overview.total_amount)} |",
-        ]
-        return "\n".join(lines)
+        return build_stats_block(self, overview)
 
     def build_market_light_snapshot(self, overview: MarketOverview) -> Dict[str, Any]:
         """Build a deterministic market-light snapshot from structured breadth data."""
@@ -1126,91 +1097,18 @@ class MarketAnalyzer:
         return reasons[:4]
 
     def _build_indices_block(self, overview: MarketOverview) -> str:
-        """构建指数行情表格"""
-        if not overview.indices:
-            return ""
-        if self._get_review_language() == "en":
-            lines = [
-                f"| Index | Last | Change % | Open | High | Low | Amplitude | Turnover ({self._get_turnover_unit_label()}) |",
-                "|-------|------|----------|------|------|-----|-----------|-----------------|",
-            ]
-        else:
-            lines = [
-                "| 指数 | 最新 | 涨跌幅 | 开盘 | 最高 | 最低 | 振幅 | 成交额(亿) |",
-                "|------|------|--------|------|------|------|------|-----------|",
-            ]
-        for idx in overview.indices:
-            arrow = self._get_index_change_arrow(idx.change_pct)
-            amount_raw = idx.amount or 0.0
-            amount_str = self._format_turnover_value(amount_raw)
-            lines.append(
-                f"| {idx.name} | {idx.current:.2f} | {arrow} {idx.change_pct:+.2f}% | "
-                f"{self._format_optional_number(idx.open)} | {self._format_optional_number(idx.high)} | "
-                f"{self._format_optional_number(idx.low)} | {self._format_optional_pct(idx.amplitude)} | {amount_str} |"
-            )
-        return "\n".join(lines)
+        return build_indices_block(self, overview)
 
     def _build_sector_block(self, overview: MarketOverview) -> str:
-        """Build industry and concept ranking blocks."""
-        lines = []
-        language = self._get_review_language()
-
-        def append_ranking(title: str, name_label: str, rows: List[Dict]) -> None:
-            if not rows:
-                return
-            if lines:
-                lines.append("")
-            lines.extend([
-                title,
-                f"| {'Rank' if language == 'en' else '排名'} | {name_label} | {'Change' if language == 'en' else '涨跌幅'} |",
-                "|------|------|--------|",
-            ])
-            for rank, item in enumerate(rows[:5], 1):
-                lines.append(
-                    f"| {rank} | {item.get('name', '-')} | {self._format_signed_pct(item.get('change_pct'))} |"
-                )
-
-        if language == "en":
-            append_ranking("#### Leading Industry Sectors", "Sector", overview.top_sectors)
-            append_ranking("#### Lagging Industry Sectors", "Sector", overview.bottom_sectors)
-            append_ranking("#### Leading Concept Themes", "Concept", overview.top_concepts)
-            append_ranking("#### Lagging Concept Themes", "Concept", overview.bottom_concepts)
-        else:
-            append_ranking("#### 行业板块领涨 Top 5", "行业板块", overview.top_sectors)
-            append_ranking("#### 行业板块领跌 Top 5", "行业板块", overview.bottom_sectors)
-            append_ranking("#### 概念板块领涨 Top 5", "概念板块", overview.top_concepts)
-            append_ranking("#### 概念板块领跌 Top 5", "概念板块", overview.bottom_concepts)
-        analysis_block = self._build_sector_analysis_block(overview)
-        if analysis_block:
-            if lines:
-                lines.append("")
-            lines.append(analysis_block)
-        return "\n".join(lines)
+        return build_sector_block(self, overview)
 
     def _build_sector_analysis_block(self, overview: MarketOverview) -> str:
-        """Render the bounded sector-analysis contract for market-review reports."""
-        return render_sector_analysis_markdown(
-            self.build_sector_analysis(overview),
-            language=self._get_review_language(),
+        return build_sector_analysis_block(
+            self, overview, renderer=render_sector_analysis_markdown
         )
 
     def _build_news_block(self, news: List) -> str:
-        """Build a compact source-aware news catalyst list for the rendered report."""
-        if not news:
-            return ""
-        language = self._get_review_language()
-        if language == "en":
-            lines = [
-                "#### News Catalysts",
-            ]
-        else:
-            lines = [
-                "#### 近三日市场线索",
-            ]
-
-        for idx, item in enumerate(news[:5], 1):
-            lines.append(self._format_news_catalyst_line(idx, item, language=language))
-        return "\n".join(lines)
+        return build_news_block(self, news)
 
     @staticmethod
     def _get_news_field(item: Any, field: str) -> str:
