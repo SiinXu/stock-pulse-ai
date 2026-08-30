@@ -1,0 +1,1 @@
+- [Chore] Bind Web signal-scorecard camelCase types to generated OpenAPI response components (Refs #721).
