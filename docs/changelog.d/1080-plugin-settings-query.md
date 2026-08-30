@@ -1,0 +1,2 @@
+- [Changed] Extract PluginManager settings query behind the existing facade (Refs #1080).
+- [Tests] Characterize PluginManager.settings_schema and settings_values facade counterexamples for the settings-query extract (Refs #1080).

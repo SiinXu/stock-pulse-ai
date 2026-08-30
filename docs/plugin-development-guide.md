@@ -209,8 +209,8 @@ External plugins should import only:
      `src.agent.tools.registry` for `agent_tool` (ToolSurface-owned)
 
 Do not import `PluginManager`, `ExternalPluginLoader`, private
-`src.plugins.*` modules (`permissions`, `lifecycle`, `loader`, `settings_update`
-internals), or invent a seventh extension point name. Host composition continues
+`src.plugins.*` modules (`permissions`, `lifecycle`, `loader`, `settings_update`,
+`settings_query` internals), or invent a seventh extension point name. Host composition continues
 to use the `PluginManager` facade; the split modules are not an author API.
 
 Lifecycle is always:
