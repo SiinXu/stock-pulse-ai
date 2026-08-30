@@ -1,0 +1,1 @@
+- [Changed] Move efinance ETF history fetch and ETF realtime-quote orchestration into `src/data_provider/efinance_parts/etf.py` behind the ADR-006 facade, keeping `EfinanceFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
