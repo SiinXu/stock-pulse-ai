@@ -41,7 +41,7 @@ describe('AiOverviewMatrix', () => {
       'min-w-0',
       'max-w-full',
       'overflow-x-auto',
-      'border-[var(--settings-border)]',
+      'border-border',
     );
     expect(table.parentElement?.parentElement).not.toHaveClass('overflow-hidden');
     expect(screen.getByTestId('ai-task-report')).toContainElement(

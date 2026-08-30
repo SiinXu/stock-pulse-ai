@@ -197,7 +197,7 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
   }, [maskToken, requestItems]);
 
   return (
-    <div data-testid="generation-backend-status-panel" className="space-y-3 rounded-xl border settings-border bg-card/70 density-surface-pad-sm">
+    <div data-testid="generation-backend-status-panel" className="space-y-3 rounded-xl border border-border bg-card/70 density-surface-pad-sm">
       <div className="flex flex-col density-gap-stack md:flex-row md:items-start md:justify-between">
         <div>
           <div className="flex flex-wrap items-center density-gap-tools">

@@ -49,7 +49,7 @@ export const KronosSettingsFields: React.FC<KronosSettingsFieldsProps> = ({
       description={t('settings.kronosFieldsDescription')}
     >
       <form
-        className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+        className="overflow-hidden rounded-lg border border-border bg-card"
         onSubmit={(event) => event.preventDefault()}
       >
         {kronosItems.map((item) => (

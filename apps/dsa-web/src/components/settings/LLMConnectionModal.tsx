@@ -1021,7 +1021,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
                 {selectedModels.map((model) => (
                   <span
                     key={model}
-                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-1.5 py-0.5 text-xs text-secondary-text"
+                    className="inline-flex max-w-full items-center gap-1 rounded-md border border-border bg-hover px-1.5 py-0.5 text-xs text-secondary-text"
                   >
                     <span className="truncate">{model}</span>
                     <button
@@ -1228,7 +1228,7 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
           </div>
 
           {showEnabledField ? (
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-3 py-2.5">
+          <div className="flex items-center justify-between gap-3 rounded-xl border border-border bg-hover px-3 py-2.5">
             <div>
               <p className="text-sm text-foreground">{text.enableThis}</p>
               <p className="text-xs text-muted-text">{text.disabledDraftHint}</p>
@@ -1351,11 +1351,11 @@ const ConnectionModal: React.FC<ConnectionModalProps> = ({
   if (isPagePresentation) {
     return (
       <section
-        className="space-y-4 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 sm:p-5"
+        className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5"
         data-testid="model-source-setup-page"
         aria-labelledby="model-source-setup-heading"
       >
-        <div className="space-y-1 border-b border-[var(--settings-border)] pb-3">
+        <div className="space-y-1 border-b border-border pb-3">
           <h2 id="model-source-setup-heading" className="text-base font-semibold text-foreground">
             {mode === 'edit' ? text.editService : text.addService}
           </h2>

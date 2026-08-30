@@ -238,7 +238,7 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
         </Suspense>
       ) : subFilteredItems.length ? (
         <form
-          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
+          className="overflow-hidden rounded-lg border border-border bg-card p-1"
           onSubmit={(event) => event.preventDefault()}
         >
           {subFilteredItems.map((item) => (
@@ -262,7 +262,7 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
             title={t('settings.promptCacheAdvancedTitle')}
             description={t('settings.promptCacheAdvancedDescription')}
             defaultOpen={false}
-            className="rounded-lg border-[var(--settings-border)] bg-[var(--settings-surface)] shadow-none hover:border-[var(--settings-border)] hover:bg-[var(--settings-surface-hover)]"
+            className="rounded-lg border-border bg-card shadow-none hover:border-border hover:bg-hover"
           >
             <form onSubmit={(event) => event.preventDefault()}>
               {activeSubPromptCacheItems.map((item) => (

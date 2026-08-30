@@ -202,7 +202,7 @@ describe('FirstRunWizard', () => {
     expect(dialog.querySelector('[data-overlay-slot="header"]')).not.toHaveClass('border-b', 'border-border');
     expect(screen.getByRole('button', { name: '取消' }).parentElement).not.toHaveClass(
       'border-t',
-      'border-[var(--settings-border)]',
+      'border-border',
     );
   });
 

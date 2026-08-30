@@ -51,7 +51,7 @@ export const InvestmentFrameworkPromptPreview: React.FC<
 
   return (
     <section
-      className="space-y-3 rounded-xl border settings-border bg-background/20 p-4"
+      className="space-y-3 rounded-xl border border-border bg-background/20 p-4"
       data-testid="investment-framework-prompt-preview"
       aria-labelledby="investment-framework-prompt-preview-title"
     >
@@ -72,14 +72,14 @@ export const InvestmentFrameworkPromptPreview: React.FC<
 
       {hasContent && preview ? (
         <pre
-          className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-3 font-mono text-xs leading-5 text-secondary-text"
+          className="max-h-80 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border bg-card p-3 font-mono text-xs leading-5 text-secondary-text"
           data-testid="investment-framework-prompt-preview-body"
         >
           {preview}
         </pre>
       ) : (
         <p
-          className="rounded-lg border border-dashed border-[var(--settings-border)] bg-[var(--settings-surface)]/60 px-3 py-4 text-xs leading-5 text-muted-text"
+          className="rounded-lg border border-dashed border-border bg-card/60 px-3 py-4 text-xs leading-5 text-muted-text"
           data-testid="investment-framework-prompt-preview-empty"
         >
           {emptyLabel}

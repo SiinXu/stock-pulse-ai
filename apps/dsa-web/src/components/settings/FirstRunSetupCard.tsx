@@ -173,7 +173,7 @@ const FirstRunSetupCard: React.FC<FirstRunSetupCardProps> = ({
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="text-sm font-semibold text-foreground">{resolveSetupCheckLabel(check, t)}</p>
-                      <span className="rounded-full border settings-border bg-background/60 px-2 py-0.5 text-xs font-medium text-muted-text">
+                      <span className="rounded-full border border-border bg-background/60 px-2 py-0.5 text-xs font-medium text-muted-text">
                         {resolveSetupCheckStatusLabel(check, t)}
                       </span>
                     </div>

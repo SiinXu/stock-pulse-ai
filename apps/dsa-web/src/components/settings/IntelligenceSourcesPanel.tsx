@@ -281,7 +281,7 @@ export function IntelligenceSourcesPanel() {
           </div>
           <ul className="space-y-2">
             {sources.map((source) => (
-              <li key={source.id} className="rounded-md border border-[var(--settings-border)] p-3">
+              <li key={source.id} className="rounded-md border border-border p-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
@@ -319,7 +319,7 @@ export function IntelligenceSourcesPanel() {
           <h3 className="text-sm font-semibold text-foreground">{text.templatesTitle}</h3>
           <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {templates.map((template) => (
-              <li key={template.templateId} className="flex items-center justify-between gap-2 rounded-md border border-[var(--settings-border)] p-2">
+              <li key={template.templateId} className="flex items-center justify-between gap-2 rounded-md border border-border p-2">
                 <span className="min-w-0 truncate text-xs text-foreground">{template.name}</span>
                 <Button variant="ghost" size="compact" onClick={() => handleAddTemplate(template.templateId)} isLoading={busy === `template:${template.templateId}`}>
                   {text.addFromTemplate}
@@ -342,7 +342,7 @@ export function IntelligenceSourcesPanel() {
         ) : (
           <ul className="space-y-1">
             {items.map((item) => (
-              <li key={item.id} className="rounded-md border border-[var(--settings-border)] p-2">
+              <li key={item.id} className="rounded-md border border-border p-2">
                 <a href={item.url} target="_blank" rel="noreferrer" className="settings-accent-text block truncate text-xs">
                   {item.title}
                 </a>

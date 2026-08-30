@@ -136,7 +136,7 @@ export const DataProvidersPanel: React.FC<DataProvidersPanelProps> = ({
                     type="button"
                     onClick={() => setOpenProviderId(provider.id)}
                     className={cn(
-                      'flex items-center justify-between gap-2 rounded-lg border settings-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-[var(--settings-surface-hover)]',
+                      'flex items-center justify-between gap-2 rounded-lg border border-border bg-background/35 px-3 py-3 text-left transition-colors hover:bg-hover',
                     )}
                   >
                     <span className="flex min-w-0 items-center gap-2">

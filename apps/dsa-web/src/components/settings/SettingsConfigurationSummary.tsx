@@ -19,7 +19,7 @@ export interface SettingsConfigurationSummaryProps {
 export const SettingsConfigurationSummary: React.FC<SettingsConfigurationSummaryProps> = ({ entries, ariaLabel }) => (
   <dl
     aria-label={ariaLabel}
-    className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] p-1"
+    className="overflow-hidden rounded-lg border border-border bg-card p-1"
   >
     {entries.map((entry) => (
       <div

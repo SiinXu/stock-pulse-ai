@@ -975,7 +975,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         <div className="space-y-4">
           {typePickerOpen ? (
             <section
-              className="space-y-4 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4 sm:p-5"
+              className="space-y-4 rounded-xl border border-border bg-card p-4 sm:p-5"
               data-testid="model-source-type-picker"
               aria-labelledby="model-source-type-heading"
             >
@@ -1013,7 +1013,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
                     data-testid={option.testId}
                     disabled={busy}
                     onClick={() => chooseSourceType(option.type)}
-                    className="rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface-hover)] px-4 py-4 text-left transition hover:border-[var(--settings-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="rounded-xl border border-border bg-hover px-4 py-4 text-left transition hover:border-foreground/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-foreground/20 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <p className="text-sm font-semibold text-foreground">{option.title}</p>
                     <p className="mt-1 text-xs leading-5 text-secondary-text">{option.description}</p>
@@ -1070,7 +1070,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
         data-testid="model-sources-hub-body"
       >
       {overriddenByMode ? (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-2.5 text-xs text-secondary-text">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border bg-card px-4 py-2.5 text-xs text-secondary-text">
           <span>{editorText.readonly}</span>
           {onViewDiagnostics ? (
             <button
@@ -1085,7 +1085,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
       ) : null}
 
       <section
-        className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
+        className="space-y-2 rounded-xl border border-border bg-card p-4"
         data-testid="model-sources-active-header"
         aria-labelledby="model-sources-active-heading"
       >
@@ -1172,7 +1172,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
           {editorText.hubCloudGroup}
         </h3>
         {channels.length === 0 ? (
-          <div className="settings-surface-overlay-muted rounded-xl border border-dashed settings-border-strong px-4 py-10 text-center">
+          <div className="bg-[hsl(var(--background)/0.12)] rounded-xl border border-dashed border-foreground/20 px-4 py-10 text-center">
             <p className="text-sm font-medium text-secondary-text">{editorText.emptyTitle}</p>
             <p className="mt-1 text-xs text-muted-text">{editorText.emptyDescription}</p>
           </div>
@@ -1252,7 +1252,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
       {localMatches ? (
         <section
-          className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
+          className="space-y-2 rounded-xl border border-border bg-card p-4"
           data-testid="model-sources-local-group"
           aria-labelledby="model-sources-local-heading"
         >
@@ -1334,7 +1334,7 @@ export const LLMChannelEditor: React.FC<LLMChannelEditorProps> = ({
 
       {cliMatches ? (
         <section
-          className="space-y-2 rounded-xl border border-[var(--settings-border)] bg-[var(--settings-surface)] p-4"
+          className="space-y-2 rounded-xl border border-border bg-card p-4"
           data-testid="model-sources-cli-group"
           aria-labelledby="model-sources-cli-heading"
         >

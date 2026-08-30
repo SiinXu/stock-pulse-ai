@@ -1450,7 +1450,7 @@ const SettingsPage: React.FC = () => {
       {visibleGroupSaveStates.map(([group, state]) => (
         <span
           key={group}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-[var(--settings-border)] px-2.5 text-xs text-secondary-text"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-md border border-border px-2.5 text-xs text-secondary-text"
         >
           {state.status === 'saved' ? (
             <CheckCircle2 className="h-4 w-4 text-success" aria-hidden="true" />
@@ -1685,7 +1685,7 @@ const SettingsPage: React.FC = () => {
               >
                 {advancedSectionItems.length > 0 ? (
                   <form
-                    className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                    className="overflow-hidden rounded-lg border border-border bg-card"
                     onSubmit={(event) => event.preventDefault()}
                   >
                     {advancedSectionItems.map((item) => (
@@ -1823,7 +1823,7 @@ const SettingsPage: React.FC = () => {
                     <div className="space-y-3">
                       {eventEssentials.length ? (
                         <form
-                          className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]"
+                          className="overflow-hidden rounded-lg border border-border bg-card"
                           onSubmit={(event) => event.preventDefault()}
                           data-testid="event-monitor-essentials"
                         >
@@ -1835,7 +1835,7 @@ const SettingsPage: React.FC = () => {
                           <Collapsible
                             title={SETTINGS_MISC_TEXT[uiLanguage].showAdvanced}
                             defaultOpen={false}
-                            className="rounded-lg border-[var(--settings-border)] bg-[var(--settings-surface)] shadow-none hover:border-[var(--settings-border)]"
+                            className="rounded-lg border-border bg-card shadow-none hover:border-border"
                           >
                             <form onSubmit={(event) => event.preventDefault()}>
                               {eventExpertJson.map(renderEventField)}

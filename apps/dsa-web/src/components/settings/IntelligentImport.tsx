@@ -304,7 +304,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="settings-surface-panel settings-border-strong rounded-xl border density-surface-pad-sm">
+      <div className="bg-background border-foreground/20 rounded-xl border density-surface-pad-sm">
         <p className="text-sm font-medium text-foreground">{t('settings.intelligentImportSupportedInputs')}</p>
         <p className="mt-1 text-xs leading-5 text-secondary-text">
           {t('settings.intelligentImportHint')}
@@ -323,7 +323,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
             setIsDragging(false);
           }}
           className={`flex min-h-18 flex-wrap items-center justify-center gap-2 rounded-xl border border-dashed p-3 transition-colors ${
-            isDragging ? 'settings-drag-active' : 'settings-border-strong settings-surface-overlay-soft'
+            isDragging ? 'settings-drag-active' : 'border-foreground/20 bg-muted'
           } ${disabled || isLoading ? 'cursor-not-allowed opacity-60' : ''}`}
         >
           <Button
@@ -360,7 +360,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
             placeholder={t('settings.intelligentImportPastePlaceholder')}
             fieldClassName="min-w-0 flex-1"
             size="default"
-            className="settings-surface-strong settings-border-strong resize-none text-xs shadow-none"
+            className="bg-card border-foreground/20 resize-none text-xs shadow-none"
             value={pasteText}
             onChange={(e) => setPasteText(e.target.value)}
             disabled={disabled || isLoading}
@@ -409,7 +409,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
               </Button>
             </div>
           </div>
-          <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border settings-border-strong settings-surface-overlay-soft p-2">
+          <div className="max-h-56 space-y-1 overflow-y-auto rounded-xl border border-foreground/20 bg-muted p-2">
             {items.map((it) => {
               const confidence = normalizeConfidence(it.confidence);
               const confidenceMeta = getConfidenceMeta(confidence, language);
@@ -418,7 +418,7 @@ export const IntelligentImport: React.FC<IntelligentImportProps> = ({
                 <div
                   key={it.id}
                   className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm ${
-                    it.code ? 'settings-border bg-[var(--settings-surface-strong)]' : 'border-danger/25 bg-danger/10'
+                    it.code ? 'border-border bg-card' : 'border-danger/25 bg-danger/10'
                   }`}
                 >
                   <Checkbox

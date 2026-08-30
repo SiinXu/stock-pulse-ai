@@ -166,26 +166,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--secondary',
   '--secondary-foreground',
   '--secondary-text',
-  '--settings-accent-shadow',
-  '--settings-border',
-  '--settings-border-overlay',
-  '--settings-border-soft',
-  '--settings-border-strong',
-  '--settings-input-rest-border',
-  '--settings-primary-border',
-  '--settings-secondary-bg',
-  '--settings-secondary-bg-hover',
-  '--settings-secondary-border',
-  '--settings-secondary-border-hover',
-  '--settings-skeleton-soft',
-  '--settings-skeleton-strong',
-  '--settings-surface',
-  '--settings-surface-hover',
-  '--settings-surface-overlay',
-  '--settings-surface-overlay-muted',
-  '--settings-surface-overlay-soft',
-  '--settings-surface-panel',
-  '--settings-surface-strong',
   '--shadow-elevation-overlay',
   '--shadow-elevation-popper',
   '--shadow-soft-card',
@@ -213,11 +193,11 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * Hard ceiling for page-scoped leftovers. Never raise this to absorb a new
  * `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`
  * name. Shrink only when a Phase 2 domain collapse deletes a leftover.
- * `--login-*`, `--backtest-*`, `--portfolio-*`, and `--chat-*` reached zero;
- * those pages consume Layer 1 plus use-site alpha. Do not reintroduce those
- * prefixes.
+ * `--login-*`, `--backtest-*`, `--portfolio-*`, `--chat-*`, and `--settings-*`
+ * reached zero; those pages consume Layer 1 plus use-site alpha. Do not
+ * reintroduce those prefixes. `settings` stays in `THEME_PAGE_SCOPED_PREFIXES`.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 76;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 56;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [

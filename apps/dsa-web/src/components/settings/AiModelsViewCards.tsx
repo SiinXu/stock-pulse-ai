@@ -149,7 +149,7 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
       description={settingsText.taskRoutingDescription}
     >
       {generationBackendItem ? (
-        <div className="mb-3 overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+        <div className="mb-3 overflow-hidden rounded-lg border border-border bg-card">
           <SettingsField
             item={generationBackendItem}
             value={generationBackendItem.value}
@@ -163,7 +163,7 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
         </div>
       ) : null}
       {usesGenerationOnlyBackend ? (
-        <p className="mb-3 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
+        <p className="mb-3 rounded-lg border border-border bg-card px-3 py-2 text-xs leading-5 text-secondary-text" data-testid="cli-agent-capability-note">
           {CLI_AGENT_CAPABILITY_NOTE[uiLanguage]}
         </p>
       ) : null}
@@ -178,7 +178,7 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
       ) : availableModelsLoading && availableModels.length === 0 ? (
         <p className="mb-3 text-xs text-secondary-text">{settingsText.loadingModels}</p>
       ) : availableModels.length === 0 ? (
-        <div className="mb-3 rounded-lg border border-dashed border-[var(--settings-border)] bg-[var(--settings-surface)] px-4 py-5 text-center">
+        <div className="mb-3 rounded-lg border border-dashed border-border bg-card px-4 py-5 text-center">
           <p className="text-sm font-medium text-foreground">
             {settingsText.noModels}
           </p>
@@ -212,7 +212,7 @@ const AiTaskRoutingCard: React.FC<AiTaskRoutingCardProps> = ({
       {!availableModelsError && !availableModelsLoading && availableModels.length > 0 ? (
         <>
           {modelRoutingItems.length > 0 ? (
-            <div className="overflow-hidden rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)]">
+            <div className="overflow-hidden rounded-lg border border-border bg-card">
               {modelRoutingItems.map((item) => (
                 TASK_MODEL_KEYS.has(item.key) ? (
                   <div key={item.key} className="grid gap-2 px-3 py-2.5 md:grid-cols-[minmax(0,1fr)_260px] md:items-center md:gap-6">

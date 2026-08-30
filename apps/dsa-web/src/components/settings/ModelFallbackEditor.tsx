@@ -116,7 +116,7 @@ export const ModelFallbackEditor: React.FC<ModelFallbackEditorProps> = ({
           {routes.map((route, index) => (
             <li
               key={`${route}-${index}`}
-              className="flex items-center justify-between gap-2 rounded-lg border border-[var(--settings-border)] bg-[var(--settings-surface)] px-3 py-1.5 text-xs"
+              className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <span className="text-muted-text">{index + 1}.</span>

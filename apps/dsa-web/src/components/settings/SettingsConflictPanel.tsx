@@ -55,7 +55,7 @@ const SettingsConflictPanel: React.FC<SettingsConflictPanelProps> = ({
 
       <div className="space-y-2">
         {fields.map((field) => (
-          <div key={field.key} className="rounded-lg border border-[var(--settings-border)] bg-background/70 p-3">
+          <div key={field.key} className="rounded-lg border border-border bg-background/70 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <p className="text-sm font-medium text-foreground">
@@ -77,13 +77,13 @@ const SettingsConflictPanel: React.FC<SettingsConflictPanelProps> = ({
               </div>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
+              <div className="rounded-md bg-card px-3 py-2">
                 <p className="text-xs font-medium text-muted-text">{settingsText.serverValue}</p>
                 <p className="mt-1 break-all text-xs text-secondary-text">
                   {field.isSensitive ? settingsText.hiddenServerValue : field.server || settingsText.emptyValue}
                 </p>
               </div>
-              <div className="rounded-md bg-[var(--settings-surface)] px-3 py-2">
+              <div className="rounded-md bg-card px-3 py-2">
                 <p className="text-xs font-medium text-muted-text">{settingsText.localValue}</p>
                 <p className="mt-1 break-all text-xs text-secondary-text">
                   {field.isSensitive ? settingsText.hiddenLocalValue : field.local || settingsText.emptyValue}
