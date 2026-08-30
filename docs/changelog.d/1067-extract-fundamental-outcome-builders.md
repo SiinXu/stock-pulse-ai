@@ -1,0 +1,1 @@
+- [Chore] Extract DataFetcherManager fundamental failed/validation-rejected outcome builders (`build_failed_fundamental_context`, `build_validation_rejected_fundamental_context`) into `src/data_provider/manager_parts/fundamental_outcome_methods.py` behind the ADR-006 facade without changing failed/rejected payload semantics (Refs #1067).
