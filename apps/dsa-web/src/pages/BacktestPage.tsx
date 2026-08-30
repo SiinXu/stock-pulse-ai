@@ -1,5 +1,6 @@
 import type React from 'react';
 import { useState, useEffect, useCallback, useId, useRef } from 'react';
+import { useBacktestInitialLoadQuery } from '../hooks';
 import { Check, ChevronDown, Inbox, Minus, SlidersHorizontal, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useRouteFocusTarget } from '../components/routing';
@@ -518,31 +519,38 @@ const BacktestPage: React.FC = () => {
     }
   }, []);
 
-  // Initial load — fetch performance first, then filter results by its window
-  useEffect(() => {
-    const init = async () => {
-      const { code, windowDays: restoredWindow, startDate, endDate, phase, page } = initialFilters;
-      if (restoredWindow) {
-        void fetchPerformance(code || undefined, restoredWindow, startDate, endDate, phase);
-        void fetchResults(page, code || undefined, restoredWindow, startDate, endDate, phase);
-        return;
-      }
-      const overall = await fetchPerformance(code || undefined, undefined, startDate, endDate, phase);
-      if (!overall) return;
-      const inferredWindow = overall.evalWindowDays;
-      if (inferredWindow > 1) lastRegularWindowRef.current = inferredWindow;
-      setEvalDays(String(inferredWindow));
-      setAppliedFilters((current) => ({ ...current, windowDays: inferredWindow }));
-      void fetchResults(page, code || undefined, inferredWindow, startDate, endDate, phase);
-    };
-    void init();
-    return () => {
-      resultsRequestGenerationRef.current += 1;
-      performanceRequestGenerationRef.current += 1;
-      runRequestGenerationRef.current += 1;
-      runAbortRef.current?.abort();
-    };
+  // Initial load — fetch performance first, then filter results by its window.
+  // Body unchanged; only the schedule moved to TanStack Query (Issue #789).
+  const loadInitial = useCallback(async () => {
+    const { code, windowDays: restoredWindow, startDate, endDate, phase, page } = initialFilters;
+    if (restoredWindow) {
+      void fetchPerformance(code || undefined, restoredWindow, startDate, endDate, phase);
+      void fetchResults(page, code || undefined, restoredWindow, startDate, endDate, phase);
+      return;
+    }
+    const overall = await fetchPerformance(code || undefined, undefined, startDate, endDate, phase);
+    if (!overall) return;
+    const inferredWindow = overall.evalWindowDays;
+    if (inferredWindow > 1) lastRegularWindowRef.current = inferredWindow;
+    setEvalDays(String(inferredWindow));
+    setAppliedFilters((current) => ({ ...current, windowDays: inferredWindow }));
+    void fetchResults(page, code || undefined, inferredWindow, startDate, endDate, phase);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cancelInFlightLoads = useCallback(() => {
+    resultsRequestGenerationRef.current += 1;
+    performanceRequestGenerationRef.current += 1;
+    runRequestGenerationRef.current += 1;
+    runAbortRef.current?.abort();
+  }, [runAbortRef]);
+
+  useBacktestInitialLoadQuery({
+    loadInitial,
+    onCancelInFlight: cancelInFlightLoads,
+  });
+
+  // Unmount cancellation stays page-owned so the migration cannot change it.
+  useEffect(() => cancelInFlightLoads, [cancelInFlightLoads]);
 
   // Run backtest
   const runBacktest = async (

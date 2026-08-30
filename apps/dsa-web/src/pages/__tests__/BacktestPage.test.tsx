@@ -1,4 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
@@ -163,27 +165,42 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   return () => {};
 });
 
+/** The mount load is scheduled through TanStack Query (Issue #789). */
+function wrapWithQueryClient(ui: ReactElement): ReactElement {
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, refetchOnWindowFocus: false },
+      mutations: { retry: false },
+    },
+  });
+  return <QueryClientProvider client={client}>{ui}</QueryClientProvider>;
+}
+
 describe('BacktestPage', () => {
   function renderPage() {
     return render(
-      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-        <BrowserRouter>
-          <BacktestPage />
-        </BrowserRouter>
-      </RouteFocusRegistrationContext.Provider>,
+      wrapWithQueryClient(
+        <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+          <BrowserRouter>
+            <BacktestPage />
+          </BrowserRouter>
+        </RouteFocusRegistrationContext.Provider>,
+      ),
     );
   }
 
   function renderEnglishPage() {
     window.localStorage.setItem(UI_LANGUAGE_STORAGE_KEY, 'en');
     return render(
-      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-        <BrowserRouter>
-          <UiLanguageProvider>
-            <BacktestPage />
-          </UiLanguageProvider>
-        </BrowserRouter>
-      </RouteFocusRegistrationContext.Provider>,
+      wrapWithQueryClient(
+        <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+          <BrowserRouter>
+            <UiLanguageProvider>
+              <BacktestPage />
+            </UiLanguageProvider>
+          </BrowserRouter>
+        </RouteFocusRegistrationContext.Provider>,
+      ),
     );
   }
 

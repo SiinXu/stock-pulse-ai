@@ -1,0 +1,1 @@
+- [Changed] Schedule the Backtest page mount load through TanStack Query instead of a bare `useEffect`, keeping the load sequence, unmount cancellation, and error surface unchanged (Refs #789).
