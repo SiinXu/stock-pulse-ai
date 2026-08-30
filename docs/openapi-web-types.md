@@ -240,6 +240,34 @@ pattern: generated snake_case is not the UI type, and
 `ApprovalDecisionRequest` is not a public export (`approvalsApi.decide`
 stays three arguments). Runtime Zod in `api/approvals.ts` is unchanged.
 
+`apps/dsa-web/src/types/watchlistScore.ts` now CamelizeKeys-binds the seven
+generated WatchlistScore object components (`WatchlistScoreFactorSource`,
+`WatchlistScoreFactor`, `WatchlistScoreItem`, `WatchlistScoreQueryCount`,
+`WatchlistScoreSourceRows`, `WatchlistScoreResponse`,
+`WatchlistScoreRequest`) plus closed string-enum aliases
+(`WatchlistScoreFactorKey`, `WatchlistScoreFactorStatus`,
+`WatchlistScoreDegradationReason`, `WatchlistScoreStatus`,
+`WatchlistScoreSortMode`, `WatchlistScoreFreshness`). Enum aliases are
+allowed (string enums, not objects). `Override` preserves today's
+required-nullable fields (`id` / `sourceReportId` / `profile` / `asOf` /
+`expiresAt` / `value` / `reason` / `score` / `asOf` / `ageDays` /
+`analysisId` / `operationAdvice`) and required arrays (`factors` /
+`degradedReasons` / `items`). There is **no** mixed-alias `expectedVersion`
+on this schema: every generated object key is snake_case
+(`stock_code`, `formula_version`, `query_count`, `source_rows`,
+`degraded_reasons`, `age_days`, `analysis_id`, `as_of`, `expires_at`,
+`source_report_id`, `operation_advice`, `disclaimer_key`, `scoring_mode`).
+Path 200 JSON for POST `/api/v1/watchlist/scores`
+(`scoreWatchlistSymbols`) is mutually equivalent to
+`WatchlistScoreResponse`; the request body pins generated
+`WatchlistScoreRequest` (internal only; `watchlistScoresApi.score` stays
+`ScoreWatchlistParams`). This is **not** the auth object export-alias
+pattern: generated snake_case is not the UI type.
+`WatchlistScoreRequest` / `WatchlistScoreQueryCount` /
+`WatchlistScoreSourceRows` are not public exports. Runtime Zod in
+`api/watchlistScores.ts` is unchanged, including the local `toCamelCase`
+helper and `.strict()` schemas.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
