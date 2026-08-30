@@ -1,0 +1,2 @@
+- [Changed] Schedule Token Usage dashboard loads through TanStack Query (Refs #789).
+- [Changed] Load the Settings Token Usage embed through a lazy import so SettingsPage stays under the gzip budget (Refs #789).

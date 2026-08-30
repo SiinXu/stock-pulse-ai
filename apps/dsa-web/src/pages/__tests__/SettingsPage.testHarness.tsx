@@ -1,7 +1,9 @@
 import React from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { createPortal } from 'react-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, vi } from 'vitest';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
@@ -17,6 +19,15 @@ import { getDefaultSubCategory } from '../../components/settings/settingsSubCate
 import { legacyToSectionView } from '../../components/settings/settingsInformationArchitecture';
 import SettingsPage from '../SettingsPage';
 import { createDeferred } from '../../test-utils';
+
+function SettingsPageWithQueryClient(props: React.ComponentProps<typeof SettingsPage>) {
+  const [client] = React.useState(() => createAppQueryClient());
+  return (
+    <QueryClientProvider client={client}>
+      <SettingsPage {...props} />
+    </QueryClientProvider>
+  );
+}
 
 const {
   analyzeAsync,
@@ -872,7 +883,7 @@ async function expectConnectionDraftAutosaveBlockedBySchema(
   try {
     render(
       <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-        <SettingsPage />
+        <SettingsPageWithQueryClient />
       </RouteFocusRegistrationContext.Provider>,
     );
     await act(async () => {
@@ -1063,7 +1074,7 @@ function registerSettingsPageBeforeEach(): void {
 
 const SettingsPageTestHarness = {
   registerSettingsPageBeforeEach,
-  SettingsPage,
+  SettingsPage: SettingsPageWithQueryClient,
   analyzeAsync,
   exportEnv,
   getSchedulerStatus,

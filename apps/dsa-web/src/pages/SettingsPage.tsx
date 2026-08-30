@@ -123,7 +123,11 @@ import { SETTINGS_MISC_TEXT } from '../locales/settingsMisc';
 import { isAgentExpertJsonKey } from '../components/settings/agentSetupPresets';
 import { SETTINGS_NOTIFICATION_TEXT } from '../locales/settingsNotifications';
 import { resolveSettingsFieldTitle } from '../locales/settingsFieldTitle';
-import TokenUsagePage from '../components/usage/TokenUsagePage';
+
+// Usage is a leaf feature embed, not Settings config. Keep it off the
+// SettingsPage / settings-route gzip families so useTokenUsageQuery is not
+// billed to those frozen caps.
+const TokenUsagePage = lazy(() => import('../components/usage/TokenUsagePage'));
 
 const RuntimeCapabilitiesPanel = lazy(async () => {
   const module = await import('../components/settings/RuntimeCapabilitiesPanel');
@@ -1527,7 +1531,9 @@ const SettingsPage: React.FC = () => {
 
           <section ref={contentRegionRef} tabIndex={-1} className="space-y-4 outline-none">
             {activeSection === SETTINGS_SECTION_IDS.usage ? (
-              <TokenUsagePage embedded />
+              <Suspense fallback={<SettingsLoading />}>
+                <TokenUsagePage embedded />
+              </Suspense>
             ) : (
               <>
                 <SettingsViewTabs
