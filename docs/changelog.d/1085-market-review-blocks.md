@@ -1,0 +1,1 @@
+- [Changed] Move market-review markdown block builders into `src/market/blocks.py` behind the existing `src.market.analyzer` facade, keeping method names, signatures, and override behavior unchanged (Refs #1085).
