@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { useWorkbenchSetupStatusQuery, useWorkbenchAnalysisSkillsQuery } from '../hooks';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   BarChart3,
@@ -296,36 +297,29 @@ const ResearchAnalysisWorkbenchPage: React.FC = () => {
     document.title = t('analysisWorkbench.documentTitle');
   }, [t]);
 
-  useEffect(() => {
-    let active = true;
-    void systemConfigApi.getSetupStatus()
-      .then((status) => {
-        if (active) setSetupComplete(status.isComplete);
-      })
-      .catch(() => {
-        if (active) setSetupComplete(null);
-      })
-      .finally(() => {
-        if (active) setIsSetupStatusResolved(true);
-      });
-    return () => {
-      active = false;
-    };
+  // Bodies unchanged; only the schedule moved to TanStack Query (Issue #789).
+  // `isActive()` replaces the previous `let active = true` unmount guard.
+  const loadSetupStatus = useCallback(async (isActive: () => boolean) => {
+    try {
+      const status = await systemConfigApi.getSetupStatus();
+      if (isActive()) setSetupComplete(status.isComplete);
+    } catch {
+      if (isActive()) setSetupComplete(null);
+    } finally {
+      if (isActive()) setIsSetupStatusResolved(true);
+    }
   }, []);
+  useWorkbenchSetupStatusQuery(loadSetupStatus);
 
-  useEffect(() => {
-    let active = true;
-    void agentApi.getSkills()
-      .then((response) => {
-        if (active) setAnalysisSkills(response.skills);
-      })
-      .catch(() => {
-        if (active) setAnalysisSkills([]);
-      });
-    return () => {
-      active = false;
-    };
+  const loadAnalysisSkills = useCallback(async (isActive: () => boolean) => {
+    try {
+      const response = await agentApi.getSkills();
+      if (isActive()) setAnalysisSkills(response.skills);
+    } catch {
+      if (isActive()) setAnalysisSkills([]);
+    }
   }, []);
+  useWorkbenchAnalysisSkillsQuery(loadAnalysisSkills);
 
   useEffect(() => {
     if (selectedStrategyId && !analysisSkills.some((skill) => skill.id === selectedStrategyId)) {

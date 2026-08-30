@@ -1,0 +1,1 @@
+- [Changed] Schedule the Research Analysis Workbench setup-status and analysis-skills mount loads through TanStack Query instead of bare `useEffect` guards, keeping both load bodies, state writes, and error surfaces unchanged (Refs #789).
