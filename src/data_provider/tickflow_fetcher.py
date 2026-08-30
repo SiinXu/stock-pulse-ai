@@ -1033,245 +1033,44 @@ class TickFlowFetcher(BaseFetcher):
     def _extract_universe_symbols(universe: Any) -> List[str]:
         return [entry["symbol"] for entry in TickFlowFetcher._extract_universe_entries(universe)]
 
-    def get_main_indices(self, region: str = "cn") -> Optional[List[Dict[str, Any]]]:
-        """Fetch main A-share indices via TickFlow quotes."""
-        if region != "cn":
-            return None
+    # Rebound from tickflow_parts.market_boards after the class is built.
+    get_main_indices = None
 
-        client = self._get_client()
-        if client is None:
-            return None
+    get_market_stats = None
 
-        symbols = [symbol for symbol, _, _ in _CN_MAIN_INDEX_QUOTES]
-        quotes: List[Dict[str, Any]] = []
-        for offset in range(0, len(symbols), _MAX_SYMBOLS_PER_QUOTE_REQUEST):
-            batch_symbols = symbols[offset : offset + _MAX_SYMBOLS_PER_QUOTE_REQUEST]
-            batch_quotes = client.quotes.get(symbols=batch_symbols)
-            if batch_quotes:
-                quotes.extend(batch_quotes)
-        if not quotes:
-            logger.warning("[TickFlowFetcher] empty index quotes")
-            return None
+    get_sector_rankings = None
 
-        quotes_by_symbol = {
-            str(item.get("symbol", "")).upper(): item for item in quotes if item
-        }
-        results: List[Dict[str, Any]] = []
 
-        for symbol, code, name in _CN_MAIN_INDEX_QUOTES:
-            quote = quotes_by_symbol.get(symbol)
-            if not quote:
-                continue
+# Keep ``src.data_provider.tickflow_fetcher.TickFlowFetcher`` as the ADR-006
+# compatibility facade while ``tickflow_parts`` owns market-board bodies.
+# Rebinding preserves method globals so existing patches against this module
+# continue to intercept moved implementations.
+from .tickflow_parts import market_boards as _market_boards_module  # noqa: E402
+from .tickflow_parts.market_boards import _MarketBoardsMethods  # noqa: E402
+from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
-            ext = quote.get("ext") or {}
-            current = self._safe_float(quote.get("last_price")) or 0.0
-            prev_close = self._safe_float(quote.get("prev_close")) or 0.0
-            change = self._safe_float(ext.get("change_amount"))
-            if change is None:
-                change = current - prev_close if current or prev_close else 0.0
-            amplitude = self._ratio_to_percent(ext.get("amplitude"))
-            if amplitude is None and prev_close > 0:
-                high = self._safe_float(quote.get("high")) or 0.0
-                low = self._safe_float(quote.get("low")) or 0.0
-                amplitude = (high - low) / prev_close * 100
 
-            results.append(
-                {
-                    "code": code,
-                    "name": name,
-                    "current": current,
-                    "change": change,
-                    "change_pct": self._ratio_to_percent(ext.get("change_pct")) or 0.0,
-                    "open": self._safe_float(quote.get("open")) or 0.0,
-                    "high": self._safe_float(quote.get("high")) or 0.0,
-                    "low": self._safe_float(quote.get("low")) or 0.0,
-                    "prev_close": prev_close,
-                    "volume": self._safe_float(quote.get("volume")) or 0.0,
-                    "amount": self._safe_float(quote.get("amount")) or 0.0,
-                    "amplitude": amplitude or 0.0,
-                }
-            )
+def _assemble_tickflow_fetcher_facade() -> None:
+    """Bind capability-domain method bodies onto the public fetcher class."""
 
-        if len(results) != len(_CN_MAIN_INDEX_QUOTES):
-            logger.warning(
-                "[TickFlowFetcher] incomplete index quotes: %s/%s",
-                len(results),
-                len(_CN_MAIN_INDEX_QUOTES),
-            )
-            return None
+    global _MarketBoardsMethods
+    _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
+    bind_methods_from_class(
+        _MarketBoardsMethods,
+        TickFlowFetcher,
+        globals(),
+        expected_names=_market_boards_module.EXPECTED_MARKET_BOARD_METHOD_NAMES,
+    )
 
-        return results or None
 
-    def get_market_stats(self) -> Optional[Dict[str, Any]]:
-        """Calculate A-share market breadth from TickFlow universe quotes."""
-        client = self._get_client()
-        if client is None:
-            return None
+_assemble_tickflow_fetcher_facade()
 
-        if not self._capability_available("universe_quotes"):
-            return None
 
-        try:
-            quotes = client.quotes.get(universes=[_CN_UNIVERSE_ID])
-            self._mark_capability("universe_quotes", True)
-        except Exception as exc:
-            if self._is_universe_permission_error(exc):
-                self._mark_capability("universe_quotes", False)
-                logger.info(
-                    "[TickFlowFetcher] universe quotes are not available; fallback to existing market stats sources"
-                )
-                return None
-            raise
-        if not quotes:
-            logger.warning("[TickFlowFetcher] empty market stats quotes")
-            return None
+def _install_part_reload_hooks() -> None:
+    """Keep an owner reload able to rebuild and rebind both sides of the seam."""
 
-        stats = {
-            "up_count": 0,
-            "down_count": 0,
-            "flat_count": 0,
-            "limit_up_count": 0,
-            "limit_down_count": 0,
-            "total_amount": 0.0,
-        }
-        valid_rows = 0
+    for module in (_market_boards_module,):
+        module._FACADE_RELOAD_HOOK = _assemble_tickflow_fetcher_facade  # type: ignore[attr-defined]
 
-        for quote in quotes:
-            if not quote:
-                continue
 
-            symbol = str(quote.get("symbol") or "").strip().upper()
-            if not self._is_cn_equity_symbol(symbol):
-                continue
-
-            amount = self._safe_float(quote.get("amount"))
-            if amount is not None and amount > 0:
-                stats["total_amount"] += amount / 1e8
-
-            pure_code = normalize_stock_code(symbol)
-            last_price = self._safe_float(quote.get("last_price"))
-            prev_close = self._safe_float(quote.get("prev_close"))
-
-            if last_price is None or prev_close is None or amount is None or amount <= 0:
-                continue
-
-            name = self._extract_name(quote)
-            ratio = self._get_limit_ratio(pure_code, name)
-            limit_up = self._round_limit_price(prev_close, ratio)
-            limit_down = math.floor(prev_close * (1 - ratio) * 100 + 0.5) / 100.0
-            limit_up_tolerance = round(abs(prev_close * (1 + ratio) - limit_up), 10)
-            limit_down_tolerance = round(
-                abs(prev_close * (1 - ratio) - limit_down), 10
-            )
-
-            valid_rows += 1
-
-            if abs(last_price - limit_up) <= limit_up_tolerance:
-                stats["limit_up_count"] += 1
-            if abs(last_price - limit_down) <= limit_down_tolerance:
-                stats["limit_down_count"] += 1
-
-            if last_price > prev_close:
-                stats["up_count"] += 1
-            elif last_price < prev_close:
-                stats["down_count"] += 1
-            else:
-                stats["flat_count"] += 1
-
-        if valid_rows == 0:
-            logger.warning("[TickFlowFetcher] no valid A-share rows for market stats")
-            return None
-
-        return stats
-
-    def get_sector_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
-        """Build SW1 industry rankings from TickFlow universes and A-share quotes."""
-        try:
-            limit = max(1, int(n))
-        except (TypeError, ValueError):
-            limit = 5
-
-        now = monotonic()
-        with self._sector_rankings_cache_lock:
-            cached = self._sector_rankings_cache
-            if cached and cached[0] > now:
-                return [dict(row) for row in cached[1][:limit]], [dict(row) for row in cached[2][:limit]]
-
-        client = self._get_client()
-        if client is None or not self._capability_available("universe_quotes"):
-            return None
-
-        try:
-            universes = client.universes.list()
-            sw1_ids = [
-                str(item.get("id"))
-                for item in universes or []
-                if isinstance(item, dict)
-                and str(item.get("id") or "").startswith("CN_Equity_SW1_")
-            ]
-            if not sw1_ids:
-                return None
-            details = client.universes.batch(sw1_ids)
-            quotes = client.quotes.get(universes=[_CN_UNIVERSE_ID])
-            self._mark_capability("universe_quotes", True)
-        except Exception as exc:
-            if self._is_universe_permission_error(exc):
-                self._mark_capability("universe_quotes", False)
-                logger.info("[TickFlowFetcher] SW1 sector rankings are unavailable for current plan")
-                return None
-            raise
-
-        quote_changes: Dict[str, float] = {}
-        for quote in quotes or []:
-            if not isinstance(quote, dict):
-                continue
-            symbol = str(quote.get("symbol") or "").strip().upper()
-            ext = quote.get("ext") or {}
-            change_pct = self._ratio_to_percent(ext.get("change_pct"))
-            if change_pct is None:
-                last_price = self._safe_float(quote.get("last_price"))
-                prev_close = self._safe_float(quote.get("prev_close"))
-                if last_price is not None and prev_close and prev_close > 0:
-                    change_pct = (last_price - prev_close) / prev_close * 100
-            if symbol and change_pct is not None:
-                quote_changes[symbol] = change_pct
-
-        industry_symbols: Dict[str, set[str]] = {}
-        universe_by_id = {
-            str(item.get("id")): item
-            for item in universes or []
-            if isinstance(item, dict) and item.get("id")
-        }
-        for universe_id, detail in (details or {}).items():
-            summary = universe_by_id.get(str(universe_id), {})
-            name = str(summary.get("name") or "").strip()
-            if name.startswith("SW1"):
-                name = name[3:].strip()
-            if not name:
-                continue
-            industry_symbols.setdefault(name, set()).update(self._extract_universe_symbols(detail))
-
-        rows: List[Dict[str, Any]] = []
-        for name, symbols in industry_symbols.items():
-            changes = [quote_changes[symbol] for symbol in symbols if symbol in quote_changes]
-            if changes:
-                rows.append(
-                    {
-                        "name": name,
-                        "change_pct": round(sum(changes) / len(changes), 4),
-                        "source": "tickflow_sw1",
-                        "constituent_count": len(changes),
-                    }
-                )
-        if not rows:
-            return None
-
-        descending = sorted(rows, key=lambda row: row["change_pct"], reverse=True)
-        ascending = sorted(rows, key=lambda row: row["change_pct"])
-        with self._sector_rankings_cache_lock:
-            self._sector_rankings_cache = (
-                now + _SECTOR_RANKINGS_CACHE_TTL_SECONDS,
-                descending,
-                ascending,
-            )
-        return [dict(row) for row in descending[:limit]], [dict(row) for row in ascending[:limit]]
+_install_part_reload_hooks()

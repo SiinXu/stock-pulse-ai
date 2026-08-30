@@ -18,7 +18,7 @@ import src.data_provider._facade_bind as shared
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PROVIDER_ROOT = REPO_ROOT / "src" / "data_provider"
 
-PARTS_PACKAGES = ("akshare_parts", "efinance_parts", "tushare_parts")
+PARTS_PACKAGES = ("akshare_parts", "efinance_parts", "tickflow_parts", "tushare_parts")
 HELPERS = (
     "_clone_facade_descriptor",
     "_clone_facade_function",

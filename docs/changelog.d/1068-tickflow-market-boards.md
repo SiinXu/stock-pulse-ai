@@ -1,0 +1,1 @@
+- [Changed] Move TickFlow main indices, market statistics, and sector rankings into `src/data_provider/tickflow_parts/market_boards.py` behind the ADR-006 facade, keeping `TickFlowFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
