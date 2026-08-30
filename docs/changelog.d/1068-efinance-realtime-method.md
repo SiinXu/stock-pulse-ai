@@ -1,0 +1,1 @@
+- [Changed] Move the efinance stock realtime quote method into `src/data_provider/efinance_parts/realtime.py` behind the ADR-006 facade, keeping `EfinanceFetcher.get_realtime_quote` name, signature, and patch targets unchanged (Refs #1068).

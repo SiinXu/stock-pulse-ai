@@ -8,4 +8,5 @@ surfaces and test patch targets stay stable (ADR-006 / Issue #1068).
 
 Owned domains:
 - ``etf`` — ETF history fetch and ETF realtime-quote orchestration methods
+- ``realtime`` — stock-path realtime quote method
 """
