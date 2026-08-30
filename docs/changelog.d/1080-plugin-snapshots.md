@@ -1,0 +1,1 @@
+- [Chore] Extract PluginManager snapshot helpers into a private mixin (Refs #1080).
