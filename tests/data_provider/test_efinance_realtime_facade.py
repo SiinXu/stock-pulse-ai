@@ -35,14 +35,18 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 FACADE_PATH = REPO_ROOT / "src" / "data_provider" / "efinance_fetcher.py"
 OWNER_PATH = REPO_ROOT / "src" / "data_provider" / "efinance_parts" / "realtime.py"
 MOVED = ("get_realtime_quote",)
+# Stock-path methods that stay on the facade after the realtime slice.
+#
+# ``get_sector_rankings``, ``get_market_stats``, and ``get_main_indices`` were
+# in this list until the market-board slice moved them into
+# ``efinance_parts.market_boards``, matching the domain that
+# ``akshare_parts.market_boards`` already owns. They are asserted from
+# ``test_efinance_market_boards_facade`` now.
 UNMOVED_FACADE_METHODS = (
     "_fetch_raw_data",
     "_fetch_stock_data",
     "_normalize_data",
-    "get_sector_rankings",
     "get_base_info",
-    "get_market_stats",
-    "get_main_indices",
 )
 
 
@@ -432,10 +436,17 @@ def _run_reload_contract(body: str) -> None:
                     "import importlib",
                     "import src.data_provider.efinance_fetcher as facade",
                     "import src.data_provider.efinance_parts.etf as etf",
+                    "import src.data_provider.efinance_parts.market_boards as boards",
                     "import src.data_provider.efinance_parts.realtime as realtime",
                     "",
                     "etf_names = etf.EXPECTED_ETF_METHOD_NAMES",
                     "realtime_names = realtime.EXPECTED_REALTIME_METHOD_NAMES",
+                    "boards_names = boards.EXPECTED_MARKET_BOARD_METHOD_NAMES",
+                    "owners = (",
+                    "    (etf_names, lambda: etf._EtfMethods),",
+                    "    (realtime_names, lambda: realtime._RealtimeMethods),",
+                    "    (boards_names, lambda: boards._MarketBoardsMethods),",
+                    ")",
                     "",
                     "def descriptor_function(descriptor):",
                     "    if isinstance(descriptor, (staticmethod, classmethod)):",
@@ -445,27 +456,21 @@ def _run_reload_contract(body: str) -> None:
                     "def bindings():",
                     "    source = {}",
                     "    bound = {}",
-                    "    for name in realtime_names:",
-                    "        source[name] = descriptor_function(",
-                    "            vars(realtime._RealtimeMethods)[name]",
-                    "        )",
-                    "        bound[name] = descriptor_function(",
-                    "            vars(facade.EfinanceFetcher)[name]",
-                    "        )",
-                    "        assert bound[name] is not source[name]",
-                    "        assert bound[name].__code__ is source[name].__code__",
-                    "        assert bound[name].__globals__ is vars(facade)",
-                    "        assert bound[name].__module__ == 'src.data_provider.efinance_fetcher'",
-                    "        assert bound[name].__qualname__ == f'EfinanceFetcher.{name}'",
-                    "    for name in etf_names:",
-                    "        source[name] = descriptor_function(",
-                    "            vars(etf._EtfMethods)[name]",
-                    "        )",
-                    "        bound[name] = descriptor_function(",
-                    "            vars(facade.EfinanceFetcher)[name]",
-                    "        )",
-                    "        assert bound[name].__globals__ is vars(facade)",
-                    "        assert bound[name].__qualname__ == f'EfinanceFetcher.{name}'",
+                    "    for names, owner in owners:",
+                    "        for name in names:",
+                    "            source[name] = descriptor_function(vars(owner())[name])",
+                    "            bound[name] = descriptor_function(",
+                    "                vars(facade.EfinanceFetcher)[name]",
+                    "            )",
+                    "            assert bound[name] is not source[name]",
+                    "            assert bound[name].__code__ is source[name].__code__",
+                    "            assert bound[name].__globals__ is vars(facade)",
+                    "            assert bound[name].__module__ == (",
+                    "                'src.data_provider.efinance_fetcher'",
+                    "            )",
+                    "            assert bound[name].__qualname__ == (",
+                    "                f'EfinanceFetcher.{name}'",
+                    "            )",
                     "    return source, bound",
                     "",
                     body,
@@ -490,8 +495,9 @@ after_source, after_bound = bindings()
 assert after_source['get_realtime_quote'] is not before_source['get_realtime_quote']
 assert after_bound['get_realtime_quote'] is not before_bound['get_realtime_quote']
 assert after_bound['get_realtime_quote'].__code__ is after_source['get_realtime_quote'].__code__
-for name in etf_names:
+for name in (*etf_names, *boards_names):
     assert after_bound[name] is not before_bound[name]
+    assert after_bound[name].__code__ is after_source[name].__code__
     assert after_bound[name].__globals__ is vars(facade)
 """
     )
@@ -511,6 +517,30 @@ for name in etf_names:
 assert after_bound['get_realtime_quote'] is not before_bound['get_realtime_quote']
 assert after_bound['get_realtime_quote'].__globals__ is vars(facade)
 assert after_bound['get_realtime_quote'].__code__ is after_source['get_realtime_quote'].__code__
+for name in boards_names:
+    assert after_bound[name] is not before_bound[name]
+    assert after_bound[name].__code__ is after_source[name].__code__
+"""
+    )
+
+
+def test_reloading_boards_also_rebinds_realtime() -> None:
+    _run_reload_contract(
+        """
+old_class = facade.EfinanceFetcher
+before_source, before_bound = bindings()
+boards = importlib.reload(boards)
+assert facade.EfinanceFetcher is old_class
+after_source, after_bound = bindings()
+for name in boards_names:
+    assert after_source[name] is not before_source[name]
+    assert after_bound[name] is not before_bound[name]
+    assert after_bound[name].__code__ is after_source[name].__code__
+assert after_bound['get_realtime_quote'] is not before_bound['get_realtime_quote']
+assert after_bound['get_realtime_quote'].__code__ is after_source['get_realtime_quote'].__code__
+for name in etf_names:
+    assert after_bound[name] is not before_bound[name]
+    assert after_bound[name].__code__ is after_source[name].__code__
 """
     )
 
