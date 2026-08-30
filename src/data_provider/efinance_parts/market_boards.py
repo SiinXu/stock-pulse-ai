@@ -121,7 +121,7 @@ class _MarketBoardsMethods:
             if results:
                 logger.info(f"[efinance] 获取到 {len(results)} 个指数行情")
             return results if results else None
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics are recorded before indices failover.
             log_safe_exception(
                 logger,
                 "Efinance market indices fetch failed",
@@ -177,7 +177,7 @@ class _MarketBoardsMethods:
                 return None
 
             return self._calc_market_stats(df)
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics are recorded before stats failover.
             log_safe_exception(
                 logger,
                 "Efinance market statistics fetch failed",
@@ -311,7 +311,7 @@ class _MarketBoardsMethods:
                 for _, row in bottom.iterrows()
             ]
             return top_sectors, bottom_sectors
-        except Exception as e:
+        except Exception as e:  # broad-exception: fallback_recorded - Safe diagnostics are recorded before ranking failover.
             log_safe_exception(
                 logger,
                 "Efinance sector ranking fetch failed",
