@@ -286,6 +286,38 @@ equivalent to `SecurityAuditEventPage`; `requestBody` is `never`. This is
 **not** the auth object export-alias pattern: generated snake_case is not the
 UI type. Runtime Zod in `api/securityAudit.ts` is unchanged.
 
+`apps/dsa-web/src/types/notificationInbox.ts` now CamelizeKeys-binds the
+generated NotificationInbox object components (`NotificationInboxItem`,
+`NotificationInboxSourceStatus`, `NotificationInboxListResponse`,
+`NotificationInboxUnreadCountResponse`, `NotificationInboxMarkReadResponse`,
+`NotificationInboxMarkAllReadResponse`, plus internal
+`NotificationInboxMarkReadRequest`) plus closed string-enum aliases
+(`NotificationInboxKind`, `NotificationInboxSeverity`,
+`NotificationInboxSource`, `NotificationInboxTitleKey`). Enum aliases are
+allowed (string enums, not objects). `Override` keeps `titleParams` and
+`sourceStatuses` required versus generated optional `title_params` /
+`source_statuses` (generated fact; not fixed by regenerating OpenAPI).
+`metadata` stays optional. Closed `kind` / `severity` / `source` / `titleKey`
+unions stay closed. `NotificationInboxListQuery` stays handwritten
+optional-without-null camelCase (generated query uses snake keys and
+`| null` on `cursor`/`kind`, and `kind` is `string` rather than the closed
+union plus `''`; do not CamelizeKeys it). The module is runtime-empty.
+Path 200 JSON for GET `/api/v1/notification-inbox/items`
+(`list_inbox_items_api_v1_notification_inbox_items_get`) is mutually
+equivalent to `NotificationInboxListResponse`; GET
+`/api/v1/notification-inbox/unread-count` to
+`NotificationInboxUnreadCountResponse`; POST
+`/api/v1/notification-inbox/items/mark-read` and POST
+`/api/v1/notification-inbox/items/mark-all-read` 200 JSON to
+`NotificationInboxMarkReadResponse` /
+`NotificationInboxMarkAllReadResponse` (those two generated responses are
+mutually equivalent; UI type is `NotificationInboxMarkReadResult`).
+Mark-read request body pins generated `NotificationInboxMarkReadRequest`
+(internal only; `notificationInboxApi.markRead` stays `itemIds: string[]`).
+List and unread GET `requestBody` is `never`. This is **not** the auth
+object export-alias pattern: generated snake_case is not the UI type.
+Runtime Zod in `api/notificationInbox.ts` is unchanged.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
