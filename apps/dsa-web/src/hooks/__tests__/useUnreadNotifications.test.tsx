@@ -143,6 +143,31 @@ async function resolvePreviewPair(
   });
 }
 
+/**
+ * Resolve every inbox pair that has been requested so far, once each.
+ * Interval ticks (`pollMs > 0`, `refetchIntervalInBackground`) can enqueue a
+ * new pair between "wait for lists.length" and "resolve last index"; leaving
+ * that pair pending keeps `isFetching` true for the whole waitFor budget.
+ */
+function createInboxDrainer(lists: InboxPageDeferred[], counts: InboxCountDeferred[]) {
+  let resolved = 0;
+  return {
+    get resolved() {
+      return resolved;
+    },
+    async drain(
+      listValue: NotificationInboxPage = page(),
+      countValue: NotificationInboxUnreadCount = count(),
+    ) {
+      while (resolved < lists.length) {
+        const index = resolved;
+        resolved += 1;
+        await resolvePreviewPair(lists[index]!, counts[index]!, listValue, countValue);
+      }
+    },
+  };
+}
+
 describe('useUnreadNotifications', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -769,6 +794,7 @@ describe('useUnreadNotifications', () => {
 
   it('discards a background in-flight fetch on disable and fetches fresh on re-enable', async () => {
     const { lists, counts } = mockDeferredInbox();
+    const drainer = createInboxDrainer(lists, counts);
     const { client, wrapper } = createWrapper();
     const { result, rerender } = renderHook(
       ({ enabled }: { enabled: boolean }) =>
@@ -777,10 +803,11 @@ describe('useUnreadNotifications', () => {
     );
 
     await waitFor(() => expect(lists).toHaveLength(1));
-    await resolvePreviewPair(lists[0]!, counts[0]!, page(), count());
-    await waitFor(() => {
+    await waitFor(async () => {
+      await drainer.drain(page(), count());
       expect(result.current.isLoading).toBe(false);
       expect(result.current.unreadCount).toBe(1);
+      expect(drainer.resolved).toBe(lists.length);
     });
 
     Object.defineProperty(document, 'hidden', { configurable: true, value: true });
@@ -789,7 +816,7 @@ describe('useUnreadNotifications', () => {
       value: 'hidden',
     });
 
-    await waitFor(() => expect(lists.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(lists.length).toBeGreaterThan(drainer.resolved));
     const inflightIndex = lists.length - 1;
     expect(result.current.isLoading).toBe(true);
 
@@ -797,14 +824,7 @@ describe('useUnreadNotifications', () => {
     expect(result.current.items).toEqual([]);
     expect(result.current.isLoading).toBe(false);
 
-    for (let index = 1; index <= inflightIndex; index += 1) {
-      await resolvePreviewPair(
-        lists[index]!,
-        counts[index]!,
-        page({ items: [ITEM_B] }),
-        count({ unreadTotal: 9 }),
-      );
-    }
+    await drainer.drain(page({ items: [ITEM_B] }), count({ unreadTotal: 9 }));
     expect(client.getQueryData(previewQueryKey(10))).toBeUndefined();
 
     rerender({ enabled: true });
@@ -813,11 +833,11 @@ describe('useUnreadNotifications', () => {
     expect(result.current.isLoading).toBe(true);
     await waitFor(() => expect(lists.length).toBeGreaterThan(inflightIndex));
 
-    const freshIndex = lists.length - 1;
-    await resolvePreviewPair(lists[freshIndex]!, counts[freshIndex]!, page(), count());
-    await waitFor(() => {
+    await waitFor(async () => {
+      await drainer.drain(page(), count());
       expect(result.current.isLoading).toBe(false);
       expect(result.current.unreadCount).toBe(1);
+      expect(drainer.resolved).toBe(lists.length);
     });
     expect(result.current.items).toEqual([ITEM]);
   });
