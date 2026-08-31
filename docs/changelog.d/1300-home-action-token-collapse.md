@@ -1,0 +1,1 @@
+- [Changed] Chat jump-to-bottom control now paints from Layer 1 `--primary` alpha instead of the eight `--home-action-*` page-scoped tokens; unused `--home-action-report-*` names are removed and page-scoped token ceiling 56 → 48 (Refs #1300).

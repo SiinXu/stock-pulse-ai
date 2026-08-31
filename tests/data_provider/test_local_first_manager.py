@@ -197,7 +197,9 @@ def test_manager_local_only_rejects_cached_data_that_fails_current_policy(
         warm_provider,
         _cache(tmp_path, clock, mode=MarketDataFetchMode.AUTO),
     )
-    warm_manager.get_daily_data("600519")
+    warm_manager.get_daily_data(
+        "600519", start_date="2026-07-01", end_date="2026-07-20", days=30
+    )
 
     monkeypatch.setenv("DATA_VALIDATION_STRICT", "true")
     monkeypatch.setenv("DATA_VALIDATION_STRICT_SCOPES", "cn/equity")
@@ -210,7 +212,9 @@ def test_manager_local_only_rejects_cached_data_that_fails_current_policy(
     )
 
     with pytest.raises(LocalDataMissingError) as exc_info:
-        offline_manager.get_daily_data("600519")
+        offline_manager.get_daily_data(
+            "600519", start_date="2026-07-01", end_date="2026-07-20", days=30
+        )
 
     assert exc_info.value.missing.reason == "quality_rejected"
     assert offline_provider.calls == 0

@@ -130,14 +130,6 @@
   --home-loading-ring-head: hsl(var(--primary));
   --page-drawer-overlay-bg: hsl(var(--neutral-black) / 0.6);
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
-  --home-action-ai-bg: hsl(var(--primary) / 0.1);
-  --home-action-ai-border: hsl(var(--primary) / 0.2);
-  --home-action-ai-text: hsl(var(--primary));
-  --home-action-ai-hover-bg: hsl(var(--primary) / 0.18);
-  --home-action-report-bg: hsl(var(--foreground) / 0.05);
-  --home-action-report-border: hsl(var(--foreground) / 0.12);
-  --home-action-report-text: hsl(var(--secondary-text));
-  --home-action-report-hover-bg: hsl(var(--foreground) / 0.09);
   --home-accent-bg: hsl(var(--primary) / 0.1);
   --home-accent-bg-hover: hsl(var(--primary) / 0.16);
   --home-accent-border: hsl(var(--primary) / 0.2);
@@ -394,14 +386,6 @@
   --home-loading-ring-head: hsl(var(--primary));
   --page-drawer-overlay-bg: hsl(var(--neutral-black) / 0.6);
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
-  --home-action-ai-bg: hsl(var(--primary) / 0.1);
-  --home-action-ai-border: hsl(var(--primary) / 0.2);
-  --home-action-ai-text: hsl(var(--primary));
-  --home-action-ai-hover-bg: hsl(var(--primary) / 0.2);
-  --home-action-report-bg: hsl(var(--foreground) / 0.08);
-  --home-action-report-border: hsl(var(--foreground) / 0.16);
-  --home-action-report-text: hsl(var(--secondary-text));
-  --home-action-report-hover-bg: hsl(var(--foreground) / 0.12);
   --home-accent-bg: hsl(var(--primary) / 0.1);
   --home-accent-bg-hover: hsl(var(--primary) / 0.18);
   --home-accent-border: hsl(var(--primary) / 0.22);
@@ -872,7 +856,7 @@ a {
   box-shadow: inset 0 1px 0 hsl(var(--neutral-white) / 0.36);
 }
 
-/* Chat page copy button style */
+/* Chat jump-to-bottom control (class name is historical; message copy uses IconButton). */
 .chat-copy-btn {
   display: inline-flex;
   align-items: center;
@@ -884,9 +868,9 @@ a {
   padding: 0.6rem 0.6rem;
   cursor: pointer;
   font-size: 0.8rem;
-  color: var(--home-action-ai-text);
-  background: var(--home-action-ai-bg);
-  border: 1px solid var(--home-action-ai-border);
+  color: hsl(var(--primary));
+  background: hsl(var(--primary) / 0.1);
+  border: 1px solid hsl(var(--primary) / 0.2);
   border-radius: var(--radius);
   transition: transform 0.15s ease, background-color 0.15s ease;
 }
@@ -914,7 +898,11 @@ a {
 }
 
 .chat-copy-btn:hover {
-  background: var(--home-action-ai-hover-bg);
+  background: hsl(var(--primary) / 0.18);
+}
+
+.dark .chat-copy-btn:hover {
+  background: hsl(var(--primary) / 0.2);
 }
 
 .chat-copy-btn:active {
