@@ -103,7 +103,7 @@ def test_search_failure_is_swallowed_and_returns_a_list() -> None:
         raise RuntimeError("search down")
 
     analyzer = _make_analyzer()
-    analyzer.search_service = SimpleNamespace(search_market_news=_boom)
+    analyzer.search_service = SimpleNamespace(search_stock_news=_boom)
     assert isinstance(analyzer.search_market_news(), list)
 
 
@@ -118,3 +118,76 @@ def test_merge_with_no_persisted_intelligence_returns_the_input() -> None:
     news = [{"title": "a"}]
     merged = analyzer._merge_persisted_market_intelligence(news)
     assert isinstance(merged, list)
+
+
+# --- Direct unit tests of the extracted functions (Issue #1085 acceptance) ----------
+#
+# The tests above exercise the functions through MarketAnalyzer. These call
+# src.market.news directly with an explicit owner, so a regression in the
+# extracted unit is caught without depending on facade wiring.
+
+
+def _owner(**overrides):
+    """Minimal duck-typed owner: only what the news functions actually read."""
+
+    def _field(item, field):
+        if isinstance(item, dict):
+            return str(item.get(field, "") or "")
+        return str(getattr(item, field, "") or "")
+
+    base = {
+        "search_service": None,
+        "config": SimpleNamespace(market_review_news_count=5),
+        "profile": SimpleNamespace(name="CN", news_queries=["A股 大盘"]),
+        "region": "cn",
+        "_log_context": lambda: "region=cn",
+        "_get_review_language": lambda: "zh",
+        "_get_news_field": _field,
+        "_compact_news_text": lambda value, *, limit: str(value)[:limit],
+    }
+    base.update(overrides)
+    return SimpleNamespace(**base)
+
+
+def test_search_market_news_returns_a_list_without_a_service() -> None:
+    assert news_mod.search_market_news(_owner()) == []
+
+
+def test_search_market_news_swallows_provider_errors() -> None:
+    def _boom(*args, **kwargs):
+        raise RuntimeError("search down")
+
+    owner = _owner(search_service=SimpleNamespace(search_market_news=_boom))
+    assert news_mod.search_market_news(owner) == []
+
+
+def test_search_market_news_passes_through_returned_items() -> None:
+    items = [{"title": "t1", "url": "u1"}, {"title": "t2", "url": "u2"}]
+    response = SimpleNamespace(results=items)
+    owner = _owner(
+        search_service=SimpleNamespace(search_stock_news=lambda *a, **k: response),
+    )
+    result = news_mod.search_market_news(owner)
+    assert isinstance(result, list)
+    assert result, "a successful search must surface its results"
+
+
+def test_normalize_news_item_maps_a_dict_item() -> None:
+    normalized = news_mod.normalize_news_item(_owner(), {"title": "t", "url": "u"})
+    assert isinstance(normalized, dict)
+
+
+def test_normalize_news_item_tolerates_a_non_dict_item() -> None:
+    normalized = news_mod.normalize_news_item(_owner(), SimpleNamespace(title="t", url="u"))
+    assert isinstance(normalized, dict)
+
+
+def test_merge_persisted_market_intelligence_returns_a_list_for_empty_input() -> None:
+    assert isinstance(news_mod.merge_persisted_market_intelligence(_owner(), []), list)
+
+
+def test_merge_persisted_market_intelligence_preserves_input_items() -> None:
+    news = [{"title": "keep-me", "url": "u"}]
+    merged = news_mod.merge_persisted_market_intelligence(_owner(), news)
+    assert isinstance(merged, list)
+    assert any(item.get("title") == "keep-me" for item in merged if isinstance(item, dict))
