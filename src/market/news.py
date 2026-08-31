@@ -10,27 +10,37 @@ This module must not import ``MarketAnalyzer``; every function receives
 ``owner`` and reaches ``search_service``, ``config``, ``profile``, ``region``,
 ``_log_context``, ``_get_review_language``, and ``_get_news_field`` through it,
 so class-level and instance-level overrides stay effective.
+
+``IntelligenceService`` is imported here (the original analyzer module-level
+binding) and resolved through the owner's defining module at call time so
+``patch("src.market.analyzer.IntelligenceService")`` still applies. Duck-typed
+owners without that name fall back to this module's binding.
 """
 
 from __future__ import annotations
 
 import logging
+import sys
 from typing import Any, Dict, List
 
+from src.services.intelligence_service import IntelligenceService
 from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger("src.market.analyzer")
-
-# ``IntelligenceService`` is imported lazily inside the merge body on the
-# analyzer; the anchor keeps flake8 F821 clean and the real object resolves
-# from that local import at call time.
-IntelligenceService = None  # type: ignore[assignment,misc]
 
 __all__ = (
     "search_market_news",
     "normalize_news_item",
     "merge_persisted_market_intelligence",
 )
+
+
+def _resolve_intelligence_service(owner: Any) -> Any:
+    """Use the owner's module binding, else this module's real import."""
+    module = sys.modules.get(getattr(type(owner), "__module__", "") or "")
+    if module is None:
+        return IntelligenceService
+    return getattr(module, "IntelligenceService", IntelligenceService)
 
 
 def search_market_news(owner: Any) -> List[Dict]:
@@ -119,7 +129,8 @@ def merge_persisted_market_intelligence(owner: Any, news: List) -> List:
         if owner._get_news_field(item, "url")
     }
     try:
-        service = IntelligenceService(config=owner.config)
+        service_cls = _resolve_intelligence_service(owner)
+        service = service_cls(config=owner.config)
         service.refresh_auto_sources()
         payload = service.list_items(
             scope_type="market",

@@ -7,12 +7,14 @@ import ast
 import inspect
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
 import src.market.analyzer as analyzer_mod
 import src.market.news as news_mod
 from src.market.analyzer import MarketAnalyzer
+from src.services.intelligence_service import IntelligenceService
 from tests.market.test_market_degradation import _make_analyzer
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -91,11 +93,12 @@ def test_instance_override_of_the_search_service_reaches_the_fetcher() -> None:
     """The counterexample the ``owner`` seam exists for."""
 
     analyzer = _make_analyzer()
+    response = SimpleNamespace(results=[{"title": "SENTINEL", "url": "u"}])
     analyzer.search_service = SimpleNamespace(
-        search_market_news=lambda *a, **k: [{"title": "SENTINEL", "url": "u"}],
+        search_stock_news=lambda *a, **k: response,
     )
     result = analyzer.search_market_news()
-    assert isinstance(result, list)
+    assert any(item.get("title") == "SENTINEL" for item in result)
 
 
 def test_search_failure_is_swallowed_and_returns_a_list() -> None:
@@ -116,8 +119,10 @@ def test_search_without_a_service_returns_a_list() -> None:
 def test_merge_with_no_persisted_intelligence_returns_the_input() -> None:
     analyzer = _make_analyzer()
     news = [{"title": "a"}]
-    merged = analyzer._merge_persisted_market_intelligence(news)
+    with patch("src.market.analyzer.IntelligenceService", side_effect=RuntimeError("intel down")):
+        merged = analyzer._merge_persisted_market_intelligence(news)
     assert isinstance(merged, list)
+    assert any(item.get("title") == "a" for item in merged)
 
 
 # --- Direct unit tests of the extracted functions (Issue #1085 acceptance) ----------
@@ -157,7 +162,7 @@ def test_search_market_news_swallows_provider_errors() -> None:
     def _boom(*args, **kwargs):
         raise RuntimeError("search down")
 
-    owner = _owner(search_service=SimpleNamespace(search_market_news=_boom))
+    owner = _owner(search_service=SimpleNamespace(search_stock_news=_boom))
     assert news_mod.search_market_news(owner) == []
 
 
@@ -182,12 +187,65 @@ def test_normalize_news_item_tolerates_a_non_dict_item() -> None:
     assert isinstance(normalized, dict)
 
 
+def test_news_module_binds_the_real_intelligence_service() -> None:
+    assert news_mod.IntelligenceService is IntelligenceService
+    assert analyzer_mod.IntelligenceService is IntelligenceService
+
+
+def test_analyzer_intelligence_service_patch_reaches_merge() -> None:
+    """Facade patches on ``src.market.analyzer.IntelligenceService`` must still fire."""
+
+    analyzer = _make_analyzer()
+    analyzer.config.get_effective_news_window_days = lambda: 3
+    with patch("src.market.analyzer.IntelligenceService") as service_cls:
+        service = service_cls.return_value
+        service.refresh_auto_sources.return_value = {"ok": True}
+        service.list_items.return_value = {
+            "items": [
+                {
+                    "title": "PATCHED-LOCAL",
+                    "summary": "from facade patch",
+                    "url": "https://example.com/patched",
+                    "source": "test",
+                    "published_at": "2026-08-31",
+                }
+            ],
+            "total": 1,
+        }
+        merged = analyzer._merge_persisted_market_intelligence([])
+    service_cls.assert_called_once_with(config=analyzer.config)
+    assert any(item.get("title") == "PATCHED-LOCAL" for item in merged)
+
+
+def test_news_module_intelligence_service_patch_reaches_duck_typed_owner() -> None:
+    with patch.object(news_mod, "IntelligenceService") as service_cls:
+        service = service_cls.return_value
+        service.refresh_auto_sources.return_value = {"ok": True}
+        service.list_items.return_value = {
+            "items": [
+                {
+                    "title": "OWNER-LOCAL",
+                    "summary": "from news-module binding",
+                    "url": "https://example.com/owner-local",
+                }
+            ],
+            "total": 1,
+        }
+        owner = _owner()
+        owner.config.get_effective_news_window_days = lambda: 3
+        merged = news_mod.merge_persisted_market_intelligence(owner, [])
+    service_cls.assert_called_once_with(config=owner.config)
+    assert any(item.get("title") == "OWNER-LOCAL" for item in merged)
+
+
 def test_merge_persisted_market_intelligence_returns_a_list_for_empty_input() -> None:
-    assert isinstance(news_mod.merge_persisted_market_intelligence(_owner(), []), list)
+    with patch.object(news_mod, "IntelligenceService", side_effect=RuntimeError("intel down")):
+        assert isinstance(news_mod.merge_persisted_market_intelligence(_owner(), []), list)
 
 
 def test_merge_persisted_market_intelligence_preserves_input_items() -> None:
     news = [{"title": "keep-me", "url": "u"}]
-    merged = news_mod.merge_persisted_market_intelligence(_owner(), news)
+    with patch.object(news_mod, "IntelligenceService", side_effect=RuntimeError("intel down")):
+        merged = news_mod.merge_persisted_market_intelligence(_owner(), news)
     assert isinstance(merged, list)
     assert any(item.get("title") == "keep-me" for item in merged if isinstance(item, dict))
