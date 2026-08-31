@@ -1,0 +1,1 @@
+- [Changed] Move Longbridge realtime quote routing, static-info caching, and volume-ratio computation into `src/data_provider/longbridge_parts/realtime.py` behind the ADR-006 facade, keeping `LongbridgeFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
