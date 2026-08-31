@@ -105,7 +105,14 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("src/services/", ("tests/services",)),
     ("src/repositories/", ("tests/repositories", "tests/services")),
     ("src/schemas/", ("tests/schemas", "tests/test_api_schema_pydantic.py", "tests/api")),
-    ("src/market/", ("tests/market", "tests/services")),
+    (
+        "src/market/",
+        (
+            "tests/market",
+            "tests/services",
+            "tests/test_exception_log_callsite_guard.py",
+        ),
+    ),
     (
         "src/migrations/",
         (

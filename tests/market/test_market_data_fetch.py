@@ -260,3 +260,36 @@ def test_owner_contract_is_only_three_attributes() -> None:
     accessed = set(re.findall(r"owner\.(\w+)", source))
     assert accessed == {"data_manager", "region", "_log_context"}
     ast.parse(source)
+
+
+def test_owner_and_overview_formals_are_protocols_not_any() -> None:
+    """``Any`` formals taint every logger sink; Protocols keep the bodies unchanged."""
+
+    tree = ast.parse(OWNER_PATH.read_text(encoding="utf-8"))
+    functions = {
+        node.name: node
+        for node in tree.body
+        if isinstance(node, ast.FunctionDef)
+        and node.name in {function_name for _method, function_name in FOUR}
+    }
+    assert set(functions) == {function_name for _method, function_name in FOUR}
+    for function_name, function in functions.items():
+        annotations = {
+            argument.arg: argument.annotation for argument in function.args.args
+        }
+        owner = annotations["owner"]
+        assert isinstance(owner, ast.Name), function_name
+        assert owner.id == "_MarketDataOwner", function_name
+        if function_name == "get_main_indices":
+            assert "overview" not in annotations
+            continue
+        overview = annotations["overview"]
+        assert isinstance(overview, ast.Name), function_name
+        assert overview.id == "_MarketOverview", function_name
+
+
+def test_extracted_logger_sinks_are_exception_log_guard_clean() -> None:
+    from tests.test_exception_log_callsite_guard import find_exception_log_violations
+
+    relative = "src/market/market_data.py"
+    assert find_exception_log_violations(relative, OWNER_PATH.read_text(encoding="utf-8")) == []

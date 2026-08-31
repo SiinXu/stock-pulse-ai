@@ -2328,6 +2328,62 @@ def run():
     ]
 
 
+def test_callsite_guard_detects_any_formals_and_accepts_protocol_owner_overview() -> None:
+    """Raw ``Any`` owner/overview formals stay detected; Protocol formals are clean.
+
+    Extracted market-data helpers log ``owner._log_context()`` and overview
+    fields. ``Any`` taints those sinks; a narrow Protocol does not.
+    """
+
+    any_source = '''
+import logging
+from typing import Any
+logger = logging.getLogger(__name__)
+
+def fetch(owner: Any, overview: Any):
+    logger.info("start %s", owner._log_context())  # any-owner-sink
+    logger.info("up=%s", overview.up_count)  # any-overview-sink
+'''
+    protocol_source = '''
+import logging
+from typing import Any, Protocol
+logger = logging.getLogger(__name__)
+
+class Owner(Protocol):
+    data_manager: Any
+    region: str
+    def _log_context(self) -> str: ...
+
+class Overview(Protocol):
+    up_count: int
+
+def fetch(owner: Owner, overview: Overview):
+    logger.info("start %s", owner._log_context())
+    logger.info("up=%s", overview.up_count)
+'''
+
+    def line_number(source: str, marker: str) -> int:
+        return next(
+            line
+            for line, content in enumerate(source.splitlines(), start=1)
+            if marker in content
+        )
+
+    assert find_exception_log_violations("fixture.py", any_source) == [
+        ExceptionLogViolation(
+            "fixture.py",
+            line_number(any_source, "any-owner-sink"),
+            "raw-exception-object",
+        ),
+        ExceptionLogViolation(
+            "fixture.py",
+            line_number(any_source, "any-overview-sink"),
+            "raw-exception-object",
+        ),
+    ]
+    assert find_exception_log_violations("fixture.py", protocol_source) == []
+
+
 def test_callsite_guard_propagates_actual_exception_arguments_across_local_calls() -> None:
     source = '''
 import logging

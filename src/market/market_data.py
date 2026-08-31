@@ -8,14 +8,14 @@ Issue #1085 step 6 extracts the four ``data_manager`` fetch helpers that
 This module must not import ``MarketAnalyzer``; every function receives
 ``owner`` and reaches ``data_manager``, ``region``, and ``_log_context``
 through it, so class-level and instance-level overrides stay effective.
-``overview`` is typed ``Any`` for the same reason, matching
-``src.market.degradation`` and ``src.market.blocks``.
+``owner`` and ``overview`` are typed as Protocols so logger sinks stay
+exception-log-guard-clean without changing runtime bodies or fallback.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Any, List
+from typing import Any, List, Protocol
 
 from src.utils.sanitize import log_safe_exception
 
@@ -34,7 +34,31 @@ __all__ = (
 )
 
 
-def get_main_indices(owner: Any) -> List[Any]:
+class _MarketDataOwner(Protocol):
+    """Duck-typed analyzer surface used by market-data fetch logging."""
+
+    data_manager: Any
+    region: str
+
+    def _log_context(self) -> str: ...
+
+
+class _MarketOverview(Protocol):
+    """Duck-typed overview payload written by market-data fetch helpers."""
+
+    up_count: int
+    down_count: int
+    flat_count: int
+    limit_up_count: int
+    limit_down_count: int
+    total_amount: float
+    top_sectors: List[Any]
+    bottom_sectors: List[Any]
+    top_concepts: List[Any]
+    bottom_concepts: List[Any]
+
+
+def get_main_indices(owner: _MarketDataOwner) -> List[Any]:
     """获取主要指数实时行情"""
     indices = []
 
@@ -84,7 +108,7 @@ def get_main_indices(owner: Any) -> List[Any]:
     return indices
 
 
-def get_market_statistics(owner: Any, overview: Any):
+def get_market_statistics(owner: _MarketDataOwner, overview: _MarketOverview):
     """获取市场涨跌统计"""
     try:
         logger.info("[大盘] %s action=get_market_stats status=start", owner._log_context())
@@ -124,7 +148,7 @@ def get_market_statistics(owner: Any, overview: Any):
         )
 
 
-def get_sector_rankings(owner: Any, overview: Any):
+def get_sector_rankings(owner: _MarketDataOwner, overview: _MarketOverview):
     """获取板块涨跌榜"""
     try:
         logger.info("[大盘] %s action=get_sector_rankings status=start", owner._log_context())
@@ -155,7 +179,7 @@ def get_sector_rankings(owner: Any, overview: Any):
         )
 
 
-def get_concept_rankings(owner: Any, overview: Any):
+def get_concept_rankings(owner: _MarketDataOwner, overview: _MarketOverview):
     """获取概念/题材涨跌榜（fail-open）。"""
     try:
         logger.info("[大盘] %s action=get_concept_rankings status=start", owner._log_context())
