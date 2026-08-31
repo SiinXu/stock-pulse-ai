@@ -8,10 +8,11 @@ Method bodies are rebound onto ``TushareFetcher`` by the compatibility facade
 ``tickflow_parts.market_boards``.
 
 No module-level helper and no sibling method moves. The rate-limited API
-client (``_api``, ``_check_rate_limit``, ``_call_api_with_rate_limit``) and the
-trade-calendar helpers (``get_trade_time``, ``_get_trade_dates``,
-``_pick_trade_date``, ``_get_china_now``) stay on the facade and are reached
-through ``self`` at call time.
+client (``_api``, ``_check_rate_limit``, ``_call_api_with_rate_limit``) stays
+on the facade. Trade-calendar helpers (``get_trade_time``, ``_get_trade_dates``,
+``_pick_trade_date``, ``_get_china_now``) are rebound from
+``tushare_parts.trade_time`` onto the facade and are reached through ``self``
+at call time.
 """
 
 from __future__ import annotations
