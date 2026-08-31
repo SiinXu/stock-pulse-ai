@@ -1,0 +1,1 @@
+- [Changed] Move pure market-review report section helpers into `src/market/report_sections.py` behind the existing `src.market.analyzer` facade, keeping method names, signatures, and descriptor kinds unchanged (Refs #1085).
