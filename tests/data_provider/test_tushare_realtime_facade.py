@@ -36,13 +36,12 @@ METHOD_SIGNATURES = {
     "get_realtime_quote": ["self", "stock_code"],
 }
 
-# Reached through `self` by the moved bodies; all stay on the facade.
+# Reached through `self` by the moved bodies; chip stays on the facade class body.
 FACADE_SIBLINGS = (
-    "get_trade_time",
     "get_chip_distribution",
-    "_get_trade_dates",
-    "_pick_trade_date",
-    "_get_china_now",
+    "compute_cyq_metrics",
+    "is_available",
+    "_determine_priority",
 )
 
 # Domains this package already owned before the slice; binding must still work.
@@ -51,6 +50,7 @@ PRE_EXISTING_BOUND = (
     "_convert_stock_code",
     "get_main_indices",
     "get_stock_name",
+    "get_trade_time",
 )
 
 
@@ -164,8 +164,8 @@ def test_bodies_no_longer_live_in_the_facade_class() -> None:
 
 
 @pytest.mark.parametrize("sibling", FACADE_SIBLINGS)
-def test_chip_and_trade_calendar_helpers_stay_on_the_facade(sibling) -> None:
-    """The moved bodies must not pull chip or trade-time helpers with them."""
+def test_chip_helpers_stay_on_the_facade(sibling) -> None:
+    """The moved bodies must not pull chip or availability helpers with them."""
 
     assert sibling in _facade_class_methods(), sibling
 

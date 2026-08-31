@@ -11,7 +11,7 @@ Requires a token and enforces a per-minute request quota.
 
 Implementation ownership lives under ``data_provider.tushare_parts`` by
 capability domain (client, symbols, history, stock_identity, market_boards,
-realtime). This module remains the stable import and monkeypatch surface so
+realtime, trade_time). This module remains the stable import and monkeypatch surface so
 provider registration, tests, fixture scripts, and diagnostics keep working
 without behavior changes.
 
@@ -61,10 +61,12 @@ from .tushare_parts.facade_bind import (
 )
 from .tushare_parts import market_boards as _market_boards_module
 from .tushare_parts import realtime as _realtime_module
+from .tushare_parts import trade_time as _trade_time_module
 from .tushare_parts.history import _HistoryMethods
 from .tushare_parts.market_boards import _MarketBoardsMethods
 from .tushare_parts.realtime import _RealtimeMethods
 from .tushare_parts.stock_identity import _StockIdentityMethods
+from .tushare_parts.trade_time import _TradeTimeMethods
 from .tushare_parts.symbols import (
     _ETF_ALL_PREFIXES,
     _ETF_SH_PREFIXES,
@@ -147,51 +149,12 @@ class TushareFetcher(BaseFetcher):
         """
         return self._api is not None
 
-    def _get_china_now(self) -> datetime:
-        """返回上海时区当前时间，方便测试覆盖跨日刷新逻辑。"""
-        return datetime.now(ZoneInfo("Asia/Shanghai"))
+    # Rebound from tushare_parts.trade_time after the class is built.
+    _get_china_now = None
 
-    def _get_trade_dates(self, end_date: Optional[str] = None) -> List[str]:
-        """按自然日刷新交易日历缓存，避免服务跨日后继续复用旧日历。"""
-        if self._api is None:
-            return []
+    _get_trade_dates = None
 
-        china_now = self._get_china_now()
-        requested_end_date = end_date or china_now.strftime("%Y%m%d")
-
-        if self.date_list is not None and self._date_list_end == requested_end_date:
-            return self.date_list
-
-        start_date = (china_now - timedelta(days=20)).strftime("%Y%m%d")
-        df_cal = self._call_api_with_rate_limit(
-            "trade_cal",
-            exchange="SSE",
-            start_date=start_date,
-            end_date=requested_end_date,
-        )
-
-        if df_cal is None or df_cal.empty or "cal_date" not in df_cal.columns:
-            logger.warning("[Tushare] trade_cal 返回为空，无法更新交易日历缓存")
-            self.date_list = []
-            self._date_list_end = requested_end_date
-            return self.date_list
-
-        trade_dates = sorted(
-            df_cal[df_cal["is_open"] == 1]["cal_date"].astype(str).tolist(),
-            reverse=True,
-        )
-        self.date_list = trade_dates
-        self._date_list_end = requested_end_date
-        return trade_dates
-
-    @staticmethod
-    def _pick_trade_date(trade_dates: List[str], use_today: bool) -> Optional[str]:
-        """根据可用交易日列表选择当天或前一交易日。"""
-        if not trade_dates:
-            return None
-        if use_today or len(trade_dates) == 1:
-            return trade_dates[0]
-        return trade_dates[1]
+    _pick_trade_date = None
 
     # Rebound from tushare_parts.realtime after the class is built.
     _get_legacy_realtime_symbol = None
@@ -205,42 +168,8 @@ class TushareFetcher(BaseFetcher):
     
     _calc_market_stats = None
 
-    def get_trade_time(self,early_time='09:30',late_time='16:30') -> Optional[str]:
-        '''
-        获取当前时间可以获得数据的开始时间日期
-
-        Args:
-                early_time: 默认 '09:30'
-                late_time: 默认 '16:30'
-                early_time-late_time 之间为使用上一个交易日数据的时间段，其他时间为使用当天数据的时间段
-        Returns:
-                start_date: 可以获得数据的开始日期
-        '''
-        china_now = self._get_china_now()
-        china_date = china_now.strftime("%Y%m%d")
-        china_clock = china_now.strftime("%H:%M")
-
-        trade_dates = self._get_trade_dates(china_date)
-        if not trade_dates:
-            return None
-
-        if china_date in trade_dates:
-            if  early_time < china_clock < late_time: # Use the data from the previous trading day's time period
-                use_today = False
-            else:
-                use_today = True
-        else:
-            # Non-trading day: today is not in trade_dates, trade_dates[0] is the latest trading day
-            use_today = True
-
-        start_date = self._pick_trade_date(trade_dates, use_today=use_today)
-        if start_date is None:
-            return None
-
-        if not use_today:
-            logger.info(f"[Tushare] 当前时间 {china_clock} 可能无法获取当天筹码分布，尝试获取前一个交易日的数据 {start_date}")
-
-        return start_date
+    # Rebound from tushare_parts.trade_time after the class is built.
+    get_trade_time = None
     
     get_sector_rankings = None
     
@@ -464,12 +393,13 @@ def _bind_http_client_facade() -> None:
 def _assemble_tushare_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _ClientMethods, _HistoryMethods, _RealtimeMethods, _StockIdentityMethods, _SymbolMethods
+    global _ClientMethods, _HistoryMethods, _RealtimeMethods, _StockIdentityMethods, _SymbolMethods, _TradeTimeMethods
     _ClientMethods = _client_module._ClientMethods
     _SymbolMethods = _symbols_module._SymbolMethods
     _HistoryMethods = _history_module._HistoryMethods
     _StockIdentityMethods = _stock_identity_module._StockIdentityMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
+    _TradeTimeMethods = _trade_time_module._TradeTimeMethods
     _bind_http_client_facade()
     bind_methods_from_class(
         _ClientMethods,
@@ -508,6 +438,12 @@ def _assemble_tushare_fetcher_facade() -> None:
         globals(),
         expected_names=_realtime_module.EXPECTED_REALTIME_METHOD_NAMES,
     )
+    bind_methods_from_class(
+        _TradeTimeMethods,
+        TushareFetcher,
+        globals(),
+        expected_names=_trade_time_module.EXPECTED_TRADE_TIME_METHOD_NAMES,
+    )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy
     # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
@@ -544,6 +480,7 @@ def _install_part_reload_hooks() -> None:
         _stock_identity_module,
         _market_boards_module,
         _realtime_module,
+        _trade_time_module,
     ):
         module._FACADE_RELOAD_HOOK = _assemble_tushare_fetcher_facade  # type: ignore[attr-defined]
 

@@ -1,0 +1,1 @@
+- [Changed] Move Tushare trade-calendar helpers into `src/data_provider/tushare_parts/trade_time.py` behind the ADR-006 facade, keeping `TushareFetcher` method names, signatures, defaults, and patch targets unchanged (Refs #1068).
