@@ -1,7 +1,6 @@
 {
   "version": 1,
-  "deferred_files": {
-  },
+  "deferred_files": {},
   "legacy_handlers": [
     {"path":"src/agent/chat_context.py","scope":"<module>._generate_summary","caught":["Exception"],"digest":"5c029979e59e9153dcc03a2ae11c7d9469bf73d4bda7b9e2318a7980504af94b"},
     {"path":"src/agent/chat_context.py","scope":"<module>.estimate_text_tokens","caught":["Exception"],"digest":"355ab86e7d5decea477c1d714d349e707726ddf2f374d07ce14482f353367a47"},
@@ -151,15 +150,15 @@
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"3d08df0ccaec74c4a07839c0c63d2cbe287f9b3dd3340ffbb13733fda3af3304"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"81b93f82bf1e64a360b083d053e6d61e86f8c3737c1021c1dce0abd3df49a651"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"fc528a1299a78e98682427a506a8420b8c27fa42b19b8fcb097509362c178c3b"},
-    {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_static_info","caught":["Exception"],"digest":"cc7c626db18a8a91a25a4aa1c3f7bee616e637bc8fa0b7a66074c2188f87f076"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._is_available","caught":["Exception"],"digest":"cd09cfff30776922864d6a16c1bcf639c15611f31241fea0db5b091e1f148656"},
-    {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher.get_realtime_quote","caught":["Exception"],"digest":"6d3f9fa3ac418c1503c948e8e3f6f647c21dbaeec1bb670bc1aa7353404f87ba"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>._longbridge_config_kwargs","caught":["Exception"],"digest":"00e2c7459267166e6ad82ced55dd2e18074cb711e741532608e12b677917f59f"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>._longbridge_config_kwargs","caught":["Exception"],"digest":"0564394328f41b2c743dee51ef602f00a8e2f0d55d3d29a1c5f75f50c7ff1957"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>._longbridge_config_kwargs","caught":["Exception"],"digest":"7468c61bd97a6c459e5e0f0c3d202376bbd5b17434e3e1216cbc8727b12cf280"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>._longbridge_config_kwargs","caught":["Exception"],"digest":"d9ba45500fa5aa9ee86378d5ea237bb33dddc2424d21b2cf314bab61570c4eb3"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>._restore_oauth_token_cache_from_env","caught":["Exception"],"digest":"3bba1e8da987e6e6226e46be9d9fab4f96dbd45c122e064ae3cef066daf77b6e"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>._sanitize_longbridge_env","caught":["Exception"],"digest":"3dd95c41a45f2f9df55cf76418599f49d51deb3cb45153a789fddc065940ecd5"},
+    {"path":"src/data_provider/longbridge_parts/realtime.py","scope":"<module>._RealtimeMethods._get_static_info","caught":["Exception"],"digest":"cc7c626db18a8a91a25a4aa1c3f7bee616e637bc8fa0b7a66074c2188f87f076"},
+    {"path":"src/data_provider/longbridge_parts/realtime.py","scope":"<module>._RealtimeMethods.get_realtime_quote","caught":["Exception"],"digest":"6d3f9fa3ac418c1503c948e8e3f6f647c21dbaeec1bb670bc1aa7353404f87ba"},
     {"path":"src/data_provider/manager_parts/belong_board_methods.py","scope":"<module>._BelongBoardMethods.get_belong_boards","caught":["Exception"],"digest":"a0212977c745c2a9832b26da982534cebb9b213c52bc4275729f0a3f81a4f940"},
     {"path":"src/data_provider/manager_parts/fundamental_timeout_methods.py","scope":"<module>._FundamentalTimeoutMethods._run_with_timeout","caught":["Exception"],"digest":"538db9ce1278cd4e69330052c168d15d6aa9c152971a039148fd2cce100db6f7"},
     {"path":"src/data_provider/manager_parts/fundamental_timeout_methods.py","scope":"<module>._FundamentalTimeoutMethods._run_with_timeout.runner","caught":["Exception"],"digest":"fd6365921bdf911df350251cd640b9baf549b218d57e9a7bb685bf056155d313"},
