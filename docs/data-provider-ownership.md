@@ -85,7 +85,7 @@ this identity.
 | `src/data_provider/yfinance_fetcher.py` | Compatibility facade for the yfinance provider: public class, constants, symbol conversion, HTTP guard, and ADR-006 method rebinding | New capability-domain bodies (add under `yfinance_parts/`) |
 | `src/data_provider/yfinance_parts/` | yfinance implementation ownership by capability domain: `main_indices` (regional main-index quotes and the shared ticker fetch), plus `facade_bind` re-export | Realtime quote routing, Stooq/US-index fallbacks, daily fetch/normalize bodies, and cross-provider manager policy (ADR-005) |
 | `src/data_provider/tushare_fetcher.py` | Compatibility facade for the Tushare provider: public class, HTTP-client / URL / symbol re-exports, and ADR-006 method rebinding / HTTP-client clone seams | New capability-domain bodies (add under `tushare_parts/`) |
-| `src/data_provider/tushare_parts/` | Tushare implementation ownership by capability domain: `client` (HTTP client, URL resolve, rate-limit wrappers), `symbols` (ETF/US classifiers and ts_code conversion), `history` (`_fetch_raw_data` / `_normalize_data`), `market_boards` (main indices, market stats, sector rankings), `stock_identity` (`get_stock_name` / `get_stock_list`), plus `facade_bind` helpers | Cross-provider manager policy (ADR-005); Tushare realtime / chip remain on the facade |
+| `src/data_provider/tushare_parts/` | Tushare implementation ownership by capability domain: `client` (HTTP client, URL resolve, rate-limit wrappers), `symbols` (ETF/US classifiers and ts_code conversion), `history` (`_fetch_raw_data` / `_normalize_data`), `market_boards` (main indices, market stats, sector rankings), `stock_identity` (`get_stock_name` / `get_stock_list`), `realtime` (`get_realtime_quote` / `_get_legacy_realtime_symbol`), plus `facade_bind` helpers | Cross-provider manager policy (ADR-005); Tushare chip remains on the facade |
 | `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
 | `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, facade `__del__`, timeout slot construction (`_fundamental_timeout_slots`), concept-rankings TTL/lock/dict class attributes, money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | `_get_fundamental_config` (rebound from `fundamental_context_methods`), CN sub-blocks (rebound from `fundamental_cn_context_methods`), payload helpers (rebound from `fundamental_payload_methods`), timeout/retry workers (rebound from `fundamental_timeout_methods`), failed/rejected builders (rebound from `fundamental_outcome_methods`), TickFlow lifecycle (rebound from `tickflow_lifecycle_methods`), prefetch (rebound from `prefetch_methods`), new pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/rankings/market-overview/belong-board/stock-name descriptors |
 | `src/data_provider/longbridge_fetcher.py` | Compatibility facade for the Longbridge provider: public class, credentials/OAuth helpers, SDK context and cooldown policy, and ADR-006 method rebinding | New capability-domain bodies (add under `longbridge_parts/`) |
@@ -519,18 +519,20 @@ Slice 24 leftover on the facade: `__del__`,
 `_init_default_fetchers`, timeout slot construction, and the remaining
 `base.py` `get_config()` site (`_init_default_fetchers`).
 
-Tushare client / symbols / history / stock-identity (Issue #1068) rebinds
-`_init_api` / `_build_api_client` / `_check_rate_limit` /
-`_call_api_with_rate_limit`, `_detect_exchange_hint` /
+Tushare client / symbols / history / stock-identity / market-boards /
+realtime (Issue #1068) rebinds `_init_api` / `_build_api_client` /
+`_check_rate_limit` / `_call_api_with_rate_limit`, `_detect_exchange_hint` /
 `_convert_stock_code` / `_convert_hk_stock_code_for_tushare`,
-`_fetch_raw_data` / `_normalize_data`, and `get_stock_name` /
-`get_stock_list` from `tushare_parts/` while preserving
+`_fetch_raw_data` / `_normalize_data`, `get_stock_name` / `get_stock_list`,
+`get_main_indices` / `get_market_stats` / `_calc_market_stats` /
+`get_sector_rankings`, and `get_realtime_quote` /
+`_get_legacy_realtime_symbol` from `tushare_parts/` while preserving
 `src.data_provider.tushare_fetcher` module, qualname, shared
 `_stock_name_cache` identity, and patch seams (`safe_post`,
-`requests.post`, `get_config`, `_check_rate_limit`, converters, `_api.*`).
-Import the facade (`src.data_provider.tushare_fetcher` /
-`src.data_provider`), not `tushare_parts`. Realtime and chip stay on
-the Tushare facade.
+`requests.post`, `get_config`, `_check_rate_limit`, converters,
+`normalize_stock_code`, `_api.*`). Import the facade
+(`src.data_provider.tushare_fetcher` / `src.data_provider`), not
+`tushare_parts`. Chip stays on the Tushare facade.
 
 ## How To Add The Next Extraction Slice
 

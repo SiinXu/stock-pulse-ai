@@ -1,0 +1,1 @@
+- [Changed] Move generation-diagnostic redaction into `src/market/diagnostics.py` behind the existing `src.market.analyzer` facade, keeping method names, signatures, keyword-only parameters, and override behavior unchanged (Refs #1085).

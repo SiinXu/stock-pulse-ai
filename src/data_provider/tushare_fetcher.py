@@ -10,9 +10,10 @@ Data source: Tushare Pro API (dig-the-rabbit)
 Requires a token and enforces a per-minute request quota.
 
 Implementation ownership lives under ``data_provider.tushare_parts`` by
-capability domain (client, symbols, history, stock_identity). This module
-remains the stable import and monkeypatch surface so provider registration,
-tests, fixture scripts, and diagnostics keep working without behavior changes.
+capability domain (client, symbols, history, stock_identity, market_boards,
+realtime). This module remains the stable import and monkeypatch surface so
+provider registration, tests, fixture scripts, and diagnostics keep working
+without behavior changes.
 
 流控策略：
 1. 实现"每分钟调用计数器"
@@ -59,8 +60,10 @@ from .tushare_parts.facade_bind import (
     bind_methods_from_class,
 )
 from .tushare_parts import market_boards as _market_boards_module
+from .tushare_parts import realtime as _realtime_module
 from .tushare_parts.history import _HistoryMethods
 from .tushare_parts.market_boards import _MarketBoardsMethods
+from .tushare_parts.realtime import _RealtimeMethods
 from .tushare_parts.stock_identity import _StockIdentityMethods
 from .tushare_parts.symbols import (
     _ETF_ALL_PREFIXES,
@@ -190,145 +193,10 @@ class TushareFetcher(BaseFetcher):
             return trade_dates[0]
         return trade_dates[1]
 
-    @classmethod
-    def _get_legacy_realtime_symbol(cls, stock_code: str) -> str:
-        """Build the legacy tushare symbol while preserving explicit SH/SZ hints."""
-        code = normalize_stock_code(stock_code)
-        exchange_hint = cls._detect_exchange_hint(stock_code)
+    # Rebound from tushare_parts.realtime after the class is built.
+    _get_legacy_realtime_symbol = None
 
-        if code == '000001' and exchange_hint == 'SH':
-            return 'sh000001'
-        if code == '399001':
-            return 'sz399001'
-        if code == '399006':
-            return 'sz399006'
-        if code == '000300':
-            return 'sh000300'
-        if is_bse_code(code):
-            return f"bj{code}"
-        return code
-
-    def get_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
-        """
-        获取实时行情
-
-        策略：
-        1. 优先尝试 Pro 接口（需要2000积分）：数据全，稳定性高
-        2. 失败降级到旧版接口：门槛低，数据较少
-
-        Args:
-            stock_code: 股票代码
-
-        Returns:
-            UnifiedRealtimeQuote 对象，失败返回 None
-        """
-        if self._api is None:
-            return None
-
-        # HK stocks not supported by Tushare
-        if _is_hk_market(stock_code):
-            logger.debug(f"TushareFetcher 跳过港股实时行情 {stock_code}")
-            return None
-
-        normalized_code = normalize_stock_code(stock_code)
-
-        from .realtime_types import (
-            RealtimeSource,
-            safe_float, safe_int
-        )
-
-        # Rate limit check.
-        self._check_rate_limit()
-
-        # Try Pro interface
-        try:
-            ts_code = self._convert_stock_code(stock_code)
-            # Attempt to call Pro real-time interface (requires points)
-            df = self._api.quotation(ts_code=ts_code)
-
-            if df is not None and not df.empty:
-                row = df.iloc[0]
-                logger.debug(f"Tushare Pro 实时行情获取成功: {stock_code}")
-
-                return UnifiedRealtimeQuote(
-                    code=normalized_code,
-                    name=str(row.get('name', '')),
-                    source=RealtimeSource.TUSHARE,
-                    price=safe_float(row.get('price')),
-                    change_pct=safe_float(row.get('pct_chg')),  # The Pro interface usually directly returns percentage change
-                    change_amount=safe_float(row.get('change')),
-                    volume=safe_int(row.get('vol')),
-                    amount=safe_float(row.get('amount')),
-                    high=safe_float(row.get('high')),
-                    low=safe_float(row.get('low')),
-                    open_price=safe_float(row.get('open')),
-                    pre_close=safe_float(row.get('pre_close')),
-                    turnover_rate=safe_float(row.get('turnover_ratio')), # The Pro interface may have turnover rates
-                    pe_ratio=safe_float(row.get('pe')),
-                    pb_ratio=safe_float(row.get('pb')),
-                    total_mv=safe_float(row.get('total_mv')),
-                )
-        except Exception as e:
-            # Log at debug level and continue to the fallback interface
-            log_safe_exception(
-                logger,
-                "Tushare Pro realtime quote unavailable; trying legacy fallback",
-                e,
-                error_code="tushare_pro_realtime_quote_unavailable",
-                level=logging.DEBUG,
-                context={"symbol": stock_code},
-            )
-
-        # Fallback: try the legacy interface
-        try:
-            import tushare as ts
-
-            symbol = self._get_legacy_realtime_symbol(stock_code)
-
-            # Call the old real-time interface (ts.get_realtime_quotes)
-            df = ts.get_realtime_quotes(symbol)
-
-            if df is None or df.empty:
-                return None
-
-            row = df.iloc[0]
-
-            # Calculate Percentage Change
-            price = safe_float(row['price'])
-            pre_close = safe_float(row['pre_close'])
-            change_pct = 0.0
-            change_amount = 0.0
-
-            if price and pre_close and pre_close > 0:
-                change_amount = price - pre_close
-                change_pct = (change_amount / pre_close) * 100
-
-            # Build unified object
-            return UnifiedRealtimeQuote(
-                code=normalized_code,
-                name=str(row['name']),
-                source=RealtimeSource.TUSHARE,
-                price=price,
-                change_pct=round(change_pct, 2),
-                change_amount=round(change_amount, 2),
-                volume=safe_int(row['volume']) // 100,  # Convert shares to lots
-                amount=safe_float(row['amount']),
-                high=safe_float(row['high']),
-                low=safe_float(row['low']),
-                open_price=safe_float(row['open']),
-                pre_close=pre_close,
-            )
-
-        except Exception as e:
-            log_safe_exception(
-                logger,
-                "Tushare legacy realtime quote failed",
-                e,
-                error_code="tushare_legacy_realtime_quote_failed",
-                level=logging.WARNING,
-                context={"symbol": stock_code},
-            )
-            return None
+    get_realtime_quote = None
 
     # Rebound from tushare_parts.market_boards after the class is built.
     get_main_indices = None
@@ -596,11 +464,12 @@ def _bind_http_client_facade() -> None:
 def _assemble_tushare_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _ClientMethods, _HistoryMethods, _StockIdentityMethods, _SymbolMethods
+    global _ClientMethods, _HistoryMethods, _RealtimeMethods, _StockIdentityMethods, _SymbolMethods
     _ClientMethods = _client_module._ClientMethods
     _SymbolMethods = _symbols_module._SymbolMethods
     _HistoryMethods = _history_module._HistoryMethods
     _StockIdentityMethods = _stock_identity_module._StockIdentityMethods
+    _RealtimeMethods = _realtime_module._RealtimeMethods
     _bind_http_client_facade()
     bind_methods_from_class(
         _ClientMethods,
@@ -632,6 +501,12 @@ def _assemble_tushare_fetcher_facade() -> None:
         TushareFetcher,
         globals(),
         expected_names=_market_boards_module.EXPECTED_MARKET_BOARD_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _RealtimeMethods,
+        TushareFetcher,
+        globals(),
+        expected_names=_realtime_module.EXPECTED_REALTIME_METHOD_NAMES,
     )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy
@@ -668,6 +543,7 @@ def _install_part_reload_hooks() -> None:
         _history_module,
         _stock_identity_module,
         _market_boards_module,
+        _realtime_module,
     ):
         module._FACADE_RELOAD_HOOK = _assemble_tushare_fetcher_facade  # type: ignore[attr-defined]
 
