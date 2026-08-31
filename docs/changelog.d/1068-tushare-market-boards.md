@@ -1,0 +1,1 @@
+- [Changed] Move Tushare main indices, market statistics, and sector rankings into `src/data_provider/tushare_parts/market_boards.py` behind the ADR-006 facade, keeping `TushareFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
