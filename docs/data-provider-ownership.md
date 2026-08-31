@@ -46,6 +46,7 @@ this identity.
 | Module | Owns | Does not own |
 | --- | --- | --- |
 | `src/data_provider/symbol_normalization.py` | Pure symbol / market code helpers: `normalize_stock_code`, `canonical_stock_code`, `is_bse_code`, `is_st_stock`, `is_kc_cy_stock`, ETF prefix checks, and market tags (`_is_*_market`, `_market_tag`, `_is_etf_code`, `ETF_PREFIXES`) | Provider I/O, caching, circuit policy, dataframe column normalization |
+| `src/data_provider/base_parts/` | `BaseFetcher` implementation ownership by capability domain: `daily_pipeline` (daily template method, clean, indicators), plus `facade_bind` re-export | Abstract hooks `_fetch_raw_data` / `_normalize_data`, manager-layer policy (`manager_parts`), and provider-specific bodies |
 | `src/data_provider/errors.py` | Typed provider failures (`DataFetchError`, `RateLimitError`, `DataSourceUnavailableError`, `CircuitOpenError`) and exception summary helpers (`unwrap_exception`, `summarize_exception`) | Provider I/O, routing, cache policy |
 | `src/data_provider/chip_helpers.py` | Pure chip metric coercion and meaningful-distribution checks | Provider I/O and chip fetch orchestration |
 | `src/data_provider/us_index_mapping.py` | US ticker / index identity helpers used by market classification | A-share / HK / JP / KR / TW suffix rules (those live with symbol normalization or `src.services.market_symbol_utils`) |
