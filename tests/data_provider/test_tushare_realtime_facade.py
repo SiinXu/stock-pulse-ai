@@ -220,6 +220,25 @@ def test_owner_module_does_not_import_the_facade() -> None:
     assert not any("tushare_fetcher" in module for module in imported)
 
 
+def test_owner_module_does_not_trip_efinance_realtime_import_grep() -> None:
+    """Sibling efinance production-import guards substring-match this token."""
+
+    text = OWNER_PATH.read_text(encoding="utf-8")
+    assert "efinance_parts.realtime" not in text
+
+
+def test_production_imports_stay_on_the_facade() -> None:
+    src_root = REPO_ROOT / "src"
+    offenders = []
+    for path in src_root.rglob("*.py"):
+        if "tushare_parts" in path.parts:
+            continue
+        text = path.read_text(encoding="utf-8")
+        if "tushare_parts.realtime" in text and path.name != "tushare_fetcher.py":
+            offenders.append(str(path.relative_to(REPO_ROOT)))
+    assert offenders == []
+
+
 def test_owner_reload_rebinds_and_leaves_other_domains_intact() -> None:
     importlib.reload(realtime_mod)
     for name in MOVED:

@@ -3,8 +3,8 @@
 
 Method bodies are rebound onto ``TushareFetcher`` by the compatibility facade
 (ADR-006) so free-name lookups and test patches stay on
-``src.data_provider.tushare_fetcher``. Mirrors the domain split of
-``efinance_parts.realtime``.
+``src.data_provider.tushare_fetcher``. Same domain split as the efinance
+stock realtime owner.
 
 No sibling method moves. Chip distribution, ``get_trade_time``, and the
 trade-calendar helpers stay on the facade. The rate-limited API client
