@@ -209,7 +209,7 @@ def test_facade_keeps_payload_helpers_timeouts_tickflow_and_prefetch() -> None:
         "prefetch_realtime_quotes",
         "prefetch_daily_klines",
     ):
-        assert name in manager_defs, name
+        assert name not in manager_defs, name
     for name in rankings.EXPECTED_RANKINGS_METHOD_NAMES:
         assert name not in manager_defs, name
 

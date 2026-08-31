@@ -1,7 +1,7 @@
 # Data Provider Module Ownership
 
 - Status: `Living`
-- Last verified: 2026-08-30
+- Last verified: 2026-08-31
 - Related: [ADR-005](adr/ADR-005-provider-fallback-and-circuit-control.md),
   [ADR-006](adr/ADR-006-behavior-preserving-module-decomposition.md),
   Issue #622, Issue #1292
@@ -17,7 +17,7 @@ priority, circuit, or fallback policy (ADR-005).
 
 | Public path | Role |
 | --- | --- |
-| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache / daily-execution / realtime field-trust / realtime quote orchestration / chip-distribution orchestration / stock-name lookup / money-flow cache / money-flow orchestration / fundamental cache / fundamental loaders / fundamental-config accessor / CN fundamental sub-blocks / fundamental payload helpers / rankings / market-overview / belong-board descriptors. |
+| `src.data_provider.base` | Canonical facade and current home of manager/fetcher workflows still mixed in, re-exports of extracted pure helpers/errors/chip helpers, and rebound capability-catalog / health / daily-cache / daily-execution / realtime field-trust / realtime quote orchestration / chip-distribution orchestration / stock-name lookup / money-flow cache / money-flow orchestration / fundamental cache / fundamental loaders / fundamental-config accessor / CN fundamental sub-blocks / fundamental payload helpers / rankings / market-overview / belong-board / prefetch descriptors. |
 | `src.data_provider` package (`__init__.py`) | Stable package exports for plugins and callers. |
 
 Production and test code import public names from `src.data_provider.base`.
@@ -41,7 +41,7 @@ and `reset_fetcher_manager()` still observe or clear **only** that fallback
 singleton. Ad-hoc `DataFetcherManager()` constructors elsewhere stay out of
 this identity.
 
-## Ownership Map (after fundamental timeout/retry worker extraction)
+## Ownership Map (after prefetch methods extraction)
 
 | Module | Owns | Does not own |
 | --- | --- | --- |
@@ -56,7 +56,7 @@ this identity.
 | `src/data_provider/manager_parts/daily_source_health.py` | Daily health/circuit/adaptive-priority methods rebound onto `DataFetcherManager`, plus the realtime `get_realtime_quote` and chip `get_chip_distribution` call locks that now enter `pull_coalesce` | Daily fetch execution loops, coalesce key policy |
 | `src/data_provider/manager_parts/daily_provider_execution.py` | Manager-owned daily execution rebound onto `DataFetcherManager`: `get_daily_data` cache-resolve entry, `_call_daily_data_provider`, and `_get_daily_data_from_providers` fallback loop | Health/circuit state machine (`daily_source_health`), layered cache storage (`daily_cache.py`), cache helpers (`daily_cache_methods`), capability inventory, realtime routing |
 | `src/data_provider/manager_parts/realtime_field_trust_methods.py` | Manager-owned realtime quote attempt and field-trust bookkeeping rebound onto `DataFetcherManager` | Realtime routing policy, fallback order, and `get_realtime_quote` |
-| `src/data_provider/manager_parts/realtime_quote_methods.py` | Manager-owned realtime quote orchestration rebound onto `DataFetcherManager`: timestamp parse/enrich, plugin realtime fallback, `get_realtime_quote` routing, quote supplement helpers, and Longbridge preference | Field-trust attempt bookkeeping (`realtime_field_trust_methods`), `prefetch_realtime_quotes`, Local Only / outbound HTTP policy, chip / money-flow / stock-name / fundamental / rankings workflows |
+| `src/data_provider/manager_parts/realtime_quote_methods.py` | Manager-owned realtime quote orchestration rebound onto `DataFetcherManager`: timestamp parse/enrich, plugin realtime fallback, `get_realtime_quote` routing, quote supplement helpers, and Longbridge preference | Field-trust attempt bookkeeping (`realtime_field_trust_methods`), prefetch (`prefetch_methods`), Local Only / outbound HTTP policy, chip / money-flow / stock-name / fundamental / rankings workflows |
 | `src/data_provider/manager_parts/chip_distribution_methods.py` | Manager-owned chip-distribution orchestration rebound onto `DataFetcherManager`: `get_chip_distribution` routing, provider priority, fallback/error behavior, and chip-circuit success/failure/inconclusive accounting | Pure chip metric helpers (`chip_helpers.py`), `pull_coalesce` chip call locks (`daily_source_health`), stock-name lookup (`stock_name_methods`), rankings / loader/cache / prefetch, BaseFetcher methods |
 | `src/data_provider/manager_parts/stock_name_methods.py` | Manager-owned single-code stock-name lookup plus bulk/prefetch rebound onto `DataFetcherManager`: `get_stock_name` cache/static/index precedence, the market-data Local Only short circuit, the optional realtime probe, provider capability ordering with the US-capable allow-list, the all-sources-failed fallback, `prefetch_stock_names`, and `batch_get_stock_names` | Stock-name memory cache helpers (`daily_cache_methods`), `STOCK_NAME_MAP` / `is_meaningful_stock_name` / `get_index_stock_name` facade seams, realtime quote orchestration, rankings, loader/cache, BaseFetcher methods |
 | `src/data_provider/manager_parts/money_flow_cache_methods.py` | Manager-owned money-flow cache lookup, store, invalidate, and stats rebound onto `DataFetcherManager` | `get_money_flow` routing and hit/miss accounting (`money_flow_methods`), circuit policy, TTL/size class attributes, and cache/circuit instance state |
@@ -69,7 +69,8 @@ this identity.
 | `src/data_provider/manager_parts/fundamental_timeout_methods.py` | Manager-owned timeout/retry workers rebound onto `DataFetcherManager`: `_run_with_timeout` (daemon `Thread`, non-blocking `BoundedSemaphore` slot) and `_run_with_retry` (budgeted attempts via rebound `_get_fundamental_config().fundamental_retry_max`). `_run_with_retry` still calls rebound `self._run_with_timeout` | Slot construction (`_fundamental_timeout_slots` / `_fundamental_timeout_worker_limit` on `__init__`), failed/rejected builders (`fundamental_outcome_methods`), TickFlow lifecycle, prefetch, `_init_default_fetchers`, remaining `get_config()` sites, CN/offshore loaders, CN sub-blocks |
 | `src/data_provider/manager_parts/fundamental_outcome_methods.py` | Manager-owned failed/validation-rejected fundamental outcome builders rebound onto `DataFetcherManager`: `build_failed_fundamental_context` and `build_validation_rejected_fundamental_context`. Cloned bodies still resolve facade `_market_tag` / `sanitize_diagnostic_text` and rebound `self._build_fundamental_block` | TickFlow lifecycle (`tickflow_lifecycle_methods`), prefetch, `_init_default_fetchers`, timeout slot construction, remaining `get_config()` sites, payload helpers, timeout/retry workers, CN/offshore loaders, CN sub-blocks |
 | `src/data_provider/manager_parts/rankings_methods.py` | Manager-owned rankings orchestration rebound onto `DataFetcherManager`: sector ranking aggregation with meta, concept-rankings cache read/write, hot-stock and limit-up pool routing | `BaseFetcher` provider methods of the same names, market-overview routing (`get_main_indices`, `get_market_stats` — Slice 16), concept-rankings TTL/lock/dict class attributes, `get_board_context` (Slice 19), and capability inventory |
-| `src/data_provider/manager_parts/tickflow_lifecycle_methods.py` | Manager-owned TickFlow lifecycle rebound onto `DataFetcherManager`: `_get_tickflow_fetcher` (create/replace/registry reuse; converts the former `get_config()` site to `self._get_fundamental_config()`) and `close` (best-effort TickFlow release). Facade `__del__` stays a live FunctionDef and still calls rebound `self.close()` | Prefetch (`prefetch_realtime_quotes` / `prefetch_daily_klines`), `_init_default_fetchers`, timeout slot construction, remaining `get_config()` sites, market-overview routing (`get_main_indices` / `get_market_stats` still call rebound `_get_tickflow_fetcher`), capability inventory |
+| `src/data_provider/manager_parts/tickflow_lifecycle_methods.py` | Manager-owned TickFlow lifecycle rebound onto `DataFetcherManager`: `_get_tickflow_fetcher` (create/replace/registry reuse; converts the former `get_config()` site to `self._get_fundamental_config()`) and `close` (best-effort TickFlow release). Facade `__del__` stays a live FunctionDef and still calls rebound `self.close()` | Prefetch (`prefetch_methods`), `_init_default_fetchers`, timeout slot construction, remaining `get_config()` sites, market-overview routing (`get_main_indices` / `get_market_stats` still call rebound `_get_tickflow_fetcher`), capability inventory |
+| `src/data_provider/manager_parts/prefetch_methods.py` | Manager-owned prefetch rebound onto `DataFetcherManager`: `prefetch_realtime_quotes` (Local Only skip, config disable, early-source routing, TickFlow batch, first-code cache warm) and `prefetch_daily_klines` (TickFlow daily K-line warm). Converts the former `prefetch_realtime_quotes` `get_config()` site to `self._get_fundamental_config()` | `_init_default_fetchers`, facade `__init__` / `__del__`, TickFlow lifecycle (`_get_tickflow_fetcher` / `close`), realtime routing (`get_realtime_quote`), capability lookup, Local Only policy body (`is_market_data_local_only`), BaseFetcher methods |
 | `src/data_provider/manager_parts/market_overview_methods.py` | Manager-owned market-overview routing rebound onto `DataFetcherManager`: TickFlow-first `get_main_indices` and `get_market_stats` capability fallback | `BaseFetcher` provider methods of the same names, TickFlow lifecycle (`tickflow_lifecycle_methods`: `_get_tickflow_fetcher`, `close`), capability inventory, rankings, CN sub-blocks, payload helpers, belong-board routing, prefetch, and timeout workers |
 | `src/data_provider/manager_parts/belong_board_methods.py` | Manager-owned belong-board missing-value and normalization helpers plus `get_belong_boards` routing, capability probing, and provider fallback rebound onto `DataFetcherManager` | Fundamental payload helpers that only *call* `_try_scalar_isna` (`fundamental_payload_methods`), stock-name bulk/prefetch, CN sub-blocks, timeout workers, TickFlow lifecycle |
 | `src/data_provider/plugin_registry.py` | Plugin provider registration and discovery seams | Built-in fetcher implementations |
@@ -86,7 +87,7 @@ this identity.
 | `src/data_provider/tushare_fetcher.py` | Compatibility facade for the Tushare provider: public class, HTTP-client / URL / symbol re-exports, and ADR-006 method rebinding / HTTP-client clone seams | New capability-domain bodies (add under `tushare_parts/`) |
 | `src/data_provider/tushare_parts/` | Tushare implementation ownership by capability domain: `client` (HTTP client, URL resolve, rate-limit wrappers), `symbols` (ETF/US classifiers and ts_code conversion), `history` (`_fetch_raw_data` / `_normalize_data`), `market_boards` (main indices, market stats, sector rankings), `stock_identity` (`get_stock_name` / `get_stock_list`), plus `facade_bind` helpers | Cross-provider manager policy (ADR-005); Tushare realtime / chip remain on the facade |
 | `src/data_provider/fundamental_adapter.py`, `yfinance_fundamental_adapter.py` | Fundamental field adaptation for specific stacks | Daily OHLCV routing |
-| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, facade `__del__`, timeout slot construction (`_fundamental_timeout_slots`), concept-rankings TTL/lock/dict class attributes, money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | `_get_fundamental_config` (rebound from `fundamental_context_methods`), CN sub-blocks (rebound from `fundamental_cn_context_methods`), payload helpers (rebound from `fundamental_payload_methods`), timeout/retry workers (rebound from `fundamental_timeout_methods`), failed/rejected builders (rebound from `fundamental_outcome_methods`), TickFlow lifecycle (rebound from `tickflow_lifecycle_methods`), new pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/rankings/market-overview/belong-board/stock-name descriptors |
+| `src/data_provider/base.py` (remainder) | `BaseFetcher` / `DataFetcherManager`, manager-owned priority/plugin policy and state, facade `__del__`, timeout slot construction (`_fundamental_timeout_slots`), concept-rankings TTL/lock/dict class attributes, money-flow TTL/size class attributes plus cache/circuit instance state, `_SUPPLEMENT_FIELDS`, facade bindings/re-exports | `_get_fundamental_config` (rebound from `fundamental_context_methods`), CN sub-blocks (rebound from `fundamental_cn_context_methods`), payload helpers (rebound from `fundamental_payload_methods`), timeout/retry workers (rebound from `fundamental_timeout_methods`), failed/rejected builders (rebound from `fundamental_outcome_methods`), TickFlow lifecycle (rebound from `tickflow_lifecycle_methods`), prefetch (rebound from `prefetch_methods`), new pure symbol rules, typed errors, chip helpers, capability-catalog mechanics, or extracted health/daily-cache/daily-execution/field-trust/realtime-quote/chip-distribution/money-flow-cache/money-flow-orchestration/fundamental-cache/fundamental-loader/rankings/market-overview/belong-board/stock-name descriptors |
 | `src/data_provider/longbridge_fetcher.py` | Compatibility facade for the Longbridge provider: public class, credentials/OAuth helpers, SDK context and cooldown policy, and ADR-006 method rebinding | New capability-domain bodies (add under `longbridge_parts/`) |
 | `src/data_provider/longbridge_parts/` | Longbridge implementation ownership by capability domain: `realtime` (quote routing, static-info cache, volume ratio), plus `facade_bind` re-export | SDK context construction and availability/cooldown policy (they read application config directly), and cross-provider manager policy (ADR-005) |
 
@@ -181,8 +182,8 @@ Slice 9 rebinds daily provider execution descriptors from
 - `_call_daily_data_provider`, `get_daily_data`, `_get_daily_data_from_providers`
 
 Health/circuit (`daily_source_health`) and daily-cache helpers remain separate
-owners. `prefetch_daily_klines` stays on the facade and still calls rebound
-`get_daily_data`.
+owners. `prefetch_daily_klines` travels with Slice 24 and still calls rebound
+TickFlow via `_get_fetcher_by_name` / `_call_fetcher_method`.
 
 Slice 10 rebinds realtime quote orchestration descriptors from
 `manager_parts/realtime_quote_methods.py` while preserving their
@@ -194,10 +195,11 @@ Slice 10 rebinds realtime quote orchestration descriptors from
 - `_longbridge_preferred`, `_supplement_from_longbridge`
 
 Field-trust (`realtime_field_trust_methods`) remains a separate owner.
-`prefetch_realtime_quotes`, `_SUPPLEMENT_FIELDS`, stock-name, and
-fundamental stay on the facade. Chip-distribution routing travels with
-Slice 13 and rankings with Slice 15. `get_realtime_quote` is rebound
-after field-trust and then wrapped by `install_facade_validation_wrappers`.
+`prefetch_realtime_quotes` travels with Slice 24. `_SUPPLEMENT_FIELDS`,
+stock-name, and fundamental stay on the facade or their existing owners.
+Chip-distribution routing travels with Slice 13 and rankings with Slice 15.
+`get_realtime_quote` is rebound after field-trust and then wrapped by
+`install_facade_validation_wrappers`.
 Import the facade (`src.data_provider.base` / `src.data_provider`), not
 `manager_parts.realtime_quote_methods`.
 
@@ -481,10 +483,41 @@ Market-overview routing still calls rebound
 `manager_parts.tickflow_lifecycle_methods`.
 
 Slice 23 leftover on the facade: `__del__`,
-`prefetch_realtime_quotes` / `prefetch_daily_klines`,
+`prefetch_realtime_quotes` / `prefetch_daily_klines` (Slice 24),
 `_init_default_fetchers`, timeout slot construction, and the remaining
 `base.py` `get_config()` sites (`_init_default_fetchers`,
-`prefetch_realtime_quotes`).
+`prefetch_realtime_quotes` until Slice 24).
+
+Slice 24 rebinds prefetch from
+`manager_parts/prefetch_methods.py` while preserving
+their `src.data_provider.base` module, qualname, signature,
+descriptor kind, globals, and patch behavior:
+
+- `prefetch_realtime_quotes`
+- `prefetch_daily_klines`
+
+Bodies stay behavior-preserving. Local Only still returns `0` before
+config or provider work. `prefetch_realtime_quotes` still normalizes
+codes through facade `normalize_stock_code`, so
+`patch("src.data_provider.base.normalize_stock_code")` keeps working.
+Disabled prefetch, disabled realtime quotes, no early prefetch source,
+and batches under 5 still skip. TickFlow still uses rebound
+`_get_fetcher_by_name` / `_call_fetcher_method` with
+`tickflow_batch_size`. Other early sources still warm cache through
+rebound `get_realtime_quote(first_code)` and fall back to `0` on empty
+quote or `Exception`. `prefetch_daily_klines` still skips Local Only,
+missing TickFlow, or missing `prefetch_daily_klines`, and swallows
+`Exception` after `tickflow_daily_kline_prefetch_failed`. The moved
+`prefetch_realtime_quotes` site converts its former `get_config()` call
+to `self._get_fundamental_config()`. Neither moved name is a
+validation-wrapped exit. The new owner has zero `get_config()` sites
+and does not import the facade. Import the facade
+(`src.data_provider.base` / `src.data_provider`), not
+`manager_parts.prefetch_methods`.
+
+Slice 24 leftover on the facade: `__del__`,
+`_init_default_fetchers`, timeout slot construction, and the remaining
+`base.py` `get_config()` site (`_init_default_fetchers`).
 
 Tushare client / symbols / history / stock-identity (Issue #1068) rebinds
 `_init_api` / `_build_api_client` / `_check_rate_limit` /
