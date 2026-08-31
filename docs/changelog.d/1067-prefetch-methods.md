@@ -1,0 +1,1 @@
+- [Changed] Extract DataFetcherManager prefetch methods behind the base facade (Refs #1067).
