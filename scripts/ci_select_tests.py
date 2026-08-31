@@ -14,10 +14,12 @@ avoid a full-suite run. The mapper fails closed to ``FULL`` when:
 - a mapping's targets are all missing or its globs match nothing
 
 Hosted CI must schedule the four ``backend-tests`` shards for ``FULL``;
-``offline-tests-selective`` refuses to run the unsharded suite. ``NONE`` is
-allowed only for the explicit ``NONE_PREFIXES`` allowlist (``docs/`` and
-``apps/dsa-web/``) excluding ``BACKEND_WEB_CONTRACT_PREFIXES`` (the
-``backend_web_contract`` paths in ``.github/workflows/ci.yml``). Those
+``offline-tests-selective`` refuses to run the unsharded suite. Mapping the
+tests tree root (``tests/``) is also ``FULL``: a non-FULL ``tests/``
+selection would run that same suite unsharded inside the 45-minute PR-tier
+job. ``NONE`` is allowed only for the explicit ``NONE_PREFIXES`` allowlist
+(``docs/`` and ``apps/dsa-web/``) excluding ``BACKEND_WEB_CONTRACT_PREFIXES``
+(the ``backend_web_contract`` paths in ``.github/workflows/ci.yml``). Those
 shared web/runtime files map to the backend tests that cover the contract.
 Any other empty selection is ``FULL``.
 
@@ -124,6 +126,10 @@ PATH_TO_TARGETS: tuple[tuple[str, tuple[str, ...]], ...] = (
         ),
     ),
     ("src/storage", ("tests/test_storage.py", "tests/storage")),
+    # Catch-all for unmapped src/* packages. The tests/ root is the full
+    # offline suite; _targets_for_path promotes it to FULL so hosted CI
+    # schedules backend-tests shards instead of the unsharded 45-minute
+    # PR-tier backend-gate (PR #1634 run 33390506115).
     ("src/", ("tests/",)),
     ("scripts/", ("tests/scripts", "tests/test_ci_workflow.py")),
     (
@@ -227,6 +233,16 @@ def _is_glob(target: str) -> bool:
     return any(char in target for char in "*?[")
 
 
+def _is_unsharded_full_suite_target(target: str) -> bool:
+    """Return True when a mapping target is the entire tests/ tree.
+
+    That workload is the full offline suite. Printing it as a non-FULL
+    selection schedules the unsharded 45-minute PR-tier backend-gate,
+    which refuses only the exact token FULL.
+    """
+    return target.replace("\\", "/").rstrip("/") == "tests"
+
+
 def _expand_target(target: str) -> set[str]:
     """Resolve one mapping target against the repo root.
 
@@ -260,6 +276,8 @@ def _targets_for_path(path: str) -> set[str]:
             continue
         selected = {target for target in targets if target}
         if selected:
+            if any(_is_unsharded_full_suite_target(target) for target in selected):
+                return {"FULL"}
             return selected
         # Empty mapping is NONE only on the explicit allowlist.
         if _is_none_allowlisted(normalized):
@@ -283,6 +301,8 @@ def select_targets(paths: Sequence[str]) -> list[str] | str:
     mapped_any = bool(selected)
     expanded: set[str] = set()
     for target in selected:
+        if _is_unsharded_full_suite_target(target):
+            return "FULL"
         expanded |= _expand_target(target)
         if "FULL" in expanded:
             return "FULL"

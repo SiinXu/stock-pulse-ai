@@ -43,6 +43,29 @@ def _expand_ci_path_filter(pattern: str) -> list[str]:
     return [pattern]
 
 
+def test_unmapped_src_package_fails_closed_to_full_suite() -> None:
+    """src/ catch-all maps to the tests/ root, which must schedule FULL shards.
+
+    A non-FULL ``tests/`` selection runs the unsharded suite in the 45-minute
+    PR-tier backend-gate and can be cancelled after pytest has already
+    passed (PR #1634 run 33390506115).
+    """
+
+    assert select_targets(["src/plugins/lifecycle.py"]) == "FULL"
+    assert select_targets(["src/plugins/lifecycle_audit_mixin.py"]) == "FULL"
+    assert (
+        select_targets(
+            [
+                "src/plugins/lifecycle.py",
+                "src/plugins/lifecycle_audit_mixin.py",
+                "tests/plugins/test_lifecycle_audit_mixin.py",
+                "docs/changelog.d/1080-lifecycle-audit-mixin.md",
+            ]
+        )
+        == "FULL"
+    )
+
+
 def test_src_bot_maps_to_bot_selective_targets() -> None:
     """src/bot/ must win over the catch-all src/ prefix (first-match)."""
 
@@ -374,6 +397,13 @@ def test_declared_mapping_targets_exist() -> None:
                 continue
             assert (root / target).exists(), f"{prefix} maps to missing {target}"
     assert set(empty_prefixes) == set(ci_select_tests.NONE_PREFIXES)
+
+
+def test_cli_paths_file_prints_full_for_unmapped_src_plugins(tmp_path, capsys) -> None:
+    paths_file = tmp_path / "paths.txt"
+    paths_file.write_text("src/plugins/lifecycle.py\n", encoding="utf-8")
+    assert ci_select_tests.main(["--paths-file", str(paths_file)]) == 0
+    assert capsys.readouterr().out == "FULL\n"
 
 
 def test_cli_paths_file_prints_full_for_unmapped(tmp_path, capsys) -> None:
