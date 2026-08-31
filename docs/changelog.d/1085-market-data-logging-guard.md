@@ -1,0 +1,2 @@
+- [Fixed] Type market-data fetch `owner` and `overview` formals as Protocols so extracted logger sinks stay exception-log-guard-clean without changing runtime fetch fallback (Refs #1085).
+- [Tests] Map `src/market/` pull requests onto `tests/test_exception_log_callsite_guard.py` so this class runs on relevant PRs (Refs #1085).

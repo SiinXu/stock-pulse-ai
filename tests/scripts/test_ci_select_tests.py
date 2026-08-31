@@ -104,8 +104,23 @@ def test_diagnostics_schema_maps_to_run_diagnostics_and_services_tests() -> None
 
 def test_src_market_maps_to_market_tests() -> None:
     result = select_targets(["src/market/analyzer.py"])
-    assert result == ["tests/market", "tests/services"]
+    assert result == [
+        "tests/market",
+        "tests/services",
+        "tests/test_exception_log_callsite_guard.py",
+    ]
     assert "tests/test_market_analyzer.py" not in result
+
+
+def test_src_market_data_maps_to_exception_log_callsite_guard() -> None:
+    """PR #1627 merged while the exception-log guard stayed off the src/market map."""
+
+    result = select_targets(["src/market/market_data.py"])
+    assert result == [
+        "tests/market",
+        "tests/services",
+        "tests/test_exception_log_callsite_guard.py",
+    ]
 
 
 def test_src_schemas_maps_to_schema_tests() -> None:
