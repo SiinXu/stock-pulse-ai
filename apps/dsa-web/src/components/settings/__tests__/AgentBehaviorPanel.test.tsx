@@ -48,6 +48,26 @@ function buildItems(values: Record<string, string>, keys: readonly string[] = AG
     .map((key, index) => buildItem(key, values[key] ?? '', index + 1));
 }
 
+const BEHAVIOR_TOGGLE_NAME = /行为|Behavior/;
+const GOVERNANCE_TOGGLE_NAME = /治理 \/ 专家|Governance \/ Expert/;
+const ESSENTIALS_FOCUS_TOGGLE_NAME = /显示高级设置|Show advanced settings/;
+
+function disclosureToggle(testId: string, name: RegExp) {
+  return within(screen.getByTestId(testId)).getByRole('button', { name });
+}
+
+function expectDefaultClosedDisclosure(testId: string, name: RegExp) {
+  const toggle = disclosureToggle(testId, name);
+  expect(toggle).toHaveAttribute('type', 'button');
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  const panelId = toggle.getAttribute('aria-controls');
+  expect(panelId).toBeTruthy();
+  const panel = document.getElementById(panelId!);
+  expect(panel).toHaveAttribute('hidden');
+  expect(panel).toHaveAttribute('inert');
+  return { toggle, panel: panel! };
+}
+
 function propsFor(overrides: Partial<AgentBehaviorPanelProps> = {}): AgentBehaviorPanelProps {
   const values = standardValues();
   return {
@@ -83,12 +103,24 @@ describe('AgentBehaviorPanel', () => {
     for (const key of AGENT_ESSENTIAL_KEYS) {
       expect(within(essentials).getByTestId(`settings-field-${key}`)).toBeInTheDocument();
     }
+    const { toggle: behaviorToggle, panel: behaviorPanel } = expectDefaultClosedDisclosure(
+      'agent-behavior-fields',
+      BEHAVIOR_TOGGLE_NAME,
+    );
+    fireEvent.click(behaviorToggle);
+    expect(behaviorToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(behaviorPanel).not.toHaveAttribute('hidden');
     const behavior = screen.getByTestId('agent-behavior-fields');
-    expect(behavior).not.toHaveAttribute('open');
     expect(within(behavior).getByText(/Runtime & mode|运行模式/)).toBeInTheDocument();
     expect(within(behavior).getByText(/Skills|技能/)).toBeInTheDocument();
+    const { toggle: governanceToggle, panel: governancePanel } = expectDefaultClosedDisclosure(
+      'agent-governance-fields',
+      GOVERNANCE_TOGGLE_NAME,
+    );
+    fireEvent.click(governanceToggle);
+    expect(governanceToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(governancePanel).not.toHaveAttribute('hidden');
     const governance = screen.getByTestId('agent-governance-fields');
-    expect(governance).not.toHaveAttribute('open');
     expect(within(governance).getByTestId('settings-field-AGENT_RISK_OVERRIDE')).toBeInTheDocument();
     expect(within(governance).getByTestId('settings-field-VALUATION_AGENT_TOOL_ENABLED')).toBeInTheDocument();
     expect(within(behavior).queryByTestId('settings-field-AGENT_RISK_OVERRIDE')).not.toBeInTheDocument();
@@ -103,8 +135,8 @@ describe('AgentBehaviorPanel', () => {
     fireEvent.click(screen.getByTestId('agent-preset-apply-simple_qa'));
     fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: /Apply preset|确认应用/ }));
     await waitFor(() => expect(document.activeElement).toBe(askCta));
-    expect(screen.getByTestId('agent-behavior-fields')).not.toHaveAttribute('open');
-    expect(screen.getByTestId('agent-governance-fields')).not.toHaveAttribute('open');
+    expectDefaultClosedDisclosure('agent-behavior-fields', BEHAVIOR_TOGGLE_NAME);
+    expectDefaultClosedDisclosure('agent-governance-fields', GOVERNANCE_TOGGLE_NAME);
   });
 
   it('previews without mutation, then confirms exactly one atomic batch', () => {
@@ -258,11 +290,29 @@ describe('AgentBehaviorPanel', () => {
     renderPanel(<AgentBehaviorPanel {...propsFor({ essentialsFocus: true })} />);
 
     const shell = screen.getByTestId('agent-essentials-focus-advanced');
-    expect(shell).not.toHaveAttribute('open');
+    const { toggle: shellToggle, panel: shellPanel } = expectDefaultClosedDisclosure(
+      'agent-essentials-focus-advanced',
+      ESSENTIALS_FOCUS_TOGGLE_NAME,
+    );
     expect(within(shell).getByTestId('agent-behavior-fields')).toBeInTheDocument();
     expect(within(shell).getByTestId('agent-governance-fields')).toBeInTheDocument();
     // Primary surface still shows essentials + ask path outside the nested shell.
     expect(screen.getByTestId('agent-essentials-fields')).toBeInTheDocument();
     expect(screen.getByTestId('agent-ask-path')).toBeInTheDocument();
+
+    fireEvent.click(shellToggle);
+    expect(shellToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(shellPanel).not.toHaveAttribute('hidden');
+    expect(screen.getByTestId('agent-behavior-fields').firstElementChild).toHaveClass('border-0');
+    expect(screen.getByTestId('agent-governance-fields').firstElementChild).toHaveClass('border-0');
+    const { toggle: behaviorToggle, panel: behaviorPanel } = expectDefaultClosedDisclosure(
+      'agent-behavior-fields',
+      BEHAVIOR_TOGGLE_NAME,
+    );
+    fireEvent.click(behaviorToggle);
+    expect(behaviorToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(behaviorPanel).not.toHaveAttribute('hidden');
+    expect(within(screen.getByTestId('agent-behavior-fields')).getByText(/Runtime & mode|运行模式/)).toBeInTheDocument();
+    expectDefaultClosedDisclosure('agent-governance-fields', GOVERNANCE_TOGGLE_NAME);
   });
 });

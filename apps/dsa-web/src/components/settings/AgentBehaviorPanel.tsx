@@ -7,7 +7,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown } from 'lucide-react';
 import type { ConfigValidationIssue, SystemConfigItem } from '../../types/systemConfig';
 import type { UiTextKey } from '../../i18n/uiText';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
@@ -18,7 +17,7 @@ import {
 } from '../../utils/configConditions';
 import { cn } from '../../utils/cn';
 import { APP_ROUTE_PATHS } from '../../routing/routes';
-import { Badge, Button, ConfirmDialog } from '../common';
+import { Badge, Button, Collapsible, ConfirmDialog } from '../common';
 import type { SettingsSaveStatus } from './autosaveMachine';
 // Import through the settings barrel so the real Settings host test harness can
 // substitute its field adapter while production still resolves the same export.
@@ -83,6 +82,14 @@ function sortByEssentialOrder(items: SystemConfigItem[]): SystemConfigItem[] {
 function normalize(value: string | undefined): string {
   return String(value ?? '').trim();
 }
+
+/** Match Settings prompt-cache / Event Monitor Collapsible chrome without extra elevation. */
+const AGENT_LAYER_COLLAPSIBLE_CLASS = 'rounded-lg border-border bg-card shadow-none hover:border-border';
+/** Nested layers drop card chrome so essentials-focus does not double-frame. */
+const AGENT_NESTED_LAYER_COLLAPSIBLE_CLASS = [
+  'rounded-lg border-0 bg-transparent shadow-none hover:border-transparent',
+  '[&>button]:px-0 [&>button]:hover:bg-transparent',
+].join(' ');
 
 export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
   items,
@@ -393,40 +400,38 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
       </section>
 
       {(() => {
+        const layerClassName = essentialsFocus
+          ? AGENT_NESTED_LAYER_COLLAPSIBLE_CLASS
+          : AGENT_LAYER_COLLAPSIBLE_CLASS;
+
         const behaviorSection = behaviorItems.length ? (
-          <details
-            className="group/agent-behavior overflow-hidden rounded-lg border border-border bg-card"
-            data-testid="agent-behavior-fields"
-          >
-            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">{copy.advancedTitle}</p>
-                <p className="text-xs leading-5 text-muted-text">{copy.advancedDescription}</p>
+          <div data-testid="agent-behavior-fields">
+            <Collapsible
+              title={copy.advancedTitle}
+              description={copy.advancedDescription}
+              defaultOpen={false}
+              className={layerClassName}
+            >
+              <div className="space-y-4">
+                {renderGroupedFields(behaviorItems)}
               </div>
-              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-behavior:rotate-180" aria-hidden="true" />
-            </summary>
-            <div className="space-y-4 border-t border-border/60 p-3">
-              {renderGroupedFields(behaviorItems)}
-            </div>
-          </details>
+            </Collapsible>
+          </div>
         ) : null;
 
         const governanceSection = governanceItems.length ? (
-          <details
-            className="group/agent-governance overflow-hidden rounded-lg border border-border bg-card"
-            data-testid="agent-governance-fields"
-          >
-            <summary className="flex cursor-pointer list-none items-start justify-between gap-3 px-4 py-4 [&::-webkit-details-marker]:hidden">
-              <div className="space-y-1">
-                <p className="text-sm font-semibold text-foreground">{copy.governanceTitle}</p>
-                <p className="text-xs leading-5 text-muted-text">{copy.governanceDescription}</p>
+          <div data-testid="agent-governance-fields">
+            <Collapsible
+              title={copy.governanceTitle}
+              description={copy.governanceDescription}
+              defaultOpen={false}
+              className={layerClassName}
+            >
+              <div className="space-y-4">
+                {renderGroupedFields(governanceItems)}
               </div>
-              <ChevronDown className="mt-0.5 h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-governance:rotate-180" aria-hidden="true" />
-            </summary>
-            <div className="space-y-4 border-t border-border/60 p-3">
-              {renderGroupedFields(governanceItems)}
-            </div>
-          </details>
+            </Collapsible>
+          </div>
         ) : null;
 
         if (!behaviorSection && !governanceSection) {
@@ -437,19 +442,18 @@ export const AgentBehaviorPanel: React.FC<AgentBehaviorPanelProps> = ({
         // the primary surface stays summary + presets + essentials + ask path.
         if (essentialsFocus) {
           return (
-            <details
-              className="group/agent-essentials-focus overflow-hidden rounded-lg border border-border bg-card"
-              data-testid="agent-essentials-focus-advanced"
-            >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-medium text-foreground [&::-webkit-details-marker]:hidden">
-                <span>{SETTINGS_MISC_TEXT[language].showAdvanced}</span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-text transition-transform group-open/agent-essentials-focus:rotate-180" aria-hidden="true" />
-              </summary>
-              <div className="space-y-3 border-t border-border/60 p-3">
-                {behaviorSection}
-                {governanceSection}
-              </div>
-            </details>
+            <div data-testid="agent-essentials-focus-advanced">
+              <Collapsible
+                title={SETTINGS_MISC_TEXT[language].showAdvanced}
+                defaultOpen={false}
+                className={AGENT_LAYER_COLLAPSIBLE_CLASS}
+              >
+                <div className="space-y-3">
+                  {behaviorSection}
+                  {governanceSection}
+                </div>
+              </Collapsible>
+            </div>
           );
         }
 

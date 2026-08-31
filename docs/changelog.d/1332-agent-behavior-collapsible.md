@@ -1,0 +1,1 @@
+- [Changed] Convert Agent Behavior remaining native details (behavior fields, governance fields, and essentials-focus advanced wrapper) to the shared Collapsible while keeping each layer default-collapsed (Refs #1332).
