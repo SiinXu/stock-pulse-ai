@@ -50,6 +50,7 @@ from src.market import formatters as _market_formatters
 from src.market import blocks as _market_blocks
 from src.market import market_data as _market_data
 from src.market import news as _market_news
+from src.market import diagnostics as _market_diagnostics
 
 build_market_light_scores = _market_metrics.build_market_light_scores
 build_market_temperature = _market_metrics.build_market_temperature
@@ -79,6 +80,8 @@ get_concept_rankings = _market_data.get_concept_rankings
 search_market_news = _market_news.search_market_news
 normalize_news_item = _market_news.normalize_news_item
 merge_persisted_market_intelligence = _market_news.merge_persisted_market_intelligence
+generation_log_redaction_values = _market_diagnostics.generation_log_redaction_values
+sanitize_generation_diagnostic = _market_diagnostics.sanitize_generation_diagnostic
 
 logger = logging.getLogger(__name__)
 
@@ -206,31 +209,7 @@ class MarketAnalyzer:
         return f"component=market_review region={self.region}"
 
     def _generation_log_redaction_values(self, error: Any = None) -> set[str]:
-        """Return exact generation secrets without depending on analyzer internals."""
-        analyzer = getattr(self, "analyzer", None)
-        if analyzer is None:
-            return exception_chain_redaction_values(error)
-        static_method = getattr_static(
-            analyzer,
-            "get_generation_log_redaction_values",
-            None,
-        )
-        if static_method is None:
-            return exception_chain_redaction_values(error)
-        method = getattr(analyzer, "get_generation_log_redaction_values", None)
-        if not callable(method):
-            return exception_chain_redaction_values(error)
-        try:
-            model = str(getattr(self.config, "litellm_model", "") or "")
-            values = method(model, fallback_error=error)
-            static_values = values if isinstance(values, set) else set(values or ())
-        except Exception:  # broad-exception: optional_metadata - optional redaction lookup falls back safely
-            return exception_chain_redaction_values(error)
-        if has_matching_exception_snapshot(error, static_values):
-            return static_values
-        exception_values = exception_chain_redaction_values(error)
-        exception_values.update(static_values)
-        return exception_values
+        return generation_log_redaction_values(self, error)
 
     def _sanitize_generation_diagnostic(
         self,
@@ -238,47 +217,8 @@ class MarketAnalyzer:
         *,
         redaction_values: Optional[set[str]] = None,
     ) -> str:
-        """Sanitize an analyzer failure before persistence or user diagnostics."""
-        if redaction_values is None:
-            redaction_values = self._generation_log_redaction_values(error)
-        if isinstance(error, GenerationError):
-            error_code = (
-                error.error_code.value
-                if isinstance(error.error_code, GenerationErrorCode)
-                else GenerationErrorCode.UNKNOWN_BACKEND_ERROR.value
-            )
-            return f"GenerationError: {error_code}"
-        if has_matching_exception_snapshot(error, redaction_values):
-            return sanitize_diagnostic_text(
-                error,
-                max_length=500,
-                redaction_values=redaction_values,
-            )
-        analyzer = getattr(self, "analyzer", None)
-        static_method = (
-            getattr_static(analyzer, "sanitize_generation_diagnostic", None)
-            if analyzer is not None
-            else None
-        )
-        method = (
-            getattr(analyzer, "sanitize_generation_diagnostic", None)
-            if static_method is not None
-            else None
-        )
-        if callable(method):
-            try:
-                model = str(getattr(self.config, "litellm_model", "") or "")
-                return sanitize_diagnostic_text(
-                    method(error, model=model),
-                    max_length=500,
-                    redaction_values=redaction_values,
-                )
-            except Exception:  # broad-exception: optional_metadata - optional sanitizer falls back safely
-                pass
-        return sanitize_diagnostic_text(
-            error,
-            max_length=500,
-            redaction_values=redaction_values,
+        return sanitize_generation_diagnostic(
+            self, error, redaction_values=redaction_values
         )
 
     def _get_output_language(self) -> str:
