@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "notes": "Duration weights for scripts/ci_test_shard.py. Unknown future modules use the median of known weights. Seeded from SiinXu/stock-pulse-ai main CI run 32963128085 attempt 3 backend-tests jobs 98171256271/281/309/252 (module wall-clock between consecutive pytest results). Do not empty this map: equal 1.0 fallback colocates tests/test_exception_log_callsite_guard.py onto shard 1 and exceeds the 30-minute backend-tests job bound.",
+  "notes": "Duration weights for scripts/ci_test_shard.py. Unknown future modules use the median of known weights. Seeded from SiinXu/stock-pulse-ai main CI run 32963128085 attempt 3 backend-tests jobs 98171256271/281/309/252 (module wall-clock between consecutive pytest results). Supplemental key tests/market/test_market_news.py from main run 33395080847 backend-tests job 99497744778 using the same consecutive-result wall-clock method. Do not empty this map: equal 1.0 fallback colocates tests/test_exception_log_callsite_guard.py onto shard 1 and exceeds the 30-minute backend-tests job bound.",
   "durations": {
     "tests/agent/benchmark/test_offline_benchmark.py": 0.17,
     "tests/agent/benchmark/test_regression_gate.py": 0.062,
@@ -301,6 +301,7 @@
     "tests/llm/test_local_cli_backend.py": 3.806,
     "tests/market/test_market_analyzer_review_contract.py": 0.273,
     "tests/market/test_market_metrics.py": 0.053,
+    "tests/market/test_market_news.py": 0.109,
     "tests/market/test_market_package_compatibility.py": 0.085,
     "tests/market/test_market_phase_prompt.py": 0.05,
     "tests/market/test_market_phase_summary.py": 0.05,
