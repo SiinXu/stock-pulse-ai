@@ -1,0 +1,1 @@
+- [Changed] Move yfinance regional main-index methods and the shared ticker fetch into `src/data_provider/yfinance_parts/main_indices.py` behind the ADR-006 facade, keeping `YfinanceFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
