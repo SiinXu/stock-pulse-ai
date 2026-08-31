@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import logging
 import sys
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Protocol
 
 from src.services.intelligence_service import IntelligenceService
 from src.utils.sanitize import log_safe_exception
@@ -35,6 +35,17 @@ __all__ = (
 )
 
 
+class _NewsSearchOwner(Protocol):
+    """Duck-typed analyzer surface used by news search logging."""
+
+    search_service: Any
+    profile: Any
+    region: str
+
+    def _log_context(self) -> str: ...
+    def _get_review_language(self) -> str: ...
+
+
 def _resolve_intelligence_service(owner: Any) -> Any:
     """Use the owner's module binding, else this module's real import."""
     module = sys.modules.get(getattr(type(owner), "__module__", "") or "")
@@ -43,7 +54,7 @@ def _resolve_intelligence_service(owner: Any) -> Any:
     return getattr(module, "IntelligenceService", IntelligenceService)
 
 
-def search_market_news(owner: Any) -> List[Dict]:
+def search_market_news(owner: _NewsSearchOwner) -> List[Dict]:
     """
     搜索市场新闻
     
