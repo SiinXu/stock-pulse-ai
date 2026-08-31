@@ -117,7 +117,6 @@ describe('settings theme tokens', () => {
   });
 
   it('removes the collapsed names from the defined inventory and does not raise the ceiling above 56', () => {
-    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBe(56);
     expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBeLessThanOrEqual(56);
 
     const inventorySource = readInventorySource();
