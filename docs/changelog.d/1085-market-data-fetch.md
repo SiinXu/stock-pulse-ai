@@ -1,0 +1,1 @@
+- [Changed] Move market-overview data fetch orchestration into `src/market/market_data.py` behind the existing `src.market.analyzer` facade, keeping method names, signatures, and override behavior unchanged (Refs #1085).

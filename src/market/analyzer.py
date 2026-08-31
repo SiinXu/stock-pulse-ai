@@ -48,6 +48,7 @@ from src.market import prompts as _market_prompts
 from src.market import degradation as _market_degradation
 from src.market import formatters as _market_formatters
 from src.market import blocks as _market_blocks
+from src.market import market_data as _market_data
 
 build_market_light_scores = _market_metrics.build_market_light_scores
 build_market_temperature = _market_metrics.build_market_temperature
@@ -70,6 +71,10 @@ build_indices_block = _market_blocks.build_indices_block
 build_sector_block = _market_blocks.build_sector_block
 build_sector_analysis_block = _market_blocks.build_sector_analysis_block
 build_news_block = _market_blocks.build_news_block
+get_main_indices = _market_data.get_main_indices
+get_market_statistics = _market_data.get_market_statistics
+get_sector_rankings = _market_data.get_sector_rankings
+get_concept_rankings = _market_data.get_concept_rankings
 
 logger = logging.getLogger(__name__)
 
@@ -139,6 +144,10 @@ class MarketOverview:
     bottom_sectors: List[Dict] = field(default_factory=list)  # Top 5 declining sectors
     top_concepts: List[Dict] = field(default_factory=list)    # Top 5 trending concepts
     bottom_concepts: List[Dict] = field(default_factory=list) # Top 5 declining concepts
+
+# ``market_data`` anchors ``MarketIndex`` to avoid a circular import; give it
+# the real class now that the dataclass exists.
+_market_data.MarketIndex = MarketIndex
 
 
 @dataclass
@@ -442,152 +451,16 @@ class MarketAnalyzer:
 
 
     def _get_main_indices(self) -> List[MarketIndex]:
-        """获取主要指数实时行情"""
-        indices = []
-
-        try:
-            logger.info("[大盘] %s action=get_main_indices status=start", self._log_context())
-
-            # Use DataFetcherManager to get index data (switch by region)
-            data_list = self.data_manager.get_main_indices(region=self.region)
-
-            if data_list:
-                for item in data_list:
-                    index = MarketIndex(
-                        code=item['code'],
-                        name=item['name'],
-                        current=item['current'],
-                        change=item['change'],
-                        change_pct=item['change_pct'],
-                        open=item['open'],
-                        high=item['high'],
-                        low=item['low'],
-                        prev_close=item['prev_close'],
-                        volume=item['volume'],
-                        amount=item['amount'],
-                        amplitude=item['amplitude']
-                    )
-                    indices.append(index)
-
-            if not indices:
-                logger.warning("[大盘] %s action=get_main_indices status=empty", self._log_context())
-            else:
-                logger.info(
-                    "[大盘] %s action=get_main_indices status=success count=%d",
-                    self._log_context(),
-                    len(indices),
-                )
-
-        except Exception as e:  # broad-exception: fallback_recorded - index failure is logged before partial fallback
-            log_safe_exception(
-                logger,
-                "Market review index fetch failed",
-                e,
-                error_code="market_review_index_fetch_failed",
-                level=logging.ERROR,
-                context={"region": self.region},
-            )
-
-        return indices
+        return get_main_indices(self)
 
     def _get_market_statistics(self, overview: MarketOverview):
-        """获取市场涨跌统计"""
-        try:
-            logger.info("[大盘] %s action=get_market_stats status=start", self._log_context())
-
-            stats = self.data_manager.get_market_stats(purpose=f"market_review:{self.region}")
-
-            if stats:
-                overview.up_count = stats.get('up_count', 0)
-                overview.down_count = stats.get('down_count', 0)
-                overview.flat_count = stats.get('flat_count', 0)
-                overview.limit_up_count = stats.get('limit_up_count', 0)
-                overview.limit_down_count = stats.get('limit_down_count', 0)
-                overview.total_amount = stats.get('total_amount', 0.0)
-
-                logger.info(
-                    "[大盘] %s action=get_market_stats status=success up=%s down=%s flat=%s "
-                    "limit_up=%s limit_down=%s amount=%.0f亿",
-                    self._log_context(),
-                    overview.up_count,
-                    overview.down_count,
-                    overview.flat_count,
-                    overview.limit_up_count,
-                    overview.limit_down_count,
-                    overview.total_amount,
-                )
-            else:
-                logger.warning("[大盘] %s action=get_market_stats status=empty", self._log_context())
-
-        except Exception as e:  # broad-exception: fallback_recorded - statistics failure is logged before fallback
-            log_safe_exception(
-                logger,
-                "Market review statistics fetch failed",
-                e,
-                error_code="market_review_statistics_fetch_failed",
-                level=logging.ERROR,
-                context={"region": self.region},
-            )
+        return get_market_statistics(self, overview)
 
     def _get_sector_rankings(self, overview: MarketOverview):
-        """获取板块涨跌榜"""
-        try:
-            logger.info("[大盘] %s action=get_sector_rankings status=start", self._log_context())
-
-            top_sectors, bottom_sectors = self.data_manager.get_sector_rankings(5)
-
-            if top_sectors or bottom_sectors:
-                overview.top_sectors = top_sectors
-                overview.bottom_sectors = bottom_sectors
-
-                logger.info(
-                    "[大盘] %s action=get_sector_rankings status=success top=%s bottom=%s",
-                    self._log_context(),
-                    [s['name'] for s in overview.top_sectors],
-                    [s['name'] for s in overview.bottom_sectors],
-                )
-            else:
-                logger.warning("[大盘] %s action=get_sector_rankings status=empty", self._log_context())
-
-        except Exception as e:  # broad-exception: fallback_recorded - sector failure is logged before fallback
-            log_safe_exception(
-                logger,
-                "Market review sector ranking fetch failed",
-                e,
-                error_code="market_review_sector_ranking_fetch_failed",
-                level=logging.ERROR,
-                context={"region": self.region},
-            )
+        return get_sector_rankings(self, overview)
 
     def _get_concept_rankings(self, overview: MarketOverview):
-        """获取概念/题材涨跌榜（fail-open）。"""
-        try:
-            logger.info("[大盘] %s action=get_concept_rankings status=start", self._log_context())
-
-            top_concepts, bottom_concepts = self.data_manager.get_concept_rankings(5)
-
-            if top_concepts or bottom_concepts:
-                overview.top_concepts = top_concepts
-                overview.bottom_concepts = bottom_concepts
-
-                logger.info(
-                    "[大盘] %s action=get_concept_rankings status=success top=%s bottom=%s",
-                    self._log_context(),
-                    [s.get('name') for s in overview.top_concepts],
-                    [s.get('name') for s in overview.bottom_concepts],
-                )
-            else:
-                logger.warning("[大盘] %s action=get_concept_rankings status=empty", self._log_context())
-
-        except Exception as e:  # broad-exception: fallback_recorded - concept failure is logged before fallback
-            log_safe_exception(
-                logger,
-                "Market review concept ranking fetch failed",
-                e,
-                error_code="market_review_concept_ranking_fetch_failed",
-                level=logging.WARNING,
-                context={"region": self.region},
-            )
+        return get_concept_rankings(self, overview)
 
     # def _get_north_flow(self, overview: MarketOverview):
     #     """获取北向资金流入"""
