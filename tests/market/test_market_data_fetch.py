@@ -171,3 +171,92 @@ def test_main_indices_returns_a_list_when_the_manager_is_missing() -> None:
     analyzer = _make_analyzer()
     analyzer.data_manager = None
     assert isinstance(analyzer._get_main_indices(), list)
+
+
+# --- Direct unit tests of the extracted functions (Issue #1085 acceptance) ----------
+#
+# The tests above exercise the functions through MarketAnalyzer. These call
+# src.market.market_data directly with an explicit owner, so a regression in the
+# extracted unit is caught without depending on facade wiring.
+#
+# The owner contract is exactly three attributes: data_manager, region,
+# _log_context. Anything more would be over-specifying the seam.
+
+
+def _owner(manager=None):
+    return SimpleNamespace(
+        data_manager=manager,
+        region="cn",
+        _log_context=lambda: "region=cn",
+    )
+
+
+def test_get_main_indices_returns_a_list_without_a_manager() -> None:
+    assert market_data_mod.get_main_indices(_owner()) == []
+
+
+def test_get_main_indices_swallows_provider_errors() -> None:
+    def _boom(*args, **kwargs):
+        raise RuntimeError("provider down")
+
+    assert market_data_mod.get_main_indices(
+        _owner(SimpleNamespace(get_main_indices=_boom))
+    ) == []
+
+
+def test_get_sector_rankings_writes_both_sides_onto_the_overview() -> None:
+    top = [{"name": "T", "change_pct": 1.0}]
+    bottom = [{"name": "B", "change_pct": -1.0}]
+    overview = _cn_overview()
+    market_data_mod.get_sector_rankings(
+        _owner(SimpleNamespace(get_sector_rankings=lambda *a, **k: (top, bottom))),
+        overview,
+    )
+    assert overview.top_sectors == top
+    assert overview.bottom_sectors == bottom
+
+
+def test_get_sector_rankings_leaves_the_overview_untouched_on_empty_result() -> None:
+    overview = _cn_overview()
+    before_top = list(overview.top_sectors)
+    market_data_mod.get_sector_rankings(
+        _owner(SimpleNamespace(get_sector_rankings=lambda *a, **k: ([], []))),
+        overview,
+    )
+    assert overview.top_sectors == before_top
+
+
+def test_get_concept_rankings_writes_both_sides_onto_the_overview() -> None:
+    top = [{"name": "CT", "change_pct": 2.0}]
+    bottom = [{"name": "CB", "change_pct": -2.0}]
+    overview = _cn_overview()
+    market_data_mod.get_concept_rankings(
+        _owner(SimpleNamespace(get_concept_rankings=lambda *a, **k: (top, bottom))),
+        overview,
+    )
+    assert overview.top_concepts == top
+    assert overview.bottom_concepts == bottom
+
+
+def test_get_market_statistics_swallows_provider_errors() -> None:
+    def _boom(*args, **kwargs):
+        raise RuntimeError("stats down")
+
+    overview = _cn_overview()
+    market_data_mod.get_market_statistics(
+        _owner(SimpleNamespace(get_market_stats=_boom)), overview
+    )
+    assert overview.up_count is not None
+
+
+def test_owner_contract_is_only_three_attributes() -> None:
+    """Guard against the seam quietly growing: adding a fourth owner attribute
+    would break every caller that builds a minimal owner, including this test."""
+
+    import ast
+    import re
+
+    source = OWNER_PATH.read_text(encoding="utf-8")
+    accessed = set(re.findall(r"owner\.(\w+)", source))
+    assert accessed == {"data_manager", "region", "_log_context"}
+    ast.parse(source)
