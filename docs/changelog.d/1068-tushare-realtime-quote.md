@@ -1,0 +1,1 @@
+- [Changed] Move Tushare realtime quote and legacy-symbol helpers into `src/data_provider/tushare_parts/realtime.py` behind the ADR-006 facade, keeping `TushareFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
