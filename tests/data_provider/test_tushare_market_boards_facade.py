@@ -40,16 +40,17 @@ METHOD_SIGNATURES = {
     "get_sector_rankings": ["self", "n"],
 }
 
-# Reached through `self` by the moved bodies; all stay on the facade.
+# Reached through `self` by the moved bodies; chip stays on the facade class body.
+# Trade-calendar helpers are rebound from tushare_parts.trade_time, not this owner.
 FACADE_SIBLINGS = (
-    "get_trade_time",
-    "_get_trade_dates",
-    "_pick_trade_date",
-    "_get_china_now",
+    "get_chip_distribution",
+    "compute_cyq_metrics",
+    "is_available",
+    "_determine_priority",
 )
 
 # Domains this package already owned before the slice; binding must still work.
-PRE_EXISTING_BOUND = ("get_daily_data", "_convert_stock_code")
+PRE_EXISTING_BOUND = ("get_daily_data", "_convert_stock_code", "get_trade_time")
 
 
 @pytest.mark.parametrize("name", MOVED)
@@ -110,8 +111,8 @@ def test_bodies_no_longer_live_in_the_facade_class() -> None:
 
 
 @pytest.mark.parametrize("sibling", FACADE_SIBLINGS)
-def test_trade_calendar_helpers_stay_on_the_facade(sibling) -> None:
-    """The moved bodies reach these through `self`; moving any would widen the slice."""
+def test_chip_and_availability_helpers_stay_on_the_facade(sibling) -> None:
+    """Boards still reach trade-calendar through `self`; chip stays on the class body."""
 
     assert sibling in _facade_class_methods(), sibling
 

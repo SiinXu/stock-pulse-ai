@@ -1,0 +1,1 @@
+- [Changed] Move market-review news retrieval and persisted-intelligence merge into `src/market/news.py` behind the existing `src.market.analyzer` facade, keeping method names, signatures, descriptor kinds, and override behavior unchanged (Refs #1085).

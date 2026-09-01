@@ -110,8 +110,18 @@ export function registerSettingsPageIntegrationTests(): void {
     expect(screen.getByTestId('agent-behavior-panel')).toBeInTheDocument();
     expect(screen.getByTestId('settings-field-AGENT_MAX_STEPS')).toBeInTheDocument();
     expect(screen.queryByTestId('settings-field-AGENT_CONTEXT_ENABLED')).not.toBeInTheDocument();
-    expect(screen.getByTestId('agent-behavior-fields')).not.toHaveAttribute('open');
-    expect(screen.getByTestId('agent-governance-fields')).not.toHaveAttribute('open');
+    const behaviorToggle = within(screen.getByTestId('agent-behavior-fields')).getByRole('button', {
+      name: /行为|Behavior/,
+    });
+    expect(behaviorToggle).toHaveAttribute('type', 'button');
+    expect(behaviorToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById(behaviorToggle.getAttribute('aria-controls')!)).toHaveAttribute('hidden');
+    const governanceToggle = within(screen.getByTestId('agent-governance-fields')).getByRole('button', {
+      name: /治理 \/ 专家|Governance \/ Expert/,
+    });
+    expect(governanceToggle).toHaveAttribute('type', 'button');
+    expect(governanceToggle).toHaveAttribute('aria-expanded', 'false');
+    expect(document.getElementById(governanceToggle.getAttribute('aria-controls')!)).toHaveAttribute('hidden');
     expect(screen.getByTestId('agent-ask-path')).toBeInTheDocument();
     expect(screen.getByTestId('agent-ask-cta')).toHaveAttribute('href', '/chat');
 

@@ -1,0 +1,1 @@
+- [Chore] Fail closed unmapped `src/` packages to sharded FULL CI instead of unsharded `tests/` in the 45-minute PR backend-gate.

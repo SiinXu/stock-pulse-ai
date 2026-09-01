@@ -49,6 +49,8 @@ from src.market import degradation as _market_degradation
 from src.market import formatters as _market_formatters
 from src.market import blocks as _market_blocks
 from src.market import market_data as _market_data
+from src.market import news as _market_news
+from src.market import diagnostics as _market_diagnostics
 from src.market import report_sections as _market_report_sections
 
 build_market_light_scores = _market_metrics.build_market_light_scores
@@ -76,6 +78,11 @@ get_main_indices = _market_data.get_main_indices
 get_market_statistics = _market_data.get_market_statistics
 get_sector_rankings = _market_data.get_sector_rankings
 get_concept_rankings = _market_data.get_concept_rankings
+search_market_news = _market_news.search_market_news
+normalize_news_item = _market_news.normalize_news_item
+merge_persisted_market_intelligence = _market_news.merge_persisted_market_intelligence
+generation_log_redaction_values = _market_diagnostics.generation_log_redaction_values
+sanitize_generation_diagnostic = _market_diagnostics.sanitize_generation_diagnostic
 extract_report_title = _market_report_sections.extract_report_title
 split_report_sections = _market_report_sections.split_report_sections
 insert_after_section = _market_report_sections.insert_after_section
@@ -206,31 +213,7 @@ class MarketAnalyzer:
         return f"component=market_review region={self.region}"
 
     def _generation_log_redaction_values(self, error: Any = None) -> set[str]:
-        """Return exact generation secrets without depending on analyzer internals."""
-        analyzer = getattr(self, "analyzer", None)
-        if analyzer is None:
-            return exception_chain_redaction_values(error)
-        static_method = getattr_static(
-            analyzer,
-            "get_generation_log_redaction_values",
-            None,
-        )
-        if static_method is None:
-            return exception_chain_redaction_values(error)
-        method = getattr(analyzer, "get_generation_log_redaction_values", None)
-        if not callable(method):
-            return exception_chain_redaction_values(error)
-        try:
-            model = str(getattr(self.config, "litellm_model", "") or "")
-            values = method(model, fallback_error=error)
-            static_values = values if isinstance(values, set) else set(values or ())
-        except Exception:  # broad-exception: optional_metadata - optional redaction lookup falls back safely
-            return exception_chain_redaction_values(error)
-        if has_matching_exception_snapshot(error, static_values):
-            return static_values
-        exception_values = exception_chain_redaction_values(error)
-        exception_values.update(static_values)
-        return exception_values
+        return generation_log_redaction_values(self, error)
 
     def _sanitize_generation_diagnostic(
         self,
@@ -238,47 +221,8 @@ class MarketAnalyzer:
         *,
         redaction_values: Optional[set[str]] = None,
     ) -> str:
-        """Sanitize an analyzer failure before persistence or user diagnostics."""
-        if redaction_values is None:
-            redaction_values = self._generation_log_redaction_values(error)
-        if isinstance(error, GenerationError):
-            error_code = (
-                error.error_code.value
-                if isinstance(error.error_code, GenerationErrorCode)
-                else GenerationErrorCode.UNKNOWN_BACKEND_ERROR.value
-            )
-            return f"GenerationError: {error_code}"
-        if has_matching_exception_snapshot(error, redaction_values):
-            return sanitize_diagnostic_text(
-                error,
-                max_length=500,
-                redaction_values=redaction_values,
-            )
-        analyzer = getattr(self, "analyzer", None)
-        static_method = (
-            getattr_static(analyzer, "sanitize_generation_diagnostic", None)
-            if analyzer is not None
-            else None
-        )
-        method = (
-            getattr(analyzer, "sanitize_generation_diagnostic", None)
-            if static_method is not None
-            else None
-        )
-        if callable(method):
-            try:
-                model = str(getattr(self.config, "litellm_model", "") or "")
-                return sanitize_diagnostic_text(
-                    method(error, model=model),
-                    max_length=500,
-                    redaction_values=redaction_values,
-                )
-            except Exception:  # broad-exception: optional_metadata - optional sanitizer falls back safely
-                pass
-        return sanitize_diagnostic_text(
-            error,
-            max_length=500,
-            redaction_values=redaction_values,
+        return sanitize_generation_diagnostic(
+            self, error, redaction_values=redaction_values
         )
 
     def _get_output_language(self) -> str:
@@ -488,69 +432,7 @@ class MarketAnalyzer:
     #         logger.warning(f"[大盘] 获取北向资金失败: {e}")
 
     def search_market_news(self) -> List[Dict]:
-        """
-        搜索市场新闻
-        
-        Returns:
-            新闻列表
-        """
-        if not self.search_service:
-            logger.warning(
-                "[大盘] %s action=search_market_news status=skipped reason=no_search_service",
-                self._log_context(),
-            )
-            return []
-
-        all_news = []
-
-        # Use different news search terms based on region.
-        search_queries = self.profile.news_queries
-        review_language = self._get_review_language()
-        market_names = {
-            "cn": "大盘" if review_language == "zh" else "A-share market",
-            "us": "美股市场" if review_language == "zh" else "US market",
-            "hk": "港股市场" if review_language == "zh" else "HK market",
-            "jp": "日本股市" if review_language == "zh" else "Japan stock market",
-            "kr": "韩国股市" if review_language == "zh" else "Korea stock market",
-        }
-
-        try:
-            logger.info("[大盘] %s action=search_market_news status=start", self._log_context())
-
-            # Set search context name based on region to avoid interpreting US stock searches as A-shares context
-            market_name = market_names.get(self.region, "大盘")
-            for query in search_queries:
-                response = self.search_service.search_stock_news(
-                    stock_code="market",
-                    stock_name=market_name,
-                    max_results=3,
-                    focus_keywords=query.split()
-                )
-                if response and response.results:
-                    all_news.extend(response.results)
-                    logger.info(
-                        "[大盘] %s action=search_market_news status=query_success count=%d",
-                        self._log_context(),
-                        len(response.results),
-                    )
-
-            logger.info(
-                "[大盘] %s action=search_market_news status=success count=%d",
-                self._log_context(),
-                len(all_news),
-            )
-
-        except Exception as e:  # broad-exception: fallback_recorded - news failure is logged before fallback
-            log_safe_exception(
-                logger,
-                "Market review news search failed",
-                e,
-                error_code="market_review_news_search_failed",
-                level=logging.ERROR,
-                context={"region": self.region},
-            )
-
-        return all_news
+        return search_market_news(self)
 
     def generate_market_review(self, overview: MarketOverview, news: List) -> str:
         """
@@ -765,13 +647,7 @@ class MarketAnalyzer:
 
     @classmethod
     def _normalize_news_item(cls, item: Any) -> Dict[str, str]:
-        return {
-            "title": cls._compact_news_text(cls._get_news_field(item, "title"), limit=120),
-            "snippet": cls._compact_news_text(cls._get_news_field(item, "snippet"), limit=260),
-            "source": cls._compact_news_text(cls._get_news_field(item, "source"), limit=80),
-            "published_date": cls._compact_news_text(cls._get_news_field(item, "published_date"), limit=40),
-            "url": cls._compact_news_text(cls._get_news_field(item, "url"), limit=240),
-        }
+        return normalize_news_item(cls, item)
 
     def _inject_data_into_review(
         self,
@@ -1085,58 +961,7 @@ class MarketAnalyzer:
         )
 
     def _merge_persisted_market_intelligence(self, news: List) -> List:
-        """Merge local persisted market intelligence and search news with bounded prompt/payload slot preservation."""
-        search_news = list(news or [])
-        merged_local = []
-        seen_urls = {
-            self._get_news_field(item, "url")
-            for item in search_news
-            if self._get_news_field(item, "url")
-        }
-        try:
-            service = IntelligenceService(config=self.config)
-            service.refresh_auto_sources()
-            payload = service.list_items(
-                scope_type="market",
-                market=self.region,
-                published_days=max(1, int(self.config.get_effective_news_window_days() or 1)),
-                page=1,
-                page_size=6,
-            )
-            for item in payload.get("items", []):
-                if not isinstance(item, dict):
-                    continue
-                url = str(item.get("url") or "")
-                if url and url in seen_urls:
-                    continue
-                seen_urls.add(url)
-                merged_local.append({
-                    "title": item.get("title") or "未命名资讯",
-                    "snippet": item.get("summary") or "",
-                    "source": item.get("source") or item.get("source_name") or "local-intel",
-                    "published_date": item.get("published_at") or "",
-                    "url": "" if url.startswith("no-url:intel:") else url,
-                })
-        except Exception as exc:  # broad-exception: fallback_recorded - local intelligence failure is logged
-            log_safe_exception(
-                logger,
-                "Market review local intelligence load failed",
-                exc,
-                error_code="market_review_local_intelligence_load_failed",
-                level=logging.DEBUG,
-                context={"region": self.region},
-            )
-        merged_news = []
-        merged_local_index = 0
-        merged_search_index = 0
-        while merged_local_index < len(merged_local) or merged_search_index < len(search_news):
-            if merged_local_index < len(merged_local):
-                merged_news.append(merged_local[merged_local_index])
-                merged_local_index += 1
-            if merged_search_index < len(search_news):
-                merged_news.append(search_news[merged_search_index])
-                merged_search_index += 1
-        return merged_news
+        return merge_persisted_market_intelligence(self, news)
 
     def run_daily_review(self) -> str:
         """

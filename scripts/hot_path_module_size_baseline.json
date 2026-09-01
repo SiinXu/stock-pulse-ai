@@ -11,10 +11,9 @@
   "extraction_preference_lines": 2000,
   "hard_ceiling_count": 10,
   "hard_ceiling_max_lines": 4659,
-  "module_count": 7,
+  "module_count": 6,
   "modules": {
     "src/agent/orchestrator_parts/pipeline.py": 1561,
-    "src/data_provider/base.py": 1559,
     "src/data_provider/data_validation.py": 1715,
     "src/services/history_service.py": 1578,
     "src/services/local_model_service.py": 1536,
