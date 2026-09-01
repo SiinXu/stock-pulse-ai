@@ -18,6 +18,7 @@ from .manager_types import (
     PluginState,
     _ManagedPlugin,
 )
+from .lifecycle_audit_mixin import PluginLifecycleAuditMixin
 from .permissions import load_time_permission_error
 from .registry import ExtensionPoint, PluginContext, RegistrationHandle
 
@@ -39,8 +40,13 @@ _HOT_RELOADABLE_EXTENSION_POINTS: frozenset[ExtensionPoint] = frozenset(
 )
 
 
-class PluginLifecycleMixin:
-    """State transitions, reverse cleanup, and operator lifecycle mutations."""
+class PluginLifecycleMixin(PluginLifecycleAuditMixin):
+    """State transitions, reverse cleanup, and operator lifecycle mutations.
+
+    Audit begin/complete bookkeeping lives in ``PluginLifecycleAuditMixin``
+    (Issue #1080); inheriting it keeps every method name, signature, and the
+    ``PluginManager`` MRO unchanged.
+    """
 
     def _bind_lifecycle_boundary(
         self,
@@ -90,79 +96,8 @@ class PluginLifecycleMixin:
         finally:
             self._lifecycle_boundary_state.active = False
 
-    def _audit_metadata_for(self, record: _ManagedPlugin) -> dict[str, Any]:
-        return {
-            "plugin_version": record.manifest.version,
-            "plugin_source": record.source,
-            "permissions": list(record.manifest.permissions),
-            "extension_points": [
-                handle.extension_point
-                for handle in record.handles
-                if handle.active
-            ],
-        }
 
-    def _audit_begin(
-        self,
-        record: _ManagedPlugin | None,
-        *,
-        plugin_id: str,
-        operation: str,
-        required: bool = False,
-        actor_type: str | None = None,
-        actor_id: str | None = None,
-    ) -> str | None:
-        if self._lifecycle_audit_disabled:
-            if required:
-                from src.services.security_audit_service import (
-                    SecurityAuditUnavailable,
-                )
 
-                raise SecurityAuditUnavailable()
-            return None
-        metadata = None if record is None else self._audit_metadata_for(record)
-        return self._lifecycle_auditor.begin(
-            plugin_id=plugin_id,
-            operation=operation,
-            metadata=metadata,
-            required=required,
-            actor_type=actor_type,
-            actor_id=actor_id,
-        )
-
-    def _audit_complete(
-        self,
-        record: _ManagedPlugin | None,
-        *,
-        plugin_id: str,
-        operation: str,
-        success: bool,
-        correlation_id: str | None,
-        error_code: str | None,
-        required: bool = False,
-        actor_type: str | None = None,
-        actor_id: str | None = None,
-    ) -> None:
-        if self._lifecycle_audit_disabled or correlation_id is None:
-            if required:
-                from src.services.security_audit_service import (
-                    SecurityAuditUnavailable,
-                )
-
-                raise SecurityAuditUnavailable()
-            return
-        metadata = None if record is None else self._audit_metadata_for(record)
-        self._lifecycle_auditor.complete(
-            plugin_id=plugin_id,
-            operation=operation,
-            success=success,
-            correlation_id=correlation_id,
-            error_code=error_code,
-            metadata=metadata,
-            required=required,
-            actor_type=actor_type,
-            actor_id=actor_id,
-        )
 
     def _set_last_error(
         self,
@@ -248,59 +183,6 @@ class PluginLifecycleMixin:
             )
         )
 
-    def _audited_operation(
-        self,
-        plugin_id: str,
-        operation: str,
-        run: Callable[[], PluginOperationResult],
-        *,
-        require_audit: bool = False,
-        actor_type: str | None = None,
-        actor_id: str | None = None,
-    ) -> PluginOperationResult:
-        """Run one lifecycle operation with selected audit strictness."""
-
-        with self._lock:
-            record = self._plugins.get(plugin_id)
-            starting_state = None if record is None else record.state
-        correlation_id = self._audit_begin(
-            record,
-            plugin_id=plugin_id,
-            operation=operation,
-            required=require_audit,
-            actor_type=actor_type,
-            actor_id=actor_id,
-        )
-        result = run()
-        with self._lock:
-            record = self._plugins.get(plugin_id)
-            if record is not None:
-                if (
-                    operation in {"load", "enable"}
-                    and result.success
-                    and result.error_code is None
-                    and starting_state != "enabled"
-                ):
-                    self._set_last_error(record, None)
-                elif result.error_code is not None:
-                    self._set_last_error(record, result.error_code)
-        from src.services.security_audit_service import SecurityAuditUnavailable
-
-        try:
-            self._audit_complete(
-                record,
-                plugin_id=plugin_id,
-                operation=operation,
-                success=result.success,
-                correlation_id=correlation_id,
-                error_code=result.error_code,
-                required=require_audit,
-                actor_type=actor_type,
-                actor_id=actor_id,
-            )
-        except SecurityAuditUnavailable:
-            raise PluginLifecycleAuditCompletionUnavailable(result) from None
-        return result
 
     def _enable(
         self,
@@ -759,49 +641,6 @@ class PluginLifecycleMixin:
             )
         )
 
-    def _audited_reload(
-        self,
-        plugin_id: str,
-        *,
-        require_audit: bool,
-        actor_type: str | None,
-        actor_id: str | None,
-    ) -> PluginReloadResult:
-        with self._lock:
-            record = self._plugins.get(plugin_id)
-        correlation_id = self._audit_begin(
-            record,
-            plugin_id=plugin_id,
-            operation="reload",
-            required=require_audit,
-            actor_type=actor_type,
-            actor_id=actor_id,
-        )
-        result = self._reload(plugin_id)
-        with self._lock:
-            record = self._plugins.get(plugin_id)
-            if record is not None:
-                if result.success and result.error_code is None:
-                    self._set_last_error(record, None)
-                elif result.error_code is not None:
-                    self._set_last_error(record, result.error_code)
-        from src.services.security_audit_service import SecurityAuditUnavailable
-
-        try:
-            self._audit_complete(
-                record,
-                plugin_id=plugin_id,
-                operation="reload",
-                success=result.success,
-                correlation_id=correlation_id,
-                error_code=result.error_code,
-                required=require_audit,
-                actor_type=actor_type,
-                actor_id=actor_id,
-            )
-        except SecurityAuditUnavailable:
-            raise PluginLifecycleAuditCompletionUnavailable(result) from None
-        return result
 
     def _reload(self, plugin_id: str) -> PluginReloadResult:
         snapshot = self.snapshot(plugin_id)

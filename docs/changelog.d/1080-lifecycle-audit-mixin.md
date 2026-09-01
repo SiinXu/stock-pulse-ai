@@ -1,0 +1,1 @@
+- [Changed] Move plugin lifecycle audit begin/complete bookkeeping into `src/plugins/lifecycle_audit_mixin.py`, inherited by `PluginLifecycleMixin` so `PluginManager` composition, method names, and signatures are unchanged (Refs #1080).
