@@ -245,21 +245,8 @@ class ScheduledTaskService:
             )
         return payload
 
-    @staticmethod
-    def _schema_is_supported(schema_version: Any) -> bool:
-        """Classify exact supported versions while keeping future rows opaque."""
-        exact_version = _exact_persisted_int(
-            schema_version,
-            field_name="schema version",
-            minimum=1,
-        )
-        if exact_version in SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS:
-            return True
-        if exact_version > SCHEDULED_TASK_SCHEMA_VERSION:
-            return False
-        raise ScheduledTaskContractError(
-            "Persisted scheduled task schema version is invalid"
-        )
+    # Rebound from scheduled_task_parts.contract_normalization after class build.
+    _schema_is_supported = None
 
     @classmethod
     def _validate_persisted_task(cls, row) -> Dict[str, Any]:
@@ -457,146 +444,7 @@ class ScheduledTaskService:
             "updated_at": cls._aware_or_none(row.updated_at),
         }
 
-    @staticmethod
-    def _normalize_contract(contract: Mapping[str, Any]) -> Dict[str, Any]:
-        if not isinstance(contract, Mapping):
-            raise ScheduledTaskValidationError("Scheduled task must be an object")
-        schema_version = contract.get(
-            "schema_version",
-            STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION,
-        )
-        if (
-            type(schema_version) is not int
-            or schema_version not in SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS
-        ):
-            raise ScheduledTaskValidationError(
-                f"Unsupported scheduled task schema_version: {schema_version}"
-            )
-
-        name = str(contract.get("name") or "").strip()
-        if not name or len(name) > 128:
-            raise ScheduledTaskValidationError(
-                "Scheduled task name must contain 1 to 128 characters"
-            )
-
-        task_type = str(
-            contract.get("task_type") or ScheduledTaskType.STOCK_ANALYSIS.value
-        ).strip()
-        supported_task_types = {member.value for member in ScheduledTaskType}
-        if task_type not in supported_task_types:
-            raise ScheduledTaskValidationError(
-                f"Unsupported scheduled task type: {task_type}"
-            )
-        expected_schema_version = (
-            STOCK_ANALYSIS_SCHEDULED_TASK_SCHEMA_VERSION
-            if task_type == ScheduledTaskType.STOCK_ANALYSIS.value
-            else SCHEDULED_RESEARCH_TASK_SCHEMA_VERSION
-        )
-        if schema_version != expected_schema_version:
-            raise ScheduledTaskValidationError(
-                f"{task_type} requires schema_version {expected_schema_version}"
-            )
-
-        schedule = contract.get("schedule")
-        if not isinstance(schedule, Mapping):
-            raise ScheduledTaskValidationError("Scheduled task schedule is required")
-        schedule_kind = str(
-            schedule.get("kind") or ScheduleKind.DAILY.value
-        ).strip()
-        if schedule_kind != ScheduleKind.DAILY.value:
-            raise ScheduledTaskValidationError(
-                f"Unsupported schedule kind: {schedule_kind}"
-            )
-        try:
-            schedule_time = validate_daily_time(str(schedule.get("time") or ""))
-            timezone_name = validate_timezone(str(schedule.get("timezone") or ""))
-        except ValueError as exc:
-            raise ScheduledTaskValidationError(str(exc)) from exc
-        calendar_market = str(schedule.get("calendar_market") or "").strip().lower()
-        if calendar_market not in MARKET_EXCHANGE:
-            raise ScheduledTaskValidationError(
-                f"Unsupported schedule calendar_market: {calendar_market}"
-            )
-        non_trading_day_policy = str(
-            schedule.get("non_trading_day_policy")
-            or NonTradingDayPolicy.SKIP.value
-        ).strip()
-        if non_trading_day_policy not in {
-            policy.value for policy in NonTradingDayPolicy
-        }:
-            raise ScheduledTaskValidationError(
-                "non_trading_day_policy must be skip or run"
-            )
-
-        payload = contract.get("payload")
-        if not isinstance(payload, Mapping):
-            raise ScheduledTaskValidationError("Scheduled task payload is required")
-        allowed_payload_keys = {"stock_code", "notify"}
-        if task_type == ScheduledTaskType.STOCK_ANALYSIS.value:
-            allowed_payload_keys.add("report_type")
-        unexpected_keys = set(payload) - allowed_payload_keys
-        if unexpected_keys:
-            raise ScheduledTaskValidationError(
-                f"Unsupported {task_type} payload fields: "
-                + ", ".join(sorted(str(key) for key in unexpected_keys))
-            )
-        stock_code = resolve_index_stock_code_for_analysis(
-            str(payload.get("stock_code") or "").strip()
-        )
-        if not stock_code or len(stock_code) > 32:
-            raise ScheduledTaskValidationError(
-                "payload.stock_code must contain 1 to 32 characters"
-            )
-        inferred_market = get_market_for_stock(stock_code)
-        if inferred_market is None:
-            raise ScheduledTaskValidationError(
-                "payload.stock_code must identify a supported stock market"
-            )
-        if inferred_market != calendar_market:
-            raise ScheduledTaskValidationError(
-                "payload.stock_code market must match schedule.calendar_market"
-            )
-        notify = payload.get("notify", True)
-        if not isinstance(notify, bool):
-            raise ScheduledTaskValidationError("payload.notify must be a boolean")
-        normalized_payload = {
-            "stock_code": stock_code,
-            "notify": notify,
-        }
-        if task_type == ScheduledTaskType.STOCK_ANALYSIS.value:
-            report_type = str(
-                payload.get("report_type") or "detailed"
-            ).strip().lower()
-            if report_type not in _REPORT_TYPES:
-                raise ScheduledTaskValidationError(
-                    f"Unsupported report_type: {report_type}"
-                )
-            normalized_payload["report_type"] = report_type
-
-        enabled = contract.get("enabled", True)
-        if not isinstance(enabled, bool):
-            raise ScheduledTaskValidationError("enabled must be a boolean")
-        max_attempts = contract.get("max_attempts", 1)
-        if type(max_attempts) is not int:
-            raise ScheduledTaskValidationError("max_attempts must be an integer")
-        if not 1 <= max_attempts <= _MAX_ATTEMPTS:
-            raise ScheduledTaskValidationError(
-                f"max_attempts must be between 1 and {_MAX_ATTEMPTS}"
-            )
-
-        return {
-            "schema_version": schema_version,
-            "name": name,
-            "task_type": task_type,
-            "schedule_kind": schedule_kind,
-            "schedule_time": schedule_time,
-            "timezone": timezone_name,
-            "calendar_market": calendar_market,
-            "non_trading_day_policy": non_trading_day_policy,
-            "payload": normalized_payload,
-            "enabled": enabled,
-            "max_attempts": max_attempts,
-        }
+    _normalize_contract = None
 
     def list_tasks(
         self,
@@ -851,96 +699,7 @@ class ScheduledTaskService:
         finally:
             self._tick_lock.release()
 
-    def _recover_supported_schema_fences(self, now: datetime) -> int:
-        """Advance slots fenced only because an older binary lacked the schema."""
-        recovered = 0
-        try:
-            rows = self.repository.list_schema_unsupported_fences(
-                now=now,
-                supported_schema_versions=sorted(
-                    SUPPORTED_SCHEDULED_TASK_SCHEMA_VERSIONS
-                ),
-            )
-        except Exception as exc:  # broad-exception: fallback_recorded - polling retries rollback-fence discovery on the next interval.
-            log_safe_exception(
-                logger,
-                "Scheduled task schema-fence discovery failed; polling will retry",
-                exc,
-                error_code="scheduled_task_schema_fence_discovery_failed",
-            )
-            return 0
-        for task, run in rows:
-            try:
-                contract = self._validate_persisted_task(task)
-                self._run_item(run)
-                if (
-                    run.status != ScheduledRunStatus.INTERRUPTED.value
-                    or run.error_code != "scheduled_task_schema_unsupported"
-                    or run.task_id != task.id
-                    or run.scheduled_for != task.next_run_at
-                    or run.definition_schema_version != task.schema_version
-                    or run.definition_generation != task.execution_generation
-                ):
-                    raise ScheduledTaskContractError(
-                        "Persisted schema fence snapshot is inconsistent"
-                    )
-                next_run = next_daily_run_at(
-                    schedule_time=contract["schedule_time"],
-                    timezone_name=contract["timezone"],
-                    after=max(now, task.next_run_at),
-                )
-                if self.repository.advance_schema_unsupported_fence(
-                    task_id=task.id,
-                    expected_schema_version=task.schema_version,
-                    expected_execution_generation=task.execution_generation,
-                    expected_next_run_at=task.next_run_at,
-                    expected_run_id=run.id,
-                    next_run_at=next_run,
-                    updated_at=now,
-                ):
-                    recovered += 1
-            except ScheduledTaskContractError as exc:
-                try:
-                    disabled = self.repository.disable_corrupt_task(
-                        task_id=task.id,
-                        expected_schema_version=task.schema_version,
-                        expected_execution_generation=(
-                            task.execution_generation
-                        ),
-                        expected_next_run_at=task.next_run_at,
-                        updated_at=now,
-                    )
-                except Exception as quarantine_exc:  # broad-exception: fallback_recorded - polling retries failed corrupt-fence quarantine.
-                    log_safe_exception(
-                        logger,
-                        "Scheduled task corrupt schema-fence quarantine failed",
-                        quarantine_exc,
-                        error_code=(
-                            "scheduled_task_schema_fence_quarantine_failed"
-                        ),
-                        context={"task_id": task.id, "run_id": run.id},
-                    )
-                else:
-                    if disabled:
-                        recovered += 1
-                log_safe_exception(
-                    logger,
-                    "Invalid scheduled task schema fence quarantined",
-                    exc,
-                    error_code="scheduled_task_schema_fence_invalid",
-                    context={"task_id": task.id, "run_id": run.id},
-                    level=logging.WARNING,
-                )
-            except Exception as exc:  # broad-exception: fallback_recorded - one corrupt rollback fence must not block unrelated schedules.
-                log_safe_exception(
-                    logger,
-                    "Scheduled task schema-fence recovery failed closed",
-                    exc,
-                    error_code="scheduled_task_schema_fence_recovery_failed",
-                    context={"task_id": task.id, "run_id": run.id},
-                    level=logging.WARNING,
-                )
-        return recovered
+    _recover_supported_schema_fences = None
 
     def _reconcile_active_runs(self, now: datetime) -> int:
         reconciled = 0
@@ -1896,6 +1655,9 @@ _analysis_admission_audit_module = importlib.import_module(
 _mutation_audit_module = importlib.import_module(
     "src.services.scheduled_task_parts.mutation_audit"
 )
+_contract_normalization_module = importlib.import_module(
+    "src.services.scheduled_task_parts.contract_normalization"
+)
 
 
 def _assemble_admission_fields_facade(
@@ -1931,6 +1693,17 @@ def _assemble_admission_fields_facade(
             "Unexpected ScheduledTaskService mutation audit methods: "
             f"{mutation_names!r}"
         )
+    contract_names = _contract_normalization_module.bind_contract_normalization_facade(
+        ScheduledTaskService,
+        globals(),
+    )
+    if contract_names != (
+        _contract_normalization_module.EXPECTED_CONTRACT_NORMALIZATION_METHOD_NAMES
+    ):
+        raise ImportError(
+            "Unexpected ScheduledTaskService contract normalization methods: "
+            f"{contract_names!r}"
+        )
     mutation_globals = (
         SCHEDULED_TASK_MUTATION_TARGET_TYPE,
         _MUTATION_ACTION_BY_OPERATION,
@@ -1960,6 +1733,9 @@ _analysis_admission_audit_module._install_facade_reload_hook(
     _assemble_admission_fields_facade
 )
 _mutation_audit_module._install_facade_reload_hook(
+    _assemble_admission_fields_facade
+)
+_contract_normalization_module._install_facade_reload_hook(
     _assemble_admission_fields_facade
 )
 del (
