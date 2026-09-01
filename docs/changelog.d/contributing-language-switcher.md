@@ -1,0 +1,1 @@
+- [Docs] Add English/Chinese language switcher to the contributing guide.

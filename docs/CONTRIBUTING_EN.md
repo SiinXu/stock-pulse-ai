@@ -1,5 +1,7 @@
 # Contributing Guide
 
+**English** | [简体中文](CONTRIBUTING.md)
+
 Thank you for your interest in contributing! All kinds of contributions are welcome.
 
 ## 🐛 Reporting Bugs
