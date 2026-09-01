@@ -1,0 +1,1 @@
+- [Changed] Move scheduled-task contract normalization and schema-fence recovery into `src/services/scheduled_task_parts/contract_normalization.py` behind the existing service facade, keeping method names, signatures, descriptor kinds, and patch targets unchanged (Refs #1086).
