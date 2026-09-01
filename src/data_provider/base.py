@@ -314,147 +314,12 @@ class BaseFetcher(DataProvider):
         """
         return None
 
-    def get_daily_data(
-        self,
-        stock_code: str, 
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-        days: int = 30
-    ) -> pd.DataFrame:
-        """
-        获取日线数据（统一入口）
-        
-        流程：
-        1. 计算日期范围
-        2. 调用子类获取原始数据
-        3. 标准化列名
-        4. 计算技术指标
-        
-        Args:
-            stock_code: 股票代码
-            start_date: 开始日期（可选）
-            end_date: 结束日期（可选，默认今天）
-            days: 获取天数（当 start_date 未指定时使用）
-            
-        Returns:
-            标准化的 DataFrame，包含技术指标
-        """
-        # Calculate Date Range
-        if end_date is None:
-            end_date = datetime.now().strftime('%Y-%m-%d')
-        
-        if start_date is None:
-            # Defaults to the most recent 30 trading days (estimated by calendar day, taking more if available)
-            from datetime import timedelta
-            start_dt = datetime.strptime(end_date, '%Y-%m-%d') - timedelta(days=days * 2)
-            start_date = start_dt.strftime('%Y-%m-%d')
-
-        request_start = time.time()
-        logger.info(f"[{self.name}] 开始获取 {stock_code} 日线数据: 范围={start_date} ~ {end_date}")
-        
-        try:
-            # Step 1: Get raw data
-            raw_df = self._fetch_raw_data(stock_code, start_date, end_date)
-            
-            if raw_df is None:
-                raise DataFetchError(f"[{self.name}] 未获取到 {stock_code} 的数据")
-            if raw_df.empty:
-                elapsed = time.time() - request_start
-                logger.info(
-                    f"[{self.name}] {stock_code} 返回空日线结果: 范围={start_date} ~ {end_date}, "
-                    f"elapsed={elapsed:.2f}s"
-                )
-                if self.allow_empty_daily_data:
-                    return pd.DataFrame(columns=STANDARD_COLUMNS)
-                raise DataFetchError(f"[{self.name}] 未获取到 {stock_code} 的数据")
-            
-            # Step 2: Standardize Column Names
-            df = self._normalize_data(raw_df, stock_code)
-            
-            # Step 3: Data Cleaning
-            df = self._clean_data(df)
-            
-            # Step 4: Calculate Technical Indicators
-            df = self._calculate_indicators(df)
-
-            elapsed = time.time() - request_start
-            logger.info(
-                f"[{self.name}] {stock_code} 获取成功: 范围={start_date} ~ {end_date}, "
-                f"rows={len(df)}, elapsed={elapsed:.2f}s"
-            )
-            return df
-            
-        except Exception as e:
-            error_type, error_reason = summarize_exception(e)
-            log_safe_exception(
-                logger,
-                "Data provider daily data fetch failed",
-                e,
-                error_code="data_provider_daily_data_failed",
-                level=logging.ERROR,
-                context={"symbol": stock_code, "provider": self.name},
-            )
-            raise DataFetchError(f"[{self.name}] {stock_code}: {error_reason}") from e
+    # Rebound from base_parts.daily_pipeline after the class is built.
+    get_daily_data = None
     
-    def _clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        数据清洗
-        
-        处理：
-        1. 确保日期列格式正确
-        2. 数值类型转换
-        3. 去除空值行
-        4. 按日期排序
-        """
-        df = df.copy()
-        
-        # Ensure the date column is of datetime type
-        if 'date' in df.columns:
-            df['date'] = pd.to_datetime(df['date'])
-        
-        # Value column type conversion
-        numeric_cols = ['open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Remove rows with empty key columns
-        df = df.dropna(subset=['close', 'volume'])
-        
-        # Sort by date in ascending order.
-        df = df.sort_values('date', ascending=True).reset_index(drop=True)
-        
-        return df
+    _clean_data = None
     
-    def _calculate_indicators(self, df: pd.DataFrame) -> pd.DataFrame:
-        """
-        计算技术指标
-        
-        计算指标：
-        - MA5, MA10, MA20: 移动平均线
-        - Volume_Ratio: 量比（今日成交量 / 5日平均成交量）
-        """
-        df = df.copy()
-        
-        # Moving Average
-        df['ma5'] = df['close'].rolling(window=5, min_periods=1).mean()
-        df['ma10'] = df['close'].rolling(window=10, min_periods=1).mean()
-        df['ma20'] = df['close'].rolling(window=20, min_periods=1).mean()
-        
-        # Relative Volume: Daily Trading Volume / 5-Day Average Trading Volume
-        # Note: This volume_ratio is the relative multiple of 'daily trading volume / 5-day average (shift 1)'.
-        # This differs from the intraday volume ratio used by some trading tools (same-time comparison) and is closer to a volume-expansion multiple.
-        # This behavior is currently retained (logic will not be modified based on demand).
-        avg_volume_5 = df['volume'].rolling(window=5, min_periods=1).mean()
-        df['volume_ratio'] = df['volume'] / avg_volume_5.shift(1)
-        df['volume_ratio'] = df['volume_ratio'].fillna(1.0)
-        
-        # Retain two decimal places
-        for col in ['ma5', 'ma10', 'ma20', 'volume_ratio']:
-            if col in df.columns:
-                df[col] = df[col].round(2)
-        
-        return df
+    _calculate_indicators = None
     
     @staticmethod
     def random_sleep(min_seconds: float = 1.0, max_seconds: float = 3.0) -> None:
@@ -1407,3 +1272,36 @@ del (
     _fundamental_timeout_methods_module,
     _fundamental_outcome_methods_module,
 )
+
+
+# ``base_parts.daily_pipeline`` owns the BaseFetcher daily template method.
+# Rebinding preserves method globals so existing patches against this module
+# continue to intercept moved implementations, and every provider subclass
+# inherits the rebound descriptors unchanged.
+from .base_parts import daily_pipeline as _daily_pipeline_module  # noqa: E402
+from .base_parts.daily_pipeline import _DailyPipelineMethods  # noqa: E402
+from .base_parts.facade_bind import bind_methods_from_class as _bind_base_parts  # noqa: E402
+
+
+def _assemble_base_fetcher_facade() -> None:
+    """Bind capability-domain method bodies onto the abstract base class."""
+
+    _bind_base_parts(
+        _DailyPipelineMethods,
+        BaseFetcher,
+        globals(),
+        expected_names=_daily_pipeline_module.EXPECTED_DAILY_PIPELINE_METHOD_NAMES,
+    )
+
+
+_assemble_base_fetcher_facade()
+
+
+def _install_base_parts_reload_hooks() -> None:
+    """Keep an owner reload able to rebuild and rebind both sides of the seam."""
+
+    for module in (_daily_pipeline_module,):
+        module._FACADE_RELOAD_HOOK = _assemble_base_fetcher_facade  # type: ignore[attr-defined]
+
+
+_install_base_parts_reload_hooks()

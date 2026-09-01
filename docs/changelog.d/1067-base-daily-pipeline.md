@@ -1,0 +1,1 @@
+- [Changed] Move the `BaseFetcher` daily-data template method and its clean/indicator steps into `src/data_provider/base_parts/daily_pipeline.py` behind the ADR-006 facade, keeping method names, signatures, patch targets, and subclass inheritance unchanged (Refs #1067).
