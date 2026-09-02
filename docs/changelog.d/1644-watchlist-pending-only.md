@@ -1,1 +1,1 @@
-- [Fixed] Keep Analysis Workbench Pending only enabled after a shared watchlist GET observer unmounts (Refs #789).
+- [Fixed] Settle shared watchlist cancellation and keep Workbench batch controls usable during background refreshes (Refs #789).

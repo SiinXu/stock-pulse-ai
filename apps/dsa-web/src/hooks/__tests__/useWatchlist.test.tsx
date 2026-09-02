@@ -55,6 +55,10 @@ function loadQueryOptions(client: QueryClient) {
   return query?.options as Record<string, unknown> | undefined;
 }
 
+function watchlistFetchStatus(client: QueryClient) {
+  return client.getQueryState(WATCHLIST_QUERY_KEY)?.fetchStatus;
+}
+
 function assertNoWatchlistPrefixOps(
   calls: Array<[filters?: { queryKey?: readonly unknown[]; exact?: boolean }]>,
 ) {
@@ -140,7 +144,7 @@ describe('useWatchlist', () => {
   it('issues one getWatchlist under host-faithful StrictMode', async () => {
     const pending = createDeferred<string[]>();
     mockGetWatchlist.mockReturnValue(pending.promise);
-    const { wrapper } = createHostWrapper();
+    const { client, wrapper } = createHostWrapper();
     const { result } = renderHook(() => useWatchlist(), { wrapper });
 
     await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(1));
@@ -150,19 +154,42 @@ describe('useWatchlist', () => {
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
       expect(result.current.watchlistCodes).toEqual(['AAPL']);
+      expect(watchlistFetchStatus(client)).not.toBe('fetching');
     });
     expect(mockGetWatchlist).toHaveBeenCalledTimes(1);
   });
 
   it('settles an immediate GET under host-faithful StrictMode', async () => {
     mockGetWatchlist.mockResolvedValue(['AAPL']);
-    const { wrapper } = createHostWrapper();
+    const { client, wrapper } = createHostWrapper();
     const { result } = renderHook(() => useWatchlist(), { wrapper });
 
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
       expect(result.current.watchlistCodes).toEqual(['AAPL']);
+      expect(watchlistFetchStatus(client)).not.toBe('fetching');
     });
+  });
+
+  it('keeps settled codes usable while a background refresh is fetching', async () => {
+    const refreshGet = createDeferred<string[]>();
+    mockGetWatchlist
+      .mockResolvedValueOnce(['AAPL'])
+      .mockReturnValueOnce(refreshGet.promise);
+    const { client, wrapper } = createWrapper();
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
+
+    await waitFor(() => expect(result.current.watchlistCodes).toEqual(['AAPL']));
+    let refreshPromise!: Promise<boolean>;
+    act(() => {
+      refreshPromise = result.current.refresh();
+    });
+    await waitFor(() => expect(watchlistFetchStatus(client)).toBe('fetching'));
+    expect(result.current.isLoading).toBe(false);
+    expect(result.current.watchlistCodes).toEqual(['AAPL']);
+
+    await act(async () => refreshGet.resolve(['AAPL', 'MSFT']));
+    await expect(refreshPromise).resolves.toBe(true);
   });
 
   it('keeps the newest watchlist result when an older refresh resolves last', async () => {
@@ -348,6 +375,54 @@ describe('useWatchlist', () => {
     expect(mockGetWatchlist).toHaveBeenCalledTimes(1);
   });
 
+  it('does not remove the shared row when one co-mounted observer unmounts', async () => {
+    const pending = createDeferred<string[]>();
+    mockGetWatchlist.mockReturnValue(pending.promise);
+    const { client, wrapper } = createWrapper();
+    const first = renderHook(() => useWatchlist(), { wrapper });
+    const second = renderHook(() => useWatchlist(), { wrapper });
+
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(1));
+    first.unmount();
+    await flushQueryMicrotasks();
+
+    expect(client.getQueryState(WATCHLIST_QUERY_KEY)).toBeDefined();
+    expect(client.getQueryCache()
+      .find({ queryKey: WATCHLIST_QUERY_KEY, exact: true })
+      ?.getObserversCount()).toBe(1);
+    await act(async () => pending.resolve(['AAPL']));
+    await waitFor(() => expect(second.result.current.watchlistCodes).toEqual(['AAPL']));
+    expect(watchlistFetchStatus(client)).not.toBe('fetching');
+  });
+
+  it('settles Decision Signals disable cancellation before its re-enabled successor completes', async () => {
+    const cancelledGet = createDeferred<string[]>();
+    const successorGet = createDeferred<string[]>();
+    mockGetWatchlist
+      .mockReturnValueOnce(cancelledGet.promise)
+      .mockReturnValueOnce(successorGet.promise);
+    const { client, wrapper } = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ enabled }) => useWatchlist({ enabled }),
+      { wrapper, initialProps: { enabled: true } },
+    );
+
+    await waitFor(() => expect(watchlistFetchStatus(client)).toBe('fetching'));
+    rerender({ enabled: false });
+    await waitFor(() => expect(watchlistFetchStatus(client)).not.toBe('fetching'));
+    rerender({ enabled: true });
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(2));
+    await act(async () => successorGet.resolve(['AAPL']));
+    await waitFor(() => {
+      expect(result.current.watchlistCodes).toEqual(['AAPL']);
+      expect(result.current.isLoading).toBe(false);
+      expect(watchlistFetchStatus(client)).not.toBe('fetching');
+    });
+
+    await act(async () => cancelledGet.resolve(['STALE']));
+    expect(result.current.watchlistCodes).toEqual(['AAPL']);
+  });
+
   it('does not let a departing route observer poison the next owner with a stale in-flight GET', async () => {
     const homeGet = createDeferred<string[]>();
     const workbenchGet = createDeferred<string[]>();
@@ -360,6 +435,7 @@ describe('useWatchlist', () => {
     await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(home.result.current.isLoading).toBe(true));
     home.unmount();
+    await flushQueryMicrotasks();
 
     const workbench = renderHook(() => useWatchlist(), { wrapper });
     await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(2));
@@ -413,6 +489,7 @@ describe('useWatchlist', () => {
 
     view.rerender(<App route="settings" />);
     expect(view.queryByTestId('watchlist-state')).not.toBeInTheDocument();
+    await flushQueryMicrotasks();
 
     view.rerender(<App route="workbench" />);
     await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(2));
@@ -466,6 +543,7 @@ describe('useWatchlist', () => {
     await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalled());
 
     view.rerender(<App route="settings" />);
+    await flushQueryMicrotasks();
     await act(async () => {
       homeGet.resolve([]);
       await homeGet.promise.catch(() => undefined);
