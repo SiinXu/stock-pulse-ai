@@ -141,7 +141,7 @@ def _get_akshare_name_to_code() -> Optional[Dict[str, str]]:
         _akshare_cache = (now, result)
         logger.info(f"[NameResolver] AkShare cache loaded: {len(result)} name->code mappings")
         return result
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - AkShare degradation is logged before returning no fallback mapping
         log_safe_exception(
             logger,
             "Name resolver AkShare fallback failed",

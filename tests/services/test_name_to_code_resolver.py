@@ -10,6 +10,8 @@ Covers:
 - Ambiguous names return None
 """
 
+import logging
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.services.name_to_code_resolver import (
@@ -19,6 +21,7 @@ from src.services.name_to_code_resolver import (
     _normalize_stock_name,
     _normalize_name_to_code_map,
     _build_reverse_map_no_duplicates,
+    _get_akshare_name_to_code,
 )
 
 
@@ -141,6 +144,20 @@ class TestBuildReverseMapNoDuplicates:
 # ---------------------------------------------------------------------------
 
 class TestResolveNameToCode:
+    def test_akshare_failure_is_logged_before_returning_none(self, caplog):
+        failing_akshare = SimpleNamespace(
+            stock_info_a_code_name=lambda: (_ for _ in ()).throw(RuntimeError("offline"))
+        )
+
+        with (
+            patch.dict("sys.modules", {"akshare": failing_akshare}),
+            patch("src.services.name_to_code_resolver._akshare_cache", None),
+            caplog.at_level(logging.WARNING),
+        ):
+            assert _get_akshare_name_to_code() is None
+
+        assert "name_resolver_akshare_fallback_failed" in caplog.text
+
     def test_code_like_input_returned_normalized(self):
         assert resolve_name_to_code("600519") == "600519"
         assert resolve_name_to_code("600519.SH") == "600519"
