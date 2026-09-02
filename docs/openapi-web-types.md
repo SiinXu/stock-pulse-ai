@@ -399,6 +399,45 @@ the UI type. Runtime Zod in `api/analysis.ts` and `api/history.ts` is
 unchanged (still requires `schemaVersion` on the wire parse; still optional
 arrays). The module is runtime-empty. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/portfolioHealth.ts` now CamelizeKeys-binds the eleven
+generated PortfolioHealth object components (`PortfolioHealthBand`,
+`PortfolioHealthDataQuality`, `PortfolioHealthDimension`,
+`PortfolioHealthDimensions`, `PortfolioHealthEffectiveWeights`,
+`PortfolioHealthInputs`, `PortfolioHealthInsight`,
+`PortfolioHealthProvenance`, `PortfolioHealthResolvedConfig`,
+`PortfolioHealthResponse`, `PortfolioHealthWeights`). Closed unions
+(`PortfolioHealthBand`, `PortfolioHealthStatus`,
+`PortfolioHealthDimensionName`, `PortfolioHealthDimensionKey`) are derived
+from generated field enums / `keyof`; there are no named OpenAPI enum
+schemas, so do not invent unions. `Override` keeps required `bands` /
+`insights` / `unavailableDimensions` versus generated optional arrays
+(generated fact; not fixed by regenerating OpenAPI). `Override` keeps
+`disclaimer?` versus generated required `disclaimer: string` (Home widget
+fixture omits it; runtime Zod in `api/portfolioHealth.ts` still requires
+wire `disclaimer`). `Override` keeps required data-quality arrays
+(`limitations` / `missingPriceSymbols` / `partialReasons`) versus generated
+optional. `Override` keeps required effective-weight keys versus generated
+optional fields. Dimension **names** stay snake (`risk_exposure`);
+dimension **object keys** are camel (`riskExposure`) via CamelizeKeys of
+`PortfolioHealthDimensions` / `PortfolioHealthWeights`. Generated
+constants `formula_version: "portfolio_health_v2"`,
+`llm_can_modify_score: false`, `score_source: "rules"`,
+`config.source: "shared_config"` stay closed; do not widen.
+`PortfolioHealthSummary` stays a `Pick` of the public response (no
+generated Summary component). `PortfolioHealthQuery` /
+`PortfolioHealthRefreshQuery` stay handwritten optional-without-null
+camelCase (generated query uses snake keys and `| null`; `persist` exists
+only on refresh; do not CamelizeKeys them). Path 200 JSON for GET
+`/api/v1/portfolio/health` (`getPortfolioHealth`) and POST
+`/api/v1/portfolio/health/refresh` (`refreshPortfolioHealth`) is mutually
+equivalent to `PortfolioHealthResponse`; both `requestBody` is `never`.
+This is **not** the auth object export-alias pattern: generated snake_case
+is not the UI type. Runtime Zod in `api/portfolioHealth.ts` is unchanged
+(still requires wire `disclaimer`; still defaults omitted arrays). The
+module is runtime-empty. This is the types-file bind; the earlier
+API-module paragraph for `portfolioHealth` stays. `Refs #721`; do not
+close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
