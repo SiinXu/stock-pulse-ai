@@ -1195,6 +1195,7 @@ test.describe('Analysis Workbench interaction contract', () => {
     });
 
     const pendingButton = page.getByRole('button', { name: 'Pending only' });
+    await expect(page.getByRole('button', { name: 'Analyze all' })).toBeEnabled();
     await expect(pendingButton).toBeEnabled();
     await pendingButton.click();
 

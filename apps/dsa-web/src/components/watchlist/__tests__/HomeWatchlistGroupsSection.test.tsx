@@ -1,9 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { StrictMode, type ReactElement, type ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { systemConfigApi } from '../../../api/systemConfig';
 import { watchlistScoresApi } from '../../../api/watchlistScores';
-import { useWatchlist } from '../../../hooks/useWatchlist';
 import { useWatchlistGroups } from '../../../hooks/useWatchlistGroups';
 import type { WatchlistScoreItem, WatchlistScoreResponse } from '../../../types/watchlistScore';
 import { HomeWatchlistGroupsSection } from '../HomeWatchlistGroupsSection';
@@ -12,8 +14,12 @@ vi.mock('../../../api/watchlistScores', () => ({
   watchlistScoresApi: { score: vi.fn() },
 }));
 
-vi.mock('../../../hooks/useWatchlist', () => ({
-  useWatchlist: vi.fn(),
+vi.mock('../../../api/systemConfig', () => ({
+  systemConfigApi: {
+    getWatchlist: vi.fn(),
+    addToWatchlist: vi.fn(),
+    removeFromWatchlist: vi.fn(),
+  },
 }));
 
 vi.mock('../../../hooks/useWatchlistGroups', () => ({
@@ -43,24 +49,28 @@ const scoreResponse = (items: WatchlistScoreItem[]): WatchlistScoreResponse => (
   disclaimerKey: 'watchlist_score.disclaimer',
 });
 
+function renderWithRealWatchlist(ui: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+  });
+  function Wrapper({ children }: { children: ReactNode }) {
+    return (
+      <StrictMode>
+        <QueryClientProvider client={client}>{children}</QueryClientProvider>
+      </StrictMode>
+    );
+  }
+  return render(ui, { wrapper: Wrapper });
+}
+
 describe('HomeWatchlistGroupsSection', () => {
-  const refreshWatchlist = vi.fn(async () => true);
   const refreshGroups = vi.fn(async () => true);
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useWatchlist).mockReturnValue({
-      watchlistCodes: ['AAPL', '600519'],
-      isLoading: false,
-      isActioning: false,
-      loadError: null,
-      actionMessage: null,
-      isInWatchlist: vi.fn(),
-      addToWatchlist: vi.fn(),
-      removeFromWatchlist: vi.fn(async () => true),
-      toggleWatchlist: vi.fn(),
-      refresh: refreshWatchlist,
-    });
+    vi.mocked(systemConfigApi.getWatchlist).mockResolvedValue(['AAPL', '600519']);
+    vi.mocked(systemConfigApi.addToWatchlist).mockResolvedValue(['AAPL', '600519']);
+    vi.mocked(systemConfigApi.removeFromWatchlist).mockResolvedValue(['AAPL']);
     vi.mocked(useWatchlistGroups).mockReturnValue({
       groups: [{
         id: 'default',
@@ -99,7 +109,7 @@ describe('HomeWatchlistGroupsSection', () => {
         scoreItem('AAPL', 91),
         scoreItem('600519', 10),
       ]));
-    const view = render(<HomeWatchlistGroupsSection scoreRefreshKey="analysis-1" />);
+    const view = renderWithRealWatchlist(<HomeWatchlistGroupsSection scoreRefreshKey="analysis-1" />);
 
     expect(await screen.findAllByTestId('watchlist-score-column')).toHaveLength(2);
     expect(watchlistScoresApi.score).toHaveBeenCalledWith(expect.objectContaining({
@@ -116,7 +126,7 @@ describe('HomeWatchlistGroupsSection', () => {
 
     await waitFor(() => expect(watchlistScoresApi.score).toHaveBeenCalledTimes(2));
     await waitFor(() => expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('AAPL'));
-    expect(refreshWatchlist).not.toHaveBeenCalled();
+    expect(systemConfigApi.getWatchlist).toHaveBeenCalledTimes(1);
     expect(refreshGroups).not.toHaveBeenCalled();
   });
 
@@ -127,7 +137,7 @@ describe('HomeWatchlistGroupsSection', () => {
         scoreItem('600519', 82),
       ]))
       .mockRejectedValueOnce(new Error('score refresh failed'));
-    render(<HomeWatchlistGroupsSection />);
+    renderWithRealWatchlist(<HomeWatchlistGroupsSection />);
 
     await screen.findAllByTestId('watchlist-score-column');
     const sort = screen.getByRole('combobox', { name: '手动排序' });
@@ -142,7 +152,7 @@ describe('HomeWatchlistGroupsSection', () => {
     expect(screen.queryByTestId('watchlist-score-column')).not.toBeInTheDocument();
     expect(screen.getAllByRole('listitem')[0]).toHaveTextContent('AAPL');
     expect(screen.getByRole('combobox', { name: '手动排序' })).toBeDisabled();
-    expect(refreshWatchlist).toHaveBeenCalledTimes(1);
+    expect(systemConfigApi.getWatchlist).toHaveBeenCalledTimes(2);
     expect(refreshGroups).toHaveBeenCalledTimes(1);
   });
 
@@ -153,7 +163,7 @@ describe('HomeWatchlistGroupsSection', () => {
         scoreItem('AAPL', 64),
         scoreItem('600519', 20),
       ]));
-    render(<HomeWatchlistGroupsSection />);
+    renderWithRealWatchlist(<HomeWatchlistGroupsSection />);
 
     expect(await screen.findByText('AI 评分暂时不可用；刷新成功前不会显示评分或按评分排序。')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(2);
@@ -162,7 +172,7 @@ describe('HomeWatchlistGroupsSection', () => {
     await waitFor(() => expect(watchlistScoresApi.score).toHaveBeenCalledTimes(2));
     expect(await screen.findAllByTestId('watchlist-score-column')).toHaveLength(2);
     expect(screen.getByText('AI 64')).toBeInTheDocument();
-    expect(refreshWatchlist).toHaveBeenCalledTimes(1);
+    expect(systemConfigApi.getWatchlist).toHaveBeenCalledTimes(2);
     expect(refreshGroups).toHaveBeenCalledTimes(1);
   });
 });
