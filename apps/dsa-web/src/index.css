@@ -177,10 +177,6 @@
   --home-surface-button-border: hsl(var(--border));
   --home-surface-button-border-hover: hsl(var(--primary) / 0.32);
   --home-state-icon-muted: hsl(var(--muted-text) / 0.85);
-  --home-prose-border: hsl(var(--foreground) / 0.1);
-  --home-prose-border-strong: hsl(var(--foreground) / 0.16);
-  --home-prose-blockquote-border: hsl(var(--primary) / 0.28);
-  --home-prose-blockquote-bg: hsl(var(--primary) / 0.06);
   --home-panel-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.04);
   --home-panel-shadow-hover: 0 2px 6px hsl(var(--neutral-black) / 0.06);
   --home-hero-border: hsl(var(--primary) / 0.32);
@@ -425,10 +421,6 @@
   --home-surface-button-border: hsl(var(--foreground) / 0.1);
   --home-surface-button-border-hover: hsl(var(--primary) / 0.28);
   --home-state-icon-muted: hsl(var(--muted-text) / 0.85);
-  --home-prose-border: hsl(var(--foreground) / 0.12);
-  --home-prose-border-strong: hsl(var(--foreground) / 0.18);
-  --home-prose-blockquote-border: hsl(var(--primary) / 0.3);
-  --home-prose-blockquote-bg: hsl(var(--primary) / 0.08);
   --home-panel-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.25);
   --home-panel-shadow-hover: 0 2px 6px hsl(var(--neutral-black) / 0.35);
   --home-hero-border: hsl(var(--primary) / 0.34);
@@ -1103,8 +1095,12 @@ a {
 }
 
 .report-markdown-prose :where(h1) {
-  border-bottom: 1px solid var(--home-prose-border);
+  border-bottom: 1px solid hsl(var(--foreground) / 0.1);
   padding-bottom: 0.5rem;
+}
+
+.dark .report-markdown-prose :where(h1) {
+  border-bottom: 1px solid hsl(var(--foreground) / 0.12);
 }
 
 .report-markdown-prose :where(h2) {
@@ -1119,8 +1115,12 @@ a {
 }
 
 .report-markdown-prose :where(pre) {
-  border: 1px solid var(--home-prose-border);
+  border: 1px solid hsl(var(--foreground) / 0.1);
   background: hsl(var(--elevated) / 0.92);
+}
+
+.dark .report-markdown-prose :where(pre) {
+  border: 1px solid hsl(var(--foreground) / 0.12);
 }
 
 .report-markdown-prose :where(table) {
@@ -1134,9 +1134,13 @@ a {
 
 .report-markdown-prose :where(th, td) {
   border: none;
-  border-bottom: 1px solid var(--home-prose-border);
+  border-bottom: 1px solid hsl(var(--foreground) / 0.1);
   padding: 0.5rem 0.75rem;
   text-align: left;
+}
+
+.dark .report-markdown-prose :where(th, td) {
+  border-bottom: 1px solid hsl(var(--foreground) / 0.12);
 }
 
 .report-markdown-prose :where(th) {
@@ -1146,12 +1150,20 @@ a {
   font-size: 0.6875rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--home-prose-border-strong);
+  border-bottom: 1px solid hsl(var(--foreground) / 0.16);
   white-space: nowrap;
 }
 
+.dark .report-markdown-prose :where(th) {
+  border-bottom: 1px solid hsl(var(--foreground) / 0.18);
+}
+
 .report-markdown-prose :where(hr) {
-  border-color: var(--home-prose-border);
+  border-color: hsl(var(--foreground) / 0.1);
+}
+
+.dark .report-markdown-prose :where(hr) {
+  border-color: hsl(var(--foreground) / 0.12);
 }
 
 .report-markdown-prose :where(a) {
@@ -1159,12 +1171,18 @@ a {
 }
 
 .report-markdown-prose :where(blockquote) {
-  border-color: var(--home-prose-blockquote-border);
-  background: var(--home-prose-blockquote-bg);
+  border-color: hsl(var(--primary) / 0.28);
+  background: hsl(var(--primary) / 0.06);
   border-radius: 0.75rem;
   padding: 0.5rem 1rem;
   color: var(--text-secondary-text);
 }
+
+.dark .report-markdown-prose :where(blockquote) {
+  border-color: hsl(var(--primary) / 0.3);
+  background: hsl(var(--primary) / 0.08);
+}
+
 .label-uppercase {
   display: inline-flex;
   align-items: center;
@@ -1488,8 +1506,12 @@ a {
 .prose :where(th, td) {
   padding: 0.5rem 0.75rem;
   border: none;
-  border-bottom: 1px solid var(--home-prose-border);
+  border-bottom: 1px solid hsl(var(--foreground) / 0.1);
   text-align: left;
+}
+
+.dark .prose :where(th, td) {
+  border-bottom: 1px solid hsl(var(--foreground) / 0.12);
 }
 
 .prose :where(th) {
@@ -1499,8 +1521,12 @@ a {
   font-size: 0.6875rem;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  border-bottom: 1px solid var(--home-prose-border-strong);
+  border-bottom: 1px solid hsl(var(--foreground) / 0.16);
   white-space: nowrap;
+}
+
+.dark .prose :where(th) {
+  border-bottom: 1px solid hsl(var(--foreground) / 0.18);
 }
 
 .prose :where(h1),
@@ -1640,15 +1666,24 @@ a {
   max-width: 100%;
   overflow-x: auto;
   background: hsl(var(--background) / 0.3);
-  border: 1px solid var(--home-prose-border);
+  border: 1px solid hsl(var(--foreground) / 0.1);
   border-radius: 0.5rem;
   padding: 0.75rem;
+}
+
+.dark .chat-prose pre {
+  border: 1px solid hsl(var(--foreground) / 0.12);
 }
 
 .chat-prose th,
 .chat-prose td {
   padding: 0.25rem 0.375rem;
-  border: 1px solid var(--home-prose-border-strong);
+  border: 1px solid hsl(var(--foreground) / 0.16);
+}
+
+.dark .chat-prose th,
+.dark .chat-prose td {
+  border: 1px solid hsl(var(--foreground) / 0.18);
 }
 
 .chat-prose th {
@@ -1657,8 +1692,12 @@ a {
 }
 
 .chat-prose hr {
-  border-color: var(--home-prose-border);
+  border-color: hsl(var(--foreground) / 0.1);
   margin: 0.75rem 0;
+}
+
+.dark .chat-prose hr {
+  border-color: hsl(var(--foreground) / 0.12);
 }
 
 .chat-prose blockquote {

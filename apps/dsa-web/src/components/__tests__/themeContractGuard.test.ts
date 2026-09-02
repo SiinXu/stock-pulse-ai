@@ -762,8 +762,8 @@ export function changeColorToCss(color: ChangeColor): string {
 
     it('declares a format for every defined custom property', () => {
       // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
-      // portfolio/chat/settings/home-action) shrank the defined inventory
-      // below 170.
+      // portfolio/chat/settings/home-action/home-prose) shrank the defined
+      // inventory below 170.
       expect(uniqueNames.length).toBeGreaterThan(160);
       for (const token of uniqueNames) {
         expect(TOKEN_FORMATS, token).toContain(declaredTokenFormat(token));
