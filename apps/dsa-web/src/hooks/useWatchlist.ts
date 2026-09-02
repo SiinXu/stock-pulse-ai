@@ -1,4 +1,7 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+// Copyright (c) 2026 SiinXu / StockPulse contributors
+// SPDX-License-Identifier: AGPL-3.0-only
+import { CancelledError, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { systemConfigApi } from '../api/systemConfig';
 import { getParsedApiError, type ParsedApiError } from '../api/error';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
@@ -21,59 +24,135 @@ export interface UseWatchlistOptions {
   enabled?: boolean;
 }
 
+/** Query 5 cancelQueries defaults `revert: true`; silent+non-revert matches cancelRefetch. */
+export const WATCHLIST_CANCEL = { silent: true, revert: false } as const;
+
+/** Shared GET identity for Home, Workbench, and Decision Signals observers. */
+export const WATCHLIST_QUERY_KEY = ['watchlist', 'codes'] as const;
+
+/** Previous hook never retried, never polled, never focus-refetched, and always called axios offline. */
+export const WATCHLIST_QUERY_SCHEDULE = {
+  retry: false,
+  refetchOnWindowFocus: false,
+  staleTime: 0,
+  networkMode: 'always',
+} as const;
+
+function isCancelledError(error: unknown): boolean {
+  return error instanceof CancelledError;
+}
+
+/**
+ * Silent CancelledError skips Query error dispatch and leaves fetchStatus
+ * fetching until a same-key successor fetch or exact-key cancel.
+ */
+export function throwIfWatchlistCancelled(
+  signal: AbortSignal | undefined,
+  stillActive: boolean,
+): void {
+  if (signal?.aborted || !stillActive) {
+    throw new CancelledError(WATCHLIST_CANCEL);
+  }
+}
+
+export async function fetchWatchlistCodes(args?: {
+  signal?: AbortSignal;
+  stillActive?: () => boolean;
+}): Promise<string[]> {
+  const stillActive = args?.stillActive ?? (() => true);
+  try {
+    throwIfWatchlistCancelled(args?.signal, stillActive());
+    const result = await systemConfigApi.getWatchlist();
+    throwIfWatchlistCancelled(args?.signal, stillActive());
+    return result;
+  } catch (error) {
+    if (isCancelledError(error)) throw error;
+    throwIfWatchlistCancelled(args?.signal, stillActive());
+    throw error;
+  }
+}
+
 export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseWatchlistReturn {
   const { t } = useUiLanguage();
-  const [codes, setCodes] = useState<string[]>([]);
-  const [isLoading, setIsLoading] = useState(enabled);
+  const queryClient = useQueryClient();
   const [isActioning, setIsActioning] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const messageTimerRef = useRef<number | null>(null);
-  const refreshRequestIdRef = useRef(0);
   const mountedRef = useRef(true);
+  const enabledRef = useRef(enabled);
+  const generationRef = useRef(0);
+  const [suppressFetchLoading, setSuppressFetchLoading] = useState(false);
+  enabledRef.current = enabled;
+
+  const query = useQuery({
+    queryKey: WATCHLIST_QUERY_KEY,
+    queryFn: ({ signal }) => {
+      const startedAt = generationRef.current;
+      return fetchWatchlistCodes({
+        signal,
+        stillActive: () => (
+          mountedRef.current
+          && enabledRef.current
+          && generationRef.current === startedAt
+        ),
+      });
+    },
+    enabled,
+    ...WATCHLIST_QUERY_SCHEDULE,
+  });
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      refreshRequestIdRef.current += 1;
       if (messageTimerRef.current !== null) {
         window.clearTimeout(messageTimerRef.current);
       }
     };
   }, []);
 
-  const refresh = useCallback(async () => {
-    const requestId = refreshRequestIdRef.current + 1;
-    refreshRequestIdRef.current = requestId;
-    if (mountedRef.current) setIsLoading(true);
-    try {
-      const result = await systemConfigApi.getWatchlist();
-      if (mountedRef.current && refreshRequestIdRef.current === requestId) {
-        setCodes(result);
-        setLoadError(null);
-      }
-      return true;
-    } catch (error) {
-      if (mountedRef.current && refreshRequestIdRef.current === requestId) {
-        setLoadError(getParsedApiError(error));
-      }
-      return false;
-    } finally {
-      if (mountedRef.current && refreshRequestIdRef.current === requestId) {
-        setIsLoading(false);
-      }
+  // Disable must cancel the exact in-flight GET so a later re-enable starts a
+  // new generation. Do not removeQueries: other live observers share this key.
+  useEffect(() => {
+    if (enabled) {
+      return undefined;
     }
-  }, []);
+    generationRef.current += 1;
+    void queryClient.cancelQueries(
+      { queryKey: WATCHLIST_QUERY_KEY, exact: true },
+      WATCHLIST_CANCEL,
+    );
+    return undefined;
+  }, [enabled, queryClient]);
 
   useEffect(() => {
-    if (!enabled) {
-      refreshRequestIdRef.current += 1;
-      setIsLoading(false);
-      return;
+    if (!query.isFetching) {
+      setSuppressFetchLoading(false);
     }
-    void refresh();
-  }, [enabled, refresh]);
+  }, [query.isFetching]);
+
+  const refresh = useCallback(async () => {
+    setSuppressFetchLoading(false);
+    try {
+      await queryClient.fetchQuery({
+        queryKey: WATCHLIST_QUERY_KEY,
+        queryFn: ({ signal }) => {
+          const startedAt = generationRef.current;
+          return fetchWatchlistCodes({
+            signal,
+            stillActive: () => mountedRef.current && generationRef.current === startedAt,
+          });
+        },
+        ...WATCHLIST_QUERY_SCHEDULE,
+      });
+      return true;
+    } catch (error) {
+      if (isCancelledError(error)) {
+        return false;
+      }
+      return false;
+    }
+  }, [queryClient]);
 
   const showMessage = useCallback((msg: string) => {
     if (messageTimerRef.current !== null) {
@@ -87,10 +166,26 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
     }, 3000);
   }, []);
 
+  const codes = useMemo(() => query.data ?? [], [query.data]);
+  const isLoading = enabled && query.isFetching && !suppressFetchLoading;
+  const loadError = query.error && !isCancelledError(query.error)
+    ? getParsedApiError(query.error)
+    : null;
+
   const isInWatchlist = useCallback(
     (stockCode: string) => includesStockCode(codes, stockCode),
     [codes],
   );
+
+  const applyMutationResult = useCallback((result: string[]) => {
+    generationRef.current += 1;
+    void queryClient.cancelQueries(
+      { queryKey: WATCHLIST_QUERY_KEY, exact: true },
+      WATCHLIST_CANCEL,
+    );
+    queryClient.setQueryData(WATCHLIST_QUERY_KEY, result);
+    setSuppressFetchLoading(true);
+  }, [queryClient]);
 
   const addToWatchlist = useCallback(async (stockCode: string) => {
     if (!stockCode || isActioning) return false;
@@ -98,10 +193,7 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
     try {
       const result = await systemConfigApi.addToWatchlist(stockCode);
       if (mountedRef.current) {
-        refreshRequestIdRef.current += 1;
-        setCodes(result);
-        setLoadError(null);
-        setIsLoading(false);
+        applyMutationResult(result);
         showMessage(t('chat.watchlistAdded', { stock: stockCode }));
       }
       return true;
@@ -111,7 +203,7 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
     } finally {
       if (mountedRef.current) setIsActioning(false);
     }
-  }, [isActioning, showMessage, t]);
+  }, [applyMutationResult, isActioning, showMessage, t]);
 
   const removeFromWatchlist = useCallback(async (stockCode: string) => {
     if (!stockCode || isActioning) return false;
@@ -119,10 +211,7 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
     try {
       const result = await systemConfigApi.removeFromWatchlist(stockCode);
       if (mountedRef.current) {
-        refreshRequestIdRef.current += 1;
-        setCodes(result);
-        setLoadError(null);
-        setIsLoading(false);
+        applyMutationResult(result);
         showMessage(t('chat.watchlistRemoved', { stock: stockCode }));
       }
       return true;
@@ -132,15 +221,14 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
     } finally {
       if (mountedRef.current) setIsActioning(false);
     }
-  }, [isActioning, showMessage, t]);
+  }, [applyMutationResult, isActioning, showMessage, t]);
 
   const toggleWatchlist = useCallback(async (stockCode: string) => {
     const existingStockCode = findMatchingStockCode(codes, stockCode);
     if (existingStockCode) {
       return removeFromWatchlist(existingStockCode);
-    } else {
-      return addToWatchlist(stockCode);
     }
+    return addToWatchlist(stockCode);
   }, [codes, removeFromWatchlist, addToWatchlist]);
 
   return {
