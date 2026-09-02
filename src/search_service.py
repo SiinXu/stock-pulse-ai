@@ -284,6 +284,7 @@ class SearchService:
         minimax_keys: Optional[List[str]] = None,
         searxng_base_urls: Optional[List[str]] = None,
         searxng_public_instances_enabled: bool = False,
+        searxng_timeout_seconds: Optional[int] = None,
         rss_news_feed_urls: Optional[List[str]] = None,
         rss_news_fetch_timeout_sec: float = 8.0,
         news_max_age_days: int = 3,
@@ -301,6 +302,7 @@ class SearchService:
             minimax_keys: MiniMax API Key 列表
             searxng_base_urls: SearXNG 实例地址列表（自建无配额兜底）
             searxng_public_instances_enabled: 未配置自建实例时，是否自动使用公共 SearXNG 实例
+            searxng_timeout_seconds: Self-hosted SearXNG per-search timeout in seconds
             rss_news_feed_urls: Optional RSS/Atom feed URLs (supplement; empty keeps feature inert)
             rss_news_fetch_timeout_sec: Per-feed fetch timeout in seconds
             news_max_age_days: 新闻最大时效（天）
@@ -354,6 +356,7 @@ class SearchService:
         searxng_provider = SearXNGSearchProvider(
             searxng_base_urls,
             use_public_instances=bool(searxng_public_instances_enabled and not searxng_base_urls),
+            self_hosted_timeout_seconds=searxng_timeout_seconds,
         )
         if searxng_provider.is_available:
             self._providers.append(searxng_provider)
@@ -668,6 +671,7 @@ def get_search_service() -> SearchService:
                     minimax_keys=config.minimax_api_keys,
                     searxng_base_urls=config.searxng_base_urls,
                     searxng_public_instances_enabled=config.searxng_public_instances_enabled,
+                    searxng_timeout_seconds=getattr(config, "searxng_timeout_seconds", None),
                     rss_news_feed_urls=getattr(config, "rss_news_feed_urls", None),
                     rss_news_fetch_timeout_sec=getattr(
                         config, "rss_news_fetch_timeout_sec", 8.0

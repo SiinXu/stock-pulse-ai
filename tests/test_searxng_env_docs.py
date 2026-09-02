@@ -107,6 +107,116 @@ def test_workflow_reports_disabled_when_variable_unset() -> None:
     assert "disabled by default" in workflow
 
 
+def test_searxng_timeout_env_contract() -> None:
+    from src.config import parse_env_int
+
+    env_example = (ROOT_DIR / ".env.example").read_text(encoding="utf-8")
+    assert "SEARXNG_TIMEOUT_SECONDS=10" in env_example
+    assert parse_env_int(None, 10, field_name="SEARXNG_TIMEOUT_SECONDS", minimum=1) == 10
+    assert parse_env_int("25", 10, field_name="SEARXNG_TIMEOUT_SECONDS", minimum=1) == 25
+    assert parse_env_int("0", 10, field_name="SEARXNG_TIMEOUT_SECONDS", minimum=1) == 1
+
+
+def test_config_constructor_defaults_searxng_timeout_to_ten() -> None:
+    from src.config import Config
+
+    assert Config().searxng_timeout_seconds == 10
+
+
+def test_daily_analysis_workflow_maps_searxng_timeout_variable() -> None:
+    workflow = (
+        ROOT_DIR / ".github" / "workflows" / "00-daily-analysis.yml"
+    ).read_text(encoding="utf-8")
+    assert (
+        "SEARXNG_TIMEOUT_SECONDS: ${{ vars.SEARXNG_TIMEOUT_SECONDS || secrets.SEARXNG_TIMEOUT_SECONDS }}"
+        in workflow
+    )
+
+
+def test_searxng_timeout_is_hidden_from_web_settings() -> None:
+    from src.core.config_registry import WEB_SETTINGS_HIDDEN_FROM_UI
+
+    assert "SEARXNG_TIMEOUT_SECONDS" in WEB_SETTINGS_HIDDEN_FROM_UI
+
+    groups_src = (
+        ROOT_DIR
+        / "apps"
+        / "dsa-web"
+        / "src"
+        / "components"
+        / "settings"
+        / "categoryFieldGroups.ts"
+    ).read_text(encoding="utf-8")
+    assert "SEARXNG_TIMEOUT_SECONDS" not in groups_src
+
+    i18n_src = (
+        ROOT_DIR / "apps" / "dsa-web" / "src" / "utils" / "systemConfigI18n.ts"
+    ).read_text(encoding="utf-8")
+    assert "SEARXNG_TIMEOUT_SECONDS" not in i18n_src
+
+
+def test_docs_document_searxng_timeout_in_both_tables() -> None:
+    chinese_docs = [
+        ROOT_DIR / "docs" / "full-guide.md",
+        ROOT_DIR / "docs" / "DEPLOY.md",
+        ROOT_DIR / "docs" / "docker" / "zeabur-deployment.md",
+    ]
+    for path in chinese_docs:
+        content = path.read_text(encoding="utf-8")
+        timeout_lines = [
+            line for line in content.splitlines() if "`SEARXNG_TIMEOUT_SECONDS`" in line
+        ]
+        assert timeout_lines, path.name
+        assert all("默认 `10`" in line for line in timeout_lines)
+        assert all("最小 `1`" in line for line in timeout_lines)
+        assert all("公共实例" in line for line in timeout_lines)
+
+    chinese_guide = (ROOT_DIR / "docs" / "full-guide.md").read_text(encoding="utf-8")
+    assert (
+        sum(
+            1
+            for line in chinese_guide.splitlines()
+            if "`SEARXNG_TIMEOUT_SECONDS`" in line
+        )
+        == 2
+    )
+
+    english_guide = (ROOT_DIR / "docs" / "full-guide_EN.md").read_text(
+        encoding="utf-8"
+    )
+    english_timeout_lines = [
+        line
+        for line in english_guide.splitlines()
+        if "`SEARXNG_TIMEOUT_SECONDS`" in line
+    ]
+    assert len(english_timeout_lines) == 2
+    assert all("default `10`" in line for line in english_timeout_lines)
+    assert all("minimum `1`" in line for line in english_timeout_lines)
+    assert all("public-instance timeout is unaffected" in line for line in english_timeout_lines)
+
+
+def test_live_search_service_constructors_pass_searxng_timeout() -> None:
+    constructor_files = [
+        ROOT_DIR / "src" / "core" / "stages" / "optional_services.py",
+        ROOT_DIR / "src" / "core" / "market_review_runtime.py",
+        ROOT_DIR / "src" / "search_service.py",
+        ROOT_DIR / "src" / "services" / "alphasift_service_parts" / "hotspot_support.py",
+    ]
+    for path in constructor_files:
+        source = path.read_text(encoding="utf-8")
+        assert "searxng_timeout_seconds=" in source, path.name
+        assert "_constructor_kwargs" not in source, path.name
+
+    hotspot_src = (
+        ROOT_DIR
+        / "src"
+        / "services"
+        / "alphasift_service_parts"
+        / "hotspot_support.py"
+    ).read_text(encoding="utf-8")
+    assert "searxng_public_instances_enabled=False" in hotspot_src
+
+
 def test_docs_describe_public_searxng_discovery_as_opt_in() -> None:
     chinese_docs = [
         ROOT_DIR / "docs" / "full-guide.md",

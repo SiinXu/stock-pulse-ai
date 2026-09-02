@@ -326,6 +326,14 @@ INVENTORY_COMPLETION_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     "SQLITE_WRITE_RETRY_MAX": _integer("SQLite Write Retry Limit", "Maximum retries after SQLite lock errors.", "system", "3", 908),
 
     "ALPHASIFT_DAILY_CALL_TIMEOUT_SEC": _integer("AlphaSift Daily Call Timeout", "Operator timeout for AlphaSift daily-history calls.", "data_source", "20", 900),
+    "SEARXNG_TIMEOUT_SECONDS": _integer(
+        "SearXNG Self-Hosted Timeout",
+        "Per-search timeout in seconds for self-hosted SearXNG instances. Public instances are unaffected.",
+        "data_source",
+        "10",
+        915,
+        minimum=1,
+    ),
     "ALPHASIFT_DAILY_HISTORY_CACHE_DIR": _text("AlphaSift Daily History Cache", "Operator path for AlphaSift daily-history cache files.", "data_source", "data/alphasift/daily_history", 901),
     "ALPHASIFT_DATA_DIR": _text("AlphaSift Data Directory", "Operator path for AlphaSift runtime data.", "data_source", "data/alphasift", 902),
     "ALPHASIFT_EASTMONEY_JITTER_SEC": _number("AlphaSift Eastmoney Jitter", "Maximum request jitter in seconds for Eastmoney fallback calls.", "data_source", "0.3", 903),
