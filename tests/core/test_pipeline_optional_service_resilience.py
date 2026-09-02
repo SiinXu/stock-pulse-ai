@@ -197,6 +197,9 @@ def test_search_service_unavailable_when_not_configured_logs_unconfigured_state(
     assert kwargs["rss_news_feed_urls"] is None
     assert kwargs["rss_news_fetch_timeout_sec"] == 8.0
     assert kwargs["news_strategy_profile"] == "short"
+    # Config fixtures may omit the env-only timeout; the constructor must
+    # getattr-default instead of failing search init with AttributeError.
+    assert kwargs["searxng_timeout_seconds"] is None
     assert (
         "Search service is unavailable because no search capability is configured"
         in caplog.text

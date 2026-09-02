@@ -25,7 +25,7 @@ EXPECTED_PUBLIC_SURFACE_SHA256 = (
     "22bb473b0c8ae2b99d97772f809a5f14d9a29a2467db11bb487d15c260e4909c"
 )
 EXPECTED_REFLECTION_SHA256 = (
-    "907e0da70d69595f76365ac045643750ba15849ad642104a3781c9e96a2ec9f3"
+    "6e5addd38145adbb5f4003d9b34d1071421b94026b872cce8436153299b32e5c"
 )
 
 EXPECTED_AST_GROUPS = (
@@ -86,8 +86,8 @@ EXPECTED_AST_GROUPS = (
     (
         "searxng.py",
         ("SearXNGSearchProvider",),
-        "b14c330cb994e2e8a704a21daa60d14f5dd71e323cf33bdd9d60812ab5cbdfdb",
-        416,
+        "f6816b5887c701d36f414216e8b7b9a9a2a692031b30611661ab586978537a5b",
+        426,
     ),
     (
         "rss_source.py",
@@ -96,7 +96,7 @@ EXPECTED_AST_GROUPS = (
         468,
     ),
 )
-EXPECTED_MOVED_AST_LINES = 2_694
+EXPECTED_MOVED_AST_LINES = 2_704
 
 MOVED_FUNCTIONS = (
     "_stable_search_failure_message",

@@ -59,7 +59,9 @@ class _OptionalServicesStageMixin:
                 minimax_keys=self.config.minimax_api_keys,
                 searxng_base_urls=self.config.searxng_base_urls,
                 searxng_public_instances_enabled=self.config.searxng_public_instances_enabled,
-                searxng_timeout_seconds=self.config.searxng_timeout_seconds,
+                searxng_timeout_seconds=getattr(
+                    self.config, "searxng_timeout_seconds", None
+                ),
                 rss_news_feed_urls=getattr(self.config, "rss_news_feed_urls", None),
                 rss_news_fetch_timeout_sec=getattr(
                     self.config, "rss_news_fetch_timeout_sec", 8.0
