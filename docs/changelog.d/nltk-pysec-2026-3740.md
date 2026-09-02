@@ -1,0 +1,1 @@
+- [Changed] Added a 30-day pip-audit exception for locked `nltk` 3.10.3 / PYSEC-2026-3740 because no released fix exists; the universal lock pin is unchanged.
