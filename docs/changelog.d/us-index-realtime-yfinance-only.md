@@ -1,0 +1,1 @@
+- [Fixed] Keep US index realtime quotes on a YFinance-only route so missing or partial YFinance data does not fall back to or field-supplement from Longbridge; US stock Longbridge fallback and field supplement stay unchanged.
