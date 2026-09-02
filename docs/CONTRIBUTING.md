@@ -1,6 +1,6 @@
 # 贡献指南
 
-**简体中文** | [English](CONTRIBUTING_EN.md)
+**简体中文** | [English](https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/CONTRIBUTING_EN.md)
 
 感谢你对本项目的关注！欢迎任何形式的贡献。
 

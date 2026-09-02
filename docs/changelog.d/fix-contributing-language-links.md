@@ -1,0 +1,1 @@
+- [Docs] Point contributing-guide language links at docs/ blob URLs so GitHub's community-health view does not 404 on CONTRIBUTING_EN.md.
