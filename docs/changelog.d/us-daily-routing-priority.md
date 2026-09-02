@@ -1,0 +1,1 @@
+- [Fixed] Order US daily fallback sources by fetcher priority while pinning US-index and Longbridge-preferred heads (Refs #1636).
