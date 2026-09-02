@@ -1,0 +1,1 @@
+- [Fixed] Keep Analysis Workbench Pending only enabled after a shared watchlist GET observer unmounts (Refs #789).

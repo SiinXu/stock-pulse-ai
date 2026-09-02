@@ -1,7 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import { QueryClient, QueryClientProvider, focusManager, onlineManager } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, render, renderHook, waitFor } from '@testing-library/react';
 import { StrictMode, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createAppQueryClient } from '../../query/createAppQueryClient';
@@ -152,6 +152,17 @@ describe('useWatchlist', () => {
       expect(result.current.watchlistCodes).toEqual(['AAPL']);
     });
     expect(mockGetWatchlist).toHaveBeenCalledTimes(1);
+  });
+
+  it('settles an immediate GET under host-faithful StrictMode', async () => {
+    mockGetWatchlist.mockResolvedValue(['AAPL']);
+    const { wrapper } = createHostWrapper();
+    const { result } = renderHook(() => useWatchlist(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.watchlistCodes).toEqual(['AAPL']);
+    });
   });
 
   it('keeps the newest watchlist result when an older refresh resolves last', async () => {
@@ -335,6 +346,143 @@ describe('useWatchlist', () => {
       expect(second.result.current.watchlistCodes).toEqual(['AAPL']);
     });
     expect(mockGetWatchlist).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not let a departing route observer poison the next owner with a stale in-flight GET', async () => {
+    const homeGet = createDeferred<string[]>();
+    const workbenchGet = createDeferred<string[]>();
+    mockGetWatchlist
+      .mockReturnValueOnce(homeGet.promise)
+      .mockReturnValueOnce(workbenchGet.promise);
+    const { wrapper } = createWrapper();
+    const home = renderHook(() => useWatchlist(), { wrapper });
+
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(home.result.current.isLoading).toBe(true));
+    home.unmount();
+
+    const workbench = renderHook(() => useWatchlist(), { wrapper });
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(workbench.result.current.isLoading).toBe(true));
+
+    await act(async () => {
+      homeGet.resolve([]);
+      await homeGet.promise.catch(() => undefined);
+    });
+    await act(async () => {
+      workbenchGet.resolve(['AAPL']);
+    });
+    await waitFor(() => {
+      expect(workbench.result.current.isLoading).toBe(false);
+      expect(workbench.result.current.watchlistCodes).toEqual(['AAPL']);
+      expect(workbench.result.current.loadError).toBeNull();
+    });
+  });
+
+  it('starts a fresh GET when a later route owner mounts in the same QueryClient after Home unmounts', async () => {
+    const homeGet = createDeferred<string[]>();
+    const workbenchGet = createDeferred<string[]>();
+    mockGetWatchlist
+      .mockReturnValueOnce(homeGet.promise)
+      .mockReturnValueOnce(workbenchGet.promise);
+
+    function RouteOwner() {
+      const watchlist = useWatchlist();
+      return (
+        <output data-testid="watchlist-state">
+          {JSON.stringify({
+            loading: watchlist.isLoading,
+            codes: watchlist.watchlistCodes,
+          })}
+        </output>
+      );
+    }
+
+    function App({ route }: { route: 'home' | 'settings' | 'workbench' }) {
+      return (
+        <>
+          {route === 'home' ? <RouteOwner /> : null}
+          {route === 'workbench' ? <RouteOwner /> : null}
+        </>
+      );
+    }
+
+    const { wrapper } = createWrapper();
+    const view = render(<App route="home" />, { wrapper });
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(1));
+
+    view.rerender(<App route="settings" />);
+    expect(view.queryByTestId('watchlist-state')).not.toBeInTheDocument();
+
+    view.rerender(<App route="workbench" />);
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      homeGet.resolve([]);
+      await homeGet.promise.catch(() => undefined);
+    });
+    await act(async () => {
+      workbenchGet.resolve(['AAPL']);
+    });
+    await waitFor(() => {
+      expect(JSON.parse(view.getByTestId('watchlist-state').textContent ?? '{}')).toEqual({
+        loading: false,
+        codes: ['AAPL'],
+      });
+    });
+  });
+
+  it('does not keep Workbench loading after Home unmounts under host StrictMode', async () => {
+    const homeGet = createDeferred<string[]>();
+    const workbenchGet = createDeferred<string[]>();
+    let stage: 'home' | 'workbench' = 'home';
+    mockGetWatchlist.mockImplementation(() => (
+      stage === 'home' ? homeGet.promise : workbenchGet.promise
+    ));
+
+    function RouteOwner() {
+      const watchlist = useWatchlist();
+      return (
+        <output data-testid="watchlist-state">
+          {JSON.stringify({
+            loading: watchlist.isLoading,
+            codes: watchlist.watchlistCodes,
+          })}
+        </output>
+      );
+    }
+
+    function App({ route }: { route: 'home' | 'settings' | 'workbench' }) {
+      return (
+        <>
+          {route === 'home' ? <RouteOwner /> : null}
+          {route === 'workbench' ? <RouteOwner /> : null}
+        </>
+      );
+    }
+
+    const { wrapper } = createHostWrapper();
+    const view = render(<App route="home" />, { wrapper });
+    await waitFor(() => expect(mockGetWatchlist).toHaveBeenCalled());
+
+    view.rerender(<App route="settings" />);
+    await act(async () => {
+      homeGet.resolve([]);
+      await homeGet.promise.catch(() => undefined);
+    });
+
+    stage = 'workbench';
+    view.rerender(<App route="workbench" />);
+    await waitFor(() => expect(mockGetWatchlist.mock.calls.length).toBeGreaterThanOrEqual(2));
+    await act(async () => {
+      workbenchGet.resolve(['AAPL']);
+    });
+    await waitFor(() => {
+      expect(JSON.parse(view.getByTestId('watchlist-state').textContent ?? '{}')).toEqual({
+        loading: false,
+        codes: ['AAPL'],
+      });
+    });
   });
 
   it('updates the exact query after a successful mutation so sibling observers converge without another GET', async () => {

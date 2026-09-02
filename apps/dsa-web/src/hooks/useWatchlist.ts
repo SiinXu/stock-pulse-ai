@@ -44,7 +44,13 @@ function isCancelledError(error: unknown): boolean {
 
 /**
  * Silent CancelledError skips Query error dispatch and leaves fetchStatus
- * fetching until a same-key successor fetch or exact-key cancel.
+ * fetching until a same-key successor fetch or exact-key cancel/remove.
+ *
+ * Do not fence this shared queryFn on a single observer's mounted lifetime.
+ * Home, Workbench, and Decision Signals share the exact key and replace each
+ * other on route change. A silent cancel from the departing observer leaves
+ * fetchStatus fetching, so the arriving observer never settles and Workbench
+ * Pending only stays disabled.
  */
 export function throwIfWatchlistCancelled(
   signal: AbortSignal | undefined,
@@ -91,8 +97,7 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
       return fetchWatchlistCodes({
         signal,
         stillActive: () => (
-          mountedRef.current
-          && enabledRef.current
+          enabledRef.current
           && generationRef.current === startedAt
         ),
       });
@@ -108,11 +113,26 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
       if (messageTimerRef.current !== null) {
         window.clearTimeout(messageTimerRef.current);
       }
+      const client = queryClient;
+      queueMicrotask(() => {
+        if (mountedRef.current) return;
+        const remaining = client.getQueryCache()
+          .find({ queryKey: WATCHLIST_QUERY_KEY, exact: true })
+          ?.getObserversCount() ?? 0;
+        if (remaining > 0) return;
+        generationRef.current += 1;
+        void client.cancelQueries(
+          { queryKey: WATCHLIST_QUERY_KEY, exact: true },
+          WATCHLIST_CANCEL,
+        );
+        client.removeQueries({ queryKey: WATCHLIST_QUERY_KEY, exact: true });
+      });
     };
-  }, []);
+  }, [queryClient]);
 
   // Disable must cancel the exact in-flight GET so a later re-enable starts a
-  // new generation. Do not removeQueries: other live observers share this key.
+  // new generation. Do not removeQueries here: other live observers share this
+  // key. Last-observer unmount discards the row after a microtask instead.
   useEffect(() => {
     if (enabled) {
       return undefined;
@@ -140,7 +160,7 @@ export function useWatchlist({ enabled = true }: UseWatchlistOptions = {}): UseW
           const startedAt = generationRef.current;
           return fetchWatchlistCodes({
             signal,
-            stillActive: () => mountedRef.current && generationRef.current === startedAt,
+            stillActive: () => generationRef.current === startedAt,
           });
         },
         ...WATCHLIST_QUERY_SCHEDULE,
