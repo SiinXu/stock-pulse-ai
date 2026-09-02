@@ -1,0 +1,1 @@
+- [Fixed] Settle shared watchlist cancellation and keep Workbench batch controls usable during background refreshes (Refs #789).
