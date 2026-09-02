@@ -38,6 +38,7 @@ type LifecycleOptions = Parameters<
 
 let lifecycleOptions: LifecycleOptions | null = null;
 let watchlistCodes: string[] = [];
+let watchlistLoading = false;
 const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
   void target;
   return () => {};
@@ -102,7 +103,7 @@ vi.mock('../../hooks/useStockIndex', () => ({
 vi.mock('../../hooks/useWatchlist', () => ({
   useWatchlist: () => ({
     watchlistCodes,
-    isLoading: false,
+    isLoading: watchlistLoading,
     isActioning: false,
     loadError: null,
     actionMessage: null,
@@ -260,6 +261,7 @@ describe('ResearchAnalysisWorkbenchPage', () => {
     window.sessionStorage.clear();
     lifecycleOptions = null;
     watchlistCodes = [];
+    watchlistLoading = false;
     useStockPoolStore.getState().resetDashboardState();
     vi.mocked(agentApi.getSkills).mockResolvedValue({ skills: [], default_skill_id: '' });
     vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
@@ -1207,6 +1209,21 @@ describe('ResearchAnalysisWorkbenchPage', () => {
       await replacementImport.promise;
     });
     expect(await screen.findByRole('button', { name: '分析已导入 (2)' })).toBeInTheDocument();
+  });
+
+  it('keeps pending-only disabled while the watchlist GET is still loading', async () => {
+    watchlistCodes = ['AAPL'];
+    watchlistLoading = true;
+    useStockPoolStore.setState({
+      stockBarItems: [stockBarItem(1, 'AAPL', '2020-01-01T00:00:00Z')],
+      isLoadingStockBar: false,
+      stockBarRefreshFailed: false,
+    });
+    renderWorkbench();
+
+    const pendingButton = await screen.findByRole('button', { name: '仅未分析' });
+    expect(pendingButton).toBeDisabled();
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
   it('submits only watchlist symbols not analyzed today', async () => {
