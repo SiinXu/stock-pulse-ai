@@ -1,0 +1,1 @@
+- [Fixed] Normalize stock names across local and AkShare resolver lookups.
