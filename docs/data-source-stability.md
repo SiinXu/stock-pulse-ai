@@ -37,7 +37,7 @@ ADR-006 拆分后，规范化 / 路由辅助 / 共享类型的文件归属见 [D
 
 - A 股个股与 AlphaSift：优先配置 `TUSHARE_TOKEN`，并保留 AkShare / Efinance / Tencent / Baostock / YFinance 兜底。
 - A 股大盘复盘：配置 `TICKFLOW_API_KEY` 后，指数和市场宽度会优先尝试 TickFlow，失败后回退现有免费源。
-- 港股 / 美股：配置 `LONGBRIDGE_*` 后，支持的实时行情与美股个股日线会优先使用 Longbridge；港股日线仍按静态 numeric priority，YFinance、AkShare、Tushare、Finnhub、AlphaVantage 继续按市场能力兜底。
+- 港股 / 美股：配置 `LONGBRIDGE_*` 后，支持的个股实时行情与美股个股日线会优先使用 Longbridge；美股指数实时固定为 YFinance-only，YFinance 缺失或部分字段时不回退、也不向 Longbridge 补字段；港股日线仍按静态 numeric priority，YFinance、AkShare、Tushare、Finnhub、AlphaVantage 继续按市场能力兜底。
 - 热点题材：AlphaSift 热点默认走 DSA EastMoney provider，并使用本地 last-good cache 降低实时接口失败影响。
 
 ## 已接入数据源矩阵
@@ -51,7 +51,7 @@ ADR-006 拆分后，规范化 / 路由辅助 / 共享类型的文件归属见 [D
 | AlphaSift 日线补特征 | DSA `DataFetcherManager` | AlphaSift 调用 DSA provider context，优先复用 DSA 日线与缓存链路 | DSA 链路失败后才回到 AlphaSift 原始日线源 |
 | AlphaSift 热点题材 | DSA EastMoney provider、AlphaSift hotspot、last-good cache | 未指定 provider 时默认使用 DSA EastMoney provider | 实时失败时回退热点缓存；无缓存时返回稳定空态和可读错误 |
 | 港股 | Tushare、AkShare、YFinance、Longbridge | 日线按 numeric priority；配置且初始化成功的 Tushare 为 `-1`，Longbridge 默认 `5`。实时行情配置 Longbridge 后优先 Longbridge | 日线继续尝试下一个 HK-capable provider；实时行情回退 AkShare。AkShare 港股东财全市场快照：刷新失败时不销毁仍在 success TTL 内的可用快照；仅在完全没有可用快照时写入约 30s 的 failure 负缓存，再回退新浪（字段更少） |
-| 美股 | Longbridge、Finnhub、AlphaVantage、YFinance | 个股配置 Longbridge 后使用 `Longbridge -> Finnhub -> AlphaVantage -> YFinance`，否则使用 `Finnhub -> AlphaVantage -> YFinance`；指数固定 `YFinance -> Finnhub` | named route 忽略 numeric priority；全部失败后才使用符合窗口的 stale 日线缓存 |
+| 美股 | Longbridge、Finnhub、AlphaVantage、YFinance | 个股日线配置 Longbridge 后使用 `Longbridge -> Finnhub -> AlphaVantage -> YFinance`，否则使用 `Finnhub -> AlphaVantage -> YFinance`；指数日线固定 `YFinance -> Finnhub`。个股实时：配置且可用的 Longbridge 优先，YFinance 兜底并可从 Finnhub/AlphaVantage 补字段；指数实时为 YFinance-only | named route 忽略 numeric priority；日线全部失败后才使用符合窗口的 stale 日线缓存。指数实时在 YFinance 缺失或部分字段时不回退、也不向 Longbridge 补字段 |
 
 ## 总体链路图
 
@@ -265,7 +265,7 @@ Tushare 自定义端点：如需指向自建节点、代理或内网镜像，可
 
 ### 港股 / 美股稳定模式
 
-适合港美股组合、持仓和个股分析。Longbridge 配置后优先参与支持的港美股实时行情和美股个股日线；港股日线仍按静态 numeric priority。YFinance、AkShare、Tushare、Finnhub、AlphaVantage 按市场能力继续兜底。
+适合港美股组合、持仓和个股分析。Longbridge 配置后优先参与支持的港美股个股实时行情和美股个股日线；美股指数实时固定为 YFinance-only，YFinance 缺失或部分字段时不回退、也不向 Longbridge 补字段；港股日线仍按静态 numeric priority。YFinance、AkShare、Tushare、Finnhub、AlphaVantage 按市场能力继续兜底。
 
 ```env
 LONGBRIDGE_OAUTH_CLIENT_ID=your_client_id

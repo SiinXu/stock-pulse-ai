@@ -64,7 +64,8 @@ The default A-share group contains Efinance and Tencent at priority 0, AkShare a
 | U.S. index daily bars | YFinance, then configured Finnhub | Stale daily cache after eligible providers fail |
 | U.S. stock daily bars | Longbridge, Finnhub, Alpha Vantage, then YFinance when Longbridge is configured and available; otherwise Finnhub, Alpha Vantage, then YFinance | Any available but non-preferred Longbridge route is last; unsupported or unavailable providers are skipped; stale daily cache is last |
 | Hong Kong daily bars | The market filter retains HK-capable providers in numeric-priority order: configured and initialized Tushare (`-1`), AkShare (`1`), YFinance (`4`), then optional Longbridge (`5`) | `LONGBRIDGE_PRIORITY` can change Longbridge's HK daily position, but credentials alone do not promote it |
-| Hong Kong and U.S. realtime quote | Configured and available Longbridge is preferred for the supported non-A-share quote route | YFinance or AkShare remains the market-specific fallback. For AkShare Hong Kong Eastmoney full-market snapshots: a failed refresh must not destroy a still-usable success-TTL snapshot; the short (~30s) failure negative-cache applies only when no usable snapshot exists, then Sina is used (smaller field set) |
+| Hong Kong and U.S. stock realtime quote | Configured and available Longbridge is preferred for the supported non-A-share stock quote route | YFinance or AkShare remains the market-specific fallback, and U.S. stocks may still field-supplement from Finnhub / Alpha Vantage. For AkShare Hong Kong Eastmoney full-market snapshots: a failed refresh must not destroy a still-usable success-TTL snapshot; the short (~30s) failure negative-cache applies only when no usable snapshot exists, then Sina is used (smaller field set) |
+| U.S. index realtime quote | YFinance only | Do not fall back to or field-supplement from Longbridge when YFinance returns missing or partial data. Plugin tail fallback after the built-in route is unchanged |
 | Japan, Korea, and Taiwan daily bars | Market capability filtering retains supported providers, primarily YFinance for current coverage | Market-specific intelligence fields may be `not_supported` even when daily bars succeed |
 | AlphaSift hotspot refresh | DSA EastMoney provider by default | Fall back to the last-good hotspot cache; without cache, return a stable empty state with a readable error code |
 
@@ -232,7 +233,7 @@ FINNHUB_API_KEY=your_finnhub_key
 ALPHAVANTAGE_API_KEY=your_alphavantage_key
 ```
 
-Configured Longbridge credentials make it preferred for supported non-A-share realtime quotes and for U.S. stock daily bars. Hong Kong daily placement still follows numeric priority. YFinance remains the broad baseline; Finnhub and Alpha Vantage participate only when configured. U.S. indexes still prefer YFinance because Longbridge does not provide that index route.
+Configured Longbridge credentials make it preferred for supported non-A-share stock realtime quotes and for U.S. stock daily bars. Hong Kong daily placement still follows numeric priority. YFinance remains the broad baseline; Finnhub and Alpha Vantage participate only when configured. U.S. index realtime quotes are YFinance-only: missing or partial YFinance data must not fall back to or field-supplement from Longbridge.
 
 ## Offline provider contract tests (recorded fixtures)
 
