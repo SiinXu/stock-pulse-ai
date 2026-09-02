@@ -12,6 +12,7 @@ from __future__ import annotations
 import difflib
 import logging
 import time
+import unicodedata
 from typing import Dict, Optional, Set, Tuple
 
 from src.data.stock_mapping import STOCK_NAME_MAP
@@ -28,6 +29,11 @@ _AKSHARE_CACHE_TTL = 1800  # 30 MIN
 def _contains_cjk(text: str) -> bool:
     """Return True when text contains CJK characters."""
     return any("\u3400" <= ch <= "\u9fff" for ch in text)
+
+
+def _normalize_stock_name(name: str) -> str:
+    """Normalize character width and remove all whitespace from a stock name."""
+    return "".join(unicodedata.normalize("NFKC", name).split())
 
 
 def _is_code_like(s: str) -> bool:
@@ -50,12 +56,29 @@ def _build_reverse_map_no_duplicates(
     for code, name in code_to_name.items():
         if not name or not code:
             continue
-        name = name.strip()
+        name = _normalize_stock_name(name)
+        if not name:
+            continue
         if name not in name_to_codes:
             name_to_codes[name] = set()
         name_to_codes[name].add(code)
     # Only include names with exactly one code
     return {name: next(iter(codes)) for name, codes in name_to_codes.items() if len(codes) == 1}
+
+
+def _normalize_name_to_code_map(name_to_code: Dict[str, str]) -> Dict[str, str]:
+    """Normalize lookup keys while excluding names that become ambiguous."""
+    normalized_to_codes: Dict[str, Set[str]] = {}
+    for name, code in name_to_code.items():
+        normalized_name = _normalize_stock_name(str(name))
+        if not normalized_name or not code:
+            continue
+        normalized_to_codes.setdefault(normalized_name, set()).add(str(code))
+    return {
+        name: next(iter(codes))
+        for name, codes in normalized_to_codes.items()
+        if len(codes) == 1
+    }
 
 
 def _build_local_name_indexes(code_to_name: Dict[str, str]) -> Tuple[Dict[str, str], Set[str]]:
@@ -68,7 +91,7 @@ def _build_local_name_indexes(code_to_name: Dict[str, str]) -> Tuple[Dict[str, s
     for code, name in code_to_name.items():
         if not name or not code:
             continue
-        normalized_name = name.strip()
+        normalized_name = _normalize_stock_name(name)
         if not normalized_name:
             continue
         name_to_codes.setdefault(normalized_name, set()).add(code)
@@ -113,12 +136,12 @@ def _get_akshare_name_to_code() -> Optional[Dict[str, str]]:
                 base, suffix = code_str.rsplit(".", 1)
                 if suffix.upper() in ("SH", "SZ", "SS") and base.isdigit():
                     code_str = base
-            code_to_name[code_str] = str(name).strip()
+            code_to_name[code_str] = _normalize_stock_name(str(name))
         result = _build_reverse_map_no_duplicates(code_to_name)
         _akshare_cache = (now, result)
         logger.info(f"[NameResolver] AkShare cache loaded: {len(result)} name->code mappings")
         return result
-    except Exception as exc:
+    except Exception as exc:  # broad-exception: fallback_recorded - AkShare degradation is logged before returning no fallback mapping
         log_safe_exception(
             logger,
             "Name resolver AkShare fallback failed",
@@ -162,7 +185,7 @@ def resolve_name_to_code(name: str) -> Optional[str]:
     """
     if not name or not isinstance(name, str):
         return None
-    s = name.strip()
+    s = _normalize_stock_name(name)
     if not s:
         return None
 
@@ -206,6 +229,9 @@ def resolve_name_to_code(name: str) -> Optional[str]:
 
     # 4. AkShare fallback
     akshare_map = _get_akshare_name_to_code()
+    if akshare_map:
+        # Normalize cached and injected maps at the merge boundary as well as at fetch time.
+        akshare_map = _normalize_name_to_code_map(akshare_map)
     if akshare_map and s in akshare_map:
         logger.debug(f"[NameResolver] 命中 AkShare 映射: {s} -> {akshare_map[s]}")
         return akshare_map[s]

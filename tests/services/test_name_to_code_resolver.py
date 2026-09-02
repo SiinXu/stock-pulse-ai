@@ -10,14 +10,18 @@ Covers:
 - Ambiguous names return None
 """
 
-import pytest
+import logging
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from src.services.name_to_code_resolver import (
     resolve_name_to_code,
     _is_code_like,
     _normalize_code,
+    _normalize_stock_name,
+    _normalize_name_to_code_map,
     _build_reverse_map_no_duplicates,
+    _get_akshare_name_to_code,
 )
 
 
@@ -110,12 +114,50 @@ class TestBuildReverseMapNoDuplicates:
         assert result["贵州茅台"] == "600519"
         assert result["腾讯控股"] == "00700"
 
+    def test_normalizes_width_and_embedded_whitespace(self):
+        result = _build_reverse_map_no_duplicates(
+            {"000001": " 浦 发 银 行 ", "000002": "京东方Ａ"}
+        )
+        assert result == {"浦发银行": "000001", "京东方A": "000002"}
+
+    def test_normalized_alias_collision_remains_ambiguous(self):
+        result = _build_reverse_map_no_duplicates(
+            {"000001": "京东方Ａ", "000002": "京东方 A"}
+        )
+        assert "京东方A" not in result
+
+    def test_normalized_cache_aliases_preserve_unique_code(self):
+        result = _normalize_name_to_code_map(
+            {"京东方Ａ": "000725", "京东方 A": "000725"}
+        )
+        assert result == {"京东方A": "000725"}
+
+    def test_normalized_cache_alias_conflict_is_excluded(self):
+        result = _normalize_name_to_code_map(
+            {"京东方Ａ": "000725", "京东方 A": "000001"}
+        )
+        assert "京东方A" not in result
+
 
 # ---------------------------------------------------------------------------
 # resolve_name_to_code
 # ---------------------------------------------------------------------------
 
 class TestResolveNameToCode:
+    def test_akshare_failure_is_logged_before_returning_none(self, caplog):
+        failing_akshare = SimpleNamespace(
+            stock_info_a_code_name=lambda: (_ for _ in ()).throw(RuntimeError("offline"))
+        )
+
+        with (
+            patch.dict("sys.modules", {"akshare": failing_akshare}),
+            patch("src.services.name_to_code_resolver._akshare_cache", None),
+            caplog.at_level(logging.WARNING),
+        ):
+            assert _get_akshare_name_to_code() is None
+
+        assert "name_resolver_akshare_fallback_failed" in caplog.text
+
     def test_code_like_input_returned_normalized(self):
         assert resolve_name_to_code("600519") == "600519"
         assert resolve_name_to_code("600519.SH") == "600519"
@@ -125,6 +167,13 @@ class TestResolveNameToCode:
     def test_local_map_exact_match(self):
         assert resolve_name_to_code("贵州茅台") == "600519"
         assert resolve_name_to_code("腾讯控股") == "00700"
+
+    def test_query_normalizes_full_width_latin_and_embedded_whitespace(self):
+        assert resolve_name_to_code("腾 讯 控 股") == "00700"
+        assert resolve_name_to_code("ＡＡＰＬ") == "AAPL"
+
+    def test_normalization_removes_unicode_whitespace(self):
+        assert _normalize_stock_name("京\u3000东 方Ａ") == "京东方A"
 
     def test_returns_none_for_empty_or_invalid_input(self):
         assert resolve_name_to_code("") is None
@@ -144,6 +193,22 @@ class TestResolveNameToCode:
         result = resolve_name_to_code("浦发银行")
         assert result == "600000"
         mock_akshare.assert_called()
+
+    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
+    def test_akshare_map_is_normalized_at_merge_boundary(self, mock_akshare):
+        mock_akshare.return_value = {"浦 发 银 行Ａ": "600000"}
+        assert resolve_name_to_code("浦发银行Ａ") == "600000"
+
+    @patch("src.services.name_to_code_resolver.time.time", return_value=101.0)
+    def test_cached_akshare_names_are_normalized(self, _mock_time):
+        from src.services import name_to_code_resolver as resolver
+
+        with patch.object(
+            resolver,
+            "_akshare_cache",
+            (100.0, {"浦 发 银 行Ａ": "600000"}),
+        ):
+            assert resolve_name_to_code("浦发银行A") == "600000"
 
     @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
     def test_fuzzy_match_fallback(self, mock_akshare):

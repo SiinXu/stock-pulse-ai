@@ -278,7 +278,6 @@
     {"path":"src/services/market_light_alerts.py","scope":"<module>._evaluate_score_drop","caught":["Exception"],"digest":"d7df216ab8549a1ea0074eebcb535d19cee47b258b9d62305981beb2e5cd50b8"},
     {"path":"src/services/market_light_alerts.py","scope":"<module>.evaluate_market_light_alert","caught":["Exception"],"digest":"ddc307858c411b33f78cfaa15ea77a504622d72fb8e63fa82c6ecc976350368a"},
     {"path":"src/services/market_light_service.py","scope":"<module>.load_previous_snapshot","caught":["Exception"],"digest":"3a36c608cd779ba0b3656d1128f93c70335621c2276f71e4d24ce33f6880b434"},
-    {"path":"src/services/name_to_code_resolver.py","scope":"<module>._get_akshare_name_to_code","caught":["Exception"],"digest":"18747073a5611f05fc3a2a0bb27a3ca020d3decb6752918f79aa4e90e5cad73a"},
     {"path":"src/services/name_to_code_resolver.py","scope":"<module>.resolve_name_to_code","caught":["Exception"],"digest":"36e1bb34c6db32425066d6c5a99d0d60923366cd2d377891e71f46fb01af0e99"},
     {"path":"src/services/portfolio_alerts.py","scope":"<module>._watchlist_symbols","caught":["Exception"],"digest":"6fc5264202df8dc8d23226d8ce061a4ea73f7679e6dffcb036812179373bd0b4"},
     {"path":"src/services/portfolio_risk_service.py","scope":"<module>.PortfolioRiskService._build_decision_signal_risk","caught":["Exception"],"digest":"c944581add1e0a554fdc87f5c9774e79371d8bf6539010306531dc49e9fb17c3"},
