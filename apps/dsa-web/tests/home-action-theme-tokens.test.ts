@@ -95,8 +95,7 @@ describe('home-action theme tokens', () => {
     }
   });
 
-  it('removes the collapsed names from the defined inventory and pins the ceiling at 48', () => {
-    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBe(48);
+  it('removes the collapsed names from the defined inventory and does not raise the ceiling above 48', () => {
     expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBeLessThanOrEqual(48);
 
     const inventorySource = readInventorySource();

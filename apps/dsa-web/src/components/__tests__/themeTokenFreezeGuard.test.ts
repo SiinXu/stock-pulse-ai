@@ -331,8 +331,8 @@ describe('theme token freeze guard', () => {
   it('fails closed when the inventory file is missing from disk', () => {
     expect(fs.existsSync('src/design/themeTokenInventory.ts')).toBe(true);
     // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
-    // portfolio/chat/settings/home-action) shrank the defined inventory
-    // below 170.
+    // portfolio/chat/settings/home-action/home-prose) shrank the defined
+    // inventory below 170.
     expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(160);
     expect(() => {
       if (THEME_DEFINED_TOKEN_NAMES.length === 0) {

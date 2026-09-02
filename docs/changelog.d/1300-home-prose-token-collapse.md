@@ -1,0 +1,1 @@
+- [Changed] Report and chat markdown prose borders now paint from Layer 1 `--foreground` / `--primary` alpha instead of the four `--home-prose-*` page-scoped tokens; page-scoped token ceiling 48 → 44 (Refs #1300).
