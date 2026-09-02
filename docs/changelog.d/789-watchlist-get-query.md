@@ -1,0 +1,1 @@
+- [Changed] Schedule watchlist GET loads through TanStack Query around `systemConfigApi.getWatchlist` while preserving the enabled gate, in-flight races, and mutation cache updates (Refs #789).
