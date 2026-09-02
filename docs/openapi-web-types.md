@@ -371,6 +371,34 @@ is `never`. This is **not** the auth object export-alias pattern: generated
 snake_case is not the UI type. Runtime Zod in `api/watchlistGroups.ts` is
 unchanged. The module is runtime-empty.
 
+`apps/dsa-web/src/types/runFlow.ts` now CamelizeKeys-binds the six generated
+RunFlow object components (`RunFlowLane`, `RunFlowNode`, `RunFlowEdge`,
+`RunFlowEvent`, `RunFlowSummary`, `RunFlowSnapshot`). Closed unions
+(`RunFlowStatus`, `RunFlowNodeKind`, `RunFlowEdgeKind`,
+`RunFlowEventSeverity`) are derived from generated field enums; there are
+no named OpenAPI enum schemas, so do not invent unions. `Override` keeps
+required `lanes` / `nodes` / `edges` / `events` versus generated optional
+arrays (generated fact; not fixed by regenerating OpenAPI). `Override` also
+keeps required summary counts (`failedAttempts` / `fallbackCount` /
+`dataSourceCount` / `eventCount`) versus OpenAPI JSON
+`RunFlowSummary.required: none` (generated TypeScript already requires the
+defaulted fields). Public UI `RunFlowSnapshot` **omits** generated
+`schema_version` / Camelized `schemaVersion` (generated required `string`
+because of default `run-flow-v1`; the current UI type never exposed it; this
+is **not** the security-audit optional-widen pattern). Generated edge keys
+are `from` / `to` (Pydantic aliases), not `from_node` / `to_node`.
+`RunFlowSnapshotSource` stays handwritten (`{ type: 'task'; taskId: string }`
+| `{ type: 'history'; recordId: number }`). Path 200 JSON for GET
+`/api/v1/analysis/tasks/{task_id}/flow`
+(`get_task_run_flow_api_v1_analysis_tasks__task_id__flow_get`) and GET
+`/api/v1/history/{record_id}/flow`
+(`get_history_run_flow_api_v1_history__record_id__flow_get`) is mutually
+equivalent to `RunFlowSnapshot`; both GET `requestBody` is `never`. This is
+**not** the auth object export-alias pattern: generated snake_case is not
+the UI type. Runtime Zod in `api/analysis.ts` and `api/history.ts` is
+unchanged (still requires `schemaVersion` on the wire parse; still optional
+arrays). The module is runtime-empty. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
