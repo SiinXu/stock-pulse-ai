@@ -35,7 +35,7 @@ StockPulse has separate priority systems. Changing one does not silently rewrite
 
 | Path | Configuration authority | Ordering rule |
 | --- | --- | --- |
-| Non-U.S. daily bars and general provider fallback | Fetcher numeric `priority`, including `EFINANCE_PRIORITY`, `AKSHARE_PRIORITY`, `TICKFLOW_PRIORITY`, `PYTDX_PRIORITY`, `BAOSTOCK_PRIORITY`, `YFINANCE_PRIORITY`, and `LONGBRIDGE_PRIORITY` | Lower numeric values are attempted earlier after market and capability filtering. A successfully initialized Tushare provider is forced to priority `-1`, ahead of the default free-provider group. U.S. daily bars use the dedicated named routes below instead of numeric priority. |
+| Non-U.S. daily bars and general provider fallback | Fetcher numeric `priority`, including `EFINANCE_PRIORITY`, `AKSHARE_PRIORITY`, `TICKFLOW_PRIORITY`, `PYTDX_PRIORITY`, `BAOSTOCK_PRIORITY`, `YFINANCE_PRIORITY`, and `LONGBRIDGE_PRIORITY` | Lower numeric values are attempted earlier after market and capability filtering. A successfully initialized Tushare provider is forced to priority `-1`, ahead of the default free-provider group. U.S. daily bars start from the dedicated named routes below, then stable-sort the **builtin** names by each fetcher’s numeric `priority` (defaults match the named chain). Pin-first keeps YFinance first for U.S. indexes and Longbridge first when Longbridge is preferred. The plugin tail is appended after that sort and is not reordered by priority. |
 | A-share realtime quotes | `REALTIME_SOURCE_PRIORITY` | Provider aliases are attempted from left to right. This list is independent of daily numeric priorities and daily adaptive ordering. |
 | AlphaSift screening snapshots | `SNAPSHOT_SOURCE_PRIORITY` or its token-aware default | When no explicit value is set, Tushare is prepended only when `TUSHARE_TOKEN` is available; the remaining chain uses Sina, Efinance, AkShare EM, and EastMoney Datacenter. |
 
@@ -48,12 +48,12 @@ When `TUSHARE_TOKEN` is set and `REALTIME_SOURCE_PRIORITY` is not explicitly set
 1. Return a fresh process-memory or persistent daily-cache entry when one is available.
 2. Normalize the symbol and determine its market.
 3. Remove providers that do not declare support for that market or are unavailable for the requested capability.
-4. Apply dedicated market routes. U.S. indexes prefer YFinance; configured Longbridge credentials can make Longbridge primary for U.S. stocks. Hong Kong daily bars remain in the filtered numeric-priority chain.
+4. Apply dedicated market routes. U.S. indexes pin YFinance first; configured Longbridge credentials can pin Longbridge first for U.S. stocks. Remaining unpinned builtin U.S. daily members then follow numeric `priority` (`YFINANCE_PRIORITY` / `LONGBRIDGE_PRIORITY`). Hong Kong daily bars remain in the filtered numeric-priority chain.
 5. For non-U.S. routes, start from numeric static priority and apply bounded adaptive ordering only to eligible equal-priority peers.
 6. Skip a provider whose per-market daily circuit is in cooldown, and try the next eligible provider after an exception, empty result, or unusable response.
 7. After every eligible provider fails, use an eligible stale daily-cache entry. If no stale entry is eligible, raise the existing data-fetch error.
 
-The default A-share group contains Efinance and Tencent at priority 0, AkShare at 1, the credential-gated TickFlow provider and always-initialized Pytdx provider at 2, Baostock at 3, and YFinance at 4. Tushare, TickFlow, Longbridge, Finnhub, and Alpha Vantage are instantiated only when their required credentials are configured; Pytdx does not require credentials. Treat numeric values as non-U.S. static boundaries, not a guarantee that every provider supports every symbol or data type.
+The default A-share group contains Efinance and Tencent at priority 0, AkShare at 1, the credential-gated TickFlow provider and always-initialized Pytdx provider at 2, Baostock at 3, and YFinance at 4. Tushare, TickFlow, Longbridge, Finnhub, and Alpha Vantage are instantiated only when their required credentials are configured; Pytdx does not require credentials. Treat numeric values as static boundaries for non-U.S. daily routes and for the unpinned remainder of U.S. daily named chains, not a guarantee that every provider supports every symbol or data type.
 
 ## Market-aware Routes
 
@@ -61,8 +61,8 @@ The default A-share group contains Efinance and Tencent at priority 0, AkShare a
 | --- | --- | --- |
 | A-share daily bars | A configured and initialized Tushare provider is preferred; otherwise the filtered numeric-priority chain is used | Continue through free providers, then use eligible stale daily cache |
 | A-share realtime quote | Left-to-right `REALTIME_SOURCE_PRIORITY`; default is `tencent,akshare_sina,efinance,akshare_em` | Continue through the list; provider-run diagnostics record the failed and successful source |
-| U.S. index daily bars | YFinance, then configured Finnhub | Stale daily cache after eligible providers fail |
-| U.S. stock daily bars | Longbridge, Finnhub, Alpha Vantage, then YFinance when Longbridge is configured and available; otherwise Finnhub, Alpha Vantage, then YFinance | Any available but non-preferred Longbridge route is last; unsupported or unavailable providers are skipped; stale daily cache is last |
+| U.S. index daily bars | Default named chain is YFinance, then configured Finnhub. YFinance stays pinned first; the remaining builtin member follows numeric `priority`. Plugin tail is appended after that sort | Stale daily cache after eligible providers fail |
+| U.S. stock daily bars | Default named chain is Longbridge, Finnhub, Alpha Vantage, then YFinance when Longbridge is configured and available; otherwise Finnhub, Alpha Vantage, YFinance, then Longbridge. Pin-first keeps Longbridge first when preferred. Remaining unpinned builtin members follow numeric `priority` (`YFINANCE_PRIORITY` / `LONGBRIDGE_PRIORITY`). Plugin tail is not reordered | Any available but non-preferred Longbridge route is last after the unpinned sort; unsupported or unavailable providers are skipped; stale daily cache is last |
 | Hong Kong daily bars | The market filter retains HK-capable providers in numeric-priority order: configured and initialized Tushare (`-1`), AkShare (`1`), YFinance (`4`), then optional Longbridge (`5`) | `LONGBRIDGE_PRIORITY` can change Longbridge's HK daily position, but credentials alone do not promote it |
 | Hong Kong and U.S. stock realtime quote | Configured and available Longbridge is preferred for the supported non-A-share stock quote route | YFinance or AkShare remains the market-specific fallback, and U.S. stocks may still field-supplement from Finnhub / Alpha Vantage. For AkShare Hong Kong Eastmoney full-market snapshots: a failed refresh must not destroy a still-usable success-TTL snapshot; the short (~30s) failure negative-cache applies only when no usable snapshot exists, then Sina is used (smaller field set) |
 | U.S. index realtime quote | YFinance only | Do not fall back to or field-supplement from Longbridge when YFinance returns missing or partial data. Plugin tail fallback after the built-in route is unchanged |
@@ -233,7 +233,7 @@ FINNHUB_API_KEY=your_finnhub_key
 ALPHAVANTAGE_API_KEY=your_alphavantage_key
 ```
 
-Configured Longbridge credentials make it preferred for supported non-A-share stock realtime quotes and for U.S. stock daily bars. Hong Kong daily placement still follows numeric priority. YFinance remains the broad baseline; Finnhub and Alpha Vantage participate only when configured. U.S. index realtime quotes are YFinance-only: missing or partial YFinance data must not fall back to or field-supplement from Longbridge.
+Configured Longbridge credentials make it preferred for supported non-A-share stock realtime quotes and pin Longbridge first for U.S. stock daily bars. Unpinned builtin U.S. daily remainder then follows numeric `priority` (`YFINANCE_PRIORITY` / `LONGBRIDGE_PRIORITY`); the plugin tail is unchanged. Hong Kong daily placement still follows numeric priority. YFinance remains the broad baseline; Finnhub and Alpha Vantage participate only when configured. U.S. index realtime quotes are YFinance-only: missing or partial YFinance data must not fall back to or field-supplement from Longbridge.
 
 ## Offline provider contract tests (recorded fixtures)
 

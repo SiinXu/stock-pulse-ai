@@ -263,6 +263,11 @@ class _DailyProviderExecutionMethods:
                 source_order = ["LongbridgeFetcher", "FinnhubFetcher", "AlphaVantageFetcher", "YfinanceFetcher"]
             else:
                 source_order = ["FinnhubFetcher", "AlphaVantageFetcher", "YfinanceFetcher", "LongbridgeFetcher"]
+            pin_first = bool(is_us_index or prefer_lb)
+            source_order = self._order_us_sources_by_priority(
+                source_order,
+                pin_first=pin_first,
+            )
             source_order.extend(
                 fetcher.name
                 for fetcher in fetchers
@@ -522,11 +527,44 @@ class _DailyProviderExecutionMethods:
             provider_failure_count=provider_failure_count,
         )
 
+    def _order_us_sources_by_priority(
+        self,
+        source_order: list,
+        *,
+        pin_first: bool,
+    ) -> list:
+        """Stable-sort builtin US daily names by live fetcher priority.
+
+        Named US routes remain the starting chain. When ``pin_first`` is true,
+        the first name stays at the head (YFinance for US indexes, Longbridge
+        when preferred) and only the remainder is sorted. Names missing from
+        the fetcher snapshot sort last. Empty input is returned unchanged.
+        Plugin names are not passed in; the caller appends the plugin tail
+        after this sort.
+        """
+        if not source_order:
+            return list(source_order)
+
+        priority_by_name = {
+            fetcher.name: fetcher.priority
+            for fetcher in self._get_fetchers_snapshot()
+        }
+        missing_priority = 10 ** 9
+
+        def _priority(name: str) -> int:
+            return priority_by_name.get(name, missing_priority)
+
+        if pin_first:
+            head = source_order[0]
+            return [head] + sorted(source_order[1:], key=_priority)
+        return sorted(source_order, key=_priority)
+
 
 EXPECTED_DAILY_PROVIDER_EXECUTION_METHOD_NAMES = (
     "_call_daily_data_provider",
     "get_daily_data",
     "_get_daily_data_from_providers",
+    "_order_us_sources_by_priority",
 )
 
 
