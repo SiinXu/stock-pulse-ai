@@ -1,0 +1,1 @@
+- [Chore] Bind Web money-flow camelCase types to generated OpenAPI components (Refs #721).

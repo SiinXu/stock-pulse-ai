@@ -5,6 +5,17 @@ import apiClient from './index';
 import { createApiError, getParsedApiError } from './error';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { components } from '../types/api.generated';
+import type {
+  MoneyFlowView,
+  MoneyFlowViewParams,
+} from '../types/moneyFlow';
+
+export type {
+  MoneyFlowView,
+  MoneyFlowSnapshot,
+  MoneyFlowSourceAttempt,
+  MoneyFlowViewParams,
+} from '../types/moneyFlow';
 
 type OpenApiMoneyFlowViewResponse = components['schemas']['MoneyFlowViewResponse'];
 type OpenApiMoneyFlowSnapshotResponse = components['schemas']['MoneyFlowSnapshotResponse'];
@@ -164,14 +175,6 @@ const moneyFlowViewSchema = z
       context.addIssue({ code: 'custom', message: 'unavailable error code is missing' });
     }
   });
-
-export type MoneyFlowView = z.infer<typeof moneyFlowViewSchema>;
-export type MoneyFlowSnapshot = z.infer<typeof moneyFlowSnapshotSchema>;
-
-export type MoneyFlowViewParams = {
-  stockCode: string;
-  days?: number;
-};
 
 export function parseMoneyFlowView(value: unknown): MoneyFlowView {
   return parseCamelCasePayload<MoneyFlowView>(

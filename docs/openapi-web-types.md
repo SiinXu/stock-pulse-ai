@@ -537,6 +537,29 @@ UI type. Runtime Zod in `api/researchTimeline.ts` is unchanged. The
 module is runtime-empty. `api/researchTimeline.ts` type-only re-exports
 the same public names. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/moneyFlow.ts` now CamelizeKeys-binds the three
+generated money-flow object components (`MoneyFlowViewResponse`,
+`MoneyFlowSnapshotResponse`, `MoneyFlowSourceAttempt`). Public UI names
+stay `MoneyFlowView`, `MoneyFlowSnapshot`, and `MoneyFlowSourceAttempt`.
+Generated `MoneyFlowSnapshotResponse.unit` is `string`; do not close it
+to a currency enum. `schemaVersion` stays the closed constant
+`money_flow_view/1.0`, and generated field enums (`status`, `market`,
+`amountScale`, `completeness`, `attitude`, `cacheState`) stay closed; do
+not widen them. There is no named OpenAPI enum schema, so do not invent
+unions. `Override` is named-type substitution for optional-nullable
+`snapshot` and optional `sourceChain` only. Do not add overrides that
+require `snapshot`, `sourceChain`, or `warnings`, or that close `unit`.
+`MoneyFlowViewParams` stays handwritten `{ stockCode: string; days?: number }`
+(generated query is `days?: number` without `stock_code` and without
+`null`; path carries `stock_code`; do not CamelizeKeys the query). Path
+200 JSON for GET `/api/v1/stocks/{stock_code}/money-flow`
+(`getStockMoneyFlow`) is mutually equivalent to `MoneyFlowViewResponse`;
+GET `requestBody` is `never`; non-GET methods on that path are `never`.
+This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. Runtime Zod in `api/moneyFlow.ts` is
+unchanged. The module is runtime-empty. `api/moneyFlow.ts` type-only
+re-exports the same public names. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
