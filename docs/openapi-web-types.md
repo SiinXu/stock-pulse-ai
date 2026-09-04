@@ -474,6 +474,44 @@ UI fields on the wire parse). The module is runtime-empty. This is the
 types-file bind; the earlier API-module paragraph for `todaysFocus` stays.
 `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/stocks.ts` now CamelizeKeys-binds the eleven
+generated stocks object components (`KLineData`, `StockQuote`,
+`StockHistoryResponse`, `StockFieldTrustResponse`,
+`FieldTrustAnalysisInput`, `FieldTrustConflict`,
+`FieldTrustConflictCheck`, `FieldTrustConflictValue`,
+`FieldTrustEntry`, `FieldTrustGap`, `FieldTrustProviderHealth`).
+Closed unions (`FieldTrustStaleness`, `FieldTrustOrigin`,
+`FieldTrustStatus`, `FieldTrustConfidence`,
+`FieldTrustProviderStatus`, `FieldTrustProviderRole`) are derived
+from generated field enums; there are no named OpenAPI enum
+schemas, so do not invent unions. `StockHistoryPeriod` stays the
+handwritten `'daily' | 'weekly' | 'monthly'` union because generated
+`StockHistoryResponse.period` is `string`. Public
+`StockHistoryCandle` is bound to `KLineData`. `Override` keeps nine
+keys versus generated optionality / open string (generated fact;
+not fixed by regenerating OpenAPI): history `data` required, history
+`period` closed, analysis-input `gaps` required, conflict `values`
+required, and field-trust `missingFields` / `fields` / `conflicts` /
+`conflictChecks` / `providerHealth` required. Nested `analysisInput`
+intersects the named `FieldTrustAnalysisInput` (gaps required) so
+existing `FieldTrustPanel` assignment stays typed; generated
+`analysis_input` is already optional, so this is named-type
+substitution rather than a tenth Override key. Do not add overrides
+for required generated scalars such as conflict `severity`. Path
+200 JSON for GET `/api/v1/stocks/{stock_code}/quote`
+(`get_stock_quote_api_v1_stocks__stock_code__quote_get`), GET
+`/api/v1/stocks/{stock_code}/history`
+(`get_stock_history_api_v1_stocks__stock_code__history_get`), and GET
+`/api/v1/stocks/{stock_code}/trust` (`getStockFieldTrust`) is
+mutually equivalent to `StockQuote`, `StockHistoryResponse`, and
+`StockFieldTrustResponse`; all three GET `requestBody` is `never`.
+This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. Runtime Zod in `api/stocks.ts` is
+unchanged. Extraction types, money-flow, and research-timeline stay
+out of this types-file bind. The module is runtime-empty. This is
+the types-file bind; the earlier API-module paragraph for the stocks
+pilot stays. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
