@@ -585,6 +585,24 @@ pattern: generated snake_case is not the UI type. Runtime Zod in
 `api/agentFeedback.ts` type-only re-exports the same public names.
 `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/usage.ts` now CamelizeKeys-binds the six
+generated usage object components (`UsageDashboardResponse`,
+`UsageCallRecord`, `CallTypeBreakdown`, `ModelBreakdown`,
+`StageBreakdown`, `AgentModeBreakdown`). This is **not** the auth
+object export-alias pattern: generated snake_case is not the UI type.
+`UsagePeriod` stays handwritten `'today' | 'month' | 'all'`; dashboard
+`period` stays `UsagePeriod | string`. `Override` makes defaulted
+generated counters optional (do not regenerate OpenAPI): dashboard
+`pricedCalls` / `unpricedCalls` / routing counters / total prompt and
+completion tokens, plus nested breakdown token, latency, and success
+fields. Nested `byStage` / `byAgentMode` are full
+`UsageStageBreakdown` / `UsageAgentModeBreakdown` projections
+(defaulted extras optional; extra generated keys kept). They are
+public type-only exports. GET `/usage/summary` /
+`UsageSummaryResponse` is out of slice. Runtime Zod in `api/usage.ts`
+is unchanged. `api/usage.ts` type-only re-exports the same public
+names. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),

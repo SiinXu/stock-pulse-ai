@@ -2,6 +2,20 @@ import { z } from 'zod';
 import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { components } from '../types/api.generated';
+import type {
+  UsageDashboard,
+  UsagePeriod,
+} from '../types/usage';
+
+export type {
+  UsagePeriod,
+  UsageCallTypeBreakdown,
+  UsageModelBreakdown,
+  UsageStageBreakdown,
+  UsageAgentModeBreakdown,
+  UsageCallRecord,
+  UsageDashboard,
+} from '../types/usage';
 
 type OpenApiUsageDashboard = components['schemas']['UsageDashboardResponse'];
 type OpenApiUsageCallRecord = components['schemas']['UsageCallRecord'];
@@ -11,64 +25,6 @@ const _dashboardAnchor: _AssertDashboard = 'period';
 const _callRecordAnchor: _AssertCallRecord = 'called_at';
 void _dashboardAnchor;
 void _callRecordAnchor;
-
-export type UsagePeriod = 'today' | 'month' | 'all';
-
-export type UsageCallTypeBreakdown = {
-  callType: string;
-  calls: number;
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens: number;
-};
-
-export type UsageModelBreakdown = {
-  model: string;
-  calls: number;
-  promptTokens?: number;
-  completionTokens?: number;
-  totalTokens: number;
-  maxTotalTokens?: number;
-};
-
-export type UsageCallRecord = {
-  id: number;
-  calledAt: string;
-  callType: string;
-  model: string;
-  stockCode?: string | null;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  estimatedCostUsd?: number | null;
-  routeOutcome?: string | null;
-  stage?: string | null;
-  agentMode?: string | null;
-  costStatus?: string | null;
-};
-
-export type UsageDashboard = {
-  period: UsagePeriod | string;
-  fromDate: string;
-  toDate: string;
-  totalCalls: number;
-  totalPromptTokens?: number;
-  totalCompletionTokens?: number;
-  totalTokens: number;
-  totalEstimatedCostUsd?: number | null;
-  pricedCalls?: number;
-  unpricedCalls?: number;
-  routingPrimarySuccess?: number;
-  routingFallbackSuccess?: number;
-  routingFailed?: number;
-  routingSuccessRate?: number | null;
-  routingFallbackRate?: number | null;
-  byCallType: UsageCallTypeBreakdown[];
-  byModel: UsageModelBreakdown[];
-  byStage?: Array<{ stage: string; calls: number; totalTokens: number }>;
-  byAgentMode?: Array<{ agentMode: string; calls: number; totalTokens: number }>;
-  recentCalls: UsageCallRecord[];
-};
 
 const usageCallTypeBreakdownSchema = z.object({
   callType: z.string(),
