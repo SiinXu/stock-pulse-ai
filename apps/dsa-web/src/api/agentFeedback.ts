@@ -4,6 +4,16 @@ import { z } from 'zod';
 import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { components } from '../types/api.generated';
+import type {
+  AgentRunFeedbackItem,
+  AgentRunFeedbackRequest,
+} from '../types/agentFeedback';
+
+export type {
+  AgentRunFeedbackItem,
+  AgentRunFeedbackRequest,
+  AgentRunFeedbackValue,
+} from '../types/agentFeedback';
 
 type OpenApiAgentRunFeedbackItem = components['schemas']['AgentRunFeedbackItem'];
 type OpenApiAgentRunFeedbackRequest = components['schemas']['AgentRunFeedbackRequest'];
@@ -15,27 +25,9 @@ void _itemFieldAnchor;
 void _requestFieldAnchor;
 
 export const AGENT_RUN_FEEDBACK_VALUES = ['useful', 'partial', 'wrong', 'harmful'] as const;
-export type AgentRunFeedbackValue = (typeof AGENT_RUN_FEEDBACK_VALUES)[number];
 
 export const AGENT_RUN_FEEDBACK_NOTE_MAX_LENGTH = 1000;
 export const AGENT_RUN_ID_MAX_LENGTH = 128;
-
-export type AgentRunFeedbackItem = {
-  runId: string;
-  feedbackValue: AgentRunFeedbackValue | null;
-  note: string | null;
-  source: 'web' | 'api' | null;
-  provenanceSource: 'system_resolve' | 'user_feedback' | 'operator' | null;
-  actorId: string | null;
-  createdAt: string | null;
-  updatedAt: string | null;
-};
-
-export type AgentRunFeedbackRequest = {
-  feedbackValue: AgentRunFeedbackValue;
-  note: string;
-  source: 'web';
-};
 
 const agentRunFeedbackValueSchema = z.enum(AGENT_RUN_FEEDBACK_VALUES);
 
