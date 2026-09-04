@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { applyPriceDirection } from '../../components/theme/themeRuntime';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -7,6 +8,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { calculatorsApi } from '../../api/calculators';
 import { RouteFocusRegistrationContext } from '../../contexts/routeFocusContext';
 import { UiLanguageProvider } from '../../contexts/UiLanguageContext';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import FinancialCalculatorsPage from '../FinancialCalculatorsPage';
 
 vi.mock('../../api/calculators', () => ({
@@ -32,13 +34,15 @@ const routeFocusRegister = vi.fn(() => () => undefined);
 
 function renderPage() {
   return render(
-    <MemoryRouter>
-      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-        <UiLanguageProvider initialLanguage="en">
-          <FinancialCalculatorsPage />
-        </UiLanguageProvider>
-      </RouteFocusRegistrationContext.Provider>
-    </MemoryRouter>,
+    <QueryClientProvider client={createAppQueryClient()}>
+      <MemoryRouter>
+        <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+          <UiLanguageProvider initialLanguage="en">
+            <FinancialCalculatorsPage />
+          </UiLanguageProvider>
+        </RouteFocusRegistrationContext.Provider>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 

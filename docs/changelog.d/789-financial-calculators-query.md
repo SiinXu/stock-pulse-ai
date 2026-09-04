@@ -1,0 +1,1 @@
+- [Changed] Schedule Financial Calculators compound-growth, target-contribution, and target-duration POSTs through TanStack Query while preserving abort, request generation, and mode-switch discard (Refs #789).

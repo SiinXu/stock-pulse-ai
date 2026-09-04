@@ -12,13 +12,11 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import {
-  calculatorsApi,
-  type CompoundGrowthResponse,
-  type TargetContributionResponse,
-  type TargetDurationResponse,
+import type {
+  CompoundGrowthResponse,
+  TargetContributionResponse,
+  TargetDurationResponse,
 } from '../api/calculators';
-import { getParsedApiError, type ParsedApiError } from '../api/error';
 import {
   ApiErrorAlert,
   AppPage,
@@ -36,10 +34,12 @@ import {
 import { useRouteFocusTarget } from '../components/routing';
 import { SignedChangeText } from '../components/theme/SignedChangeText';
 import { useUiLanguage } from '../contexts/UiLanguageContext';
+import {
+  useFinancialCalculatorsMutation,
+  type CalculatorMode,
+} from '../hooks/useFinancialCalculatorsMutation';
 import { FINANCIAL_CALCULATORS_TEXT } from '../locales/financialCalculators';
 import { APP_ROUTE_PATHS } from '../routing/routes';
-
-type CalculatorMode = 'growth' | 'contribution' | 'duration';
 
 type FieldKey =
   | 'principal'
@@ -85,8 +85,16 @@ const FinancialCalculatorsPage: React.FC = () => {
   const { language } = useUiLanguage();
   const text = FINANCIAL_CALCULATORS_TEXT[language];
   const pageHeadingRef = useRef<HTMLHeadingElement | null>(null);
-  const requestVersionRef = useRef(0);
-  const activeRequestRef = useRef<AbortController | null>(null);
+  const {
+    run,
+    cancel,
+    clearResults,
+    loading,
+    error,
+    growth: growthResult,
+    contribution: contributionResult,
+    duration: durationResult,
+  } = useFinancialCalculatorsMutation();
 
   const [mode, setMode] = useState<CalculatorMode>('growth');
   const [principal, setPrincipal] = useState(DEFAULTS.principal);
@@ -96,11 +104,6 @@ const FinancialCalculatorsPage: React.FC = () => {
   const [target, setTarget] = useState(DEFAULTS.target);
   const [periodsPerYear, setPeriodsPerYear] = useState(DEFAULTS.periodsPerYear);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const [growthResult, setGrowthResult] = useState<CompoundGrowthResponse | null>(null);
-  const [contributionResult, setContributionResult] = useState<TargetContributionResponse | null>(null);
-  const [durationResult, setDurationResult] = useState<TargetDurationResponse | null>(null);
 
   useRouteFocusTarget({
     routeId: APP_ROUTE_PATHS.calculators,
@@ -111,11 +114,6 @@ const FinancialCalculatorsPage: React.FC = () => {
   useEffect(() => {
     document.title = text.documentTitle;
   }, [text.documentTitle]);
-
-  useEffect(() => () => {
-    requestVersionRef.current += 1;
-    activeRequestRef.current?.abort();
-  }, []);
 
   const modeOptions = useMemo(
     () => [
@@ -198,22 +196,8 @@ const FinancialCalculatorsPage: React.FC = () => {
     };
   };
 
-  const clearResults = () => {
-    setGrowthResult(null);
-    setContributionResult(null);
-    setDurationResult(null);
-    setError(null);
-  };
-
-  const cancelActiveRequest = () => {
-    requestVersionRef.current += 1;
-    activeRequestRef.current?.abort();
-    activeRequestRef.current = null;
-    setLoading(false);
-  };
-
   const handleReset = () => {
-    cancelActiveRequest();
+    cancel();
     setPrincipal(DEFAULTS.principal);
     setAnnualRatePercent(DEFAULTS.annualRatePercent);
     setYears(DEFAULTS.years);
@@ -227,62 +211,7 @@ const FinancialCalculatorsPage: React.FC = () => {
   const handleCalculate = async () => {
     const parsed = validate();
     if (!parsed) return;
-    activeRequestRef.current?.abort();
-    const controller = new AbortController();
-    activeRequestRef.current = controller;
-    const requestVersion = requestVersionRef.current + 1;
-    requestVersionRef.current = requestVersion;
-    const requestedMode = mode;
-    setLoading(true);
-    setError(null);
-    try {
-      if (requestedMode === 'growth') {
-        const result = await calculatorsApi.compoundGrowth({
-          principal: parsed.principal,
-          annualRate: parsed.annualRate,
-          years: parsed.years,
-          contributionPerPeriod: parsed.contribution,
-          periodsPerYear: parsed.periodsPerYear,
-        }, { signal: controller.signal });
-        if (requestVersionRef.current !== requestVersion) return;
-        setGrowthResult(result);
-        setContributionResult(null);
-        setDurationResult(null);
-      } else if (requestedMode === 'contribution') {
-        const result = await calculatorsApi.targetContribution({
-          target: parsed.target,
-          principal: parsed.principal,
-          annualRate: parsed.annualRate,
-          years: parsed.years,
-          periodsPerYear: parsed.periodsPerYear,
-        }, { signal: controller.signal });
-        if (requestVersionRef.current !== requestVersion) return;
-        setContributionResult(result);
-        setGrowthResult(null);
-        setDurationResult(null);
-      } else {
-        const result = await calculatorsApi.targetDuration({
-          target: parsed.target,
-          principal: parsed.principal,
-          annualRate: parsed.annualRate,
-          contributionPerPeriod: parsed.contribution,
-          periodsPerYear: parsed.periodsPerYear,
-        }, { signal: controller.signal });
-        if (requestVersionRef.current !== requestVersion) return;
-        setDurationResult(result);
-        setGrowthResult(null);
-        setContributionResult(null);
-      }
-    } catch (cause) {
-      if (controller.signal.aborted || requestVersionRef.current !== requestVersion) return;
-      clearResults();
-      setError(getParsedApiError(cause));
-    } finally {
-      if (requestVersionRef.current === requestVersion) {
-        activeRequestRef.current = null;
-        setLoading(false);
-      }
-    }
+    await run(mode, parsed);
   };
 
   const chartData = useMemo(() => {
@@ -378,7 +307,7 @@ const FinancialCalculatorsPage: React.FC = () => {
             value={mode}
             options={modeOptions}
             onChange={(value) => {
-              cancelActiveRequest();
+              cancel();
               setMode(value);
               clearResults();
               setFieldErrors({});
