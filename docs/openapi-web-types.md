@@ -603,6 +603,22 @@ public type-only exports. GET `/usage/summary` /
 is unchanged. `api/usage.ts` type-only re-exports the same public
 names. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/calculators.ts` now CamelizeKeys-binds the
+generated calculator object components (`CompoundGrowthRequest`,
+`TargetContributionRequest`, `TargetDurationRequest`,
+`CompoundGrowthResponse`, `BalancePoint`,
+`TargetContributionOkResponse`, `TargetContributionAlreadyMetResponse`,
+`TargetContributionUnreachableResponse`, `TargetDurationOkResponse`,
+`TargetDurationAlreadyMetResponse`, `TargetDurationUnreachableResponse`).
+This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. Nested series points are the public
+`CalculatorBalancePoint` projection (extra generated keys kept; there
+are no extra keys today). Target contribution/duration 200s stay
+discriminated unions of the three named generated variants; do not
+flatten. Runtime Zod in `api/calculators.ts` is unchanged (`.strict()`
+/ discriminated unions). `api/calculators.ts` type-only re-exports the
+same public names. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
