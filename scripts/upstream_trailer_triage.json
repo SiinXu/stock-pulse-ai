@@ -57,6 +57,11 @@
       "sha": "ae19329d6684c4ec4ad0b51e627c0c5204ccd594",
       "subject": "fix: stabilize watchlist details and workspace state",
       "reason": "Watchlist coverage abort/bound lookups landed via #1425 / PR #1432 squash 7562a2579: useWatchlistAnalysisCoverage passes a generation-scoped AbortSignal and WATCHLIST_HISTORY_LOOKUP_CONCURRENCY=4. Historical malformed trailer Ported-from: ae19329d on 4aec0439 does not count; this well-formed line is the absorb record (same pattern as ed848da6f)."
+    },
+    {
+      "sha": "8d5b9628ab0c15257f46d7c90e2edfbdb10eb425",
+      "subject": "fix: CVE-2026-25639 security vulnerability",
+      "reason": "Web Axios CVE-2026-25639 already landed via #1559 / PR #1559 squash 7e96e680ceb63761f947dfa26c554e7f4217a078: package.json axios ^1.18.0 and package-lock axios 1.18.0, with fork-native transitive form-data 4.0.6 (upstream lock still resolved form-data 4.0.5). Product behavior is already on main; this is a truthful provenance restoration, not a package change. The child squash had no well-formed Ported-from line."
     }
   ],
   "do_not_trailer": [
