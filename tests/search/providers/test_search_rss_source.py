@@ -1,11 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Deterministic tests for the RSS/Atom search-pipeline provider.
-
-Time control: freeze ``datetime.now`` on ``src.search_service`` (the facade
-globals ``RssAtomSearchProvider._soft_age_filter`` actually reads) via
-``tests.time_determinism``. Static fixture pubDates plus rolling ``days=30``
-must not depend on the real UTC calendar.
-"""
+"""Deterministic tests for the RSS/Atom search-pipeline provider."""
 
 from __future__ import annotations
 
