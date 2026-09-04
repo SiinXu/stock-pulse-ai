@@ -53,4 +53,10 @@ describe('Query consumer hosts', () => {
     expect(read('src/hooks/__tests__/useTokenUsageQuery.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/pages/__tests__/SettingsPage.testHarness.tsx')).toContain('createAppQueryClient');
   });
+
+  it('wraps FinancialCalculatorsPage tests with the production retry-free client', () => {
+    expect(read('src/pages/__tests__/FinancialCalculatorsPage.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/pages/__tests__/FinancialCalculatorsPage.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useFinancialCalculatorsMutation.test.tsx')).toContain('createAppQueryClient');
+  });
 });
