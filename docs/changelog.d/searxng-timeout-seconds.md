@@ -1,0 +1,1 @@
+- [Added] Make self-hosted SearXNG search timeout configurable via SEARXNG_TIMEOUT_SECONDS (Refs #1636).

@@ -167,6 +167,7 @@ FastAPI 服务会监听 Zeabur 的非本机接口。配置该启动模式前，�
 | `MINIMAX_API_KEYS` | MiniMax API 密钥（用逗号分隔） |
 | `SEARXNG_BASE_URLS` | SearXNG 实例地址（逗号分隔，无配额兜底，需在 settings.yml 启用 format: json）；留空时仅在显式启用公共实例发现后使用 `searx.space` |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `false`） |
+| `SEARXNG_TIMEOUT_SECONDS` | 自建 SearXNG 单次搜索超时（秒，默认 `10`，最小 `1`）；公共实例超时不受影响 |
 
 ### 5.4 配置方法
 

@@ -652,6 +652,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `SCHEDULE_TIMES` | `空` | 是 | List execution over multiple time periods (comma-separated, use SCHEDULE_TIME if empty) |
 | `SEARXNG_BASE_URLS` | `空` | 是 | SearXNG instance address (comma-separated, private deployments have no quotas; enable format: json in settings.yml) P... |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | `false` | 是 |  |
+| `SEARXNG_TIMEOUT_SECONDS` | `10` | 是 | Self-hosted SearXNG per-search timeout in seconds (default 10, minimum 1); public instances are unaffected. |
 | `SECURITY_AUDIT_MAX_EVENTS` | `10000` | 是 | 模板中注释; Hard capacity (max retained rows) |
 | `SECURITY_AUDIT_RETENTION_DAYS` | `90` | 是 | 模板中注释; =========================================== Durable security audit (privileged operations) ==========================... |
 | `SERPAPI_API_KEYS` | `空` | 是 | SerpAPI Keys (supports multiple, comma-separated) |

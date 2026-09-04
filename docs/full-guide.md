@@ -171,6 +171,7 @@ stock-pulse-ai/
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimax.io/) Coding Plan Web Search（结构化搜索结果） | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时仅在显式启用公共实例发现后使用 `searx.space` | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `false`）。公共实例普遍限流或未开启 JSON 输出，开启后每次分析可能多耗 30~60 秒且新闻面为空 | 可选 |
+| `SEARXNG_TIMEOUT_SECONDS` | 自建 SearXNG 单次搜索超时（秒，默认 `10`，最小 `1`）；实例较慢（如聚合引擎较多的 NAS 部署）时可调大，公共实例超时不受影响。GitHub Actions 需显式映射该变量 | 可选 |
 | `RSS_NEWS_FEED_URLS` | 可选 RSS/Atom feed URL（逗号分隔），按需新闻搜索免费补充源；留空则惰性关闭。详见「搜索服务配置」与 [出站 HTTP 安全策略](security-outbound-policy.md) | 可选 |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | 按需 RSS/Atom 单源拉取超时秒数（默认 8） | 可选 |
 | `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/) Token | 可选 |
@@ -375,6 +376,7 @@ stock-pulse-ai/
 | `SOCIAL_SENTIMENT_API_URL` | Stock Sentiment API 地址（默认 `https://api.adanos.org`） | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时仅在显式启用公共实例发现后使用 `searx.space` | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `false`）。公共实例普遍限流或未开启 JSON 输出，开启后每次分析可能多耗 30~60 秒且新闻面为空 | 可选 |
+| `SEARXNG_TIMEOUT_SECONDS` | 自建 SearXNG 单次搜索超时（秒，默认 `10`，最小 `1`）；实例较慢（如聚合引擎较多的 NAS 部署）时可调大，公共实例超时不受影响。GitHub Actions 需显式映射该变量 | 可选 |
 | `RSS_NEWS_FEED_URLS` | 可选 RSS/Atom feed URL 列表（逗号分隔），作为按需新闻搜索链路的免费补充源（**不是** SearXNG/付费搜索的替代，也不同于本地资讯池 `NEWS_INTEL_*`）。留空时功能完全惰性。Feed 拉取走 fail-closed 出站策略；公网源无需 allowlist，私网/回环需精确 `OUTBOUND_HTTP_ALLOWLIST` 条目，详见 [出站 HTTP 安全策略](security-outbound-policy.md) | 可选 |
 | `RSS_NEWS_FETCH_TIMEOUT_SEC` | 按需 RSS/Atom 单源拉取超时（秒，1–30）；默认 `8`。与 `NEWS_INTEL_FETCH_TIMEOUT_SEC` 独立 | 可选 |
 | `NEWS_STRATEGY_PROFILE` | 新闻策略窗口档位：`ultra_short`(1天)/`short`(3天)/`medium`(7天)/`long`(30天)；实际窗口取与 `NEWS_MAX_AGE_DAYS` 的最小值 | 默认 `short` |

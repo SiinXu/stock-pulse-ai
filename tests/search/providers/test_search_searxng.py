@@ -32,10 +32,12 @@ class TestSearXNGSearchProvider(unittest.TestCase):
         base_urls=None,
         *,
         use_public_instances: bool = False,
+        self_hosted_timeout_seconds=None,
     ) -> SearXNGSearchProvider:
         return SearXNGSearchProvider(
             base_urls=base_urls or [],
             use_public_instances=use_public_instances,
+            self_hosted_timeout_seconds=self_hosted_timeout_seconds,
         )
 
     @staticmethod
@@ -452,6 +454,183 @@ class TestSearXNGSearchProvider(unittest.TestCase):
 
         self.assertFalse(service.is_available)
         self.assertFalse(any(provider.name == "SearXNG" for provider in service._providers))
+
+    def test_self_hosted_timeout_defaults_to_ten_seconds(self):
+        provider = self._create_provider(["https://searx.example.org"])
+        self.assertEqual(provider._self_hosted_timeout_seconds, 10)
+        self.assertEqual(
+            provider._self_hosted_timeout_seconds,
+            SearXNGSearchProvider.SELF_HOSTED_TIMEOUT_SECONDS,
+        )
+
+    @patch("src.search_service._get_with_retry")
+    def test_self_hosted_search_uses_default_timeout(self, mock_get):
+        mock_get.return_value = self._response(json_payload={"results": []})
+
+        provider = self._create_provider(["https://searx.example.org"])
+        resp = provider.search("query", max_results=5)
+
+        self.assertTrue(resp.success)
+        self.assertEqual(mock_get.call_args.kwargs["timeout"], 10)
+
+    @patch("src.search_service._get_with_retry")
+    def test_configured_self_hosted_timeout_reaches_request(self, mock_get):
+        mock_get.return_value = self._response(json_payload={"results": []})
+
+        provider = self._create_provider(
+            ["https://searx.example.org"],
+            self_hosted_timeout_seconds=25,
+        )
+        resp = provider.search("query", max_results=5)
+
+        self.assertTrue(resp.success)
+        self.assertEqual(provider._self_hosted_timeout_seconds, 25)
+        self.assertEqual(mock_get.call_args.kwargs["timeout"], 25)
+
+    def test_search_service_threads_timeout_to_self_hosted_provider(self):
+        service = SearchService(
+            searxng_base_urls=["http://searxng.local:8080"],
+            searxng_timeout_seconds=25,
+        )
+        searxng = next(p for p in service._providers if p.name == "SearXNG")
+        self.assertEqual(searxng._self_hosted_timeout_seconds, 25)
+
+    @patch("src.search_service.requests.get")
+    def test_public_instance_discovery_and_search_keep_five_second_timeout(self, mock_get):
+        mock_get.side_effect = [
+            self._response(json_payload=self._public_feed(["https://public-1.example/"])),
+            self._response(json_payload={"results": []}),
+        ]
+
+        provider = self._create_provider(
+            use_public_instances=True,
+            self_hosted_timeout_seconds=25,
+        )
+        resp = provider.search("query", max_results=5)
+
+        self.assertTrue(resp.success)
+        self.assertEqual(provider._self_hosted_timeout_seconds, 25)
+        self.assertEqual(SearXNGSearchProvider.PUBLIC_INSTANCES_TIMEOUT_SECONDS, 5)
+        self.assertEqual(mock_get.call_args_list[0][0][0], SearXNGSearchProvider.PUBLIC_INSTANCES_URL)
+        self.assertEqual(mock_get.call_args_list[0].kwargs["timeout"], 5)
+        self.assertIn("https://public-1.example/search", mock_get.call_args_list[1][0][0])
+        self.assertEqual(mock_get.call_args_list[1].kwargs["timeout"], 5)
+
+    def test_hotspot_constructor_keeps_public_instances_disabled_and_passes_timeout(self):
+        from types import SimpleNamespace
+
+        from src.services.alphasift_service_parts import hotspot_support
+
+        captured = {}
+
+        class FakeSearchService:
+            def __init__(self, **kwargs):
+                captured.update(kwargs)
+
+            def search_stock_news(self, *args, **kwargs):
+                return SimpleNamespace(success=True, results=[])
+
+        config = SimpleNamespace(
+            bocha_api_keys=None,
+            tavily_api_keys=None,
+            anspire_api_keys=None,
+            brave_api_keys=None,
+            serpapi_api_keys=None,
+            minimax_api_keys=None,
+            searxng_base_urls=["http://searxng.local:8080"],
+            searxng_timeout_seconds=25,
+            rss_news_feed_urls=None,
+            rss_news_fetch_timeout_sec=8.0,
+            news_max_age_days=3,
+            news_strategy_profile="short",
+        )
+        with patch("src.search_service.SearchService", FakeSearchService):
+            hotspot_support._run_hotspot_topic_news_search("芯片", config)
+
+        self.assertEqual(captured["searxng_timeout_seconds"], 25)
+        self.assertIs(captured["searxng_public_instances_enabled"], False)
+
+    def test_optional_services_constructor_threads_timeout(self):
+        from src.config import Config
+        from src.core.stages.optional_services import _OptionalServicesStageMixin
+
+        class Host(_OptionalServicesStageMixin):
+            def __init__(self):
+                self.config = Config(
+                    searxng_base_urls=["http://searxng.local:8080"],
+                    searxng_timeout_seconds=25,
+                )
+                self.search_service = None
+
+        host = Host()
+        host._init_optional_search_service()
+        searxng = next(p for p in host.search_service._providers if p.name == "SearXNG")
+        self.assertEqual(searxng._self_hosted_timeout_seconds, 25)
+
+    @patch("src.search_service._get_with_retry")
+    def test_optional_services_missing_timeout_attr_defaults_and_reaches_request(
+        self, mock_get
+    ):
+        from types import SimpleNamespace
+
+        from src.core.stages.optional_services import _OptionalServicesStageMixin
+
+        mock_get.return_value = self._response(json_payload={"results": []})
+
+        class Host(_OptionalServicesStageMixin):
+            def __init__(self):
+                self.config = SimpleNamespace(
+                    bocha_api_keys=[],
+                    tavily_api_keys=[],
+                    anspire_api_keys=[],
+                    brave_api_keys=[],
+                    serpapi_keys=[],
+                    minimax_api_keys=[],
+                    searxng_base_urls=["http://searxng.local:8080"],
+                    searxng_public_instances_enabled=False,
+                    news_max_age_days=3,
+                )
+                self.search_service = None
+
+        host = Host()
+        host._init_optional_search_service()
+
+        self.assertIsNotNone(host.search_service)
+        searxng = next(p for p in host.search_service._providers if p.name == "SearXNG")
+        self.assertEqual(searxng._self_hosted_timeout_seconds, 10)
+        resp = searxng.search("query", max_results=5)
+        self.assertTrue(resp.success)
+        self.assertEqual(mock_get.call_args.kwargs["timeout"], 10)
+
+    def test_market_review_runtime_threads_timeout(self):
+        from src.config import Config
+        from src.core.market_review_runtime import build_market_review_runtime
+
+        config = Config(
+            searxng_base_urls=["http://searxng.local:8080"],
+            searxng_timeout_seconds=25,
+        )
+        _notifier, _analyzer, search_service = build_market_review_runtime(config)
+        self.assertIsNotNone(search_service)
+        searxng = next(p for p in search_service._providers if p.name == "SearXNG")
+        self.assertEqual(searxng._self_hosted_timeout_seconds, 25)
+
+    def test_get_search_service_threads_timeout(self):
+        from src.config import Config
+        from src.search_service import get_search_service, reset_search_service
+
+        reset_search_service()
+        config = Config(
+            searxng_base_urls=["http://searxng.local:8080"],
+            searxng_timeout_seconds=25,
+        )
+        try:
+            with patch("src.config.get_config", return_value=config):
+                service = get_search_service()
+            searxng = next(p for p in service._providers if p.name == "SearXNG")
+            self.assertEqual(searxng._self_hosted_timeout_seconds, 25)
+        finally:
+            reset_search_service()
 
 
 if __name__ == "__main__":

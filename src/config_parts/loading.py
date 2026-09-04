@@ -548,6 +548,12 @@ class _ConfigLoadingMethods:
             os.getenv('SEARXNG_PUBLIC_INSTANCES_ENABLED'),
             default=False,
         )
+        searxng_timeout_seconds = parse_env_int(
+            os.getenv('SEARXNG_TIMEOUT_SECONDS'),
+            10,
+            field_name='SEARXNG_TIMEOUT_SECONDS',
+            minimum=1,
+        )
 
         # Optional RSS/Atom feeds for on-demand news search (supplement; empty = inert)
         _raw_rss_urls = [
@@ -821,6 +827,7 @@ class _ConfigLoadingMethods:
             serpapi_keys=serpapi_keys,
             searxng_base_urls=searxng_base_urls,
             searxng_public_instances_enabled=searxng_public_instances_enabled,
+            searxng_timeout_seconds=searxng_timeout_seconds,
             rss_news_feed_urls=rss_news_feed_urls,
             rss_news_fetch_timeout_sec=rss_news_fetch_timeout_sec,
             social_sentiment_api_key=os.getenv('SOCIAL_SENTIMENT_API_KEY') or None,

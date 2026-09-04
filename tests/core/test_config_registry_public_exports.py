@@ -64,7 +64,7 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "237ed83d7b6511a306ae2e23d093b2ef162c0d2b3bae8ea4de461529cb27a9fd"
+    "317d1b29c01c199f954b911750ec326281ab3f608dfe54865510e753724aad27"
 )
 EXPECTED_SCHEMA_SHA256 = (
     "8c9dee30831d8f7a765987a04d75b843bcda510d71c137a003a3c24f9e021c84"
@@ -104,12 +104,9 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Combined live snapshot after merging current main: per-symbol episode
-    # forgetting help (Refs #1119), #1518 skill-retrieval key, #1513 Local Only
-    # Mode copy/registry description, Lane E OCR/Kronos extras-path
-    # description rewrites, #1118 LAYERED_MEMORY_COLLECTION_ENABLED
-    # durable-store copy, and #1135 AGENT_RED_TEAM_ENABLED. Keys digest
-    # unchanged from the red-team snapshot (`237ed83d…`).
+    # Combined live snapshot after merging current main plus env-only
+    # SEARXNG_TIMEOUT_SECONDS (hidden from Web settings). Schema digest is
+    # unchanged because hidden keys are excluded from build_schema_response.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256
