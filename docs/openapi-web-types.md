@@ -512,6 +512,31 @@ out of this types-file bind. The module is runtime-empty. This is
 the types-file bind; the earlier API-module paragraph for the stocks
 pilot stays. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/researchTimeline.ts` now CamelizeKeys-binds the four
+generated research-timeline object components (`ResearchTimelineResponse`,
+`ResearchTimelineNode`, `ResearchTimelineLink`,
+`ResearchTimelineSources`). Closed union `ResearchTimelineKind` stays
+handwritten `'analysis_run' | 'chat' | 'signal' | 'hypothesis'` because
+generated `ResearchTimelineNode.kind` is `string`; there is no named
+OpenAPI enum schema, so do not invent extra unions. `Override` keeps
+three UI deltas versus generated optionality / open string / index
+signature (generated fact; not fixed by regenerating OpenAPI): response
+`items` required, node `kind` closed, and the generated
+`ResearchTimelineLink` string index signature stripped while known keys
+stay. Do not add overrides for sources strings, `link.type`,
+`nextCursor`, `meta`, or required scalars. `ResearchTimelineParams`
+stays handwritten optional camelCase with `kinds` as
+`ResearchTimelineKind[]` (generated query uses `kinds?: string | null`
+as a comma-separated filter; do not CamelizeKeys it). Path 200 JSON for
+GET `/api/v1/stocks/{stock_code}/research-timeline`
+(`get_stock_research_timeline_api_v1_stocks__stock_code__research_timeline_get`)
+is mutually equivalent to `ResearchTimelineResponse`; GET `requestBody`
+is `never`; non-GET methods on that path are `never`. This is **not**
+the auth object export-alias pattern: generated snake_case is not the
+UI type. Runtime Zod in `api/researchTimeline.ts` is unchanged. The
+module is runtime-empty. `api/researchTimeline.ts` type-only re-exports
+the same public names. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
