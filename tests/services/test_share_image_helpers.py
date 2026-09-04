@@ -265,7 +265,50 @@ def test_social_branding_renders_only_safe_links(tmp_path):
     card = share_image._xiaohongshu_card(branding, "en")
     assert "data:image/png;base64,cXI=" in card
     assert 'href="https://example.com/profile"' in card
-    assert "@stockpulse · ID 123" in card
+    assert "<b>Xiaohongshu</b>@stockpulse" in card
+    assert "ID 123" not in card
+    assert "123" not in card
     footer = share_image._footer(branding, " · Local", "en")
     assert "SiinXu/stock-pulse-ai" in footer
     assert "Local" in footer
+
+
+def test_xiaohongshu_id_only_branding_stays_hidden():
+    branding = share_image.ShareImageBranding(xiaohongshu_id="99887766")
+    assert branding.has_xiaohongshu is False
+    assert share_image._xiaohongshu_card(branding, "zh") == ""
+    assert share_image._xiaohongshu_card(branding, "en") == ""
+
+
+def test_xiaohongshu_url_only_caption_falls_back_to_safe_url():
+    branding = share_image.ShareImageBranding(
+        xiaohongshu_url="https://example.com/xhs-profile",
+        xiaohongshu_id="99887766",
+    )
+    assert branding.has_xiaohongshu is True
+    card = share_image._xiaohongshu_card(branding, "zh")
+    assert "<b>小红书</b> https://example.com/xhs-profile" in card
+    assert 'href="https://example.com/xhs-profile"' in card
+    assert "99887766" not in card
+    assert "ID " not in card
+
+
+def test_xiaohongshu_handle_without_at_sign_keeps_spacing():
+    branding = share_image.ShareImageBranding(xiaohongshu_handle="stockpulse")
+    card = share_image._xiaohongshu_card(branding, "zh")
+    assert "<b>小红书</b> stockpulse" in card
+    assert "<b>小红书</b>stockpulse" not in card
+
+
+def test_xiaohongshu_javascript_url_is_rejected():
+    branding = share_image.ShareImageBranding(
+        xiaohongshu_url="javascript:alert(1)",
+        xiaohongshu_handle="@stockpulse",
+        xiaohongshu_id="99887766",
+    )
+    card = share_image._xiaohongshu_card(branding, "en")
+    assert "<b>Xiaohongshu</b>@stockpulse" in card
+    assert "javascript:" not in card
+    assert "alert(1)" not in card
+    assert "99887766" not in card
+    assert "href=" not in card

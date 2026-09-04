@@ -64,16 +64,17 @@ class ShareImageBranding:
 
     xiaohongshu_url: str = ""
     xiaohongshu_handle: str = ""
+    # Kept for compatibility with persisted configs. The poster deliberately
+    # renders only the public nickname/handle below the QR code.
     xiaohongshu_id: str = ""
     xiaohongshu_qr_path: str = ""
 
     @property
     def has_xiaohongshu(self) -> bool:
         return any((
-            self.xiaohongshu_url,
-            self.xiaohongshu_handle,
-            self.xiaohongshu_id,
-            self.xiaohongshu_qr_path,
+            self.xiaohongshu_url.strip(),
+            self.xiaohongshu_handle.strip(),
+            self.xiaohongshu_qr_path.strip(),
         ))
 
 @dataclass
