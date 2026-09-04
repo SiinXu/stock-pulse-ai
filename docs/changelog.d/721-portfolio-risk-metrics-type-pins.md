@@ -1,0 +1,1 @@
+- [Tests] Pin Web portfolio risk-metrics camelCase types to generated OpenAPI components (Refs #721).
