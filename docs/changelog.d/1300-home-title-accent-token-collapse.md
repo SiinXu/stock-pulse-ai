@@ -1,0 +1,1 @@
+- [Changed] Deleted leftover `--home-title-accent`; historical `.home-title-accent` inlines Layer 1 `--foreground` without moving the rule, so later equal-specificity `.label-uppercase` still wins computed dashboard eyebrow paint as `--text-secondary-text`; page-scoped token ceiling 44 → 43 (Refs #1300).
