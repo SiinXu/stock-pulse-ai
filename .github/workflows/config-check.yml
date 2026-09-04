@@ -153,5 +153,9 @@ jobs:
             if [ "${{ inputs.probe_llm }}" = "true" ]; then
               EXTRA_ARGS+=(--probe-llm)
             fi
+          else
+            # Push/schedule canaries must stay deterministic without LLM secrets.
+            # Manual Run workflow remains strict; malformed provided keys still fail.
+            EXTRA_ARGS+=(--allow-missing-llm)
           fi
           python scripts/actions_config_check.py "${EXTRA_ARGS[@]}"

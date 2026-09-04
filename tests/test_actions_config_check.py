@@ -59,6 +59,68 @@ def test_missing_llm_is_hard_failure(tmp_path: Path) -> None:
     assert "LLM_ZHIPU_API_KEY" in fails[0].hint_en or "GEMINI_API_KEY" in fails[0].hint_en
 
 
+def test_allow_missing_llm_warns_when_no_secrets(tmp_path: Path) -> None:
+    env = env_from_mapping({"STOCK_LIST": "600519,hk00700,AAPL"})
+    report = run_config_check(env, allow_missing_llm=True, repo_root=tmp_path)
+    assert report.ok
+    assert report.exit_code == 0
+    assert report.allow_missing_llm
+    missing = [item for item in report.warnings if item.code == "config.llm.missing"]
+    assert len(missing) == 1
+    assert not any(item.code == "config.llm.missing" for item in report.hard_failures)
+
+
+def test_allow_missing_llm_does_not_mask_malformed_keys(tmp_path: Path) -> None:
+    report = run_config_check(
+        _complete_env(GEMINI_API_KEY="xxx"),
+        allow_missing_llm=True,
+        repo_root=tmp_path,
+    )
+    assert not report.ok
+    assert any(item.code == "config.llm.malformed" for item in report.hard_failures)
+
+
+def test_allow_missing_llm_does_not_mask_missing_watchlist(tmp_path: Path) -> None:
+    env = env_from_mapping({})
+    report = run_config_check(env, allow_missing_llm=True, repo_root=tmp_path)
+    assert not report.ok
+    codes = {item.code for item in report.hard_failures}
+    assert "config.watchlist.missing" in codes
+    assert "config.llm.missing" not in codes
+    assert any(item.code == "config.llm.missing" for item in report.warnings)
+
+
+def test_allow_missing_llm_still_honors_strict_notify(tmp_path: Path) -> None:
+    env = env_from_mapping({"STOCK_LIST": "600519"})
+    report = run_config_check(
+        env,
+        allow_missing_llm=True,
+        strict_notify=True,
+        probe_llm=False,
+        repo_root=tmp_path,
+    )
+    assert not report.ok
+    hard = {item.code for item in report.hard_failures}
+    assert "config.notify.missing" in hard
+    assert "config.llm.missing" not in hard
+    assert any(item.code == "config.llm.missing" for item in report.warnings)
+
+
+def test_probe_llm_overrides_allow_missing_llm(tmp_path: Path) -> None:
+    env = env_from_mapping({"STOCK_LIST": "600519"})
+    report = run_config_check(
+        env,
+        allow_missing_llm=True,
+        probe_llm=True,
+        repo_root=tmp_path,
+    )
+    assert not report.ok
+    hard = {item.code for item in report.hard_failures}
+    codes = {item.code for item in report.items}
+    assert "config.llm.missing" in hard
+    assert "config.llm.probe.skipped_no_target" in codes
+
+
 def test_missing_watchlist_is_hard_failure(tmp_path: Path) -> None:
     env = _complete_env()
     del env["STOCK_LIST"]
@@ -229,6 +291,16 @@ def test_cli_main_exit_codes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) ->
     code = cli.main(["--no-text"])
     assert code == 1
 
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("STOCK_LIST", "600519")
+    code = cli.main(["--allow-missing-llm", "--no-text"])
+    assert code == 0
+
+    _clear_llm_env(monkeypatch)
+    monkeypatch.setenv("STOCK_LIST", "600519")
+    code = cli.main(["--allow-missing-llm", "--probe-llm", "--no-text"])
+    assert code == 1
+
 
 def test_workflow_yaml_structure_and_pins() -> None:
     assert WORKFLOW_PATH.is_file()
@@ -257,6 +329,19 @@ def test_workflow_yaml_structure_and_pins() -> None:
     run_script = run_step["run"]
     assert "actions_config_check.py" in run_script
     assert "echo $" not in run_script
+    assert "--allow-missing-llm" in run_script
+    dispatch_idx = run_script.find('github.event_name')
+    flag_idx = run_script.find("--allow-missing-llm")
+    assert dispatch_idx != -1
+    assert flag_idx > dispatch_idx
+    dispatch_block = run_script[dispatch_idx:flag_idx]
+    assert "--strict-notify" in dispatch_block
+    assert "--probe-llm" in dispatch_block
+    assert "--allow-missing-llm" not in dispatch_block
+    canary_block = run_script[flag_idx:]
+    assert "--allow-missing-llm" in canary_block
+    assert "--probe-llm" not in canary_block
+    assert "--strict-notify" not in canary_block
 
 
 def test_format_markdown_bilingual_headers() -> None:

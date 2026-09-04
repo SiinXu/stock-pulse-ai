@@ -495,8 +495,8 @@ Before a full daily analysis, verify Secrets/Variables are ready (**no** analysi
 2. Optional inputs:
    - `strict_notify`: fail when no notification channel is configured (default: warn only)
    - `probe_llm`: one cheap connectivity call for the first detectable provider (default: off)
-3. Within about a minute, read the Job Summary checklist (✅/❌/⚠️). Missing LLM key or `STOCK_LIST` fails the job and points you to Settings.
-4. Local equivalent: `python scripts/actions_config_check.py` (optional `--strict-notify` / `--probe-llm`)
+3. Within about a minute, read the Job Summary checklist (✅/❌/⚠️). Missing LLM key or `STOCK_LIST` fails the **manual** job and points you to Settings. Automated `push`/`schedule` runs pass `--allow-missing-llm` (without `--probe-llm`) so the checker stays deterministic in repositories without LLM secrets; malformed provided keys still fail. `--probe-llm` keeps missing keys as a hard failure even if `--allow-missing-llm` is also set.
+4. Local equivalent: `python scripts/actions_config_check.py` (optional `--strict-notify` / `--probe-llm` / `--allow-missing-llm`)
 
 Only after Config Check passes, run Daily Analysis.
 

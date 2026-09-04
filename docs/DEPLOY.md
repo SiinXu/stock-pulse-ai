@@ -522,8 +522,8 @@ git push
 2. 可选输入：
    - `strict_notify`：缺通知渠道时也标红失败（默认仅警告）
    - `probe_llm`：对第一个可识别提供商做一次廉价连通性探测（默认关闭）
-3. 约 1 分钟内在 Job Summary 查看 ✅/❌/⚠️ 清单；缺 LLM Key 或 `STOCK_LIST` 会失败并提示到 Settings 补齐
-4. 本地等价命令：`python scripts/actions_config_check.py`（可选 `--strict-notify` / `--probe-llm`）
+3. 约 1 分钟内在 Job Summary 查看 ✅/❌/⚠️ 清单；**手动 Run workflow** 时缺 LLM Key 或 `STOCK_LIST` 会失败并提示到 Settings 补齐。自动 `push`/`schedule` 会传入 `--allow-missing-llm`（不带 `--probe-llm`），以便在未配置 LLM Secret 的仓库中保持确定性；已提供但格式错误的 Key 仍会失败。即使同时传入 `--allow-missing-llm`，`--probe-llm` 仍会把缺失 Key 视为硬失败。
+4. 本地等价命令：`python scripts/actions_config_check.py`（可选 `--strict-notify` / `--probe-llm` / `--allow-missing-llm`）
 
 通过后再执行下一步日推分析。
 

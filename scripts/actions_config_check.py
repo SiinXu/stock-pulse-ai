@@ -6,6 +6,7 @@ Usage:
     python scripts/actions_config_check.py
     python scripts/actions_config_check.py --strict-notify
     python scripts/actions_config_check.py --probe-llm
+    python scripts/actions_config_check.py --allow-missing-llm
     python scripts/actions_config_check.py --summary-file /tmp/summary.md
 
 Exit codes:
@@ -70,6 +71,17 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     parser.add_argument(
+        "--allow-missing-llm",
+        action="store_true",
+        help=(
+            "Treat a missing LLM key as a warning instead of a hard failure. "
+            "Used by automated push/schedule Config Check canaries in repositories "
+            "without LLM secrets. Malformed provided keys still fail. "
+            "--probe-llm overrides this flag and keeps missing keys as a hard failure. "
+            "Manual dispatch and the default CLI remain strict."
+        ),
+    )
+    parser.add_argument(
         "--summary-file",
         type=str,
         default="",
@@ -86,6 +98,7 @@ def main(argv: list[str] | None = None) -> int:
         os.environ,
         strict_notify=bool(args.strict_notify),
         probe_llm=bool(args.probe_llm),
+        allow_missing_llm=bool(args.allow_missing_llm),
         repo_root=REPO_ROOT,
     )
 
