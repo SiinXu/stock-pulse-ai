@@ -107,6 +107,40 @@ SYSTEM_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "versioned scheduled tasks (POST /api/v1/scheduled-tasks; Web Settings → Saved schedule definitions)"
         ),
     },
+    "DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS": {
+        "title": "Runtime Scheduler Timeout",
+        "description": (
+            "Hard timeout in seconds for each attached Web/API/Desktop runtime-scheduler "
+            "analysis. Environment-only; re-read for every analysis. Minimum 60 seconds; "
+            "invalid values use 2700. Not exposed in Web Settings."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "2700",
+        "options": [],
+        "validation": {"min": 60},
+        "display_order": 13,
+        "help_key": "settings.system.schedule",
+        "examples": [
+            "DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS=2700",
+            "DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS=60",
+        ],
+        "docs": [
+            {
+                "label": "Scheduled tasks: runtime ownership",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/scheduled-tasks.md#runtime-ownership",
+            },
+            {
+                "label": "Full guide: configuration",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#其他配置",
+            },
+        ],
+        "warning_codes": [],
+    },
     "USE_PROXY": {
         "title": "Enable Local Proxy",
         "description": (

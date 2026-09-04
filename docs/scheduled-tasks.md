@@ -409,6 +409,17 @@ No new scheduler loop is introduced:
   deployment roles explicit; it is not a second operator-facing scheduling
   switch.
 
+Attached Web/API/Desktop legacy day-batch jobs and the run-now API execute
+analysis in a multiprocessing spawn child named `runtime-scheduled-analysis`.
+`DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS` (default `2700`, minimum `60`, invalid
+values use the default) is re-read for every analysis. Timeout or stop
+terminates the worker process tree (POSIX `setsid` + `killpg` TERM then KILL;
+Windows `taskkill /PID /T /F`). A generation fence drops stale callbacks after
+stop, and an expected kill does not become `last_error`. The timeout is
+environment-only and is hidden from Web Settings. Pure CLI
+`python main.py --schedule` and the versioned `ScheduledTaskService` queue path
+are unchanged.
+
 Do not run multiple analyzer processes against the same task database. SQLite
 claiming prevents duplicate due-slot rows, but canonical execution state and
 retry ownership remain process-local.

@@ -1,0 +1,1 @@
+- [Fixed] Isolate attached Web/API/Desktop runtime-scheduler analysis in a spawn child with an env-only portable watchdog (Refs #1636).

@@ -452,6 +452,7 @@ For the notification baseline, diagnostics, and deployment notes, see [Notificat
 | `SCHEDULE_ENABLED` | Enable scheduled tasks | `false` |
 | `SCHEDULE_TIME` | Scheduled execution time | `18:00` |
 | `SCHEDULE_TIMES` | Multiple scheduled execution times, comma-separated; falls back to `SCHEDULE_TIME` when empty | empty |
+| `DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS` | Hard timeout in seconds for each attached Web/API/Desktop runtime-scheduler analysis (minimum 60; invalid values use 2700). Environment-only; not a Web Settings control | `2700` |
 | `SCHEDULE_RUN_IMMEDIATELY` | Run once immediately when scheduler mode starts; when unset it keeps following the legacy `RUN_IMMEDIATELY` runtime override | `true` |
 | `RUN_IMMEDIATELY` | Run once immediately for non-scheduler startup; also acts as the legacy fallback when `SCHEDULE_RUN_IMMEDIATELY` is unset | `true` |
 | `LOG_DIR` | Log directory | `./logs` |
@@ -820,7 +821,7 @@ crontab -e
 >
 > When the built-in scheduler is started via `python main.py --schedule` or an equivalent CLI-only mode, saving a new `SCHEDULE_TIME` / `SCHEDULE_TIMES` from the WebUI will rebind the daily jobs on the next scheduler poll without restarting the process. The previous trigger times are removed instead of being kept alongside the new ones. `python main.py --serve --schedule` is owned by the Web/API runtime scheduler, so long-running WebUI/API/Desktop processes that have it attached start, stop, or rebuild the runtime scheduler after saving `SCHEDULE_ENABLED`, `SCHEDULE_TIME`, or `SCHEDULE_TIMES`. Restarting standalone `python main.py --serve-only` or Desktop restores enabled daily jobs, while service startup itself never runs an immediate analysis. Default Compose `analyzer` + `server` keeps `analyzer` as the sole legacy day-batch owner; `server` does not attach it.
 >
-> The Web/API runtime scheduler run-now endpoint only accepts a request when no analysis is already running; if an analysis is in progress, it returns a busy response instead of reporting a queued run.
+> The Web/API runtime scheduler run-now endpoint only accepts a request when no analysis is already running; if an analysis is in progress, it returns a busy response instead of reporting a queued run. Attached legacy day-batch jobs and run-now execute in a spawn child named `runtime-scheduled-analysis`, isolated by `DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS` (default 2700 seconds, minimum 60, invalid values fall back to the default; re-read per analysis). Timeout or stop terminates the process tree. The timeout is environment-only and is not exposed in Web Settings.
 
 ### Market Phase Baseline (Issue #1386 P0)
 
