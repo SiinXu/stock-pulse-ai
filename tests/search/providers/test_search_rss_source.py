@@ -18,8 +18,12 @@ if "newspaper" not in sys.modules:
 
 from src.search_service import RssAtomSearchProvider, SearchService
 from src.security.outbound_policy import OutboundPolicyError
+from tests.time_determinism import frozen_time
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "rss"
+
+# Newest dated fixture pubDate; days=30 keeps the 2026-08-03 and 2026-08-05 items.
+_RSS_FIXTURE_NOW = "2026-08-05T12:00:00+00:00"
 
 
 def _load_fixture(name: str) -> bytes:
@@ -34,6 +38,14 @@ class TestRssAtomSearchProvider(unittest.TestCase):
         self.feed_empty = "https://feeds.example.com/empty.rss"
         self.feed_bad = "https://feeds.example.com/bad.rss"
         self.loopback_feed = "http://127.0.0.1:9/feed.rss"
+        # Patch the search facade datetime binding used by _soft_age_filter.
+        self._clock_cm = frozen_time(
+            at=_RSS_FIXTURE_NOW,
+            datetime_modules=("src.search_service",),
+            patch_sleep=False,
+        )
+        self.clock = self._clock_cm.__enter__()
+        self.addCleanup(self._clock_cm.__exit__, None, None, None)
 
     def _response(self, body: bytes, *, status_code: int = 200, url: str = "") -> MagicMock:
         resp = MagicMock()
