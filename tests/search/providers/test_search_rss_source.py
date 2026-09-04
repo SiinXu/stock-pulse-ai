@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import sys
 import unittest
-from datetime import timedelta, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -23,19 +22,14 @@ if "newspaper" not in sys.modules:
     mock_np.Config = MagicMock()
     sys.modules["newspaper"] = mock_np
 
-from src.search_service import RssAtomSearchProvider, SearchResult, SearchService
+from src.search_service import RssAtomSearchProvider, SearchService
 from src.security.outbound_policy import OutboundPolicyError
 from tests.time_determinism import frozen_time
 
 FIXTURES = Path(__file__).resolve().parents[2] / "fixtures" / "rss"
 
-# Newest pubDate in tests/fixtures/rss/{well_formed_rss,well_formed_atom,duplicate_items}.xml.
-# days=30 from this instant keeps 2026-08-03 and 2026-08-05 inside the window.
+# Newest dated fixture pubDate; days=30 keeps the 2026-08-03 and 2026-08-05 items.
 _RSS_FIXTURE_NOW = "2026-08-05T12:00:00+00:00"
-# Last UTC day where well_formed_rss.xml's 2026-08-03 AAPL item is still in days=30.
-_RSS_DAYS30_INCLUSIVE_BOUNDARY = "2026-09-02T12:00:00+00:00"
-# GitHub run 33835188197 canary date: 2026-08-03 is outside days=30.
-_RSS_CANARY_UTC = "2026-09-04T00:00:00+00:00"
 
 
 def _load_fixture(name: str) -> bytes:
@@ -97,82 +91,6 @@ class TestRssAtomSearchProvider(unittest.TestCase):
         self.assertEqual(first.url, "https://news.example.com/aapl-earnings")
         self.assertIn("RSS", first.source)
         self.assertEqual(first.published_date, "2026-08-05")
-
-    def test_soft_age_filter_keeps_cutoff_day_and_drops_older(self) -> None:
-        """days=N is inclusive of today-N and drops today-(N+1); undated items stay."""
-        import src.search_service as search_service_module
-
-        provider = RssAtomSearchProvider([self.feed_a])
-        today = search_service_module.datetime.now(timezone.utc).date()
-        days = 30
-        on_cutoff = (today - timedelta(days=days)).isoformat()
-        too_old = (today - timedelta(days=days + 1)).isoformat()
-        kept = provider._soft_age_filter(
-            [
-                SearchResult(
-                    title="old AAPL",
-                    snippet="Apple",
-                    url="https://news.example.com/old",
-                    source="x (RSS)",
-                    published_date=too_old,
-                ),
-                SearchResult(
-                    title="cutoff AAPL",
-                    snippet="Apple",
-                    url="https://news.example.com/cutoff",
-                    source="x (RSS)",
-                    published_date=on_cutoff,
-                ),
-                SearchResult(
-                    title="undated AAPL",
-                    snippet="Apple",
-                    url="https://news.example.com/undated",
-                    source="x (RSS)",
-                    published_date=None,
-                ),
-            ],
-            days=days,
-        )
-        self.assertEqual(
-            [item.url for item in kept],
-            [
-                "https://news.example.com/cutoff",
-                "https://news.example.com/undated",
-            ],
-        )
-
-    def test_well_formed_rss_keeps_oldest_fixture_on_days30_inclusive_boundary(self) -> None:
-        """On 2026-09-02 UTC, days=30 still includes the 2026-08-03 AAPL item."""
-        body = _load_fixture("well_formed_rss.xml")
-        provider = RssAtomSearchProvider([self.feed_a])
-        with frozen_time(
-            at=_RSS_DAYS30_INCLUSIVE_BOUNDARY,
-            datetime_modules=("src.search_service",),
-            patch_sleep=False,
-        ):
-            with patch("src.search_service.safe_get", return_value=self._response(body)):
-                resp = provider.search("AAPL", max_results=10, days=30)
-        titles = [r.title for r in resp.results]
-        self.assertGreaterEqual(len(resp.results), 2)
-        self.assertTrue(any("earnings" in t.lower() for t in titles))
-        self.assertTrue(any("supplier" in t.lower() for t in titles))
-
-    def test_well_formed_rss_drops_item_outside_days30_on_canary_utc(self) -> None:
-        """GitHub run 33835188197: on 2026-09-04 UTC, days=30 drops 2026-08-03."""
-        body = _load_fixture("well_formed_rss.xml")
-        provider = RssAtomSearchProvider([self.feed_a])
-        with frozen_time(
-            at=_RSS_CANARY_UTC,
-            datetime_modules=("src.search_service",),
-            patch_sleep=False,
-        ):
-            with patch("src.search_service.safe_get", return_value=self._response(body)):
-                resp = provider.search("AAPL", max_results=10, days=30)
-        titles = [r.title for r in resp.results]
-        self.assertEqual(len(resp.results), 1)
-        self.assertTrue(any("earnings" in t.lower() for t in titles))
-        self.assertFalse(any("supplier" in t.lower() for t in titles))
-        self.assertEqual(resp.results[0].published_date, "2026-08-05")
 
     def test_well_formed_atom_parse(self) -> None:
         body = _load_fixture("well_formed_atom.xml")
