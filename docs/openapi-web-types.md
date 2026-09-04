@@ -438,6 +438,42 @@ module is runtime-empty. This is the types-file bind; the earlier
 API-module paragraph for `portfolioHealth` stays. `Refs #721`; do not
 close the issue.
 
+`apps/dsa-web/src/types/todaysFocus.ts` now CamelizeKeys-binds the ten
+generated TodaysFocus object components (`TodaysFocusAlertEvidence`,
+`TodaysFocusAnalysisEvidence`, `TodaysFocusCorporateEventEvidence`,
+`TodaysFocusCostContract`, `TodaysFocusItem`,
+`TodaysFocusMarketDayWindow`, `TodaysFocusPresentationBoundary`,
+`TodaysFocusResponse`, `TodaysFocusTemporalPolicy`,
+`TodaysFocusUniverseContract`). Closed unions (`TodaysFocusReasonCode`,
+status, evidence `type`, `sourcesUsed`, `degradedSources`, universe
+`sources`, market, directional action) are derived from generated field
+enums; there are no named OpenAPI enum schemas, so do not invent unions.
+`Override` keeps seven UI fields required versus generated optional
+(generated fact; not fixed by regenerating OpenAPI): alert `ruleId`,
+analysis `queryId`, item `weightPct`, market-window `isTradingDay`,
+response `emptyReason` / `emptyMessage`, and universe `dataNotes`. Alert
+`source` stays optional on both sides. Discriminator and enum **values**
+stay snake (`corporate_event`, `alert_triggered`, `analysis_history`,
+`watchlist_config`, `portfolio_position_cache`); object **keys** are camel
+(`reasonCode`, `emptyReason`, `universeContract`) via CamelizeKeys. This
+is the same snake-value versus camel-key split as portfolio-health
+dimension names versus dimension object keys. Generated constants
+`pack_version: "todays_focus/2.1"`, `hard_cap: 1000`, `database_writes: 0`,
+`provider_calls: 0`, `analysis_runs_triggered: 0`, `zero_extra_fetch: true`,
+`read_only: true`, `alerts_owned_by: "signal_center"`,
+`duplicate_alert_ui: false`,
+`focus_shows: "prioritized_symbols_with_evidence_links"` stay closed; do
+not widen. `TodaysFocusQuery` stays handwritten optional-without-null
+camelCase (generated query uses snake keys `max_items` / `account_id` /
+`language` and `| null`; do not CamelizeKeys it). Path 200 JSON for GET
+`/api/v1/focus/today` (`getTodaysFocus`) is mutually equivalent to
+`TodaysFocusResponse`; GET `requestBody` is `never`. This is **not** the
+auth object export-alias pattern: generated snake_case is not the UI type.
+Runtime Zod in `api/todaysFocus.ts` is unchanged (still requires the seven
+UI fields on the wire parse). The module is runtime-empty. This is the
+types-file bind; the earlier API-module paragraph for `todaysFocus` stays.
+`Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
