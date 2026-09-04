@@ -1,0 +1,1 @@
+- [Fixed] Linux and Docker share images now install Noto CJK fonts and use Chinese/Korean font stacks so supported CJK report text remains visible in PNG output (Refs #1636).
