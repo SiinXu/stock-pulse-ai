@@ -4,12 +4,18 @@
 from __future__ import annotations
 
 import logging
+import multiprocessing
 import os
+import signal
+import subprocess
 import threading
 import _thread
+import time
 import uuid
 from datetime import datetime, timezone, tzinfo
+from functools import partial
 from pathlib import Path
+from queue import Empty
 from types import SimpleNamespace
 from typing import Any, Callable, Dict, List, Optional, Set
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -24,6 +30,8 @@ RUNTIME_SCHEDULER_FORCE_ENABLED_ENV = "DSA_RUNTIME_SCHEDULER_FORCE_ENABLED"
 RUNTIME_SCHEDULER_RUN_IMMEDIATELY_ENV = "DSA_RUNTIME_SCHEDULER_RUN_IMMEDIATELY"
 RUNTIME_SCHEDULER_SUPPRESS_START_ENV = "DSA_RUNTIME_SCHEDULER_SUPPRESS_START"
 RUNTIME_SCHEDULER_ARGS_ENV = "DSA_RUNTIME_SCHEDULER_ARGS"
+RUNTIME_SCHEDULER_TIMEOUT_ENV = "DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS"
+DEFAULT_RUNTIME_SCHEDULER_TIMEOUT_SECONDS = 45 * 60
 SCHEDULED_TASK_OWNER_ENV = "DSA_SCHEDULED_TASK_OWNER"
 DESKTOP_MODE_ENV = "DSA_DESKTOP_MODE"
 _RUNTIME_ANALYSIS_LOCK = threading.Lock()
@@ -128,6 +136,137 @@ def run_with_global_analysis_lock(
     finally:
         _RUNTIME_ANALYSIS_LOCK.release()
     return True
+
+
+def _run_scheduled_analysis_process(
+    result_queue: Any,
+    stock_codes: Optional[List[str]],
+    schedule_args_overrides: Dict[str, Any],
+) -> None:
+    """Run one analysis in a spawn-safe child process."""
+    if os.name == "posix":
+        try:
+            os.setsid()
+        except OSError:
+            # Being a session leader already is equivalent to success. Any
+            # other failure would make process-tree cleanup unsafe, so fail
+            # before analysis can create descendants.
+            if os.getsid(0) != os.getpid():
+                raise
+    service = RuntimeSchedulerService(schedule_args_overrides=schedule_args_overrides)
+    run_id = str(uuid.uuid4())
+    success = service._run_analysis_locked(stock_codes, run_id=run_id)
+    result_queue.put({"success": success, "error": service._last_error})
+
+
+def _posix_descendant_process_ids(root_pid: int) -> Set[int]:
+    """Return a best-effort snapshot of descendants before the root exits."""
+    try:
+        completed = subprocess.run(
+            ["ps", "-axo", "pid=,ppid="],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return set()
+
+    children_by_parent: Dict[int, List[int]] = {}
+    for line in completed.stdout.splitlines():
+        parts = line.split()
+        if len(parts) != 2:
+            continue
+        try:
+            pid, parent_pid = (int(value) for value in parts)
+        except ValueError:
+            continue
+        children_by_parent.setdefault(parent_pid, []).append(pid)
+
+    descendants: Set[int] = set()
+    pending = list(children_by_parent.get(root_pid, []))
+    while pending:
+        pid = pending.pop()
+        if pid in descendants:
+            continue
+        descendants.add(pid)
+        pending.extend(children_by_parent.get(pid, []))
+    return descendants
+
+
+def _terminate_analysis_process_tree(process: Any) -> None:
+    """Stop an analysis worker and any descendants it created."""
+    root_alive = process.is_alive()
+    process_id = process.pid
+
+    posix_process_groups: Set[int] = set()
+    if os.name == "posix" and process_id:
+        posix_process_groups.add(process_id)
+        current_process_group = os.getpgrp()
+        if root_alive:
+            for descendant_pid in _posix_descendant_process_ids(process_id):
+                try:
+                    descendant_group = os.getpgid(descendant_pid)
+                except ProcessLookupError:
+                    continue
+                if descendant_group != current_process_group:
+                    posix_process_groups.add(descendant_group)
+
+    try:
+        if os.name == "posix" and process_id:
+            for process_group in posix_process_groups:
+                try:
+                    os.killpg(process_group, signal.SIGTERM)
+                except ProcessLookupError:
+                    continue
+            # The spawned worker calls setsid(), but stop/timeout can win the
+            # race before that happens. In that window killpg(worker_pid, ...)
+            # has no target, so also terminate the multiprocessing handle.
+            if process.is_alive():
+                process.terminate()
+        elif os.name == "nt" and process_id:
+            subprocess.run(
+                ["taskkill", "/PID", str(process_id), "/T", "/F"],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=10,
+            )
+        elif root_alive:
+            process.terminate()
+    except (OSError, subprocess.SubprocessError):
+        if root_alive:
+            process.terminate()
+
+    process.join(2)
+    if os.name == "posix" and process_id:
+        remaining_process_groups: Set[int] = set()
+        for process_group in posix_process_groups:
+            try:
+                os.killpg(process_group, 0)
+            except ProcessLookupError:
+                continue
+            except PermissionError:
+                pass
+            remaining_process_groups.add(process_group)
+        if not remaining_process_groups:
+            return
+    elif not process.is_alive():
+        return
+
+    try:
+        if os.name == "posix" and process_id:
+            for process_group in remaining_process_groups:
+                try:
+                    os.killpg(process_group, signal.SIGKILL)
+                except ProcessLookupError:
+                    continue
+        else:
+            process.kill()
+    except (OSError, AttributeError):
+        if process.is_alive():
+            process.terminate()
+    process.join(10)
 
 
 def _agent_event_monitor_interval_seconds(config: Config) -> int:
@@ -323,6 +462,10 @@ class RuntimeSchedulerService:
         self._active_run_id: Optional[str] = None
         self._last_run_id: Optional[str] = None
         self._last_run_outcome: Optional[str] = None
+        self._analysis_process_target = _run_scheduled_analysis_process
+        self._analysis_process: Optional[Any] = None
+        self._analysis_process_lock = threading.Lock()
+        self._analysis_generation = 0
 
     def _make_schedule_args(self) -> SimpleNamespace:
         defaults = {
@@ -416,6 +559,218 @@ class RuntimeSchedulerService:
             )
         finally:
             self._run_lock.release()
+        return True
+
+    def _analysis_timeout_seconds(self) -> int:
+        """Read the current process env timeout; invalid values use the default."""
+        try:
+            value = os.getenv(
+                RUNTIME_SCHEDULER_TIMEOUT_ENV,
+                str(DEFAULT_RUNTIME_SCHEDULER_TIMEOUT_SECONDS),
+            )
+            return max(60, int(value))
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid %s; using %ss",
+                RUNTIME_SCHEDULER_TIMEOUT_ENV,
+                DEFAULT_RUNTIME_SCHEDULER_TIMEOUT_SECONDS,
+            )
+            return DEFAULT_RUNTIME_SCHEDULER_TIMEOUT_SECONDS
+
+    def _record_watchdog_outcome(
+        self,
+        run_id: str,
+        generation: int,
+        *,
+        succeeded: bool,
+        error: Optional[str] = None,
+    ) -> bool:
+        """Record a watchdog outcome unless stop() advanced the generation fence."""
+        with self._lock:
+            with self._analysis_process_lock:
+                if generation != self._analysis_generation:
+                    if self._active_run_id == run_id:
+                        self._active_run_id = None
+                    return False
+                if succeeded:
+                    self._last_success_at = _utc_now_iso()
+                    self._last_error = None
+                else:
+                    self._last_error = error or "runtime scheduled analysis failed"
+                if self._active_run_id == run_id:
+                    self._active_run_id = None
+                self._last_run_id = run_id
+                self._last_run_outcome = "succeeded" if succeeded else "failed"
+                return True
+
+    def _run_analysis_with_watchdog(
+        self,
+        stock_codes: Optional[List[str]] = None,
+        *,
+        lock_held: bool = False,
+        generation: Optional[int] = None,
+        run_id: Optional[str] = None,
+        started_at: Optional[str] = None,
+    ) -> None:
+        if not lock_held and not self._run_lock.acquire(blocking=False):
+            self._record_analysis_busy_skip()
+            return
+        if generation is None:
+            with self._analysis_process_lock:
+                generation = self._analysis_generation
+        if run_id is None:
+            run_id = str(uuid.uuid4())
+            started_at = self._begin_run(run_id, started_at=started_at)
+
+        result_queue = None
+        process: Optional[Any] = None
+        try:
+            context = multiprocessing.get_context("spawn")
+            result_queue = context.Queue()
+            process = context.Process(
+                target=self._analysis_process_target,
+                args=(result_queue, stock_codes, dict(self._schedule_args_overrides)),
+                name="runtime-scheduled-analysis",
+            )
+            timeout = self._analysis_timeout_seconds()
+            with self._lock:
+                with self._analysis_process_lock:
+                    if generation != self._analysis_generation:
+                        if self._active_run_id == run_id:
+                            self._active_run_id = None
+                        return
+                    process.start()
+                    self._analysis_process = process
+                    self._active_run_id = run_id
+                    self._last_run_at = started_at or _utc_now_iso()
+
+            result = None
+            deadline = time.monotonic() + timeout
+            while result is None:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    break
+                try:
+                    result = result_queue.get(timeout=min(0.2, remaining))
+                except Empty:
+                    if not process.is_alive():
+                        deadline = min(deadline, time.monotonic() + 2)
+
+            if result is None and process.is_alive():
+                logger.error(
+                    "Runtime scheduled analysis exceeded %ss; terminating worker",
+                    timeout,
+                )
+                _terminate_analysis_process_tree(process)
+                self._record_watchdog_outcome(
+                    run_id,
+                    generation,
+                    succeeded=False,
+                    error=f"runtime scheduled analysis timed out after {timeout}s",
+                )
+                return
+
+            if result is None:
+                exit_code = process.exitcode
+                _terminate_analysis_process_tree(process)
+                self._record_watchdog_outcome(
+                    run_id,
+                    generation,
+                    succeeded=False,
+                    error=(
+                        "runtime scheduled analysis worker exited without a result "
+                        f"(exit code {exit_code})"
+                    ),
+                )
+                return
+
+            process.join(2)
+            if process.is_alive():
+                _terminate_analysis_process_tree(process)
+                self._record_watchdog_outcome(
+                    run_id,
+                    generation,
+                    succeeded=False,
+                    error="runtime scheduled analysis worker did not exit",
+                )
+                return
+
+            if result.get("success"):
+                self._record_watchdog_outcome(run_id, generation, succeeded=True)
+            else:
+                self._record_watchdog_outcome(
+                    run_id,
+                    generation,
+                    succeeded=False,
+                    error=result.get("error") or "runtime scheduled analysis failed",
+                )
+        except Exception as exc:  # broad-exception: fallback_recorded - watchdog must release the scheduler
+            self._record_watchdog_outcome(
+                run_id,
+                generation,
+                succeeded=False,
+                error=sanitize_exception_chain(exc),
+            )
+            log_safe_exception(
+                logger,
+                "Runtime scheduler watchdog failed",
+                exc,
+                error_code="runtime_scheduler_watchdog_failed",
+            )
+        finally:
+            self._run_lock.release()
+            if process is not None:
+                with self._analysis_process_lock:
+                    if self._analysis_process is process:
+                        self._analysis_process = None
+            if result_queue is not None:
+                result_queue.cancel_join_thread()
+                result_queue.close()
+
+    def _start_analysis_watchdog(
+        self,
+        stock_codes: Optional[List[str]] = None,
+        *,
+        generation: Optional[int] = None,
+        run_id: Optional[str] = None,
+        started_at: Optional[str] = None,
+    ) -> bool:
+        with self._analysis_process_lock:
+            current_generation = self._analysis_generation
+            if generation is not None and generation != current_generation:
+                return False
+            generation = current_generation
+        if not self._run_lock.acquire(blocking=False):
+            self._record_analysis_busy_skip()
+            return False
+        run_id = run_id or str(uuid.uuid4())
+        started_at = self._begin_run(run_id, started_at=started_at)
+        worker = threading.Thread(
+            target=lambda: self._run_analysis_with_watchdog(
+                stock_codes,
+                lock_held=True,
+                generation=generation,
+                run_id=run_id,
+                started_at=started_at,
+            ),
+            daemon=True,
+            name="runtime-scheduler-watchdog",
+        )
+        try:
+            worker.start()
+        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
+            log_safe_exception(
+                logger,
+                "Runtime scheduler watchdog thread failed to start",
+                exc,
+                error_code="runtime_scheduler_watchdog_start_failed",
+                level=logging.WARNING,
+            )
+            with self._lock:
+                self._last_error = sanitize_exception_chain(exc)
+            self._finish_run(run_id, succeeded=False)
+            self._run_lock.release()
+            raise
         return True
 
     def _current_times(self) -> List[str]:
@@ -663,6 +1018,12 @@ class RuntimeSchedulerService:
                 include_legacy and self._is_legacy_schedule_enabled(config)
             )
             self.stop()
+            with self._analysis_process_lock:
+                generation = self._analysis_generation
+            scheduled_analysis = partial(
+                self._start_analysis_watchdog,
+                generation=generation,
+            )
             times = normalize_schedule_times(
                 getattr(config, "schedule_times", None),
                 fallback_time=getattr(config, "schedule_time", "18:00"),
@@ -675,9 +1036,12 @@ class RuntimeSchedulerService:
             )
             if legacy_enabled:
                 if run_immediately and self._run_immediately_in_background:
-                    scheduler.set_daily_task(self._run_analysis_once, run_immediately=False)
+                    scheduler.set_daily_task(scheduled_analysis, run_immediately=False)
                 else:
-                    scheduler.set_daily_task(self._run_analysis_once, run_immediately=run_immediately)
+                    scheduler.set_daily_task(
+                        scheduled_analysis,
+                        run_immediately=run_immediately,
+                    )
             for entry in background_tasks:
                 scheduler.add_background_task(
                     entry["task"],
@@ -686,7 +1050,7 @@ class RuntimeSchedulerService:
                     name=entry.get("name"),
                 )
             if legacy_enabled and run_immediately and self._run_immediately_in_background:
-                self._run_in_background_thread(self._run_analysis_once)
+                self._run_in_background_thread(scheduled_analysis)
             thread = threading.Thread(
                 target=scheduler.run,
                 daemon=True,
@@ -699,13 +1063,20 @@ class RuntimeSchedulerService:
             thread.start()
 
     def stop(self) -> None:
-        scheduler = self._scheduler
-        if scheduler is not None:
-            scheduler.stop()
-        self._scheduler = None
-        self._thread = None
-        self._enabled = False
-        self._legacy_enabled = False
+        with self._lock:
+            with self._analysis_process_lock:
+                self._analysis_generation += 1
+                process = self._analysis_process
+                self._analysis_process = None
+            scheduler = self._scheduler
+            if scheduler is not None:
+                scheduler.stop()
+            if process is not None:
+                _terminate_analysis_process_tree(process)
+            self._scheduler = None
+            self._thread = None
+            self._enabled = False
+            self._legacy_enabled = False
 
     def reconcile_from_config(
         self,
@@ -772,40 +1143,14 @@ class RuntimeSchedulerService:
                 "running": self._run_lock.locked(),
                 "reason": block_reason,
             }
-        if not self._run_lock.acquire(blocking=False):
-            self._record_analysis_busy_skip()
+        run_id = str(uuid.uuid4())
+        started_at = _utc_now_iso()
+        if not self._start_analysis_watchdog(run_id=run_id, started_at=started_at):
             return {
                 "accepted": False,
                 "running": True,
                 "reason": "analysis_already_running",
             }
-
-        run_id = str(uuid.uuid4())
-        started_at = self._begin_run(run_id)
-
-        def run_and_release() -> None:
-            try:
-                self._run_analysis_locked(
-                    None,
-                    run_id=run_id,
-                )
-            finally:
-                self._run_lock.release()
-
-        worker = threading.Thread(
-            target=run_and_release,
-            daemon=True,
-            name="runtime-scheduler-run-now",
-        )
-        try:
-            worker.start()
-        except Exception as exc:  # broad-exception: fallback_recorded - isolate failure for sequential merge
-            log_safe_exception(logger, 'operation failed', exc, error_code='internal_error', level=logging.WARNING)
-            with self._lock:
-                self._last_error = sanitize_exception_chain(exc)
-            self._finish_run(run_id, succeeded=False)
-            self._run_lock.release()
-            raise
         return {
             "accepted": True,
             "running": True,

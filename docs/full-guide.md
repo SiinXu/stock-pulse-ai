@@ -521,6 +521,7 @@ stock-pulse-ai/
 | `SCHEDULE_ENABLED` | 启用定时任务 | `false` |
 | `SCHEDULE_TIME` | 定时执行时间 | `18:00` |
 | `SCHEDULE_TIMES` | 多个定时执行时间，逗号分隔；为空时使用 `SCHEDULE_TIME` | 空 |
+| `DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS` | 已挂载 Web/API/Desktop runtime scheduler 单次分析硬超时（秒，最小 60；非法值回退 2700）。仅环境变量，不出现在 Web 设置页 | `2700` |
 | `LOG_DIR` | 日志目录 | `./logs` |
 | `SAVE_CONTEXT_SNAPSHOT` | 保存分析历史 `context_snapshot`；设为 `false` 时新历史不保存 enhanced_context、market_phase_summary、AnalysisContextPack overview 或诊断快照，但不关闭当次 Prompt 低敏摘要 | `true` |
 
@@ -900,7 +901,7 @@ python main.py --schedule --no-run-immediately
 >
 > 从 `python main.py --schedule` 或等价纯 CLI 调度模式启动后，WebUI 保存新的 `SCHEDULE_TIME` / `SCHEDULE_TIMES` 会在下一轮调度检查内自动重绑 daily jobs，无需重启进程；旧的执行时间不会继续保留。`python main.py --serve --schedule` 会由 Web/API runtime scheduler 接管定时任务，已挂载的 WebUI/API/Desktop 长运行进程保存 `SCHEDULE_ENABLED`、`SCHEDULE_TIME` 或 `SCHEDULE_TIMES` 后会按当前配置启停或重建 runtime scheduler。独立进程或 Desktop 重启 `python main.py --serve-only` 时，已启用的 daily jobs 会自动恢复，但服务启动本身不会立即执行分析。默认 Compose 同时启动 `analyzer` + `server` 时，由 `analyzer` 独占遗留日批，`server` 不挂载。
 >
-> Web/API runtime scheduler 的立即执行入口只会在没有分析任务运行时接受请求；如果已有分析在执行，会返回忙碌状态而不是假装排队成功。
+> Web/API runtime scheduler 的立即执行入口只会在没有分析任务运行时接受请求；如果已有分析在执行，会返回忙碌状态而不是假装排队成功。已挂载进程的遗留日批与 run-now 会在名为 `runtime-scheduled-analysis` 的 spawn 子进程中执行，并由 `DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS`（默认 2700 秒，最小 60 秒，非法值回退默认值；每次分析重新读取）看门狗隔离；超时或 stop 会终止进程树。该超时仅环境变量生效，Web 设置页不提供控件。
 
 #### 环境变量方式
 
@@ -911,6 +912,7 @@ python main.py --schedule --no-run-immediately
 | `SCHEDULE_ENABLED` | 是否启用定时任务 | `false` | `true` |
 | `SCHEDULE_TIME` | 每日执行时间 (HH:MM) | `18:00` | `09:30` |
 | `SCHEDULE_TIMES` | 多个每日执行时间，逗号分隔；为空时使用 `SCHEDULE_TIME` | 空 | `09:20,12:30,15:10,18:00` |
+| `DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS` | 已挂载 Web/API/Desktop runtime scheduler 单次分析硬超时；仅环境变量，不出现在 Web 设置 | `2700` | `3600` |
 | `SCHEDULE_RUN_IMMEDIATELY` | 定时模式启动时是否立即运行一次；未显式设置时沿用 `RUN_IMMEDIATELY` 的运行时覆盖语义 | `true` | `false` |
 | `RUN_IMMEDIATELY` | 非定时模式启动时是否立即运行一次；同时作为未显式设置 `SCHEDULE_RUN_IMMEDIATELY` 时的 legacy 回退 | `true` | `false` |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查：非交易日跳过执行；设为 `false` 可强制执行 | `true` | `false` |

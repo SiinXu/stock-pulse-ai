@@ -281,6 +281,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `DISCORD_MAIN_CHANNEL_ID` | `空` | 是 | 模板中注释 |
 | `DISCORD_MAX_WORDS` | `2000` | 是 | 模板中注释; Discord content limit is 2000; automatically truncates to no more than 2000 and splits long reports for sending |
 | `DISCORD_WEBHOOK_URL` | `https://discord.com/api/webhooks/your_webhook_id/your_webhook_token` | 是 | 模板中注释; Discord Configuration Supports two methods: Webhook (recommended, simple configuration) and Bot API (high permissions) |
+| `DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS` | `2700` | 是 | Hard timeout in seconds for each attached Web/API/Desktop runtime-scheduler analysis (minimum 60; invalid values use 2700). Environment-only; not a Web Settings control. |
 | `DSA_WEB_DEV_API_PROXY` | `http://127.0.0.1:8000` | 是 | 模板中注释; Frontend development proxy target |
 | `EFINANCE_CALL_TIMEOUT` | `30` | 是 | 模板中注释; Timeout (seconds) for efinance API calls; prevents indefinite hangs |
 | `EFINANCE_PRIORITY` | `0` | 是 | 模板中注释; EastMoney (China) - default: 0 |

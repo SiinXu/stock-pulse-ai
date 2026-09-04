@@ -118,6 +118,9 @@ WEB_SETTINGS_HIDDEN_FROM_UI = {
     "PREDICTION_RESOLVE_PROVIDER_ERROR_CIRCUIT_COOLDOWN_SECONDS",
     "PREDICTION_RESOLVE_CIRCUIT_OPEN_MAX_PER_TICK",
     "PREDICTION_RESOLVE_RETRY_JITTER_RATIO",
+    # Operator-only hard timeout for isolated runtime-scheduler analysis workers.
+    # Re-read from process env per analysis; not a Web Settings control.
+    "DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS",
     # USE_PROXY / PROXY_HOST / PROXY_PORT are Web-editable (system network
     # section). Previously hidden as low-frequency ops keys applied only at
     # process bootstrap; remain restart-gated via warning_codes + field help.
