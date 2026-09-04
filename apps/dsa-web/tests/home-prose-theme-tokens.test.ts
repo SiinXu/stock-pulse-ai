@@ -87,8 +87,7 @@ describe('home-prose theme tokens', () => {
     }
   });
 
-  it('removes the collapsed names from the defined inventory and pins the ceiling at 44', () => {
-    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBe(44);
+  it('removes the collapsed names from the defined inventory and does not raise the ceiling above 44', () => {
     expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBeLessThanOrEqual(44);
 
     const inventorySource = readInventorySource();

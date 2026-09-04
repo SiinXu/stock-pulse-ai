@@ -112,7 +112,7 @@
 
 - **冻结当前自定义属性名集合**，不在本阶段删除 page-scoped 遗留、不统一格式、不引入第二套 token 系统。
 - 可执行清单：`THEME_DEFINED_TOKEN_NAMES`（`src/index.css` 的 unique 定义）+ `classifyThemeToken()`。
-- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*`、`--backtest-*`、`--portfolio-*`、`--chat-*`、`--settings-*`、`--home-action-*` 与 `--home-prose-*` 已在 Phase 2 清零，禁止重新引入这些前缀或 action/prose 族。
+- **禁止新增** `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`。这些名字记为 `page-scoped-debt`，不得晋升为 Layer 1 来让 CI 变绿。`--home-price-up/down` 仍是 Layer 0 色相别名。`--login-*`、`--backtest-*`、`--portfolio-*`、`--chat-*`、`--settings-*`、`--home-action-*` 与 `--home-prose-*` 已在 Phase 2 清零，`--home-title-accent` 也已收敛，禁止重新引入这些前缀或 action/prose/title-accent 遗留。
 - 新 UI 只用 Layer 1 + `components/common`；缺色用 `hsl(var(--token) / alpha)`，不要为每个透明度再开 token。
 - 未定义的 `var(--*)`（如 `--home-border`、`--info`、`--color-purple`、`.input-surface` 可选槽）登记在 freeze 守卫测试里的 `THEME_UNGOVERNED_REFERENCE_DEBT`（`themeTokenFreezeGuard.test.ts`），只减不增，且**不得**写进已定义清单冒充合法 token。
 - Desktop 嵌入的 WebView 走同一套 Web token。`apps/dsa-desktop/renderer/assistant.html` / `loading.html` 是独立 chrome 清单，禁止把 `--bg` / `--panel` 并进 Web Layer 1。
@@ -180,6 +180,14 @@
 - 消费者保持既有 class：`.report-markdown-prose` 的 `h1` / `pre` / `th, td` / `th` / `hr` / `blockquote`；共享 `.prose` 表格的 `th, td` / `th`；`.chat-prose` 的 `pre` / `th, td` / `hr`。`.chat-prose blockquote` 原本就用 `--secondary-text` alpha，不在本族，保持不变。
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 48 降到 44；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（这四个名字不在格式债清单中）。非空下界保持 160（已定义清单约 164）。
 - 这些描边原本就包装 `--foreground` / `--primary`，因此 `data-theme-pack="slate"` 在收敛前后都会给 prose 换色（slate 覆盖 `--primary`、不覆盖 `--foreground`），**不是**首次换色。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余 `--home-*` 族（cool / shadow / panel / surface）不在本切片。
+
+### 2.14 Phase 2 域收敛：Home-title-accent（#1300）
+
+- 唯一剩余的 `--home-title-accent` 定义（light + dark）已删除；未新增页面级或领域 token。`THEME_PAGE_SCOPED_PREFIXES` 仍永久禁止 `--home-*`。
+- 历史 class `.home-title-accent` 保留。唯一 CSS 消费者改为内联 `color: hsl(var(--foreground));`。light 与 dark 原先就是同一 Layer 1 wrap，**不加** `.dark` 拆分。不要写成 `color: var(--foreground)`（`--foreground` 是 HSL 三元组），也不要把颜色挪到 Tailwind `text-foreground`（那会改 TSX）。
+- `.home-title-accent` 与 `.label-uppercase` 都是单 class、同等 specificity。`.home-title-accent` 规则必须保持在前（`color: hsl(var(--foreground))`）；后面的 `.label-uppercase` 仍设置 `color: var(--text-secondary-text)`，因此赢得渲染后的 eyebrow 颜色。计算色保持 `--text-secondary-text`。不要挪规则或提高 specificity 来让 `--foreground` 赢——那会改变 playground 画色。`DashboardPanelHeader` 的 class 名与 `accentEyebrow` 默认 `false` 不变；flag 为 true 时仍同时挂两个 class。生产 Home / watchlist / report / history / task 调用点当前省略该 flag，因此生产页眉颜色不变；在用调用点是 playground `dashboard-panel-header`。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 44 降到 43；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（该名字不在格式债清单中）。非空下界保持 160（已定义清单约 163）。
+- 该 token 原本就包装 `--foreground`，且当前 `slate` pack 不覆盖 `--foreground`，因此 **不是**首次 `data-theme-pack="slate"` 换色。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余 `--home-*` 族（cool / shadow / panel / surface / unused wrappers）不在本切片。
 
 ## 3. 字体阶（全部 Geist）
 
