@@ -5,6 +5,19 @@ import { z } from 'zod';
 import apiClient from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import type { components } from '../types/api.generated';
+import type {
+  ResearchTimelineParams,
+  ResearchTimelineResponse,
+} from '../types/researchTimeline';
+
+export type {
+  ResearchTimelineKind,
+  ResearchTimelineLink,
+  ResearchTimelineNode,
+  ResearchTimelineParams,
+  ResearchTimelineResponse,
+  ResearchTimelineSources,
+} from '../types/researchTimeline';
 
 type OpenApiResearchTimelineResponse = components['schemas']['ResearchTimelineResponse'];
 type OpenApiResearchTimelineNode = components['schemas']['ResearchTimelineNode'];
@@ -58,55 +71,6 @@ const researchTimelineResponseSchema = z.object({
   limit: z.number().int().finite(),
   sources: researchTimelineSourcesSchema,
 }).passthrough();
-
-export type ResearchTimelineKind = 'analysis_run' | 'chat' | 'signal' | 'hypothesis';
-
-export type ResearchTimelineLink = {
-  type: string;
-  stockCode?: string | null;
-  recordId?: number | null;
-  queryId?: string | null;
-  sessionId?: string | null;
-  messageId?: number | null;
-  turnId?: string | null;
-  signalId?: number | null;
-  sourceReportId?: number | null;
-};
-
-export type ResearchTimelineNode = {
-  id: string;
-  kind: ResearchTimelineKind;
-  occurredAt: string;
-  title: string;
-  summary?: string | null;
-  direction?: string | null;
-  confidence?: number | null;
-  status?: string | null;
-  link: ResearchTimelineLink;
-  meta?: Record<string, unknown>;
-};
-
-export type ResearchTimelineSources = {
-  analysisRun: string;
-  chat: string;
-  signal: string;
-  hypothesis: string;
-};
-
-export type ResearchTimelineResponse = {
-  stockCode: string;
-  items: ResearchTimelineNode[];
-  nextCursor?: string | null;
-  hasMore: boolean;
-  limit: number;
-  sources: ResearchTimelineSources;
-};
-
-export type ResearchTimelineParams = {
-  cursor?: string | null;
-  limit?: number;
-  kinds?: ResearchTimelineKind[];
-};
 
 function toStockCodePath(stockCode: string): string {
   const trimmed = stockCode.trim();
