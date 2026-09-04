@@ -41,6 +41,9 @@ SHARE_IMAGE_MAX_CHARS=100000
 
 不要把「通知里的纯 Markdown 文本路径」与分享海报 HTML 路径混用能力假设：若未来 m2f 主版本改为 escape HTML，应拒绝该引擎用于分享海报并回退到下一引擎，避免输出 HTML 源码长图。
 
+分享图需要运行环境提供对应语言字体。官方 Docker 镜像已内置 Noto CJK 字体；Debian/Ubuntu 源码部署使用默认 `wkhtmltoimage` 引擎时，应安装 `wkhtmltopdf fonts-noto-cjk`。如果只安装转图工具而缺少 CJK 字体，中文或韩文可能在 PNG 中消失，只剩数字、英文和边框。
+`fonts-noto-cjk` 是 Debian 字体包名，不代表新增日文报告语言。项目的报告输出仍只支持 `REPORT_LANGUAGE=zh|en|ko`；日股个股和日本市场复盘中的日文原生名称由通用 Noto CJK fallback 覆盖，页面语言仍跟随所选报告语言，不会根据 `7203.T` 或 `region=jp` 切换成未支持的 `ja` 输出。
+
 小红书品牌使用以下可选配置。URL、昵称或二维码任一非空即显示该区域；仅配置数字 ID 时仍隐藏。`SHARE_IMAGE_XIAOHONGSHU_ID` 保留以便兼容既有配置，但不参与分享图渲染：
 
 ```dotenv

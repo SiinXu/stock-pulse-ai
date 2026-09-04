@@ -253,6 +253,12 @@ def _poster_language(
         return "en"
     return "zh"
 
+def _poster_html_language(language: str) -> str:
+    """Map the supported report language, not the market region, to HTML lang."""
+
+    return {"zh": "zh-CN", "en": "en", "ko": "ko"}.get(language, "zh-CN")
+
+
 def _poster_text(language: str, key: str) -> str:
     return _POSTER_TEXT.get(language, _POSTER_TEXT["zh"]).get(key, _POSTER_TEXT["zh"].get(key, key))
 
