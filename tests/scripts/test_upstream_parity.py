@@ -33,6 +33,7 @@ from scripts.check_upstream_parity import (
 )
 from scripts.inventory_upstream_drift import (
     DEFAULT_TRAILER_TRIAGE,
+    KIND_TRAILER_SAFE,
     load_trailer_triage,
 )
 
@@ -242,6 +243,7 @@ CHILD_ABSORBED_TRAILER_SHAS = (
     "40b8c6c3cd6829d3fa4146c7aa64e273387df0e3",
     "ae19329d6684c4ec4ad0b51e627c0c5204ccd594",
 )
+AXIOS_CVE_TRAILER_SHA = "8d5b9628ab0c15257f46d7c90e2edfbdb10eb425"
 PR_REVIEW_SKIP_SHAS = (
     "a54f46e1ec7d2ceeaa012d9029e8e66b97a4856b",
     "16e3421c1bcad53ce0cfd5c8d69956c305ef867d",
@@ -299,6 +301,28 @@ def test_child_absorbed_shas_are_trailer_safe_not_denied() -> None:
         matched = match_ported_by(sha, index)
         assert matched, f"{sha[:9]} must have exactly one well-formed Ported-from trailer"
         assert len(matched) == 1, f"{sha[:9]} must not be duplicated: {matched}"
+
+
+def test_axios_cve_sha_is_trailer_safe_not_denied() -> None:
+    """#1559 absorbed Axios CVE-2026-25639; authorize one well-formed trailer."""
+    triage = load_trailer_triage(DEFAULT_TRAILER_TRIAGE)
+    messages = list_local_commit_messages(ROOT, "HEAD")
+    index = build_ported_index(
+        messages, upstream_repo="ZhuLinsen/daily_stock_analysis"
+    )
+    sha = AXIOS_CVE_TRAILER_SHA
+    entry = triage.lookup(sha)
+    assert entry is not None, sha
+    assert entry.kind == KIND_TRAILER_SAFE, sha
+    assert _triage_contains(triage.trailer_safe, sha), sha
+    assert not _triage_contains(triage.do_not_trailer, sha), sha
+    assert "7e96e680" in entry.reason
+    assert "^1.18.0" in entry.reason
+    assert "form-data 4.0.6" in entry.reason
+    assert "not a package change" in entry.reason.lower()
+    matched = match_ported_by(sha, index)
+    assert matched, f"{sha[:9]} must have exactly one well-formed Ported-from trailer"
+    assert len(matched) == 1, f"{sha[:9]} must not be duplicated: {matched}"
 
 
 def test_pr_review_pull_request_target_skip_is_encoded_and_unported() -> None:
