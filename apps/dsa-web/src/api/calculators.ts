@@ -2,36 +2,37 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 import type { components } from '../types/api.generated';
+import type {
+  CompoundGrowthRequest,
+  CompoundGrowthResponse,
+  TargetContributionRequest,
+  TargetContributionResponse,
+  TargetDurationRequest,
+  TargetDurationResponse,
+} from '../types/calculators';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
 import apiClient from './index';
 
+export type {
+  CalculatorBalancePoint,
+  CompoundGrowthRequest,
+  CompoundGrowthResponse,
+  TargetContributionRequest,
+  TargetContributionResponse,
+  TargetDurationRequest,
+  TargetDurationResponse,
+} from '../types/calculators';
+
 const BASE_PATH = '/api/v1/calculators';
 
-type Schemas = components['schemas'];
-type CamelCase<S extends string> = S extends `${infer Head}_${infer Tail}`
-  ? `${Head}${Capitalize<CamelCase<Tail>>}`
-  : S;
-type CamelizeKeys<T> = T extends readonly (infer U)[]
-  ? Array<CamelizeKeys<U>>
-  : T extends object
-    ? { [K in keyof T as CamelCase<K & string>]: CamelizeKeys<T[K]> }
-    : T;
-
-type OpenApiTargetContributionResponse =
-  | Schemas['TargetContributionOkResponse']
-  | Schemas['TargetContributionAlreadyMetResponse']
-  | Schemas['TargetContributionUnreachableResponse'];
-type OpenApiTargetDurationResponse =
-  | Schemas['TargetDurationOkResponse']
-  | Schemas['TargetDurationAlreadyMetResponse']
-  | Schemas['TargetDurationUnreachableResponse'];
-
-export type CompoundGrowthRequest = CamelizeKeys<Schemas['CompoundGrowthRequest']>;
-export type TargetContributionRequest = CamelizeKeys<Schemas['TargetContributionRequest']>;
-export type TargetDurationRequest = CamelizeKeys<Schemas['TargetDurationRequest']>;
-export type CompoundGrowthResponse = CamelizeKeys<Schemas['CompoundGrowthResponse']>;
-export type TargetContributionResponse = CamelizeKeys<OpenApiTargetContributionResponse>;
-export type TargetDurationResponse = CamelizeKeys<OpenApiTargetDurationResponse>;
+type OpenApiCompoundGrowthResponse = components['schemas']['CompoundGrowthResponse'];
+type OpenApiBalancePoint = components['schemas']['BalancePoint'];
+type _AssertCompoundGrowth = keyof OpenApiCompoundGrowthResponse;
+type _AssertBalancePoint = keyof OpenApiBalancePoint;
+const _compoundGrowthAnchor: _AssertCompoundGrowth = 'annual_rate';
+const _balancePointAnchor: _AssertBalancePoint = 'total_contributed';
+void _compoundGrowthAnchor;
+void _balancePointAnchor;
 
 const balancePointSchema = z.object({
   period: z.number().int().nonnegative(),
