@@ -1,0 +1,1 @@
+- [Fixed] Omit the numeric Xiaohongshu ID from share-image captions; show the handle or a safe URL instead, and keep ID-only branding hidden (Refs #1636).

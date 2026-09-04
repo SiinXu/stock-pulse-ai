@@ -256,23 +256,19 @@ def _xiaohongshu_card(branding: ShareImageBranding, language: str) -> str:
         return ""
 
     label = _poster_text(language, "xiaohongshu")
-    account_parts = [part for part in (
-        branding.xiaohongshu_handle.strip(),
-        f"ID {branding.xiaohongshu_id.strip()}" if branding.xiaohongshu_id.strip() else "",
-    ) if part]
-    account = " · ".join(account_parts) or branding.xiaohongshu_url.strip()
+    handle = branding.xiaohongshu_handle.strip()
+    url = _safe_web_url(branding.xiaohongshu_url)
+    account = handle or url
     qr_data_uri = _asset_data_uri(branding.xiaohongshu_qr_path)
     qr_alt = f"{label}二维码" if language == "zh" else f"{label} QR"
     image = (
         f'<div class="qr-frame"><img src="{qr_data_uri}" alt="{_escape(qr_alt)}"></div>'
         if qr_data_uri else ""
     )
-    url = _safe_web_url(branding.xiaohongshu_url)
     if image and url:
         image = f'<a href="{_escape(url)}">{image}</a>'
-    account_markup = (
-        f'<span><b>{_escape(label)}</b>{(" " + _escape(account)) if account else ""}</span>'
-    )
+    separator = "" if handle.startswith("@") else (" " if account else "")
+    account_markup = f'<span><b>{_escape(label)}</b>{separator}{_escape(account)}</span>'
     if url:
         account_markup = f'<a class="social-link" href="{_escape(url)}">{account_markup}</a>'
     return (

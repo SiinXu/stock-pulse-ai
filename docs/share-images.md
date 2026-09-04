@@ -41,7 +41,7 @@ SHARE_IMAGE_MAX_CHARS=100000
 
 不要把「通知里的纯 Markdown 文本路径」与分享海报 HTML 路径混用能力假设：若未来 m2f 主版本改为 escape HTML，应拒绝该引擎用于分享海报并回退到下一引擎，避免输出 HTML 源码长图。
 
-小红书品牌使用以下可选配置，四项全部留空即关闭该区域：
+小红书品牌使用以下可选配置。URL、昵称或二维码任一非空即显示该区域；仅配置数字 ID 时仍隐藏。`SHARE_IMAGE_XIAOHONGSHU_ID` 保留以便兼容既有配置，但不参与分享图渲染：
 
 ```dotenv
 SHARE_IMAGE_XIAOHONGSHU_URL=https://example.com/my-xiaohongshu
@@ -50,7 +50,7 @@ SHARE_IMAGE_XIAOHONGSHU_ID=123456789
 SHARE_IMAGE_XIAOHONGSHU_QR_PATH=assets/my-xiaohongshu-qr.png
 ```
 
-二维码路径支持绝对路径或相对项目根目录路径；冻结桌面后端也会从 PyInstaller 资源目录解析相对路径。账号 URL 只接受 `http://` 或 `https://`。二维码在转图时以内嵌 Data URI 渲染，不依赖运行时网络。
+二维码路径支持绝对路径或相对项目根目录路径；冻结桌面后端也会从 PyInstaller 资源目录解析相对路径。账号 URL 只接受 `http://` 或 `https://`；`javascript:` 等非 http(s) URL 会被拒绝，不会写入 caption 或链接。二维码在转图时以内嵌 Data URI 渲染，不依赖运行时网络。二维码下方优先显示小红书昵称（`@` 前不加空格）；无昵称时回退为安全的 http(s) URL。历史配置中的数字 ID 不参与分享图渲染。
 
 ## Web 一键分享
 
@@ -172,6 +172,6 @@ png_bytes = markdown_to_image(
 - 涨跌颜色优先使用结构化 payload 持久化的 `color_scheme`，旧记录则从最终报告颜色标记恢复；模板不按市场地区硬编码涨跌色。
 - 分享图中的买入、止损和目标只保留可扫描的价格或“等待企稳”；完整条件始终保留在原报告中。
 - 没有真实价格序列时不绘制伪 K 线；顶部仅保留非数据化的品牌光晕。
-- 小红书 URL、账号、ID 和二维码路径来自运行时配置；全部留空时不渲染小红书区域。GitHub 固定展示仓库标识 `SiinXu/stock-pulse-ai`，不生成二维码。
+- 小红书 URL、昵称和二维码路径来自运行时配置；二维码下只显示昵称（无昵称时回退安全 URL），不显示数字 ID。仅配置 ID 或全部留空时不渲染小红书区域。GitHub 固定展示仓库标识 `SiinXu/stock-pulse-ai`，不生成二维码。
 - 大盘报告在核心模块已成功提取时不重复附加完整 Markdown；额外的详情章节保留在原报告中，分享图只呈现结构化摘要。
 - 图片底部固定说明“AI 生成，仅供研究交流，不构成投资建议”。
