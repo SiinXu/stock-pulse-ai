@@ -99,7 +99,7 @@ Everything beyond the three steps lives in the existing docs. Do not expand this
 | Full Actions deploy steps, complete secret tables | [Deploy Guide (EN) — Option 4](DEPLOY_EN.md#option-4-github-actions-deployment-serverless) · [部署指南（中文）](DEPLOY.md) |
 | LLM providers, models, multi-channel routing | [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) · [LLM 配置指南](LLM_CONFIG_GUIDE.md) · [Provider guide](llm-providers.md) |
 | Full install / local / Docker | [Full Guide (EN)](full-guide_EN.md) · [完整指南](full-guide.md) |
-| Config Check CLI | `python scripts/actions_config_check.py` (optional `--strict-notify` / `--probe-llm`) |
+| Config Check CLI | `python scripts/actions_config_check.py` (optional `--strict-notify` / `--probe-llm` / `--allow-missing-llm`) |
 | Workflow source | [`.github/workflows/00-daily-analysis.yml`](../.github/workflows/00-daily-analysis.yml) |
 
 Examples of **advanced** (not required for first success) names already wired in the daily workflow: news keys (`SERPAPI_API_KEYS`, `TAVILY_API_KEYS`, …), `TUSHARE_TOKEN`, `AIHUBMIX_KEY`, `ANSPIRE_API_KEYS`, model overrides (`GEMINI_MODEL`, `LLM_*_MODELS`), and notification routing (`NOTIFICATION_REPORT_CHANNELS`, `NOTIFICATION_SYSTEM_ERROR_CHANNELS`).

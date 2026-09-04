@@ -1,0 +1,1 @@
+- [Fixed] Keep automated Config Check push/schedule runs deterministic when LLM secrets are absent; malformed provided keys, live `--probe-llm`, and manual dispatch remain strict.

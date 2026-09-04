@@ -211,6 +211,7 @@ class ConfigCheckReport:
     items: List[CheckItem] = field(default_factory=list)
     strict_notify: bool = False
     probe_llm: bool = False
+    allow_missing_llm: bool = False
 
     @property
     def hard_failures(self) -> List[CheckItem]:
@@ -352,17 +353,25 @@ def check_watchlist(env: Mapping[str, str]) -> CheckItem:
     )
 
 
-def check_llm_keys(env: Mapping[str, str]) -> List[CheckItem]:
+def check_llm_keys(
+    env: Mapping[str, str],
+    *,
+    allow_missing_llm: bool = False,
+) -> List[CheckItem]:
     items: List[CheckItem] = []
     found = discover_llm_key_names(env)
     malformed = [name for name in found if _is_malformed_secret(env, name)]
 
     if not found:
         recommended = ", ".join(RECOMMENDED_LLM_KEYS[:4])
+        # Automated push/schedule canaries may run in repositories that have no
+        # LLM secrets. Missing keys stay visible; only the hard-fail is relaxed.
+        # Provided-but-malformed keys still fail below.
+        severity = CheckSeverity.WARN if allow_missing_llm else CheckSeverity.FAIL
         items.append(
             CheckItem(
                 code="config.llm.missing",
-                severity=CheckSeverity.FAIL,
+                severity=severity,
                 label_en="LLM API key",
                 label_zh="大模型 API Key",
                 detail_en="No LLM API key or LiteLLM config was detected.",
@@ -708,7 +717,6 @@ def probe_llm_connectivity(
     # Do not probe Gemini via ?key= URL query: that pattern can leak the secret
     # into exception/proxy logs. Optional probe uses Bearer-style /models only.
 
-
     for label, base, key_name in candidates:
         api_key = _env_get(env, key_name)
         base_url = base.rstrip("/")
@@ -792,14 +800,22 @@ def run_config_check(
     *,
     strict_notify: bool = False,
     probe_llm: bool = False,
+    allow_missing_llm: bool = False,
     repo_root: Optional[Path] = None,
 ) -> ConfigCheckReport:
     """Run the full configuration checklist against an env mapping."""
     source: Mapping[str, str] = env if env is not None else os.environ
-    report = ConfigCheckReport(strict_notify=strict_notify, probe_llm=probe_llm)
+    report = ConfigCheckReport(
+        strict_notify=strict_notify,
+        probe_llm=probe_llm,
+        allow_missing_llm=allow_missing_llm,
+    )
+    # Live probe requires a real key. Do not let the canary relaxation hide a
+    # missing credential when the caller asked to probe connectivity.
+    relax_missing_llm = bool(allow_missing_llm) and not bool(probe_llm)
 
     report.items.append(check_watchlist(source))
-    report.items.extend(check_llm_keys(source))
+    report.items.extend(check_llm_keys(source, allow_missing_llm=relax_missing_llm))
     report.items.extend(check_notifications(source, strict_notify=strict_notify))
     report.items.extend(check_optional_data_sources(source))
     report.items.extend(check_data_paths(source, repo_root=repo_root))

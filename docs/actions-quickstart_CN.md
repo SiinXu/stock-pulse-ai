@@ -99,7 +99,7 @@ Telegram 需要**两个** Secret：`TELEGRAM_BOT_TOKEN` 与 `TELEGRAM_CHAT_ID`�
 | Actions 完整部署步骤与 Secret 总表 | [部署指南（中文）](DEPLOY.md) · [Deploy Guide (EN) — Option 4](DEPLOY_EN.md#option-4-github-actions-deployment-serverless) |
 | LLM 服务商、模型、多通道路由 | [LLM 配置指南](LLM_CONFIG_GUIDE.md) · [LLM Config Guide (EN)](LLM_CONFIG_GUIDE_EN.md) · [服务商指南](llm-providers.md) |
 | 本地 / Docker 安装 | [完整指南](full-guide.md) · [Full Guide (EN)](full-guide_EN.md) |
-| Config Check 本地命令 | `python scripts/actions_config_check.py`（可选 `--strict-notify` / `--probe-llm`） |
+| Config Check 本地命令 | `python scripts/actions_config_check.py`（可选 `--strict-notify` / `--probe-llm` / `--allow-missing-llm`） |
 | Workflow 源文件 | [`.github/workflows/00-daily-analysis.yml`](../.github/workflows/00-daily-analysis.yml) |
 
 日更 workflow 中已接入、但**首次上手不必配置**的示例：新闻 Key（`SERPAPI_API_KEYS`、`TAVILY_API_KEYS` 等）、`TUSHARE_TOKEN`、`AIHUBMIX_KEY`、`ANSPIRE_API_KEYS`、模型覆盖（`GEMINI_MODEL`、`LLM_*_MODELS`）、通知路由（`NOTIFICATION_REPORT_CHANNELS`、`NOTIFICATION_SYSTEM_ERROR_CHANNELS`）。
