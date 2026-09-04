@@ -12,9 +12,11 @@ import {
 /**
  * Phase 2 leftover collapse (#1300). `--home-title-accent` is deleted;
  * `.home-title-accent` inlines Layer 1 `hsl(var(--foreground))` with no
- * `.dark` split (light and dark were already the same wrap). This guard
- * keeps the leftover from coming back and pins the replacements plus the
- * lowered page-scoped ceiling.
+ * `.dark` split (light and dark were already the same wrap). The class
+ * rule stays earlier than equal-specificity `.label-uppercase`, so the
+ * rendered eyebrow still computes `--text-secondary-text`. This guard
+ * keeps the leftover from coming back, pins the replacements plus the
+ * lowered page-scoped ceiling, and pins that source-order winner.
  */
 const COLLAPSED_HOME_TITLE_ACCENT_TOKEN = '--home-title-accent';
 
@@ -123,6 +125,38 @@ describe('home-title-accent theme tokens', () => {
     expect(indexCss).toContain('.home-title-accent {\n  color: hsl(var(--foreground));\n}');
     expect(indexCss).not.toContain('.dark .home-title-accent');
     expect(indexCss).not.toContain('color: var(--foreground)');
+  });
+
+  it('keeps earlier .home-title-accent from winning over later equal-specificity .label-uppercase', () => {
+    const indexCss = readIndexCss();
+    const titleAccentSelector = '.home-title-accent {';
+    const labelSelector = '.label-uppercase {';
+    const titleAccentIndex = indexCss.indexOf(titleAccentSelector);
+    const labelIndex = indexCss.indexOf(labelSelector);
+
+    expect(titleAccentIndex).toBeGreaterThan(-1);
+    expect(labelIndex).toBeGreaterThan(-1);
+    expect(titleAccentIndex).toBeLessThan(labelIndex);
+    expect(indexCss.split(titleAccentSelector)).toHaveLength(2);
+    expect(indexCss.split(labelSelector)).toHaveLength(2);
+    expect(indexCss).not.toMatch(/\.label-uppercase\.home-title-accent|\.home-title-accent\.label-uppercase/);
+    expect(indexCss).not.toMatch(/\.home-title-accent[^{]*!important/);
+
+    const titleAccentRule = indexCss.slice(
+      titleAccentIndex,
+      indexCss.indexOf('}', titleAccentIndex) + 1,
+    );
+    const labelRule = indexCss.slice(labelIndex, indexCss.indexOf('}', labelIndex) + 1);
+
+    expect(titleAccentRule).toBe('.home-title-accent {\n  color: hsl(var(--foreground));\n}');
+    expect(labelRule).toContain('color: var(--text-secondary-text);');
+    expect(labelRule).not.toContain('--foreground');
+
+    const header = readFileSync(
+      resolve(SRC_ROOT, 'components/dashboard/DashboardPanelHeader.tsx'),
+      'utf8',
+    );
+    expect(header).toContain("cn('label-uppercase', accentEyebrow && 'home-title-accent')");
   });
 
   it('keeps TOKEN_FORMAT_DEBT at 12 because title-accent was a conforming wrap', () => {

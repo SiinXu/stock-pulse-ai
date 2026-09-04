@@ -185,7 +185,7 @@
 
 - 唯一剩余的 `--home-title-accent` 定义（light + dark）已删除；未新增页面级或领域 token。`THEME_PAGE_SCOPED_PREFIXES` 仍永久禁止 `--home-*`。
 - 历史 class `.home-title-accent` 保留。唯一 CSS 消费者改为内联 `color: hsl(var(--foreground));`。light 与 dark 原先就是同一 Layer 1 wrap，**不加** `.dark` 拆分。不要写成 `color: var(--foreground)`（`--foreground` 是 HSL 三元组），也不要把颜色挪到 Tailwind `text-foreground`（那会改 TSX）。
-- `.label-uppercase` 仍设置 `color: var(--text-secondary-text)`；`.home-title-accent` 必须继续覆盖该文字色。`DashboardPanelHeader` 的 class 名与 `accentEyebrow` 默认 `false` 不变。生产 Home / watchlist / report / history / task 调用点当前省略该 flag，因此生产页眉颜色不变；在用调用点是 playground `dashboard-panel-header`。
+- `.home-title-accent` 与 `.label-uppercase` 都是单 class、同等 specificity。`.home-title-accent` 规则必须保持在前（`color: hsl(var(--foreground))`）；后面的 `.label-uppercase` 仍设置 `color: var(--text-secondary-text)`，因此赢得渲染后的 eyebrow 颜色。计算色保持 `--text-secondary-text`。不要挪规则或提高 specificity 来让 `--foreground` 赢——那会改变 playground 画色。`DashboardPanelHeader` 的 class 名与 `accentEyebrow` 默认 `false` 不变；flag 为 true 时仍同时挂两个 class。生产 Home / watchlist / report / history / task 调用点当前省略该 flag，因此生产页眉颜色不变；在用调用点是 playground `dashboard-panel-header`。
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 44 降到 43；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（该名字不在格式债清单中）。非空下界保持 160（已定义清单约 163）。
 - 该 token 原本就包装 `--foreground`，且当前 `slate` pack 不覆盖 `--foreground`，因此 **不是**首次 `data-theme-pack="slate"` 换色。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余 `--home-*` 族（cool / shadow / panel / surface / unused wrappers）不在本切片。
 

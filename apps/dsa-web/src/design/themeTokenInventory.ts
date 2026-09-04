@@ -182,7 +182,8 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * name. Shrink only when a Phase 2 domain collapse deletes a leftover.
  * `--login-*`, `--backtest-*`, `--portfolio-*`, `--chat-*`, `--settings-*`,
  * `--home-action-*`, and `--home-prose-*` reached zero; leftover title-accent
- * is also collapsed. Those families consume Layer 1 plus use-site alpha.
+ * is also collapsed. Action/prose families consume Layer 1 plus use-site
+ * alpha; title-accent inlines Layer 1 `--foreground` with no alpha.
  * Do not reintroduce those prefixes or the action/prose/title-accent
  * leftovers. Remaining leftover `--home-*` names stay page-scoped. `home`
  * and `settings` stay in `THEME_PAGE_SCOPED_PREFIXES`.
