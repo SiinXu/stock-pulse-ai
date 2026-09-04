@@ -1,0 +1,1 @@
+- [Chore] Bind Web skill-outcome camelCase types to generated OpenAPI components (Refs #721).

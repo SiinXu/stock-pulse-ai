@@ -7,36 +7,49 @@
  */
 import { z } from 'zod';
 import type { components } from '../types/api.generated';
+import type {
+  SkillOutcomeItem,
+  SkillOutcomeListParams,
+  SkillOutcomeListResponse,
+  SkillOutcomePerformanceBucket,
+  SkillOutcomePerformanceStats,
+  SkillOutcomeRunRequest,
+  SkillOutcomeRunResponse,
+  SkillOutcomeSampleItem,
+  SkillOutcomeSampleListParams,
+  SkillOutcomeSampleListResponse,
+  SkillOutcomeStatsParams,
+} from '../types/skillOutcomes';
 import apiClient from './index';
 import { assertCamelCasePayload } from './parseCamelCasePayload';
 import { toCamelCase } from './utils';
 
-type Schemas = components['schemas'];
+export type {
+  SkillOutcomeItem,
+  SkillOutcomeListParams,
+  SkillOutcomeListResponse,
+  SkillOutcomePerformanceBucket,
+  SkillOutcomePerformanceStats,
+  SkillOutcomeRunErrorItem,
+  SkillOutcomeRunRequest,
+  SkillOutcomeRunResponse,
+  SkillOutcomeSampleItem,
+  SkillOutcomeSampleListParams,
+  SkillOutcomeSampleListResponse,
+  SkillOutcomeStatsParams,
+} from '../types/skillOutcomes';
 
-type CamelCase<S extends string> = S extends `${infer Head}_${infer Tail}`
-  ? `${Head}${Capitalize<CamelCase<Tail>>}`
-  : S;
-
-type CamelizeKeys<T> = T extends readonly (infer U)[]
-  ? Array<CamelizeKeys<U>>
-  : T extends object
-    ? { [K in keyof T as CamelCase<K & string>]: CamelizeKeys<T[K]> }
-    : T;
-
-export type SkillOpinionOutcomeItemDto = Schemas['SkillOpinionOutcomeItem'];
-export type SkillOpinionOutcomeListResponseDto = Schemas['SkillOpinionOutcomeListResponse'];
-export type SkillOpinionOutcomeRunRequestDto = Schemas['SkillOpinionOutcomeRunRequest'];
-export type SkillOpinionOutcomeRunResponseDto = Schemas['SkillOpinionOutcomeRunResponse'];
-export type SkillOpinionPerformanceBucketItemDto = Schemas['SkillOpinionPerformanceBucketItem'];
-export type SkillOpinionPerformanceStatsResponseDto = Schemas['SkillOpinionPerformanceStatsResponse'];
-export type SkillOpinionSampleItemDto = Schemas['SkillOpinionSampleItem'];
-export type SkillOpinionSampleListResponseDto = Schemas['SkillOpinionSampleListResponse'];
-
-type _AssertOutcomeItem = keyof SkillOpinionOutcomeItemDto;
-type _AssertOutcomeList = keyof SkillOpinionOutcomeListResponseDto;
-type _AssertStats = keyof SkillOpinionPerformanceStatsResponseDto;
-type _AssertSample = keyof SkillOpinionSampleItemDto;
-type _AssertRun = keyof SkillOpinionOutcomeRunResponseDto;
+type OpenApiOutcomeItem = components['schemas']['SkillOpinionOutcomeItem'];
+type OpenApiOutcomeListResponse = components['schemas']['SkillOpinionOutcomeListResponse'];
+type OpenApiRunRequest = components['schemas']['SkillOpinionOutcomeRunRequest'];
+type OpenApiRunResponse = components['schemas']['SkillOpinionOutcomeRunResponse'];
+type OpenApiPerformanceStats = components['schemas']['SkillOpinionPerformanceStatsResponse'];
+type OpenApiSampleItem = components['schemas']['SkillOpinionSampleItem'];
+type _AssertOutcomeItem = keyof OpenApiOutcomeItem;
+type _AssertOutcomeList = keyof OpenApiOutcomeListResponse;
+type _AssertStats = keyof OpenApiPerformanceStats;
+type _AssertSample = keyof OpenApiSampleItem;
+type _AssertRun = keyof OpenApiRunResponse;
 const _outcomeItemAnchor: _AssertOutcomeItem = 'skill_opinion_sample_id';
 const _outcomeListAnchor: _AssertOutcomeList = 'engine_version';
 const _statsAnchor: _AssertStats = 'minimum_evaluated_sample_size';
@@ -47,43 +60,6 @@ void _outcomeListAnchor;
 void _statsAnchor;
 void _sampleAnchor;
 void _runAnchor;
-
-
-export type SkillOutcomeItem = CamelizeKeys<SkillOpinionOutcomeItemDto>;
-export type SkillOutcomeListResponse = CamelizeKeys<SkillOpinionOutcomeListResponseDto>;
-export type SkillOutcomeRunRequest = CamelizeKeys<SkillOpinionOutcomeRunRequestDto>;
-export type SkillOutcomeRunResponse = CamelizeKeys<SkillOpinionOutcomeRunResponseDto>;
-export type SkillOutcomePerformanceBucket = CamelizeKeys<SkillOpinionPerformanceBucketItemDto>;
-export type SkillOutcomePerformanceStats = CamelizeKeys<SkillOpinionPerformanceStatsResponseDto>;
-export type SkillOutcomeSampleItem = CamelizeKeys<SkillOpinionSampleItemDto>;
-export type SkillOutcomeSampleListResponse = CamelizeKeys<SkillOpinionSampleListResponseDto>;
-
-export type SkillOutcomeListParams = {
-  skillId?: string;
-  stockCode?: string;
-  horizon?: string;
-  evalStatus?: string;
-  sampleId?: number;
-  analysisHistoryId?: number;
-  engineVersion?: string;
-  limit?: number;
-  offset?: number;
-};
-
-export type SkillOutcomeStatsParams = {
-  skillId?: string;
-  skillIds?: string[];
-  horizons?: string[];
-  engineVersion?: string;
-};
-
-export type SkillOutcomeSampleListParams = {
-  skillId?: string;
-  stockCode?: string;
-  analysisHistoryId?: number;
-  limit?: number;
-  offset?: number;
-};
 
 
 const finiteNumber = z.number().refine((value) => Number.isFinite(value), {
@@ -265,7 +241,7 @@ function toRunResponse(data: Record<string, unknown>): SkillOutcomeRunResponse {
   );
 }
 
-function toSnakeRunPayload(payload: SkillOutcomeRunRequest): SkillOpinionOutcomeRunRequestDto {
+function toSnakeRunPayload(payload: SkillOutcomeRunRequest): OpenApiRunRequest {
   return omitUndefined({
     sample_id: payload.sampleId,
     analysis_history_id: payload.analysisHistoryId,
@@ -273,7 +249,7 @@ function toSnakeRunPayload(payload: SkillOutcomeRunRequest): SkillOpinionOutcome
     stock_code: payload.stockCode,
     horizons: payload.horizons,
     limit: payload.limit ?? 100,
-  }) as SkillOpinionOutcomeRunRequestDto;
+  }) as OpenApiRunRequest;
 }
 
 export const skillOutcomesApi = {

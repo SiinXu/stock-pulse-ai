@@ -619,6 +619,23 @@ flatten. Runtime Zod in `api/calculators.ts` is unchanged (`.strict()`
 / discriminated unions). `api/calculators.ts` type-only re-exports the
 same public names. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/skillOutcomes.ts` now CamelizeKeys-binds the
+generated skill-opinion object components (`SkillOpinionOutcomeItem`,
+`SkillOpinionOutcomeListResponse`, `SkillOpinionOutcomeRunErrorItem`,
+`SkillOpinionOutcomeRunRequest`, `SkillOpinionOutcomeRunResponse`,
+`SkillOpinionPerformanceBucketItem`, `SkillOpinionPerformanceStatsResponse`,
+`SkillOpinionSampleItem`, `SkillOpinionSampleListResponse`).
+This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. Nested run errors are the public
+`SkillOutcomeRunErrorItem` projection (extra generated keys kept).
+Query bags `SkillOutcomeListParams` / `SkillOutcomeStatsParams` /
+`SkillOutcomeSampleListParams` stay handwritten optional camelCase
+(generated query values are `string | null` / `number | null`; do not
+CamelizeKeys them). `limit` on `SkillOutcomeRunRequest` stays required.
+Runtime Zod in `api/skillOutcomes.ts` is unchanged (including sample
+`confidence` string union). `api/skillOutcomes.ts` type-only re-exports
+the same public names. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
