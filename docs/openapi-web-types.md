@@ -560,6 +560,31 @@ snake_case is not the UI type. Runtime Zod in `api/moneyFlow.ts` is
 unchanged. The module is runtime-empty. `api/moneyFlow.ts` type-only
 re-exports the same public names. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/agentFeedback.ts` now CamelizeKeys-binds the
+generated agent-feedback item component (`AgentRunFeedbackItem`).
+`AgentRunFeedbackValue` is derived from the generated item
+`feedback_value` field union; there is no named OpenAPI enum schema,
+so do not invent extra unions. `Override` makes seven UI keys
+required-nullable versus generated optionality (generated fact; not
+fixed by regenerating OpenAPI): `feedbackValue`, `note`, `source`,
+`provenanceSource`, `actorId`, `createdAt`, and `updatedAt`. Do not
+add overrides for required `runId`. Public `AgentRunFeedbackRequest`
+stays handwritten and narrower than the generated request:
+`feedbackValue` is the same union, `note` is a required string
+(including empty), and `source` is the literal `web` (generated
+`note` is optional-nullable and `source` is `web | api`; do not
+CamelizeKeys the request into the public type). Path GET/PUT
+`/api/v1/agent/runs/{run_id}/feedback` (`getAgentRunFeedback` /
+`putAgentRunFeedback`) 200 JSON is mutually equivalent to
+`AgentRunFeedbackItem`; PUT `requestBody` is mutually equivalent to
+generated `AgentRunFeedbackRequest`; GET `requestBody` and GET/PUT
+`query` are `never`; path `run_id` is `string`; POST/DELETE/PATCH on
+that path are `never`. This is **not** the auth object export-alias
+pattern: generated snake_case is not the UI type. Runtime Zod in
+`api/agentFeedback.ts` is unchanged. The module is runtime-empty.
+`api/agentFeedback.ts` type-only re-exports the same public names.
+`Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
