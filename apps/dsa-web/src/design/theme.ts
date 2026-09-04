@@ -103,8 +103,9 @@ export const THEME_DOCUMENT_ATTRS = {
  *    `--input-surface-*`) — never a page prefix.
  * 4. Do not add `--home-*` / `--settings-*` / `--login-*` / `--chat-*` /
  *    `--backtest-*` / `--portfolio-*` names. `--settings-*` is now zero;
- *    `--home-action-*` and `--home-prose-*` are collapsed. Keep the prefix
- *    ban. Collapse remaining leftover `--home-*` in T25/T40.
+ *    `--home-action-*`, `--home-prose-*`, and leftover title-accent are
+ *    collapsed. Keep the prefix ban. Collapse remaining leftover `--home-*`
+ *    in T25/T40.
  * 5. Do not classify dead, duplicate, or undefined references as Layer 1.
  *    Record leftover undefined `var(--*)` sites in the freeze guard's
  *    shrink-only debt list (`themeTokenFreeze.ts`) and shrink that list only.

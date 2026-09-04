@@ -103,7 +103,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--home-surface-button-bg-hover',
   '--home-surface-button-border',
   '--home-surface-button-border-hover',
-  '--home-title-accent',
   '--hover',
   '--input',
   '--input-surface-bg',
@@ -182,12 +181,13 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * `--home-*` / `--settings-*` / `--chat-*` / `--backtest-*` / `--portfolio-*`
  * name. Shrink only when a Phase 2 domain collapse deletes a leftover.
  * `--login-*`, `--backtest-*`, `--portfolio-*`, `--chat-*`, `--settings-*`,
- * `--home-action-*`, and `--home-prose-*` reached zero; those families
- * consume Layer 1 plus use-site alpha. Do not reintroduce those prefixes
- * or the action/prose families. Remaining leftover `--home-*` names stay
- * page-scoped. `home` and `settings` stay in `THEME_PAGE_SCOPED_PREFIXES`.
+ * `--home-action-*`, and `--home-prose-*` reached zero; leftover title-accent
+ * is also collapsed. Those families consume Layer 1 plus use-site alpha.
+ * Do not reintroduce those prefixes or the action/prose/title-accent
+ * leftovers. Remaining leftover `--home-*` names stay page-scoped. `home`
+ * and `settings` stay in `THEME_PAGE_SCOPED_PREFIXES`.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 44;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 43;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [

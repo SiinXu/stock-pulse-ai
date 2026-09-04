@@ -1,0 +1,1 @@
+- [Changed] Dashboard panel eyebrow accent class now paints from Layer 1 `--foreground` instead of leftover `--home-title-accent`; page-scoped token ceiling 44 → 43 (Refs #1300).
