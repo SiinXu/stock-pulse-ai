@@ -11,4 +11,5 @@ serves the ``BaseFetcher`` abstract base that every provider fetcher inherits.
 
 Owned domains:
 - ``daily_pipeline`` — the daily-data template method and its clean/indicator steps
+- ``market_stubs`` — default market-overview and rankings stubs (``return None``)
 """

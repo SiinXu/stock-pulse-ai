@@ -98,7 +98,7 @@ def test_market_overview_bodies_leave_manager_and_stay_on_base_fetcher() -> None
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
     for name in market_overview.EXPECTED_MARKET_OVERVIEW_METHOD_NAMES:
-        assert name in base_fetcher_defs, name
+        assert name not in base_fetcher_defs, name
 
 
 def test_base_fetcher_provider_methods_are_untouched() -> None:

@@ -1,0 +1,1 @@
+- [Chore] Extract BaseFetcher default market stubs into base_parts (Refs #1067).

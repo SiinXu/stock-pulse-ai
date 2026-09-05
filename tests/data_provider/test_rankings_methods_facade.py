@@ -94,7 +94,7 @@ def test_rankings_bodies_no_longer_live_in_data_fetcher_manager() -> None:
     }
     for name in ("get_sector_rankings", "get_concept_rankings", "get_hot_stocks",
                  "get_limit_up_pool"):
-        assert name in base_fetcher_defs, name
+        assert name not in base_fetcher_defs, name
 
 
 def test_facade_reload_rebinds_rankings_methods() -> None:
@@ -137,8 +137,8 @@ def test_facade_keeps_main_indices_and_market_stats() -> None:
         for node in cls.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert "get_main_indices" in base_fetcher_defs
-    assert "get_market_stats" in base_fetcher_defs
+    assert "get_main_indices" not in base_fetcher_defs
+    assert "get_market_stats" not in base_fetcher_defs
 
     source = BASE_PATH.read_text(encoding="utf-8")
     assert "    get_main_indices = None" in source
