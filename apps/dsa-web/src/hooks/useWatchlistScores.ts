@@ -92,7 +92,9 @@ export async function fetchWatchlistScores(args: {
  * `refreshKey` belongs to the caller's analysis/refresh lifecycle. A changed
  * key invalidates the previous result immediately: display and sorting see an
  * empty map until the matching request succeeds, and a failed request never
- * falls back to scores from an older lifecycle generation.
+ * falls back to scores from an older lifecycle generation. Reusing a prior
+ * signature (A→B→A or A→empty→A) starts a new generation and must not read
+ * the earlier matching settled record.
  */
 export function useWatchlistScores(
   stockCodes: readonly string[],
@@ -102,8 +104,14 @@ export function useWatchlistScores(
   const codesKey = JSON.stringify(stockCodes.map((code) => code.trim()).filter(Boolean));
   const requestSignature = `${codesKey}\n${String(refreshKey)}`;
   const [settledRequest, setSettledRequest] = useState<SettledScoreRequest | null>(null);
+  const [seenSignature, setSeenSignature] = useState(requestSignature);
   const requestIdRef = useRef(0);
   const liveKeysRef = useRef<WatchlistScoresQueryKey[]>([]);
+
+  if (seenSignature !== requestSignature) {
+    setSeenSignature(requestSignature);
+    setSettledRequest(null);
+  }
 
   useEffect(() => {
     const discardLive = () => {

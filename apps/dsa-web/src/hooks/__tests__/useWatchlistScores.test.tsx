@@ -450,6 +450,118 @@ describe('useWatchlistScores', () => {
     expect(queryFetchStatus(client, nextKey)).toBe('idle');
   });
 
+  it('does not resurrect settled A while A→B(pending)→A starts a new A generation', async () => {
+    const bPending = createDeferred<WatchlistScoreResponse>();
+    const reusedA = createDeferred<WatchlistScoreResponse>();
+    score
+      .mockResolvedValueOnce(scoreResponse([scoreItem('600519', 80), scoreItem('AAPL', 70)]))
+      .mockReturnValueOnce(bPending.promise)
+      .mockReturnValueOnce(reusedA.promise);
+    const { client, wrapper } = createWrapper();
+    const cancelSpy = vi.spyOn(client, 'cancelQueries');
+    const removeSpy = vi.spyOn(client, 'removeQueries');
+    const aKey = buildWatchlistScoresQueryKey(CODES_KEY, '');
+    const bKey = buildWatchlistScoresQueryKey(CODES_KEY, 'b');
+    const { result, rerender } = renderHook(
+      ({ refreshKey }: { refreshKey: string }) => useWatchlistScores(CODES, refreshKey),
+      { wrapper, initialProps: { refreshKey: '' } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(80);
+
+    rerender({ refreshKey: 'b' });
+    await waitFor(() => expect(score).toHaveBeenCalledTimes(2));
+    expect(result.current.status).toBe('loading');
+    expect(result.current.itemsByCode.size).toBe(0);
+
+    rerender({ refreshKey: '' });
+    expect(result.current.status).toBe('loading');
+    expect(result.current.itemsByCode.size).toBe(0);
+    expect(result.current.itemsByCode.get('600519')?.score).toBeUndefined();
+
+    await waitFor(() => expect(score).toHaveBeenCalledTimes(3));
+    expect(bPending.promise).toBeDefined();
+    expect(score.mock.calls[1]?.[0]?.signal?.aborted).toBe(true);
+    expect(client.getQueryState(bKey)).toBeUndefined();
+
+    await act(async () => {
+      reusedA.resolve(scoreResponse([scoreItem('600519', 11), scoreItem('AAPL', 12)]));
+    });
+    await waitFor(() => expect(result.current.itemsByCode.get('600519')?.score).toBe(11));
+
+    await act(async () => {
+      bPending.resolve(scoreResponse([scoreItem('600519', 99), scoreItem('AAPL', 98)]));
+      await bPending.promise.catch(() => undefined);
+    });
+
+    expect(result.current.status).toBe('ready');
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(11);
+    expect(queryFetchStatus(client, aKey)).toBe('idle');
+    assertNoWatchlistPrefixOps(cancelSpy.mock.calls as Array<[filters?: { queryKey?: readonly unknown[]; exact?: boolean }]>);
+    assertNoWatchlistPrefixOps(removeSpy.mock.calls as Array<[filters?: { queryKey?: readonly unknown[]; exact?: boolean }]>);
+  });
+
+  it('does not resurrect settled A after A→empty→A', async () => {
+    score
+      .mockResolvedValueOnce(scoreResponse([scoreItem('600519', 80), scoreItem('AAPL', 70)]))
+      .mockResolvedValueOnce(scoreResponse([scoreItem('600519', 11), scoreItem('AAPL', 12)]));
+    const { client, wrapper } = createWrapper();
+    const cancelSpy = vi.spyOn(client, 'cancelQueries');
+    const removeSpy = vi.spyOn(client, 'removeQueries');
+    const key = buildWatchlistScoresQueryKey(CODES_KEY, '');
+    const { result, rerender } = renderHook(
+      ({ codes }: { codes: readonly string[] }) => useWatchlistScores(codes),
+      { wrapper, initialProps: { codes: CODES as readonly string[] } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(80);
+
+    rerender({ codes: [] });
+    expect(result.current.status).toBe('idle');
+    expect(result.current.itemsByCode.size).toBe(0);
+    expect(client.getQueryState(key)).toBeUndefined();
+
+    rerender({ codes: [...CODES] });
+    expect(result.current.status).toBe('loading');
+    expect(result.current.itemsByCode.size).toBe(0);
+    expect(result.current.itemsByCode.get('600519')?.score).toBeUndefined();
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(11);
+    expect(score).toHaveBeenCalledTimes(2);
+    assertNoWatchlistPrefixOps(cancelSpy.mock.calls as Array<[filters?: { queryKey?: readonly unknown[]; exact?: boolean }]>);
+    assertNoWatchlistPrefixOps(removeSpy.mock.calls as Array<[filters?: { queryKey?: readonly unknown[]; exact?: boolean }]>);
+  });
+
+  it('does not resurrect a prior error signature while A→B(pending)→A reloads', async () => {
+    const bPending = createDeferred<WatchlistScoreResponse>();
+    score
+      .mockRejectedValueOnce(Object.assign(new Error('server'), { response: { status: 500 } }))
+      .mockReturnValueOnce(bPending.promise)
+      .mockResolvedValueOnce(scoreResponse([scoreItem('600519', 11), scoreItem('AAPL', 12)]));
+    const { wrapper } = createWrapper();
+    const { result, rerender } = renderHook(
+      ({ refreshKey }: { refreshKey: string }) => useWatchlistScores(CODES, refreshKey),
+      { wrapper, initialProps: { refreshKey: '' } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('error'));
+    expect(result.current.itemsByCode.size).toBe(0);
+
+    rerender({ refreshKey: 'b' });
+    await waitFor(() => expect(score).toHaveBeenCalledTimes(2));
+    expect(result.current.status).toBe('loading');
+
+    rerender({ refreshKey: '' });
+    expect(result.current.status).toBe('loading');
+    expect(result.current.itemsByCode.size).toBe(0);
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(11);
+  });
+
   it('returns idle and cancels the previous fetch when codes become empty', async () => {
     const pending = createDeferred<WatchlistScoreResponse>();
     score.mockReturnValueOnce(pending.promise);
