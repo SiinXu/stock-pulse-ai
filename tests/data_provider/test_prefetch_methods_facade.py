@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 import src.data_provider.base as base
+import src.data_provider.manager_parts.init_default_fetchers_methods as init_default
 import src.data_provider.manager_parts.prefetch_methods as prefetch
 from src.data_provider.base import DataFetcherManager
 
@@ -28,6 +29,13 @@ OWNER_PATH = (
     / "data_provider"
     / "manager_parts"
     / "prefetch_methods.py"
+)
+INIT_DEFAULT_OWNER_PATH = (
+    ROOT
+    / "src"
+    / "data_provider"
+    / "manager_parts"
+    / "init_default_fetchers_methods.py"
 )
 
 INSTANCE_NAMES = (
@@ -125,10 +133,12 @@ def test_owner_module_exists_for_prefetch_extraction() -> None:
     for name in prefetch.EXPECTED_PREFETCH_METHOD_NAMES:
         assert f"def {name}(" not in source
         assert f"    {name} = None" in source
-    assert "def _init_default_fetchers(" in source
+    assert "def _init_default_fetchers(" not in source
+    assert "    _init_default_fetchers = None" in source
     assert "def __init__(" in source
     assert "def __del__(" in source
     importlib.import_module("src.data_provider.manager_parts.prefetch_methods")
+    importlib.import_module("src.data_provider.manager_parts.init_default_fetchers_methods")
 
 
 def test_prefetch_bodies_leave_manager_and_stay_callable_on_facade() -> None:
@@ -143,7 +153,8 @@ def test_prefetch_bodies_leave_manager_and_stay_callable_on_facade() -> None:
     for name in prefetch.EXPECTED_PREFETCH_METHOD_NAMES:
         assert name not in manager_defs, name
         assert callable(getattr(DataFetcherManager, name)), name
-    assert "_init_default_fetchers" in manager_defs
+    assert "_init_default_fetchers" not in manager_defs
+    assert callable(getattr(DataFetcherManager, "_init_default_fetchers"))
     assert "__init__" in manager_defs
     assert "__del__" in manager_defs
 
@@ -326,6 +337,174 @@ for name in names:
     assert after_base_facade[name] is not before_facade[name]
 reloaded_class = base.DataFetcherManager
 prefetch = importlib.reload(prefetch)
+assert base.DataFetcherManager is reloaded_class
+after_owner_source, after_owner_facade = bindings()
+for name in names:
+    assert after_owner_source[name] is not after_base_source[name]
+    assert after_owner_facade[name] is not after_base_facade[name]
+    assert after_owner_facade[name].__code__ is after_owner_source[name].__code__
+"""
+    )
+
+
+def test_init_default_fetchers_remain_on_data_fetcher_manager_facade() -> None:
+    for name in init_default.EXPECTED_INIT_DEFAULT_FETCHERS_METHOD_NAMES:
+        method = getattr(DataFetcherManager, name)
+        assert callable(method), name
+        function = _descriptor_function(vars(DataFetcherManager)[name])
+        assert function.__module__ == "src.data_provider.base", name
+        assert function.__qualname__ == f"DataFetcherManager.{name}", name
+        assert function.__globals__ is vars(base), name
+
+
+def test_init_default_fetchers_owner_module_exists() -> None:
+    assert INIT_DEFAULT_OWNER_PATH.is_file()
+    source = BASE_PATH.read_text(encoding="utf-8")
+    assert "init_default_fetchers_methods" in source
+    assert "bind_init_default_fetchers_methods_facade" in source
+    for name in init_default.EXPECTED_INIT_DEFAULT_FETCHERS_METHOD_NAMES:
+        assert f"def {name}(" not in source
+        assert f"    {name} = None" in source
+    assert "get_config" not in source
+
+
+def test_init_default_fetchers_source_descriptors_share_code_not_identity() -> None:
+    source_names = []
+    for name, source_descriptor in vars(init_default._InitDefaultFetchersMethods).items():
+        source_function = _descriptor_function(source_descriptor)
+        if name.startswith("__") or not inspect.isfunction(source_function):
+            continue
+        source_names.append(name)
+        facade_function = _descriptor_function(vars(DataFetcherManager)[name])
+        assert facade_function is not source_function
+        assert facade_function.__code__ is source_function.__code__
+        assert source_function.__module__ == init_default.__name__
+    assert tuple(source_names) == init_default.EXPECTED_INIT_DEFAULT_FETCHERS_METHOD_NAMES
+
+
+def test_init_default_fetchers_bind_returns_expected_names() -> None:
+    dummy = type("DummyDataFetcherManager", (), {})
+    bound = init_default.bind_init_default_fetchers_methods_facade(
+        dummy,
+        vars(base),
+    )
+    assert bound == init_default.EXPECTED_INIT_DEFAULT_FETCHERS_METHOD_NAMES
+
+
+def test_init_default_fetchers_assemble_raises_on_expected_name_mismatch() -> None:
+    dummy = type("DummyDataFetcherManager", (), {})
+    extra = lambda self: None  # noqa: E731
+    init_default._InitDefaultFetchersMethods._extra_init = extra
+    try:
+        bound = init_default.bind_init_default_fetchers_methods_facade(
+            dummy,
+            vars(base),
+        )
+        with pytest.raises(
+            ImportError,
+            match="Unexpected DataFetcherManager default-fetcher-init methods",
+        ):
+            if bound != init_default.EXPECTED_INIT_DEFAULT_FETCHERS_METHOD_NAMES:
+                raise ImportError(
+                    "Unexpected DataFetcherManager default-fetcher-init methods: "
+                    f"{bound!r}"
+                )
+        assert "_extra_init" in bound
+    finally:
+        delattr(init_default._InitDefaultFetchersMethods, "_extra_init")
+
+
+def test_init_default_fetchers_owner_keeps_get_config() -> None:
+    source = INIT_DEFAULT_OWNER_PATH.read_text(encoding="utf-8")
+    assert "from src.config import get_config" in source
+    assert "self._get_fundamental_config()" not in source
+
+
+def _run_init_default_reload_contract(body: str) -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                (
+                    "import importlib",
+                    "import src.data_provider.base as base",
+                    "import src.data_provider.manager_parts.init_default_fetchers_methods as init_default",
+                    "",
+                    "names = init_default.EXPECTED_INIT_DEFAULT_FETCHERS_METHOD_NAMES",
+                    "",
+                    "def descriptor_function(descriptor):",
+                    "    if isinstance(descriptor, (staticmethod, classmethod)):",
+                    "        descriptor = descriptor.__func__",
+                    "    original = getattr(",
+                    "        descriptor,",
+                    "        '_stockpulse_data_validation_original',",
+                    "        None,",
+                    "    )",
+                    "    return original if original is not None else descriptor",
+                    "",
+                    "def bindings():",
+                    "    source = {}",
+                    "    facade = {}",
+                    "    for name in names:",
+                    "        source[name] = descriptor_function(",
+                    "            vars(init_default._InitDefaultFetchersMethods)[name]",
+                    "        )",
+                    "        facade[name] = descriptor_function(",
+                    "            vars(base.DataFetcherManager)[name]",
+                    "        )",
+                    "        assert facade[name] is not source[name]",
+                    "        assert facade[name].__code__ is source[name].__code__",
+                    "        assert facade[name].__globals__ is vars(base)",
+                    "        assert facade[name].__module__ == 'src.data_provider.base'",
+                    "        assert facade[name].__qualname__ == f'DataFetcherManager.{name}'",
+                    "        assert getattr(",
+                    "            vars(base.DataFetcherManager)[name],",
+                    "            '_stockpulse_data_validation_wrapper_token',",
+                    "            None,",
+                    "        ) is None",
+                    "    return source, facade",
+                    "",
+                    body,
+                )
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_init_default_fetchers_owner_reload_rebinds_loaded_facade() -> None:
+    _run_init_default_reload_contract(
+        """
+old_class = base.DataFetcherManager
+before_source, before_facade = bindings()
+init_default = importlib.reload(init_default)
+assert base.DataFetcherManager is old_class
+after_source, after_facade = bindings()
+for name in names:
+    assert after_source[name] is not before_source[name]
+    assert after_facade[name] is not before_facade[name]
+    assert after_facade[name].__code__ is after_source[name].__code__
+"""
+    )
+
+
+def test_init_default_fetchers_facade_then_owner_reload_keeps_one_current_contract() -> None:
+    _run_init_default_reload_contract(
+        """
+old_class = base.DataFetcherManager
+before_source, before_facade = bindings()
+base = importlib.reload(base)
+assert base.DataFetcherManager is not old_class
+after_base_source, after_base_facade = bindings()
+for name in names:
+    assert after_base_source[name] is before_source[name]
+    assert after_base_facade[name] is not before_facade[name]
+reloaded_class = base.DataFetcherManager
+init_default = importlib.reload(init_default)
 assert base.DataFetcherManager is reloaded_class
 after_owner_source, after_owner_facade = bindings()
 for name in names:
