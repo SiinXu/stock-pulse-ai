@@ -59,4 +59,20 @@ describe('Query consumer hosts', () => {
     expect(read('src/pages/__tests__/FinancialCalculatorsPage.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useFinancialCalculatorsMutation.test.tsx')).toContain('createAppQueryClient');
   });
+
+  it('wraps ReportVersionComparePage tests with the production retry-free client', () => {
+    expect(read('src/pages/__tests__/ReportVersionComparePage.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/pages/__tests__/ReportVersionComparePage.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useReportVersionCompareQueries.test.tsx')).toContain('createAppQueryClient');
+  });
+
+  it('keeps report version-compare on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useReportVersionCompareQueries.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(barrelSource).not.toContain('useReportVersionCompareQueries');
+  });
 });

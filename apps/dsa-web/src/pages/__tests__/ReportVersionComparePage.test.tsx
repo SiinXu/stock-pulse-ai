@@ -1,5 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
@@ -9,6 +10,7 @@ import {
   RouteFocusRegistrationContext,
   type RouteFocusTarget,
 } from '../../contexts/routeFocusContext';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
 import {
   APP_ROUTE_PATHS,
   buildReportVersionCompareHref,
@@ -29,13 +31,15 @@ const routeFocusRegister = vi.fn((target: RouteFocusTarget) => {
 
 function renderPage(initialEntry: string = APP_ROUTE_PATHS.researchReportCompare) {
   return render(
-    <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
-      <UiLanguageProvider initialLanguage="en">
-        <MemoryRouter initialEntries={[initialEntry]}>
-          <ReportVersionComparePage />
-        </MemoryRouter>
-      </UiLanguageProvider>
-    </RouteFocusRegistrationContext.Provider>,
+    <QueryClientProvider client={createAppQueryClient()}>
+      <RouteFocusRegistrationContext.Provider value={{ register: routeFocusRegister }}>
+        <UiLanguageProvider initialLanguage="en">
+          <MemoryRouter initialEntries={[initialEntry]}>
+            <ReportVersionComparePage />
+          </MemoryRouter>
+        </UiLanguageProvider>
+      </RouteFocusRegistrationContext.Provider>
+    </QueryClientProvider>,
   );
 }
 
@@ -249,19 +253,23 @@ describe('ReportVersionComparePage', () => {
     }));
 
     await waitFor(() => {
-      expect(reportVersionCompareApi.listRuns).toHaveBeenCalledWith({
-        stockCode: '600519',
-        page: 1,
-        limit: 50,
-      });
+      expect(reportVersionCompareApi.listRuns).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stockCode: '600519',
+          page: 1,
+          limit: 50,
+        }),
+      );
     });
     await screen.findByTestId('report-version-compare-result');
     expect(screen.getByTestId('report-version-compare-stock-input')).toHaveValue('600519');
-    expect(reportVersionCompareApi.compare).toHaveBeenCalledWith({
-      stockCode: '600519',
-      baseRunId: '1',
-      targetRunId: '2',
-    });
+    expect(reportVersionCompareApi.compare).toHaveBeenCalledWith(
+      expect.objectContaining({
+        stockCode: '600519',
+        baseRunId: '1',
+        targetRunId: '2',
+      }),
+    );
   });
 
   it('retries the failed compare with the same inputs without reloading runs', async () => {
