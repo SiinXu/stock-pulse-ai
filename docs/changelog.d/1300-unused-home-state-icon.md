@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-state-icon-muted wrapper (Refs #1300).

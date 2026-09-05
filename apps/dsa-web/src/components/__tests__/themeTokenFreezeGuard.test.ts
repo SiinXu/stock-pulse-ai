@@ -189,6 +189,13 @@ describe('theme token freeze guard', () => {
     expect(THEME_DEFINED_TOKEN_NAMES, unusedHomeDividerWrapper).not.toContain(unusedHomeDividerWrapper);
   });
 
+  it('keeps unused Home state-icon wrapper absent from definitions and inventory', () => {
+    const unusedHomeStateIconWrapper = '--home-state-icon-muted';
+    const definedNames = uniqueDefinedCustomPropertyNames(indexCss);
+    expect(definedNames, unusedHomeStateIconWrapper).not.toContain(unusedHomeStateIconWrapper);
+    expect(THEME_DEFINED_TOKEN_NAMES, unusedHomeStateIconWrapper).not.toContain(unusedHomeStateIconWrapper);
+  });
+
   it('accounts for light/dark, price-direction, charts, aliases, and desktop chrome', () => {
     expect(indexCss).toMatch(/:root\s*\{/);
     expect(indexCss).toMatch(/^\.dark\s*\{/m);
@@ -352,7 +359,7 @@ describe('theme token freeze guard', () => {
     // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
     // portfolio/chat/settings/home-action/home-prose) shrank the defined
     // inventory below 170.
-    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(159);
+    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(158);
     expect(() => {
       if (THEME_DEFINED_TOKEN_NAMES.length === 0) {
         throw new Error('theme token inventory is empty; refusing to pass a vacuous freeze.');
