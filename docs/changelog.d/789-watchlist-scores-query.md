@@ -1,0 +1,1 @@
+- [Changed] Schedule Web Home watchlist aggregate scores through TanStack Query (Refs #789).

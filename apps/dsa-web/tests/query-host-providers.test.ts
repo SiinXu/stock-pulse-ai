@@ -75,4 +75,19 @@ describe('Query consumer hosts', () => {
     expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
     expect(barrelSource).not.toContain('useReportVersionCompareQueries');
   });
+
+  it('wraps useWatchlistScores tests with the production retry-free client', () => {
+    expect(read('src/hooks/__tests__/useWatchlistScores.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useWatchlistScores.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps watchlist scores on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useWatchlistScores.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(barrelSource).not.toContain('useWatchlistScores');
+  });
 });
