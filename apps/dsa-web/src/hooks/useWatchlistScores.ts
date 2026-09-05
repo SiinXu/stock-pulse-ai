@@ -90,11 +90,12 @@ export async function fetchWatchlistScores(args: {
  * Load the current aggregate score projection for a bounded watchlist.
  *
  * `refreshKey` belongs to the caller's analysis/refresh lifecycle. A changed
- * key invalidates the previous result immediately: display and sorting see an
- * empty map until the matching request succeeds, and a failed request never
- * falls back to scores from an older lifecycle generation. Reusing a prior
- * signature (A→B→A or A→empty→A) starts a new generation and must not read
- * the earlier matching settled record.
+ * canonical identity (`String(refreshKey)`) invalidates the previous result
+ * immediately: display and sorting see an empty map until the matching request
+ * succeeds, and a failed request never falls back to scores from an older
+ * lifecycle generation. Number `1` and string `'1'` are one generation.
+ * Reusing a prior signature (A→B→A or A→empty→A) starts a new generation and
+ * must not read the earlier matching settled record.
  */
 export function useWatchlistScores(
   stockCodes: readonly string[],
@@ -102,7 +103,8 @@ export function useWatchlistScores(
 ): UseWatchlistScoresResult {
   const queryClient = useQueryClient();
   const codesKey = JSON.stringify(stockCodes.map((code) => code.trim()).filter(Boolean));
-  const requestSignature = `${codesKey}\n${String(refreshKey)}`;
+  const refreshIdentity = String(refreshKey);
+  const requestSignature = `${codesKey}\n${refreshIdentity}`;
   const [settledRequest, setSettledRequest] = useState<SettledScoreRequest | null>(null);
   const [seenSignature, setSeenSignature] = useState(requestSignature);
   const requestIdRef = useRef(0);
@@ -133,7 +135,7 @@ export function useWatchlistScores(
 
     const requestId = requestIdRef.current + 1;
     requestIdRef.current = requestId;
-    const key = buildWatchlistScoresQueryKey(codesKey, refreshKey);
+    const key = buildWatchlistScoresQueryKey(codesKey, refreshIdentity);
     // Same-key refresh must cancel+remove before fetchQuery (Query 5 joins a cancelled retryer).
     discardLive();
     liveKeysRef.current = [key];
@@ -170,7 +172,7 @@ export function useWatchlistScores(
       requestIdRef.current += 1;
       discardLive();
     };
-  }, [codesKey, requestSignature, refreshKey, queryClient]);
+  }, [codesKey, requestSignature, refreshIdentity, queryClient]);
 
   return useMemo(() => {
     const codes = JSON.parse(codesKey) as string[];

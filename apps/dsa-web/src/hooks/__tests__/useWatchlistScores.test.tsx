@@ -286,6 +286,46 @@ describe('useWatchlistScores', () => {
     });
   });
 
+  it('treats number 1 and string 1 as one canonical refresh generation', async () => {
+    const { client, wrapper } = createWrapper();
+    const fetchSpy = vi.spyOn(client, 'fetchQuery');
+    const { result, rerender } = renderHook(
+      ({ refreshKey }: { refreshKey: string | number }) => useWatchlistScores(CODES, refreshKey),
+      { wrapper, initialProps: { refreshKey: 1 as string | number } },
+    );
+
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(score).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0]?.[0]?.queryKey).toEqual([
+      'watchlist',
+      'scores',
+      CODES_KEY,
+      '1',
+    ]);
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(80);
+
+    rerender({ refreshKey: '1' });
+    expect(result.current.status).toBe('ready');
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(80);
+    await flushQueryMicrotasks(6);
+    expect(score).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(result.current.status).toBe('ready');
+    expect(result.current.itemsByCode.get('600519')?.score).toBe(80);
+
+    rerender({ refreshKey: 2 });
+    expect(result.current.status).toBe('loading');
+    expect(result.current.itemsByCode.size).toBe(0);
+    await waitFor(() => expect(result.current.status).toBe('ready'));
+    expect(score).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[1]?.[0]?.queryKey).toEqual([
+      'watchlist',
+      'scores',
+      CODES_KEY,
+      '2',
+    ]);
+  });
+
   it('exposes loading plus empty immediately on refreshKey and lets the newest result win', async () => {
     const first = createDeferred<WatchlistScoreResponse>();
     score
