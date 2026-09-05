@@ -172,7 +172,6 @@
   --home-surface-button-bg-hover: hsl(80 7% 95% / 0.99);
   --home-surface-button-border: hsl(var(--border));
   --home-surface-button-border-hover: hsl(var(--primary) / 0.32);
-  --home-state-icon-muted: hsl(var(--muted-text) / 0.85);
   --home-panel-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.04);
   --home-panel-shadow-hover: 0 2px 6px hsl(var(--neutral-black) / 0.06);
   --home-hero-border: hsl(var(--primary) / 0.32);
@@ -412,7 +411,6 @@
   --home-surface-button-bg-hover: hsl(var(--foreground) / 0.06);
   --home-surface-button-border: hsl(var(--foreground) / 0.1);
   --home-surface-button-border-hover: hsl(var(--primary) / 0.28);
-  --home-state-icon-muted: hsl(var(--muted-text) / 0.85);
   --home-panel-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.25);
   --home-panel-shadow-hover: 0 2px 6px hsl(var(--neutral-black) / 0.35);
   --home-hero-border: hsl(var(--primary) / 0.34);
