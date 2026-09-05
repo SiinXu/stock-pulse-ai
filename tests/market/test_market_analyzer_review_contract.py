@@ -1057,3 +1057,51 @@ Sector text.
         assert violations == [], (
             f"market_analyzer.py still accesses private Analyzer attributes: {violations}"
         )
+
+
+def test_review_inject_owner_module_exists() -> None:
+    from pathlib import Path
+
+    owner_path = Path("src/market/review_inject.py")
+    assert owner_path.is_file()
+    source = owner_path.read_text(encoding="utf-8")
+    assert "def inject_data_into_review(" in source
+    assert "funds_sentiment" in source
+    assert "news_catalysts" in source
+
+
+def test_inject_data_into_review_is_a_thin_delegator_on_the_analyzer() -> None:
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse(Path("src/market/analyzer.py").read_text(encoding="utf-8"))
+    cls = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "MarketAnalyzer"
+    )
+    method = next(
+        node
+        for node in cls.body
+        if isinstance(node, ast.FunctionDef) and node.name == "_inject_data_into_review"
+    )
+    assert len(method.body) == 1
+    assert isinstance(method.body[0], ast.Return)
+    source = Path("src/market/analyzer.py").read_text(encoding="utf-8")
+    assert "return inject_data_into_review(" in source
+    assert "stats_block = self._build_stats_block" not in source
+
+
+def test_review_inject_module_does_not_import_the_analyzer() -> None:
+    import ast
+    from pathlib import Path
+
+    tree = ast.parse(Path("src/market/review_inject.py").read_text(encoding="utf-8"))
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module)
+        elif isinstance(node, ast.Import):
+            imported.update(alias.name for alias in node.names)
+    assert "src.market.analyzer" not in imported
+    assert not any(module.endswith(".analyzer") for module in imported)
