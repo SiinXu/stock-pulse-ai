@@ -1,0 +1,1 @@
+- [Chore] Extract DataFetcherManager default-fetcher initialization from base.py (Refs #1067).

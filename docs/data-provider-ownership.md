@@ -46,7 +46,7 @@ this identity.
 | Module | Owns | Does not own |
 | --- | --- | --- |
 | `src/data_provider/symbol_normalization.py` | Pure symbol / market code helpers: `normalize_stock_code`, `canonical_stock_code`, `is_bse_code`, `is_st_stock`, `is_kc_cy_stock`, ETF prefix checks, and market tags (`_is_*_market`, `_market_tag`, `_is_etf_code`, `ETF_PREFIXES`) | Provider I/O, caching, circuit policy, dataframe column normalization |
-| `src/data_provider/base_parts/` | `BaseFetcher` implementation ownership by capability domain: `daily_pipeline` (daily template method, clean, indicators), `market_stubs` (default market-overview/rankings `return None` stubs), plus `facade_bind` re-export | Abstract hooks `_fetch_raw_data` / `_normalize_data`, `random_sleep`, manager `__del__` / `_init_default_fetchers` (last `get_config()`), manager-layer policy (`manager_parts`), and provider-specific bodies |
+| `src/data_provider/base_parts/` | `BaseFetcher` implementation ownership by capability domain: `daily_pipeline` (daily template method, clean, indicators), `market_stubs` (default market-overview/rankings `return None` stubs), plus `facade_bind` re-export | Abstract hooks `_fetch_raw_data` / `_normalize_data`, `random_sleep`, manager `__del__` / timeout-slot construction, manager-layer policy (`manager_parts`), and provider-specific bodies |
 | `src/data_provider/errors.py` | Typed provider failures (`DataFetchError`, `RateLimitError`, `DataSourceUnavailableError`, `CircuitOpenError`) and exception summary helpers (`unwrap_exception`, `summarize_exception`) | Provider I/O, routing, cache policy |
 | `src/data_provider/chip_helpers.py` | Pure chip metric coercion and meaningful-distribution checks | Provider I/O and chip fetch orchestration |
 | `src/data_provider/us_index_mapping.py` | US ticker / index identity helpers used by market classification | A-share / HK / JP / KR / TW suffix rules (those live with symbol normalization or `src.services.market_symbol_utils`) |
@@ -71,7 +71,8 @@ this identity.
 | `src/data_provider/manager_parts/fundamental_outcome_methods.py` | Manager-owned failed/validation-rejected fundamental outcome builders rebound onto `DataFetcherManager`: `build_failed_fundamental_context` and `build_validation_rejected_fundamental_context`. Cloned bodies still resolve facade `_market_tag` / `sanitize_diagnostic_text` and rebound `self._build_fundamental_block` | TickFlow lifecycle (`tickflow_lifecycle_methods`), prefetch, `_init_default_fetchers`, timeout slot construction, remaining `get_config()` sites, payload helpers, timeout/retry workers, CN/offshore loaders, CN sub-blocks |
 | `src/data_provider/manager_parts/rankings_methods.py` | Manager-owned rankings orchestration rebound onto `DataFetcherManager`: sector ranking aggregation with meta, concept-rankings cache read/write, hot-stock and limit-up pool routing | `BaseFetcher` provider methods of the same names, market-overview routing (`get_main_indices`, `get_market_stats` — Slice 16), concept-rankings TTL/lock/dict class attributes, `get_board_context` (Slice 19), and capability inventory |
 | `src/data_provider/manager_parts/tickflow_lifecycle_methods.py` | Manager-owned TickFlow lifecycle rebound onto `DataFetcherManager`: `_get_tickflow_fetcher` (create/replace/registry reuse; converts the former `get_config()` site to `self._get_fundamental_config()`) and `close` (best-effort TickFlow release). Facade `__del__` stays a live FunctionDef and still calls rebound `self.close()` | Prefetch (`prefetch_methods`), `_init_default_fetchers`, timeout slot construction, remaining `get_config()` sites, market-overview routing (`get_main_indices` / `get_market_stats` still call rebound `_get_tickflow_fetcher`), capability inventory |
-| `src/data_provider/manager_parts/prefetch_methods.py` | Manager-owned prefetch rebound onto `DataFetcherManager`: `prefetch_realtime_quotes` (Local Only skip, config disable, early-source routing, TickFlow batch, first-code cache warm) and `prefetch_daily_klines` (TickFlow daily K-line warm). Converts the former `prefetch_realtime_quotes` `get_config()` site to `self._get_fundamental_config()` | `_init_default_fetchers`, facade `__init__` / `__del__`, TickFlow lifecycle (`_get_tickflow_fetcher` / `close`), realtime routing (`get_realtime_quote`), capability lookup, Local Only policy body (`is_market_data_local_only`), BaseFetcher methods |
+| `src/data_provider/manager_parts/prefetch_methods.py` | Manager-owned prefetch rebound onto `DataFetcherManager`: `prefetch_realtime_quotes` (Local Only skip, config disable, early-source routing, TickFlow batch, first-code cache warm) and `prefetch_daily_klines` (TickFlow daily K-line warm). Converts the former `prefetch_realtime_quotes` `get_config()` site to `self._get_fundamental_config()` | Default-fetcher init (`init_default_fetchers_methods`), facade `__init__` / `__del__`, TickFlow lifecycle (`_get_tickflow_fetcher` / `close`), realtime routing (`get_realtime_quote`), capability lookup, Local Only policy body (`is_market_data_local_only`), BaseFetcher methods |
+| `src/data_provider/manager_parts/init_default_fetchers_methods.py` | Manager-owned default-fetcher initialization rebound onto `DataFetcherManager`: `_init_default_fetchers(self, config)` (built-in fetchers, optional Tushare/TickFlow/Longbridge/Finnhub/AlphaVantage skip, crypto `is True` default-off, `_register_builtin_data_provider` + `_sync_registered_data_providers`). Does not import or call `get_config` and does not use `_get_fundamental_config()`. Facade `__init__` dynamically imports `src.config.get_config` in the no-explicit-fetchers branch and calls rebound `self._init_default_fetchers(get_config())`. Private signature now requires `config`; there is no `src.data_provider.base.get_config` seam | Facade `__init__` (still constructs defaults when no explicit fetchers are passed), `__del__`, timeout-slot construction, prefetch, TickFlow lifecycle, provider priority/fallback/circuit/cache policy |
 | `src/data_provider/manager_parts/market_overview_methods.py` | Manager-owned market-overview routing rebound onto `DataFetcherManager`: TickFlow-first `get_main_indices` and `get_market_stats` capability fallback | `BaseFetcher` provider methods of the same names, TickFlow lifecycle (`tickflow_lifecycle_methods`: `_get_tickflow_fetcher`, `close`), capability inventory, rankings, CN sub-blocks, payload helpers, belong-board routing, prefetch, and timeout workers |
 | `src/data_provider/manager_parts/belong_board_methods.py` | Manager-owned belong-board missing-value and normalization helpers plus `get_belong_boards` routing, capability probing, and provider fallback rebound onto `DataFetcherManager` | Fundamental payload helpers that only *call* `_try_scalar_isna` (`fundamental_payload_methods`), stock-name bulk/prefetch, CN sub-blocks, timeout workers, TickFlow lifecycle |
 | `src/data_provider/plugin_registry.py` | Plugin provider registration and discovery seams | Built-in fetcher implementations |
@@ -519,6 +520,28 @@ and does not import the facade. Import the facade
 Slice 24 leftover on the facade: `__del__`,
 `_init_default_fetchers`, timeout slot construction, and the remaining
 `base.py` `get_config()` site (`_init_default_fetchers`).
+
+Slice 25 rebinds `_init_default_fetchers` from
+`manager_parts/init_default_fetchers_methods.py` while preserving
+its `src.data_provider.base` module, qualname, descriptor kind,
+and globals. The rebound private signature is
+`_init_default_fetchers(self, config)`: facade `__init__` dynamically
+imports `src.config.get_config` in the no-explicit-fetchers branch
+and calls `self._init_default_fetchers(get_config())`. There is no
+live FunctionDef for this name on `base.py` and no
+`src.data_provider.base.get_config` wrapper. The helper does not
+import or call `get_config` and does not use
+`_get_fundamental_config()`. The body still skips unconfigured
+optional providers and activates CoinGecko only when
+`crypto_provider_enabled is True`. Import the facade
+(`src.data_provider.base` / `src.data_provider`), not
+`manager_parts.init_default_fetchers_methods`. After this slice,
+`base.py` still owns the default-fetcher `get_config()` lookup on
+the `__init__` else branch so the new-module config-access ratchet
+stays clean.
+
+Slice 25 leftover on the facade: `__del__` and timeout slot
+construction in `__init__`.
 
 Tushare client / symbols / history / stock-identity / market-boards /
 realtime (Issue #1068) rebinds `_init_api` / `_build_api_client` /

@@ -3,9 +3,9 @@
 """Manager-owned prefetch methods rebound onto DataFetcherManager.
 
 Extracted from ``src.data_provider.base`` behind an ADR-006 compatibility
-facade. ``_init_default_fetchers``, facade ``__init__`` / ``__del__``, and
-TickFlow lifecycle stay on the facade or their existing owners. These
-descriptors own ``prefetch_realtime_quotes`` and ``prefetch_daily_klines``.
+facade. Facade ``__init__`` / ``__del__`` and TickFlow lifecycle stay on
+the facade or their existing owners. These descriptors own
+``prefetch_realtime_quotes`` and ``prefetch_daily_klines``.
 Config is resolved through rebound ``self._get_fundamental_config()`` (not
 bare ``get_config()``). ``DataFetcherManager`` remains the public import
 and patch surface.
