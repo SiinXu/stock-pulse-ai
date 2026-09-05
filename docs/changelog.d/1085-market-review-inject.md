@@ -1,0 +1,1 @@
+- [Changed] Move market-review markdown injectors into src/market/review_inject.py behind the existing analyzer facade (Refs #1085).

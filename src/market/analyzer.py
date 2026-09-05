@@ -11,7 +11,6 @@
 """
 
 import logging
-import re
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -52,6 +51,7 @@ from src.market import market_data as _market_data
 from src.market import news as _market_news
 from src.market import diagnostics as _market_diagnostics
 from src.market import report_sections as _market_report_sections
+from src.market import review_inject as _market_review_inject
 
 build_market_light_scores = _market_metrics.build_market_light_scores
 build_market_temperature = _market_metrics.build_market_temperature
@@ -86,23 +86,9 @@ sanitize_generation_diagnostic = _market_diagnostics.sanitize_generation_diagnos
 extract_report_title = _market_report_sections.extract_report_title
 split_report_sections = _market_report_sections.split_report_sections
 insert_after_section = _market_report_sections.insert_after_section
+inject_data_into_review = _market_review_inject.inject_data_into_review
 
 logger = logging.getLogger(__name__)
-
-
-_ENGLISH_SECTION_PATTERNS = {
-    "market_summary": r"###\s*(?:1\.\s*)?Market Summary",
-    "index_commentary": r"###\s*(?:2\.\s*)?(?:Index Commentary|Major Indices)",
-    "sector_highlights": r"###\s*(?:4\.\s*)?(?:Sector Highlights|Sector/Theme Highlights)",
-}
-
-_CHINESE_SECTION_PATTERNS = {
-    "market_summary": r"###\s*一、(?:盘面总览|市场总结)",
-    "index_commentary": r"###\s*二、(?:指数结构|指数点评|主要指数)",
-    "sector_highlights": r"###\s*三、(?:板块主线|热点解读|板块表现)",
-    "funds_sentiment": r"###\s*四、(?:资金与情绪|资金动向)",
-    "news_catalysts": r"###\s*五、(?:消息催化|后市展望)",
-}
 
 
 @dataclass
@@ -655,47 +641,7 @@ class MarketAnalyzer:
         overview: MarketOverview,
         news: Optional[List] = None,
     ) -> str:
-        """Inject structured data tables into the corresponding LLM prose sections."""
-        # Build data blocks
-        stats_block = self._build_stats_block(overview)
-        indices_block = self._build_indices_block(overview)
-        sector_block = self._build_sector_block(overview)
-        patterns = (
-            _ENGLISH_SECTION_PATTERNS
-            if self._get_review_language() == "en"
-            else _CHINESE_SECTION_PATTERNS
-        )
-
-        if stats_block:
-            review = self._insert_after_section(
-                review,
-                patterns["market_summary"],
-                stats_block,
-            )
-
-        if indices_block:
-            review = self._insert_after_section(
-                review,
-                patterns["index_commentary"],
-                indices_block,
-            )
-
-        if sector_block:
-            original_review = review
-            review = self._insert_after_section(
-                review,
-                patterns["sector_highlights"],
-                sector_block,
-            )
-            if review == original_review and sector_block not in review:
-                fallback_heading = (
-                    "### 4. Sector Highlights"
-                    if self._get_review_language() == "en"
-                    else "### 三、板块主线"
-                )
-                review = f"{review.rstrip()}\n\n{fallback_heading}\n{sector_block}\n"
-
-        return review
+        return inject_data_into_review(self, review, overview, news)
 
     @staticmethod
     def _insert_after_section(text, heading_pattern, block):

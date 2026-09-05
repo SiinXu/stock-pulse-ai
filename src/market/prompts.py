@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """Market review prompt builders.
 
-Issue #1085 step 2 extracts prompt assembly only. Metric scoring, markdown
-injectors, LLM calls, and degradation policy remain in ``src.market.analyzer``.
+Issue #1085 step 2 extracts prompt assembly only. Metric scoring, LLM
+calls, and degradation policy remain in ``src.market.analyzer``. Markdown
+injectors live in ``src.market.review_inject`` behind the analyzer facade.
 These helpers take explicit primitives or preformatted strings and must not
 import ``MarketAnalyzer``.
 """
