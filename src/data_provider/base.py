@@ -236,83 +236,18 @@ class BaseFetcher(DataProvider):
         """
         pass
 
-    def get_main_indices(self, region: str = "cn") -> Optional[List[Dict[str, Any]]]:
-        """
-        获取主要指数实时行情
+    # Rebound from base_parts.market_stubs after the class is built.
+    get_main_indices = None
 
-        Args:
-            region: 市场区域，cn=A股 us=美股
+    get_market_stats = None
 
-        Returns:
-            List[Dict]: 指数列表，每个元素为字典，包含:
-                - code: 指数代码
-                - name: 指数名称
-                - current: 当前点位
-                - change: 涨跌点数
-                - change_pct: 涨跌幅(%)
-                - volume: 成交量
-                - amount: 成交额
-        """
-        return None
+    get_sector_rankings = None
 
-    def get_market_stats(self) -> Optional[Dict[str, Any]]:
-        """
-        获取市场涨跌统计
+    get_concept_rankings = None
 
-        Returns:
-            Dict: 包含:
-                - up_count: 上涨家数
-                - down_count: 下跌家数
-                - flat_count: 平盘家数
-                - limit_up_count: 涨停家数
-                - limit_down_count: 跌停家数
-                - total_amount: 两市成交额
-        """
-        return None
+    get_hot_stocks = None
 
-    def get_sector_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
-        """
-        获取板块涨跌榜
-
-        Args:
-            n: 返回前n个
-
-        Returns:
-            Tuple: (领涨板块列表, 领跌板块列表)
-        """
-        return None
-
-    def get_concept_rankings(self, n: int = 5) -> Optional[Tuple[List[Dict], List[Dict]]]:
-        """
-        获取概念/题材涨跌榜。
-
-        Returns:
-            Tuple: (领涨概念列表, 领跌概念列表)
-        """
-        return None
-
-    def get_hot_stocks(self, n: int = 10) -> Optional[List[Dict[str, Any]]]:
-        """
-        获取市场人气股榜。
-
-        Returns:
-            List[Dict]: 人气股列表
-        """
-        return None
-
-    def get_limit_up_pool(
-        self,
-        date: Optional[str] = None,
-        n: int = 20,
-    ) -> Optional[List[Dict[str, Any]]]:
-        """
-        获取涨停池/连板梯队。
-
-        Args:
-            date: YYYYMMDD，默认由具体数据源决定
-            n: 返回条数
-        """
-        return None
+    get_limit_up_pool = None
 
     # Rebound from base_parts.daily_pipeline after the class is built.
     get_daily_data = None
@@ -1275,11 +1210,14 @@ del (
 
 
 # ``base_parts.daily_pipeline`` owns the BaseFetcher daily template method.
+# ``base_parts.market_stubs`` owns the default market-overview/rankings stubs.
 # Rebinding preserves method globals so existing patches against this module
 # continue to intercept moved implementations, and every provider subclass
 # inherits the rebound descriptors unchanged.
 from .base_parts import daily_pipeline as _daily_pipeline_module  # noqa: E402
 from .base_parts.daily_pipeline import _DailyPipelineMethods  # noqa: E402
+from .base_parts import market_stubs as _market_stubs_module  # noqa: E402
+from .base_parts.market_stubs import _MarketStubMethods  # noqa: E402
 from .base_parts.facade_bind import bind_methods_from_class as _bind_base_parts  # noqa: E402
 
 
@@ -1292,6 +1230,12 @@ def _assemble_base_fetcher_facade() -> None:
         globals(),
         expected_names=_daily_pipeline_module.EXPECTED_DAILY_PIPELINE_METHOD_NAMES,
     )
+    _bind_base_parts(
+        _MarketStubMethods,
+        BaseFetcher,
+        globals(),
+        expected_names=_market_stubs_module.EXPECTED_MARKET_STUB_METHOD_NAMES,
+    )
 
 
 _assemble_base_fetcher_facade()
@@ -1300,7 +1244,7 @@ _assemble_base_fetcher_facade()
 def _install_base_parts_reload_hooks() -> None:
     """Keep an owner reload able to rebuild and rebind both sides of the seam."""
 
-    for module in (_daily_pipeline_module,):
+    for module in (_daily_pipeline_module, _market_stubs_module):
         module._FACADE_RELOAD_HOOK = _assemble_base_fetcher_facade  # type: ignore[attr-defined]
 
 
