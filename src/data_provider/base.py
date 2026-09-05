@@ -60,18 +60,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-def get_config(*args, **kwargs):
-    """Live facade lookup for default-fetcher init.
-
-    ``DataFetcherManager._init_default_fetchers`` calls this name from
-    facade globals, so ``patch("src.data_provider.base.get_config")``
-    governs construction. The body imports ``src.config.get_config`` at
-    call time so ``patch("src.config.get_config")`` still governs too.
-    """
-    from src.config import get_config as _live_get_config
-    return _live_get_config(*args, **kwargs)
-
-
 # Health/circuit defaults and env parsers are owned by
 # ``manager_parts.daily_source_health`` and re-exported immediately below so
 # class attributes and rebound methods still resolve names on this facade.
@@ -396,7 +384,8 @@ class DataFetcherManager:
                 self._refresh_fetcher_indexes_locked()
         else:
             # Default data source will be lazily loaded on first use
-            self._init_default_fetchers()
+            from src.config import get_config
+            self._init_default_fetchers(get_config())
         self._fundamental_adapter = AkshareFundamentalAdapter()
         self._yfinance_fundamental_adapter = YfinanceFundamentalAdapter()
         self._tickflow_fetcher = None
@@ -483,10 +472,7 @@ class DataFetcherManager:
     _register_builtin_data_provider = None
 
     # Rebound from manager_parts.init_default_fetchers_methods after the class is built.
-    _init_default_fetchers_with_config = None
-
-    def _init_default_fetchers(self) -> None:
-        self._init_default_fetchers_with_config(get_config())
+    _init_default_fetchers = None
 
     add_fetcher = None
 

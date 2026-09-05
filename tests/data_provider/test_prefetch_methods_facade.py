@@ -133,9 +133,8 @@ def test_owner_module_exists_for_prefetch_extraction() -> None:
     for name in prefetch.EXPECTED_PREFETCH_METHOD_NAMES:
         assert f"def {name}(" not in source
         assert f"    {name} = None" in source
-    assert "def _init_default_fetchers_with_config(" not in source
-    assert "    _init_default_fetchers_with_config = None" in source
-    assert "def _init_default_fetchers(" in source
+    assert "def _init_default_fetchers(" not in source
+    assert "    _init_default_fetchers = None" in source
     assert "def __init__(" in source
     assert "def __del__(" in source
     importlib.import_module("src.data_provider.manager_parts.prefetch_methods")
@@ -154,9 +153,7 @@ def test_prefetch_bodies_leave_manager_and_stay_callable_on_facade() -> None:
     for name in prefetch.EXPECTED_PREFETCH_METHOD_NAMES:
         assert name not in manager_defs, name
         assert callable(getattr(DataFetcherManager, name)), name
-    assert "_init_default_fetchers_with_config" not in manager_defs
-    assert callable(getattr(DataFetcherManager, "_init_default_fetchers_with_config"))
-    assert "_init_default_fetchers" in manager_defs
+    assert "_init_default_fetchers" not in manager_defs
     assert callable(getattr(DataFetcherManager, "_init_default_fetchers"))
     assert "__init__" in manager_defs
     assert "__del__" in manager_defs
@@ -369,9 +366,8 @@ def test_init_default_fetchers_owner_module_exists() -> None:
         assert f"def {name}(" not in source
         assert f"    {name} = None" in source
     assert "from src.config import get_config" in source
-    assert "def _init_default_fetchers(" in source
-    assert "self._init_default_fetchers_with_config(get_config())" in source
-    assert "self._init_default_fetchers()" in source
+    assert "self._init_default_fetchers(get_config())" in source
+    assert "def get_config(" not in source
 
 
 def test_init_default_fetchers_source_descriptors_share_code_not_identity() -> None:
@@ -433,49 +429,63 @@ def test_init_default_fetchers_owner_has_no_direct_config_access() -> None:
             assert not node.module.startswith("src.config.")
 
 
-def test_facade_get_config_patch_governs_init_default_fetchers() -> None:
-    manager = _bare_manager()
-    seen: list[object] = []
-
-    def _capture(config: object) -> None:
-        seen.append(config)
-
-    sentinel = object()
-    manager._init_default_fetchers_with_config = _capture
-    with patch.object(base, "get_config", return_value=sentinel) as mocked:
-        DataFetcherManager._init_default_fetchers(manager)
-    mocked.assert_called_once_with()
-    assert seen == [sentinel]
-
-
-def test_src_config_get_config_patch_governs_init_default_fetchers() -> None:
-    manager = _bare_manager()
-    seen: list[object] = []
-
-    def _capture(config: object) -> None:
-        seen.append(config)
-
-    sentinel = object()
-    manager._init_default_fetchers_with_config = _capture
-    with patch("src.config.get_config", return_value=sentinel) as mocked:
-        DataFetcherManager._init_default_fetchers(manager)
-    mocked.assert_called_once_with()
-    assert seen == [sentinel]
-
-
-def test_init_default_fetchers_delegator_stays_live_on_facade() -> None:
-    function = _descriptor_function(vars(DataFetcherManager)["_init_default_fetchers"])
-    assert callable(function)
-    assert function.__module__ == "src.data_provider.base"
-    assert function.__qualname__ == "DataFetcherManager._init_default_fetchers"
-    assert function.__globals__ is vars(base)
-    source_names = {
-        name
-        for name, descriptor in vars(init_default._InitDefaultFetchersMethods).items()
-        if not name.startswith("__") and inspect.isfunction(_descriptor_function(descriptor))
+def test_base_has_no_get_config_or_init_default_fetchers_functiondef() -> None:
+    source = BASE_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    module_funcs = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert "_init_default_fetchers" not in source_names
-    assert "_init_default_fetchers_with_config" in source_names
+    assert "get_config" not in module_funcs
+    manager_defs = {
+        node.name
+        for cls in tree.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "DataFetcherManager"
+        for node in cls.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert "_init_default_fetchers" not in manager_defs
+    assert "    _init_default_fetchers = None" in source
+    assert "from src.config import get_config" in source
+    assert "self._init_default_fetchers(get_config())" in source
+
+
+def test_init_default_fetchers_private_signature_accepts_config() -> None:
+    signature = inspect.signature(DataFetcherManager._init_default_fetchers)
+    assert list(signature.parameters) == ["self", "config"]
+    for parameter in signature.parameters.values():
+        assert parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+
+
+def test_src_config_get_config_patch_governs_real_construction() -> None:
+    seen: list[object] = []
+    original = DataFetcherManager._init_default_fetchers
+
+    def _wrap(self, config):
+        seen.append(config)
+        return original(self, config)
+
+    sentinel = SimpleNamespace(
+        tushare_token="",
+        longbridge_app_key="",
+        longbridge_app_secret="",
+        longbridge_access_token="",
+        longbridge_oauth_client_id="",
+        tickflow_api_key="",
+        finnhub_api_key="",
+        alphavantage_api_key="",
+        crypto_provider_enabled=False,
+    )
+    with patch.object(DataFetcherManager, "_init_default_fetchers", _wrap), patch(
+        "src.config.get_config",
+        return_value=sentinel,
+    ) as mocked:
+        manager = DataFetcherManager()
+    assert mocked.call_count >= 1
+    mocked.assert_called_with()
+    assert seen == [sentinel]
+    assert "CryptoCoingeckoFetcher" not in manager.available_fetchers
 
 
 def _run_init_default_reload_contract(body: str) -> None:

@@ -3,12 +3,13 @@
 """Manager-owned default-fetcher initialization rebound onto DataFetcherManager.
 
 Extracted from ``src.data_provider.base`` behind an ADR-006 compatibility
-facade. Facade ``__init__`` still calls live ``self._init_default_fetchers()``,
-which resolves ``get_config()`` on the facade and passes the config into
-rebound ``_init_default_fetchers_with_config``. This helper does not import
-or call ``get_config`` and does not use ``_get_fundamental_config``.
-``__del__`` and timeout-slot construction stay on the facade.
-``DataFetcherManager`` remains the public import and patch surface.
+facade. Facade ``__init__`` still dynamically imports
+``src.config.get_config`` in the no-explicit-fetchers branch and calls
+rebound ``self._init_default_fetchers(get_config())``. This helper does
+not import or call ``get_config`` and does not use
+``_get_fundamental_config``. ``__del__`` and timeout-slot construction
+stay on the facade. ``DataFetcherManager`` remains the public import
+and patch surface.
 """
 
 from __future__ import annotations
@@ -43,7 +44,7 @@ _FACADE_RELOAD_HOOK: Optional[Callable[[], None]] = globals().get(
 class _InitDefaultFetchersMethods:
     """Source descriptors rebound onto ``DataFetcherManager`` by its facade."""
 
-    def _init_default_fetchers_with_config(self, config) -> None:
+    def _init_default_fetchers(self, config) -> None:
         """
         初始化默认数据源列表
 
@@ -154,7 +155,7 @@ class _InitDefaultFetchersMethods:
 
 
 EXPECTED_INIT_DEFAULT_FETCHERS_METHOD_NAMES: Tuple[str, ...] = (
-    "_init_default_fetchers_with_config",
+    "_init_default_fetchers",
 )
 
 
