@@ -195,6 +195,12 @@
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 43 降到 41；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（这两个名字不在格式债清单中）。非空下界保持严格 `> 160`（已定义清单约 161）。
 - 这两个名字没有生产或测试消费者，因此亮色 / 暗色计算样式与 theme-pack 行为不变，**不是**视觉改版。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。`--home-divider-border` 与其余在用 `--home-*` 族不在本切片。
 
+### 2.16 Phase 2 无引用包装删除：Home divider（#1300）
+
+- 无引用定义 `--home-divider-border` 已删除（`:root` 与 `.dark` 各一份）。未新增页面级或领域 token，也没有调用点需要迁移。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 41 降到 40；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（该名字不在格式债清单中）。非空下界由严格 `> 160` 调整为 `> 159`（已定义清单约 160）。
+- 该名字没有生产或测试消费者，因此亮色 / 暗色计算样式与 theme-pack 行为不变，**不是**视觉改版。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余在用 `--home-*` 族（panel / surface / hero / price）不在本切片。
+
 ## 3. 字体阶（全部 Geist）
 
 | 用途 | 字号 | 字重 |

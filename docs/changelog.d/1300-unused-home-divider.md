@@ -1,0 +1,1 @@
+- [Chore] Remove the unused Home divider theme wrapper and tighten the page-scoped token ratchet (Refs #1300).

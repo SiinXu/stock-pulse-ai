@@ -168,7 +168,6 @@
   --home-history-item-hover-bg: hsl(80 7% 96% / 0.99);
   --home-history-item-selected-bg:
     linear-gradient(180deg, hsl(var(--primary) / 0.08), hsl(80 7% 96% / 0.98));
-  --home-divider-border: hsl(var(--border));
   --home-surface-button-bg: hsl(80 7% 97% / 0.98);
   --home-surface-button-bg-hover: hsl(80 7% 95% / 0.99);
   --home-surface-button-border: hsl(var(--border));
@@ -409,7 +408,6 @@
   --home-history-item-hover-bg: hsl(var(--foreground) / 0.06);
   --home-history-item-selected-bg:
     linear-gradient(180deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.08));
-  --home-divider-border: hsl(var(--foreground) / 0.1);
   --home-surface-button-bg: hsl(var(--foreground) / 0.03);
   --home-surface-button-bg-hover: hsl(var(--foreground) / 0.06);
   --home-surface-button-border: hsl(var(--foreground) / 0.1);
