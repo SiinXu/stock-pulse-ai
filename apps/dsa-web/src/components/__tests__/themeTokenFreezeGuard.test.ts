@@ -170,6 +170,18 @@ describe('theme token freeze guard', () => {
     expect(classifyThemeToken('--wizard-bg')).toBe('ungoverned');
   });
 
+  it('keeps unused Home loading-ring wrappers absent from definitions and inventory', () => {
+    const unusedHomeLoadingRingWrappers = [
+      '--home-loading-ring-head',
+      '--home-loading-ring-track',
+    ] as const;
+    const definedNames = uniqueDefinedCustomPropertyNames(indexCss);
+    for (const token of unusedHomeLoadingRingWrappers) {
+      expect(definedNames, token).not.toContain(token);
+      expect(THEME_DEFINED_TOKEN_NAMES, token).not.toContain(token);
+    }
+  });
+
   it('accounts for light/dark, price-direction, charts, aliases, and desktop chrome', () => {
     expect(indexCss).toMatch(/:root\s*\{/);
     expect(indexCss).toMatch(/^\.dark\s*\{/m);
