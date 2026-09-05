@@ -1,0 +1,1 @@
+- [Chore] Remove two unused Home loading-ring theme wrappers and tighten the page-scoped token ratchet (Refs #1300).

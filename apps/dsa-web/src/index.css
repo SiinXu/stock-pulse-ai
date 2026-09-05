@@ -126,8 +126,6 @@
   --shell-sidebar-border: hsl(var(--border));
 
   /* Home page related (using HSL format) */
-  --home-loading-ring-track: hsl(var(--primary) / 0.2);
-  --home-loading-ring-head: hsl(var(--primary));
   --page-drawer-overlay-bg: hsl(var(--neutral-black) / 0.6);
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
   --home-accent-bg: hsl(var(--primary) / 0.1);
@@ -377,8 +375,6 @@
   --shell-sidebar-border: hsl(var(--border));
 
   /* Home page related (Dark theme) */
-  --home-loading-ring-track: hsl(var(--primary) / 0.2);
-  --home-loading-ring-head: hsl(var(--primary));
   --page-drawer-overlay-bg: hsl(var(--neutral-black) / 0.6);
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
   --home-accent-bg: hsl(var(--primary) / 0.1);

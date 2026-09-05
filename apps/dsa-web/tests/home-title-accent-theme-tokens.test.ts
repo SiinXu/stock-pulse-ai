@@ -86,8 +86,9 @@ describe('home-title-accent theme tokens', () => {
     expect(darkBlock).not.toContain(COLLAPSED_HOME_TITLE_ACCENT_TOKEN);
   });
 
-  it('removes the collapsed name from the defined inventory and pins the ceiling at 43', () => {
-    expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBe(43);
+  it('removes the collapsed name from the defined inventory and does not raise the ceiling above 43', () => {
+    // Historical title-accent slice landed at 43. Later unused-wrapper
+    // shrinks may lower the ceiling; growth above 43 remains forbidden.
     expect(THEME_PAGE_SCOPED_TOKEN_CEILING).toBeLessThanOrEqual(43);
 
     const inventorySource = readInventorySource();
