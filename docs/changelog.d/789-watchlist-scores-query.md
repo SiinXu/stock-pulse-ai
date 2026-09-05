@@ -1,0 +1,3 @@
+- [Changed] Schedule Web Home watchlist aggregate scores through TanStack Query (Refs #789).
+- [Fixed] Invalidate Home watchlist score reads when a request signature is reused (Refs #789).
+- [Fixed] Canonicalize Home watchlist score refreshKey identity across signature, Query key, and effect deps (Refs #789).
