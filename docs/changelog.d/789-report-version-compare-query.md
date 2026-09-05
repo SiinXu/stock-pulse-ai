@@ -1,0 +1,1 @@
+- [Changed] Schedule Web report version-compare list and compare GETs through TanStack Query (Refs #789).
