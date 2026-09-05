@@ -636,6 +636,24 @@ Runtime Zod in `api/skillOutcomes.ts` is unchanged (including sample
 `confidence` string union). `api/skillOutcomes.ts` type-only re-exports
 the same public names. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/plugins.ts` now CamelizeKeys-binds the
+generated plugin object components (`PluginInfo`,
+`PluginListResponse`, `PluginLifecycleRequest`,
+`PluginLifecycleResponse`, `PluginSettingOptionResponse`,
+`PluginSettingFieldResponse`, `PluginSettingsResponse`,
+`PluginSettingsUpdateRequest`, `PluginSettingsUpdateResponse`).
+This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. `Override` makes generated-optional
+`items` / `extensionPoints` / `notificationChannels` / settings
+`schema` / `values` / `maskedKeys` / `changedKeys` / field `options`
+/ `validation` / `defaultValue` required, matching post-`normalize*`
+UI types. Extra generated keys kept. Nested option rows are the
+public `PluginSettingOption` projection. GET `/api/v1/plugins/health`
+and `PluginHealth*` are out of slice. Runtime Zod /
+`normalizePlugin` / `normalizeSettings` in `api/plugins.ts` are
+unchanged. `api/plugins.ts` type-only re-exports the same public
+names. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),

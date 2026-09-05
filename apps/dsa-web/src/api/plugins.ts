@@ -2,8 +2,31 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 import { z } from 'zod';
 import type { components } from '../types/api.generated';
+import type {
+  PluginInfo,
+  PluginLifecycleAction,
+  PluginLifecycleResponse,
+  PluginListResponse,
+  PluginSettingValue,
+  PluginSettingsResponse,
+  PluginSettingsUpdateResponse,
+} from '../types/plugins';
 import apiClient, { locallyRecoverableResourceConfig } from './index';
 import { parseCamelCasePayload } from './parseCamelCasePayload';
+
+export type {
+  PluginLifecycleAction,
+  PluginLifecycleState,
+  PluginSource,
+  PluginSettingValue,
+  PluginInfo,
+  PluginListResponse,
+  PluginLifecycleResponse,
+  PluginSettingOption,
+  PluginSettingField,
+  PluginSettingsResponse,
+  PluginSettingsUpdateResponse,
+} from '../types/plugins';
 
 type OpenApiPluginInfo = components['schemas']['PluginInfo'];
 type OpenApiPluginListResponse = components['schemas']['PluginListResponse'];
@@ -27,73 +50,6 @@ void _lifecycleResponseAnchor;
 void _settingsAnchor;
 void _settingsRequestAnchor;
 void _settingsUpdateAnchor;
-
-export type PluginLifecycleAction = OpenApiPluginLifecycleRequest['action'];
-export type PluginLifecycleState = OpenApiPluginInfo['state'];
-export type PluginSource = OpenApiPluginInfo['source'];
-export type PluginSettingValue = string | number | boolean | null;
-
-export type PluginInfo = {
-  id: string;
-  name: string;
-  version: string;
-  source: PluginSource;
-  state: PluginLifecycleState;
-  desiredEnabled: boolean;
-  reloadable: boolean;
-  packageRoot?: string | null;
-  extensionPoints: string[];
-  /** Active notification_channel registration IDs; empty when not loaded/active. */
-  notificationChannels: string[];
-  lastErrorCode?: string | null;
-  description: string;
-  author: string;
-  settingsCount: number;
-};
-
-export type PluginListResponse = {
-  items: PluginInfo[];
-  total: number;
-};
-
-export type PluginLifecycleResponse = {
-  pluginId: string;
-  action: PluginLifecycleAction;
-  success: boolean;
-  state: PluginLifecycleState;
-  reloaded: boolean;
-  restartRequired: boolean;
-  errorCode?: string | null;
-  message?: string | null;
-  plugin?: PluginInfo | null;
-};
-
-export type PluginSettingField = {
-  key: string;
-  title: string;
-  description: string;
-  dataType: 'string' | 'integer' | 'number' | 'boolean';
-  uiControl: 'text' | 'password' | 'number' | 'select' | 'textarea' | 'switch';
-  isSensitive: boolean;
-  isRequired: boolean;
-  defaultValue: PluginSettingValue;
-  options: Array<{ label: string; value: PluginSettingValue }>;
-  validation: Record<string, unknown>;
-  displayOrder: number;
-};
-
-export type PluginSettingsResponse = {
-  pluginId: string;
-  schema: PluginSettingField[];
-  values: Record<string, PluginSettingValue>;
-  maskedKeys: string[];
-  maskToken: string;
-};
-
-export type PluginSettingsUpdateResponse = PluginSettingsResponse & {
-  changedKeys: string[];
-  restartRequired: boolean;
-};
 
 const finiteNumberSchema = z.number().finite();
 const settingValueSchema = z.union([
