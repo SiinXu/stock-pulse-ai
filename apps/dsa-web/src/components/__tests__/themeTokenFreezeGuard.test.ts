@@ -196,6 +196,13 @@ describe('theme token freeze guard', () => {
     expect(THEME_DEFINED_TOKEN_NAMES, unusedHomeStateIconWrapper).not.toContain(unusedHomeStateIconWrapper);
   });
 
+  it('keeps unused Home secondary-accent wrapper absent from definitions and inventory', () => {
+    const unusedHomeSecondaryAccentWrapper = '--home-secondary-accent-text';
+    const definedNames = uniqueDefinedCustomPropertyNames(indexCss);
+    expect(definedNames, unusedHomeSecondaryAccentWrapper).not.toContain(unusedHomeSecondaryAccentWrapper);
+    expect(THEME_DEFINED_TOKEN_NAMES, unusedHomeSecondaryAccentWrapper).not.toContain(unusedHomeSecondaryAccentWrapper);
+  });
+
   it('accounts for light/dark, price-direction, charts, aliases, and desktop chrome', () => {
     expect(indexCss).toMatch(/:root\s*\{/);
     expect(indexCss).toMatch(/^\.dark\s*\{/m);
@@ -359,7 +366,7 @@ describe('theme token freeze guard', () => {
     // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
     // portfolio/chat/settings/home-action/home-prose) shrank the defined
     // inventory below 170.
-    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(158);
+    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(157);
     expect(() => {
       if (THEME_DEFINED_TOKEN_NAMES.length === 0) {
         throw new Error('theme token inventory is empty; refusing to pass a vacuous freeze.');

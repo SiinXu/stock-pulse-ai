@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-secondary-accent-text wrapper (Refs #1300).
