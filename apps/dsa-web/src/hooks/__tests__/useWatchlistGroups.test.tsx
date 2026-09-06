@@ -188,7 +188,7 @@ describe('useWatchlistGroups', () => {
   it('returns false from refresh when the GET fails and keeps the current revision', async () => {
     mockList
       .mockResolvedValueOnce(state(1))
-      .mockRejectedValueOnce(new Error('groups down'));
+      .mockRejectedValueOnce(apiError('groups down'));
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useWatchlistGroups(), { wrapper });
     await waitFor(() => expect(result.current.revision).toBe(1));
@@ -200,17 +200,42 @@ describe('useWatchlistGroups', () => {
 
     expect(refreshed).toBe(false);
     expect(result.current.revision).toBe(1);
-    expect(result.current.errorMessage).toBeTruthy();
+    expect(result.current.errorMessage).toBe('groups down');
     expect(result.current.isLoading).toBe(false);
+  });
+
+  it('keeps isLoading true during an explicit refresh while cached groups remain', async () => {
+    const pending = createDeferred<WatchlistGroupState>();
+    mockList
+      .mockResolvedValueOnce(state(1))
+      .mockReturnValueOnce(pending.promise);
+    const { wrapper } = createWrapper();
+    const { result } = renderHook(() => useWatchlistGroups(), { wrapper });
+    await waitFor(() => expect(result.current.revision).toBe(1));
+    expect(result.current.isLoading).toBe(false);
+
+    act(() => {
+      void result.current.refresh();
+    });
+    await waitFor(() => expect(result.current.isLoading).toBe(true));
+    expect(result.current.revision).toBe(1);
+
+    await act(async () => {
+      pending.resolve(state(2));
+    });
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+      expect(result.current.revision).toBe(2);
+    });
   });
 
   it('returns true from refresh and clears a prior load error', async () => {
     mockList
-      .mockRejectedValueOnce(new Error('groups down'))
+      .mockRejectedValueOnce(apiError('groups down'))
       .mockResolvedValueOnce(state(2));
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useWatchlistGroups(), { wrapper });
-    await waitFor(() => expect(result.current.errorMessage).toBeTruthy());
+    await waitFor(() => expect(result.current.errorMessage).toBe('groups down'));
 
     let refreshed!: boolean;
     await act(async () => {
@@ -549,7 +574,7 @@ describe('useWatchlistGroups', () => {
   });
 
   it('returns false through the public callback when a mutation fails', async () => {
-    mockCreate.mockRejectedValue(new Error('create failed'));
+    mockCreate.mockRejectedValue(apiError('create failed'));
     const { wrapper } = createWrapper();
     const { result } = renderHook(() => useWatchlistGroups(), { wrapper });
     await waitFor(() => expect(result.current.revision).toBe(1));
@@ -560,7 +585,7 @@ describe('useWatchlistGroups', () => {
     });
 
     expect(succeeded).toBe(false);
-    expect(result.current.errorMessage).toBeTruthy();
+    expect(result.current.errorMessage).toBe('create failed');
     expect(mockList).toHaveBeenCalledTimes(2);
   });
 
