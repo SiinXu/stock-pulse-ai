@@ -139,4 +139,21 @@ describe('Query consumer hosts', () => {
     expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
     expect(barrelSource).not.toContain('useDataProviderRuntimeStatusQuery');
   });
+
+  it('wraps KronosStatusPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/KronosStatusPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/KronosStatusPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useKronosStatusQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useKronosStatusQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings Kronos status on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useKronosStatusQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(barrelSource).not.toContain('useKronosStatusQuery');
+  });
 });

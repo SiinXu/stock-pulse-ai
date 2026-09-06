@@ -1,12 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { CheckCircle2, CircleAlert, RefreshCw } from 'lucide-react';
-import { systemConfigApi } from '../../api/systemConfig';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import type { KronosStatusResponse } from '../../types/systemConfig';
+import { useKronosStatusQuery } from '../../hooks/useKronosStatusQuery';
 import { ApiErrorAlert, Badge, IconButton, Surface } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 import { SettingsSectionCard } from './SettingsSectionCard';
@@ -30,38 +27,7 @@ export const KronosStatusPanel: React.FC<KronosStatusPanelProps> = ({
   disabled = false,
 }) => {
   const { t } = useUiLanguage();
-  const [status, setStatus] = useState<KronosStatusResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const requestIdRef = useRef(0);
-
-  const refresh = useCallback(async () => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const next = await systemConfigApi.getKronosStatus();
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
-      setStatus(next);
-    } catch (err: unknown) {
-      if (requestIdRef.current !== requestId) {
-        return;
-      }
-      setStatus(null);
-      setError(getParsedApiError(err));
-    } finally {
-      if (requestIdRef.current === requestId) {
-        setIsLoading(false);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
+  const { status, isLoading, error, refresh } = useKronosStatusQuery();
 
   const sizeLabel = formatBytes(status?.weightsTotalBytes ?? null);
 
