@@ -805,7 +805,7 @@ describe('first-paint entry budget (Refs #883)', () => {
       'ChatPage': { measuredGzipBytes: 23427, maxGzipBytes: 23827 },
       'StockDetailsPage': { measuredGzipBytes: 26891, maxGzipBytes: 27291 },
       'StockScreeningPage': { measuredGzipBytes: 27717, maxGzipBytes: 28117 },
-      'HomePage': { measuredGzipBytes: 26813, maxGzipBytes: 27213 },
+      'HomePage': { measuredGzipBytes: 27239, maxGzipBytes: 27639 },
       'BacktestPage': { measuredGzipBytes: 13970, maxGzipBytes: 15368 },
       'css-entry': { measuredGzipBytes: 26173, maxGzipBytes: 28791 },
       'css-vendor': { measuredGzipBytes: 523, maxGzipBytes: 576 },
@@ -826,7 +826,7 @@ describe('first-paint entry budget (Refs #883)', () => {
       'PortfolioPage-family': { measuredGzipBytes: 24381, maxGzipBytes: 26601 },
       'DecisionSignalsPage-family': { measuredGzipBytes: 67448, maxGzipBytes: 67848 },
       'ChatPage-family': { measuredGzipBytes: 23427, maxGzipBytes: 23827 },
-      'HomePage-family': { measuredGzipBytes: 26813, maxGzipBytes: 27213 },
+      'HomePage-family': { measuredGzipBytes: 27239, maxGzipBytes: 27639 },
       'StockScreeningPage-family': { measuredGzipBytes: 27717, maxGzipBytes: 28117 },
       'StockDetailsPage-family': { measuredGzipBytes: 26891, maxGzipBytes: 27291 },
       'BacktestPage-family': { measuredGzipBytes: 15216, maxGzipBytes: 15368 },
@@ -957,5 +957,29 @@ describe('first-paint entry budget (Refs #883)', () => {
       'backtest-route',
       'criticalPath',
     ]);
+  });
+
+  it('reseeds only HomePage gzip budgets after watchlist groups Query scheduling (Refs #789)', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const rule = budget.rules.find((entry) => entry.id === 'HomePage');
+    const family = budget.aggregateRules.find((entry) => entry.id === 'HomePage-family');
+
+    expect(rule).toEqual(expect.objectContaining({
+      id: 'HomePage',
+      match: 'assets/HomePage-*.js',
+      measuredGzipBytes: 27239,
+      maxGzipBytes: 27639,
+    }));
+    expect(rule.note).toContain('Refs #789');
+    expect(rule.maxGzipBytes).toBe(rule.measuredGzipBytes + 400);
+    expect(family).toEqual(expect.objectContaining({
+      id: 'HomePage-family',
+      match: ['assets/HomePage-*.js'],
+      measuredGzipBytes: 27239,
+      maxGzipBytes: 27639,
+    }));
+    expect(family.note).toContain('Refs #789');
+    expect(family.maxGzipBytes).toBe(family.measuredGzipBytes + 400);
+    expect(family.maxGzipBytes).toBe(rule.maxGzipBytes);
   });
 });
