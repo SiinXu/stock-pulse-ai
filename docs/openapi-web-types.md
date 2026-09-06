@@ -708,6 +708,41 @@ Skill-performance GET is out of slice. The types module is
 runtime-empty. Runtime Zod in `api/backtest.ts` is unchanged.
 `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/localModels.ts` now CamelizeKeys-binds the
+generated local-model and model-pack object components
+(`LocalModelCatalogResponse`, `LocalModelCatalogEntry`,
+`LocalModelCatalogText`, `LocalModelConfigurationResponse`,
+`LocalModelRuntimeResponse`, `LocalModelMutationResponse`,
+`LocalModelUnregistrationResponse`, `LocalModelPullAccepted`,
+`LocalModelPullResult`, `LocalModelPullStatus`,
+`ImportedLocalModelMetadata`, `ModelPackImportAccepted`,
+`ModelPackImportResult`, `ModelPackImportStatus`). This is **not**
+the auth object export-alias pattern: generated snake_case is not
+the UI type. No new enum aliases beyond keeping handwritten
+`LocalModelRuntimeStatus` / `LocalModelAssignment` /
+section-memory-install unions; do not invent extra unions; do not
+re-export `TaskStatusEnum`. `Override` keeps configuration
+`registeredModels` and mutation `updatedKeys` / `warnings`
+required, `localInstallPlatform` required-nullable,
+`installedModels` required, UI runtime status as the handwritten
+union, named desktop extras (`managed` / `operation` /
+`totalMemoryGb` / `progress`), ModelPack `status: 'accepted'`,
+and pull/pack `status` as `TaskLifecycleStatus`.
+`LocalizedCatalogText` / `LocalModelConfiguration` /
+`LocalModelRuntimeState` keep public names. `LocalModelProgress`
+stays handwritten (no generated component). Path **200** JSON for
+GET `/api/v1/local-models/runtime` is mutually equivalent to
+generated `LocalModelRuntimeResponse`, **not** public
+`LocalModelRuntimeState`. Catalog / configuration GET JSON are
+path **200** (not 201). POST `/api/v1/local-models/pulls` and
+POST `/api/v1/model-packs/import` accepted JSON are path **202**
+(generated has no 200; not 201). Model-pack import request is
+multipart; JSON response only. Request Pydantic `extra="forbid"`
+objects are out of the public types file. The types module is
+runtime-empty. Runtime Zod in `api/localModels.ts` /
+`api/modelPacks.ts` is unchanged. `Refs #721`; do not close the
+issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
