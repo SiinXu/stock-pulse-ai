@@ -65,7 +65,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--home-cool-surface-strong',
   '--home-hero-gradient-end',
   '--home-hero-gradient-mid',
-  '--home-hero-gradient-start',
   '--home-hero-shadow',
   '--home-history-item-bg',
   '--home-history-item-hover-bg',
@@ -177,20 +176,20 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * is also collapsed. Unused `--home-loading-ring-track`,
  * `--home-loading-ring-head`, `--home-divider-border`,
  * `--home-state-icon-muted`, `--home-secondary-accent-text`,
- * `--home-accent-bg-hover`, `--home-accent-border-hover`, and
- * `--home-hero-border` wrappers are
+ * `--home-accent-bg-hover`, `--home-accent-border-hover`,
+ * `--home-hero-border`, and `--home-hero-gradient-start` wrappers are
  * deleted with no replacement.
  * Action/prose families consume Layer 1 plus use-site
  * alpha; title-accent inlines Layer 1 `--foreground` with no alpha.
  * Do not reintroduce those prefixes, the action/prose/title-accent
  * leftovers, or the unused loading-ring, divider, state-icon,
- * secondary-accent-text, accent-bg-hover, accent-border-hover, or
- * hero-border wrappers.
+ * secondary-accent-text, accent-bg-hover, accent-border-hover,
+ * hero-border, or hero-gradient-start wrappers.
  * Remaining leftover
  * `--home-*` names stay page-scoped. `home` and `settings` stay in
  * `THEME_PAGE_SCOPED_PREFIXES`.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 35;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 34;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [
