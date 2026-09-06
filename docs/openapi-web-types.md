@@ -743,6 +743,40 @@ runtime-empty. Runtime Zod in `api/localModels.ts` /
 `api/modelPacks.ts` is unchanged. `Refs #721`; do not close the
 issue.
 
+`apps/dsa-web/src/types/onboarding.ts` now CamelizeKeys-binds the
+generated onboarding object components
+(`UserOnboardingProfile`, `OnboardingFeaturePath`,
+`OnboardingConfigItem`, `OnboardingPlanStep`, `OnboardingTodoItem`,
+`OnboardingWeekStep`, `OnboardingPlanResponse`,
+`OnboardingApplyResponse`, `OnboardingStateResponse`,
+`LocalRuntimeSnapshot`, `FirstRunReadinessResponse`,
+`DemoAnalysisResponse`). This is **not** the auth object
+export-alias pattern: generated snake_case is not the UI type. No
+new enum aliases beyond keeping handwritten onboarding / first-run
+unions; do not invent extra unions; do not re-export
+`OnboardingPlanResponse` as the UI type. `Override` keeps plan
+collections (`configChanges` / `configItems` / `todos` /
+`todayPlan` / `weekPlan`) required, FeaturePath arrays
+(`primaryPath` / `emphasize` / `defer`) required, apply/state
+`appliedKeys` required, first-run `reasonParams` /
+`suggestedProfile` required, runtime `models` /
+`suggestedProfile` required, closed profile unions, plan / apply /
+state `profile` as `UserOnboardingProfile | Record<string, unknown>`,
+and `configChanges` as `Array<Record<string, string>>`. Public names
+stay `OnboardingPlan` / `OnboardingApplyResult` / `OnboardingState`
+/ `FirstRunReadiness` / `DemoAnalysisPayload`. Runtime constants
+remain (`DEFAULT_ONBOARDING_PROFILE`,
+`ONBOARDING_DRAFT_STORAGE_KEY`, `ONBOARDING_PLAN_STORAGE_KEY`). The
+types module is **not** runtime-empty. Path **200** JSON for GET
+`/api/v1/onboarding/state`, POST `/api/v1/onboarding/plan`, POST
+`/api/v1/onboarding/apply`, GET `/api/v1/onboarding/first-run`, GET
+`/api/v1/onboarding/demo-analysis`, and DELETE
+`/api/v1/onboarding/state` is mutually equivalent to the generated
+`*Response` components, **not** the public Override types. GET
+`requestBody` is `never`. Request objects are out of the public
+types file. Runtime Zod in `api/onboarding.ts` is unchanged.
+`Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
