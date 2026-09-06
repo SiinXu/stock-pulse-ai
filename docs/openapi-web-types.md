@@ -679,6 +679,35 @@ run `executionTaskIds` / `resultRefs` required, and
 in `api/scheduledTasks.ts` is unchanged. `Refs #721`; do not close
 the issue.
 
+`apps/dsa-web/src/types/backtest.ts` now CamelizeKeys-binds the seven
+generated backtest object components (`BacktestRunRequest`,
+`BacktestAppliedConfig`, `BacktestMethodology`, `BacktestRunResponse`,
+`BacktestResultItem`, `BacktestResultsResponse`, `PerformanceMetrics`).
+This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. No new enum aliases; keep handwritten
+`BacktestAnalysisPhase` / `BacktestPhaseFilter` and do not invent extra
+unions. `Override` keeps run `force` / `limit` / non-null `code` and
+dates optional, appliedConfig cost fields (`commissionBps` /
+`slippageBps` / `roundTripCostPct`) optional, methodology defaulted
+fields optional, results `items` required, and the required-without-null
+versus generated optional-nullable mix on the listed result/metrics
+fields. `action` stays `DecisionAction`. `marketPhaseSummary` stays the
+`analysis.ts` `MarketPhaseSummary` (`warnings: string[]` required).
+Named bags (`diagnostics` / `costModel` / `sampleSplit` /
+`adviceBreakdown`) stay `Record<string, unknown>`. Query bags stay
+handwritten (`'all'` is UI-only; do not CamelizeKeys generated
+`analysis_phase`). Path **200** JSON for POST `/api/v1/backtest/run`
+(`run_backtest_api_v1_backtest_run_post`) is mutually equivalent to
+`BacktestRunResponse` (not 201); the request body pins
+`BacktestRunRequest`. GET `/api/v1/backtest/results` 200 JSON is
+mutually equivalent to `BacktestResultsResponse`; GET
+`/api/v1/backtest/performance` and GET
+`/api/v1/backtest/performance/{code}` 200 JSON are mutually equivalent
+to `PerformanceMetrics`; those GET `requestBody` values are `never`.
+Skill-performance GET is out of slice. The types module is
+runtime-empty. Runtime Zod in `api/backtest.ts` is unchanged.
+`Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
