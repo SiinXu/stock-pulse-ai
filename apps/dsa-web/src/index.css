@@ -171,7 +171,6 @@
   --home-surface-button-border-hover: hsl(var(--primary) / 0.32);
   --home-panel-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.04);
   --home-panel-shadow-hover: 0 2px 6px hsl(var(--neutral-black) / 0.06);
-  --home-hero-gradient-start: hsl(var(--primary) / 0.2);
   --home-hero-gradient-mid: hsl(var(--foreground) / 0.06);
   --home-hero-gradient-end: hsl(var(--foreground) / 0.04);
   --home-hero-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.04);
@@ -406,7 +405,6 @@
   --home-surface-button-border-hover: hsl(var(--primary) / 0.28);
   --home-panel-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.25);
   --home-panel-shadow-hover: 0 2px 6px hsl(var(--neutral-black) / 0.35);
-  --home-hero-gradient-start: hsl(var(--primary) / 0.24);
   --home-hero-gradient-mid: hsl(var(--foreground) / 0.1);
   --home-hero-gradient-end: hsl(var(--foreground) / 0.06);
   --home-hero-shadow: 0 1px 2px hsl(var(--neutral-black) / 0.25);

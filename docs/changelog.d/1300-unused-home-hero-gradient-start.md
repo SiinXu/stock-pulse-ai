@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-hero-gradient-start wrapper (Refs #1300).
