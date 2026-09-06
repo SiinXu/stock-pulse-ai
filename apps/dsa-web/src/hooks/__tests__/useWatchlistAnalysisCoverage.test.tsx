@@ -1,12 +1,15 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { historyApi } from '../../api/history';
+import { createAppQueryClient } from '../../query/createAppQueryClient';
+import { createDeferred } from '../../test-utils';
 import type { HistoryListResponse, StockBarItem } from '../../types/analysis';
 import {
   WATCHLIST_HISTORY_LOOKUP_CONCURRENCY,
   useWatchlistAnalysisCoverage,
 } from '../useWatchlistAnalysisCoverage';
-import { createDeferred } from '../../test-utils';
 
 vi.mock('../../api/history', () => ({
   historyApi: {
@@ -69,6 +72,14 @@ function coverageProps(overrides: {
   };
 }
 
+function createWrapper() {
+  const queryClient = createAppQueryClient();
+  function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+  }
+  return Wrapper;
+}
+
 describe('useWatchlistAnalysisCoverage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -79,7 +90,9 @@ describe('useWatchlistAnalysisCoverage', () => {
       historyResponse('AAPL', '2020-01-01T00:00:00Z'),
     );
 
-    renderHook(() => useWatchlistAnalysisCoverage(coverageProps()));
+    renderHook(() => useWatchlistAnalysisCoverage(coverageProps()), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => expect(historyApi.getList).toHaveBeenCalled());
     expect(historyApi.getList).toHaveBeenCalledWith(
@@ -111,7 +124,7 @@ describe('useWatchlistAnalysisCoverage', () => {
       ({ watchlistCodes }: { watchlistCodes: string[] }) => (
         useWatchlistAnalysisCoverage(coverageProps({ watchlistCodes }))
       ),
-      { initialProps: { watchlistCodes: ['AAPL'] } },
+      { initialProps: { watchlistCodes: ['AAPL'] }, wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(historyApi.getList).toHaveBeenCalledTimes(1));
@@ -146,7 +159,7 @@ describe('useWatchlistAnalysisCoverage', () => {
 
     const { result, unmount } = renderHook(() => (
       useWatchlistAnalysisCoverage(coverageProps())
-    ));
+    ), { wrapper: createWrapper() });
 
     await waitFor(() => expect(historyApi.getList).toHaveBeenCalledTimes(1));
     expect(result.current.rows[0]?.isTodayStatusLoading).toBe(true);
@@ -171,7 +184,7 @@ describe('useWatchlistAnalysisCoverage', () => {
       ({ isLoadingStockBar }: { isLoadingStockBar: boolean }) => (
         useWatchlistAnalysisCoverage(coverageProps({ isLoadingStockBar }))
       ),
-      { initialProps: { isLoadingStockBar: false } },
+      { initialProps: { isLoadingStockBar: false }, wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(historyApi.getList).toHaveBeenCalledTimes(1));
@@ -204,7 +217,9 @@ describe('useWatchlistAnalysisCoverage', () => {
       });
     });
 
-    renderHook(() => useWatchlistAnalysisCoverage(coverageProps({ watchlistCodes })));
+    renderHook(() => useWatchlistAnalysisCoverage(coverageProps({ watchlistCodes })), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => (
       expect(historyApi.getList).toHaveBeenCalledTimes(WATCHLIST_HISTORY_LOOKUP_CONCURRENCY)
@@ -226,7 +241,9 @@ describe('useWatchlistAnalysisCoverage', () => {
     const lookup = createDeferred<HistoryListResponse>();
     vi.mocked(historyApi.getList).mockReturnValue(lookup.promise);
 
-    const { result } = renderHook(() => useWatchlistAnalysisCoverage(coverageProps()));
+    const { result } = renderHook(() => useWatchlistAnalysisCoverage(coverageProps()), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => expect(historyApi.getList).toHaveBeenCalled());
     expect(result.current.isTodayStatusBlocked).toBe(true);
@@ -238,7 +255,9 @@ describe('useWatchlistAnalysisCoverage', () => {
   it('marks a failed per-code lookup unknown instead of pending or analyzed', async () => {
     vi.mocked(historyApi.getList).mockRejectedValue(new Error('lookup failed'));
 
-    const { result } = renderHook(() => useWatchlistAnalysisCoverage(coverageProps()));
+    const { result } = renderHook(() => useWatchlistAnalysisCoverage(coverageProps()), {
+      wrapper: createWrapper(),
+    });
 
     await waitFor(() => expect(result.current.rows[0]?.isTodayStatusUnknown).toBe(true));
     expect(result.current.isTodayStatusBlocked).toBe(true);
@@ -254,7 +273,7 @@ describe('useWatchlistAnalysisCoverage', () => {
       ({ stockBarRefreshFailed }: { stockBarRefreshFailed: boolean }) => (
         useWatchlistAnalysisCoverage(coverageProps({ stockBarRefreshFailed }))
       ),
-      { initialProps: { stockBarRefreshFailed: false } },
+      { initialProps: { stockBarRefreshFailed: false }, wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(historyApi.getList).toHaveBeenCalledTimes(1));
@@ -282,7 +301,7 @@ describe('useWatchlistAnalysisCoverage', () => {
       ({ stockBarItems }: { stockBarItems: StockBarItem[] }) => (
         useWatchlistAnalysisCoverage(coverageProps({ watchlistCodes, stockBarItems }))
       ),
-      { initialProps: { stockBarItems: [] as StockBarItem[] } },
+      { initialProps: { stockBarItems: [] as StockBarItem[] }, wrapper: createWrapper() },
     );
 
     await waitFor(() => expect(result.current.pendingCodes).toEqual(['AAPL']));
