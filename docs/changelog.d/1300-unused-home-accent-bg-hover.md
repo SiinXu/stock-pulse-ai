@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-accent-bg-hover wrapper (Refs #1300).
