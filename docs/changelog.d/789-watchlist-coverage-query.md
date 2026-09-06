@@ -1,0 +1,1 @@
+- [Changed] Schedule Research Analysis Workbench watchlist coverage fallback history lookups through TanStack Query (Refs #789).
