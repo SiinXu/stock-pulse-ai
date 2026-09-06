@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings Signal Scorecard public preview GET through TanStack Query (Refs #789).

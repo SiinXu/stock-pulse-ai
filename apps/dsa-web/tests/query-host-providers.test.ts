@@ -105,4 +105,21 @@ describe('Query consumer hosts', () => {
     expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
     expect(barrelSource).not.toContain('useWatchlistAnalysisCoverage');
   });
+
+  it('wraps SignalScorecardPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/SignalScorecardPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/SignalScorecardPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useSignalScorecardQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useSignalScorecardQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings signal scorecard on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useSignalScorecardQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(barrelSource).not.toContain('useSignalScorecardQuery');
+  });
 });
