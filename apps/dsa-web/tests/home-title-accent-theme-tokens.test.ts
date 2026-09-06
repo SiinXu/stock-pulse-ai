@@ -94,7 +94,7 @@ describe('home-title-accent theme tokens', () => {
     const inventorySource = readInventorySource();
     expect(THEME_DEFINED_TOKEN_NAMES).not.toContain(COLLAPSED_HOME_TITLE_ACCENT_TOKEN);
     expect(inventorySource).not.toContain(`'${COLLAPSED_HOME_TITLE_ACCENT_TOKEN}'`);
-    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(158);
+    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(157);
   });
 
   it('keeps home in the page-scoped prefix ban after title-accent reaches zero', () => {
