@@ -130,7 +130,6 @@
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
   --home-accent-bg: hsl(var(--primary) / 0.1);
   --home-accent-border: hsl(var(--primary) / 0.2);
-  --home-accent-border-hover: hsl(var(--primary) / 0.28);
   --home-accent-text: hsl(var(--primary));
   /*
    * Layer 0 — market paint (Theme Contract v1 / #880).
@@ -375,7 +374,6 @@
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
   --home-accent-bg: hsl(var(--primary) / 0.1);
   --home-accent-border: hsl(var(--primary) / 0.22);
-  --home-accent-border-hover: hsl(var(--primary) / 0.34);
   --home-accent-text: hsl(var(--primary));
   --price-red-hsl: 0 88% 64%;
   --price-green-hsl: 149 100% 44%;
