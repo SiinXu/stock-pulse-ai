@@ -1,0 +1,1 @@
+- [Chore] Bind Web local-model camelCase types to generated OpenAPI components (Refs #721).
