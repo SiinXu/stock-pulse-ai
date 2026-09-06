@@ -1,0 +1,1 @@
+- [Chore] Extract DataFetcherManager destructor from base.py (Refs #1067).

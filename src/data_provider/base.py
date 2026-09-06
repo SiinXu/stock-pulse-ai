@@ -456,13 +456,7 @@ class DataFetcherManager:
     # Rebound from manager_parts.tickflow_lifecycle_methods after the class is built.
     _get_tickflow_fetcher = None
     close = None
-
-    def __del__(self) -> None:
-        try:
-            self.close()
-        except Exception:
-            # Best-effort cleanup during interpreter shutdown.
-            pass
+    __del__ = None
 
     # Rebound from manager_parts.belong_board_methods after the class is built.
     _try_scalar_isna = None
@@ -564,9 +558,9 @@ class DataFetcherManager:
 # facade while focused parts own inventory, daily health/cache/execution, realtime,
 # chip, money-flow, fundamental cache/loaders/Config accessor/CN sub-blocks/
 # payload helpers, timeout/retry workers, failed/rejected outcome builders,
-# stock-name, rankings, TickFlow lifecycle, market-overview, belong-board,
-# prefetch, and default-fetcher init. Rebinding preserves method globals and
-# patch seams.
+# stock-name, rankings, TickFlow lifecycle, destructor, market-overview,
+# belong-board, prefetch, and default-fetcher init. Rebinding preserves
+# method globals and patch seams.
 from . import _capability_catalog as _capability_catalog_module  # noqa: E402
 from .manager_parts import daily_cache_methods as _daily_cache_methods_module  # noqa: E402
 from .manager_parts import daily_source_health as _daily_source_health_module  # noqa: E402
@@ -574,6 +568,7 @@ from .manager_parts import (  # noqa: E402
     belong_board_methods as _belong_board_methods_module,
     chip_distribution_methods as _chip_distribution_methods_module,
     daily_provider_execution as _daily_provider_execution_module,
+    del_methods as _del_methods_module,
     fundamental_cache_methods as _fundamental_cache_methods_module,
     fundamental_cn_context_methods as _fundamental_cn_context_methods_module,
     fundamental_context_methods as _fundamental_context_methods_module,
@@ -907,6 +902,20 @@ def _assemble_tickflow_lifecycle_methods_facade(
         )
 
 
+def _assemble_del_methods_facade(
+    del_module=_del_methods_module,
+) -> None:
+    bound_method_names = del_module.bind_del_methods_facade(
+        DataFetcherManager,
+        globals(),
+    )
+    if bound_method_names != del_module.EXPECTED_DEL_METHOD_NAMES:
+        raise ImportError(
+            "Unexpected DataFetcherManager destructor methods: "
+            f"{bound_method_names!r}"
+        )
+
+
 def _assemble_market_overview_methods_facade(
     market_overview_module=_market_overview_methods_module,
 ) -> None:
@@ -976,6 +985,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_outcome=_assemble_fundamental_outcome_methods_facade,
     assemble_rankings=_assemble_rankings_methods_facade,
     assemble_tickflow_lifecycle=_assemble_tickflow_lifecycle_methods_facade,
+    assemble_del=_assemble_del_methods_facade,
     assemble_market_overview=_assemble_market_overview_methods_facade,
     assemble_prefetch=_assemble_prefetch_methods_facade,
     assemble_init_default_fetchers=_assemble_init_default_fetchers_methods_facade,
@@ -1000,6 +1010,7 @@ def _assemble_data_fetcher_manager_facades(
     assemble_fundamental_outcome()
     assemble_rankings()
     assemble_tickflow_lifecycle()
+    assemble_del()
     assemble_market_overview()
     assemble_prefetch()
     assemble_init_default_fetchers()
@@ -1066,6 +1077,9 @@ _rankings_methods_module._install_facade_reload_hook(
 _tickflow_lifecycle_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
+_del_methods_module._install_facade_reload_hook(
+    _assemble_data_fetcher_manager_facades
+)
 _market_overview_methods_module._install_facade_reload_hook(
     _assemble_data_fetcher_manager_facades
 )
@@ -1098,6 +1112,7 @@ del (
     _assemble_fundamental_outcome_methods_facade,
     _assemble_rankings_methods_facade,
     _assemble_tickflow_lifecycle_methods_facade,
+    _assemble_del_methods_facade,
     _assemble_market_overview_methods_facade,
     _assemble_prefetch_methods_facade,
     _assemble_init_default_fetchers_methods_facade,
@@ -1114,6 +1129,7 @@ del (
     _money_flow_methods_module,
     _rankings_methods_module,
     _tickflow_lifecycle_methods_module,
+    _del_methods_module,
     _market_overview_methods_module,
     _prefetch_methods_module,
     _init_default_fetchers_methods_module,

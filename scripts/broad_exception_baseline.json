@@ -136,7 +136,6 @@
     {"path":"src/data_provider/baostock_fetcher.py","scope":"<module>.BaostockFetcher._baostock_session","caught":["Exception"],"digest":"d5def5b41d72591ad9b5caa18a9f17c27c0b899883b1df11a04cce38966f4f47"},
     {"path":"src/data_provider/baostock_fetcher.py","scope":"<module>.BaostockFetcher.get_stock_list","caught":["Exception"],"digest":"f3dafcab7848db64532abd1eb0a6a01edb3b0ae3c0aa344f2234b1bb453e0b87"},
     {"path":"src/data_provider/baostock_fetcher.py","scope":"<module>.BaostockFetcher.get_stock_name","caught":["Exception"],"digest":"4cdfb7135d8ec5c92c216639d097e9d54e1dc4396d504b41a37308b00d41e635"},
-    {"path":"src/data_provider/base.py","scope":"<module>.DataFetcherManager.__del__","caught":["Exception"],"digest":"8fa22283da894c97c4c057eaeedc304e6ec63f85b78a76d8dfb513ff6857cfa7"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"54e154074a8eb279ae7f727eac7dc0091f6db5945bc7ebf749aac0f7625592b3"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"5c35a304ac1a3077a6a708dc35624a7ef75972e468a52eb99235b19af863b905"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"a0af82c117e461dcdd00ecf7e3711f4abfc275825e7b971d4f1fee4f8994edd2"},

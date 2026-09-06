@@ -16,6 +16,7 @@ from unittest.mock import patch
 import pytest
 
 import src.data_provider.base as base
+import src.data_provider.manager_parts.del_methods as del_methods
 import src.data_provider.manager_parts.tickflow_lifecycle_methods as tickflow_lifecycle
 from src.data_provider.base import DataFetcherManager
 
@@ -28,6 +29,13 @@ OWNER_PATH = (
     / "data_provider"
     / "manager_parts"
     / "tickflow_lifecycle_methods.py"
+)
+DEL_OWNER_PATH = (
+    ROOT
+    / "src"
+    / "data_provider"
+    / "manager_parts"
+    / "del_methods.py"
 )
 
 INSTANCE_NAMES = (
@@ -109,10 +117,12 @@ def test_owner_module_exists_for_tickflow_lifecycle_extraction() -> None:
     for name in tickflow_lifecycle.EXPECTED_TICKFLOW_LIFECYCLE_METHOD_NAMES:
         assert f"def {name}(" not in source
         assert f"    {name} = None" in source
-    assert "def __del__(" in source
+    assert "def __del__(" not in source
+    assert "    __del__ = None" in source
     importlib.import_module(
         "src.data_provider.manager_parts.tickflow_lifecycle_methods"
     )
+    importlib.import_module("src.data_provider.manager_parts.del_methods")
 
 
 def test_tickflow_lifecycle_bodies_leave_manager_and_stay_callable_on_facade() -> None:
@@ -127,7 +137,8 @@ def test_tickflow_lifecycle_bodies_leave_manager_and_stay_callable_on_facade() -
     for name in tickflow_lifecycle.EXPECTED_TICKFLOW_LIFECYCLE_METHOD_NAMES:
         assert name not in manager_defs, name
         assert callable(getattr(DataFetcherManager, name)), name
-    assert "__del__" in manager_defs
+    assert "__del__" not in manager_defs
+    assert callable(getattr(DataFetcherManager, "__del__"))
 
 
 def test_tickflow_lifecycle_source_descriptors_share_code_not_identity() -> None:
@@ -152,7 +163,7 @@ def test_tickflow_lifecycle_placeholders_preserve_descriptor_order() -> None:
     assert names.index("_cache_stock_name") < names.index("_get_tickflow_fetcher")
     for left, right in zip(expected, expected[1:]):
         assert names.index(left) < names.index(right)
-    assert names.index("close") < names.index("__del__")
+    assert names.index("__del__") == names.index("close") + 1
 
 
 def test_bind_returns_expected_names_in_class_body_order() -> None:
@@ -461,9 +472,241 @@ def test_close_clears_handles_and_is_best_effort() -> None:
 
 def test_facade_del_still_calls_rebound_close() -> None:
     function = _descriptor_function(vars(DataFetcherManager)["__del__"])
+    source_function = _descriptor_function(vars(del_methods._DelMethods)["__del__"])
     assert inspect.isfunction(function)
+    assert function is not source_function
+    assert function.__code__ is source_function.__code__
+    assert function.__globals__ is vars(base)
     assert function.__module__ == "src.data_provider.base"
     assert function.__qualname__ == "DataFetcherManager.__del__"
     source = inspect.getsource(function)
     assert "self.close()" in source
     assert "except Exception" in source
+    assert "broad-exception: cleanup" in source
+    assert getattr(
+        vars(DataFetcherManager)["__del__"],
+        "_stockpulse_data_validation_wrapper_token",
+        None,
+    ) is None
+
+
+def test_rebound_del_calls_close_and_swallows_exception() -> None:
+    manager = _bare_manager()
+    calls: list[str] = []
+
+    def _close() -> None:
+        calls.append("close")
+        raise RuntimeError("close boom")
+
+    manager.close = _close
+    DataFetcherManager.__del__(manager)
+    assert calls == ["close"]
+
+    calls.clear()
+    manager.close = lambda: calls.append("close")
+    DataFetcherManager.__del__(manager)
+    assert calls == ["close"]
+
+
+def test_del_methods_remain_on_data_fetcher_manager_facade() -> None:
+    for name in del_methods.EXPECTED_DEL_METHOD_NAMES:
+        method = getattr(DataFetcherManager, name)
+        assert callable(method), name
+        function = _descriptor_function(vars(DataFetcherManager)[name])
+        assert function.__module__ == "src.data_provider.base", name
+        assert function.__qualname__ == f"DataFetcherManager.{name}", name
+        assert function.__globals__ is vars(base), name
+
+
+def test_del_signatures_and_descriptor_kinds_are_unchanged() -> None:
+    descriptor = vars(DataFetcherManager)["__del__"]
+    source_descriptor = vars(del_methods._DelMethods)["__del__"]
+    assert not isinstance(descriptor, (staticmethod, classmethod))
+    assert not isinstance(source_descriptor, (staticmethod, classmethod))
+    signature = inspect.signature(getattr(DataFetcherManager, "__del__"))
+    assert list(signature.parameters) == ["self"]
+    for parameter in signature.parameters.values():
+        assert parameter.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
+    assert signature.return_annotation in {None, "None"}
+
+
+def test_generic_dunder_binding_skips_del_so_bind_is_explicit() -> None:
+    dummy = type("DummyDataFetcherManager", (), {})
+    skipped = []
+    for name, descriptor in vars(del_methods._DelMethods).items():
+        if name.startswith("__") or _descriptor_function(descriptor) is None:
+            continue
+        skipped.append(name)
+    assert skipped == []
+    bound = del_methods.bind_del_methods_facade(dummy, vars(base))
+    assert bound == del_methods.EXPECTED_DEL_METHOD_NAMES
+    function = _descriptor_function(vars(dummy)["__del__"])
+    assert function.__module__ == "src.data_provider.base"
+    assert function.__qualname__ == "DummyDataFetcherManager.__del__"
+
+
+def test_del_bind_returns_expected_names() -> None:
+    dummy = type("DummyDataFetcherManager", (), {})
+    bound = del_methods.bind_del_methods_facade(dummy, vars(base))
+    assert bound == del_methods.EXPECTED_DEL_METHOD_NAMES
+
+
+def test_del_assemble_raises_on_expected_name_mismatch() -> None:
+    dummy = type("DummyDataFetcherManager", (), {})
+    extra = lambda self: None  # noqa: E731
+    del_methods._DelMethods._extra_del = extra
+    try:
+        bound = del_methods.bind_del_methods_facade(dummy, vars(base))
+        with pytest.raises(
+            ImportError,
+            match="Unexpected DataFetcherManager destructor methods",
+        ):
+            if bound != del_methods.EXPECTED_DEL_METHOD_NAMES:
+                raise ImportError(
+                    "Unexpected DataFetcherManager destructor methods: "
+                    f"{bound!r}"
+                )
+        assert "_extra_del" in bound
+    finally:
+        delattr(del_methods._DelMethods, "_extra_del")
+
+
+def test_del_owner_module_exists_and_declares_expected_names_only() -> None:
+    assert DEL_OWNER_PATH.is_file()
+    source = BASE_PATH.read_text(encoding="utf-8")
+    assert "del_methods" in source
+    assert "bind_del_methods_facade" in source
+    assert "def __del__(" not in source
+    assert "    __del__ = None" in source
+    tree = ast.parse(DEL_OWNER_PATH.read_text(encoding="utf-8"))
+    defined = {
+        node.name
+        for cls in tree.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "_DelMethods"
+        for node in cls.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert defined == set(del_methods.EXPECTED_DEL_METHOD_NAMES)
+    owner_source = DEL_OWNER_PATH.read_text(encoding="utf-8")
+    assert "broad-exception: cleanup - Best-effort manager close during interpreter shutdown" in owner_source
+
+
+def test_del_owner_has_zero_bare_get_config_and_forbidden_imports() -> None:
+    source = DEL_OWNER_PATH.read_text(encoding="utf-8")
+    tree = ast.parse(source)
+    forbidden_prefixes = (
+        "src.config",
+        "src.core",
+        "src.services",
+        "src.data_provider.base",
+    )
+    assert "from src.config import get_config" not in source
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
+            assert node.func.id != "get_config"
+        if isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+            assert not any(
+                node.module == prefix or node.module.startswith(prefix + ".")
+                for prefix in forbidden_prefixes
+            )
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert not any(
+                    alias.name == prefix or alias.name.startswith(prefix + ".")
+                    for prefix in forbidden_prefixes
+                )
+
+
+def _run_del_reload_contract(body: str) -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                (
+                    "import importlib",
+                    "import src.data_provider.base as base",
+                    "import src.data_provider.manager_parts.del_methods as del_methods",
+                    "",
+                    "names = del_methods.EXPECTED_DEL_METHOD_NAMES",
+                    "",
+                    "def descriptor_function(descriptor):",
+                    "    if isinstance(descriptor, (staticmethod, classmethod)):",
+                    "        descriptor = descriptor.__func__",
+                    "    original = getattr(",
+                    "        descriptor,",
+                    "        '_stockpulse_data_validation_original',",
+                    "        None,",
+                    "    )",
+                    "    return original if original is not None else descriptor",
+                    "",
+                    "def bindings():",
+                    "    source = {}",
+                    "    facade = {}",
+                    "    for name in names:",
+                    "        source[name] = descriptor_function(",
+                    "            vars(del_methods._DelMethods)[name]",
+                    "        )",
+                    "        facade[name] = descriptor_function(",
+                    "            vars(base.DataFetcherManager)[name]",
+                    "        )",
+                    "        assert facade[name] is not source[name]",
+                    "        assert facade[name].__code__ is source[name].__code__",
+                    "        assert facade[name].__globals__ is vars(base)",
+                    "        assert facade[name].__module__ == 'src.data_provider.base'",
+                    "        assert facade[name].__qualname__ == f'DataFetcherManager.{name}'",
+                    "        assert getattr(",
+                    "            vars(base.DataFetcherManager)[name],",
+                    "            '_stockpulse_data_validation_wrapper_token',",
+                    "            None,",
+                    "        ) is None",
+                    "    return source, facade",
+                    "",
+                    body,
+                )
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
+def test_del_owner_reload_rebinds_loaded_facade() -> None:
+    _run_del_reload_contract(
+        """
+old_class = base.DataFetcherManager
+before_source, before_facade = bindings()
+del_methods = importlib.reload(del_methods)
+assert base.DataFetcherManager is old_class
+after_source, after_facade = bindings()
+for name in names:
+    assert after_source[name] is not before_source[name]
+    assert after_facade[name] is not before_facade[name]
+    assert after_facade[name].__code__ is after_source[name].__code__
+"""
+    )
+
+
+def test_del_facade_then_owner_reload_keeps_one_current_contract() -> None:
+    _run_del_reload_contract(
+        """
+old_class = base.DataFetcherManager
+before_source, before_facade = bindings()
+base = importlib.reload(base)
+assert base.DataFetcherManager is not old_class
+after_base_source, after_base_facade = bindings()
+for name in names:
+    assert after_base_source[name] is before_source[name]
+    assert after_base_facade[name] is not before_facade[name]
+reloaded_class = base.DataFetcherManager
+del_methods = importlib.reload(del_methods)
+assert base.DataFetcherManager is reloaded_class
+after_owner_source, after_owner_facade = bindings()
+for name in names:
+    assert after_owner_source[name] is not after_base_source[name]
+    assert after_owner_facade[name] is not after_base_facade[name]
+    assert after_owner_facade[name].__code__ is after_owner_source[name].__code__
+"""
+    )
