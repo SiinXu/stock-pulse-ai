@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings data-provider runtime status GET through TanStack Query (Refs #789).

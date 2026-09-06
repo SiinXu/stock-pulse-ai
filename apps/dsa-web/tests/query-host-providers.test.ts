@@ -122,4 +122,21 @@ describe('Query consumer hosts', () => {
     expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
     expect(barrelSource).not.toContain('useSignalScorecardQuery');
   });
+
+  it('wraps DataProviderRuntimeStatusPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/DataProviderRuntimeStatusPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/DataProviderRuntimeStatusPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useDataProviderRuntimeStatusQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useDataProviderRuntimeStatusQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings data-provider runtime status on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useDataProviderRuntimeStatusQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(barrelSource).not.toContain('useDataProviderRuntimeStatusQuery');
+  });
 });

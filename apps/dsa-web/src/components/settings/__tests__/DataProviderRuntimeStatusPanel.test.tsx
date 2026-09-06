@@ -1,7 +1,9 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import type { DataProviderRuntimeStatusResponse } from '../../../types/systemConfig';
 import { DataProviderRuntimeStatusPanel } from '../DataProviderRuntimeStatusPanel';
 
@@ -12,6 +14,18 @@ vi.mock('../../../api/systemConfig', () => ({
     getDataProviderRuntimeStatus: (...args: unknown[]) => getDataProviderRuntimeStatus(...args),
   },
 }));
+
+function renderPanel(props: { disabled?: boolean } = {}) {
+  const client = createAppQueryClient();
+  return {
+    client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <DataProviderRuntimeStatusPanel {...props} />
+      </QueryClientProvider>,
+    ),
+  };
+}
 
 function okStatus(): DataProviderRuntimeStatusResponse {
   return {
@@ -95,7 +109,7 @@ describe('DataProviderRuntimeStatusPanel', () => {
 
   it('loads and shows primary, fallback, cache, enhancer health, and as-of', async () => {
     getDataProviderRuntimeStatus.mockResolvedValue(okStatus());
-    render(<DataProviderRuntimeStatusPanel />);
+    renderPanel();
 
     expect(screen.getByTestId('data-runtime-loading')).toBeInTheDocument();
 
@@ -124,7 +138,7 @@ describe('DataProviderRuntimeStatusPanel', () => {
       providers: [],
       cache: null,
     });
-    render(<DataProviderRuntimeStatusPanel />);
+    renderPanel();
 
     await waitFor(() => {
       expect(screen.getByTestId('data-runtime-partial')).toBeInTheDocument();
@@ -135,21 +149,27 @@ describe('DataProviderRuntimeStatusPanel', () => {
   });
 
   it('surfaces API errors and keeps empty status (not healthy)', async () => {
-    getDataProviderRuntimeStatus.mockRejectedValue(new Error('network down'));
-    render(<DataProviderRuntimeStatusPanel />);
+    getDataProviderRuntimeStatus.mockRejectedValue(Object.assign(new Error('server'), {
+      response: {
+        status: 500,
+        data: { error: 'internal', message: 'runtime status unavailable' },
+      },
+    }));
+    renderPanel();
 
     await waitFor(() => {
       expect(screen.queryByTestId('data-runtime-loading')).not.toBeInTheDocument();
     });
-    // Fail closed: no healthy projection, no invented market/provider rows.
+    // Fail closed: no healthy projection, no invented market/provider rows, not partial Surface.
     expect(screen.queryByTestId('data-runtime-status')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('data-runtime-partial')).not.toBeInTheDocument();
     expect(screen.queryByTestId('data-runtime-provider-akshare')).not.toBeInTheDocument();
     expect(screen.queryByText(/^健康$|^Healthy$/)).not.toBeInTheDocument();
   });
 
   it('refreshes on demand', async () => {
     getDataProviderRuntimeStatus.mockResolvedValue(okStatus());
-    render(<DataProviderRuntimeStatusPanel />);
+    renderPanel();
 
     await waitFor(() => {
       expect(getDataProviderRuntimeStatus).toHaveBeenCalledTimes(1);
@@ -158,5 +178,17 @@ describe('DataProviderRuntimeStatusPanel', () => {
     await waitFor(() => {
       expect(getDataProviderRuntimeStatus).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('still fetches on mount when disabled and only disables the refresh button', async () => {
+    getDataProviderRuntimeStatus.mockResolvedValue(okStatus());
+    renderPanel({ disabled: true });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('data-runtime-status')).toBeInTheDocument();
+    });
+    expect(getDataProviderRuntimeStatus).toHaveBeenCalledTimes(1);
+    expect(getDataProviderRuntimeStatus.mock.calls[0]).toEqual([]);
+    expect(screen.getByTestId('data-runtime-refresh')).toBeDisabled();
   });
 });
