@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-hero-border wrapper (Refs #1300).
