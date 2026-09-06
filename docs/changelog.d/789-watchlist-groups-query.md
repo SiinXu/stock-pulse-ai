@@ -1,0 +1,1 @@
+- [Changed] Schedule Web Home watchlist groups GET through TanStack Query while preserving revision-CAS mutations (Refs #789).
