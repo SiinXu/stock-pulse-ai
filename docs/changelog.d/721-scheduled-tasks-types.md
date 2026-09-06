@@ -1,0 +1,1 @@
+- [Chore] Bind Web scheduled-task camelCase types to generated OpenAPI components (Refs #721).
