@@ -5,8 +5,8 @@
 Extracted from ``src.data_provider.base`` behind an ADR-006 compatibility
 facade. Prefetch, ``_init_default_fetchers``, timeout slot construction,
 and remaining ``get_config()`` sites stay on the facade. These descriptors
-own ``_get_tickflow_fetcher`` and ``close``. Facade ``__del__`` stays a
-live FunctionDef and still calls rebound ``self.close()``. Config is
+own ``_get_tickflow_fetcher`` and ``close``. Rebound ``__del__`` lives in
+``del_methods`` and still calls rebound ``self.close()``. Config is
 resolved through rebound ``self._get_fundamental_config()`` (not bare
 ``get_config()``). ``DataFetcherManager`` remains the public import and
 patch surface.

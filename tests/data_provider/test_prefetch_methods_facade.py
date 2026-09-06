@@ -136,7 +136,8 @@ def test_owner_module_exists_for_prefetch_extraction() -> None:
     assert "def _init_default_fetchers(" not in source
     assert "    _init_default_fetchers = None" in source
     assert "def __init__(" in source
-    assert "def __del__(" in source
+    assert "def __del__(" not in source
+    assert "    __del__ = None" in source
     importlib.import_module("src.data_provider.manager_parts.prefetch_methods")
     importlib.import_module("src.data_provider.manager_parts.init_default_fetchers_methods")
 
@@ -156,7 +157,8 @@ def test_prefetch_bodies_leave_manager_and_stay_callable_on_facade() -> None:
     assert "_init_default_fetchers" not in manager_defs
     assert callable(getattr(DataFetcherManager, "_init_default_fetchers"))
     assert "__init__" in manager_defs
-    assert "__del__" in manager_defs
+    assert "__del__" not in manager_defs
+    assert callable(getattr(DataFetcherManager, "__del__"))
 
 
 def test_prefetch_source_descriptors_share_code_not_identity() -> None:
