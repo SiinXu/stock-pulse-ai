@@ -60,7 +60,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--gradient-primary',
   '--home-accent-bg',
   '--home-accent-border',
-  '--home-accent-border-hover',
   '--home-accent-text',
   '--home-cool-surface',
   '--home-cool-surface-strong',
@@ -178,18 +177,19 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * `--home-action-*`, and `--home-prose-*` reached zero; leftover title-accent
  * is also collapsed. Unused `--home-loading-ring-track`,
  * `--home-loading-ring-head`, `--home-divider-border`,
- * `--home-state-icon-muted`, `--home-secondary-accent-text`, and
- * `--home-accent-bg-hover` wrappers are
+ * `--home-state-icon-muted`, `--home-secondary-accent-text`,
+ * `--home-accent-bg-hover`, and `--home-accent-border-hover` wrappers are
  * deleted with no replacement.
  * Action/prose families consume Layer 1 plus use-site
  * alpha; title-accent inlines Layer 1 `--foreground` with no alpha.
  * Do not reintroduce those prefixes, the action/prose/title-accent
  * leftovers, or the unused loading-ring, divider, state-icon,
- * secondary-accent-text, or accent-bg-hover wrappers. Remaining leftover
+ * secondary-accent-text, accent-bg-hover, or accent-border-hover wrappers.
+ * Remaining leftover
  * `--home-*` names stay page-scoped. `home` and `settings` stay in
  * `THEME_PAGE_SCOPED_PREFIXES`.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 37;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 36;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [
