@@ -1,15 +1,14 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type React from 'react';
 import { RefreshCw } from 'lucide-react';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { scorecardApi } from '../../api/scorecard';
+import type { ParsedApiError } from '../../api/error';
+import { useSignalScorecardQuery } from '../../hooks/useSignalScorecardQuery';
 import type {
   ScorecardBucket,
   ScorecardMiss,
   ScorecardReturnBand,
-  SignalScorecardResponse,
 } from '../../types/scorecard';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { getUiLocale } from '../../utils/uiLocale';
@@ -64,43 +63,7 @@ const SignalScorecardPanel: React.FC<SignalScorecardPanelProps> = ({
   t,
   language,
 }) => {
-  const [data, setData] = useState<SignalScorecardResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
-
-  const loadScorecard = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    // Preview uses the public route only. When the Settings draft flag is off,
-    // do not call the endpoint (default-off stays quiet and fail-closed).
-    if (!publicEnabled) {
-      setData(null);
-      setLoadError(null);
-      setIsLoading(false);
-      setIsRefreshing(false);
-      return;
-    }
-
-    setLoadError(null);
-    if (mode === 'initial') {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
-    try {
-      const next = await scorecardApi.getPublic();
-      setData(next);
-    } catch (error: unknown) {
-      setData(null);
-      setLoadError(getParsedApiError(error));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [publicEnabled]);
-
-  useEffect(() => {
-    void loadScorecard('initial');
-  }, [loadScorecard]);
+  const { data, isLoading, isRefreshing, loadError, load } = useSignalScorecardQuery(publicEnabled);
 
   const disabledByApi = isDisabledScorecardError(loadError);
   const showDisabled = !publicEnabled || disabledByApi;
@@ -225,7 +188,7 @@ const SignalScorecardPanel: React.FC<SignalScorecardPanelProps> = ({
           size="compact"
           aria-label={t('settings.scorecardRefreshAria')}
           disabled={disabled || isLoading || isRefreshing || !publicEnabled}
-          onClick={() => void loadScorecard('refresh')}
+          onClick={() => void load('refresh')}
         >
           <RefreshCw className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} aria-hidden="true" />
         </IconButton>

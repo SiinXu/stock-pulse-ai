@@ -1,9 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { scorecardApi } from '../../../api/scorecard';
 import { UI_TEXT } from '../../../i18n/uiText';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import SignalScorecardPanel from '../SignalScorecardPanel';
 
 vi.mock('../../../api/scorecard', () => ({
@@ -38,20 +40,34 @@ function mockDisabledScorecard() {
   vi.mocked(scorecardApi.getPublic).mockRejectedValue(error);
 }
 
+function renderPanel(props: {
+  publicEnabled: boolean;
+  minSamples?: number | null;
+  disabled?: boolean;
+}) {
+  const client = createAppQueryClient();
+  return {
+    client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <SignalScorecardPanel
+          minSamples={10}
+          t={t}
+          language="en"
+          {...props}
+        />
+      </QueryClientProvider>,
+    ),
+  };
+}
+
 describe('SignalScorecardPanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('shows the disabled empty state without calling the public route when the flag is off', async () => {
-    render(
-      <SignalScorecardPanel
-        publicEnabled={false}
-        minSamples={10}
-        t={t}
-        language="en"
-      />,
-    );
+    renderPanel({ publicEnabled: false, minSamples: 10 });
 
     const descriptionNote = screen.getByText(UI_TEXT.en['settings.scorecardDescription']);
     expect(descriptionNote).toHaveClass('text-xs', 'text-muted-text');
@@ -67,14 +83,7 @@ describe('SignalScorecardPanel', () => {
   it('shows enable-for-preview empty state when the public route returns 404', async () => {
     mockDisabledScorecard();
 
-    render(
-      <SignalScorecardPanel
-        publicEnabled
-        minSamples={10}
-        t={t}
-        language="en"
-      />,
-    );
+    renderPanel({ publicEnabled: true, minSamples: 10 });
 
     expect(await screen.findByText('Public scorecard is disabled')).toBeInTheDocument();
     expect(scorecardApi.getPublic).toHaveBeenCalledTimes(1);
@@ -115,14 +124,7 @@ describe('SignalScorecardPanel', () => {
       ],
     });
 
-    render(
-      <SignalScorecardPanel
-        publicEnabled
-        minSamples={5}
-        t={t}
-        language="en"
-      />,
-    );
+    renderPanel({ publicEnabled: true, minSamples: 5 });
 
     expect(await screen.findByText('Enabled (public route reachable)')).toBeInTheDocument();
     expect(screen.getByText('58.3%')).toBeInTheDocument();
@@ -134,5 +136,23 @@ describe('SignalScorecardPanel', () => {
     await waitFor(() => {
       expect(scorecardApi.getPublic).toHaveBeenCalledTimes(2);
     });
+  });
+
+  it('fails closed on a hard 500 instead of showing the disabled empty state', async () => {
+    vi.mocked(scorecardApi.getPublic).mockRejectedValue(
+      Object.assign(new Error('scorecard unavailable'), {
+        response: {
+          status: 500,
+          data: { error: 'internal', message: 'scorecard unavailable' },
+        },
+      }),
+    );
+
+    renderPanel({ publicEnabled: true, minSamples: 10 });
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Public scorecard is disabled')).not.toBeInTheDocument();
+    expect(screen.queryByText('58.3%')).not.toBeInTheDocument();
+    expect(scorecardApi.getPublic).toHaveBeenCalledTimes(1);
   });
 });
