@@ -129,7 +129,6 @@
   --page-drawer-overlay-bg: hsl(var(--neutral-black) / 0.6);
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
   --home-accent-bg: hsl(var(--primary) / 0.1);
-  --home-accent-bg-hover: hsl(var(--primary) / 0.16);
   --home-accent-border: hsl(var(--primary) / 0.2);
   --home-accent-border-hover: hsl(var(--primary) / 0.28);
   --home-accent-text: hsl(var(--primary));
@@ -375,7 +374,6 @@
   --page-drawer-overlay-bg: hsl(var(--neutral-black) / 0.6);
   --home-mobile-overlay-bg: var(--page-drawer-overlay-bg);
   --home-accent-bg: hsl(var(--primary) / 0.1);
-  --home-accent-bg-hover: hsl(var(--primary) / 0.18);
   --home-accent-border: hsl(var(--primary) / 0.22);
   --home-accent-border-hover: hsl(var(--primary) / 0.34);
   --home-accent-text: hsl(var(--primary));

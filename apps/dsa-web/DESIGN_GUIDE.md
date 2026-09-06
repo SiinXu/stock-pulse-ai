@@ -213,6 +213,12 @@
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 39 降到 38；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（该名字不在格式债清单中）。非空下界由严格 `> 158` 调整为 `> 157`（已定义清单约 158）。
 - 该名字没有生产或测试消费者，因此亮色 / 暗色计算样式与 theme-pack 行为不变，**不是**视觉改版。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余在用 `--home-*` 族（accent chip / panel / surface / hero / price）不在本切片。
 
+### 2.19 Phase 2 无引用包装删除：Home accent-bg-hover（#1300）
+
+- 无引用定义 `--home-accent-bg-hover` 已删除（`:root` 与 `.dark` 各一份）。未新增页面级或领域 token，也没有调用点需要迁移。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 38 降到 37；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（该名字不在格式债清单中）。非空下界由严格 `> 157` 调整为 `> 156`（已定义清单约 157）。
+- 该名字没有生产或测试消费者，因此亮色 / 暗色计算样式与 theme-pack 行为不变，**不是**视觉改版。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余在用 `--home-*` 族（accent chip / panel / surface / hero / price）以及未使用的 `--home-accent-border-hover` 不在本切片。
+
 ## 3. 字体阶（全部 Geist）
 
 | 用途 | 字号 | 字重 |
