@@ -654,6 +654,31 @@ and `PluginHealth*` are out of slice. Runtime Zod /
 unchanged. `api/plugins.ts` type-only re-exports the same public
 names. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/scheduledTasks.ts` now CamelizeKeys-binds the
+twelve generated scheduled-task object components
+(`ScheduledTaskCreateRequest`, `ScheduledTaskItem`,
+`UnsupportedScheduledTaskItem`, `ScheduledTaskListResponse`,
+`ScheduledTaskRunItem`, `ScheduledTaskRunListResponse`,
+`ScheduledTaskStatusResponse`, `ScheduledTaskTodayItem`,
+`ScheduledTaskTodayResponse`, `DailyScheduleRequest`,
+`StockAnalysisScheduledPayload`, `ResearchScheduledPayload`).
+This is **not** the auth object export-alias pattern: generated
+snake_case is not the UI type. Enum aliases come from generated field
+enums and create `task_type`; do not invent extra unions.
+`ScheduledTaskType` stays `ScheduledTaskSupportedType | string`
+because generated `ScheduledTaskItem.task_type` is `string`.
+`Override` keeps create `enabled` / `maxAttempts` and payload
+`notify` / `reportType` optional, collection `items` required,
+`nextRunAt` / `run` / `latestRun` / `errorCode` required-nullable,
+run `executionTaskIds` / `resultRefs` required, and
+`notificationStatus` as `string | null`. Public
+`ScheduledTaskDefinitionSummary` omits supported-only `payload` /
+`schedule`. Query bags stay handwritten (`enabled?: boolean` without
+`| null`; do not CamelizeKeys them). Create is path **201** JSON =
+`ScheduledTaskItem`. The types module is runtime-empty. Runtime Zod
+in `api/scheduledTasks.ts` is unchanged. `Refs #721`; do not close
+the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
