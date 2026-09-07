@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-hero-gradient-mid wrapper (Refs #1300).
