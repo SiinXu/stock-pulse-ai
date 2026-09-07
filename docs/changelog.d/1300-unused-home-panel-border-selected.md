@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-panel-border-selected wrapper (Refs #1300).
