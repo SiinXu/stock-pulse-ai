@@ -814,6 +814,56 @@ keys stay wire format. The types module is runtime-empty. Runtime
 Zod in `api/alerts.ts` is unchanged. `Refs #721`; do not close the
 issue.
 
+`apps/dsa-web/src/types/decisionSignals.ts` now CamelizeKeys-binds the
+generated DecisionSignal object components (`DecisionSignalItem`,
+`DecisionSignalCreateRequest`, `DecisionSignalListResponse`,
+`DecisionSignalPresentation`, `DecisionSignalMutationResponse`,
+`DecisionSignalStatusUpdateRequest`, `DecisionSignalWarning`,
+`DecisionSignalReassessRequest`, `DecisionSignalReassessResponse`,
+`DecisionSignalPreview`, `DecisionSignalFeedbackItem`,
+`DecisionSignalFeedbackRequest`, `DecisionSignalMemoryFlagItem`,
+`DecisionSignalMemoryFlagRequest`, `DecisionSignalOutcomeItem`,
+`DecisionSignalOutcomeRunRequest`, `DecisionSignalOutcomeRunResponse`,
+`DecisionSignalOutcomeListResponse`, `DecisionSignalOutcomeStatsResponse`,
+`DecisionSignalOutcomeStatsBucket`, `DecisionSignalProfileCalibration`,
+`DecisionSignalProfileCalibrationBucket`,
+`DecisionSignalProfileCalibrationBreakdowns`). This is **not** the auth
+object export-alias pattern: generated snake_case is not the UI type. No
+new enum aliases beyond keeping handwritten decision-signal unions
+(`DecisionSignalSourceType`, `DecisionSignalStatus`,
+`DecisionSignalPlanQuality`, `DecisionSignalHorizon`,
+`DecisionSignalMarket`, outcome/feedback enums, `DecisionProfile`,
+`DecisionSignalPersistStatus`); `action` / `marketPhase` /
+`reportLanguage` stay `analysis.ts` `DecisionAction` /
+`MarketPhaseValue` / `ReportLanguage`. Do not invent extra unions; do
+not re-export generated `DecisionSignalItem` snake names as the UI
+type. `Override` keeps `presentation` optional for rolling upgrades,
+reassess `persist` / feedback `source` / outcome `force`+`limit`
+optional, list `items` / reassess `warnings` / stats `breakdowns`+
+`unableReasons`+`statuses` required, closed unions, opaque JSON on item
+`evidence` / `dataQualitySummary` / `metadata`, named metadata bags on
+create/status/warning/preview/stats, and omits generated-only feedback
+`actorId` / `provenanceSource`. Query bags stay handwritten.
+`DecisionSignalReassessBlockedError` stays public-only (not generated
+`DecisionSignalReassessErrorResponse`). Public names stay
+(`DecisionSignalMemoryFlagUpdateRequest` vs generated
+`DecisionSignalMemoryFlagRequest`, …). Path **200** JSON for GET
+`/api/v1/decision-signals`, POST `/api/v1/decision-signals`, GET
+`/api/v1/decision-signals/latest/{stock_code}`, GET
+`/api/v1/decision-signals/{signal_id}`, PATCH
+`/api/v1/decision-signals/{signal_id}/status`, POST
+`/api/v1/decision-signals/reassess`, GET/PUT
+`/api/v1/decision-signals/{signal_id}/feedback`, GET/PATCH
+`/api/v1/decision-signals/{signal_id}/memory-flag`, GET
+`/api/v1/decision-signals/outcomes`, GET
+`/api/v1/decision-signals/{signal_id}/outcomes`, POST
+`/api/v1/decision-signals/outcomes/run`, and GET
+`/api/v1/decision-signals/outcomes/stats` is mutually equivalent to the
+generated components, **not** the public Override types. GET
+`requestBody` is `never`. Request extra parent keys still TS2353. The
+types module is runtime-empty. Runtime Zod in `api/decisionSignals.ts`
+is unchanged. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
