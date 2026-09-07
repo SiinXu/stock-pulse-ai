@@ -935,6 +935,59 @@ extra parent keys still TS2353. The types module is runtime-empty.
 Runtime Zod in `api/portfolio.ts` is unchanged. `Refs #721`; do not
 close the issue.
 
+`apps/dsa-web/src/types/analysis.ts` now CamelizeKeys-binds the
+generated analysis/task/market-review/report/context-pack object
+components (`AnalyzeRequest`, `TaskAccepted`, `BatchTaskAcceptedItem`,
+`BatchDuplicateTaskItem`, `BatchTaskAcceptedResponse`, `TaskStatus`,
+`TaskInfo`, `TaskListResponse`, `AnalysisResultResponse`,
+`AnalysisReport`, `ReportMeta`, `ReportSummary`, `ReportStrategy`,
+`ReportDetails`, `MarketPhaseSummary`, `MarketReviewRequest`,
+`MarketReviewAccepted`, `AnalysisContextPackOverview` plus nested
+subject/block/counts/metadata/data-quality, `ReportStructuredInsights`
+plus nested phase/signal/synthesis/committee schemas, `HistoryItem`,
+`HistoryListResponse`, `HistorySearchItem`, `HistorySearchResponse`,
+`NewsIntelItem`, `NewsIntelResponse`, `StockBarItem`,
+`StockBarResponse`). This is **not** the auth object export-alias
+pattern: generated snake_case is not the UI type. Public UI name
+`AnalysisRequest` stays; do not re-export generated `AnalyzeRequest`.
+No new enum aliases beyond keeping handwritten unions
+(`StockReportType`, `ReportType`, `AnalysisPhase`, `TaskLifecycleStatus`,
+`ReportLanguage`, `MarketPhaseValue`, `DecisionAction`,
+`SentimentLabel`, `MarketReviewRegion`, context-pack block status,
+market-structure / strata / run-diagnostic unions). Do not invent extra
+unions; do not re-export `TaskStatusEnum`. `Override` keeps
+generated-default AnalyzeRequest `analysisPhase` / `asyncMode` /
+`forceRefresh` / `notify` / `reportType` optional, TaskAccepted /
+BatchItem / TaskInfo `analysisPhase` / `messageCode` optional,
+MarketReviewRequest `sendNotification` optional, MarketPhaseSummary
+`warnings` required, ReportMeta `stockName` / `createdAt` /
+`reportType` required, BatchTaskAcceptedResponse `accepted` /
+`duplicates` required, context-pack overview `warnings` / `blocks` /
+`metadata` required, closed TaskAccepted status extract
+`'pending' | 'processing'`, MarketReviewAccepted `status: 'accepted'`,
+and named `messageParams` bags. Generated-only AnalyzeRequest fields
+`useMemory` / `enableDebate` / `debateMaxRounds` are omitted (fresh
+`useMemory` stays TS2353). Public `AnalysisResult.report` stays
+`AnalysisReport`; generated `AnalysisResultResponse.report` is
+`unknown`. Handwritten remain: market-structure, market-review payload,
+report-strata, run-diagnostics, `DuplicateTaskError`, `AnalyzeResponse`
+union, query bags, and `ApiError`. Runtime `getSentimentLabel` /
+`getSentimentColor` remain; the types module is **not** runtime-empty.
+Path **200** JSON for POST `/api/v1/analysis/analyze` is mutually
+equivalent to generated `AnalysisResultResponse` (**not** public
+`AnalysisResult`); path **202** JSON is generated `TaskAccepted` or
+`BatchTaskAcceptedResponse` (not 201). POST
+`/api/v1/analysis/market-review` is path **202** JSON = generated
+`MarketReviewAccepted` (no 200; not 201). GET
+`/api/v1/analysis/status/{task_id}` and POST
+`/api/v1/analysis/tasks/{task_id}/cancel` 200 JSON are mutually
+equivalent to generated `TaskStatus`. GET `/api/v1/analysis/tasks` 200
+JSON is mutually equivalent to generated `TaskListResponse`. GET
+`requestBody` is `never`. SSE stream, GET `.../flow`, evidence-pack /
+evidence-chain exporters, and AlphaSift/discover task paths are out of
+slice. Request extra parent keys still TS2353. Runtime Zod in
+`api/analysis.ts` is unchanged. `Refs #721`; do not close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),

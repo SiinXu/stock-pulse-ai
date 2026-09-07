@@ -1,0 +1,1 @@
+- [Chore] Bind Web analysis camelCase types to generated OpenAPI components (Refs #721).
