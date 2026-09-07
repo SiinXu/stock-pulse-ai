@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-hero-gradient-end wrapper (Refs #1300).

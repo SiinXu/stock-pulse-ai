@@ -764,7 +764,7 @@ export function changeColorToCss(color: ChangeColor): string {
       // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
       // portfolio/chat/settings/home-action/home-prose) shrank the defined
       // inventory below 170.
-      expect(uniqueNames.length).toBeGreaterThan(152);
+      expect(uniqueNames.length).toBeGreaterThan(151);
       for (const token of uniqueNames) {
         expect(TOKEN_FORMATS, token).toContain(declaredTokenFormat(token));
       }
