@@ -259,6 +259,13 @@ describe('theme token freeze guard', () => {
     expect(THEME_DEFINED_TOKEN_NAMES, unusedHomePanelGradientStartWrapper).not.toContain(unusedHomePanelGradientStartWrapper);
   });
 
+  it('keeps unused Home panel-gradient-mid wrapper absent from definitions and inventory', () => {
+    const unusedHomePanelGradientMidWrapper = '--home-panel-gradient-mid';
+    const definedNames = uniqueDefinedCustomPropertyNames(indexCss);
+    expect(definedNames, unusedHomePanelGradientMidWrapper).not.toContain(unusedHomePanelGradientMidWrapper);
+    expect(THEME_DEFINED_TOKEN_NAMES, unusedHomePanelGradientMidWrapper).not.toContain(unusedHomePanelGradientMidWrapper);
+  });
+
   it('accounts for light/dark, price-direction, charts, aliases, and desktop chrome', () => {
     expect(indexCss).toMatch(/:root\s*\{/);
     expect(indexCss).toMatch(/^\.dark\s*\{/m);
@@ -422,7 +429,7 @@ describe('theme token freeze guard', () => {
     // Non-vacuity floor only. Phase 2 domain collapses (login/backtest/
     // portfolio/chat/settings/home-action/home-prose) shrank the defined
     // inventory below 170.
-    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(149);
+    expect(THEME_DEFINED_TOKEN_NAMES.length).toBeGreaterThan(148);
     expect(() => {
       if (THEME_DEFINED_TOKEN_NAMES.length === 0) {
         throw new Error('theme token inventory is empty; refusing to pass a vacuous freeze.');
