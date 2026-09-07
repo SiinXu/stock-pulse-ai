@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-panel-gradient-start wrapper (Refs #1300).
