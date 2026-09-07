@@ -777,6 +777,43 @@ types module is **not** runtime-empty. Path **200** JSON for GET
 types file. Runtime Zod in `api/onboarding.ts` is unchanged.
 `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/alerts.ts` now CamelizeKeys-binds the
+generated alerts object components (`AlertRuleItem`,
+`AlertRuleCreateRequest`, `AlertRuleListResponse`,
+`AlertDeleteResponse`, `AlertRuleTestResponse`,
+`AlertRuleTargetResult`, `AlertTriggerItem`,
+`AlertTriggerListResponse`, `AlertNotificationItem`,
+`AlertNotificationListResponse`). This is **not** the auth object
+export-alias pattern: generated snake_case is not the UI type. No
+new enum aliases beyond keeping handwritten alert unions
+(`AlertType`, `AlertSeverity`, `AlertTargetScope`, `AlertDirection`,
+`PortfolioStopLossMode`, `MarketRegion`, `MarketLightStatus`,
+`AlertDryRunStatus`, `AlertTriggerStatus`); do not invent extra
+unions; do not re-export generated `AlertRuleItem` snake names as
+the UI type. `Override` keeps list `items` required on rule /
+trigger / notification collections, create `enabled` / `targetScope`
+/ `name` optional without null, test count fields optional, closed
+`AlertType` and related unions, `parameters` as the closed named
+`AlertRuleParameters` interface, cooldown / notification as named
+bags (`cooldown_seconds` stays a wire inner key), and trigger nested
+types from `analysis.ts` / `eventAlerts.ts` plus the public inline
+`suggestedAction` / `autoAnalysis` shapes. Query bags stay
+handwritten. Public names stay (`AlertRuleItem`,
+`AlertRuleCreateRequest`, `AlertRuleListResponse`, …). PATCH body is
+generated `AlertRuleUpdateRequest` (no public export). Compile-nl is
+out of this slice. Path **200** JSON for GET `/api/v1/alerts/rules`,
+POST `/api/v1/alerts/rules`, GET `/api/v1/alerts/rules/{rule_id}`,
+PATCH `/api/v1/alerts/rules/{rule_id}`, DELETE
+`/api/v1/alerts/rules/{rule_id}`, POST `.../enable`, POST
+`.../disable`, POST `.../test`, GET `/api/v1/alerts/triggers`, and
+GET `/api/v1/alerts/notifications` is mutually equivalent to the
+generated components, **not** the public Override types (except 1:1
+`AlertDeleteResponse` / `AlertNotificationItem`). GET `requestBody`
+is `never`. Request extra parent keys still TS2353. Cooldown inner
+keys stay wire format. The types module is runtime-empty. Runtime
+Zod in `api/alerts.ts` is unchanged. `Refs #721`; do not close the
+issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
