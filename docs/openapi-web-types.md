@@ -864,6 +864,77 @@ generated components, **not** the public Override types. GET
 types module is runtime-empty. Runtime Zod in `api/decisionSignals.ts`
 is unchanged. `Refs #721`; do not close the issue.
 
+`apps/dsa-web/src/types/portfolio.ts` now CamelizeKeys-binds the
+generated Portfolio account/snapshot/trade/import/risk/paper-quality
+object components (`PortfolioAccountItem`,
+`PortfolioAccountCreateRequest`, `PortfolioAccountListResponse`,
+`PortfolioAccountUpdateRequest`, `PortfolioAccountSnapshot`,
+`PortfolioSnapshotResponse`, `PortfolioPositionItem`,
+`PortfolioPositionAnalysisRequest`, `PortfolioTradeCreateRequest`,
+`PortfolioTradeListItem`, `PortfolioTradeListResponse`,
+`PortfolioCashLedgerCreateRequest`, `PortfolioCashLedgerListItem`,
+`PortfolioCashLedgerListResponse`,
+`PortfolioCorporateActionCreateRequest`,
+`PortfolioCorporateActionListItem`,
+`PortfolioCorporateActionListResponse`, `PortfolioEventCreatedResponse`,
+`PortfolioDeleteResponse`, `PortfolioImportTradeItem`,
+`PortfolioImportFailedRow`, `PortfolioImportParseResponse`,
+`PortfolioFutuImportPreviewResponse`, `PortfolioFutuImportRequest`,
+`PortfolioImportCommitResponse`, `PortfolioImportBrokerItem`,
+`PortfolioImportBrokerListResponse`, `PortfolioFxRefreshResponse`,
+`PortfolioRiskResponse`, `PortfolioDecisionSignalRiskBlock`,
+`PortfolioDecisionSignalRiskItem`, `PaperTradeCreateRequest`,
+`PaperTradeCreatedResponse`, `PaperDecisionQualityResponse`,
+`PaperDecisionQualityItem`, `PaperDecisionQualityDimension`,
+`PaperDecisionQualityReason`, `PaperDecisionQualityAggregate`). This is
+**not** the auth object export-alias pattern: generated snake_case is
+not the UI type. No new enum aliases beyond keeping handwritten
+portfolio unions (`PortfolioCostMethod`, `PortfolioSide`,
+`PortfolioAccountType`, `PortfolioCashDirection`,
+`PortfolioCorporateActionType`, `PortfolioImportSource`). Do not invent
+extra unions; do not re-export generated `PortfolioAccountItem` snake
+names as the UI type. `Override` keeps generated-default `accountType`
+/ trade `fee`+`tax` / position-snapshot `dataQuality` /
+`priceAvailable` / `priceStale` / `priceSource` optional, list
+`accounts` / snapshot `accounts` / account-snapshot `positions` / trade
+`items` / import `records`+`errors` / broker `brokers` /
+paper-quality `items` / decision-signal risk `items` required, import
+`failedRows` optional as on today's public surface, trade and
+paper-trade `operationId` required, closed unions, named `actions`
+integer bag, and closed named risk `concentration` / `drawdown` /
+`stopLoss` / `sectorConcentration` objects even though generated nested
+blocks are open bags. `signal` stays `Pick<DecisionSignalItem,
+'action'> & Partial<DecisionSignalItem>` of the already-bound
+`decisionSignals.ts` item; do not replace it with the generated open
+bag. Handwritten concentration/drawdown/stop-loss item interfaces stay
+(no dedicated generated components). Health / insights / risk-metrics /
+rebalancing / stress stay in their already-bound sibling type files and
+are out of this slice. POST positions analysis 202 `TaskAccepted` stays
+on `analysis.ts`. Query bags that are not named OpenAPI components stay
+handwritten in the API client. Path **200** JSON for GET/POST
+`/api/v1/portfolio/accounts`, PUT
+`/api/v1/portfolio/accounts/{account_id}`, GET
+`/api/v1/portfolio/snapshot`, GET/POST `/api/v1/portfolio/trades`,
+DELETE `/api/v1/portfolio/trades/{trade_id}`, GET/POST
+`/api/v1/portfolio/cash-ledger`, DELETE
+`/api/v1/portfolio/cash-ledger/{entry_id}`, GET/POST
+`/api/v1/portfolio/corporate-actions`, DELETE
+`/api/v1/portfolio/corporate-actions/{action_id}`, POST
+`/api/v1/portfolio/fx/refresh`, GET `/api/v1/portfolio/risk`, GET
+`/api/v1/portfolio/imports/csv/brokers`, POST
+`/api/v1/portfolio/imports/csv/parse`, POST
+`/api/v1/portfolio/imports/csv/commit`, POST
+`/api/v1/portfolio/imports/futu`, POST
+`/api/v1/portfolio/imports/futu/preview`, POST
+`/api/v1/portfolio/accounts/{account_id}/paper-trades`, and GET
+`/api/v1/portfolio/accounts/{account_id}/paper-decision-quality` is
+mutually equivalent to the generated components, **not** the public
+Override types (except 1:1 `PortfolioDeleteResponse` /
+`PortfolioEventCreatedResponse`). GET `requestBody` is `never`. Request
+extra parent keys still TS2353. The types module is runtime-empty.
+Runtime Zod in `api/portfolio.ts` is unchanged. `Refs #721`; do not
+close the issue.
+
 Keep issue #721 open until residual intentional skips are documented and
 owners accept residual risk: SSE/streaming, binary blob downloads, checker
 `[review]` allowlist (`backtestRunOutcome`, evidence/research pack exporters),
