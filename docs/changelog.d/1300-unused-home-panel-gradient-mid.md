@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-panel-gradient-mid wrapper (Refs #1300).

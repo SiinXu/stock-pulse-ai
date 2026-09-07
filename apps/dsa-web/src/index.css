@@ -152,7 +152,6 @@
   --report-strategy-take: hsl(38 100% 52%);
   --home-panel-border: hsl(var(--border));
   --home-panel-border-hover: hsl(var(--primary) / 0.3);
-  --home-panel-gradient-mid: hsl(var(--foreground) / 0.05);
   --home-panel-gradient-end: hsl(var(--foreground) / 0.04);
   --home-panel-selected-shadow:
     0 0 0 1px hsl(var(--primary) / 0.1),
@@ -382,7 +381,6 @@
   --report-strategy-take: hsl(38 100% 58%);
   --home-panel-border: hsl(var(--foreground) / 0.1);
   --home-panel-border-hover: hsl(var(--primary) / 0.34);
-  --home-panel-gradient-mid: hsl(var(--foreground) / 0.1);
   --home-panel-gradient-end: hsl(var(--foreground) / 0.06);
   --home-panel-selected-shadow:
     0 0 0 1px hsl(var(--primary) / 0.14),
