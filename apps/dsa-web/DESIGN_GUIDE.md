@@ -277,7 +277,13 @@
 
 - 无引用定义 `--home-history-item-bg` 已删除（`:root` 与 `.dark` 各一份）。未新增页面级或领域 token，也没有调用点需要迁移。
 - `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 28 降到 27；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（该名字不在格式债清单中）。非空下界由严格 `> 147` 调整为 `> 146`（已定义清单约 147）。
-- 该名字没有生产或测试消费者，因此亮色 / 暗色计算样式与 theme-pack 行为不变，**不是**视觉改版。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余在用 `--home-*` 族（accent chip / panel / surface / price）、在用 class `.home-report-hero`、未使用的 `--home-hero-shadow`，以及未使用的 `--home-history-item-hover-bg` / `--home-history-item-selected-bg` / rail leftovers 不在本切片。`.home-report-hero` 是在用 class，但 `--home-hero-*` 自定义属性本身仍是无引用 leftover，本切片不把该类当作在用 `--home-hero-*` token 族。
+- 该名字没有生产或测试消费者，因此亮色 / 暗色计算样式与 theme-pack 行为不变，**不是**视觉改版。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余在用 `--home-*` 族（accent chip / panel / surface / price）、在用 class `.home-report-hero`、未使用的 `--home-hero-shadow`，以及未使用的 `--home-history-item-hover-bg` / `--home-history-item-selected-bg` / rail leftovers 不在本切片。`.home-report-hero` 是在用 class，但 `--home-hero-*` 自定义属性本身仍是无引用 leftover，本切片不把该类当作在用 `--home-hero-*` token 族。后续落地切片删除了 `--home-rail-border`；未删除 `--home-rail-bg` / `--home-rail-shadow` / `--home-hero-shadow` / history hover-selected。
+
+### 2.30 Phase 2 无引用包装删除：Home rail-border（#1300）
+
+- 无引用定义 `--home-rail-border` 已删除（`:root` 与 `.dark` 各一份）。未新增页面级或领域 token，也没有调用点需要迁移。
+- `THEME_PAGE_SCOPED_TOKEN_CEILING` 由 27 降到 26；`themeContractGuard.test.ts` 的 `TOKEN_FORMAT_DEBT` 保持 12（该名字不在格式债清单中）。非空下界由严格 `> 146` 调整为 `> 145`（已定义清单约 146）。
+- 该名字没有生产或测试消费者，因此亮色 / 暗色计算样式与 theme-pack 行为不变，**不是**视觉改版。Layer 0 涨跌色与 `--home-price-up/down` 别名不变。其余在用 `--home-*` 族（accent chip / panel / surface / price）、在用 class `.home-report-hero`、在用 `--home-rail-bg`（`.home-rail-card`）、未使用的 `--home-hero-shadow` / `--home-rail-shadow`，以及未使用的 `--home-history-item-hover-bg` / `--home-history-item-selected-bg` 不在本切片。`.home-rail-card` 是在用 class，但只读取 `--home-rail-bg`，本切片不把该类当作在用 `--home-rail-border` token 族。
 
 ## 3. 字体阶（全部 Geist）
 

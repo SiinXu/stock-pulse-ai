@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-rail-border wrapper (Refs #1300).
