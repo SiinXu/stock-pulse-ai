@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings scheduler status GET through TanStack Query (Refs #789).
