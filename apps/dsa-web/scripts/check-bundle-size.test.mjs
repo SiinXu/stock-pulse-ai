@@ -727,8 +727,8 @@ describe('first-paint entry budget (Refs #883)', () => {
   it('reseeds locale-de and locale-ko gzip budgets after Local Only copy honesty (Refs #218)', () => {
     const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
     const reseeds = {
-      'locale-de': 157743,
-      'locale-ko': 157613,
+      'locale-de': 158166,
+      'locale-ko': 158038,
     };
 
     for (const [id, measuredGzipBytes] of Object.entries(reseeds)) {
@@ -758,8 +758,8 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(family).toEqual(expect.objectContaining({
       id: 'locale-zh-TW-family',
       match: ['assets/zh-TW-*.js'],
-      measuredGzipBytes: 158702,
-      maxGzipBytes: 159102,
+      measuredGzipBytes: 159181,
+      maxGzipBytes: 159581,
     }));
     expect(family.maxGzipBytes).toBe(family.measuredGzipBytes + 400);
     expect(family.maxGzipBytes).toBeGreaterThan(rule.maxGzipBytes);
@@ -770,25 +770,25 @@ describe('first-paint entry budget (Refs #883)', () => {
   it('reseeds only overflowed locale gzip budgets after reportRunFeedback keys (Refs #1105)', () => {
     const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
     const affectedAssets = {
-      'locale-fr': { match: 'assets/fr-*.js', measuredGzipBytes: 157363 },
+      'locale-fr': { match: 'assets/fr-*.js', measuredGzipBytes: 157837 },
       'locale-es': { match: 'assets/es-*.js', measuredGzipBytes: 153001 },
-      'locale-id': { match: 'assets/id-*.js', measuredGzipBytes: 143073 },
-      'locale-ms': { match: 'assets/ms-*.js', measuredGzipBytes: 142875 },
+      'locale-id': { match: 'assets/id-*.js', measuredGzipBytes: 143488 },
+      'locale-ms': { match: 'assets/ms-*.js', measuredGzipBytes: 143333 },
     };
     const affectedFamilies = {
-      'locale-ja-family': { match: ['assets/ja-*.js'], measuredGzipBytes: 171571 },
-      'locale-de-family': { match: ['assets/de-*.js'], measuredGzipBytes: 163842 },
-      'locale-ko-family': { match: ['assets/ko-*.js'], measuredGzipBytes: 164166 },
-      'locale-fr-family': { match: ['assets/fr-*.js'], measuredGzipBytes: 163520 },
+      'locale-ja-family': { match: ['assets/ja-*.js'], measuredGzipBytes: 172048 },
+      'locale-de-family': { match: ['assets/de-*.js'], measuredGzipBytes: 164298 },
+      'locale-ko-family': { match: ['assets/ko-*.js'], measuredGzipBytes: 164679 },
+      'locale-fr-family': { match: ['assets/fr-*.js'], measuredGzipBytes: 163994 },
       'locale-es-family': { match: ['assets/es-*.js'], measuredGzipBytes: 158907 },
-      'locale-zh-TW-family': { match: ['assets/zh-TW-*.js'], measuredGzipBytes: 158702 },
-      'locale-ms-family': { match: ['assets/ms-*.js'], measuredGzipBytes: 148470 },
-      'locale-id-family': { match: ['assets/id-*.js'], measuredGzipBytes: 148662 },
+      'locale-zh-TW-family': { match: ['assets/zh-TW-*.js'], measuredGzipBytes: 159181 },
+      'locale-ms-family': { match: ['assets/ms-*.js'], measuredGzipBytes: 148928 },
+      'locale-id-family': { match: ['assets/id-*.js'], measuredGzipBytes: 149077 },
     };
     const unchangedAssetCaps = {
       'js-entry': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
       'ui-text-en': { measuredGzipBytes: 34893, maxGzipBytes: 38383 },
-      'locale-ja': { measuredGzipBytes: 164341, maxGzipBytes: 164741 },
+      'locale-ja': { measuredGzipBytes: 164979, maxGzipBytes: 165379 },
       'locale-extra': { measuredGzipBytes: 3087, maxGzipBytes: 3487 },
       'vendor-charts': { measuredGzipBytes: 111229, maxGzipBytes: 122352 },
       'vendor-react': { measuredGzipBytes: 60605, maxGzipBytes: 66666 },
@@ -798,7 +798,7 @@ describe('first-paint entry budget (Refs #883)', () => {
       'vendor-icons': { measuredGzipBytes: 10461, maxGzipBytes: 10861 },
       'vendor-misc': { measuredGzipBytes: 78692, maxGzipBytes: 86562 },
       'RunFlowPanel': { measuredGzipBytes: 73118, maxGzipBytes: 73318 },
-      'SettingsPage': { measuredGzipBytes: 298423, maxGzipBytes: 298823 },
+      'SettingsPage': { measuredGzipBytes: 299219, maxGzipBytes: 299619 },
       'PortfolioRiskMetricsPanel': { measuredGzipBytes: 9685, maxGzipBytes: 10654 },
       'PortfolioPage': { measuredGzipBytes: 26401, maxGzipBytes: 26601 },
       'DecisionSignalsPage': { measuredGzipBytes: 67448, maxGzipBytes: 67848 },
@@ -821,7 +821,7 @@ describe('first-paint entry budget (Refs #883)', () => {
       'vendor-router-family': { measuredGzipBytes: 30183, maxGzipBytes: 33202 },
       'vendor-icons-family': { measuredGzipBytes: 10753, maxGzipBytes: 10861 },
       'RunFlowPanel-family': { measuredGzipBytes: 66718, maxGzipBytes: 73318 },
-      'SettingsPage-family': { measuredGzipBytes: 298423, maxGzipBytes: 298823 },
+      'SettingsPage-family': { measuredGzipBytes: 299219, maxGzipBytes: 299619 },
       'PortfolioRiskMetricsPanel-family': { measuredGzipBytes: 8167, maxGzipBytes: 10654 },
       'PortfolioPage-family': { measuredGzipBytes: 24381, maxGzipBytes: 26601 },
       'DecisionSignalsPage-family': { measuredGzipBytes: 67448, maxGzipBytes: 67848 },
@@ -832,7 +832,7 @@ describe('first-paint entry budget (Refs #883)', () => {
       'BacktestPage-family': { measuredGzipBytes: 15216, maxGzipBytes: 15368 },
       'css-entry-family': { measuredGzipBytes: 26954, maxGzipBytes: 28791 },
       'css-vendor-family': { measuredGzipBytes: 523, maxGzipBytes: 576 },
-      'settings-route': { measuredGzipBytes: 340988, maxGzipBytes: 341388 },
+      'settings-route': { measuredGzipBytes: 341784, maxGzipBytes: 342184 },
       'portfolio-route': { measuredGzipBytes: 93896, maxGzipBytes: 94296 },
       'screening-route': { measuredGzipBytes: 31626, maxGzipBytes: 32026 },
       'home-watchlist-route': { measuredGzipBytes: 21293, maxGzipBytes: 21693 },
@@ -981,5 +981,110 @@ describe('first-paint entry budget (Refs #883)', () => {
     expect(family.note).toContain('Refs #789');
     expect(family.maxGzipBytes).toBe(family.measuredGzipBytes + 400);
     expect(family.maxGzipBytes).toBe(rule.maxGzipBytes);
+  });
+
+  it('reseeds only overflowing SettingsPage/locale/settings-route gzip budgets after AGENT_STAGE_PARALLEL_ENABLED Settings copy (Refs #1290)', () => {
+    const budget = JSON.parse(readFileSync(budgetPath, 'utf8'));
+    const hostedSha = '1bf8470e81b0127979530152a1062f62ed642fb3';
+    const hostedRun = '34230723805';
+    const overflowingAssets = {
+      SettingsPage: { match: 'assets/SettingsPage-*.js', measuredGzipBytes: 299219 },
+      'locale-ja': { match: 'assets/ja-*.js', measuredGzipBytes: 164979 },
+      'locale-de': { match: 'assets/de-*.js', measuredGzipBytes: 158166 },
+      'locale-ko': { match: 'assets/ko-*.js', measuredGzipBytes: 158038 },
+      'locale-fr': { match: 'assets/fr-*.js', measuredGzipBytes: 157837 },
+      'locale-id': { match: 'assets/id-*.js', measuredGzipBytes: 143488 },
+      'locale-ms': { match: 'assets/ms-*.js', measuredGzipBytes: 143333 },
+    };
+    const overflowingFamilies = {
+      'SettingsPage-family': { match: ['assets/SettingsPage-*.js'], measuredGzipBytes: 299219 },
+      'settings-route': {
+        match: [
+          'assets/SettingsPage-*.js',
+          'assets/settings-*.js',
+          'assets/settingsPage-*.js',
+          'assets/settingsTranslations-*.js',
+        ],
+        measuredGzipBytes: 341784,
+      },
+      'locale-ja-family': { match: ['assets/ja-*.js'], measuredGzipBytes: 172048 },
+      'locale-de-family': { match: ['assets/de-*.js'], measuredGzipBytes: 164298 },
+      'locale-ko-family': { match: ['assets/ko-*.js'], measuredGzipBytes: 164679 },
+      'locale-fr-family': { match: ['assets/fr-*.js'], measuredGzipBytes: 163994 },
+      'locale-zh-TW-family': { match: ['assets/zh-TW-*.js'], measuredGzipBytes: 159181 },
+      'locale-ms-family': { match: ['assets/ms-*.js'], measuredGzipBytes: 148928 },
+      'locale-id-family': { match: ['assets/id-*.js'], measuredGzipBytes: 149077 },
+    };
+    const unchangedAssets = {
+      'locale-es': { measuredGzipBytes: 153001, maxGzipBytes: 153401 },
+      'locale-zh-TW': { measuredGzipBytes: 150083, maxGzipBytes: 150483 },
+      'locale-extra': { measuredGzipBytes: 3087, maxGzipBytes: 3487 },
+      'js-entry': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
+    };
+    const unchangedFamilies = {
+      'locale-es-family': { measuredGzipBytes: 158907, maxGzipBytes: 159307 },
+      'locale-extra-family': { measuredGzipBytes: 22228, maxGzipBytes: 22628 },
+      'js-entry-family': { measuredGzipBytes: 148147, maxGzipBytes: 155555 },
+    };
+
+    expect(budget.baselineNote).toContain('Refs #1290');
+    expect(budget.baselineNote).toContain(hostedSha);
+    expect(budget.baselineNote).toContain(hostedRun);
+    expect(budget.baselineNote).toContain('400 B');
+
+    for (const [id, expected] of Object.entries(overflowingAssets)) {
+      const rule = budget.rules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        match: expected.match,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.measuredGzipBytes + 400,
+      }));
+      expect(rule.note).toContain(hostedSha);
+      expect(rule.note).toContain(hostedRun);
+      expect(rule.note).toContain('Refs #1290');
+    }
+
+    for (const [id, expected] of Object.entries(overflowingFamilies)) {
+      const rule = budget.aggregateRules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        match: expected.match,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.measuredGzipBytes + 400,
+      }));
+      expect(rule.note).toContain(hostedSha);
+      expect(rule.note).toContain(hostedRun);
+      expect(rule.note).toContain('Refs #1290');
+    }
+
+    const settingsPage = budget.rules.find((entry) => entry.id === 'SettingsPage');
+    const settingsPageFamily = budget.aggregateRules.find((entry) => entry.id === 'SettingsPage-family');
+    expect(settingsPageFamily.maxGzipBytes).toBe(settingsPage.maxGzipBytes);
+
+    for (const localeId of ['locale-ja', 'locale-de', 'locale-ko', 'locale-fr', 'locale-id', 'locale-ms', 'locale-zh-TW']) {
+      const rule = budget.rules.find((entry) => entry.id === localeId);
+      const family = budget.aggregateRules.find((entry) => entry.id === `${localeId}-family`);
+      expect(family.maxGzipBytes).toBe(family.measuredGzipBytes + 400);
+      expect(family.maxGzipBytes).toBeGreaterThan(rule.maxGzipBytes);
+    }
+
+    for (const [id, expected] of Object.entries(unchangedAssets)) {
+      const rule = budget.rules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.maxGzipBytes,
+      }));
+    }
+
+    for (const [id, expected] of Object.entries(unchangedFamilies)) {
+      const rule = budget.aggregateRules.find((entry) => entry.id === id);
+      expect(rule, id).toEqual(expect.objectContaining({
+        id,
+        measuredGzipBytes: expected.measuredGzipBytes,
+        maxGzipBytes: expected.maxGzipBytes,
+      }));
+    }
   });
 });

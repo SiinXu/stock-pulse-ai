@@ -4,7 +4,7 @@
   "outDir": "../../static",
   "gzipLevel": 9,
   "measuredAt": "2026-08-25",
-  "baselineNote": "Already-split aggregate families use measured zlib-9 sum + 400 B (Refs #1451). PR #1496 (Refs #1105) reseeded only the locale per-asset caps that overflowed after eleven reportRunFeedback.* keys (locale-fr/es/id/ms) and the eight extra-locale same-pattern families (ja/de/ko/fr/es/zh-TW/ms/id); each cap is current zlib-9 measured + 400 B on SHA 5a2fb65d. PR #1544 (Refs #1332) later reseeded only per-asset locale-zh-TW after honest reassess-lock Traditional Chinese copy; locale-zh-TW-family and every other locale cap stayed under budget. The Axios 1.18.0 security upgrade (CVE-2026-25639 / GHSA-43fc-jf86-j433) then reseeded only the criticalPath aggregate family; that rule's own note records the measured before/after figures and the measurement SHA. Defaults, matching rules, checker behavior, locale-extra, vendor/route families, and the remaining non-overflowing locale per-asset caps (ja/de/ko) are unchanged.",
+  "baselineNote": "Already-split aggregate families use measured zlib-9 sum + 400 B (Refs #1451). PR #1496 (Refs #1105) reseeded only the locale per-asset caps that overflowed after eleven reportRunFeedback.* keys (locale-fr/es/id/ms) and the eight extra-locale same-pattern families (ja/de/ko/fr/es/zh-TW/ms/id); each cap is current zlib-9 measured + 400 B on SHA 5a2fb65d. PR #1544 (Refs #1332) later reseeded only per-asset locale-zh-TW after honest reassess-lock Traditional Chinese copy; locale-zh-TW-family and every other locale cap stayed under budget. The Axios 1.18.0 security upgrade (CVE-2026-25639 / GHSA-43fc-jf86-j433) then reseeded only the criticalPath aggregate family; that rule's own note records the measured before/after figures and the measurement SHA. PR #1716 (Refs #1290) reseeded only the overflowing SettingsPage / SettingsPage-family / settings-route and extra-locale per-asset plus family caps after AGENT_STAGE_PARALLEL_ENABLED Settings copy, using hosted Linux zlib-9 on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. locale-es per-asset, locale-zh-TW per-asset, locale-es-family, extra-locale-family, js-entry, and other vendor/route families stayed under budget and are unchanged.",
   "defaults": {
     "jsMaxGzipBytes": 13436,
     "cssMaxGzipBytes": 28791
@@ -27,30 +27,30 @@
     {
       "id": "locale-ja",
       "match": "assets/ja-*.js",
-      "maxGzipBytes": 164741,
-      "measuredGzipBytes": 164341,
-      "note": "Re-measured from a combined production build after the 2026-08-13 merge backlog drain (70 PRs landed). Each PR added a small number of translation keys and was individually within the previous budget; the locale bundles grew cumulatively. Measured 164341 B with 400 B headroom, matching the IntelligenceSourcesPanel convention already recorded in this file."
+      "maxGzipBytes": 165379,
+      "measuredGzipBytes": 164979,
+      "note": "Reseeded after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 164979 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Match glob unchanged."
     },
     {
       "id": "locale-de",
       "match": "assets/de-*.js",
-      "maxGzipBytes": 158143,
-      "measuredGzipBytes": 157743,
-      "note": "Re-baselined after honest Local Only Mode Settings help (Refs #218). Accurate copy is longer than the overclaim; local zlib-9 157743 B. Cap = measured + 400 B, the existing locale per-asset convention, so locale-de-family (not over budget) stays above this cap. A 5% cap would invert that family invariant."
+      "maxGzipBytes": 158566,
+      "measuredGzipBytes": 158166,
+      "note": "Re-baselined after honest Local Only Mode Settings help (Refs #218). Reseeded after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 158166 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Cap = measured + 400 B so locale-de-family stays above this cap."
     },
     {
       "id": "locale-ko",
       "match": "assets/ko-*.js",
-      "maxGzipBytes": 158013,
-      "measuredGzipBytes": 157613,
-      "note": "Re-baselined after honest Local Only Mode Settings help (Refs #218). Accurate copy is longer than the overclaim; local zlib-9 157613 B. Cap = measured + 400 B, the existing locale per-asset convention, so locale-ko-family (not over budget) stays above this cap. A 5% cap would invert that family invariant."
+      "maxGzipBytes": 158438,
+      "measuredGzipBytes": 158038,
+      "note": "Re-baselined after honest Local Only Mode Settings help (Refs #218). Reseeded after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 158038 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Cap = measured + 400 B so locale-ko-family stays above this cap."
     },
     {
       "id": "locale-fr",
       "match": "assets/fr-*.js",
-      "maxGzipBytes": 157763,
-      "measuredGzipBytes": 157363,
-      "note": "Reseeded after PR #1496 added reportRunFeedback.* (11 keys) to extra locales (Refs #1105). zlib-9 measurement 157363 B on 5a2fb65d (hosted run 32753507669 and local checker identical) + 400 B headroom. Match glob unchanged."
+      "maxGzipBytes": 158237,
+      "measuredGzipBytes": 157837,
+      "note": "Reseeded after PR #1496 added reportRunFeedback.* (11 keys) to extra locales (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 157837 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Match glob unchanged."
     },
     {
       "id": "locale-es",
@@ -69,16 +69,16 @@
     {
       "id": "locale-ms",
       "match": "assets/ms-*.js",
-      "maxGzipBytes": 143275,
-      "measuredGzipBytes": 142875,
-      "note": "Reseeded after PR #1496 added reportRunFeedback.* (11 keys) to extra locales (Refs #1105). zlib-9 measurement 142875 B on 5a2fb65d (hosted run 32753507669 and local checker identical) + 400 B headroom. Match glob unchanged."
+      "maxGzipBytes": 143733,
+      "measuredGzipBytes": 143333,
+      "note": "Reseeded after PR #1496 added reportRunFeedback.* (11 keys) to extra locales (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 143333 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Match glob unchanged."
     },
     {
       "id": "locale-id",
       "match": "assets/id-*.js",
-      "maxGzipBytes": 143473,
-      "measuredGzipBytes": 143073,
-      "note": "Reseeded after PR #1496 added reportRunFeedback.* (11 keys) to extra locales (Refs #1105). zlib-9 measurement 143073 B on 5a2fb65d (hosted run 32753507669 and local checker identical) + 400 B headroom. Match glob unchanged."
+      "maxGzipBytes": 143888,
+      "measuredGzipBytes": 143488,
+      "note": "Reseeded after PR #1496 added reportRunFeedback.* (11 keys) to extra locales (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 143488 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Match glob unchanged."
     },
     {
       "id": "locale-extra",
@@ -141,9 +141,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 298823,
-      "measuredGzipBytes": 298423,
-      "note": "Reseeded after scheduling Settings security-audit list GET through TanStack Query (Refs #789). Same-toolchain zlib-9 (node 22.13.0, vite 7.3.1, shared node_modules) measured 298423 B on the SettingsPage lazy chunk. Query itself stays in vendor; the extra bytes are hook scheduling/fencing on SettingsPage. Cap = measured zlib-9 + 400 B. No other budgets changed besides the matching SettingsPage-family and settings-route rows."
+      "maxGzipBytes": 299619,
+      "measuredGzipBytes": 299219,
+      "note": "Reseeded after AGENT_STAGE_PARALLEL_ENABLED Settings help (Refs #1290). Hosted Linux zlib-9 299219 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. The extra bytes are dual-source Settings help at the same density as AGENT_CRITIC_ENABLED. Cap = measured zlib-9 + 400 B. Match glob unchanged."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -237,36 +237,36 @@
       "match": [
         "assets/ja-*.js"
       ],
-      "maxGzipBytes": 171971,
-      "measuredGzipBytes": 171571,
-      "note": "Already-split same-pattern family for locale-ja. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 171571 B on 5a2fb65d + 400 B headroom. Per-asset locale-ja cap is unchanged because that asset stayed under budget."
+      "maxGzipBytes": 172448,
+      "measuredGzipBytes": 172048,
+      "note": "Already-split same-pattern family for locale-ja. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 unique sum 172048 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset locale-ja cap is also reseeded."
     },
     {
       "id": "locale-de-family",
       "match": [
         "assets/de-*.js"
       ],
-      "maxGzipBytes": 164242,
-      "measuredGzipBytes": 163842,
-      "note": "Already-split same-pattern family for locale-de. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 163842 B on 5a2fb65d + 400 B headroom. Per-asset locale-de cap is unchanged because that asset stayed under budget."
+      "maxGzipBytes": 164698,
+      "measuredGzipBytes": 164298,
+      "note": "Already-split same-pattern family for locale-de. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 unique sum 164298 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset locale-de cap is also reseeded."
     },
     {
       "id": "locale-ko-family",
       "match": [
         "assets/ko-*.js"
       ],
-      "maxGzipBytes": 164566,
-      "measuredGzipBytes": 164166,
-      "note": "Already-split same-pattern family for locale-ko. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 164166 B on 5a2fb65d + 400 B headroom. Per-asset locale-ko cap is unchanged because that asset stayed under budget."
+      "maxGzipBytes": 165079,
+      "measuredGzipBytes": 164679,
+      "note": "Already-split same-pattern family for locale-ko. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 unique sum 164679 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset locale-ko cap is also reseeded."
     },
     {
       "id": "locale-fr-family",
       "match": [
         "assets/fr-*.js"
       ],
-      "maxGzipBytes": 163920,
-      "measuredGzipBytes": 163520,
-      "note": "Already-split same-pattern family for locale-fr. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 163520 B on 5a2fb65d + 400 B headroom. Per-asset locale-fr cap is also reseeded."
+      "maxGzipBytes": 164394,
+      "measuredGzipBytes": 163994,
+      "note": "Already-split same-pattern family for locale-fr. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 unique sum 163994 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset locale-fr cap is also reseeded."
     },
     {
       "id": "locale-es-family",
@@ -282,27 +282,27 @@
       "match": [
         "assets/zh-TW-*.js"
       ],
-      "maxGzipBytes": 159102,
-      "measuredGzipBytes": 158702,
-      "note": "Already-split same-pattern family for locale-zh-TW. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 158702 B on 5a2fb65d + 400 B headroom. Per-asset locale-zh-TW was later reseeded in PR #1544 (Refs #1332); this family cap is unchanged because the unique sum stayed under budget."
+      "maxGzipBytes": 159581,
+      "measuredGzipBytes": 159181,
+      "note": "Already-split same-pattern family for locale-zh-TW. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). Per-asset locale-zh-TW was later reseeded in PR #1544 (Refs #1332). Family reseeded after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 unique sum 159181 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset locale-zh-TW stayed under budget and is unchanged."
     },
     {
       "id": "locale-ms-family",
       "match": [
         "assets/ms-*.js"
       ],
-      "maxGzipBytes": 148870,
-      "measuredGzipBytes": 148470,
-      "note": "Already-split same-pattern family for locale-ms. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 148470 B on 5a2fb65d + 400 B headroom. Per-asset locale-ms cap is also reseeded."
+      "maxGzipBytes": 149328,
+      "measuredGzipBytes": 148928,
+      "note": "Already-split same-pattern family for locale-ms. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 unique sum 148928 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset locale-ms cap is also reseeded."
     },
     {
       "id": "locale-id-family",
       "match": [
         "assets/id-*.js"
       ],
-      "maxGzipBytes": 149062,
-      "measuredGzipBytes": 148662,
-      "note": "Already-split same-pattern family for locale-id. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105). zlib-9 unique sum 148662 B on 5a2fb65d + 400 B headroom. Per-asset locale-id cap is also reseeded."
+      "maxGzipBytes": 149477,
+      "measuredGzipBytes": 149077,
+      "note": "Already-split same-pattern family for locale-id. Reseeded after PR #1496 reportRunFeedback.* keys (Refs #1105) and again after AGENT_STAGE_PARALLEL_ENABLED extra-locale Settings copy (Refs #1290). Hosted Linux zlib-9 unique sum 149077 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset locale-id cap is also reseeded."
     },
     {
       "id": "locale-extra-family",
@@ -381,9 +381,9 @@
       "match": [
         "assets/SettingsPage-*.js"
       ],
-      "maxGzipBytes": 298823,
-      "measuredGzipBytes": 298423,
-      "note": "Same-pattern family after scheduling Settings security-audit list GET through TanStack Query (Refs #789). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 298423 B (node 22.13.0, vite 7.3.1)."
+      "maxGzipBytes": 299619,
+      "measuredGzipBytes": 299219,
+      "note": "Same-pattern family after AGENT_STAGE_PARALLEL_ENABLED Settings help (Refs #1290). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Hosted Linux zlib-9 299219 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805)."
     },
     {
       "id": "PortfolioRiskMetricsPanel-family",
@@ -483,9 +483,9 @@
         "assets/settingsPage-*.js",
         "assets/settingsTranslations-*.js"
       ],
-      "maxGzipBytes": 341388,
-      "measuredGzipBytes": 340988,
-      "note": "Already-split Settings route family. Reseeded after scheduling Settings security-audit list GET through TanStack Query (Refs #789). Same-toolchain zlib-9 sum 340988 B (node 22.13.0, vite 7.3.1) + 400 B headroom. Per-asset SettingsPage cap is also reseeded. No other route families changed."
+      "maxGzipBytes": 342184,
+      "measuredGzipBytes": 341784,
+      "note": "Already-split Settings route family. Reseeded after AGENT_STAGE_PARALLEL_ENABLED Settings help (Refs #1290). Hosted Linux zlib-9 unique sum 341784 B on 1bf8470e81b0127979530152a1062f62ed642fb3 (run 34230723805) + 400 B headroom. Per-asset SettingsPage cap is also reseeded. No other route families changed."
     },
     {
       "id": "portfolio-route",
