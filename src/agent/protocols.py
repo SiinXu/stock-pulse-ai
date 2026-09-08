@@ -9,6 +9,7 @@ they can be serialised, logged, and passed across process boundaries.
 
 from __future__ import annotations
 
+import copy
 import time
 from dataclasses import dataclass, field
 from enum import Enum
@@ -206,6 +207,15 @@ class _SealedAgentData(dict):
         if key not in self:
             self._reject_if_sealed(key)
         return super().setdefault(key, default)
+
+    def __deepcopy__(self, memo: Dict[int, Any]) -> "_SealedAgentData":
+        """Clone without ``clear()``, which sealed bags reject."""
+        cloned = _SealedAgentData(sealed_keys=())
+        memo[id(self)] = cloned
+        for key, value in self.items():
+            cloned[copy.deepcopy(key, memo)] = copy.deepcopy(value, memo)
+        cloned._sealed_keys = self._sealed_keys
+        return cloned
 
 
 # ============================================================

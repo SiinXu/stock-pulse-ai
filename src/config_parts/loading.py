@@ -973,6 +973,10 @@ class _ConfigLoadingMethods:
                 os.getenv('AGENT_MODE_BUDGET_CHAT_MAX_COST_USD'), 0.0,
                 field_name='AGENT_MODE_BUDGET_CHAT_MAX_COST_USD', minimum=0.0,
             ),
+            agent_stage_parallel_enabled=parse_env_bool(
+                os.getenv('AGENT_STAGE_PARALLEL_ENABLED'),
+                False,
+            ),
             agent_critic_enabled=parse_env_bool(
                 os.getenv('AGENT_CRITIC_ENABLED'),
                 False,

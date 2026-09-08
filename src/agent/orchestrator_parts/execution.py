@@ -302,15 +302,72 @@ class _ExecutionMethods:
         """Commit one completed isolated stage while preserving container identity."""
         for context_field in dataclass_fields(AgentContext):
             name = context_field.name
+            if name == "_input_snapshot":
+                continue
             current_value = getattr(target, name)
             staged_value = getattr(staged, name)
             if isinstance(current_value, dict) and isinstance(staged_value, dict):
-                current_value.clear()
-                current_value.update(staged_value)
+                sealed_keys = getattr(current_value, "_sealed_keys", None)
+                if sealed_keys:
+                    for key, value in staged_value.items():
+                        if key in sealed_keys:
+                            continue
+                        current_value[key] = value
+                    for key in list(current_value.keys()):
+                        if key not in sealed_keys and key not in staged_value:
+                            del current_value[key]
+                else:
+                    current_value.clear()
+                    current_value.update(staged_value)
             elif isinstance(current_value, list) and isinstance(staged_value, list):
                 current_value[:] = staged_value
             else:
                 setattr(target, name, staged_value)
+
+    @staticmethod
+    def _expand_wave_restored_stages(restored):
+        """Treat a technical_intel checkpoint as both Technical and Intel."""
+        from src.agent.orchestrator_parts.stage_parallel import expand_wave_restored_stages
+        return expand_wave_restored_stages(restored)
+
+    def _maybe_run_technical_intel_wave(
+        self,
+        agents,
+        index,
+        ctx,
+        stats,
+        all_tool_calls,
+        models_used,
+        progress_callback,
+        cancelled_check,
+        timeout_s,
+        elapsed_s,
+        t0,
+        restored_agent_stages,
+        checkpoint_session,
+        parse_dashboard,
+        stage_entry_counts,
+    ):
+        """Run the opt-in Technical ∥ Intel wave or return None for serial."""
+        from src.agent.orchestrator_parts.stage_parallel import maybe_run_technical_intel_wave
+        return maybe_run_technical_intel_wave(
+            self,
+            agents,
+            index,
+            ctx,
+            stats,
+            all_tool_calls,
+            models_used,
+            progress_callback,
+            cancelled_check,
+            timeout_s,
+            elapsed_s,
+            t0,
+            restored_agent_stages,
+            checkpoint_session,
+            parse_dashboard,
+            stage_entry_counts,
+        )
 
     def _execute_isolated_stage(
         self,

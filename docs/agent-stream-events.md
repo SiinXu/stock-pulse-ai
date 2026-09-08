@@ -53,7 +53,14 @@ New clients may additionally read:
 - `turn_id`
 - `message_id`
 
-Unknown event types should be ignored or displayed with a generic fallback.
+When `AGENT_STAGE_PARALLEL_ENABLED=true` and a Native Multi `standard` /
+`full` / `specialist` run opens the Technical ∥ Intel wave, both `stage_start`
+events are emitted first in declaration order (`technical` then `intel`).
+`stage_done` is also emitted in that declaration order even if Intel finishes
+first. In-wave `thinking` / `tool_start` / `tool_done` events may interleave
+but always include `stage`. Default-off serial runs keep the existing
+start-then-done pairing. Unknown event types should still be ignored or
+displayed with a generic fallback.
 `done` and `error` keep their existing completion semantics.
 In particular, `done` is not a persistence acknowledgement. Clients that need
 to decide whether a stopped or disconnected turn is resendable must use the
@@ -164,3 +171,7 @@ rows already created before rollback are not removed automatically.
 For the bounded Critic additions specifically, disabling
 `AGENT_CRITIC_ENABLED` restores the previous event set immediately; reverting
 the Critic change removes the event types without data or schema migration.
+For the Technical ∥ Intel wave, disabling `AGENT_STAGE_PARALLEL_ENABLED`
+restores the serial start/done pairing immediately; reverting the wave change
+removes only the concurrent start/done ordering without data or schema
+migration.

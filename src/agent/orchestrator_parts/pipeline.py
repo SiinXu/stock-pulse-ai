@@ -120,7 +120,7 @@ class _PipelineMethods:
             ctx.meta["_checkpoint_agent_input_fingerprint"] = (
                 build_agent_input_fingerprint(ctx)
             )
-            restored_agent_stages = set(
+            restored_agent_stages = self._expand_wave_restored_stages(
                 restore_agent_context_from_session(checkpoint_session, ctx)
             )
             if restored_agent_stages:
@@ -411,6 +411,16 @@ class _PipelineMethods:
             if _red_team.maybe_insert_review_stages(
                 self, agents, index, ctx, stats, timeout_s, remaining_budget, _OPTIONAL_STAGE_REQUIRED_S, progress_callback):
                 continue
+
+            _wave = self._maybe_run_technical_intel_wave(
+                agents, index, ctx, stats, all_tool_calls, models_used,
+                progress_callback, cancelled_check, timeout_s, elapsed_s, t0,
+                restored_agent_stages, checkpoint_session, parse_dashboard, stage_entry_counts)
+            if isinstance(_wave, int):
+                index = _wave
+                continue
+            if _wave is not None:
+                return _wave
 
             stage_name = str(agent.agent_name or "")
             observed_entries = stage_entry_counts.get(stage_name, 0) + 1
@@ -1119,7 +1129,6 @@ class _PipelineMethods:
 
 
     def _run_specialist_agent_batch(self, agents, ctx, *, progress_callback=None, timeout_seconds=None) -> SkillBatchResult:
-        from math import ceil
         sub_agent_timeout_map = self._get_sub_agent_timeout_map()
         configured_skill_timeout = sub_agent_timeout_map.get("skill", 0.0)
         budget_per_skill = self._skill_batch_timeout_slice(len(agents), timeout_seconds=timeout_seconds)
@@ -1142,18 +1151,8 @@ class _PipelineMethods:
         return batch
 
     def _skill_batch_timeout_slice(self, agent_count, *, timeout_seconds):
-        from math import ceil
-        if timeout_seconds is None:
-            return None
-        try:
-            remaining = float(timeout_seconds)
-        except (TypeError, ValueError):
-            return None
-        if remaining <= 0:
-            return 0.0
-        count = max(1, int(agent_count or 1))
-        worker_count = min(3, count)
-        return remaining / max(1, ceil(count / worker_count))
+        from src.agent.orchestrator_parts.stage_parallel import skill_batch_timeout_slice
+        return skill_batch_timeout_slice(agent_count, timeout_seconds=timeout_seconds)
 
     def _build_specialist_agents(self, ctx: AgentContext) -> list:
         """Build specialist sub-agents based on requested skills.

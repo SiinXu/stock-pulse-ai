@@ -354,6 +354,38 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         ],
         "warning_codes": [],
     },
+    "AGENT_STAGE_PARALLEL_ENABLED": {
+        "title": "Opt-in Technical/Intel Stage Wave",
+        "description": (
+            "When enabled, Native Multi standard/full/specialist runs execute "
+            "Technical and Intel concurrently against the same sealed snapshot "
+            "and merge in declaration order (max_workers=2). Default off keeps "
+            "today's serial contract. quick mode never opens the wave. Risk, "
+            "SkillRouter, Critic, red-team, and debate stay serial."
+        ),
+        "category": "agent",
+        "data_type": "boolean",
+        "ui_control": "switch",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "false",
+        "options": [],
+        "validation": {},
+        "display_order": 62,
+        "help_key": "settings.agent.AGENT_STAGE_PARALLEL_ENABLED",
+        "examples": [
+            "AGENT_STAGE_PARALLEL_ENABLED=false",
+            "AGENT_STAGE_PARALLEL_ENABLED=true",
+        ],
+        "docs": [
+            {
+                "label": "完整指南：Agent 配置",
+                "href": "https://github.com/SiinXu/stock-pulse-ai/blob/main/docs/full-guide.md#环境变量完整列表",
+            },
+        ],
+        "warning_codes": [],
+    },
     "AGENT_MODE_BUDGET_ENABLED": {
         "title": "Mode Hard Budget Enabled",
         "description": "Enable hard per-mode budgets for LLM turns, tool calls, and estimated cost. On breach the run terminates with an explicit budget reason (never silent success). Residual wall-clock skips remain budget_skip under the same diagnostic snapshot.",

@@ -1983,6 +1983,14 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 
 更多问题请 [提交 Issue](https://github.com/SiinXu/stock-pulse-ai/issues)
 
+## 可选 Technical ∥ Intel 阶段并行
+
+`AGENT_STAGE_PARALLEL_ENABLED=false`（默认）保持今日串行合同：Technical 完成后 Intel 才开始，Intel 可以看到 Technical 写入的非密封 `ctx.data` 与 opinions。设为 `true` 时，仅 Native Multi 的 `standard` / `full` / `specialist` 模式会在相邻 pair 正好是 Technical 与 Intel、且两者都未被 checkpoint restore 时，对**同一密封** `AgentContext` 快照做 isolated deepcopy 并发（`max_workers=2`）。无论完成顺序，合并固定为 technical then intel；重叠的非密封 key 在 flag-on 下 first-wins（Technical）。`quick` 即使打开该开关也不会启用 wave。Risk 仍在 Intel 之后串行，并能读到合并后的 `intel_opinion`。SkillRouter、Critic、红队与辩论仍在既有 Decision 插入点串行。
+
+失败合同：Intel 失败且 isolate、且为非关键阶段时记录 degraded，保留 Technical，继续 Decision。Technical 失败会取消 Intel，不提交仅 Intel 的 context，pipeline fail-fast。Intel 超时按 isolate 处理，不丢 Technical。硬预算（`budget_tools` / `budget_turns` / `budget_cost` / `budget_tokens`）fail-fast，不把 Intel 当 isolate。Checkpoint 仅在两阶段都 `COMPLETED` 时写入 `technical_intel`；Intel isolate 后只保存 technical，resume 时 Intel 走串行。SSE：两个 `stage_start` 先按声明顺序发出；`stage_done` 也按声明顺序发出；波次内 `thinking` / `tool_*` 允许交错但必须带 `stage`。未知 type 仍可忽略；不改 `done` / `error`。
+
+成本边界：默认关闭，默认安装行为不变。回滚时保持或设置 `AGENT_STAGE_PARALLEL_ENABLED=false`，或 revert 该变更；无需数据迁移。这是 issue #1290 的第一刀，不关闭完整 dependency DAG / max-concurrent 旋钮 / 默认开 flag。
+
 ## 有界 Multi-Agent Critic
 
 `AGENT_CRITIC_ENABLED=false`（默认）保持现有行为。设为 `true` 时，仅 Native Multi 的非 Chat 分析会在已完成的 technical/intel/risk/specialist 意见之后、`DecisionAgent` 之前增加一次无工具 Critic LLM 调用。Single、Multi Chat 和关闭该配置的日批/普通分析不进入该阶段。
