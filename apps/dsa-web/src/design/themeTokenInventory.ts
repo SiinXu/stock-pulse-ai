@@ -64,7 +64,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--home-cool-surface',
   '--home-cool-surface-strong',
   '--home-hero-shadow',
-  '--home-history-item-bg',
   '--home-history-item-hover-bg',
   '--home-history-item-selected-bg',
   '--home-insight-surface',
@@ -175,8 +174,9 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * `--home-hero-gradient-mid`, `--home-hero-gradient-end`,
  * `--home-panel-border-selected`,
  * `--home-panel-gradient-start`,
- * `--home-panel-gradient-mid`, and
- * `--home-panel-gradient-end`
+ * `--home-panel-gradient-mid`,
+ * `--home-panel-gradient-end`, and
+ * `--home-history-item-bg`
  * wrappers are
  * deleted with no replacement.
  * Action/prose families consume Layer 1 plus use-site
@@ -186,13 +186,13 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * secondary-accent-text, accent-bg-hover, accent-border-hover,
  * hero-border, hero-gradient-start, hero-gradient-mid,
  * hero-gradient-end, panel-border-selected,
- * panel-gradient-start, panel-gradient-mid, or
- * panel-gradient-end wrappers.
+ * panel-gradient-start, panel-gradient-mid,
+ * panel-gradient-end, or history-item-bg wrappers.
  * Remaining leftover
  * `--home-*` names stay page-scoped. `home` and `settings` stay in
  * `THEME_PAGE_SCOPED_PREFIXES`.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 28;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 27;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [

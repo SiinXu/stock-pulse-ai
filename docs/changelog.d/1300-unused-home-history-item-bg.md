@@ -1,0 +1,1 @@
+- [Chore] Remove unused Home --home-history-item-bg wrapper (Refs #1300).
