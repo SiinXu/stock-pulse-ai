@@ -5,6 +5,7 @@ import { Bell, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { scheduledTasksApi } from '../../api/scheduledTasks';
 import { systemConfigApi } from '../../api/systemConfig';
+import { useSchedulerStatusQuery } from '../../hooks/useSchedulerStatusQuery';
 import type {
   ConfigValidationIssue,
   SchedulerStatusResponse,
@@ -160,6 +161,30 @@ type TrackedRun = {
   state: 'running' | 'succeeded' | 'failed' | 'unknown';
 };
 
+function deriveTrackedRun(
+  current: TrackedRun | null,
+  payload: SchedulerStatusResponse,
+): TrackedRun | null {
+  if (!current) return current;
+  if (current.id && payload.activeRunId === current.id) {
+    return { ...current, state: 'running' };
+  }
+  if (current.id && payload.lastRunId === current.id) {
+    return {
+      ...current,
+      state: payload.lastRunOutcome === 'succeeded'
+        ? 'succeeded'
+        : payload.lastRunOutcome === 'failed'
+          ? 'failed'
+          : 'unknown',
+    };
+  }
+  if (!payload.running) {
+    return { ...current, state: 'unknown' };
+  }
+  return current;
+}
+
 type SchedulerSettingsCardProps = {
   items: SystemConfigItem[];
   disabled: boolean;
@@ -188,10 +213,16 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   const scheduleTimesItem = getConfigItem(items, 'SCHEDULE_TIMES');
   const scheduleTimeItem = getConfigItem(items, 'SCHEDULE_TIME');
   const hasSchedulerSettings = Boolean(scheduleEnabledItem || scheduleTimesItem || scheduleTimeItem);
-  const [status, setStatus] = useState<SchedulerStatusResponse | null>(null);
-  const [isRefreshingStatus, setIsRefreshingStatus] = useState(false);
+  const {
+    status,
+    isRefreshingStatus,
+    statusError,
+    refresh: refreshSchedulerStatus,
+  } = useSchedulerStatusQuery({
+    enabled: hasSchedulerSettings,
+    refreshToken: statusRefreshToken,
+  });
   const [isRunningNow, setIsRunningNow] = useState(false);
-  const [statusError, setStatusError] = useState<ParsedApiError | null>(null);
   const [runNowError, setRunNowError] = useState<ParsedApiError | null>(null);
   const [trackedRun, setTrackedRun] = useState<TrackedRun | null>(null);
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
@@ -200,7 +231,6 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
   // null = not yet known / probe failed — never invent an overlap state.
   const [hasEnabledVersionedTasks, setHasEnabledVersionedTasks] = useState<boolean | null>(null);
   const mountedRef = useRef(true);
-  const statusRequestRef = useRef(0);
   const runNowRequestRef = useRef(0);
   const navigate = useNavigate();
 
@@ -227,53 +257,19 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     }
   }, []);
 
-  const refreshSchedulerStatus = useCallback(async () => {
-    const requestId = ++statusRequestRef.current;
-    setStatusError(null);
-    setIsRefreshingStatus(true);
-    try {
-      const payload = await systemConfigApi.getSchedulerStatus();
-      if (mountedRef.current && requestId === statusRequestRef.current) {
-        setStatus(payload);
-        setTrackedRun((current) => {
-          if (!current) return current;
-          if (current.id && payload.activeRunId === current.id) {
-            return { ...current, state: 'running' };
-          }
-          if (current.id && payload.lastRunId === current.id) {
-            return {
-              ...current,
-              state: payload.lastRunOutcome === 'succeeded'
-                ? 'succeeded'
-                : payload.lastRunOutcome === 'failed'
-                  ? 'failed'
-                  : 'unknown',
-            };
-          }
-          if (!payload.running) {
-            return { ...current, state: 'unknown' };
-          }
-          return current;
-        });
-      }
-    } catch (error: unknown) {
-      if (mountedRef.current && requestId === statusRequestRef.current) {
-        setStatusError(getParsedApiError(error));
-      }
-    } finally {
-      if (mountedRef.current && requestId === statusRequestRef.current) {
-        setIsRefreshingStatus(false);
-      }
+  useEffect(() => {
+    if (!status) {
+      return;
     }
-  }, []);
+    setTrackedRun((current) => deriveTrackedRun(current, status));
+  }, [status]);
 
   useEffect(() => {
     if (!hasSchedulerSettings) {
       return;
     }
-    void refreshSchedulerStatus();
     void refreshVersionedTaskOverlap();
-  }, [hasSchedulerSettings, refreshSchedulerStatus, refreshVersionedTaskOverlap, statusRefreshToken]);
+  }, [hasSchedulerSettings, refreshVersionedTaskOverlap, statusRefreshToken]);
 
   // While analysis is running in this process, poll status so run-now stays trackable
   // (accepted → running → idle with last success/error) without showing only a task id.

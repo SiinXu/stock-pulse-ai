@@ -1,6 +1,7 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type { ReactElement } from 'react';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
@@ -8,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { systemConfigApi } from '../../../api/systemConfig';
 import { UI_TEXT } from '../../../i18n/uiText';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { buildSettingsHref } from '../../../routing/routes';
 import type { SchedulerStatusResponse, SystemConfigItem } from '../../../types/systemConfig';
 import SchedulerSettingsCard from '../SchedulerSettingsCard';
@@ -18,13 +20,19 @@ const schedulerNotificationsChannelsHref = buildSettingsHref({
 });
 
 function renderCard(ui: ReactElement) {
-  return render(
-    <MemoryRouter>
-      <UiLanguageProvider initialLanguage="en">
-        {ui}
-      </UiLanguageProvider>
-    </MemoryRouter>,
-  );
+  const client = createAppQueryClient();
+  return {
+    client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <UiLanguageProvider initialLanguage="en">
+            {ui}
+          </UiLanguageProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 vi.mock('../../../api/scheduledTasks', () => ({
@@ -418,7 +426,7 @@ describe('SchedulerSettingsCard observability', () => {
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
 
-    const { rerender } = renderCard(
+    const { rerender, client } = renderCard(
       <SchedulerSettingsCard
         items={defaultItems}
         disabled={false}
@@ -432,17 +440,21 @@ describe('SchedulerSettingsCard observability', () => {
     await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(1));
 
     rerender(
-      <MemoryRouter>
-        <SchedulerSettingsCard
-          items={defaultItems}
-          disabled={false}
-          issueByKey={{}}
-          statusRefreshToken={1}
-          onChange={vi.fn()}
-          t={t}
-          language="en"
-        />
-      </MemoryRouter>,
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <UiLanguageProvider initialLanguage="en">
+            <SchedulerSettingsCard
+              items={defaultItems}
+              disabled={false}
+              issueByKey={{}}
+              statusRefreshToken={1}
+              onChange={vi.fn()}
+              t={t}
+              language="en"
+            />
+          </UiLanguageProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
     await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(2));
 
@@ -644,6 +656,42 @@ describe('SchedulerSettingsCard observability', () => {
     });
     expect(await screen.findByTestId('scheduler-migration-notice')).toBeInTheDocument();
     expect(screen.queryByText(/both enabled/i)).not.toBeInTheDocument();
+  });
+
+  it('skips scheduler status GET when schedule settings are absent', async () => {
+    renderCard(
+      <SchedulerSettingsCard
+        items={[]}
+        disabled={false}
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    expect(screen.queryByTestId('scheduler-settings-card')).not.toBeInTheDocument();
+    expect(systemConfigApi.getSchedulerStatus).not.toHaveBeenCalled();
+    expect(scheduledTasksApi.list).not.toHaveBeenCalled();
+  });
+
+  it('still fetches status when the card is disabled and only disables refresh/run-now', async () => {
+    renderCard(
+      <SchedulerSettingsCard
+        items={defaultItems}
+        disabled
+        issueByKey={{}}
+        statusRefreshToken={0}
+        onChange={vi.fn()}
+        t={t}
+        language="en"
+      />,
+    );
+
+    await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(1));
+    expect(await screen.findByTestId('scheduler-refresh-status-button')).toBeDisabled();
+    expect(screen.getByTestId('scheduler-run-now-button')).toBeDisabled();
   });
 
   it('does not show the migration notice when legacy day-batch is disabled', async () => {
