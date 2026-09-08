@@ -117,12 +117,13 @@ EXPECTED_DASHBOARD_METHODS = (
 
 # Refresh a hash only for an intentional behavior change to the moved methods.
 # ``_ExecutionMethods`` last changed for #1290: sealed-key commit plus Technical ∥ Intel wave wrappers.
-# ``_PipelineMethods`` last changed for #1290: opt-in wave hook and timeout-slice re-export.
+# ``_PipelineMethods`` last changed for #131: critic phase-start emit plus commit_critic_stage_result.
+# ``_DashboardMethods`` last changed for #131: additive dashboard.critic appendix on finalize.
 EXPECTED_AST_HASHES = {
     '_ChatMethods': '1eb6d82eb64cb3a6ee13749137b09d26d320fc353dd0e3fc63f0d8a3a69fa41d',
-    '_DashboardMethods': '61172d08c68fc42fa87b83542a2e67878b6b8e011b34b5e266d391c69fbf536b',
+    '_DashboardMethods': '6609d7691c083bb3f512f0a2130a22ea9f6d1764b03c85b01587349ca909f63d',
     '_ExecutionMethods': '29c0b1c7e692209dfd1d3da4f6f26ac6b5eca9377fc4ae59ab0a4b92fd189854',
-    '_PipelineMethods': '114e0d0899f2f41f83e7054b7fd4a183196816fc2e93491131ceb8ca5dd89c8c',
+    '_PipelineMethods': '52d9530c538d5b11fc427ee9f63f31db3c38318cf00e8db932f7ce8894b6d788',
 }
 
 
