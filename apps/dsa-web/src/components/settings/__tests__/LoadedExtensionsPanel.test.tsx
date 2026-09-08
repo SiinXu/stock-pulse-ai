@@ -1,11 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { pluginsApi } from '../../../api/plugins';
 import { createParsedApiError } from '../../../api/error';
 import { UI_TEXT } from '../../../i18n/uiText';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import LoadedExtensionsPanel from '../LoadedExtensionsPanel';
 
 vi.mock('../../../api/plugins', () => ({
@@ -25,11 +27,17 @@ const t = (key: keyof typeof UI_TEXT.en, params?: Record<string, string | number
   ));
 };
 
-function renderPanel(initialEntry = '/settings?section=system_security&view=extensions') {
+function renderPanel(
+  initialEntry = '/settings?section=system_security&view=extensions',
+  { disabled = false }: { disabled?: boolean } = {},
+) {
+  const client = createAppQueryClient();
   return render(
-    <MemoryRouter initialEntries={[initialEntry]}>
-      <LoadedExtensionsPanel t={t} language="en" />
-    </MemoryRouter>,
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <LoadedExtensionsPanel t={t} language="en" disabled={disabled} />
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
@@ -452,5 +460,35 @@ describe('LoadedExtensionsPanel', () => {
       .toHaveTextContent(/not active/i);
     expect(screen.queryByTestId('loaded-extension-notification-link-dormant-notifier-example_log'))
       .not.toBeInTheDocument();
+  });
+
+  it('still fetches on mount when disabled and only disables lifecycle and settings controls', async () => {
+    vi.mocked(pluginsApi.list).mockResolvedValue({
+      total: 1,
+      items: [{
+        id: 'toggle-demo',
+        name: 'Toggle Demo',
+        version: '1.0.0',
+        source: 'external',
+        state: 'disabled',
+        desiredEnabled: false,
+        reloadable: true,
+        packageRoot: '/opt/plugins/toggle-demo',
+        extensionPoints: [],
+        notificationChannels: [],
+        description: '',
+        author: '',
+        settingsCount: 1,
+      }],
+    });
+
+    renderPanel('/settings?section=system_security&view=extensions', { disabled: true });
+
+    expect(await screen.findByTestId('loaded-extension-row-toggle-demo')).toBeInTheDocument();
+    expect(vi.mocked(pluginsApi.list)).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(pluginsApi.list).mock.calls[0]).toEqual([]);
+    expect(screen.getByRole('switch', { name: /Enabled: Toggle Demo/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'View details: Toggle Demo' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Refresh extensions list' })).toBeDisabled();
   });
 });

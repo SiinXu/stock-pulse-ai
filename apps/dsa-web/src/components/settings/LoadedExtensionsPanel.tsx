@@ -4,7 +4,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react
 import type React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { RefreshCw, Settings2 } from 'lucide-react';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
+import { getParsedApiError } from '../../api/error';
 import {
   pluginsApi,
   type PluginInfo,
@@ -12,6 +12,7 @@ import {
   type PluginSettingValue,
   type PluginSettingsResponse,
 } from '../../api/plugins';
+import { useLoadedExtensionsQuery } from '../../hooks/useLoadedExtensionsQuery';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { SETTINGS_ROUTE_QUERY_KEYS } from '../../routing/routes';
 import {
@@ -126,43 +127,21 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
 }) => {
   const [searchParams] = useSearchParams();
   const focusedPluginId = searchParams.get(SETTINGS_ROUTE_QUERY_KEYS.plugin);
-  const [items, setItems] = useState<PluginInfo[]>([]);
-  const [total, setTotal] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
+  const {
+    items,
+    total,
+    isLoading,
+    isRefreshing,
+    loadError,
+    load,
+    setItems,
+  } = useLoadedExtensionsQuery();
   const [actionError, setActionError] = useState<string | null>(null);
   const [pendingPluginId, setPendingPluginId] = useState<string | null>(null);
   const [selectedSettings, setSelectedSettings] = useState<PluginSettingsResponse | null>(null);
   const [settingsPluginName, setSettingsPluginName] = useState('');
   const [settingsSaveError, setSettingsSaveError] = useState<string | null>(null);
   const [restartRequired, setRestartRequired] = useState(false);
-
-  const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    setLoadError(null);
-    if (mode === 'initial') setIsLoading(true);
-    else setIsRefreshing(true);
-    try {
-      const response = await pluginsApi.list();
-      setItems(response.items);
-      setTotal(response.total);
-    } catch (error: unknown) {
-      // Keep a previously loaded roster on refresh so a transient GET
-      // failure cannot wipe rows after a completed lifecycle change.
-      if (mode === 'initial') {
-        setItems([]);
-        setTotal(0);
-      }
-      setLoadError(getParsedApiError(error));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load('initial');
-  }, [load]);
 
   useEffect(() => {
     if (!focusedPluginId || isLoading) return;
@@ -205,7 +184,7 @@ const LoadedExtensionsPanel: React.FC<LoadedExtensionsPanelProps> = ({
     } finally {
       setPendingPluginId(null);
     }
-  }, [language, load, t]);
+  }, [language, load, setItems, t]);
 
   const openSettings = useCallback(async (plugin: PluginInfo) => {
     setPendingPluginId(plugin.id);
