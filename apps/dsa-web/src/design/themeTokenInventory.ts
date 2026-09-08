@@ -79,7 +79,6 @@ const THEME_NON_SPACING_DEFINED_TOKEN_NAMES = [
   '--home-price-down',
   '--home-price-up',
   '--home-rail-bg',
-  '--home-rail-border',
   '--home-rail-shadow',
   '--home-shadow-deep',
   '--home-shadow-neutral',
@@ -175,8 +174,9 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * `--home-panel-border-selected`,
  * `--home-panel-gradient-start`,
  * `--home-panel-gradient-mid`,
- * `--home-panel-gradient-end`, and
- * `--home-history-item-bg`
+ * `--home-panel-gradient-end`,
+ * `--home-history-item-bg`, and
+ * `--home-rail-border`
  * wrappers are
  * deleted with no replacement.
  * Action/prose families consume Layer 1 plus use-site
@@ -187,12 +187,12 @@ export type ThemeDefinedTokenName = (typeof THEME_NON_SPACING_DEFINED_TOKEN_NAME
  * hero-border, hero-gradient-start, hero-gradient-mid,
  * hero-gradient-end, panel-border-selected,
  * panel-gradient-start, panel-gradient-mid,
- * panel-gradient-end, or history-item-bg wrappers.
+ * panel-gradient-end, history-item-bg, or rail-border wrappers.
  * Remaining leftover
  * `--home-*` names stay page-scoped. `home` and `settings` stay in
  * `THEME_PAGE_SCOPED_PREFIXES`.
  */
-export const THEME_PAGE_SCOPED_TOKEN_CEILING = 27;
+export const THEME_PAGE_SCOPED_TOKEN_CEILING = 26;
 
 export const DESKTOP_CHROME_DEFINED_TOKENS = {
   assistant: [
