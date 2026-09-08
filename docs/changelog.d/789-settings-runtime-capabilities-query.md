@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings runtime-capabilities inventory and Agent deployment-models GETs through TanStack Query (Refs #789).
