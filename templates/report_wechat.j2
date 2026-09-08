@@ -150,6 +150,12 @@
 {% endfor %}
 {% endif %}
 
+{% set critic = dashboard.get('critic') if dashboard else none %}
+{% if mode_limits.include_critic and critic and critic.get('enabled') %}
+🔍 **{{ labels.critic_heading }}**: {{ critic.get('verdict') }} | {{ labels.critic_convergence_label }} {{ critic.get('convergence_status') }}
+{% if critic.get('summary') %}- {{ critic.get('summary') }}{% endif %}
+{% endif %}
+
 {% set checklist = battle.get('action_checklist', []) if battle else [] %}
 {% set fc = failed_checks(checklist) %}
 {% if fc %}

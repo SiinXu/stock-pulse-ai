@@ -314,6 +314,48 @@ def _build_tool_call_evidence_and_steps(
     return items, steps
 
 
+def _project_dashboard_critic(
+    raw_result: Mapping[str, Any],
+    *,
+    evidence_items: List[EvidenceItem],
+    steps: List[ReasoningStep],
+) -> bool:
+    """Project one critic pipeline-stage item and reasoning step when present."""
+    dashboard = _as_mapping(raw_result.get("dashboard"))
+    critic = _as_mapping(dashboard.get("critic"))
+    if not critic:
+        return False
+    summary = _clip(critic.get("summary"), limit=300)
+    ran = bool(critic.get("ran"))
+    status = "present" if ran else "partial"
+    missing_reason = None if ran else "Critic was entered but did not complete a revision pass."
+    if not any(
+        item.source_type == "pipeline_stage" and item.source_id == "critic"
+        for item in evidence_items
+    ):
+        evidence_items.append(EvidenceItem(
+            evidence_id=_make_evidence_id("critic", 1),
+            source_type="pipeline_stage",
+            source_id="critic",
+            snippet=summary or "critic",
+            as_of=None,
+            as_of_status=MISSING_AS_OF,
+            status=status,  # type: ignore[arg-type]
+            missing_reason=missing_reason,
+        ))
+    if not any(step.stage == "critic" or step.role == "critic" for step in steps):
+        steps.append(ReasoningStep(
+            step_id=_make_evidence_id("critic_step", 1),
+            stage="critic",
+            role="critic",
+            input_refs=[],
+            output_summary=summary,
+            status=status,  # type: ignore[arg-type]
+            missing_reason=missing_reason,
+        ))
+    return True
+
+
 def _conclusion_from_fact(
     fact: Mapping[str, Any],
     *,
@@ -574,6 +616,9 @@ def build_evidence_chain_package(
         strata, raw_map, evidence_index=evidence_index, data_source_ids=data_source_ids,
     )
     evidence_items.extend(extra)
+    critic_present = _project_dashboard_critic(
+        raw_map, evidence_items=evidence_items, steps=steps,
+    )
 
     if not evidence_items:
         evidence_items.append(EvidenceItem(
@@ -604,6 +649,7 @@ def build_evidence_chain_package(
         _cov("diagnostics.agent_events", bool(_as_list(diagnostics_map.get("agent_events")))),
         _cov("diagnostics.llm_runs", bool(_as_list(diagnostics_map.get("llm_runs")))),
         _cov("diagnostics.pipeline_stage_runs", bool(_as_list(diagnostics_map.get("pipeline_stage_runs")))),
+        _cov("dashboard.critic", critic_present),
     ]
 
     diagnostic_trace_id = _clip(diagnostics_map.get("trace_id"), limit=128) if diagnostics_map else None

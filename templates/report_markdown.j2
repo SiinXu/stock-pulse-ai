@@ -399,6 +399,16 @@
 
 {% endif %}
 
+{% set critic = dashboard.get('critic') if dashboard else none %}
+{% if mode_limits.include_critic and critic and critic.get('enabled') %}
+### 🔍 {{ labels.critic_heading }}
+
+- {{ labels.critic_verdict_label }}: {{ critic.get('verdict') }} | {{ labels.critic_convergence_label }}: {{ critic.get('convergence_status') }} | {{ labels.critic_retry_status_label }}: {{ critic.get('retry_status') }}
+- {{ labels.critic_revision_label }}: {{ labels.critic_revision_occurred_yes if critic.get('revision_occurred') else labels.critic_revision_occurred_no }} | {{ labels.critic_iteration_label }}: {{ critic.get('iteration_consumed') }}/{{ critic.get('iteration_max') }}
+{% if critic.get('summary') %}- {{ labels.critic_summary_label }}: {{ critic.get('summary') }}{% endif %}
+
+{% endif %}
+
 {% if mode_limits.include_battle_plan and battle %}
 ### 🎯 {{ labels.battle_plan_heading }}
 

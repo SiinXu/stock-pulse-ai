@@ -21,10 +21,31 @@ from src.utils.sanitize import log_safe_exception
 logger = logging.getLogger(__name__)
 
 CRITIC_STAGE_NAME = "critic"
+CRITIC_RETRY_PHASE_NAME = "critic_retry"
 CRITIC_MAX_STEPS = 1
 CRITIC_RETRY_BUDGET = 1
 CRITIC_MAX_ITERS_DEFAULT = 1
 CRITIC_MAX_ITERS_HARD_CAP = 2
+_SUMMARY_MAX_CHARS = 300
+_ALLOWED_VERDICTS = frozenset({"pass", "retry", "fail_soft"})
+_ALLOWED_CONVERGENCE = frozenset({
+    "pass",
+    "converged",
+    "not_converged",
+    "unavailable",
+    "budget_skipped",
+    "stage_failed",
+    "not_required",
+})
+_SUMMARY_BY_CONVERGENCE = {
+    "pass": "Critic passed without requesting a revision.",
+    "converged": "Critic revision converged after a controlled retry.",
+    "not_converged": "Critic findings remain after the bounded revision budget.",
+    "unavailable": "Critic convergence check was unavailable; original evidence is preserved.",
+    "budget_skipped": "Critic was skipped to preserve the Decision stage budget.",
+    "stage_failed": "Critic stage did not complete; Decision preserves this limitation.",
+    "not_required": "Critic revision was not required for this run.",
+}
 INTELLIGENCE_RETRY_TARGET = "intelligence"
 SKILL_RETRY_TARGET_PREFIX = "skill:"
 _SKILL_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
@@ -665,6 +686,8 @@ def record_critic_budget_skip(
         max_iters=max_iters,
     )
     ctx.meta["critic_trace"] = trace
+    emit_critic_phase_start(CRITIC_STAGE_NAME, trace=trace)
+    emit_critic_phase_end(CRITIC_STAGE_NAME, status="error", trace=trace)
     return trace
 
 
@@ -860,6 +883,163 @@ def trace_event_fields(trace: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def _bounded_phase_attrs(trace: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """Return the bounded phase attributes allowed on critic observability events."""
+    if not isinstance(trace, dict):
+        return {}
+    reasons = [
+        item for item in list(trace.get("reasons") or [])
+        if isinstance(item, str) and item.strip()
+    ]
+    rounds = list(trace.get("revision_rounds") or [])
+    try:
+        consumed = int(trace.get("iteration_consumed") or 0)
+    except (TypeError, ValueError):
+        consumed = 0
+    attrs: Dict[str, Any] = {
+        "verdict": trace.get("verdict"),
+        "convergence": trace.get("convergence_status"),
+        "retry_status": trace.get("retry_status"),
+        "revision": bool(rounds) or consumed > 0,
+    }
+    if reasons:
+        attrs["reason"] = sanitize_agent_diagnostic(reasons[0])
+    return {
+        key: value
+        for key, value in attrs.items()
+        if value not in (None, "")
+    }
+
+
+def emit_critic_phase_start(
+    name: str,
+    *,
+    trace: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Emit PHASE_START for critic or critic_retry without raising."""
+    from src.agent.observability import emit_phase_start
+
+    emit_phase_start(str(name or CRITIC_STAGE_NAME), attrs=_bounded_phase_attrs(trace))
+
+
+def emit_critic_phase_end(
+    name: str,
+    *,
+    status: str = "success",
+    trace: Optional[Dict[str, Any]] = None,
+) -> None:
+    """Emit PHASE_END for critic or critic_retry without raising."""
+    from src.agent.observability import emit_phase_end
+
+    emit_phase_end(
+        str(name or CRITIC_STAGE_NAME),
+        status=status,
+        attrs=_bounded_phase_attrs(trace),
+    )
+
+
+def maybe_emit_critic_phase_start(stage_name: Any) -> None:
+    """Emit critic PHASE_START only when the current stage is the Critic."""
+    if is_critic_stage(stage_name):
+        emit_critic_phase_start(CRITIC_STAGE_NAME)
+
+
+def _phase_end_status(result: StageResult) -> str:
+    return "success" if result.status == StageStatus.COMPLETED else "error"
+
+
+def commit_critic_stage_result(
+    ctx: AgentContext,
+    result: StageResult,
+    *,
+    config: Any = None,
+    stage_name: Any = None,
+) -> Optional[Dict[str, Any]]:
+    """Stamp the critic_trace onto the stage result and close the critic phase."""
+    name = stage_name if stage_name is not None else result.stage_name
+    if not is_critic_stage(name):
+        return None
+    max_iters = resolve_critic_max_iters(config)
+    if result.status == StageStatus.FAILED:
+        trace = record_critic_stage_failure(ctx, max_iters=max_iters)
+    else:
+        trace = get_critic_trace(ctx)
+        if trace is None:
+            trace = record_critic_stage_failure(ctx, max_iters=max_iters)
+        else:
+            trace = apply_iteration_budget(trace, max_iters=max_iters)
+            ctx.meta["critic_trace"] = trace
+    if trace is not None and trace.get("verdict") != "retry":
+        trace = finalize_convergence(ctx)
+    result.meta["critic"] = trace_event_fields(trace)
+    emit_critic_phase_end(
+        CRITIC_STAGE_NAME,
+        status=_phase_end_status(result),
+        trace=trace,
+    )
+    return trace
+
+
+def build_critic_summary(trace: Optional[Dict[str, Any]]) -> str:
+    """Return a deterministic English, sanitized critic summary of at most 300 chars."""
+    mapping = trace if isinstance(trace, dict) else {}
+    convergence = str(mapping.get("convergence_status") or "")
+    base = _SUMMARY_BY_CONVERGENCE.get(convergence)
+    if not base:
+        verdict = sanitize_agent_diagnostic(str(mapping.get("verdict") or "unknown"))
+        status = sanitize_agent_diagnostic(convergence or "unknown")
+        base = f"Critic verdict={verdict}; convergence={status}."
+    reasons = [
+        item for item in list(mapping.get("reasons") or [])
+        if isinstance(item, str) and item.strip()
+    ]
+    if reasons:
+        extra = sanitize_agent_diagnostic(reasons[0])
+        candidate = f"{base} {extra}"
+        if len(candidate) <= _SUMMARY_MAX_CHARS:
+            base = candidate
+    text = sanitize_agent_diagnostic(base)
+    return text[:_SUMMARY_MAX_CHARS]
+
+
+def build_dashboard_critic_appendix(
+    trace: Optional[Dict[str, Any]],
+    *,
+    enabled: bool,
+    ran: bool,
+) -> Dict[str, Any]:
+    """Build the additive dashboard.critic appendix from a bounded critic_trace."""
+    mapping = dict(trace) if isinstance(trace, dict) else {}
+    verdict = mapping.get("verdict")
+    if verdict not in _ALLOWED_VERDICTS:
+        verdict = "fail_soft"
+    convergence = mapping.get("convergence_status")
+    if convergence not in _ALLOWED_CONVERGENCE:
+        convergence = _CONVERGENCE_NOT_REQUIRED
+    rounds = mapping.get("revision_rounds")
+    try:
+        consumed = max(0, int(mapping.get("iteration_consumed") or 0))
+    except (TypeError, ValueError):
+        consumed = 0
+    iteration_max = _bounded_iteration_budget(mapping.get("iteration_max"))
+    revision_occurred = (isinstance(rounds, list) and bool(rounds)) or consumed > 0
+    retry_status = mapping.get("retry_status") or "not_started"
+    summary_source = dict(mapping)
+    summary_source["verdict"] = verdict
+    summary_source["convergence_status"] = convergence
+    return {
+        "enabled": bool(enabled),
+        "ran": bool(ran),
+        "verdict": verdict,
+        "convergence_status": convergence,
+        "retry_status": retry_status,
+        "revision_occurred": bool(revision_occurred),
+        "iteration_consumed": consumed,
+        "iteration_max": iteration_max,
+        "summary": build_critic_summary(summary_source),
+    }
+
+
 class BoundedCriticAgent(BaseAgent):
     """One-call, tool-free verifier over already-collected Multi evidence."""
 
@@ -986,18 +1166,25 @@ __all__ = [
     "CRITIC_MAX_ITERS_HARD_CAP",
     "CRITIC_MAX_STEPS",
     "CRITIC_RETRY_BUDGET",
+    "CRITIC_RETRY_PHASE_NAME",
     "CRITIC_STAGE_NAME",
     "INTELLIGENCE_RETRY_TARGET",
     "SKILL_RETRY_TARGET_PREFIX",
     "append_revision_round",
     "apply_iteration_budget",
+    "build_critic_summary",
+    "build_dashboard_critic_appendix",
     "build_retry_seed",
     "build_revision_diff",
+    "commit_critic_stage_result",
+    "emit_critic_phase_end",
+    "emit_critic_phase_start",
     "finalize_convergence",
     "finish_retry",
     "get_critic_trace",
     "is_critic_enabled",
     "is_critic_stage",
+    "maybe_emit_critic_phase_start",
     "mark_convergence_unavailable",
     "mark_retry_unavailable",
     "mode_budget_allows_optional_work",

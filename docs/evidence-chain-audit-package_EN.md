@@ -46,6 +46,7 @@ Security-audit events: `evidence_chain.export`, `audit_package.export`.
 3. Redaction reuses `redact_export_payload` from reasoning-trace export.
 4. Audit package embeds reasoning-trace via `build_reasoning_trace_package` (no parallel exporter).
 5. Failed, timed-out, or unknown source/tool runs cannot support conclusions; they remain explicit missing evidence records.
+6. When `dashboard.critic` is present, the existing builder projects one `pipeline_stage` item with `source_id=critic`, one reasoning step with `stage`/`role` critic, and `dashboard.critic` coverage. This does not expand the schema.
 
 ## Rollback
 

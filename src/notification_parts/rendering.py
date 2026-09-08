@@ -12,6 +12,7 @@ if TYPE_CHECKING:
         _append_strategy_synthesis_block,
         _append_bull_bear_debate_block,
         _append_red_team_block,
+        _append_critic_block,
         _safe_float,
         display_action_fields_for_result,
         display_decision_type_for_result,
@@ -805,6 +806,8 @@ class _RenderingMethods:
                 _append_bull_bear_debate_block(report_lines, debate_payload, labels, report_language)
                 red_team_payload = dashboard.get("red_team") if isinstance(dashboard, dict) else None
                 _append_red_team_block(report_lines, red_team_payload, labels)
+                critic_payload = dashboard.get("critic") if isinstance(dashboard, dict) else None
+                _append_critic_block(report_lines, critic_payload, labels)
 
                 from src.notification import _append_multi_model_comparison_block
 
@@ -1410,6 +1413,8 @@ class _RenderingMethods:
         _append_bull_bear_debate_block(lines, debate_payload, labels, report_language)
         red_team_payload = dashboard.get("red_team") if isinstance(dashboard, dict) else None
         _append_red_team_block(lines, red_team_payload, labels)
+        critic_payload = dashboard.get("critic") if isinstance(dashboard, dict) else None
+        _append_critic_block(lines, critic_payload, labels)
 
         from src.notification import _append_multi_model_comparison_block
 

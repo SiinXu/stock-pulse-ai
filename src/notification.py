@@ -45,6 +45,7 @@ from src.notification_parts.noise import (
 )
 from src.report_language import (
     append_committee_deliberation_lines as _append_committee_deliberation_lines,
+    append_critic_lines as _append_critic_lines,
     format_red_team_limitations_overflow_note as _format_red_team_limitations_overflow_note,
     format_strategy_skill_items,
     get_localized_stock_name,
@@ -768,6 +769,10 @@ class NotificationBuilder:
 
 
 # Convenient function
+
+def _append_critic_block(lines: List[str], payload: Any, labels: Dict[str, str]) -> None:
+    _append_critic_lines(lines, {"critic": payload} if isinstance(payload, dict) else {}, labels)
+
 
 def _append_red_team_block(lines: List[str], payload: Any, labels: Dict[str, str]) -> None:
     if not isinstance(payload, dict) or not payload.get("enabled"):

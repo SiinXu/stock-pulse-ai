@@ -120,6 +120,37 @@ def test_failed_source_runs_do_not_support_decisions():
     assert decision["evidence_refs"] == []
     assert any(item["status"] == "missing" for item in package["evidence_items"])
 
+def test_dashboard_critic_is_projected_when_present():
+    raw = _base_raw_result()
+    raw["dashboard"]["critic"] = {
+        "enabled": True,
+        "ran": True,
+        "verdict": "pass",
+        "convergence_status": "pass",
+        "retry_status": "not_requested",
+        "revision_occurred": False,
+        "iteration_consumed": 0,
+        "iteration_max": 1,
+        "summary": "Critic passed without requesting a revision.",
+    }
+    package = build_evidence_chain_package(
+        run_id="run-critic", record_id="131", diagnostics=_diagnostics(), raw_result=raw,
+    ).package
+    EvidenceChainPackage.model_validate(package)
+    items = [
+        item for item in package["evidence_items"]
+        if item["source_type"] == "pipeline_stage" and item["source_id"] == "critic"
+    ]
+    steps = [
+        step for step in package["reasoning_steps"]
+        if step.get("stage") == "critic" or step.get("role") == "critic"
+    ]
+    coverage = {source["source"]: source for source in package["coverage"]["sources"]}
+    assert items and items[0]["snippet"]
+    assert steps
+    assert coverage["dashboard.critic"]["present"] is True
+
+
 def test_service_disabled_raises():
     service = EvidenceChainService(
         history_service=SimpleNamespace(_resolve_record=lambda _id: object()),

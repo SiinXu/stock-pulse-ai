@@ -104,6 +104,10 @@ URLs record that ambiguity as `context=unknown`, preventing refresh from
 recreating a duplicate draft without falsely claiming `context=active`.
 Critic events are not emitted on Chat runs. A non-Chat progress consumer can
 render their bounded fields directly or treat them as an additive unknown type.
+Enabled Native Multi also persists `agent.phase_start` / `agent.phase_end`
+observability events named `critic` and `critic_retry` on
+`diagnostics.agent_events` for `/flow` and the process timeline. Those are
+not additional SSE types.
 If a future backend event is not recognized, the UI keeps the event in the
 message progress history and renders a generic fallback instead of an empty
 progress row.

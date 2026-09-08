@@ -852,6 +852,15 @@ class _DashboardMethods:
             phase_decision["data_limitations"] = merged
             dashboard_block["phase_decision"] = phase_decision
 
+        dashboard_block.pop("critic", None)
+        critic_trace = ctx.meta.get("critic_trace") if isinstance(ctx.meta, dict) else None
+        if isinstance(critic_trace, dict):
+            dashboard_block["critic"] = _critic.build_dashboard_critic_appendix(
+                critic_trace,
+                enabled=True,
+                ran=str(critic_trace.get("validation_status") or "") != "budget_skipped",
+            )
+
         # Bull-Bear debate section (#117): additive product surface; never silent-drop.
         try:
             from src.agent.bull_bear_debate import (

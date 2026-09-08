@@ -607,6 +607,15 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "red_team_missing_heading": "证据缺口",
         "red_team_no_replace_note": "红队二审不替换主决策对象。",
         "red_team_limitations_overflow_note": "主决策 data_limitations 已满，另有 {count} 条红队缺口仅保留在本节。",
+        "critic_heading": "批评审阅",
+        "critic_verdict_label": "审阅结论",
+        "critic_convergence_label": "收敛状态",
+        "critic_retry_status_label": "重试状态",
+        "critic_revision_label": "是否修订",
+        "critic_iteration_label": "修订轮次",
+        "critic_summary_label": "审阅摘要",
+        "critic_revision_occurred_yes": "已修订",
+        "critic_revision_occurred_no": "未修订",
         "report_strata_heading": "证据分层",
         "disclaimer_heading": "非投资建议声明",
         "verified_facts_heading": "已核实事实",
@@ -863,6 +872,15 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "red_team_missing_heading": "Evidence gaps",
         "red_team_no_replace_note": "Red-team review does not replace the primary decision object.",
         "red_team_limitations_overflow_note": "Primary data_limitations is at capacity; omitted {count} red-team gap(s) remain in this section only.",
+        "critic_heading": "Critic Review",
+        "critic_verdict_label": "Verdict",
+        "critic_convergence_label": "Convergence",
+        "critic_retry_status_label": "Retry status",
+        "critic_revision_label": "Revision",
+        "critic_iteration_label": "Iteration",
+        "critic_summary_label": "Summary",
+        "critic_revision_occurred_yes": "revised",
+        "critic_revision_occurred_no": "no revision",
         "report_strata_heading": "Evidence Strata",
         "disclaimer_heading": "Non-Investment-Advice Disclaimer",
         "verified_facts_heading": "Verified Facts",
@@ -1121,6 +1139,15 @@ _REPORT_LABELS: Dict[str, Dict[str, str]] = {
         "red_team_missing_heading": "증거 공백",
         "red_team_no_replace_note": "레드팀 재검토는 주 결정을 대체하지 않습니다.",
         "red_team_limitations_overflow_note": "주 결정 data_limitations가 가득 차 {count}개 레드팀 공백은 이 섹션에만 남습니다.",
+        "critic_heading": "비평 검토",
+        "critic_verdict_label": "판정",
+        "critic_convergence_label": "수렴 상태",
+        "critic_retry_status_label": "재시도 상태",
+        "critic_revision_label": "개정 여부",
+        "critic_iteration_label": "개정 횟수",
+        "critic_summary_label": "요약",
+        "critic_revision_occurred_yes": "개정됨",
+        "critic_revision_occurred_no": "개정 없음",
         "report_strata_heading": "증거 계층",
         "disclaimer_heading": "투자 권유 아님 고지",
         "verified_facts_heading": "검증된 사실",
@@ -1762,6 +1789,40 @@ def append_red_team_lines(
     if overflow_note:
         lines.append(f"- {overflow_note}")
     lines.append(f"- {labels.get('red_team_no_replace_note', 'Red-team review does not replace the primary decision object.')}")
+    lines.append("")
+
+
+def append_critic_lines(
+    lines: List[str],
+    dashboard: Any,
+    labels: Dict[str, str],
+) -> None:
+    """Append the additive Critic appendix. No-op when the stage was not entered."""
+    payload = dashboard.get("critic") if isinstance(dashboard, dict) else None
+    if not isinstance(payload, dict) or not payload.get("enabled"):
+        return
+    revision_label = (
+        labels.get("critic_revision_occurred_yes", "revised")
+        if payload.get("revision_occurred")
+        else labels.get("critic_revision_occurred_no", "no revision")
+    )
+    lines.append(f"### 🔍 {labels.get('critic_heading', 'Critic Review')}")
+    lines.append(
+        f"- {labels.get('critic_verdict_label', 'Verdict')}: {payload.get('verdict')} | "
+        f"{labels.get('critic_convergence_label', 'Convergence')}: "
+        f"{payload.get('convergence_status')} | "
+        f"{labels.get('critic_retry_status_label', 'Retry status')}: "
+        f"{payload.get('retry_status')}"
+    )
+    lines.append(
+        f"- {labels.get('critic_revision_label', 'Revision')}: {revision_label} | "
+        f"{labels.get('critic_iteration_label', 'Iteration')}: "
+        f"{payload.get('iteration_consumed')}/{payload.get('iteration_max')}"
+    )
+    if payload.get("summary"):
+        lines.append(
+            f"- {labels.get('critic_summary_label', 'Summary')}: {payload.get('summary')}"
+        )
     lines.append("")
 
 

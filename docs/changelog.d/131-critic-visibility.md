@@ -1,0 +1,1 @@
+- [Added] Native Multi Critic now writes an additive dashboard.critic appendix, persisted phase_start/end events, and evidence-chain coverage for pass and revision outcomes (Refs #131).
