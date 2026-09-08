@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { RuntimeCapabilitiesPanel } from '../RuntimeCapabilitiesPanel';
 
 const listCapabilities = vi.fn();
@@ -58,11 +60,26 @@ function modelResponse() {
 }
 
 function renderPanel() {
-  return render(
-    <UiLanguageProvider initialLanguage="en">
-      <RuntimeCapabilitiesPanel />
-    </UiLanguageProvider>,
-  );
+  const client = createAppQueryClient();
+  return {
+    client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <UiLanguageProvider initialLanguage="en">
+          <RuntimeCapabilitiesPanel />
+        </UiLanguageProvider>
+      </QueryClientProvider>,
+    ),
+  };
+}
+
+function serverError(message: string): Error {
+  return Object.assign(new Error('server'), {
+    response: {
+      status: 500,
+      data: { error: 'internal', message },
+    },
+  });
 }
 
 describe('RuntimeCapabilitiesPanel', () => {
@@ -136,6 +153,18 @@ describe('RuntimeCapabilitiesPanel', () => {
 
     await waitFor(() => expect(listCapabilities).toHaveBeenCalledTimes(2));
     expect(await screen.findByText('Market quote')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload: Capabilities' })).toBeInTheDocument();
+  });
+
+  it('shows the DataTable error path when the first capabilities GET fails with no snapshot', async () => {
+    listCapabilities.mockRejectedValue(serverError('capabilities unavailable'));
+    getModels.mockResolvedValue(modelResponse());
+
+    renderPanel();
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.queryByText('Market quote')).not.toBeInTheDocument();
+    expect(screen.getByText('Primary Agent')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Reload: Capabilities' })).toBeInTheDocument();
   });
 });

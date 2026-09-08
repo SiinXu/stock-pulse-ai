@@ -1,15 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { agentApi, type AgentModelDeployment } from '../../api/agent';
+import { useMemo } from 'react';
+import { type AgentModelDeployment } from '../../api/agent';
 import {
-  capabilitiesApi,
   type CapabilityItem,
-  type CapabilityListResponse,
   type CapabilitySourceStatus,
 } from '../../api/capabilities';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { useRuntimeCapabilitiesQuery } from '../../hooks/useRuntimeCapabilitiesQuery';
 import { MODEL_ACCESS_TEXT } from '../../locales/settingsModelAccess';
 import { SETTINGS_PAGE_TEXT } from '../../locales/settingsPage';
 import {
@@ -69,60 +67,16 @@ export function RuntimeCapabilitiesPanel() {
   const agentModelsTitle = `${text.routeAgent} · ${modelText.availableModels}`;
   const capabilityReloadLabel = `${text.reload}: ${capabilityTitle}`;
   const modelReloadLabel = `${text.reload}: ${agentModelsTitle}`;
-  const [capabilities, setCapabilities] = useState<CapabilityListResponse | null>(null);
-  const [models, setModels] = useState<AgentModelDeployment[] | null>(null);
-  const [capabilitiesError, setCapabilitiesError] = useState<ParsedApiError | null>(null);
-  const [modelsError, setModelsError] = useState<ParsedApiError | null>(null);
-  const [capabilitiesLoading, setCapabilitiesLoading] = useState(true);
-  const [modelsLoading, setModelsLoading] = useState(true);
-  const [capabilitiesRequest, setCapabilitiesRequest] = useState(0);
-  const [modelsRequest, setModelsRequest] = useState(0);
-
-  const reloadCapabilities = useCallback(() => {
-    setCapabilitiesLoading(true);
-    setCapabilitiesError(null);
-    setCapabilitiesRequest((request) => request + 1);
-  }, []);
-
-  const reloadModels = useCallback(() => {
-    setModelsLoading(true);
-    setModelsError(null);
-    setModelsRequest((request) => request + 1);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void capabilitiesApi.list().then((response) => {
-      if (cancelled) return;
-      setCapabilities(response);
-      setCapabilitiesError(null);
-    }).catch((error: unknown) => {
-      if (cancelled) return;
-      setCapabilitiesError(getParsedApiError(error));
-    }).finally(() => {
-      if (!cancelled) setCapabilitiesLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [capabilitiesRequest]);
-
-  useEffect(() => {
-    let cancelled = false;
-    void agentApi.getModels().then((response) => {
-      if (cancelled) return;
-      setModels(response.models);
-      setModelsError(null);
-    }).catch((error: unknown) => {
-      if (cancelled) return;
-      setModelsError(getParsedApiError(error));
-    }).finally(() => {
-      if (!cancelled) setModelsLoading(false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [modelsRequest]);
+  const {
+    capabilities,
+    capabilitiesLoading,
+    capabilitiesError,
+    models,
+    modelsLoading,
+    modelsError,
+    reloadCapabilities,
+    reloadModels,
+  } = useRuntimeCapabilitiesQuery();
 
   const capabilityRows = useMemo(
     () => [...(capabilities?.items ?? [])].sort((left, right) => (
