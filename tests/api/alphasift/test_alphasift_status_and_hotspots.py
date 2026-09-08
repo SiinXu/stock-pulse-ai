@@ -1893,3 +1893,31 @@ class AlphaSiftOpportunitiesApiTestCase(_AlphaSiftApiTestCaseBase):
             text = provider._fetch_ths_summary_event("MLCC")
 
         self.assertEqual(text, "")
+
+
+def test_local_only_blocks_eastmoney_board_names_before_session_get(monkeypatch) -> None:
+    import pandas as pd
+
+    monkeypatch.setenv("LOCAL_ONLY_MODE", "true")
+    provider = alphasift_service.DsaEastMoneyHotspotProvider()
+    transport = MagicMock(side_effect=AssertionError("eastmoney session.get egressed"))
+    with patch.object(provider, "_fetch_board_changes_with_fallback", return_value=pd.DataFrame()):
+        with patch.object(provider, "_fetch_rankings_with_fallback", return_value=pd.DataFrame()):
+            with patch.object(provider._session, "get", transport):
+                frame = provider._fetch_board_names(source_fs="m:90 t:3 f:!50")
+    assert frame.empty
+    transport.assert_not_called()
+
+
+def test_local_only_hotspot_rows_fail_soft_when_eastmoney_fallback_blocked(monkeypatch) -> None:
+    import pandas as pd
+
+    monkeypatch.setenv("LOCAL_ONLY_MODE", "true")
+    provider = alphasift_service.DsaEastMoneyHotspotProvider()
+    transport = MagicMock(side_effect=AssertionError("eastmoney session.get egressed"))
+    with patch.object(provider, "_fetch_board_changes_with_fallback", return_value=pd.DataFrame()):
+        with patch.object(provider, "_fetch_rankings_with_fallback", return_value=pd.DataFrame()):
+            with patch.object(provider._session, "get", transport):
+                rows = provider.hotspot_rows(top=12)
+    assert rows == []
+    transport.assert_not_called()

@@ -1,0 +1,1 @@
+- [Fixed] Routed the AlphaSift EastMoney hotspot last-fallback GET through the outbound safe wrapper (Refs #218).
