@@ -1,6 +1,6 @@
 # Principal 作用域分层 Agent 记忆
 
-**状态**：分层记忆基础 + 生命周期 + 默认关闭的观测持久化存储（无生产分层记忆 prompt 注入，无用户 CRUD）。#1118 剩余 UX/prompt/语义事实/程序层 persist：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。写入准入库：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1。按标的确定性 episode 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2（压缩仍开放）。
+**状态**：分层记忆基础 + 生命周期 + 默认关闭的观测持久化存储（无生产分层记忆 prompt 注入，无用户 CRUD）。#1118 剩余 UX/prompt/语义事实/程序层 persist：[#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118)。来源标注与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。写入准入库：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1。按标的确定性 episode 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2。按标的紧凑 episode 压缩：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 3。
 
 **English**: [agent-memory.md](agent-memory.md)
 
@@ -15,6 +15,7 @@
 | `src/agent/memory_isolation.py` | 面向 prompt 的不可信数据隔离 |
 | `src/schemas/memory_write_policy.py` | 仅库层、覆盖既有存储的写入准入（#1119 Slice 1） |
 | `src/schemas/memory_forget_policy.py` | 仅库层、覆盖既有 `agent_episodes` 的按标的遗忘（#1119 Slice 2） |
+| `src/schemas/memory_consolidate_policy.py` | 仅库层、把旧 episodic 行压成一条 `mode=consolidate` 摘要（#1119 Slice 3） |
 | `src/schemas/layered_memory_persist.py` | 观测映射准入：服务端 provenance、secret/PII 拒绝、事实/意见锁 |
 | `src/repositories/layered_memory_repo.py` | SQLite 观测行 + 同意 + 仅追加访问审计 |
 | `src/services/layered_memory_collection_service.py` | 分析历史保存后的默认关闭、失败软化收集 |
@@ -139,6 +140,28 @@ Decision Memory 的 `admit_decision_memory` 是 **独立的 READ / 注入** 过�
 
 本切片 **不** 增加压缩、Decision Memory 检索分数衰减、#1118 存储、自动晋升或新的产品反馈 API。不可逆遗忘会向既有 `agent_evolution_events` 追加仅元数据的 `episode.forget` 行。[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) 保持开放。
 
+<a id="episode-consolidation-policy"></a>
+## Episode 压缩策略（#1119 Slice 3）
+
+仅库层的按标的压缩位于 `src/schemas/memory_consolidate_policy.py`，由 `AgentEpisodeRepository.apply_consolidate` 作用于既有 `agent_episodes` 表。源集合精确等于 Slice 2 会删除的按标的行（严格 `created_at < cutoff`，再按最旧 `id` 做容量溢出），并排除 `mode=consolidate` 行。少于两行源数据是空操作，以便既有遗忘仍能丢掉剩余行。UPDATE 仍被 `trg_agent_episodes_immutable` 中止。没有新表、新环境变量、公开 API、Web 或 Desktop CRUD。
+
+| 规则 | 契约 |
+| --- | --- |
+| 作用域 | 必须有非空 `symbol`。缺符号 / 空白为无策略或 fail-closed 的无作用域，**绝不是**全局改写 |
+| 源集合 | Slice 2 遗忘删除集减去已有 `mode=consolidate` 摘要 |
+| 最小批次 | 少于两行源数据时不写库 |
+| 摘要 | 恰好一条有大小上限的 `AgentEpisodeCreate`，`mode=consolidate`，只含计数与紧凑 lessons。没有 Soul 正文、用户笔记事实或原始轨迹转储。`require_episodic_write` 必须准入，否则整笔中止 |
+| 无策略 | 既无 cutoff 也无 `max_rows` 时不写库；`remaining_count` 是该 symbol（无 symbol 时为整表）的实时 COUNT |
+| 时钟 | cutoff 来自注入的 datetime（`retention_days` 必须带 `now`）。复用既有 `AGENT_EPISODE_RETENTION_DAYS` / `AGENT_EPISODE_MAX_ROWS` |
+| 审计 | 不可逆源 DELETE 会在同一 `session_scope` 里、已准入摘要 INSERT 之后、DELETE 之前插入仅元数据的 `episode.consolidate` EvolutionEvent（symbol、计数、cutoff/max_rows、源行 id 的 SHA-256、新摘要 `episode_id`）。摘要或审计失败则回滚全部写入。dry-run / 无策略不写事件，也不存 episode 正文、lessons 或轨迹 |
+| 事务 | 压缩本身是一次 SQLite 写事务：选出源 id → 已准入摘要 INSERT → 一条 EvolutionEvent → 仅对这些源 id 分块 `DELETE ... id IN (...)` → commit。分块不是多次提交。`append` 仍先提交；insert+consolidate+forget **不是**同一事务。SQLite 串行化写者；本切片不用 `SELECT FOR UPDATE` |
+| 恢复 | 代码回滚不能恢复已删源 episode 行，只能靠备份 / PITR。`AGENT_EPISODE_LOG_ENABLED=false` 只停止新写入与追加后压缩/遗忘 |
+| 不在范围内 | prediction、decision-memory 排序或分数衰减、sidecar 反馈/标签、Soul 编辑、语义/程序性 persist、公开 API / Web / Desktop |
+
+成功追加 episode 后，`AgentEpisodeService` 只对该次写入的 symbol **先**运行本策略，再跑既有遗忘。分析路径仍 fail-soft：压缩失败只记日志、不写库，也不会把已成功的 append 变成 `None`，更不会跳过后续遗忘。显式 `consolidate_symbol(...)` 不是 fail-soft。其他 symbol 的行以及已有摘要不会成为该次压缩的源。
+
+本切片 **不** 增加 Decision Memory 检索分数衰减、#1118 存储、自动晋升或新的产品反馈 API。[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) 保持开放。
+
 ## 剩余范围
 
 - 权威 principal 赋值（API/bot/CLI/定时任务）与遗留迁移。
@@ -147,7 +170,7 @@ Decision Memory 的 `admit_decision_memory` 是 **独立的 READ / 注入** 过�
 - 语义事实表 persist 与程序层权重 persist（#1119 下仍为 fail-closed `persist=False`）。
 - 偏好层：[#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117)（吸收已关闭的 [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)）。
 - 记忆 provenance、事实/意见隔离与防投毒基线：[#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124)。DAG-0 威胁注释、DAG-1 事实/意见锁定、DAG-2 Soul/超限写路径拒绝（`src/schemas/memory_write_guard.py`）和 DAG-3 服务端盖章 provenance（`src/schemas/memory_provenance.py`）已落地。DAG-4 将默认关闭的 AgentMemory 注入隔离为不可信数据（`src/agent/agents/base_agent.py` / `src/agent/memory.py`），`signal` 规范为 `buy` / `hold` / `sell`。不要并入 #1118 存储/UI 或 #1105 产品反馈 API。
-- 写入准入 / 压缩 / 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119)。Slice 1（库层写入准入）与 Slice 2（按标的确定性 episode 遗忘）见上文。仍缺：旧 episodic 行压缩、不改 Soul 的语义/程序性候选晋升、Decision Memory 检索分数衰减，以及 [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113) 落地后丢弃已回滚的程序性标记。保持 #1119 开放。
+- 写入准入 / 压缩 / 遗忘：[#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119)。Slice 1（库层写入准入）、Slice 2（按标的确定性 episode 遗忘）与 Slice 3（按标的紧凑 episode 压缩）见上文。仍缺：不改 Soul 的语义/程序性候选晋升、Decision Memory 检索分数衰减，以及 [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113) 落地后丢弃已回滚的程序性标记。保持 #1119 开放。
 
 不要重开 #250、#198 或 #150。
 
@@ -174,7 +197,7 @@ automatic 路径开启时：
 
 ## 回滚
 
-将 `LAYERED_MEMORY_COLLECTION_ENABLED=false`（默认值）关闭收集。然后执行本切片 migration `downgrade`，仅 DROP `layered_memory_observations`、`layered_memory_consent`、`layered_memory_access_audit` 及其索引/trigger。不得触碰 episode / evolution-event / prediction / decision-memory 表。回退 PR 以移除收集助手。未接线生产 prompt，关闭开关后分析输出不变。回退 episode 遗忘相关模块/测试/文档/配置描述/Settings 帮助与 changelog fragment。采集与 episode 日志默认关闭。Slice 2 无 migration；已被 DELETE 的 episode 行无法用代码恢复，只能靠备份 / PITR。EvolutionEvent 审计行是 append-only，不会被 episode 遗忘删除。
+将 `LAYERED_MEMORY_COLLECTION_ENABLED=false`（默认值）关闭收集。然后执行本切片 migration `downgrade`，仅 DROP `layered_memory_observations`、`layered_memory_consent`、`layered_memory_access_audit` 及其索引/trigger。不得触碰 episode / evolution-event / prediction / decision-memory 表。回退 PR 以移除收集助手。未接线生产 prompt，关闭开关后分析输出不变。回退 episode 遗忘与压缩相关模块/测试/文档/配置描述/Settings 帮助与 changelog fragment。采集与 episode 日志默认关闭。Slice 2 与 Slice 3 无 migration；已被 DELETE 的 episode 行无法用代码恢复，只能靠备份 / PITR。EvolutionEvent 审计行是 append-only，不会被 episode 遗忘或压缩删除。
 
 ## 相关：错误模式百科
 

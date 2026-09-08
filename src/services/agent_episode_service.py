@@ -23,6 +23,11 @@ from src.schemas.agent_episode import (
     EpisodeOutcomeLabels,
     TrajectoryStepSummary,
 )
+from src.schemas.memory_consolidate_policy import (
+    EpisodeConsolidateResult,
+    MemoryConsolidateError,
+    resolve_episode_consolidate_policy,
+)
 from src.schemas.memory_forget_policy import (
     EpisodeForgetResult,
     MemoryForgetError,
@@ -85,6 +90,7 @@ class AgentEpisodeService:
             )
             create = self._sanitize_create(create)
             stored = self._get_repository().append(create)
+            self._maybe_apply_consolidation(cfg, symbol=stored.symbol)
             self._maybe_apply_forgetting(cfg, symbol=stored.symbol)
             return stored
         except Exception as exc:  # broad-exception: fallback_recorded - episode append must never fail analysis
@@ -215,6 +221,49 @@ class AgentEpisodeService:
         )
         return result
 
+    def consolidate_symbol(
+        self,
+        symbol: str,
+        *,
+        cutoff: Optional[datetime] = None,
+        retention_days: Optional[int] = None,
+        max_rows: Optional[int] = None,
+        now: Optional[datetime] = None,
+        dry_run: bool = False,
+    ) -> EpisodeConsolidateResult:
+        """Apply an explicit per-symbol consolidate pass.
+
+        Missing cutoff and max_rows is no-policy and writes nothing. Invalid
+        or unscoped policy raises. Persistence failures raise; this path is
+        not fail-soft. Analysis still uses ``_maybe_apply_consolidation``.
+        """
+        repository = self._get_repository()
+        clock_now = now if now is not None else repository._clock()
+        decision = resolve_episode_consolidate_policy(
+            symbol=symbol,
+            cutoff=cutoff,
+            retention_days=retention_days,
+            now=clock_now,
+            max_rows=max_rows,
+            dry_run=dry_run,
+        )
+        if decision.error_code:
+            raise MemoryConsolidateError(
+                decision.reason or "invalid episode consolidate policy",
+                error_code=decision.error_code,
+            )
+        result = repository.apply_consolidate(decision)
+        logger.info(
+            "agent_episode_consolidate_applied deleted_count=%s remaining_count=%s "
+            "symbol=%s dry_run=%s summary_episode_id=%s",
+            result.deleted_count,
+            result.remaining_count,
+            result.symbol,
+            result.dry_run,
+            result.summary_episode_id,
+        )
+        return result
+
     def _sanitize_create(self, episode: AgentEpisodeCreate) -> AgentEpisodeCreate:
         lessons: List[EpisodeLesson] = []
         for lesson in episode.lessons:
@@ -227,9 +276,7 @@ class AgentEpisodeService:
             outcome = EpisodeOutcomeLabels.model_validate(redacted) if isinstance(redacted, dict) else None
         return episode.model_copy(update={"lessons": lessons, "outcome_labels": outcome, "soul_charter": None})
 
-    def _maybe_apply_forgetting(self, config: Any, *, symbol: Optional[str]) -> None:
-        if not isinstance(symbol, str) or not symbol.strip():
-            return
+    def _retention_bounds(self, config: Any) -> tuple[int, int]:
         retention_days = _policy_int(
             config, "agent_episode_retention_days", AGENT_EPISODE_DEFAULT_RETENTION_DAYS,
             minimum=1, maximum=3650,
@@ -238,6 +285,43 @@ class AgentEpisodeService:
             config, "agent_episode_max_rows", AGENT_EPISODE_DEFAULT_MAX_ROWS,
             minimum=100, maximum=1_000_000,
         )
+        return retention_days, max_rows
+
+    def _maybe_apply_consolidation(self, config: Any, *, symbol: Optional[str]) -> None:
+        if not isinstance(symbol, str) or not symbol.strip():
+            return
+        retention_days, max_rows = self._retention_bounds(config)
+        try:
+            repository = self._get_repository()
+            decision = resolve_episode_consolidate_policy(
+                symbol=symbol,
+                retention_days=retention_days,
+                now=repository._clock(),
+                max_rows=max_rows,
+            )
+            if decision.error_code or not decision.apply:
+                return
+            result = repository.apply_consolidate(decision)
+            logger.info(
+                "agent_episode_consolidate_applied deleted_count=%s remaining_count=%s "
+                "symbol=%s dry_run=%s summary_episode_id=%s",
+                result.deleted_count,
+                result.remaining_count,
+                result.symbol,
+                result.dry_run,
+                result.summary_episode_id,
+            )
+        except Exception as exc:  # broad-exception: fallback_recorded - consolidation is fail-soft after append
+            log_safe_exception(
+                logger, "agent_episode_consolidate_failed", exc,
+                error_code="agent_episode_consolidate_failed",
+                context={"symbol": symbol},
+            )
+
+    def _maybe_apply_forgetting(self, config: Any, *, symbol: Optional[str]) -> None:
+        if not isinstance(symbol, str) or not symbol.strip():
+            return
+        retention_days, max_rows = self._retention_bounds(config)
         try:
             repository = self._get_repository()
             decision = resolve_episode_forget_policy(

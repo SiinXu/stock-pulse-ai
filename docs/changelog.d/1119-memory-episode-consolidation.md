@@ -1,0 +1,1 @@
+- [Added] Compress old per-symbol episodic rows into one admitted `mode=consolidate` summary episode before existing TTL/capacity deletion, with a single SQLite writer transaction, metadata-only `episode.consolidate` EvolutionEvent audit, and fail-soft analysis-path behavior (Refs #1119).
