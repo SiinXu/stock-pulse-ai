@@ -17,6 +17,17 @@ from src.repositories.agent_episode_tables import agent_episodes_table
 from src.repositories.agent_evolution_event_repo import insert_evolution_event_on_session
 from src.repositories.base import BaseRepository, RepositoryError
 from src.schemas.evolution_event import EvolutionEventCreate
+from src.schemas.memory_consolidate_policy import (
+    CONSOLIDATE_MIN_SOURCE_ROWS,
+    EPISODE_CONSOLIDATE_EVENT_TYPE,
+    EPISODE_CONSOLIDATE_MODE,
+    ERROR_CONSOLIDATE_INVALID_POLICY,
+    ERROR_CONSOLIDATE_UNSCOPED,
+    EpisodeConsolidateDecision,
+    EpisodeConsolidateResult,
+    MemoryConsolidateError,
+    build_episode_consolidate_summary,
+)
 from src.schemas.memory_forget_policy import (
     EPISODE_FORGET_EVENT_TYPE,
     ERROR_FORGET_INVALID_POLICY,
@@ -237,12 +248,14 @@ class AgentEpisodeRepository(BaseRepository):
             }
         )
 
-    def append(self, episode: AgentEpisodeCreate) -> AgentEpisode:
-        stamp = require_episodic_write(episode).stamp_mapping()
-        now = _as_utc_naive(self._clock())
-        if now is None:
-            raise ValueError("agent episode clock must return a datetime")
-        values = {
+    @staticmethod
+    def _episode_insert_values(
+        episode: AgentEpisodeCreate,
+        *,
+        stamp: dict[str, Optional[str]],
+        created_at: datetime,
+    ) -> dict[str, Any]:
+        return {
             "schema_version": episode.schema_version or AGENT_EPISODE_SCHEMA_VERSION,
             "episode_id": episode.episode_id,
             "run_id": episode.run_id,
@@ -265,10 +278,35 @@ class AgentEpisodeRepository(BaseRepository):
                 if episode.outcome_labels is not None
                 else None
             ),
-            "created_at": now,
+            "created_at": created_at,
             "provenance_source": stamp["provenance_source"],
             "actor_id": stamp["actor_id"],
         }
+
+    def _insert_episode_on_session(
+        self,
+        session: Any,
+        episode: AgentEpisodeCreate,
+        *,
+        stamp: dict[str, Optional[str]],
+        created_at: datetime,
+    ) -> int:
+        result = session.execute(
+            agent_episodes_table.insert().values(
+                **self._episode_insert_values(
+                    episode, stamp=stamp, created_at=created_at
+                )
+            )
+        )
+        session.flush()
+        return int(result.inserted_primary_key[0])
+
+    def append(self, episode: AgentEpisodeCreate) -> AgentEpisode:
+        stamp = require_episodic_write(episode).stamp_mapping()
+        now = _as_utc_naive(self._clock())
+        if now is None:
+            raise ValueError("agent episode clock must return a datetime")
+        values = self._episode_insert_values(episode, stamp=stamp, created_at=now)
         try:
             with self.db.get_session() as session:
                 result = session.execute(agent_episodes_table.insert().values(**values))
@@ -399,6 +437,22 @@ class AgentEpisodeRepository(BaseRepository):
             stmt = stmt.where(agent_episodes_table.c.symbol == symbol)
         return int(session.execute(stmt).scalar() or 0)
 
+    def _ordered_symbol_id_rows(self, session: Any, symbol: str) -> list[Any]:
+        return list(
+            session.execute(
+                select(
+                    agent_episodes_table.c.id,
+                    agent_episodes_table.c.created_at,
+                    agent_episodes_table.c.mode,
+                )
+                .where(agent_episodes_table.c.symbol == symbol)
+                .order_by(
+                    agent_episodes_table.c.created_at.asc(),
+                    agent_episodes_table.c.id.asc(),
+                )
+            )
+        )
+
     def _collect_forget_ids(
         self,
         session: Any,
@@ -407,20 +461,7 @@ class AgentEpisodeRepository(BaseRepository):
         cutoff_naive: Optional[datetime],
         max_rows: Optional[int],
     ) -> tuple[list[int], list[int]]:
-        scoped = agent_episodes_table.c.symbol == symbol
-        id_rows = list(
-            session.execute(
-                select(
-                    agent_episodes_table.c.id,
-                    agent_episodes_table.c.created_at,
-                )
-                .where(scoped)
-                .order_by(
-                    agent_episodes_table.c.created_at.asc(),
-                    agent_episodes_table.c.id.asc(),
-                )
-            )
-        )
+        id_rows = self._ordered_symbol_id_rows(session, symbol)
         delete_ids: list[int] = []
         kept_ids: list[int] = []
         for row in id_rows:
@@ -440,6 +481,66 @@ class AgentEpisodeRepository(BaseRepository):
             delete_ids.extend(kept_ids[:overflow])
             kept_ids = kept_ids[overflow:]
         return delete_ids, kept_ids
+
+    def _collect_consolidate_source_ids(
+        self,
+        session: Any,
+        *,
+        symbol: str,
+        cutoff_naive: Optional[datetime],
+        max_rows: Optional[int],
+    ) -> list[int]:
+        delete_ids, _kept_ids = self._collect_forget_ids(
+            session,
+            symbol=symbol,
+            cutoff_naive=cutoff_naive,
+            max_rows=max_rows,
+        )
+        mode_by_id = {
+            int(row.id): str(row.mode or "")
+            for row in self._ordered_symbol_id_rows(session, symbol)
+        }
+        return [
+            item
+            for item in delete_ids
+            if mode_by_id.get(item) != EPISODE_CONSOLIDATE_MODE
+        ]
+
+    def _load_episodes_on_session(
+        self,
+        session: Any,
+        *,
+        symbol: str,
+        ids: list[int],
+    ) -> list[AgentEpisode]:
+        if not ids:
+            return []
+        chunk_size = forget_id_in_chunk_size(
+            session, configured=self._forget_id_chunk_size
+        )
+        by_id: dict[int, AgentEpisode] = {}
+        scoped = agent_episodes_table.c.symbol == symbol
+        for offset in range(0, len(ids), chunk_size):
+            chunk = ids[offset : offset + chunk_size]
+            rows = session.execute(
+                select(agent_episodes_table).where(
+                    and_(
+                        scoped,
+                        agent_episodes_table.c.id.in_(list(chunk)),
+                    )
+                )
+            ).all()
+            for row in rows:
+                episode = self._row_to_episode(row)
+                by_id[int(episode.id)] = episode
+        missing = [item for item in ids if item not in by_id]
+        if missing:
+            raise RepositoryError(
+                "episode consolidate could not load the selected source set",
+                error_code="agent_episode_consolidate_conflict",
+                context={"symbol": symbol, "missing": len(missing)},
+            )
+        return [by_id[item] for item in ids]
 
     def _audit_forget_on_session(
         self,
@@ -633,6 +734,205 @@ class AgentEpisodeRepository(BaseRepository):
             raise RepositoryError(
                 "agent_episode_forget_failed",
                 error_code="agent_episode_forget_failed",
+                context=context,
+            ) from exc
+
+    def _audit_consolidate_on_session(
+        self,
+        session: Any,
+        *,
+        symbol: str,
+        before_count: int,
+        after_count: int,
+        source_ids: list[int],
+        summary_episode_id: str,
+        cutoff: Optional[datetime],
+        max_rows: Optional[int],
+    ) -> str:
+        fingerprint = hashlib.sha256(
+            ",".join(str(item) for item in sorted(source_ids)).encode("utf-8")
+        ).hexdigest()
+        after: dict[str, Any] = {
+            "count": after_count,
+            "deleted_count": len(source_ids),
+            "source_count": len(source_ids),
+            "source_id_sha256": fingerprint,
+            "symbol": symbol,
+            "summary_episode_id": summary_episode_id,
+        }
+        if cutoff is not None:
+            after["cutoff"] = cutoff.replace(tzinfo=timezone.utc).isoformat()
+        if max_rows is not None:
+            after["max_rows"] = max_rows
+        occurred = self._clock()
+        if occurred.tzinfo is None or occurred.utcoffset() is None:
+            occurred_at = occurred.replace(tzinfo=timezone.utc)
+            created_at = occurred
+        else:
+            occurred_at = occurred.astimezone(timezone.utc)
+            created_at = occurred_at.replace(tzinfo=None)
+        event = EvolutionEventCreate.model_validate(
+            {
+                "event_type": EPISODE_CONSOLIDATE_EVENT_TYPE,
+                "actor": "system",
+                "occurred_at": occurred_at,
+                "before": {"count": before_count, "symbol": symbol},
+                "after": after,
+            }
+        )
+        return insert_evolution_event_on_session(session, event, created_at=created_at)
+
+    def apply_consolidate(
+        self, decision: EpisodeConsolidateDecision
+    ) -> EpisodeConsolidateResult:
+        """Compress in-scope episodic rows for one symbol in a single transaction.
+
+        Source IDs match the Slice 2 forget delete set (strict
+        ``created_at < cutoff``, then oldest ``id`` capacity overflow) excluding
+        ``mode=consolidate`` rows. Fewer than two sources is a no-op. A real
+        pass inserts one admitted summary, one metadata-only EvolutionEvent,
+        then chunked ``DELETE`` of those source IDs only. Summary or audit
+        failure rolls back every write. Dry-run counts without INSERT, DELETE,
+        or event. SQLite serializes writers; this pass does not use
+        SELECT FOR UPDATE.
+        """
+        if not isinstance(decision, EpisodeConsolidateDecision):
+            raise MemoryConsolidateError(
+                "episode consolidate requires a resolved policy decision",
+                error_code=ERROR_CONSOLIDATE_INVALID_POLICY,
+            )
+        if decision.error_code:
+            raise MemoryConsolidateError(
+                decision.reason or "invalid episode consolidate policy",
+                error_code=decision.error_code,
+            )
+        symbol = str(decision.symbol or "").strip() or None
+        if decision.apply and not symbol:
+            raise MemoryConsolidateError(
+                "consolidating requires an explicit symbol scope",
+                error_code=ERROR_CONSOLIDATE_UNSCOPED,
+            )
+        cutoff_naive = (
+            _as_utc_naive(decision.cutoff) if decision.cutoff is not None else None
+        )
+        try:
+            if not decision.apply:
+                with self.db.get_session() as session:
+                    remaining = self._count_remaining(session, symbol)
+                return EpisodeConsolidateResult(
+                    applied=False,
+                    symbol=symbol,
+                    deleted_count=0,
+                    remaining_count=remaining,
+                    cutoff=decision.cutoff,
+                    max_rows=decision.max_rows,
+                    dry_run=bool(decision.dry_run),
+                )
+            assert symbol is not None
+            if decision.dry_run:
+                with self.db.get_session() as session:
+                    source_ids = self._collect_consolidate_source_ids(
+                        session,
+                        symbol=symbol,
+                        cutoff_naive=cutoff_naive,
+                        max_rows=decision.max_rows,
+                    )
+                    remaining = self._count_remaining(session, symbol)
+                will_write = len(source_ids) >= CONSOLIDATE_MIN_SOURCE_ROWS
+                deleted = len(source_ids) if will_write else 0
+                return EpisodeConsolidateResult(
+                    applied=True,
+                    symbol=symbol,
+                    deleted_count=deleted,
+                    remaining_count=(
+                        remaining - deleted + 1 if will_write else remaining
+                    ),
+                    cutoff=cutoff_naive,
+                    max_rows=decision.max_rows,
+                    dry_run=True,
+                    source_count=len(source_ids),
+                )
+            with self.db.session_scope() as session:
+                source_ids = self._collect_consolidate_source_ids(
+                    session,
+                    symbol=symbol,
+                    cutoff_naive=cutoff_naive,
+                    max_rows=decision.max_rows,
+                )
+                before_count = self._count_remaining(session, symbol)
+                if len(source_ids) < CONSOLIDATE_MIN_SOURCE_ROWS:
+                    return EpisodeConsolidateResult(
+                        applied=True,
+                        symbol=symbol,
+                        deleted_count=0,
+                        remaining_count=before_count,
+                        cutoff=cutoff_naive,
+                        max_rows=decision.max_rows,
+                        dry_run=False,
+                        source_count=len(source_ids),
+                    )
+                sources = self._load_episodes_on_session(
+                    session, symbol=symbol, ids=source_ids
+                )
+                summary = build_episode_consolidate_summary(sources, symbol=symbol)
+                stamp = require_episodic_write(summary).stamp_mapping()
+                created_at = _as_utc_naive(self._clock())
+                if created_at is None:
+                    raise ValueError("agent episode clock must return a datetime")
+                self._insert_episode_on_session(
+                    session, summary, stamp=stamp, created_at=created_at
+                )
+                after_count = before_count - len(source_ids) + 1
+                audit_event_id = self._audit_consolidate_on_session(
+                    session,
+                    symbol=symbol,
+                    before_count=before_count,
+                    after_count=after_count,
+                    source_ids=source_ids,
+                    summary_episode_id=summary.episode_id,
+                    cutoff=cutoff_naive,
+                    max_rows=decision.max_rows,
+                )
+                deleted_count = self._delete_symbol_ids(
+                    session, symbol=symbol, delete_ids=source_ids
+                )
+                if deleted_count != len(source_ids):
+                    raise RepositoryError(
+                        "episode consolidate deleted a different row set than selected",
+                        error_code="agent_episode_consolidate_conflict",
+                        context={
+                            "symbol": symbol,
+                            "selected": len(source_ids),
+                            "deleted": deleted_count,
+                        },
+                    )
+                remaining = self._count_remaining(session, symbol)
+                return EpisodeConsolidateResult(
+                    applied=True,
+                    symbol=symbol,
+                    deleted_count=deleted_count,
+                    remaining_count=remaining,
+                    cutoff=cutoff_naive,
+                    max_rows=decision.max_rows,
+                    dry_run=False,
+                    audit_event_id=audit_event_id,
+                    summary_episode_id=summary.episode_id,
+                    source_count=len(source_ids),
+                )
+        except MemoryConsolidateError:
+            raise
+        except Exception as exc:  # broad-exception: fallback_recorded - surface as repository error
+            context = {"symbol": symbol, "dry_run": bool(decision.dry_run)}
+            log_safe_exception(
+                logger,
+                "agent_episode_consolidate_failed",
+                exc,
+                error_code="agent_episode_consolidate_failed",
+                context=context,
+            )
+            raise RepositoryError(
+                "agent_episode_consolidate_failed",
+                error_code="agent_episode_consolidate_failed",
                 context=context,
             ) from exc
 

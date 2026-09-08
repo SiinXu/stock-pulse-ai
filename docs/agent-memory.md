@@ -1,6 +1,6 @@
 # Principal-scoped layered Agent memory
 
-**Status**: layered foundation + lifecycle + default-off durable observation store (no production layered-memory prompt hook, no user CRUD). Remaining #1118 UX/prompt/semantic-fact/procedural persist: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). Write admission library: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1. Deterministic per-symbol episode forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2 (consolidation remains open).
+**Status**: layered foundation + lifecycle + default-off durable observation store (no production layered-memory prompt hook, no user CRUD). Remaining #1118 UX/prompt/semantic-fact/procedural persist: [#1118](https://github.com/SiinXu/stock-pulse-ai/issues/1118). Provenance/anti-poisoning: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). Write admission library: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 1. Deterministic per-symbol episode forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 2. Compact per-symbol episode consolidation: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) Slice 3.
 
 **Chinese**: [agent-memory_CN.md](agent-memory_CN.md)
 
@@ -15,6 +15,7 @@
 | `src/agent/memory_isolation.py` | Untrusted-data isolation for any future prompt path |
 | `src/schemas/memory_write_policy.py` | Library-only persist write admission over existing stores (#1119 Slice 1) |
 | `src/schemas/memory_forget_policy.py` | Library-only per-symbol episode forgetting over `agent_episodes` (#1119 Slice 2) |
+| `src/schemas/memory_consolidate_policy.py` | Library-only per-symbol compression of old episodic rows into one `mode=consolidate` summary (#1119 Slice 3) |
 | `src/schemas/layered_memory_persist.py` | Observation mapping admission: server provenance, secret/PII reject, fact/opinion lock |
 | `src/repositories/layered_memory_repo.py` | SQLite observations + consent + append-only access audit |
 | `src/services/layered_memory_collection_service.py` | Default-off fail-soft collection after analysis-history save |
@@ -159,6 +160,28 @@ After a successful episode append, `AgentEpisodeService` runs this pass for the 
 
 This slice does **not** add consolidation, Decision Memory retrieval-score decay, the #1118 store, auto-promotion, or new product feedback APIs. [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) stays open.
 
+<a id="episode-consolidation-policy"></a>
+## Episode consolidation policy (#1119 Slice 3)
+
+Library-only per-symbol compression in `src/schemas/memory_consolidate_policy.py`, applied by `AgentEpisodeRepository.apply_consolidate` on the existing `agent_episodes` table. The source set is exactly the per-symbol rows Slice 2 would delete (strict `created_at < cutoff`, then oldest `id` capacity overflow) excluding `mode=consolidate` rows. Fewer than two source rows is a no-op so existing forgetting still drops leftovers. UPDATE remains aborted by `trg_agent_episodes_immutable`. No new table, env key, public API, Web, or Desktop CRUD.
+
+| Rule | Contract |
+| --- | --- |
+| Scope | An explicit non-empty `symbol`. Missing / blank symbol is no-policy or fail-closed unscoped — never a global rewrite |
+| Source set | Slice 2 forget delete set minus existing `mode=consolidate` summaries |
+| Minimum batch | Fewer than two source rows writes nothing |
+| Summary | Exactly one size-capped `AgentEpisodeCreate` with `mode=consolidate`, counts and compact lessons only. No Soul text, no user-note facts, no raw trajectory dump. `require_episodic_write` must admit it or the pass aborts |
+| No-policy | Neither cutoff nor `max_rows` writes nothing; `remaining_count` is a live COUNT for that symbol (or the whole table if no symbol) |
+| Clock | Cutoff from an injected datetime (`retention_days` requires `now`). Reuses existing `AGENT_EPISODE_RETENTION_DAYS` / `AGENT_EPISODE_MAX_ROWS` |
+| Audit | Irreversible source DELETE inserts a metadata-only `episode.consolidate` EvolutionEvent (`symbol`, counts, cutoff/max_rows, SHA-256 of source row ids, new summary `episode_id`) in the **same** `session_scope` after the admitted summary INSERT and before DELETE. Summary or audit failure rolls back every write. Dry-run and no-policy write no event and store no episode body, lessons, or trajectory. |
+| Transactions | Consolidate itself is one SQLite writer transaction: select source ids → admitted summary INSERT → one EvolutionEvent insert → chunked `DELETE ... id IN (...)` of those source ids only → commit. Chunks are not separate commits. `append` still commits first; insert+consolidate+forget is **not** one transaction (#1090 fail-soft). SQLite serializes writers; this pass does not use `SELECT FOR UPDATE`. |
+| Recovery | Code revert cannot restore deleted source episode rows. Recovery requires backup / point-in-time restore. `AGENT_EPISODE_LOG_ENABLED=false` only stops new writes and append-triggered consolidate/forget. |
+| Not in scope | Predictions, decision-memory ranking or score decay, sidecar feedback/labels, Soul edits, semantic/procedural persistence, public API / Web / Desktop |
+
+After a successful episode append, `AgentEpisodeService` runs this pass for the stored symbol only, **before** existing forgetting. Analysis stays fail-soft: consolidate failure is logged, does not write, does not turn a successful append into `None`, and does not skip the later forget pass. Explicit `consolidate_symbol(...)` is not fail-soft. Rows of other symbols, and existing summaries, are not sources for that pass.
+
+This slice does **not** add Decision Memory retrieval-score decay, the #1118 store, auto-promotion, or new product feedback APIs. [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119) stays open.
+
 ## Remaining scope
 
 - Authoritative principal assignment across API/bot/CLI/scheduled runs; legacy migration.
@@ -167,7 +190,7 @@ This slice does **not** add consolidation, Decision Memory retrieval-score decay
 - Semantic-fact table persist and procedural-weight persist (still fail-closed `persist=False` under #1119).
 - Preference-profile layer: [#1117](https://github.com/SiinXu/stock-pulse-ai/issues/1117) (absorbs closed [#150](https://github.com/SiinXu/stock-pulse-ai/issues/150)).
 - Memory provenance, fact/opinion isolation, and anti-poisoning baseline: [#1124](https://github.com/SiinXu/stock-pulse-ai/issues/1124). DAG-0 threat notes, DAG-1 fact/opinion lock, DAG-2 Soul/oversize write reject (`src/schemas/memory_write_guard.py`), and DAG-3 server-stamped provenance (`src/schemas/memory_provenance.py`) have landed. DAG-4 isolates default-off AgentMemory prompt inject (`src/agent/agents/base_agent.py` / `src/agent/memory.py`) as untrusted data with canonical `buy` / `hold` / `sell` signals. Do not fold in #1118 store/UX or #1105 product feedback APIs.
-- Write admission / consolidation / forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119). Slice 1 (library write admission) and Slice 2 (deterministic per-symbol episode forgetting) are documented above. Remaining: consolidation of old episodic rows, semantic/procedural candidate promotion without Soul edits, Decision Memory retrieval-score decay, and drop of rolled-back procedural flags after [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113). Keep #1119 open.
+- Write admission / consolidation / forgetting: [#1119](https://github.com/SiinXu/stock-pulse-ai/issues/1119). Slice 1 (library write admission), Slice 2 (deterministic per-symbol episode forgetting), and Slice 3 (compact per-symbol episode consolidation) are documented above. Remaining: semantic/procedural candidate promotion without Soul edits, Decision Memory retrieval-score decay, and drop of rolled-back procedural flags after [#1113](https://github.com/SiinXu/stock-pulse-ai/issues/1113). Keep #1119 open.
 
 Do not reopen #250, #198, or #150.
 
@@ -194,7 +217,7 @@ Remaining for later #1123 slices: planner tool-effectiveness ordering, adversari
 
 ## Rollback
 
-Set `LAYERED_MEMORY_COLLECTION_ENABLED=false` (the default) so collection is a no-op. Then run this slice's migration `downgrade`, which drops only `layered_memory_observations`, `layered_memory_consent`, `layered_memory_access_audit`, and their indexes/triggers. Episode, evolution-event, prediction, and decision-memory tables are untouched. Revert the PR to remove the collection helper. No production prompt path is wired, so analysis output is unchanged when the flag is off. Revert modules/tests/docs/config-description/Settings-help edits and changelog fragments for episode forgetting. Collection and episode log stay default-off. Slice 2 adds no migration; already-deleted episode rows cannot be restored from code — recovery requires backup / point-in-time restore. EvolutionEvent audit rows are append-only and are not deleted by episode forgetting.
+Set `LAYERED_MEMORY_COLLECTION_ENABLED=false` (the default) so collection is a no-op. Then run this slice's migration `downgrade`, which drops only `layered_memory_observations`, `layered_memory_consent`, `layered_memory_access_audit`, and their indexes/triggers. Episode, evolution-event, prediction, and decision-memory tables are untouched. Revert the PR to remove the collection helper. No production prompt path is wired, so analysis output is unchanged when the flag is off. Revert modules/tests/docs/config-description/Settings-help edits and changelog fragments for episode forgetting and consolidation. Collection and episode log stay default-off. Slice 2 and Slice 3 add no migration; already-deleted episode rows cannot be restored from code — recovery requires backup / point-in-time restore. EvolutionEvent audit rows are append-only and are not deleted by episode forgetting or consolidation.
 
 ## Related: error-pattern encyclopedia
 

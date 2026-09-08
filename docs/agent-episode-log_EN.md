@@ -21,7 +21,8 @@ Persist compact, queryable **episodes** after agent runs so offline eval, post-m
 | Path | Role |
 | --- | --- |
 | `src/schemas/agent_episode.py` | Strict contracts |
-| `src/repositories/agent_episode_repo.py` | Append / query / per-symbol forget |
+| `src/schemas/memory_consolidate_policy.py` | Per-symbol compact summary policy (#1119 Slice 3) |
+| `src/repositories/agent_episode_repo.py` | Append / query / per-symbol consolidate then forget |
 | `src/services/agent_episode_service.py` | Feature flag, redaction, fail-soft writer |
 | `src/migrations/versions/v202608120002_agent_episode_schema.py` | Table + append-only trigger |
 | `src/repositories/agent_forward_return_repo.py` | Sidecar upsert for #1096 forward-return buckets |
@@ -51,6 +52,10 @@ When disabled, the executor does not import the episode writer or initialize its
 ## Retention / forgetting (#1119 Slice 2)
 
 Deterministic per-symbol forgetting is resolved by `src/schemas/memory_forget_policy.py` and applied by `AgentEpisodeRepository.apply_forget`. After a successful append, `AgentEpisodeService` forgets **only the stored symbol**, using existing `AGENT_EPISODE_RETENTION_DAYS` / `AGENT_EPISODE_MAX_ROWS` as per-symbol bounds (they are not table-wide caps) and the repository clock for cutoff. No symbol → no delete. `created_at < cutoff` is deleted; equality is kept. Capacity keeps the newest rows of that symbol. No-policy (neither cutoff nor max_rows) deletes nothing and still returns a live remaining COUNT. Irreversible DELETE inserts one metadata-only `episode.forget` EvolutionEvent in the same transaction before the delete, then issues chunked `DELETE ... id IN (...)` statements so each batch stays within SQLite `MAX_VARIABLE_NUMBER` (one bind reserved for `symbol`). Chunks do not commit separately; audit failure rolls back every chunk. Dry-run does not write an event. `append` commits before forget; insert+forget is not atomic. SQLite serializes writers; there is no `SELECT FOR UPDATE`. Unscoped `apply_retention` / `apply_capacity` fail closed and route through the same policy. Code revert cannot restore deleted rows — recovery requires backup / point-in-time restore. Analysis still fail-softs forget errors after append so episode failure cannot abort the Agent result.
+
+## Consolidation (#1119 Slice 3)
+
+Deterministic per-symbol compression is resolved by `src/schemas/memory_consolidate_policy.py` and applied by `AgentEpisodeRepository.apply_consolidate` **after a successful append and before forgetting**. The source set is exactly the rows Slice 2 would delete for that symbol, excluding existing `mode=consolidate` summaries. Fewer than two source rows is a no-op so forget can still drop the leftover. A real pass writes exactly one size-capped `mode=consolidate` episode (counts and compact lessons only; no Soul text, user-note facts, or raw trajectory) after `require_episodic_write` admits it, then a metadata-only `episode.consolidate` EvolutionEvent (`symbol`, counts, cutoff/max_rows, SHA-256 of source ids, new summary `episode_id`), then chunked `DELETE` of those source ids only, in one SQLite writer transaction. Summary or audit failure rolls back every write. Dry-run performs no INSERT/DELETE/event. Analysis fail-softs consolidate errors after append and still runs forget; explicit `consolidate_symbol` is fail-loud. No new env key, table, or public API.
 
 Queries and replay lists are bounded to 200 rows/IDs. Persisted JSON corruption is surfaced as `agent_episode_corrupt_json`; it is never converted into an apparently valid empty trajectory or lesson list.
 
