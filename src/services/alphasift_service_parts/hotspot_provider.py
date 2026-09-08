@@ -141,17 +141,20 @@ class DsaEastMoneyHotspotProvider:
         self._min_request_interval = 0.25
 
     def _eastmoney_get_once(self, url: str, **kwargs: Any) -> Any:
+        from src.security.outbound_policy import safe_get
+
         with self._request_lock:
             elapsed = time.monotonic() - self._last_request_ts
             if elapsed < self._min_request_interval:
                 time.sleep(self._min_request_interval - elapsed)
             try:
-                return self._session.get(url, **kwargs)
+                return safe_get(url, transport=self._session, **kwargs)
             finally:
                 self._last_request_ts = time.monotonic()
 
     def _eastmoney_get(self, url: str, **kwargs: Any) -> Any:
         import requests
+        from src.security.outbound_policy import OutboundPolicyError
 
         retryable_errors = (
             requests.exceptions.ConnectionError,
@@ -163,6 +166,8 @@ class DsaEastMoneyHotspotProvider:
         for attempt in range(len(delays) + 1):
             try:
                 return self._eastmoney_get_once(url, **kwargs)
+            except OutboundPolicyError:
+                raise
             except retryable_errors as exc:
                 last_error = exc
                 if attempt >= len(delays):
@@ -435,15 +440,19 @@ class DsaEastMoneyHotspotProvider:
 
     def _fetch_board_names(self, *, source_fs: str) -> Any:
         import pandas as pd
+        from src.security.outbound_policy import OutboundPolicyError
 
         params = dict(self._COMMON_PARAMS)
         params.update({"pz": "100", "fs": source_fs})
-        response = self._eastmoney_get(
-            self._BASE_URL,
-            params=params,
-            timeout=self._HTTP_TIMEOUT_SECONDS,
-            headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"},
-        )
+        try:
+            response = self._eastmoney_get(
+                self._BASE_URL,
+                params=params,
+                timeout=self._HTTP_TIMEOUT_SECONDS,
+                headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json,text/plain,*/*"},
+            )
+        except OutboundPolicyError:
+            return pd.DataFrame()
         response.raise_for_status()
         payload = response.json()
         rows = ((payload.get("data") or {}).get("diff") or []) if isinstance(payload, dict) else []
