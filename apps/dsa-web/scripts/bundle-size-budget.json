@@ -141,9 +141,9 @@
     {
       "id": "SettingsPage",
       "match": "assets/SettingsPage-*.js",
-      "maxGzipBytes": 297002,
-      "measuredGzipBytes": 296602,
-      "note": "Reseeded after scheduling Settings outbound-activity GET through TanStack Query (Refs #789). Same-toolchain zlib-9 (node 22.13.0, vite 7.3.1, shared node_modules) measured 296602 B on the SettingsPage lazy chunk. Query itself stays in vendor; the extra bytes are hook scheduling/fencing on SettingsPage. Cap = measured zlib-9 + 400 B. No other budgets changed besides the matching SettingsPage-family and settings-route rows."
+      "maxGzipBytes": 298823,
+      "measuredGzipBytes": 298423,
+      "note": "Reseeded after scheduling Settings security-audit list GET through TanStack Query (Refs #789). Same-toolchain zlib-9 (node 22.13.0, vite 7.3.1, shared node_modules) measured 298423 B on the SettingsPage lazy chunk. Query itself stays in vendor; the extra bytes are hook scheduling/fencing on SettingsPage. Cap = measured zlib-9 + 400 B. No other budgets changed besides the matching SettingsPage-family and settings-route rows."
     },
     {
       "id": "PortfolioRiskMetricsPanel",
@@ -381,9 +381,9 @@
       "match": [
         "assets/SettingsPage-*.js"
       ],
-      "maxGzipBytes": 297002,
-      "measuredGzipBytes": 296602,
-      "note": "Same-pattern family after scheduling Settings outbound-activity GET through TanStack Query (Refs #789). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 296602 B (node 22.13.0, vite 7.3.1)."
+      "maxGzipBytes": 298823,
+      "measuredGzipBytes": 298423,
+      "note": "Same-pattern family after scheduling Settings security-audit list GET through TanStack Query (Refs #789). Cap inherited from the per-asset rule so splitting the chunk cannot grow the family total. Measured zlib-9 298423 B (node 22.13.0, vite 7.3.1)."
     },
     {
       "id": "PortfolioRiskMetricsPanel-family",
@@ -483,9 +483,9 @@
         "assets/settingsPage-*.js",
         "assets/settingsTranslations-*.js"
       ],
-      "maxGzipBytes": 339565,
-      "measuredGzipBytes": 339165,
-      "note": "Already-split Settings route family. Reseeded after scheduling Settings outbound-activity GET through TanStack Query (Refs #789). Same-toolchain zlib-9 sum 339165 B (node 22.13.0, vite 7.3.1) + 400 B headroom. Per-asset SettingsPage cap is also reseeded. No other route families changed."
+      "maxGzipBytes": 341388,
+      "measuredGzipBytes": 340988,
+      "note": "Already-split Settings route family. Reseeded after scheduling Settings security-audit list GET through TanStack Query (Refs #789). Same-toolchain zlib-9 sum 340988 B (node 22.13.0, vite 7.3.1) + 400 B headroom. Per-asset SettingsPage cap is also reseeded. No other route families changed."
     },
     {
       "id": "portfolio-route",
