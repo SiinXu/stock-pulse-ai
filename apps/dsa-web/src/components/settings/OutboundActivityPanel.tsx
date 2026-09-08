@@ -1,12 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type React from 'react';
 import { RefreshCw } from 'lucide-react';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { outboundActivityApi } from '../../api/outboundActivity';
+import { useOutboundActivityQuery } from '../../hooks/useOutboundActivityQuery';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
-import type { LocalOnlyModeStatus, OutboundActivityItem } from '../../types/outboundActivity';
+import type { OutboundActivityItem } from '../../types/outboundActivity';
 import { getUiLocale } from '../../utils/uiLocale';
 import { ApiErrorAlert, Badge, DataTable, type DataTableColumn, EmptyState, IconButton, StatePanel } from '../common';
 import { SettingsSectionCard } from './SettingsSectionCard';
@@ -16,8 +15,6 @@ type OutboundActivityPanelProps = {
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
   language: UiLanguage;
 };
-
-const DEFAULT_LIMIT = 50;
 
 function formatTimestamp(value: string | null | undefined, language: UiLanguage): string {
   if (!value) return '—';
@@ -31,33 +28,7 @@ function formatTimestamp(value: string | null | undefined, language: UiLanguage)
 }
 
 const OutboundActivityPanel: React.FC<OutboundActivityPanelProps> = ({ disabled = false, t, language }) => {
-  const [status, setStatus] = useState<LocalOnlyModeStatus | null>(null);
-  const [items, setItems] = useState<OutboundActivityItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
-
-  const load = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    setLoadError(null);
-    if (mode === 'initial') setIsLoading(true); else setIsRefreshing(true);
-    try {
-      const [nextStatus, page] = await Promise.all([
-        outboundActivityApi.getLocalOnlyStatus(),
-        outboundActivityApi.listActivity({ limit: DEFAULT_LIMIT }),
-      ]);
-      setStatus(nextStatus);
-      setItems(page.items);
-    } catch (error: unknown) {
-      setStatus(null);
-      setItems([]);
-      setLoadError(getParsedApiError(error));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => { void load('initial'); }, [load]);
+  const { status, items, isLoading, isRefreshing, loadError, load } = useOutboundActivityQuery();
 
   const columns = useMemo<DataTableColumn<OutboundActivityItem>[]>(() => [
     {
