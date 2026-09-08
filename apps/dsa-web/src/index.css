@@ -157,7 +157,6 @@
     0 10px 24px hsl(var(--neutral-black) / 0.06);
   --home-panel-subtle-bg: hsl(80 7% 98% / 0.98);
   --home-panel-subtle-bg-hover: hsl(80 7% 96% / 0.99);
-  --home-history-item-bg: hsl(var(--neutral-white) / 0.82);
   --home-history-item-hover-bg: hsl(80 7% 96% / 0.99);
   --home-history-item-selected-bg:
     linear-gradient(180deg, hsl(var(--primary) / 0.08), hsl(80 7% 96% / 0.98));
@@ -385,7 +384,6 @@
     0 4px 16px hsl(var(--primary) / 0.16);
   --home-panel-subtle-bg: hsl(var(--foreground) / 0.03);
   --home-panel-subtle-bg-hover: hsl(var(--foreground) / 0.05);
-  --home-history-item-bg: hsl(var(--foreground) / 0.03);
   --home-history-item-hover-bg: hsl(var(--foreground) / 0.06);
   --home-history-item-selected-bg:
     linear-gradient(180deg, hsl(var(--primary) / 0.16), hsl(var(--primary) / 0.08));
