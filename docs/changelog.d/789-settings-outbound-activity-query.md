@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings outbound-activity GET through TanStack Query (Refs #789).
