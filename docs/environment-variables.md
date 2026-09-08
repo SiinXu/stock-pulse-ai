@@ -177,6 +177,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_SKILL_RETRIEVAL_K` | `0` | 是 | 模板中注释 |
 | `AGENT_SKILL_ROUTING` | `auto` | 是 | 模板中注释; Strategy routing mode (auto=select from market state / manual=use the AGENT_SKILLS list) |
 | `AGENT_STAGE_FAILURE_POLICY` | `isolate` | 是 | 模板中注释; Stage failure policy for ordinary stages: isolate=degrade a non-critical stage; fail_fast=stop on failure |
+| `AGENT_STAGE_PARALLEL_ENABLED` | `false` | 是 | 模板中注释; Optional Technical ∥ Intel stage wave for Native Multi (default false) |
 | `AGENT_STEP_CRITIQUE_ENABLED` | `false` | 是 | 模板中注释; Multi-level reflection (#1094): immediate step critique / trajectory / meta-review |
 | `AGENT_TECHNICAL_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释; Independent per-sub-agent timeout cap in seconds (0 disables it; a positive value such as 180 enables a hard cap for ... |
 | `AGENT_TOOL_TIMEOUT_S` | `120` | 是 | 模板中注释; Agent runtime guards (enabled by default; set an individual numeric value to 0 to disable that guard) Timeout for one... |

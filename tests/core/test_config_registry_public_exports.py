@@ -64,10 +64,10 @@ EXPECTED_MODULE_ANNOTATIONS = {
     "_FIELD_HELP_METADATA": "Dict[str, Dict[str, Any]]",
 }
 EXPECTED_REGISTERED_KEYS_SHA256 = (
-    "328e8ac85a3501e0c05bc189968ecaf7e80a99a43ce2c3a4da333a6e0e443764"
+    "5a3289e35f36eda755c1b7509eb295c7d03f240acb2d41c580ef232c3e10bfe6"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "8c9dee30831d8f7a765987a04d75b843bcda510d71c137a003a3c24f9e021c84"
+    "fe63c31aab0e5ab45e9ed5b834df8ea2fc430d28214f9297b2dea26395383d02"
 )
 
 
@@ -104,9 +104,10 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Combined live snapshot after merging current main plus env-only
-    # DSA_RUNTIME_SCHEDULER_TIMEOUT_SECONDS (hidden from Web settings). Schema
-    # digest is unchanged because hidden keys are excluded from build_schema_response.
+    # Combined live snapshot after adding visible AGENT_STAGE_PARALLEL_ENABLED
+    # (Web settings switch, not hidden). Both the registered-keys digest and
+    # the schema digest change because the field is included in
+    # build_schema_response.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

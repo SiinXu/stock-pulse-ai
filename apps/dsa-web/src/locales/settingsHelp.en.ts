@@ -1504,6 +1504,16 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
       'See docs/valuation-models_EN.md for the phase-1 contract and rollback steps.',
     ],
   },
+  'settings.agent.AGENT_STAGE_PARALLEL_ENABLED': {
+    summary: 'Optionally run Technical and Intel against the same sealed snapshot in one Native Multi wave.',
+    usage: 'Leave disabled for default serial behavior. Enable only when you accept that Intel no longer sees Technical non-sealed writes.',
+    valueNotes: [
+      'Disabled by default; quick mode never opens the wave even when this flag is on.',
+      'The wave is only Technical and Intel with max_workers=2. Risk, SkillRouter, Critic, red-team, and debate stay serial.',
+    ],
+    impact: ['When on, standard/full/specialist Native Multi runs Technical and Intel concurrently and merges in declaration order.'],
+    notes: ['Intel isolate keeps Technical and continues to Decision. Technical failure cancels Intel and fail-fasts. Hard budget breaches never isolate.'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     summary: 'Adds one read-only Critic call before the Native Multi Decision stage.',
     usage: 'Enable only when the extra Critic call and a possible single whitelist-stage retry fit the run budget.',

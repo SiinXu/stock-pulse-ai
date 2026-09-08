@@ -1547,6 +1547,16 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
     usage: '默认关闭；仅在需要告警附带管理数据影响说明时开启。',
     notes: ['仅使用自选/持仓/情报上下文，不做实时刷新。'],
   },
+  'settings.agent.AGENT_STAGE_PARALLEL_ENABLED': {
+    summary: '可选地让 Technical 与 Intel 在同一次 Native Multi 波次中对同一密封快照并发执行。',
+    usage: '默认保持关闭以沿用串行合同。仅在接受 Intel 不再看到 Technical 的非密封写入时开启。',
+    valueNotes: [
+      '默认关闭；即使打开此开关，quick 模式也不会启用该波次。',
+      '波次仅覆盖 Technical 与 Intel，且 max_workers=2。Risk、SkillRouter、Critic、红队与辩论仍串行。',
+    ],
+    impact: ['开启后，standard/full/specialist 的 Native Multi 会并发运行 Technical 与 Intel，并按声明顺序合并。'],
+    notes: ['Intel isolate 会保留 Technical 并继续 Decision。Technical 失败会取消 Intel 并 fail-fast。硬预算违约不会 isolate。'],
+  },
   'settings.agent.AGENT_CRITIC_ENABLED': {
     summary: '在 Native Multi 的 Decision 阶段前执行一次只读证据复核。',
     usage: '仅在运行预算能够承担额外 Critic 调用及可能的一次白名单阶段重试时开启。',

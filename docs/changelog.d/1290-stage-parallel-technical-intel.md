@@ -1,0 +1,2 @@
+- [Added] Add default-off `AGENT_STAGE_PARALLEL_ENABLED` so Native Multi standard/full/specialist can run Technical and Intel concurrently against one sealed snapshot and merge in declaration order (Refs #1290).
+- [Chore] Reseed overflowing SettingsPage, extra-locale, and settings-route gzip budgets from hosted Linux zlib-9 on run 34230723805 after AGENT_STAGE_PARALLEL_ENABLED Settings copy (Refs #1290).

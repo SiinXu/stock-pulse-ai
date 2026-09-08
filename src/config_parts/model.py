@@ -343,6 +343,7 @@ class Config:
     agent_mode_budget_chat_max_llm_turns: int = 0
     agent_mode_budget_chat_max_tool_calls: int = 0
     agent_mode_budget_chat_max_cost_usd: float = 0.0
+    agent_stage_parallel_enabled: bool = False  # Opt-in Technical ∥ Intel wave in Native Multi
     agent_critic_enabled: bool = False  # Enable the bounded pre-Decision Critic in Native Multi runs
     agent_critic_max_iters: int = 1  # Max controlled revision rounds after Critic findings (hard-capped at 2)
     # Optional adversarial red-team second opinion after Decision (Issue #1135). Default off.
