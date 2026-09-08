@@ -173,4 +173,21 @@ describe('Query consumer hosts', () => {
     expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
     expect(barrelSource).not.toContain('useOutboundActivityQuery');
   });
+
+  it('wraps SecurityAuditPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/SecurityAuditPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/SecurityAuditPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useSecurityAuditQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useSecurityAuditQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings security-audit list on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useSecurityAuditQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(barrelSource).not.toContain('useSecurityAuditQuery');
+  });
 });

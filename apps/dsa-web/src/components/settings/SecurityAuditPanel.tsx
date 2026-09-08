@@ -1,16 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type React from 'react';
 import { RefreshCw } from 'lucide-react';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { securityAuditApi } from '../../api/securityAudit';
+import type { ParsedApiError } from '../../api/error';
+import { useSecurityAuditQuery } from '../../hooks/useSecurityAuditQuery';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
-import type {
-  SecurityAuditEvent,
-  SecurityAuditListQuery,
-  SecurityAuditOutcome,
-} from '../../types/securityAudit';
+import type { SecurityAuditOutcome } from '../../types/securityAudit';
 import { SECURITY_AUDIT_MAX_PAGE_SIZE } from '../../types/securityAudit';
 import { getUiLocale } from '../../utils/uiLocale';
 import {
@@ -32,8 +28,6 @@ type SecurityAuditPanelProps = {
   t: (key: UiTextKey, params?: Record<string, string | number>) => string;
   language: UiLanguage;
 };
-
-const DEFAULT_PAGE_SIZE = 50;
 
 const OUTCOME_OPTIONS: Array<SecurityAuditOutcome | ''> = [
   '',
@@ -78,106 +72,32 @@ function isAuthRequiredError(error: ParsedApiError | null): boolean {
   return Boolean(error && error.code === 'security_audit_auth_required');
 }
 
-function buildQuery(
-  page: number,
-  pageSize: number,
-  eventType: string,
-  outcome: SecurityAuditOutcome | '',
-  correlationId: string,
-): SecurityAuditListQuery {
-  const trimmedEventType = eventType.trim();
-  const trimmedCorrelation = correlationId.trim();
-  return {
-    page,
-    pageSize,
-    ...(trimmedEventType ? { eventType: trimmedEventType } : {}),
-    ...(outcome ? { outcome } : {}),
-    ...(trimmedCorrelation ? { correlationId: trimmedCorrelation } : {}),
-  };
-}
-
 const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
   disabled = false,
   t,
   language,
 }) => {
-  const [items, setItems] = useState<SecurityAuditEvent[]>([]);
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
-  const [total, setTotal] = useState(0);
+  const {
+    items,
+    page,
+    pageSize,
+    total,
+    isLoading,
+    isRefreshing,
+    loadError,
+    load,
+  } = useSecurityAuditQuery(language);
   const [eventTypeDraft, setEventTypeDraft] = useState('');
   const [outcomeDraft, setOutcomeDraft] = useState<SecurityAuditOutcome | ''>('');
   const [correlationDraft, setCorrelationDraft] = useState('');
-  const [appliedEventType, setAppliedEventType] = useState('');
-  const [appliedOutcome, setAppliedOutcome] = useState<SecurityAuditOutcome | ''>('');
-  const [appliedCorrelation, setAppliedCorrelation] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
 
   const totalPages = useMemo(
     () => Math.max(1, Math.ceil(total / Math.max(pageSize, 1))),
     [pageSize, total],
   );
 
-  const loadEvents = useCallback(async (
-    mode: 'initial' | 'refresh' = 'initial',
-    overrides?: {
-      page?: number;
-      pageSize?: number;
-      eventType?: string;
-      outcome?: SecurityAuditOutcome | '';
-      correlationId?: string;
-    },
-  ) => {
-    const nextPage = overrides?.page ?? page;
-    const nextPageSize = overrides?.pageSize ?? pageSize;
-    const nextEventType = overrides?.eventType ?? appliedEventType;
-    const nextOutcome = overrides?.outcome ?? appliedOutcome;
-    const nextCorrelation = overrides?.correlationId ?? appliedCorrelation;
-
-    setLoadError(null);
-    if (mode === 'initial') {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
-    }
-    try {
-      const response = await securityAuditApi.list(
-        buildQuery(nextPage, nextPageSize, nextEventType, nextOutcome, nextCorrelation),
-      );
-      setItems(response.items);
-      setPage(response.page);
-      setPageSize(response.pageSize);
-      setTotal(response.total);
-    } catch (error: unknown) {
-      setLoadError(getParsedApiError(error, language));
-      setItems([]);
-      setTotal(0);
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [
-    appliedCorrelation,
-    appliedEventType,
-    appliedOutcome,
-    language,
-    page,
-    pageSize,
-  ]);
-
-  useEffect(() => {
-    void loadEvents('initial');
-    // Initial mount only; subsequent loads are user-driven.
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional one-shot mount load
-  }, []);
-
   const applyFilters = () => {
-    setAppliedEventType(eventTypeDraft.trim());
-    setAppliedOutcome(outcomeDraft);
-    setAppliedCorrelation(correlationDraft.trim());
-    void loadEvents('refresh', {
+    void load('refresh', {
       page: 1,
       eventType: eventTypeDraft.trim(),
       outcome: outcomeDraft,
@@ -186,7 +106,7 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
   };
 
   const handlePageChange = (nextPage: number) => {
-    void loadEvents('refresh', { page: nextPage });
+    void load('refresh', { page: nextPage });
   };
 
   const handlePageSizeChange = (value: string) => {
@@ -195,8 +115,7 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
       return;
     }
     const nextSize = Math.min(SECURITY_AUDIT_MAX_PAGE_SIZE, Math.max(1, Math.trunc(parsed)));
-    setPageSize(nextSize);
-    void loadEvents('refresh', { page: 1, pageSize: nextSize });
+    void load('refresh', { page: 1, pageSize: nextSize });
   };
 
   const outcomeLabel = (value: SecurityAuditOutcome | ''): string => {
@@ -232,7 +151,7 @@ const SecurityAuditPanel: React.FC<SecurityAuditPanelProps> = ({
           type="button"
           variant="outline"
           size="compact"
-          onClick={() => void loadEvents('refresh')}
+          onClick={() => void load('refresh')}
           // Keep refresh available after a 403 so operators can retry once auth
           // is enabled without leaving Settings.
           disabled={disabled || isLoading || isRefreshing}

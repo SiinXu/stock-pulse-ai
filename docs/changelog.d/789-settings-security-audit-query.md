@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings security-audit list GET through TanStack Query (Refs #789).
