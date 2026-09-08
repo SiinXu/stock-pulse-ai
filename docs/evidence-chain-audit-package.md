@@ -40,6 +40,7 @@ JSON 使用 `artifacts` 对象承载同一组内容；`evidence_chain.json` 通�
 3. 脱敏复用 reasoning-trace 导出。
 4. 审计包内嵌推理轨迹复用 `build_reasoning_trace_package`，不另造导出器。
 5. 失败、超时或未知状态的数据源/工具执行不得作为结论支持证据；只显示为缺失证据记录。
+6. 当报告含 `dashboard.critic` 时，现有 builder 投影一条 `source_type=pipeline_stage`、`source_id=critic` 的证据项、一条 `stage`/`role=critic` 的推理步骤，以及 `dashboard.critic` coverage；不扩展 schema。
 
 ## 回滚
 

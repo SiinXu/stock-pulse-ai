@@ -6,6 +6,7 @@ from typing import Any
 
 from src.report_language import (
     append_bull_bear_debate_lines,
+    append_critic_lines,
     append_red_team_lines,
     format_strategy_skill_items,
     localize_conflict_severity,
@@ -101,9 +102,10 @@ def append_debate_and_red_team_lines(
     dashboard: Any,
     labels: dict[str, str],
 ) -> None:
-    """Append debate then the additive red-team second-opinion section."""
+    """Append debate then the additive red-team and critic sections."""
     append_bull_bear_debate_lines(report_lines, dashboard, labels)
     append_red_team_lines(report_lines, dashboard, labels)
+    append_critic_lines(report_lines, dashboard, labels)
 
 
 __all__ = ["append_debate_and_red_team_lines", "append_strategy_synthesis_lines"]

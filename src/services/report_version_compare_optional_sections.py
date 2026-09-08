@@ -41,6 +41,7 @@ _MULTI_AGENT_KEYS: Tuple[str, ...] = (
     "bull_bear_debate",
     "committee_deliberation",
     "red_team",
+    "critic",
 )
 
 

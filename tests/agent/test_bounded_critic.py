@@ -1720,6 +1720,10 @@ def test_failed_convergence_keeps_critic_opinions_in_dashboard_limitations(monke
     assert "Audited segment detail." in joined
     assert "Existing limitation 0." in joined
     assert ctx.meta["critic_trace"]["convergence_status"] == "not_converged"
+    appendix = (final.get("dashboard") or {}).get("critic") or {}
+    assert appendix.get("enabled") is True
+    assert appendix.get("verdict") == "fail_soft"
+    assert appendix.get("convergence_status") == "not_converged"
 
 
 def test_mode_budget_blocks_revision_without_consuming_budget(monkeypatch) -> None:

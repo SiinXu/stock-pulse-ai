@@ -96,6 +96,10 @@ class _CriticRevisionRunner:
                 retry_target=target,
                 **_critic.trace_event_fields(started_trace),
             ))
+        _critic.emit_critic_phase_start(
+            _critic.CRITIC_RETRY_PHASE_NAME,
+            trace=started_trace,
+        )
 
         before = _critic.snapshot_target_evidence(self.ctx, target)
         started_elapsed_s = time.time() - self.started_at
@@ -193,6 +197,11 @@ class _CriticRevisionRunner:
                 retry_target=target,
                 **_critic.trace_event_fields(trace),
             ))
+        _critic.emit_critic_phase_end(
+            _critic.CRITIC_RETRY_PHASE_NAME,
+            status="success" if completed else "error",
+            trace=trace,
+        )
         if revision_result.status == StageStatus.FAILED:
             self.orchestrator._record_degraded_stage(
                 self.ctx,
@@ -225,6 +234,7 @@ class _CriticRevisionRunner:
                 stage=_critic.CRITIC_STAGE_NAME,
                 message="Rechecking Critic convergence...",
             ))
+        _critic.emit_critic_phase_start(_critic.CRITIC_STAGE_NAME)
         try:
             recheck_result, recheck_ctx = (
                 self.orchestrator._execute_isolated_stage(
@@ -286,6 +296,15 @@ class _CriticRevisionRunner:
             )
         recheck_result.meta["critic"] = _critic.trace_event_fields(trace)
         self._record_optional_stage(recheck_result)
+        _critic.emit_critic_phase_end(
+            _critic.CRITIC_STAGE_NAME,
+            status=(
+                "success"
+                if recheck_result.status == StageStatus.COMPLETED
+                else "error"
+            ),
+            trace=trace,
+        )
         if self.progress_callback:
             self.progress_callback(stream_event(
                 "stage_done",

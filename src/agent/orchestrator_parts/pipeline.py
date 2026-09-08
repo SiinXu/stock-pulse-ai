@@ -475,6 +475,7 @@ class _PipelineMethods:
                     stage=agent.agent_name,
                     message=f"Starting {agent.agent_name} analysis...",
                 ))
+            _critic.maybe_emit_critic_phase_start(stage_name)
 
             remaining_timeout_s = _debate.reserve_optional_stage_timeout(stage_name, timeout_s, elapsed_s, _critic.is_critic_stage(stage_name), _DECISION_BUDGET_RESERVE_S, _OPTIONAL_STAGE_MARGIN_S)
             effective_stage_timeout_s = self._resolve_stage_timeout_seconds(
@@ -572,33 +573,9 @@ class _PipelineMethods:
                     max(0.0, elapsed_s - stage_started_elapsed_s),
                     2,
                 )
-            critic_trace = None
-            if _critic.is_critic_stage(stage_name):
-                critic_max_iters = _critic.resolve_critic_max_iters(self.config)
-                if result.status == StageStatus.FAILED:
-                    critic_trace = _critic.record_critic_stage_failure(
-                        ctx,
-                        max_iters=critic_max_iters,
-                    )
-                else:
-                    critic_trace = _critic.get_critic_trace(ctx)
-                    if critic_trace is None:
-                        critic_trace = _critic.record_critic_stage_failure(
-                            ctx,
-                            max_iters=critic_max_iters,
-                        )
-                    else:
-                        critic_trace = _critic.apply_iteration_budget(
-                            critic_trace,
-                            max_iters=critic_max_iters,
-                        )
-                        ctx.meta["critic_trace"] = critic_trace
-                if (
-                    critic_trace is not None
-                    and critic_trace.get("verdict") != "retry"
-                ):
-                    critic_trace = _critic.finalize_convergence(ctx)
-                result.meta["critic"] = _critic.trace_event_fields(critic_trace)
+            critic_trace = _critic.commit_critic_stage_result(
+                ctx, result, config=self.config, stage_name=stage_name,
+            )
             _red_team.commit_pipeline_stage_result(ctx, result, stage_name)
             stats.record_stage(result)
             all_tool_calls.extend(

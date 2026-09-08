@@ -2001,6 +2001,8 @@ Critic 只能返回 `pass`、`retry` 或 `fail_soft`。`retry` 在当前合同�
 
 `StrategyEngine` 仍在既有 Decision 边界唯一负责 Skill evidence partition 和 `strategy_synthesis`；Critic 只读、无 ToolSurface、不能生成最终投资决策。Critic 的 verdict、reasons、missing evidence、requested/executed targets、budget consumption 和 retry status 写入内部 `AgentContext.meta`、`StageResult.meta` 与 `critic_verdict` / `critic_retry_start` / `critic_retry_done` progress events，不扩张持久化的 runtime-facts 或公开 Chat metadata。
 
+只要 Native Multi 实际进入 Critic（含 pass-without-revision、budget_skipped、stage_failed），就会写入加性 `dashboard.critic` 附录（`enabled` / `ran` / `verdict` / `convergence_status` / `retry_status` / `revision_occurred` / `iteration_consumed` / `iteration_max` / 不超过 300 字的英文摘要），不改现有报告字段或 Decision 权威。该阶段还通过既有 `emit_agent_event` 发出 `agent.phase_start` / `agent.phase_end`（name 为 `critic` 与 `critic_retry`），经 `diagnostics.agent_events` 与 `/flow` 进入当前过程时间线。evidence-chain-v1 在既有 builder 中投影一条 `source_type=pipeline_stage` / `source_id=critic` 的证据、一条 `stage`/`role=critic` 的推理步骤，以及 `dashboard.critic` coverage。标准/研究 Markdown、通知与微信路径渲染该附录；brief 模式省略。Chat 与默认关闭的 Critic 行为不变。
+
 成本边界：开启后每条符合条件的 Multi run 固定最多增加 1 次 Critic LLM 调用；只有 `retry` verdict 再增加最多 1 次白名单 Stage 的 LLM/工具执行。两者都受现有 `AGENT_ORCHESTRATOR_TIMEOUT_S` 剩余预算约束，且其 timeout 会排除为 Decision 保留的最低预算。回滚时关闭或删除 `AGENT_CRITIC_ENABLED`；无需数据迁移或清理。
 
 ### 对抗性红队二审
