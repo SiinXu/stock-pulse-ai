@@ -52,7 +52,6 @@ import { parseModelAccessFieldKey, type ModelAccessFieldFocusRequest } from '../
 import { connectionItemsRespectSchema } from '../components/settings/settingsConnectionUpdateContract';
 import { SettingsSectionNav, SettingsViewTabs } from '../components/settings/SettingsNavigation';
 import ConfigBackupCard from '../components/settings/ConfigBackupCard';
-import ConfigPresetsPanel from '../components/settings/ConfigPresetsPanel';
 import OverviewSection from '../components/settings/sections/OverviewSection';
 import SystemSecuritySection from '../components/settings/sections/SystemSecuritySection';
 import {
@@ -133,6 +132,8 @@ const RuntimeCapabilitiesPanel = lazy(async () => {
   const module = await import('../components/settings/RuntimeCapabilitiesPanel');
   return { default: module.RuntimeCapabilitiesPanel };
 });
+
+const ConfigPresetsPanel = lazy(() => import('../components/settings/ConfigPresetsPanel'));
 
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
@@ -1593,7 +1594,9 @@ const SettingsPage: React.FC = () => {
             />
             {isTopLevelAdvanced && activeView === 'backup' ? (
               <>
-                <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
+                <Suspense fallback={<SettingsLoading />}>
+                  <ConfigPresetsPanel configVersion={configVersion} disabled={isSaving || isLoading} t={t} language={uiLanguage} onApplied={async (keys) => { await refreshAfterExternalSave(keys); applyPostSaveEffects(); }} />
+                </Suspense>
                 <ConfigBackupCard configVersion={configVersion} hasDirty={hasDirty} disabled={isSaving || isLoading} load={load} onSchedulerKeysImported={() => setSchedulerStatusRefreshToken((c) => c + 1)} onRefreshSetupStatus={() => { void refreshSetupStatus(); }} onRolledBack={async (result) => { await refreshAfterExternalSave(result.updatedKeys); applyPostSaveEffects(); }} onReloadLatest={() => refreshAfterExternalSave([])} />
               </>
             ) : null}
