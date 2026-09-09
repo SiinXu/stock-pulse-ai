@@ -7,9 +7,9 @@ Method bodies are rebound onto ``YfinanceFetcher`` by the compatibility facade
 ``main_indices`` in this package and the realtime owners of
 ``efinance_parts``, ``tushare_parts``, and ``longbridge_parts``.
 
-No sibling method moves. Symbol conversion, US/JP/KR/TW classifiers, daily
-fetch/normalize, and the HTTP guard stay on the facade; the cluster reaches
-them through ``self`` or facade globals at call time.
+No sibling method moves. Symbol conversion, US/JP/KR/TW classifiers, and the
+HTTP guard stay on the facade; the cluster reaches them through ``self`` or
+facade globals at call time.
 """
 
 from __future__ import annotations

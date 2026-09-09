@@ -9,4 +9,5 @@ surfaces and test patch targets stay stable (ADR-006 / Issue #1068).
 Owned domains:
 - ``main_indices`` — regional main-index quotes and the shared ticker fetch
 - ``realtime`` — US/index realtime quote routing and the Stooq fallback
+- ``history`` — daily fetch (``_fetch_raw_data``) and normalize (``_normalize_data``)
 """

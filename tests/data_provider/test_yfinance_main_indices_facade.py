@@ -49,8 +49,6 @@ METHOD_SIGNATURES = {
 # Methods the slice does NOT own; a later slice may move them, but not silently.
 UNMOVED_FACADE_METHODS = (
     "_convert_stock_code",
-    "_normalize_data",
-    "_fetch_raw_data",
 )
 
 
