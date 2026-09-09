@@ -1,5 +1,23 @@
 import React from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
+
+// Existing Agent Behavior view tests use synchronous getByTestId; keep that
+// card mock eager while other Settings lazy imports still suspend.
+vi.mock('react', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('react')>();
+  function InvestmentFrameworkSettingsCardMock() {
+    return <div data-testid="investment-framework-settings-card">个人投资框架</div>;
+  }
+  return {
+    ...actual,
+    lazy: ((importer: () => Promise<{ default: React.ComponentType<unknown> }>) => {
+      if (String(importer).includes('InvestmentFrameworkSettingsCard')) {
+        return InvestmentFrameworkSettingsCardMock;
+      }
+      return actual.lazy(importer);
+    }) as typeof actual.lazy,
+  };
+});
 import { createPortal } from 'react-dom';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, expect, vi } from 'vitest';
@@ -251,6 +269,17 @@ vi.mock('../../components/settings/RuntimeCapabilitiesPanel', () => ({
   ),
 }));
 
+vi.mock('../../components/settings/InvestmentFrameworkSettingsCard', () => {
+  function InvestmentFrameworkSettingsCardMock() {
+    return <div data-testid="investment-framework-settings-card">个人投资框架</div>;
+  }
+  return {
+    __esModule: true,
+    default: InvestmentFrameworkSettingsCardMock,
+    InvestmentFrameworkSettingsCard: InvestmentFrameworkSettingsCardMock,
+  };
+});
+
 vi.mock('../../api/alphasift', () => ({
   alphasiftApi: {
     enable: (...args: unknown[]) => alphasiftEnable(...args),
@@ -289,7 +318,6 @@ vi.mock('../../components/settings', async () => {
     </div>
   ),
   AuthSettingsCard: () => <div>认证与登录保护</div>,
-  InvestmentFrameworkSettingsCard: () => <div data-testid="investment-framework-settings-card">个人投资框架</div>,
   ChangePasswordCard: () => <div>修改密码</div>,
   IntelligentImport: ({ onMerged }: { onMerged: (value: string) => void }) => (
     <button type="button" onClick={() => onMerged('SZ000001,SZ000002')}>

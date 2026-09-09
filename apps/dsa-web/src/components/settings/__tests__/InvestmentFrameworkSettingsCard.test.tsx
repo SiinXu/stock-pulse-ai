@@ -1,8 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createApiError, createParsedApiError } from '../../../api/error';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { formatDateTime } from '../../../utils/format';
 import { InvestmentFrameworkSettingsCard } from '../InvestmentFrameworkSettingsCard';
 
@@ -99,6 +101,15 @@ function confirmFrameworkBasics(dialog: HTMLElement) {
   fireEvent.click(within(dialog).getByRole('button', { name: '确定' }));
 }
 
+function renderCard() {
+  const client = createAppQueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      <InvestmentFrameworkSettingsCard />
+    </QueryClientProvider>,
+  );
+}
+
 describe('InvestmentFrameworkSettingsCard', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -143,9 +154,11 @@ describe('InvestmentFrameworkSettingsCard', () => {
       versionCreatedAt: '2026-07-26T00:00:00Z',
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
 
     await waitForFrameworkEditor();
+    expect(getFramework).toHaveBeenCalledTimes(1);
+    expect(historyFramework).not.toHaveBeenCalled();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByTestId('investment-framework-prompt-preview')).toBeInTheDocument();
     expect(screen.getByTestId('investment-framework-prompt-preview-empty')).toBeInTheDocument();
@@ -181,7 +194,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
   it('previews decision-tree criteria phrasing in the analysis context panel', async () => {
     getFramework.mockResolvedValue(structuredFrameworkResponse());
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
 
     await waitForFrameworkEditor();
     const preview = await screen.findByTestId('investment-framework-prompt-preview-body');
@@ -207,13 +220,42 @@ describe('InvestmentFrameworkSettingsCard', () => {
       ),
     );
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
 
     expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
+    expect(getFramework).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('未配置')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('框架名称')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '重试' })).toBeInTheDocument();
     expect(createFramework).not.toHaveBeenCalled();
+  });
+
+  it('retries a failed framework read with another GET and does not treat 500 as missing', async () => {
+    getFramework
+      .mockRejectedValueOnce(
+        createApiError(
+          createParsedApiError({
+            title: '框架加载失败',
+            message: '暂时无法读取个人投资框架。',
+            rawMessage: 'framework unavailable',
+            status: 500,
+            category: 'http_error',
+            code: 'framework_load_failed',
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(structuredFrameworkResponse());
+
+    renderCard();
+
+    expect(await screen.findByText('暂时无法读取个人投资框架。')).toBeInTheDocument();
+    expect(screen.queryByText('未配置')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+
+    await waitForFrameworkEditor();
+    expect(getFramework).toHaveBeenCalledTimes(2);
+    expect(screen.queryByText('暂时无法读取个人投资框架。')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '保存新版本' })).toBeInTheDocument();
   });
 
   it('saves a new version with optimistic concurrency', async () => {
@@ -256,7 +298,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       resolveUpdate = resolve;
     }));
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
 
     const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
@@ -327,7 +369,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       ),
     );
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
 
     const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
@@ -404,7 +446,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       ),
     );
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
 
     const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
@@ -455,7 +497,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       },
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
 
     const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
@@ -513,7 +555,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       versionCreatedAt: '2026-07-26T01:00:00Z',
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     const basicsDialog = await openFrameworkBasics();
     fireEvent.change(screen.getByLabelText('自由规则'), {
       target: { value: 'Keep free form updated' },
@@ -562,7 +604,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       revision: 8,
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
 
     fireEvent.click(screen.getByRole('button', { name: '添加节点' }));
@@ -627,7 +669,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       revision: 8,
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
 
     const criteria = screen.getByLabelText('评估标准（每行一条）');
@@ -675,7 +717,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
   it('renames a node through an existing ID without stealing its references or focus', async () => {
     getFramework.mockResolvedValue(structuredFrameworkResponse());
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
 
     const nodeIdInput = screen.getByLabelText('节点 1 的 ID');
@@ -699,7 +741,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
   it('reverts a colliding node ID without rewriting graph references', async () => {
     getFramework.mockResolvedValue(structuredFrameworkResponse());
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
 
     const nodeIdInput = screen.getByLabelText('节点 2 的 ID');
@@ -763,7 +805,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       revision: 8,
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
 
     const renamedNodeId = screen.getByLabelText('节点 2 的 ID');
@@ -816,7 +858,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       versionCreatedAt: '2026-07-26T00:00:00Z',
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
     fireEvent.change(screen.getByLabelText('维度 2 的名称'), {
       target: { value: 'STRASSE' },
@@ -866,7 +908,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       revision: 8,
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
@@ -945,7 +987,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       },
     }));
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '保存新版本' }));
 
@@ -1019,7 +1061,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
     });
     updateFramework.mockResolvedValue({ ...current, version: 4, revision: 10 });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
 
@@ -1103,7 +1145,7 @@ describe('InvestmentFrameworkSettingsCard', () => {
       ],
     });
 
-    render(<InvestmentFrameworkSettingsCard />);
+    renderCard();
     await waitForFrameworkEditor();
     fireEvent.click(screen.getByRole('button', { name: '历史版本' }));
 

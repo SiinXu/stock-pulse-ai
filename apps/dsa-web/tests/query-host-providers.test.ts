@@ -317,4 +317,36 @@ describe('Query consumer hosts', () => {
     expect(backupCardSource).not.toContain('useConfigPresetsListQuery');
     expect(backupCardSource).not.toContain('ConfigPresetsPanel');
   });
+
+  it('wraps InvestmentFrameworkSettingsCard tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/InvestmentFrameworkSettingsCard.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/InvestmentFrameworkSettingsCard.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useInvestmentFrameworkQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useInvestmentFrameworkQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings investment-framework current GET on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useInvestmentFrameworkQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const cardSource = read('src/components/settings/InvestmentFrameworkSettingsCard.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const harnessSource = read('src/pages/__tests__/SettingsPage.testHarness.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['investment-framework', 'current']");
+    expect(hookSource).toContain('investmentFrameworkApi.get()');
+    expect(hookSource).not.toContain('.create(');
+    expect(hookSource).not.toContain('.update(');
+    expect(hookSource).not.toContain('.deactivate(');
+    expect(hookSource).not.toContain('.remove(');
+    expect(hookSource).not.toContain('.history(');
+    expect(barrelSource).not.toContain('useInvestmentFrameworkQuery');
+    expect(cardSource).toContain('useInvestmentFrameworkQuery');
+    expect(settingsPageSource).toContain("lazy(() => import('../components/settings/InvestmentFrameworkSettingsCard'))");
+    expect(settingsPageSource).toContain('Suspense');
+    expect(settingsPageSource).not.toContain('useInvestmentFrameworkQuery');
+    expect(harnessSource).toContain("vi.mock('../../components/settings/InvestmentFrameworkSettingsCard'");
+  });
 });

@@ -1,11 +1,12 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronRight, Copy, History, RefreshCw, X } from 'lucide-react';
 import { investmentFrameworkApi } from '../../api/investmentFramework';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
+import { useInvestmentFrameworkQuery } from '../../hooks/useInvestmentFrameworkQuery';
 import { formatDateTime } from '../../utils/format';
 import { resolveBusyRecoveryDecision } from '../../utils/asyncTaskUx';
 import type {
@@ -58,15 +59,21 @@ function editableContent(content: InvestmentFrameworkContent): InvestmentFramewo
 
 export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const { language, t } = useUiLanguage();
-  const [framework, setFramework] = useState<InvestmentFrameworkResponse | null>(null);
-  const [exists, setExists] = useState(false);
+  const {
+    framework,
+    exists,
+    isLoading,
+    loadError,
+    load: loadCurrent,
+    setFramework,
+    setExists,
+  } = useInvestmentFrameworkQuery();
   const [content, setContent] = useState<InvestmentFrameworkContent>(
     emptyInvestmentFrameworkContent,
   );
   const [changeSummary, setChangeSummary] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [draftReady, setDraftReady] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [error, setError] = useState<ParsedApiError | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showValidation, setShowValidation] = useState(false);
@@ -81,38 +88,37 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   const [historyError, setHistoryError] = useState<ParsedApiError | null>(null);
   const [basicsDraft, setBasicsDraft] = useState<InvestmentFrameworkContent | null>(null);
 
-  const load = useCallback(async (replaceDraft = true): Promise<boolean> => {
-    setIsLoading(true);
-    setLoadError(null);
-    setError(null);
-    try {
-      const current = await investmentFrameworkApi.get();
-      setFramework(current);
-      setExists(true);
-      if (replaceDraft) {
-        setContent(editableContent(current.content));
-        setChangeSummary('');
-        setShowValidation(false);
-      }
-      return true;
-    } catch (err) {
-      const parsed = getParsedApiError(err);
-      if (parsed.status === 404 || parsed.code === 'investment_framework_not_found') {
-        setFramework(null);
-        setExists(false);
-        if (replaceDraft) {
-          setContent(emptyInvestmentFrameworkContent());
-          setChangeSummary('');
-          setShowValidation(false);
-        }
-        return true;
-      }
-      setLoadError(parsed);
-      return false;
-    } finally {
-      setIsLoading(false);
+  const replaceDraftFrom = useCallback((
+    nextFramework: InvestmentFrameworkResponse | null,
+    nextExists: boolean,
+  ) => {
+    if (nextExists && nextFramework) {
+      setContent(editableContent(nextFramework.content));
+    } else {
+      setContent(emptyInvestmentFrameworkContent());
     }
+    setChangeSummary('');
+    setShowValidation(false);
+    setDraftReady(true);
   }, []);
+
+  const pendingReplaceDraftRef = useRef(true);
+  const appliedDraftKeyRef = useRef<string | null>(null);
+
+  const load = useCallback(async (replaceDraft = true): Promise<boolean> => {
+    pendingReplaceDraftRef.current = replaceDraft;
+    setError(null);
+    const result = await loadCurrent();
+    if (!result) return false;
+    if (replaceDraft) {
+      const key = result.exists && result.framework
+        ? `${result.framework.frameworkId}:${result.framework.revision}:${result.framework.updatedAt}`
+        : 'missing';
+      appliedDraftKeyRef.current = key;
+      replaceDraftFrom(result.framework, result.exists);
+    }
+    return true;
+  }, [loadCurrent, replaceDraftFrom]);
 
   const loadHistory = useCallback(async (forceExists = false) => {
     if (!exists && !forceExists) {
@@ -143,8 +149,15 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
   }, [exists]);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    if (isLoading || loadError) return;
+    if (!pendingReplaceDraftRef.current) return;
+    const key = exists && framework
+      ? `${framework.frameworkId}:${framework.revision}:${framework.updatedAt}`
+      : 'missing';
+    if (appliedDraftKeyRef.current === key) return;
+    appliedDraftKeyRef.current = key;
+    replaceDraftFrom(framework, exists);
+  }, [exists, framework, isLoading, loadError, replaceDraftFrom]);
 
   useEffect(() => {
     if (isHistoryOpen) {
@@ -379,7 +392,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
             size="default"
             aria-controls="investment-framework-history-drawer"
             aria-expanded={isHistoryOpen}
-            disabled={!exists || isLoading || Boolean(loadError)}
+            disabled={!exists || isLoading || !draftReady || Boolean(loadError)}
             onClick={() => setIsHistoryOpen((current) => !current)}
           >
             <History className="h-3.5 w-3.5" aria-hidden="true" />
@@ -399,7 +412,7 @@ export const InvestmentFrameworkSettingsCard: React.FC = () => {
           <p className="text-xs leading-6 text-muted-text">
             {t('settings.frameworkDisclaimer')}
           </p>
-          {isLoading ? (
+          {isLoading || (!loadError && !draftReady) ? (
             <StatePanel state="loading" title={t('common.loading')} size="compact" titleAs="p" />
           ) : loadError ? (
             <SettingsAlert
