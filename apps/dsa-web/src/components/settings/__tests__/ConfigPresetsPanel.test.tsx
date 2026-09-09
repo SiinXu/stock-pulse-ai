@@ -181,7 +181,7 @@ describe('ConfigPresetsPanel', () => {
   });
 
   it('confirms apply, calls onApplied, then reloads the list', async () => {
-    const onApplied = vi.fn(async (_updatedKeys: string[]) => undefined);
+    const onApplied = vi.fn(async () => undefined);
     vi.mocked(configProfilesApi.previewPreset).mockResolvedValue({
       presetId: 'local-first',
       displayName: 'Local-first (Ollama / Model Pack)',
@@ -254,7 +254,7 @@ describe('ConfigPresetsPanel', () => {
   });
 
   it('previews import, confirms, calls onApplied, then reloads', async () => {
-    const onApplied = vi.fn(async (_updatedKeys: string[]) => undefined);
+    const onApplied = vi.fn(async () => undefined);
     vi.mocked(configProfilesApi.previewImport).mockResolvedValue({
       valid: true,
       configVersion: 'v1',
