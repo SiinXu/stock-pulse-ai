@@ -1,0 +1,1 @@
+- [Changed] Move yfinance daily fetch (`_fetch_raw_data`) and normalize (`_normalize_data`) into `src/data_provider/yfinance_parts/history.py` behind the ADR-006 facade, keeping `YfinanceFetcher` method names, signatures, retry policy, and patch targets unchanged (Refs #1068).

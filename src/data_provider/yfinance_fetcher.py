@@ -191,143 +191,10 @@ class YfinanceFetcher(BaseFetcher):
             logger.warning(f"无法确定股票 {code} 的市场，默认使用深市")
             return f"{code}.SZ"
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
-        before_sleep=safe_before_sleep_log(
-            logger,
-            logging.WARNING,
-            event="Yfinance daily data retry scheduled",
-            error_code="yfinance_daily_data_retry",
-        ),
-    )
-    def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """
-        从 Yahoo Finance 获取原始数据
+    # Rebound from yfinance_parts.history after the class is built.
+    _fetch_raw_data = None
 
-        使用 yfinance.download() 获取历史数据
-
-        流程：
-        1. 转换股票代码格式
-        2. 调用 yfinance API
-        3. 处理返回数据
-        """
-        # Convert Code Format
-        yf_code = self._convert_stock_code(stock_code)
-
-        logger.debug(f"调用 yfinance.download({yf_code}, {start_date}, {end_date})")
-
-        try:
-            with _yfinance_http_guard():
-                import yfinance as yf
-
-                # Use yfinance to download data
-                df = yf.download(
-                    tickers=yf_code,
-                    start=start_date,
-                    end=end_date,
-                    progress=False,  # Disable progress bar
-                    auto_adjust=True,  # Automatically adjust prices for splits and dividends.
-                    multi_level_index=True
-                )
-
-                # Filter yf_code columns, avoid confusion of data for multiple stocks
-                if isinstance(df.columns, pd.MultiIndex) and len(df.columns) > 1:
-                    ticker_level = df.columns.get_level_values(1)
-                    mask = ticker_level == yf_code
-                    if mask.any():
-                        df = df.loc[:, mask].copy()
-
-                if df.empty:
-                    raise DataFetchError(f"Yahoo Finance 未查询到 {stock_code} 的数据")
-
-                return df
-
-        except Exception as e:  # broad-exception: fallback_recorded - Map provider I/O failure to DataFetchError for manager fallback.
-            if isinstance(e, DataFetchError):
-                raise
-            log_safe_exception(
-                logger,
-                "Yfinance daily HTTP request failed",
-                e,
-                error_code="yfinance_daily_http_failed",
-                level=logging.DEBUG,
-                context={"symbol": stock_code},
-            )
-            raise DataFetchError(f"Yahoo Finance 获取数据失败: {e}") from e
-
-    def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
-        """
-        标准化 Yahoo Finance 数据
-
-        yfinance 返回的列名：
-        Open, High, Low, Close, Volume（索引是日期）
-
-        注意：新版 yfinance 返回 MultiIndex 列名，如 ('Close', 'AMD')
-        需要先扁平化列名再进行处理
-
-        需要映射到标准列名：
-        date, open, high, low, close, volume, amount, pct_chg
-        """
-        df = df.copy()
-
-        # Handle MultiIndex column names (new yfinance format)
-        # For example: ('Close', 'AMD') -> 'Close'
-        if isinstance(df.columns, pd.MultiIndex):
-            logger.debug("检测到 MultiIndex 列名，进行扁平化处理")
-            # Get first-level column names (Price level: Close, High, Low, etc.)
-            df.columns = df.columns.get_level_values(0)
-
-        # Reset index, change date from index to column
-        df = df.reset_index()
-
-        # Column name mapping (yfinance uses Title Case)
-        column_mapping = {
-            'Date': 'date',
-            'Datetime': 'date',
-            'datetime': 'date',
-            'Open': 'open',
-            'High': 'high',
-            'Low': 'low',
-            'Close': 'close',
-            'Volume': 'volume',
-        }
-
-        df = df.rename(columns=column_mapping)
-        if 'date' not in df.columns:
-            index_col = df.columns[0] if len(df.columns) else None
-            if index_col is not None:
-                candidate = df[index_col]
-                if pd.api.types.is_datetime64_any_dtype(candidate):
-                    df = df.rename(columns={index_col: 'date'})
-                elif not pd.api.types.is_numeric_dtype(candidate):
-                    parsed_dates = pd.to_datetime(candidate, errors='coerce')
-                    if parsed_dates.notna().any():
-                        df = df.rename(columns={index_col: 'date'})
-                        df['date'] = parsed_dates
-
-        # Calculate Percentage Change (because yfinance does not directly provide)
-        if 'close' in df.columns:
-            df['pct_chg'] = df['close'].pct_change() * 100
-            df['pct_chg'] = df['pct_chg'].fillna(0).round(2)
-
-        # Estimate trading value because yfinance does not provide it directly.
-        # Trading value is approximately volume times average price.
-        if 'volume' in df.columns and 'close' in df.columns:
-            df['amount'] = df['volume'] * df['close']
-        else:
-            df['amount'] = 0
-
-        # Add stock code column
-        df['code'] = stock_code
-
-        # Keep only required columns.
-        keep_cols = ['code'] + STANDARD_COLUMNS
-        existing_cols = [col for col in keep_cols if col in df.columns]
-        df = df[existing_cols]
-
-        return df
+    _normalize_data = None
 
     # Rebound from yfinance_parts.main_indices after the class is built.
     _fetch_yf_ticker_data = None
@@ -375,23 +242,51 @@ if __name__ == "__main__":
 
 
 # Keep ``src.data_provider.yfinance_fetcher.YfinanceFetcher`` as the ADR-006
-# compatibility facade while ``yfinance_parts`` owns main-index and realtime
-# bodies.
+# compatibility facade while ``yfinance_parts`` owns main-index, realtime,
+# and daily history bodies.
 # Rebinding preserves method globals so existing patches against this module
 # continue to intercept moved implementations.
+from .yfinance_parts import history as _history_module  # noqa: E402
 from .yfinance_parts import main_indices as _main_indices_module  # noqa: E402
 from .yfinance_parts import realtime as _realtime_module  # noqa: E402
+from .yfinance_parts.history import _HistoryMethods  # noqa: E402
 from .yfinance_parts.main_indices import _MainIndicesMethods  # noqa: E402
 from .yfinance_parts.realtime import _RealtimeMethods  # noqa: E402
 from .yfinance_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
 
+def _apply_history_retry(name: str, bound):
+    """Re-apply the historical tenacity policy after facade cloning."""
+
+    if name != "_fetch_raw_data":
+        return bound
+    return retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+        retry=retry_if_exception_type((ConnectionError, TimeoutError)),
+        before_sleep=safe_before_sleep_log(
+            logger,
+            logging.WARNING,
+            event="Yfinance daily data retry scheduled",
+            error_code="yfinance_daily_data_retry",
+        ),
+    )(bound)
+
+
 def _assemble_yfinance_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _MainIndicesMethods, _RealtimeMethods
+    global _HistoryMethods, _MainIndicesMethods, _RealtimeMethods
+    _HistoryMethods = _history_module._HistoryMethods
     _MainIndicesMethods = _main_indices_module._MainIndicesMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
+    bind_methods_from_class(
+        _HistoryMethods,
+        YfinanceFetcher,
+        globals(),
+        expected_names=_history_module.EXPECTED_HISTORY_METHOD_NAMES,
+        post_bind=_apply_history_retry,
+    )
     bind_methods_from_class(
         _MainIndicesMethods,
         YfinanceFetcher,
@@ -404,15 +299,38 @@ def _assemble_yfinance_fetcher_facade() -> None:
         globals(),
         expected_names=_realtime_module.EXPECTED_REALTIME_METHOD_NAMES,
     )
+    # Rebound methods are assigned after class body evaluation; clear ABC
+    # abstracts that are now implemented so instantiation matches the legacy
+    # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
+    abstracts = set(getattr(YfinanceFetcher, "__abstractmethods__", ()))
+    if abstracts:
+        abstracts.difference_update(
+            {
+                name
+                for name in (
+                    "_fetch_raw_data",
+                    "_normalize_data",
+                    "get_daily_data",
+                )
+                if callable(getattr(YfinanceFetcher, name, None))
+            }
+        )
+        abstracts = {
+            name
+            for name in abstracts
+            if name not in YfinanceFetcher.__dict__
+            or getattr(YfinanceFetcher.__dict__[name], "__isabstractmethod__", False)
+        }
+        YfinanceFetcher.__abstractmethods__ = frozenset(abstracts)
 
 
 _assemble_yfinance_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind both owner modules."""
+    """Keep an owner reload able to rebuild and rebind every owner module."""
 
-    for module in (_main_indices_module, _realtime_module):
+    for module in (_history_module, _main_indices_module, _realtime_module):
         module._FACADE_RELOAD_HOOK = _assemble_yfinance_fetcher_facade  # type: ignore[attr-defined]
 
 

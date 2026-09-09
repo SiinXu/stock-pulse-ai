@@ -39,8 +39,6 @@ METHOD_SIGNATURES = {
 
 UNMOVED_FACADE_METHODS = (
     "_convert_stock_code",
-    "_normalize_data",
-    "_fetch_raw_data",
     "_is_us_stock",
     "_is_jp_kr_suffix_stock",
     "_is_tw_suffix_stock",
