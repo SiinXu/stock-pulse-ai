@@ -1,10 +1,10 @@
 # StockPulse universal Python dependency constraints
 # Generated file; do not edit by hand.
 # Resolver: uv==0.11.31
-# Source-SHA256: fdf62fbd86781516c4d6793b95009bfcfab23a282c48657b9ab5a21cb2ac442c
+# Source-SHA256: 241553696824946188c275155869f2e3e2230ae59048ac883977cfd7b95808b5
 # Python-Minimum: 3.10
 # Exclude-Newer: 2026-07-27T04:06:13Z
-# Exclude-Newer-Packages: cryptography=2026-07-31T14:25:11Z,mcp=2026-07-29T00:00:00Z,mcp-types=2026-07-29T00:00:00Z,nltk=2026-08-12T23:46:38Z,pip=2026-08-04T22:51:15Z
+# Exclude-Newer-Packages: cryptography=2026-07-31T14:25:11Z,httpcore2=2026-08-18T13:22:09Z,httpx2=2026-08-18T13:22:10Z,httpx2-jsfetch=2026-08-07T00:13:08Z,mcp=2026-07-29T00:00:00Z,mcp-types=2026-07-29T00:00:00Z,nltk=2026-08-12T23:46:38Z,pip=2026-08-04T22:51:15Z
 # Platforms: universal (Linux, macOS, Windows)
 # Regenerate: python scripts/check_dependency_locks.py --update
 aiohappyeyeballs==2.7.1
@@ -70,10 +70,11 @@ h11==0.16.0
 hf-xet==1.5.2 ; platform_machine == 'AMD64' or platform_machine == 'aarch64' or platform_machine == 'amd64' or platform_machine == 'arm64' or platform_machine == 'x86_64'
 html5lib==1.1
 httpcore==1.0.9
-httpcore2==2.7.0
+httpcore2==2.12.0
 httptools==0.8.0
 httpx==0.28.1
-httpx2==2.7.0
+httpx2==2.12.0
+httpx2-jsfetch==1.0 ; python_full_version >= '3.12' and sys_platform == 'emscripten'
 huggingface-hub==1.24.0
 idna==3.18
 imgkit==1.2.3
