@@ -1,10 +1,14 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import type { ReactElement } from 'react';
 import { StrictMode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { createParsedApiError } from '../../../api/error';
 import { scheduledTasksApi } from '../../../api/scheduledTasks';
 import { UI_TEXT } from '../../../i18n/uiText';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { createDeferred } from '../../../test-utils';
 import ScheduledTasksPanel from '../ScheduledTasksPanel';
 
@@ -41,6 +45,15 @@ const scheduledTask = {
   createdAt: '2026-07-25T10:00:00Z',
   updatedAt: '2026-07-25T10:00:00Z',
 };
+
+function renderPanel(ui: ReactElement) {
+  const client = createAppQueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      {ui}
+    </QueryClientProvider>,
+  );
+}
 
 function buildRun(id: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -111,7 +124,7 @@ describe('ScheduledTasksPanel', () => {
       updatedAt: '2026-07-26T10:00:00Z',
     });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
 
     const descriptionNote = screen.getByText(UI_TEXT.en['settings.scheduledTasksDescription']);
     expect(descriptionNote).toHaveClass('text-xs', 'text-muted-text');
@@ -157,7 +170,7 @@ describe('ScheduledTasksPanel', () => {
       latestRun: null,
     });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
 
     expect(await screen.findByText('Future task')).toBeInTheDocument();
     expect(screen.getByText('Unsupported schema')).toBeInTheDocument();
@@ -207,7 +220,7 @@ describe('ScheduledTasksPanel', () => {
       latestRun: null,
     });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
 
     expect(await screen.findByText('No schedule definitions yet')).toBeInTheDocument();
     fireEvent.click(screen.getByTestId('settings-scheduled-tasks-create'));
@@ -278,7 +291,7 @@ describe('ScheduledTasksPanel', () => {
       },
     });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
 
     expect(await screen.findByText('Daily AAPL')).toBeInTheDocument();
     await waitFor(() => {
@@ -291,7 +304,7 @@ describe('ScheduledTasksPanel', () => {
   it('shows client-side validation when required create fields are empty', async () => {
     vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 0, items: [] });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
 
     fireEvent.click(await screen.findByTestId('settings-scheduled-tasks-create'));
     fireEvent.click(screen.getByTestId('settings-scheduled-tasks-create-submit'));
@@ -303,7 +316,7 @@ describe('ScheduledTasksPanel', () => {
   it('rejects invalid max attempts before calling create', async () => {
     vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 0, items: [] });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
 
     fireEvent.click(await screen.findByTestId('settings-scheduled-tasks-create'));
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Daily AAPL' } });
@@ -335,7 +348,7 @@ describe('ScheduledTasksPanel', () => {
       ],
     });
 
-    render(<ScheduledTasksPanel t={t} language="en" />);
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
 
     expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
     expect(scheduledTasksApi.listRuns).not.toHaveBeenCalled();
@@ -378,7 +391,7 @@ describe('ScheduledTasksPanel', () => {
         items: [buildRun('run-1'), buildRun('run-2')],
       });
 
-    render(
+    renderPanel(
       <StrictMode>
         <ScheduledTasksPanel t={t} language="en" />
       </StrictMode>,
@@ -435,4 +448,56 @@ describe('ScheduledTasksPanel', () => {
       { limit: 20 },
     ));
   }, HISTORY_FLOW_TIMEOUT_MS);
+
+  it('still issues the list GET when disabled and only disables existing controls', async () => {
+    vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 1, items: [scheduledTask] });
+
+    renderPanel(<ScheduledTasksPanel t={t} language="en" disabled />);
+
+    expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
+    expect(scheduledTasksApi.list).toHaveBeenCalledWith({ limit: 200 });
+    expect(screen.getByTestId('settings-scheduled-tasks-create')).toBeDisabled();
+    expect(screen.getByRole('button', { name: UI_TEXT.en['settings.scheduledTasksRefresh'] })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: /Enable or disable AAPL risk check/i })).toBeDisabled();
+  });
+
+  it('fans out getStatus after a successful list load and skips it after an initial error', async () => {
+    vi.mocked(scheduledTasksApi.list).mockRejectedValueOnce(
+      createParsedApiError({
+        title: 'Unavailable',
+        message: 'scheduled tasks unavailable',
+        status: 500,
+        code: 'internal',
+        category: 'http_error',
+      }),
+    );
+
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
+
+    expect(await screen.findByText('scheduled tasks unavailable')).toBeInTheDocument();
+    expect(scheduledTasksApi.getStatus).not.toHaveBeenCalled();
+  });
+
+  it('keeps last-good rows when a later refresh list GET fails', async () => {
+    vi.mocked(scheduledTasksApi.list)
+      .mockResolvedValueOnce({ total: 1, items: [scheduledTask] })
+      .mockRejectedValueOnce(
+        createParsedApiError({
+          title: 'Unavailable',
+          message: 'refresh failed',
+          status: 500,
+          code: 'internal',
+          category: 'http_error',
+        }),
+      );
+
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
+
+    expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
+    await waitFor(() => expect(scheduledTasksApi.getStatus).toHaveBeenCalledWith('task-1'));
+
+    fireEvent.click(screen.getByRole('button', { name: UI_TEXT.en['settings.scheduledTasksRefresh'] }));
+    expect(await screen.findByText(/refresh failed/i)).toBeInTheDocument();
+    expect(screen.getByText('AAPL risk check')).toBeInTheDocument();
+  });
 });

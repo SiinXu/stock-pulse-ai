@@ -5,6 +5,7 @@ import type React from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { scheduledTasksApi } from '../../api/scheduledTasks';
+import { useScheduledTasksListQuery } from '../../hooks/useScheduledTasksListQuery';
 import type {
   ScheduledTaskCalendarMarket,
   ScheduledTaskCreateRequest,
@@ -214,12 +215,17 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
   const timezoneFieldId = useId();
   const maxAttemptsFieldId = useId();
   const statusRequestSeq = useRef(0);
+  const didInitialFanout = useRef(false);
 
-  const [items, setItems] = useState<ScheduledTaskDefinitionSummary[]>([]);
+  const {
+    items,
+    isLoading,
+    isRefreshing,
+    loadError,
+    load,
+    setItems,
+  } = useScheduledTasksListQuery();
   const [latestRuns, setLatestRuns] = useState<Record<string, ScheduledTaskRunItem | null>>({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [actionError, setActionError] = useState<ParsedApiError | null>(null);
   const [actionSuccess, setActionSuccess] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -287,28 +293,20 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
   }, []);
 
   const loadTasks = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
-    setLoadError(null);
     setActionError(null);
-    if (mode === 'initial') {
-      setIsLoading(true);
-    } else {
-      setIsRefreshing(true);
+    const next = await load(mode);
+    if (next !== undefined) {
+      void loadLatestRuns(next);
     }
-    try {
-      const response = await scheduledTasksApi.list({ limit: 200 });
-      setItems(response.items);
-      void loadLatestRuns(response.items);
-    } catch (error: unknown) {
-      setLoadError(getParsedApiError(error));
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
-    }
-  }, [loadLatestRuns]);
+  }, [load, loadLatestRuns]);
 
   useEffect(() => {
-    void loadTasks('initial');
-  }, [loadTasks]);
+    if (didInitialFanout.current || isLoading) return;
+    didInitialFanout.current = true;
+    if (!loadError) {
+      void loadLatestRuns(items);
+    }
+  }, [isLoading, loadError, items, loadLatestRuns]);
 
   const openCreate = () => {
     setDraft(emptyDraft());

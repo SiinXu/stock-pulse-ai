@@ -249,4 +249,39 @@ describe('Query consumer hosts', () => {
     expect(sectionSource).toContain("lazy(() => import('../LoadedExtensionsPanel'))");
     expect(sectionSource).not.toContain('useLoadedExtensionsQuery');
   });
+
+  it('wraps ScheduledTasksPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/ScheduledTasksPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/ScheduledTasksPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useScheduledTasksListQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useScheduledTasksListQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings scheduled-tasks list on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useScheduledTasksListQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/ScheduledTasksPanel.tsx');
+    const sectionSource = read('src/components/settings/sections/SystemSecuritySection.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const schedulerCardSource = read('src/components/settings/SchedulerSettingsCard.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['scheduled-tasks', 'list']");
+    expect(hookSource).toContain('list({ limit: 200 })');
+    expect(hookSource).not.toContain('getStatus');
+    expect(hookSource).not.toContain('listRuns');
+    expect(hookSource).not.toContain('.create(');
+    expect(hookSource).not.toContain('.enable(');
+    expect(hookSource).not.toContain('.disable(');
+    expect(barrelSource).not.toContain('useScheduledTasksListQuery');
+    expect(panelSource).toContain('useScheduledTasksListQuery');
+    expect(sectionSource).toContain("lazy(() => import('../ScheduledTasksPanel'))");
+    expect(sectionSource).toContain('Suspense');
+    expect(sectionSource).not.toContain('useScheduledTasksListQuery');
+    expect(settingsPageSource).not.toContain('useScheduledTasksListQuery');
+    expect(schedulerCardSource).not.toContain('useScheduledTasksListQuery');
+    expect(schedulerCardSource).toContain('list({ enabled: true, limit: 1 })');
+  });
 });

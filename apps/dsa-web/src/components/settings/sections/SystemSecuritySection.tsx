@@ -6,12 +6,12 @@ import { AuthSettingsCard } from '../AuthSettingsCard';
 import { ChangePasswordCard } from '../ChangePasswordCard';
 import OutboundActivityPanel from '../OutboundActivityPanel';
 import SchedulerSettingsCard from '../SchedulerSettingsCard';
-import ScheduledTasksPanel from '../ScheduledTasksPanel';
 import SecurityAuditPanel from '../SecurityAuditPanel';
 import SignalScorecardPanel from '../SignalScorecardPanel';
 import SystemAboutCard from '../SystemAboutCard';
 
 const LoadedExtensionsPanel = lazy(() => import('../LoadedExtensionsPanel'));
+const ScheduledTasksPanel = lazy(() => import('../ScheduledTasksPanel'));
 
 type SchedulerProps = React.ComponentProps<typeof SchedulerSettingsCard>;
 type ExtensionProps = React.ComponentProps<typeof LoadedExtensionsPanel>;
@@ -65,7 +65,9 @@ const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (props) => {
           t={props.t}
           language={props.language}
         />
-        <ScheduledTasksPanel disabled={props.disabled} t={props.t} language={props.language} />
+        <Suspense fallback={null}>
+          <ScheduledTasksPanel disabled={props.disabled} t={props.t} language={props.language} />
+        </Suspense>
       </>
     );
   }
