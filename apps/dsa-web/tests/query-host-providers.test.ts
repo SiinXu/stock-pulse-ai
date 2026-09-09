@@ -284,4 +284,37 @@ describe('Query consumer hosts', () => {
     expect(schedulerCardSource).not.toContain('useScheduledTasksListQuery');
     expect(schedulerCardSource).toContain('list({ enabled: true, limit: 1 })');
   });
+
+  it('wraps ConfigPresetsPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/ConfigPresetsPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/ConfigPresetsPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useConfigPresetsListQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useConfigPresetsListQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings config-presets list on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useConfigPresetsListQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/ConfigPresetsPanel.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const backupCardSource = read('src/components/settings/ConfigBackupCard.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['config-presets', 'list']");
+    expect(hookSource).toContain('listPresets()');
+    expect(hookSource).not.toContain('previewPreset');
+    expect(hookSource).not.toContain('applyPreset');
+    expect(hookSource).not.toContain('exportProfile');
+    expect(hookSource).not.toContain('previewImport');
+    expect(hookSource).not.toContain('applyImport');
+    expect(barrelSource).not.toContain('useConfigPresetsListQuery');
+    expect(panelSource).toContain('useConfigPresetsListQuery');
+    expect(settingsPageSource).toContain("lazy(() => import('../components/settings/ConfigPresetsPanel'))");
+    expect(settingsPageSource).toContain('Suspense');
+    expect(settingsPageSource).not.toContain('useConfigPresetsListQuery');
+    expect(backupCardSource).not.toContain('useConfigPresetsListQuery');
+    expect(backupCardSource).not.toContain('ConfigPresetsPanel');
+  });
 });

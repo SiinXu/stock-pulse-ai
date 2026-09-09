@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings config-presets list GET through TanStack Query (Refs #789).

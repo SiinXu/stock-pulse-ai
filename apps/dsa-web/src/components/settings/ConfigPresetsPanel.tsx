@@ -1,13 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Download, RefreshCw, Upload } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { configProfilesApi } from '../../api/configProfiles';
+import { useConfigPresetsListQuery } from '../../hooks/useConfigPresetsListQuery';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import type {
-  ConfigPresetItem,
   ConfigPresetPreviewResponse,
   ConfigProfileChange,
   ConfigProfileImportPreviewResponse,
@@ -56,38 +56,15 @@ const ConfigPresetsPanel: React.FC<ConfigPresetsPanelProps> = ({
 }) => {
   void language;
   const importRef = useRef<HTMLInputElement | null>(null);
+  const { presets, recommendedId, isLoading, loadError, load } = useConfigPresetsListQuery();
 
-  const [presets, setPresets] = useState<ConfigPresetItem[]>([]);
-  const [recommendedId, setRecommendedId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
-  const [loadError, setLoadError] = useState<ParsedApiError | null>(null);
   const [actionError, setActionError] = useState<ParsedApiError | null>(null);
   const [successMessage, setSuccessMessage] = useState('');
 
   const [pendingPreset, setPendingPreset] = useState<ConfigPresetPreviewResponse | null>(null);
   const [pendingImport, setPendingImport] = useState<ConfigProfileImportPreviewResponse | null>(null);
   const [pendingImportContent, setPendingImportContent] = useState('');
-
-  const loadPresets = useCallback(async () => {
-    setIsLoading(true);
-    setLoadError(null);
-    try {
-      const payload = await configProfilesApi.listPresets();
-      setPresets(payload.presets || []);
-      setRecommendedId(payload.recommendedPresetId);
-    } catch (error: unknown) {
-      setLoadError(getParsedApiError(error));
-      setPresets([]);
-      setRecommendedId(null);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadPresets();
-  }, [loadPresets]);
 
   const beginApplyPreset = async (presetId: string) => {
     setActionError(null);
@@ -115,7 +92,7 @@ const ConfigPresetsPanel: React.FC<ConfigPresetsPanelProps> = ({
       setPendingPreset(null);
       setSuccessMessage(result.message || t('settings.configPresetsApplied'));
       await onApplied(result.updatedKeys || []);
-      await loadPresets();
+      await load('refresh');
     } catch (error: unknown) {
       setActionError(getParsedApiError(error));
     } finally {
@@ -186,7 +163,7 @@ const ConfigPresetsPanel: React.FC<ConfigPresetsPanelProps> = ({
       setPendingImportContent('');
       setSuccessMessage(result.message || t('settings.configPresetsImported'));
       await onApplied(result.updatedKeys || []);
-      await loadPresets();
+      await load('refresh');
     } catch (error: unknown) {
       setActionError(getParsedApiError(error));
     } finally {
@@ -222,7 +199,7 @@ const ConfigPresetsPanel: React.FC<ConfigPresetsPanelProps> = ({
             size="default"
             aria-label={t('settings.configPresetsRefreshAria')}
             disabled={busy}
-            onClick={() => { void loadPresets(); }}
+            onClick={() => { void load('refresh'); }}
           >
             <RefreshCw size={16} />
           </IconButton>
