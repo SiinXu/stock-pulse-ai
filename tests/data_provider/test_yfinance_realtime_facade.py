@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Facade identity, patch-seam, and reload characterization for the yfinance indices slice.
+"""Facade identity, patch-seam, and reload characterization for the yfinance realtime slice.
 
-Issue #1068: the main-index methods moved into
-``src/data_provider/yfinance_parts/main_indices.py`` and are rebound onto the
+Issue #1068: the realtime quote methods moved into
+``src/data_provider/yfinance_parts/realtime.py`` and are rebound onto the
 public ``YfinanceFetcher`` class.
 """
 
@@ -12,45 +12,38 @@ import ast
 import importlib
 import inspect
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
 import src.data_provider.yfinance_fetcher as yfinance_mod
-import src.data_provider.yfinance_parts.main_indices as indices_mod
+import src.data_provider.yfinance_parts.realtime as realtime_mod
 from src.data_provider.yfinance_fetcher import YfinanceFetcher
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FACADE_PATH = REPO_ROOT / "src" / "data_provider" / "yfinance_fetcher.py"
-OWNER_PATH = (
-    REPO_ROOT / "src" / "data_provider" / "yfinance_parts" / "main_indices.py"
-)
+OWNER_PATH = REPO_ROOT / "src" / "data_provider" / "yfinance_parts" / "realtime.py"
 
 MOVED = (
-    "_fetch_yf_ticker_data",
-    "get_main_indices",
-    "_get_us_main_indices",
-    "_get_hk_main_indices",
-    "_get_jp_main_indices",
-    "_get_kr_main_indices",
-    "_get_tw_main_indices",
+    "_get_us_stock_quote_from_stooq",
+    "_get_us_index_realtime_quote",
+    "get_realtime_quote",
 )
 
-# Pre-slice shapes, read from origin/main before the move.
 METHOD_SIGNATURES = {
-    "_fetch_yf_ticker_data": ["self", "yf", "yf_code", "name", "return_code"],
-    "get_main_indices": ["self", "region"],
-    "_get_us_main_indices": ["self", "yf"],
-    "_get_hk_main_indices": ["self", "yf"],
-    "_get_jp_main_indices": ["self", "yf"],
-    "_get_kr_main_indices": ["self", "yf"],
-    "_get_tw_main_indices": ["self", "yf"],
+    "_get_us_stock_quote_from_stooq": ["self", "stock_code"],
+    "_get_us_index_realtime_quote": ["self", "user_code", "yf_symbol", "index_name"],
+    "get_realtime_quote": ["self", "stock_code"],
 }
 
-# Methods the slice does NOT own; a later slice may move them, but not silently.
 UNMOVED_FACADE_METHODS = (
     "_convert_stock_code",
     "_normalize_data",
     "_fetch_raw_data",
+    "_is_us_stock",
+    "_is_jp_kr_suffix_stock",
+    "_is_tw_suffix_stock",
 )
 
 
@@ -93,12 +86,12 @@ def _facade_class_methods() -> set:
 
 
 def test_owner_module_declares_exactly_the_slice() -> None:
-    assert set(indices_mod.EXPECTED_MAIN_INDEX_METHOD_NAMES) == set(MOVED)
+    assert realtime_mod.EXPECTED_REALTIME_METHOD_NAMES == MOVED
     tree = ast.parse(OWNER_PATH.read_text(encoding="utf-8"))
     defined = {
         node.name
         for cls in tree.body
-        if isinstance(cls, ast.ClassDef) and cls.name == "_MainIndicesMethods"
+        if isinstance(cls, ast.ClassDef) and cls.name == "_RealtimeMethods"
         for node in cls.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
@@ -116,21 +109,29 @@ def test_unmoved_methods_stay_on_the_facade(name) -> None:
     assert name in _facade_class_methods(), name
 
 
-def test_shared_ticker_fetch_travels_with_the_cluster() -> None:
-    """All six regional methods call it; leaving it behind would add a cross-module hop."""
-
-    assert "_fetch_yf_ticker_data" in indices_mod.EXPECTED_MAIN_INDEX_METHOD_NAMES
-    source = OWNER_PATH.read_text(encoding="utf-8")
-    assert "def _fetch_yf_ticker_data(" in source
-
-
 def test_moved_bodies_still_reach_a_patched_facade_global() -> None:
-    sentinel = object()
+    sentinel_symbol = "^SENTINEL"
+    sentinel_name = "Sentinel Index"
     original = yfinance_mod.get_us_index_yf_symbol
+    fetcher = YfinanceFetcher()
+    quote = SimpleNamespace(source="not-fallback")
     try:
-        yfinance_mod.get_us_index_yf_symbol = lambda *a, **k: sentinel
-        method = YfinanceFetcher.__dict__["_get_us_main_indices"]
-        assert method.__globals__["get_us_index_yf_symbol"]("^GSPC") is sentinel
+        yfinance_mod.get_us_index_yf_symbol = lambda *a, **k: (sentinel_symbol, sentinel_name)
+        method = YfinanceFetcher.__dict__["get_realtime_quote"]
+        assert method.__globals__["get_us_index_yf_symbol"]("SPX") == (
+            sentinel_symbol,
+            sentinel_name,
+        )
+        with patch.object(
+            fetcher, "_get_us_index_realtime_quote", return_value=quote
+        ) as mocked:
+            result = fetcher.get_realtime_quote("SPX")
+        mocked.assert_called_once_with(
+            user_code="SPX",
+            yf_symbol=sentinel_symbol,
+            index_name=sentinel_name,
+        )
+        assert result is quote
     finally:
         yfinance_mod.get_us_index_yf_symbol = original
 
@@ -156,17 +157,18 @@ def test_facade_bind_is_a_re_export_not_a_copy() -> None:
 
 
 def test_owner_reload_rebinds_onto_the_facade() -> None:
-    importlib.reload(indices_mod)
+    importlib.reload(realtime_mod)
     for name in MOVED:
         method = YfinanceFetcher.__dict__[name]
         assert method.__globals__ is vars(yfinance_mod), name
+        assert method.__qualname__ == f"YfinanceFetcher.{name}", name
 
 
 def test_expected_names_mismatch_is_an_import_error() -> None:
     from src.data_provider.yfinance_parts.facade_bind import bind_methods_from_class
 
     class _Partial:
-        def get_main_indices(self):  # pragma: no cover - shape only
+        def get_realtime_quote(self):  # pragma: no cover - shape only
             return None
 
     class _Target:

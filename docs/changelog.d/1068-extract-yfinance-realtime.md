@@ -1,0 +1,1 @@
+- [Changed] Move yfinance realtime quote routing, US-index quotes, and the Stooq fallback into `src/data_provider/yfinance_parts/realtime.py` behind the ADR-006 facade, keeping `YfinanceFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
