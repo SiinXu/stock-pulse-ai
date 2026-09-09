@@ -7,9 +7,10 @@ Method bodies are rebound onto ``YfinanceFetcher`` by the compatibility facade
 facade after bind, only for ``_fetch_raw_data``. Mirrors ``tushare_parts.history``
 and the domain split of ``realtime`` / ``main_indices`` in this package.
 
-Symbol conversion, US/JP/KR/TW classifiers, and the HTTP guard stay on the
-facade; this cluster reaches them through ``self`` or facade globals at call
-time. No sibling method moves.
+Symbol conversion and US/JP/KR/TW classifiers are rebound from
+``yfinance_parts.symbols``; the HTTP guard stays on the facade. This cluster
+reaches them through ``self`` or facade globals at call time. No sibling
+method moves.
 """
 
 from __future__ import annotations

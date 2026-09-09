@@ -1,0 +1,1 @@
+- [Changed] Move yfinance symbol conversion and US/JP/KR/TW suffix classifiers into `src/data_provider/yfinance_parts/symbols.py` behind the ADR-006 facade, keeping `YfinanceFetcher` method names, signatures, staticmethod kinds, and patch targets unchanged (Refs #1068).
