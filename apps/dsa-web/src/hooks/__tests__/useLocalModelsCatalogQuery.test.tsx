@@ -469,4 +469,108 @@ describe('useLocalModelsCatalogQuery', () => {
     )).toBe(true);
     expect(isLocalModelsCatalogCancelledError(serverError())).toBe(false);
   });
+
+  it('overlapping loadCatalog from a second living consumer joins instead of cancelling', async () => {
+    const pending = createDeferred<LocalModelCatalogResponse>();
+    const live = catalog({ verifiedAt: '2026-09-09' });
+    getCatalog.mockReturnValueOnce(pending.promise);
+    const { client, wrapper } = createWrapper();
+    const cancelSpy = vi.spyOn(client, 'cancelQueries');
+    const removeSpy = vi.spyOn(client, 'removeQueries');
+    const a = renderHook(() => useLocalModelsCatalogQuery(), { wrapper });
+
+    let aResult: LocalModelCatalogResponse | undefined;
+    let aError: unknown;
+    let bResult: LocalModelCatalogResponse | undefined;
+    let bError: unknown;
+    await act(async () => {
+      void a.result.current.loadCatalog().then(
+        (value) => { aResult = value; },
+        (error: unknown) => { aError = error; },
+      );
+    });
+    await waitFor(() => expect(getCatalog).toHaveBeenCalledTimes(1));
+    const cancelsAfterFirst = cancelSpy.mock.calls.length;
+    const removesAfterFirst = removeSpy.mock.calls.length;
+
+    const b = renderHook(() => useLocalModelsCatalogQuery(), { wrapper });
+    await act(async () => {
+      void b.result.current.loadCatalog().then(
+        (value) => { bResult = value; },
+        (error: unknown) => { bError = error; },
+      );
+    });
+    await flushQueryMicrotasks();
+
+    expect(getCatalog).toHaveBeenCalledTimes(1);
+    expect(cancelSpy.mock.calls.length).toBe(cancelsAfterFirst);
+    expect(removeSpy.mock.calls.length).toBe(removesAfterFirst);
+
+    await act(async () => {
+      pending.resolve(live);
+      await pending.promise;
+      await Promise.resolve();
+    });
+
+    expect(aError).toBeUndefined();
+    expect(bError).toBeUndefined();
+    expect(isLocalModelsCatalogCancelledError(aError)).toBe(false);
+    expect(aResult).toEqual(live);
+    expect(bResult).toEqual(live);
+    expect(client.getQueryState(LOCAL_MODELS_CATALOG_QUERY_KEY)?.status).toBe('success');
+    a.unmount();
+    b.unmount();
+  });
+
+  it('unmount of a non-last consumer leaves the remaining in-flight catalog fetch intact', async () => {
+    const pending = createDeferred<LocalModelCatalogResponse>();
+    const live = catalog({ verifiedAt: '2026-09-09' });
+    getCatalog.mockReturnValueOnce(pending.promise);
+    const { client, wrapper } = createWrapper();
+    const cancelSpy = vi.spyOn(client, 'cancelQueries');
+    const removeSpy = vi.spyOn(client, 'removeQueries');
+    const a = renderHook(() => useLocalModelsCatalogQuery(), { wrapper });
+
+    let aError: unknown;
+    let bResult: LocalModelCatalogResponse | undefined;
+    let bError: unknown;
+    await act(async () => {
+      void a.result.current.loadCatalog().catch((error: unknown) => {
+        aError = error;
+      });
+    });
+    await waitFor(() => expect(getCatalog).toHaveBeenCalledTimes(1));
+
+    const b = renderHook(() => useLocalModelsCatalogQuery(), { wrapper });
+    await act(async () => {
+      void b.result.current.loadCatalog().then(
+        (value) => { bResult = value; },
+        (error: unknown) => { bError = error; },
+      );
+    });
+    await flushQueryMicrotasks();
+    const cancelsBeforeUnmount = cancelSpy.mock.calls.length;
+    const removesBeforeUnmount = removeSpy.mock.calls.length;
+
+    a.unmount();
+    await flushQueryMicrotasks();
+    expect(cancelSpy.mock.calls.length).toBe(cancelsBeforeUnmount);
+    expect(removeSpy.mock.calls.length).toBe(removesBeforeUnmount);
+    expect(client.getQueryState(LOCAL_MODELS_CATALOG_QUERY_KEY)).toBeDefined();
+
+    await act(async () => {
+      pending.resolve(live);
+      await pending.promise;
+      await Promise.resolve();
+    });
+
+    expect(bError).toBeUndefined();
+    expect(isLocalModelsCatalogCancelledError(aError)).toBe(false);
+    expect(bResult).toEqual(live);
+    expect(client.getQueryState(LOCAL_MODELS_CATALOG_QUERY_KEY)?.status).toBe('success');
+
+    b.unmount();
+    expect(client.getQueryState(LOCAL_MODELS_CATALOG_QUERY_KEY)).toBeUndefined();
+    expect(client.getQueryCache().findAll({ queryKey: ['local-models'] })).toHaveLength(0);
+  });
 });

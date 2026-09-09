@@ -1,1 +1,2 @@
 - [Changed] Schedule the Settings Local Models catalog GET through TanStack Query (Refs #789).
+- [Fixed] Keep a still-mounted Local Models panel from losing an in-flight catalog GET when a sibling panel mounts or unmounts (Refs #789).

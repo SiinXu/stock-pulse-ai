@@ -4,8 +4,8 @@
 // Do not import this hook from Shell, App, SettingsPage, first-paint barrels, or hooks/index.ts.
 // Combined catalog+runtime initialization, runtime transport, and display state stay panel-owned.
 
-import { CancelledError, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffect, useRef } from 'react';
+import { CancelledError, useQueryClient, type QueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect } from 'react';
 import { localModelsApi } from '../api/localModels';
 import type { LocalModelCatalogResponse } from '../types/localModels';
 
@@ -65,9 +65,25 @@ export async function fetchLocalModelsCatalog(args: {
   }
 }
 
+type LocalModelsCatalogQueryOwnerState = {
+  ownerCount: number;
+  fetchGeneration: number;
+};
+
+const localModelsCatalogQueryOwners = new WeakMap<QueryClient, LocalModelsCatalogQueryOwnerState>();
+
+function localModelsCatalogQueryOwnerState(
+  queryClient: QueryClient,
+): LocalModelsCatalogQueryOwnerState {
+  const existing = localModelsCatalogQueryOwners.get(queryClient);
+  if (existing) return existing;
+  const created = { ownerCount: 0, fetchGeneration: 0 };
+  localModelsCatalogQueryOwners.set(queryClient, created);
+  return created;
+}
+
 export function useLocalModelsCatalogQuery(): UseLocalModelsCatalogQueryResult {
   const queryClient = useQueryClient();
-  const requestIdRef = useRef(0);
 
   const discardExactLocalModelsCatalogQuery = useCallback(() => {
     void queryClient.cancelQueries(
@@ -78,12 +94,17 @@ export function useLocalModelsCatalogQuery(): UseLocalModelsCatalogQueryResult {
   }, [queryClient]);
 
   const loadCatalog = useCallback(async () => {
-    const requestId = requestIdRef.current + 1;
-    requestIdRef.current = requestId;
-    const stillActive = () => requestIdRef.current === requestId;
-
+    const owners = localModelsCatalogQueryOwnerState(queryClient);
     // Same-key refresh must cancel+remove before fetchQuery (Query 5 joins a cancelled retryer).
-    discardExactLocalModelsCatalogQuery();
+    // Only the sole living owner may discard; a sibling must join the in-flight exact-key fetch.
+    if (owners.ownerCount <= 1) {
+      owners.fetchGeneration += 1;
+      discardExactLocalModelsCatalogQuery();
+    }
+    const generation = owners.fetchGeneration;
+    const stillActive = () => (
+      owners.fetchGeneration === generation && owners.ownerCount > 0
+    );
 
     return queryClient.fetchQuery({
       queryKey: LOCAL_MODELS_CATALOG_QUERY_KEY,
@@ -95,10 +116,17 @@ export function useLocalModelsCatalogQuery(): UseLocalModelsCatalogQueryResult {
     });
   }, [discardExactLocalModelsCatalogQuery, queryClient]);
 
-  useEffect(() => () => {
-    requestIdRef.current += 1;
-    discardExactLocalModelsCatalogQuery();
-  }, [discardExactLocalModelsCatalogQuery]);
+  useEffect(() => {
+    const owners = localModelsCatalogQueryOwnerState(queryClient);
+    owners.ownerCount += 1;
+    return () => {
+      owners.ownerCount = Math.max(0, owners.ownerCount - 1);
+      if (owners.ownerCount === 0) {
+        owners.fetchGeneration += 1;
+        discardExactLocalModelsCatalogQuery();
+      }
+    };
+  }, [discardExactLocalModelsCatalogQuery, queryClient]);
 
   return { loadCatalog };
 }

@@ -353,6 +353,8 @@ describe('Query consumer hosts', () => {
   it('wraps LocalModelsPanel tests with the production retry-free client', () => {
     expect(read('src/components/settings/__tests__/LocalModelsPanel.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/components/settings/__tests__/LocalModelsPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/components/settings/__tests__/LocalModelsPanel.dualMount.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/LocalModelsPanel.dualMount.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('QueryClientProvider');
   });
