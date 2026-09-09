@@ -22,7 +22,6 @@ import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, AppPage, Button, Collapsible, ConfirmDialog, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
-  InvestmentFrameworkSettingsCard,
   GenerationBackendStatusPanel,
   LocalModelsWithKronos,
   LLMChannelEditor,
@@ -134,6 +133,7 @@ const RuntimeCapabilitiesPanel = lazy(async () => {
 });
 
 const ConfigPresetsPanel = lazy(() => import('../components/settings/ConfigPresetsPanel'));
+const InvestmentFrameworkSettingsCard = lazy(() => import('../components/settings/InvestmentFrameworkSettingsCard'));
 
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
@@ -1577,7 +1577,11 @@ const SettingsPage: React.FC = () => {
               isIntelligentImportOpen={isIntelligentImportOpen}
               setIsIntelligentImportOpen={setIsIntelligentImportOpen}
             />
-            {isInvestmentFrameworkView ? <InvestmentFrameworkSettingsCard /> : null}
+            {isInvestmentFrameworkView ? (
+              <Suspense fallback={<SettingsLoading />}>
+                <InvestmentFrameworkSettingsCard />
+              </Suspense>
+            ) : null}
             <SystemSecuritySection
               activeCategory={activeCategory}
               activeView={activeView}
