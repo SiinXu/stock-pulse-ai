@@ -28,8 +28,11 @@ import {
   StatusDot,
   useClipboard,
 } from '../common';
-import { localModelsApi } from '../../api/localModels';
 import { formatUiText } from '../../i18n/uiText';
+import {
+  isLocalModelsCatalogCancelledError,
+  useLocalModelsCatalogQuery,
+} from '../../hooks/useLocalModelsCatalogQuery';
 import { UI_LANGUAGE_METADATA, prefersChineseContent } from '../../i18n/uiLanguages';
 import { SETTINGS_LOCAL_MODELS_TEXT } from '../../locales/settingsLocalModels';
 import type {
@@ -192,6 +195,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
 }) => {
   const text = SETTINGS_LOCAL_MODELS_TEXT[language];
   const transport = useMemo<LocalModelTransport>(() => createLocalModelTransport(), []);
+  const { loadCatalog } = useLocalModelsCatalogQuery();
   const { copyText, copyError, clearCopyError } = useClipboard();
   const [models, setModels] = useState<LocalModelCatalogEntry[]>([]);
   const [runtime, setRuntime] = useState<LocalModelRuntimeState | null>(null);
@@ -208,25 +212,34 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   const [deleteModel, setDeleteModel] = useState<LocalModelCatalogEntry | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    const requestId = requestIdRef.current + 1;
+    requestIdRef.current = requestId;
+    const stillActive = () => requestIdRef.current === requestId;
+
     setIsLoading(true);
     setCatalogFailed(false);
     setActionError('');
     setActionWarning('');
     try {
       const [catalog, nextRuntime] = await Promise.all([
-        localModelsApi.getCatalog(),
+        loadCatalog(),
         transport.getRuntime(),
       ]);
+      if (!stillActive()) return;
       setModels(catalog.models);
       setRuntime(nextRuntime);
-    } catch {
+    } catch (error) {
+      if (!stillActive() || isLocalModelsCatalogCancelledError(error)) return;
       setCatalogFailed(true);
     } finally {
-      setIsLoading(false);
+      if (stillActive()) {
+        setIsLoading(false);
+      }
     }
-  }, [transport]);
+  }, [loadCatalog, transport]);
 
   const refreshRuntime = useCallback(async () => {
     setActionError('');
@@ -242,7 +255,10 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
 
   useEffect(() => {
     void load();
-    return () => abortRef.current?.abort();
+    return () => {
+      requestIdRef.current += 1;
+      abortRef.current?.abort();
+    };
   }, [load]);
 
   useEffect(() => {
@@ -987,3 +1003,5 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     </Section>
   );
 };
+
+export default LocalModelsPanel;

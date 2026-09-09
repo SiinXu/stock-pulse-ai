@@ -1,11 +1,14 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
+import { lazy, Suspense } from 'react';
 import type { ConfigValidationIssue, SystemConfigItem } from '../../types/systemConfig';
+import { Loading } from '../common';
 import type { UiLang } from './settingsInformationArchitecture';
 import { KronosSettingsFields } from './KronosSettingsFields';
 import { KronosStatusPanel } from './KronosStatusPanel';
-import { LocalModelsPanel } from './LocalModelsPanel';
+
+const LocalModelsPanel = lazy(() => import('./LocalModelsPanel'));
 
 interface LocalModelsWithKronosProps {
   language: UiLang;
@@ -30,7 +33,9 @@ export const LocalModelsWithKronos: React.FC<LocalModelsWithKronosProps> = ({
   readOnlyDiagnostic,
 }) => (
   <>
-    <LocalModelsPanel language={language} onConfigurationChanged={onConfigurationChanged} />
+    <Suspense fallback={<Loading />}>
+      <LocalModelsPanel language={language} onConfigurationChanged={onConfigurationChanged} />
+    </Suspense>
     <KronosStatusPanel disabled={disabled} />
     <KronosSettingsFields
       items={kronosItems}

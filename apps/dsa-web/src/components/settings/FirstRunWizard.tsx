@@ -1,12 +1,13 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
 import type React from 'react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import {
   Button,
   Checkbox,
   InlineAlert,
   Input,
+  Loading,
   Modal,
   Select,
   type SearchableSelectOption,
@@ -50,8 +51,9 @@ import {
 } from '../../utils/setupSmokeTask';
 import { ProviderQuickLinks } from './ProviderQuickLinks';
 import { SETTINGS_CONTROL_WIDTH_CLASS } from './settingsControlLayout';
-import { LocalModelsPanel } from './LocalModelsPanel';
 import { CLI_AGENT_CAPABILITY_NOTE } from './aiTaskMatrix';
+
+const LocalModelsPanel = lazy(() => import('./LocalModelsPanel'));
 
 export interface WizardDraftItem {
   key: string;
@@ -1099,15 +1101,17 @@ export const FirstRunWizard: React.FC<FirstRunWizardProps> = ({
         ) : null}
 
         {step === 'local_model' && mode === 'local_model' ? (
-          <LocalModelsPanel
-            language={language}
-            headingAs="h3"
-            onConfigurationChanged={onLocalModelConfigurationChanged}
-            selectedModelId={localModelReady}
-            selectModelLabel={text.select}
-            selectedModelLabel={text.readyLocalModel}
-            onModelReady={setLocalModelReady}
-          />
+          <Suspense fallback={<Loading />}>
+            <LocalModelsPanel
+              language={language}
+              headingAs="h3"
+              onConfigurationChanged={onLocalModelConfigurationChanged}
+              selectedModelId={localModelReady}
+              selectModelLabel={text.select}
+              selectedModelLabel={text.readyLocalModel}
+              onModelReady={setLocalModelReady}
+            />
+          </Suspense>
         ) : null}
 
         {step === 'models' && showModelsField ? (
