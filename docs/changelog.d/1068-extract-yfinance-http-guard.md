@@ -1,0 +1,1 @@
+- [Changed] Move the yfinance Yahoo/Stooq HTTP guard and outbound URL tuple into `src/data_provider/yfinance_parts/http_guard.py` behind the ADR-006 facade, keeping the module-level `_yfinance_http_guard` name, `strict_dns=False`, and facade patch/reload seams unchanged (Refs #1068).

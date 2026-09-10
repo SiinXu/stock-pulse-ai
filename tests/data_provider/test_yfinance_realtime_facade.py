@@ -99,13 +99,7 @@ def test_remaining_facade_class_methods_are_only_init() -> None:
 
 
 def test_http_guard_remains_a_module_level_function() -> None:
-    tree = ast.parse(FACADE_PATH.read_text(encoding="utf-8"))
-    module_funcs = {
-        node.name
-        for node in tree.body
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
-    }
-    assert "_yfinance_http_guard" in module_funcs
+    assert callable(yfinance_mod._yfinance_http_guard)
     assert "_yfinance_http_guard" not in _facade_class_methods()
 
 

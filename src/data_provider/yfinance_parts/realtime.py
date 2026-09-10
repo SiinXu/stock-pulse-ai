@@ -8,8 +8,9 @@ Method bodies are rebound onto ``YfinanceFetcher`` by the compatibility facade
 ``efinance_parts``, ``tushare_parts``, and ``longbridge_parts``.
 
 No sibling method moves. Symbol conversion and US/JP/KR/TW classifiers are
-rebound from ``yfinance_parts.symbols``; the HTTP guard stays on the facade.
-The cluster reaches them through ``self`` or facade globals at call time.
+rebound from ``yfinance_parts.symbols``; the HTTP guard is cloned from
+``http_guard`` onto facade globals. The cluster reaches them through
+``self`` or facade globals at call time.
 """
 
 from __future__ import annotations
