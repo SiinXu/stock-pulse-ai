@@ -22,7 +22,6 @@ import { systemConfigApi } from '../api/systemConfig';
 import { ApiErrorAlert, AppPage, Button, Collapsible, ConfirmDialog, PageHeader, ToastViewport, type SearchableSelectOption } from '../components/common';
 import { SettingsModeToggle } from '../components/settings/SettingsModeToggle';
 import {
-  GenerationBackendStatusPanel,
   LocalModelsWithKronos,
   LLMChannelEditor,
   LLMConfigModeBanner,
@@ -134,6 +133,7 @@ const RuntimeCapabilitiesPanel = lazy(async () => {
 
 const ConfigPresetsPanel = lazy(() => import('../components/settings/ConfigPresetsPanel'));
 const InvestmentFrameworkSettingsCard = lazy(() => import('../components/settings/InvestmentFrameworkSettingsCard'));
+const GenerationBackendStatusPanel = lazy(() => import('../components/settings/GenerationBackendStatusPanel'));
 
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
@@ -1678,11 +1678,13 @@ const SettingsPage: React.FC = () => {
                     })();
                   }}
                 />
-                <GenerationBackendStatusPanel
-                  items={generationBackendDraftItems}
-                  maskToken={maskToken}
-                  disabled={isSaving || isLoading}
-                />
+                <Suspense fallback={<SettingsLoading />}>
+                  <GenerationBackendStatusPanel
+                    items={generationBackendDraftItems}
+                    maskToken={maskToken}
+                    disabled={isSaving || isLoading}
+                  />
+                </Suspense>
               </>
             ) : null}
             {isTopLevelAdvanced && activeView === 'diagnostics' ? (

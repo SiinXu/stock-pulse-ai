@@ -393,4 +393,36 @@ describe('Query consumer hosts', () => {
     expect(harnessSource).toContain('local-models-with-kronos');
     expect(harnessSource).toContain('FirstRunWizard');
   });
+
+  it('wraps GenerationBackendStatusPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/GenerationBackendStatusPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/GenerationBackendStatusPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useGenerationBackendStatusQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useGenerationBackendStatusQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings generation-backend saved GET and draft preview POST on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useGenerationBackendStatusQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/GenerationBackendStatusPanel.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const editorSource = read('src/components/settings/LLMChannelEditor.tsx');
+    const harnessSource = read('src/pages/__tests__/SettingsPage.testHarness.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['generation-backend', 'status', 'saved']");
+    expect(hookSource).toContain('buildGenerationBackendPreviewStatusQueryKey');
+    expect(hookSource).toContain('getGenerationBackendStatus');
+    expect(hookSource).toContain('previewGenerationBackendStatus');
+    expect(hookSource).not.toContain('testGenerationBackend');
+    expect(barrelSource).not.toContain('useGenerationBackendStatusQuery');
+    expect(panelSource).toContain('useGenerationBackendStatusQuery');
+    expect(settingsPageSource).toContain("lazy(() => import('../components/settings/GenerationBackendStatusPanel'))");
+    expect(settingsPageSource).toContain('Suspense');
+    expect(settingsPageSource).not.toContain('useGenerationBackendStatusQuery');
+    expect(editorSource).toContain('getGenerationBackendStatus()');
+    expect(harnessSource).toContain('GenerationBackendStatusPanel');
+  });
 });
