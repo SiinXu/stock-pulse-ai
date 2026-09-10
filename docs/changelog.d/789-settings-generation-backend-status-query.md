@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings generation-backend saved status GET and draft preview POST through TanStack Query (Refs #789).

@@ -8,11 +8,22 @@ vi.mock('react', async (importOriginal) => {
   function InvestmentFrameworkSettingsCardMock() {
     return <div data-testid="investment-framework-settings-card">个人投资框架</div>;
   }
+  function GenerationBackendStatusPanelMock({ items }: { items?: Array<{ key: string; value: string }> }) {
+    return (
+      <div data-testid="generation-backend-status-items">
+        {(items ?? []).map((item) => `${item.key}=${item.value}`).join('|')}
+      </div>
+    );
+  }
   return {
     ...actual,
     lazy: ((importer: () => Promise<{ default: React.ComponentType<unknown> }>) => {
-      if (String(importer).includes('InvestmentFrameworkSettingsCard')) {
+      const source = String(importer);
+      if (source.includes('InvestmentFrameworkSettingsCard')) {
         return InvestmentFrameworkSettingsCardMock;
+      }
+      if (source.includes('GenerationBackendStatusPanel')) {
+        return GenerationBackendStatusPanelMock;
       }
       return actual.lazy(importer);
     }) as typeof actual.lazy,
@@ -277,6 +288,21 @@ vi.mock('../../components/settings/InvestmentFrameworkSettingsCard', () => {
     __esModule: true,
     default: InvestmentFrameworkSettingsCardMock,
     InvestmentFrameworkSettingsCard: InvestmentFrameworkSettingsCardMock,
+  };
+});
+
+vi.mock('../../components/settings/GenerationBackendStatusPanel', () => {
+  function GenerationBackendStatusPanelMock({ items }: { items?: Array<{ key: string; value: string }> }) {
+    return (
+      <div data-testid="generation-backend-status-items">
+        {(items ?? []).map((item) => `${item.key}=${item.value}`).join('|')}
+      </div>
+    );
+  }
+  return {
+    __esModule: true,
+    default: GenerationBackendStatusPanelMock,
+    GenerationBackendStatusPanel: GenerationBackendStatusPanelMock,
   };
 });
 

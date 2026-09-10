@@ -2,9 +2,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { CheckCircle2, CircleAlert, CircleDashed, FlaskConical, RefreshCw } from 'lucide-react';
 import { systemConfigApi } from '../../api/systemConfig';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
+import { getParsedApiError } from '../../api/error';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
-import type { GenerationBackendStatus, GenerationBackendStatusResponse, SystemConfigUpdateItem, TestGenerationBackendResponse } from '../../types/systemConfig';
+import { useGenerationBackendStatusQuery } from '../../hooks/useGenerationBackendStatusQuery';
+import type { GenerationBackendStatus, SystemConfigUpdateItem, TestGenerationBackendResponse } from '../../types/systemConfig';
 import { ApiErrorAlert, Badge, Button, IconButton, Surface } from '../common';
 import { SettingsAlert } from './SettingsAlert';
 
@@ -92,14 +93,18 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
   disabled = false,
 }) => {
   const { t } = useUiLanguage();
-  const [status, setStatus] = useState<GenerationBackendStatusResponse | null>(null);
+  const {
+    status,
+    isLoading,
+    error,
+    load,
+    setStatus,
+    setError,
+    abandonLiveLoad,
+  } = useGenerationBackendStatusQuery(items, maskToken);
   const [smokeResult, setSmokeResult] = useState<TestGenerationBackendResponse | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isSmoking, setIsSmoking] = useState(false);
-  const [error, setError] = useState<ParsedApiError | null>(null);
-  const refreshRequestIdRef = useRef(0);
   const smokeRequestIdRef = useRef(0);
-  const didInitialRefreshRef = useRef(false);
   const hasDraft = items.length > 0;
   const requestItems = useMemo(() => items.map((item) => ({ key: item.key, value: item.value })), [items]);
   const requestItemsFingerprint = useMemo(() => JSON.stringify(requestItems), [requestItems]);
@@ -110,58 +115,18 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
     setIsSmoking(false);
   }, [requestItemsFingerprint]);
 
-  const refresh = useCallback(async () => {
-    const requestId = refreshRequestIdRef.current + 1;
-    refreshRequestIdRef.current = requestId;
+  const refresh = useCallback(() => {
     smokeRequestIdRef.current += 1;
-    setIsLoading(true);
     setIsSmoking(false);
-    setError(null);
     setSmokeResult(null);
-    try {
-      const next = hasDraft
-        ? await systemConfigApi.previewGenerationBackendStatus({ items: requestItems, maskToken })
-        : await systemConfigApi.getGenerationBackendStatus();
-      if (refreshRequestIdRef.current !== requestId) {
-        return;
-      }
-      setStatus(next);
-    } catch (err: unknown) {
-      if (refreshRequestIdRef.current !== requestId) {
-        return;
-      }
-      setStatus(null);
-      setSmokeResult(null);
-      setError(getParsedApiError(err));
-    } finally {
-      if (refreshRequestIdRef.current === requestId) {
-        setIsLoading(false);
-      }
-    }
-  }, [hasDraft, maskToken, requestItems]);
-
-  useEffect(() => {
-    // Refresh the saved status immediately on mount, but debounce subsequent
-    // draft-driven previews so typing in the editor doesn't fire a preview
-    // request per keystroke.
-    if (!didInitialRefreshRef.current) {
-      didInitialRefreshRef.current = true;
-      void refresh();
-      return;
-    }
-    const timer = window.setTimeout(() => {
-      void refresh();
-    }, 500);
-    return () => window.clearTimeout(timer);
-  }, [refresh]);
+    void load();
+  }, [load]);
 
   const runSmoke = useCallback(async () => {
     const requestId = smokeRequestIdRef.current + 1;
     smokeRequestIdRef.current = requestId;
-    refreshRequestIdRef.current += 1;
-    setIsLoading(false);
+    abandonLiveLoad();
     setIsSmoking(true);
-    setError(null);
     setSmokeResult(null);
     try {
       const result = await systemConfigApi.testGenerationBackend({
@@ -194,7 +159,7 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
         setIsSmoking(false);
       }
     }
-  }, [maskToken, requestItems]);
+  }, [abandonLiveLoad, maskToken, requestItems, setError, setStatus]);
 
   return (
     <div data-testid="generation-backend-status-panel" className="space-y-3 rounded-xl border border-border bg-card/70 density-surface-pad-sm">
@@ -241,3 +206,5 @@ export const GenerationBackendStatusPanel: React.FC<GenerationBackendStatusPanel
     </div>
   );
 };
+
+export default GenerationBackendStatusPanel;
