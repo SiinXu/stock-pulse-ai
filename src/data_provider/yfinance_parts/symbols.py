@@ -7,9 +7,9 @@ Method bodies are rebound onto ``YfinanceFetcher`` by the compatibility facade
 the domain split of ``history`` / ``realtime`` / ``main_indices`` in this
 package.
 
-The HTTP guard stays on the facade; this cluster never calls it. History and
-realtime keep reaching conversion through ``self`` at call time. No sibling
-method moves.
+The HTTP guard is cloned from ``http_guard`` onto facade globals; this
+cluster never calls it. History and realtime keep reaching conversion
+through ``self`` at call time. No sibling method moves.
 """
 
 from __future__ import annotations

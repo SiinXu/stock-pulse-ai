@@ -54,18 +54,9 @@ import os
 
 logger = logging.getLogger(__name__)
 
-# Hosts owned by the yfinance SDK and the Stooq urllib fallback. LOCAL_ONLY_MODE
-# rejects these at guard entry; strict_dns is off so extra Yahoo CDN hosts used
-# when the flag is off do not become unexpected-target failures.
-_YFINANCE_OUTBOUND_URLS = (
-    "https://query1.finance.yahoo.com/",
-    "https://query2.finance.yahoo.com/",
-    "https://stooq.com/",
-)
-
-
-def _yfinance_http_guard():
-    return guard_outbound_urls(_YFINANCE_OUTBOUND_URLS, strict_dns=False)
+# Rebound from yfinance_parts.http_guard after the module is assembled.
+_YFINANCE_OUTBOUND_URLS = None
+_yfinance_http_guard = None
 
 
 class YfinanceFetcher(BaseFetcher):
@@ -146,10 +137,11 @@ if __name__ == "__main__":
 
 # Keep ``src.data_provider.yfinance_fetcher.YfinanceFetcher`` as the ADR-006
 # compatibility facade while ``yfinance_parts`` owns symbol conversion,
-# main-index, realtime, and daily history bodies.
+# main-index, realtime, daily history, and HTTP-guard bodies.
 # Rebinding preserves method globals so existing patches against this module
 # continue to intercept moved implementations.
 from .yfinance_parts import history as _history_module  # noqa: E402
+from .yfinance_parts import http_guard as _http_guard_module  # noqa: E402
 from .yfinance_parts import main_indices as _main_indices_module  # noqa: E402
 from .yfinance_parts import realtime as _realtime_module  # noqa: E402
 from .yfinance_parts import symbols as _symbols_module  # noqa: E402
@@ -157,7 +149,22 @@ from .yfinance_parts.history import _HistoryMethods  # noqa: E402
 from .yfinance_parts.main_indices import _MainIndicesMethods  # noqa: E402
 from .yfinance_parts.realtime import _RealtimeMethods  # noqa: E402
 from .yfinance_parts.symbols import _SymbolMethods  # noqa: E402
-from .yfinance_parts.facade_bind import bind_methods_from_class  # noqa: E402
+from .yfinance_parts.facade_bind import (  # noqa: E402
+    _clone_facade_function,
+    bind_methods_from_class,
+)
+
+
+def _bind_http_guard_facade() -> None:
+    """Clone the Yahoo/Stooq HTTP guard so patches on this module intercept it."""
+
+    global _YFINANCE_OUTBOUND_URLS, _yfinance_http_guard
+    _YFINANCE_OUTBOUND_URLS = _http_guard_module._YFINANCE_OUTBOUND_URLS
+    _yfinance_http_guard = _clone_facade_function(
+        _http_guard_module._yfinance_http_guard,
+        globals(),
+        qualname="_yfinance_http_guard",
+    )
 
 
 def _apply_history_retry(name: str, bound):
@@ -182,6 +189,7 @@ def _assemble_yfinance_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
     global _SymbolMethods, _HistoryMethods, _MainIndicesMethods, _RealtimeMethods
+    _bind_http_guard_facade()
     _SymbolMethods = _symbols_module._SymbolMethods
     _HistoryMethods = _history_module._HistoryMethods
     _MainIndicesMethods = _main_indices_module._MainIndicesMethods
@@ -243,6 +251,7 @@ def _install_part_reload_hooks() -> None:
     """Keep an owner reload able to rebuild and rebind every owner module."""
 
     for module in (
+        _http_guard_module,
         _symbols_module,
         _history_module,
         _main_indices_module,

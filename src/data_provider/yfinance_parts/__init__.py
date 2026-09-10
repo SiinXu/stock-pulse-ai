@@ -11,4 +11,5 @@ Owned domains:
 - ``realtime`` — US/index realtime quote routing and the Stooq fallback
 - ``history`` — daily fetch (``_fetch_raw_data``) and normalize (``_normalize_data``)
 - ``symbols`` — Yahoo symbol conversion and US/JP/KR/TW suffix classifiers
+- ``http_guard`` — Yahoo/Stooq outbound URL tuple and module-level HTTP guard
 """

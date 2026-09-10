@@ -7,8 +7,9 @@ Method bodies are rebound onto ``YfinanceFetcher`` by the compatibility facade
 ``akshare_parts``, ``efinance_parts``, and ``tickflow_parts``.
 
 The cluster is self-contained: the six regional/dispatch methods reach only
-``_fetch_yf_ticker_data``, which travels with them. No module-level helper
-moves; the rebind resolves free names from the facade globals at call time.
+``_fetch_yf_ticker_data``, which travels with them. The HTTP guard is cloned
+from ``http_guard`` onto facade globals; the rebind resolves free names from
+those globals at call time.
 """
 
 from __future__ import annotations
