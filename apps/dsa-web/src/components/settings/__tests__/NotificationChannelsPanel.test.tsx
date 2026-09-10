@@ -1,9 +1,12 @@
+import { CancelledError, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SystemConfigItem, TestNotificationChannelResponse } from '../../../types/systemConfig';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import { createDeferred } from '../../../test-utils';
+import { NOTIFICATION_CHANNEL_PLUGINS_CANCEL } from '../../../hooks/useNotificationChannelPluginsQuery';
 import { NotificationChannelsPanel } from '../NotificationChannelsPanel';
 import {
   NOTIFICATION_CHANNELS,
@@ -56,7 +59,12 @@ function buildItem(overrides: Partial<SystemConfigItem> = {}): SystemConfigItem 
 }
 
 function renderHub(ui: ReactElement, initialEntry = '/settings?section=notifications&view=channels') {
-  return render(<MemoryRouter initialEntries={[initialEntry]}>{ui}</MemoryRouter>);
+  const client = createAppQueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter initialEntries={[initialEntry]}>{ui}</MemoryRouter>
+    </QueryClientProvider>,
+  );
 }
 
 describe('NotificationChannelsPanel', () => {
@@ -953,5 +961,89 @@ describe('NotificationChannelsPanel', () => {
 
     expect(await screen.findByText(/Plugin roster unavailable|无法读取插件名册/)).toBeInTheDocument();
     expect(screen.queryByTestId(/notification-plugin-channel-card-/)).not.toBeInTheDocument();
+  });
+
+  it('shows the loading StatePanel while the plugin roster GET is in flight', async () => {
+    const pending = createDeferred<{ total: number; items: never[] }>();
+    listPlugins.mockReturnValueOnce(pending.promise);
+
+    renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    expect(await screen.findByText(/正在加载|Loading/)).toBeInTheDocument();
+    expect(document.querySelector('[data-state-panel="loading"]')).toBeInTheDocument();
+    expect(screen.queryByText(/Plugin roster unavailable|无法读取插件名册/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No plugin notification channels loaded|当前没有已加载的插件通知渠道/)).not.toBeInTheDocument();
+
+    await act(async () => {
+      pending.resolve({ total: 0, items: [] });
+      await pending.promise.catch(() => undefined);
+    });
+    expect(await screen.findByText(/No plugin notification channels loaded|当前没有已加载的插件通知渠道/)).toBeInTheDocument();
+  });
+
+  it('does not flash the unavailable warning when unmounted during an in-flight GET', async () => {
+    const pending = createDeferred<{ total: number; items: never[] }>();
+    listPlugins.mockReturnValueOnce(pending.promise);
+
+    const { unmount } = renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    expect(await screen.findByText(/正在加载|Loading/)).toBeInTheDocument();
+    unmount();
+
+    await act(async () => {
+      pending.reject(new Error('late roster failure'));
+      await pending.promise.catch(() => undefined);
+    });
+    expect(screen.queryByText(/Plugin roster unavailable|无法读取插件名册/)).not.toBeInTheDocument();
+  });
+
+  it('does not flash the unavailable warning on a silent cancel while the GET is in flight', async () => {
+    listPlugins.mockRejectedValueOnce(new CancelledError(NOTIFICATION_CHANNEL_PLUGINS_CANCEL));
+
+    renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled={false}
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    await waitFor(() => expect(listPlugins).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.queryByText(/正在加载|Loading/)).not.toBeInTheDocument());
+    expect(screen.queryByText(/Plugin roster unavailable|无法读取插件名册/)).not.toBeInTheDocument();
+  });
+
+  it('still issues list() once when the hub is disabled', async () => {
+    renderHub(
+      <NotificationChannelsPanel
+        items={[buildItem()]}
+        configuredChannels={[]}
+        disabled
+        onChange={vi.fn()}
+        issueByKey={{}}
+      />,
+    );
+
+    await waitFor(() => expect(listPlugins).toHaveBeenCalledTimes(1));
+    expect(listPlugins.mock.calls[0]).toEqual([]);
+    expect(await screen.findByText(/No plugin notification channels loaded|当前没有已加载的插件通知渠道/)).toBeInTheDocument();
   });
 });

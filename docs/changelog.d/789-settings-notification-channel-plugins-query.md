@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings notification-channel plugin roster GET through TanStack Query (Refs #789).

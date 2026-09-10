@@ -15,6 +15,15 @@ vi.mock('react', async (importOriginal) => {
       </div>
     );
   }
+  function NotificationChannelsPanelMock({ items }: { items: Array<{ key: string }> }) {
+    return (
+      <div data-testid="notification-channels-panel">
+        {items.map((item) => (
+          <div key={item.key}>{item.key}</div>
+        ))}
+      </div>
+    );
+  }
   return {
     ...actual,
     lazy: ((importer: () => Promise<{ default: React.ComponentType<unknown> }>) => {
@@ -24,6 +33,9 @@ vi.mock('react', async (importOriginal) => {
       }
       if (source.includes('GenerationBackendStatusPanel')) {
         return GenerationBackendStatusPanelMock;
+      }
+      if (source.includes('NotificationChannelsPanel')) {
+        return NotificationChannelsPanelMock;
       }
       return actual.lazy(importer);
     }) as typeof actual.lazy,

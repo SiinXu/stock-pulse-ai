@@ -45,8 +45,8 @@ import {
   type NotificationChannelTestOutcome,
 } from './notificationChannelTestStatus';
 import { systemConfigApi } from '../../api/systemConfig';
-import { pluginsApi, type PluginInfo } from '../../api/plugins';
 import { createParsedApiError, getParsedApiError } from '../../api/error';
+import { useNotificationChannelPluginsQuery } from '../../hooks/useNotificationChannelPluginsQuery';
 import { mapApiErrorToActionable } from '../../utils/apiReasonMapper';
 import { SETTINGS_ROUTE_QUERY_KEYS } from '../../routing/routes';
 import {
@@ -129,9 +129,11 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
   const [configurationFingerprints, setConfigurationFingerprints] = useState<ReadonlyMap<string, string>>(new Map());
   const [selectedBindEvents, setSelectedBindEvents] = useState<NotificationEventKind[]>([]);
   const [bindFeedback, setBindFeedback] = useState<string | null>(null);
-  const [pluginItems, setPluginItems] = useState<PluginInfo[]>([]);
-  const [pluginsLoading, setPluginsLoading] = useState(true);
-  const [pluginsLoadFailed, setPluginsLoadFailed] = useState(false);
+  const {
+    items: pluginItems,
+    isLoading: pluginsLoading,
+    loadFailed: pluginsLoadFailed,
+  } = useNotificationChannelPluginsQuery();
   const [modalFeedback, setModalFeedback] = useState<{
     outcome: NotificationChannelTestOutcome;
     title: string;
@@ -139,28 +141,6 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     technical?: string;
     attempts?: NotificationTestAttempt[];
   } | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setPluginsLoading(true);
-    setPluginsLoadFailed(false);
-    void pluginsApi.list()
-      .then((response) => {
-        if (cancelled) return;
-        setPluginItems(response.items);
-        setPluginsLoadFailed(false);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        // Fail closed: never invent plugin channels when the roster cannot be read.
-        setPluginItems([]);
-        setPluginsLoadFailed(true);
-      })
-      .finally(() => {
-        if (!cancelled) setPluginsLoading(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
 
   const pluginChannelLinks = useMemo(
     () => collectPluginNotificationChannelLinks(pluginItems),
@@ -842,3 +822,5 @@ export const NotificationChannelsPanel: React.FC<NotificationChannelsPanelProps>
     </div>
   );
 };
+
+export default NotificationChannelsPanel;

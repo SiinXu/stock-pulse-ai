@@ -458,4 +458,40 @@ describe('Query consumer hosts', () => {
     expect(settingsPageSource).not.toContain('useIntelligenceSourcesQuery');
     expect(settingsBarrelSource).not.toContain('IntelligenceSourcesPanel');
   });
+
+  it('wraps NotificationChannelsPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/NotificationChannelsPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/NotificationChannelsPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useNotificationChannelPluginsQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useNotificationChannelPluginsQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings notification-channel plugin roster GET on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useNotificationChannelPluginsQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/NotificationChannelsPanel.tsx');
+    const activeConfigSource = read('src/components/settings/SettingsActiveConfigPanel.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const settingsBarrelSource = read('src/components/settings/index.ts');
+    const harnessSource = read('src/pages/__tests__/SettingsPage.testHarness.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['plugins', 'notification-channels']");
+    expect(hookSource).toContain('pluginsApi.list');
+    expect(hookSource).not.toContain('updateLifecycle');
+    expect(hookSource).not.toContain('getSettings');
+    expect(hookSource).not.toContain('updateSettings');
+    expect(hookSource).not.toMatch(/\['plugins',\s*'list'\]/);
+    expect(barrelSource).not.toContain('useNotificationChannelPluginsQuery');
+    expect(panelSource).toContain('useNotificationChannelPluginsQuery');
+    expect(activeConfigSource).toContain("lazy(() => import('./NotificationChannelsPanel'))");
+    expect(activeConfigSource).toContain('Suspense');
+    expect(activeConfigSource).not.toContain('useNotificationChannelPluginsQuery');
+    expect(settingsPageSource).not.toContain('useNotificationChannelPluginsQuery');
+    expect(settingsBarrelSource).toContain('NotificationChannelsPanel');
+    expect(harnessSource).toContain('NotificationChannelsPanel');
+    expect(harnessSource).toContain("source.includes('NotificationChannelsPanel')");
+  });
 });
