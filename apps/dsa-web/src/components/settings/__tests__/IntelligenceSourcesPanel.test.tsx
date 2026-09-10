@@ -1,7 +1,11 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { CancelledError, QueryClientProvider } from '@tanstack/react-query';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { INTELLIGENCE_SOURCES_CANCEL } from '../../../hooks/useIntelligenceSourcesQuery';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
+import { createDeferred } from '../../../test-utils';
 import { IntelligenceSourcesPanel } from '../IntelligenceSourcesPanel';
 
 vi.mock('../../../contexts/UiLanguageContext', () => ({
@@ -24,6 +28,24 @@ vi.mock('../../../api/intelligence', () => ({ intelligenceApi: api }));
 
 const emptyList = { items: [], total: 0, page: 1, pageSize: 50 };
 const emptyTemplates = { items: [], total: 0 };
+const listedSource = {
+  id: 3,
+  name: '财经RSS',
+  sourceType: 'rss',
+  url: 'https://feed',
+  enabled: true,
+  scopeType: 'market',
+  market: 'cn',
+};
+
+function renderPanel() {
+  const client = createAppQueryClient();
+  return render(
+    <QueryClientProvider client={client}>
+      <IntelligenceSourcesPanel />
+    </QueryClientProvider>,
+  );
+}
 
 beforeEach(() => {
   Object.values(api).forEach((fn) => fn.mockReset());
@@ -33,25 +55,69 @@ beforeEach(() => {
 describe('IntelligenceSourcesPanel', () => {
   it('shows a loading state before data resolves', () => {
     api.listSources.mockReturnValue(new Promise(() => {}));
-    render(<IntelligenceSourcesPanel />);
+    renderPanel();
     expect(screen.getByText('正在加载情报源…')).toBeInTheDocument();
   });
 
   it('shows an error state with a retry that reloads', async () => {
     api.listSources.mockRejectedValueOnce(new Error('boom'));
-    render(<IntelligenceSourcesPanel />);
+    renderPanel();
     await screen.findByText('情报源加载失败');
 
     api.listSources.mockResolvedValueOnce(emptyList);
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     await screen.findByText('还没有情报源');
     expect(api.listSources).toHaveBeenCalledTimes(2);
+    expect(api.listTemplates).toHaveBeenCalledTimes(2);
+  });
+
+  it('fails the whole mount when templates 500 after sources succeed', async () => {
+    api.listSources.mockResolvedValue({
+      items: [listedSource],
+      total: 1,
+      page: 1,
+      pageSize: 50,
+    });
+    api.listTemplates.mockRejectedValueOnce(new Error('templates boom'));
+    renderPanel();
+
+    await screen.findByText('情报源加载失败');
+    expect(screen.queryByText('财经RSS')).not.toBeInTheDocument();
+    expect(screen.queryByText('还没有情报源')).not.toBeInTheDocument();
+  });
+
+  it('does not flash the error StatePanel when unmounted during mount', async () => {
+    const pendingSources = createDeferred<{ items: unknown[]; total: number; page: number; pageSize: number }>();
+    const pendingTemplates = createDeferred<{ items: unknown[]; total: number }>();
+    api.listSources.mockReturnValueOnce(pendingSources.promise);
+    api.listTemplates.mockReturnValueOnce(pendingTemplates.promise);
+    const { unmount } = renderPanel();
+    expect(screen.getByText('正在加载情报源…')).toBeInTheDocument();
+    unmount();
+
+    await act(async () => {
+      pendingSources.reject(new Error('late sources'));
+      pendingTemplates.reject(new Error('late templates'));
+      await pendingSources.promise.catch(() => undefined);
+      await pendingTemplates.promise.catch(() => undefined);
+    });
+
+    expect(screen.queryByText('情报源加载失败')).not.toBeInTheDocument();
+  });
+
+  it('does not flash the error StatePanel when mount GETs settle as silent CancelledError', async () => {
+    api.listSources.mockRejectedValue(new CancelledError(INTELLIGENCE_SOURCES_CANCEL));
+    renderPanel();
+    expect(screen.getByText('正在加载情报源…')).toBeInTheDocument();
+    await waitFor(() => expect(api.listSources).toHaveBeenCalled());
+    expect(screen.getByText('正在加载情报源…')).toBeInTheDocument();
+    expect(screen.queryByText('情报源加载失败')).not.toBeInTheDocument();
   });
 
   it('offers default sources when empty and creates them', async () => {
     api.listSources.mockResolvedValue(emptyList);
     api.createDefaultSources.mockResolvedValueOnce({ items: [], createdCount: 2, total: 2 });
-    render(<IntelligenceSourcesPanel />);
+    renderPanel();
 
     const createButton = await screen.findByRole('button', { name: '创建默认情报源' });
     fireEvent.click(createButton);
@@ -60,13 +126,13 @@ describe('IntelligenceSourcesPanel', () => {
 
   it('lists connected sources and fetches one', async () => {
     api.listSources.mockResolvedValue({
-      items: [{ id: 3, name: '财经RSS', sourceType: 'rss', url: 'https://feed', enabled: true, scopeType: 'market', market: 'cn' }],
+      items: [listedSource],
       total: 1,
       page: 1,
       pageSize: 50,
     });
     api.fetchSource.mockResolvedValueOnce({ ok: true, sourceId: 3, fetchedCount: 5, savedCount: 5, sampleItems: [] });
-    render(<IntelligenceSourcesPanel />);
+    renderPanel();
 
     await screen.findByText('财经RSS');
     fireEvent.click(screen.getByRole('button', { name: '抓取' }));
@@ -75,7 +141,7 @@ describe('IntelligenceSourcesPanel', () => {
 
   it('mounts the manual source form only after opening the shared dialog', async () => {
     api.listSources.mockResolvedValue(emptyList);
-    render(<IntelligenceSourcesPanel />);
+    renderPanel();
 
     const trigger = await screen.findByRole('button', { name: '新增情报源' });
     expect(screen.queryByRole('textbox', { name: '名称' })).not.toBeInTheDocument();
@@ -95,7 +161,7 @@ describe('IntelligenceSourcesPanel', () => {
 
   it('validates required fields before creating', async () => {
     api.listSources.mockResolvedValue(emptyList);
-    render(<IntelligenceSourcesPanel />);
+    renderPanel();
     await screen.findByText('还没有情报源');
 
     fireEvent.click(screen.getByRole('button', { name: '新增情报源' }));
@@ -111,9 +177,10 @@ describe('IntelligenceSourcesPanel', () => {
       .mockRejectedValueOnce(new Error('refresh failed'))
       .mockResolvedValueOnce(emptyList);
     api.createSource.mockResolvedValueOnce({});
-    render(<IntelligenceSourcesPanel />);
+    renderPanel();
 
     await screen.findByText('还没有情报源');
+    expect(api.listTemplates).toHaveBeenCalledTimes(1);
     fireEvent.click(screen.getByRole('button', { name: '新增情报源' }));
 
     const dialog = screen.getByRole('dialog', { name: '新增情报源' });
@@ -136,9 +203,12 @@ describe('IntelligenceSourcesPanel', () => {
     }));
     expect(await screen.findByText('情报源加载失败')).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: '新增情报源' })).not.toBeInTheDocument();
+    expect(api.listTemplates).toHaveBeenCalledTimes(1);
+    expect(api.listSources).toHaveBeenCalledTimes(2);
 
     fireEvent.click(screen.getByRole('button', { name: '重试' }));
     await screen.findByText('还没有情报源');
+    expect(api.listTemplates).toHaveBeenCalledTimes(2);
     fireEvent.click(screen.getByRole('button', { name: '新增情报源' }));
 
     const reopenedDialog = screen.getByRole('dialog', { name: '新增情报源' });

@@ -425,4 +425,37 @@ describe('Query consumer hosts', () => {
     expect(editorSource).toContain('getGenerationBackendStatus()');
     expect(harnessSource).toContain('GenerationBackendStatusPanel');
   });
+
+  it('wraps IntelligenceSourcesPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/IntelligenceSourcesPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/IntelligenceSourcesPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useIntelligenceSourcesQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useIntelligenceSourcesQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings intelligence sources list GET and templates list GET on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useIntelligenceSourcesQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/IntelligenceSourcesPanel.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const settingsBarrelSource = read('src/components/settings/index.ts');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['intelligence', 'sources', 'list']");
+    expect(hookSource).toContain("['intelligence', 'templates', 'list']");
+    expect(hookSource).toContain('listSources');
+    expect(hookSource).toContain('listTemplates');
+    expect(hookSource).not.toContain('listItems');
+    expect(hookSource).not.toContain('createSource');
+    expect(hookSource).not.toContain('testSource');
+    expect(hookSource).not.toContain('fetchSource');
+    expect(barrelSource).not.toContain('useIntelligenceSourcesQuery');
+    expect(panelSource).toContain('useIntelligenceSourcesQuery');
+    expect(settingsPageSource).toContain("lazy(() => import('../components/settings/IntelligenceSourcesPanel'))");
+    expect(settingsPageSource).toContain('Suspense');
+    expect(settingsPageSource).not.toContain('useIntelligenceSourcesQuery');
+    expect(settingsBarrelSource).not.toContain('IntelligenceSourcesPanel');
+  });
 });

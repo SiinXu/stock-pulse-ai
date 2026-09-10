@@ -11,6 +11,10 @@ import {
   type IntelligenceSource,
   type IntelligenceSourceTemplate,
 } from '../../api/intelligence';
+import {
+  isIntelligenceSourcesCancelledError,
+  useIntelligenceSourcesQuery,
+} from '../../hooks/useIntelligenceSourcesQuery';
 import { Button } from '../common/Button';
 import { Input } from '../common/Input';
 import { Textarea } from '../common/Textarea';
@@ -64,22 +68,25 @@ export function IntelligenceSourcesPanel() {
   const [notice, setNotice] = useState<string | null>(null);
   const [actionError, setActionError] = useState<ParsedApiError | null>(null);
 
+  const { loadSources, loadTemplates } = useIntelligenceSourcesQuery();
+
   const load = useCallback(async () => {
     setPhase('loading');
     setLoadError(null);
     try {
       const [sourceList, templateList] = await Promise.all([
-        intelligenceApi.listSources({ pageSize: 100 }),
-        intelligenceApi.listTemplates(),
+        loadSources(),
+        loadTemplates(),
       ]);
       setSources(sourceList.items);
       setTemplates(templateList.items);
       setPhase('ready');
     } catch (error: unknown) {
+      if (isIntelligenceSourcesCancelledError(error)) return;
       setLoadError(getParsedApiError(error, language));
       setPhase('error');
     }
-  }, [language]);
+  }, [language, loadSources, loadTemplates]);
 
   useEffect(() => {
     void load();
@@ -98,11 +105,13 @@ export function IntelligenceSourcesPanel() {
       setNotice(message);
       if (reload) {
         try {
-          const sourceList = await intelligenceApi.listSources({ pageSize: 100 });
+          const sourceList = await loadSources();
           setSources(sourceList.items);
         } catch (error: unknown) {
-          setLoadError(getParsedApiError(error, language));
-          setPhase('error');
+          if (!isIntelligenceSourcesCancelledError(error)) {
+            setLoadError(getParsedApiError(error, language));
+            setPhase('error');
+          }
         }
       }
       return true;
@@ -112,7 +121,7 @@ export function IntelligenceSourcesPanel() {
     } finally {
       setBusy(null);
     }
-  }, [language]);
+  }, [language, loadSources]);
 
   const handleCreate = useCallback(() => {
     if (!draft.name.trim() || !draft.url.trim()) {
@@ -395,3 +404,5 @@ export function IntelligenceSourcesPanel() {
     </div>
   );
 }
+
+export default IntelligenceSourcesPanel;
