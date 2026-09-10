@@ -349,4 +349,48 @@ describe('Query consumer hosts', () => {
     expect(settingsPageSource).not.toContain('useInvestmentFrameworkQuery');
     expect(harnessSource).toContain("vi.mock('../../components/settings/InvestmentFrameworkSettingsCard'");
   });
+
+  it('wraps LocalModelsPanel tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/LocalModelsPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/LocalModelsPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/components/settings/__tests__/LocalModelsPanel.dualMount.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/LocalModelsPanel.dualMount.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings local-models catalog GET on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useLocalModelsCatalogQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/LocalModelsPanel.tsx');
+    const withKronosSource = read('src/components/settings/LocalModelsWithKronos.tsx');
+    const wizardSource = read('src/components/settings/FirstRunWizard.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const onboardingSource = read('src/components/onboarding/SettingsOnboardingHosts.tsx');
+    const harnessSource = read('src/pages/__tests__/SettingsPage.testHarness.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['local-models', 'catalog']");
+    expect(hookSource).toContain('getCatalog()');
+    expect(hookSource).not.toContain('getRuntime(');
+    expect(hookSource).not.toContain('startPull');
+    expect(hookSource).not.toContain('.assign(');
+    expect(hookSource).not.toContain('deleteModel');
+    expect(hookSource).not.toContain('importPack');
+    expect(barrelSource).not.toContain('useLocalModelsCatalogQuery');
+    expect(panelSource).toContain('useLocalModelsCatalogQuery');
+    expect(withKronosSource).toContain("lazy(() => import('./LocalModelsPanel'))");
+    expect(withKronosSource).toContain('Suspense');
+    expect(withKronosSource).not.toContain('useLocalModelsCatalogQuery');
+    expect(wizardSource).toContain("lazy(() => import('./LocalModelsPanel'))");
+    expect(wizardSource).toContain('Suspense');
+    expect(wizardSource).not.toContain('useLocalModelsCatalogQuery');
+    expect(settingsPageSource).not.toContain('useLocalModelsCatalogQuery');
+    expect(onboardingSource).toContain('FirstRunWizard');
+    expect(onboardingSource).not.toContain('useLocalModelsCatalogQuery');
+    expect(harnessSource).toContain('local-models-with-kronos');
+    expect(harnessSource).toContain('FirstRunWizard');
+  });
 });

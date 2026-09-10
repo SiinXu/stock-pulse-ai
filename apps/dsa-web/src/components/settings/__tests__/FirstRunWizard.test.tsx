@@ -30,27 +30,34 @@ vi.mock('../../../api/analysis', async () => {
   };
 });
 
-vi.mock('../LocalModelsPanel', () => ({
-  LocalModelsPanel: ({
+vi.mock('../LocalModelsPanel', () => {
+  function LocalModelsPanelMock({
     onConfigurationChanged,
     onModelReady,
   }: {
     onConfigurationChanged?: () => void | Promise<void>;
     onModelReady?: (modelId: string) => void;
-  }) => (
-    <div data-testid="wizard-local-model-panel">
-      <button
-        type="button"
-        onClick={() => {
-          void onConfigurationChanged?.();
-          onModelReady?.('qwen3:4b');
-        }}
-      >
-        simulate ready local model
-      </button>
-    </div>
-  ),
-}));
+  }) {
+    return (
+      <div data-testid="wizard-local-model-panel">
+        <button
+          type="button"
+          onClick={() => {
+            void onConfigurationChanged?.();
+            onModelReady?.('qwen3:4b');
+          }}
+        >
+          simulate ready local model
+        </button>
+      </div>
+    );
+  }
+  return {
+    __esModule: true,
+    default: LocalModelsPanelMock,
+    LocalModelsPanel: LocalModelsPanelMock,
+  };
+});
 
 if (!HTMLElement.prototype.scrollIntoView) {
   HTMLElement.prototype.scrollIntoView = () => {};
@@ -255,7 +262,7 @@ describe('FirstRunWizard', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Local model/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    expect(screen.getByTestId('wizard-local-model-panel')).toBeInTheDocument();
+    expect(await screen.findByTestId('wizard-local-model-panel')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
 
     fireEvent.click(screen.getByRole('button', { name: 'simulate ready local model' }));

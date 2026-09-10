@@ -1,6 +1,8 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UiLanguageProvider } from '../../../contexts/UiLanguageContext';
+import { createAppQueryClient } from '../../../query/createAppQueryClient';
 import type {
   LocalModelCatalogEntry,
   LocalModelRuntimeState,
@@ -118,10 +120,13 @@ const AVAILABLE_RUNTIME: LocalModelRuntimeState = {
 };
 
 function renderPanel(props: Partial<React.ComponentProps<typeof LocalModelsPanel>> = {}) {
+  const client = createAppQueryClient();
   return render(
-    <UiLanguageProvider initialLanguage="en">
-      <LocalModelsPanel language="en" {...props} />
-    </UiLanguageProvider>,
+    <QueryClientProvider client={client}>
+      <UiLanguageProvider initialLanguage="en">
+        <LocalModelsPanel language="en" {...props} />
+      </UiLanguageProvider>
+    </QueryClientProvider>,
   );
 }
 
@@ -698,5 +703,97 @@ describe('LocalModelsPanel', () => {
       'Model Pack integrity verification failed. Do not use it; download it again from a trusted source.',
     )).toBeInTheDocument();
     expect(screen.queryByText('private path details')).not.toBeInTheDocument();
+  });
+
+  it('issues one catalog GET and one runtime GET on mount', async () => {
+    const getRuntime = vi.fn().mockResolvedValue(AVAILABLE_RUNTIME);
+    createTransport.mockReturnValue(transport({ getRuntime }));
+
+    renderPanel();
+
+    expect(await screen.findByTestId('local-model-qwen3-4b')).toBeInTheDocument();
+    expect(getCatalog).toHaveBeenCalledTimes(1);
+    expect(getCatalog.mock.calls[0]).toEqual([]);
+    expect(getRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats an empty catalog 200 as success rather than a failed catalog', async () => {
+    getCatalog.mockResolvedValue({
+      schemaVersion: 1,
+      verifiedAt: '2026-07-23',
+      models: [],
+    });
+    createTransport.mockReturnValue(transport());
+
+    renderPanel();
+
+    expect(await screen.findAllByText('No models are listed in this section.')).not.toHaveLength(0);
+    expect(screen.queryByText('The model catalog is temporarily unavailable.')).not.toBeInTheDocument();
+  });
+
+  it('does not report a catalog failure as a successful empty catalog', async () => {
+    getCatalog.mockRejectedValue(new Error('catalog down'));
+    createTransport.mockReturnValue(transport());
+
+    renderPanel();
+
+    expect(await screen.findByText('The model catalog is temporarily unavailable.')).toBeInTheDocument();
+    expect(screen.queryByText('No models are listed in this section.')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('local-model-qwen3-4b')).not.toBeInTheDocument();
+  });
+
+  it('does not report a runtime failure as a successful empty catalog', async () => {
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockRejectedValue(new Error('runtime down')),
+    }));
+
+    renderPanel();
+
+    expect(await screen.findByText('The model catalog is temporarily unavailable.')).toBeInTheDocument();
+    expect(screen.queryByText('No models are listed in this section.')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('local-model-qwen3-4b')).not.toBeInTheDocument();
+  });
+
+  it('retries both catalog and runtime from the catalog-failed refresh action', async () => {
+    const getRuntime = vi.fn()
+      .mockRejectedValueOnce(new Error('runtime down'))
+      .mockResolvedValue(AVAILABLE_RUNTIME);
+    getCatalog
+      .mockRejectedValueOnce(new Error('catalog down'))
+      .mockResolvedValue({
+        schemaVersion: 1,
+        verifiedAt: '2026-07-23',
+        models: [GENERAL_MODEL, FINANCE_MODEL],
+      });
+    createTransport.mockReturnValue(transport({ getRuntime }));
+
+    renderPanel();
+    expect(await screen.findByText('The model catalog is temporarily unavailable.')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+
+    expect(await screen.findByTestId('local-model-qwen3-4b')).toBeInTheDocument();
+    expect(getCatalog).toHaveBeenCalledTimes(2);
+    expect(getRuntime).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps last-good catalog cards when a later runtime-only refresh fails', async () => {
+    const getRuntime = vi.fn()
+      .mockResolvedValueOnce(AVAILABLE_RUNTIME)
+      .mockRejectedValueOnce(new Error('runtime down'));
+    createTransport.mockReturnValue(transport({ getRuntime }));
+
+    renderPanel();
+    expect(await screen.findByTestId('local-model-qwen3-4b')).toBeInTheDocument();
+    expect(getCatalog).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Refresh status' }));
+
+    expect(await screen.findByText(
+      'The operation did not complete. Refresh status and try again.',
+    )).toBeInTheDocument();
+    expect(screen.getByTestId('local-model-qwen3-4b')).toBeInTheDocument();
+    expect(screen.queryByText('The model catalog is temporarily unavailable.')).not.toBeInTheDocument();
+    expect(getCatalog).toHaveBeenCalledTimes(1);
+    expect(getRuntime).toHaveBeenCalledTimes(2);
   });
 });
