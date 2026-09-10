@@ -37,14 +37,6 @@ METHOD_SIGNATURES = {
     "get_realtime_quote": ["self", "stock_code"],
 }
 
-UNMOVED_FACADE_METHODS = (
-    "_convert_stock_code",
-    "_is_us_stock",
-    "_is_jp_kr_suffix_stock",
-    "_is_tw_suffix_stock",
-)
-
-
 @pytest.mark.parametrize("name", MOVED)
 def test_moved_methods_remain_on_the_public_fetcher(name) -> None:
     assert callable(getattr(YfinanceFetcher, name))
@@ -102,9 +94,19 @@ def test_bodies_no_longer_live_in_the_facade_class() -> None:
         assert name not in defined, name
 
 
-@pytest.mark.parametrize("name", UNMOVED_FACADE_METHODS)
-def test_unmoved_methods_stay_on_the_facade(name) -> None:
-    assert name in _facade_class_methods(), name
+def test_remaining_facade_class_methods_are_only_init() -> None:
+    assert _facade_class_methods() == {"__init__"}
+
+
+def test_http_guard_remains_a_module_level_function() -> None:
+    tree = ast.parse(FACADE_PATH.read_text(encoding="utf-8"))
+    module_funcs = {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert "_yfinance_http_guard" in module_funcs
+    assert "_yfinance_http_guard" not in _facade_class_methods()
 
 
 def test_moved_bodies_still_reach_a_patched_facade_global() -> None:
