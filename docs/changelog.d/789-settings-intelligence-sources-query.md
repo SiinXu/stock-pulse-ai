@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings intelligence sources list GET and templates list GET through TanStack Query (Refs #789).

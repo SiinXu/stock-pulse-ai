@@ -99,7 +99,6 @@ import {
   computeGroupFingerprint,
   shouldMarkDirtyOnConflict,
 } from '../components/settings/autosaveMachine';
-import { IntelligenceSourcesPanel } from '../components/settings/IntelligenceSourcesPanel';
 import { getConfigItem } from '../components/settings/settingsConfigItems';
 import { getCategoryDescription, getCategoryTitle } from '../utils/systemConfigI18n';
 import {
@@ -134,6 +133,7 @@ const RuntimeCapabilitiesPanel = lazy(async () => {
 const ConfigPresetsPanel = lazy(() => import('../components/settings/ConfigPresetsPanel'));
 const InvestmentFrameworkSettingsCard = lazy(() => import('../components/settings/InvestmentFrameworkSettingsCard'));
 const GenerationBackendStatusPanel = lazy(() => import('../components/settings/GenerationBackendStatusPanel'));
+const IntelligenceSourcesPanel = lazy(() => import('../components/settings/IntelligenceSourcesPanel'));
 
 const SettingsPage: React.FC = () => {
   const { passwordChangeable } = useAuth();
@@ -1803,7 +1803,9 @@ const SettingsPage: React.FC = () => {
                 diagnosticHint={settingsPanelDiagnosticHint}
               >
                 <div className="mt-2">
-                  <IntelligenceSourcesPanel />
+                  <Suspense fallback={<SettingsLoading />}>
+                    <IntelligenceSourcesPanel />
+                  </Suspense>
                 </div>
               </SettingsPanelErrorBoundary>
             ) : null}
