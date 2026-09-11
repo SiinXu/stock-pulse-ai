@@ -690,6 +690,8 @@ describe('SchedulerSettingsCard observability', () => {
     );
 
     await waitFor(() => expect(systemConfigApi.getSchedulerStatus).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(scheduledTasksApi.list).toHaveBeenCalledTimes(1));
+    expect(scheduledTasksApi.list).toHaveBeenCalledWith({ enabled: true, limit: 1 });
     expect(await screen.findByTestId('scheduler-refresh-status-button')).toBeDisabled();
     expect(screen.getByTestId('scheduler-run-now-button')).toBeDisabled();
   });

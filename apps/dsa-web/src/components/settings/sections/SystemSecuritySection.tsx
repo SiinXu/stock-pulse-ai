@@ -5,13 +5,13 @@ import { lazy, Suspense } from 'react';
 import { AuthSettingsCard } from '../AuthSettingsCard';
 import { ChangePasswordCard } from '../ChangePasswordCard';
 import OutboundActivityPanel from '../OutboundActivityPanel';
-import SchedulerSettingsCard from '../SchedulerSettingsCard';
 import SecurityAuditPanel from '../SecurityAuditPanel';
 import SignalScorecardPanel from '../SignalScorecardPanel';
 import SystemAboutCard from '../SystemAboutCard';
 
 const LoadedExtensionsPanel = lazy(() => import('../LoadedExtensionsPanel'));
 const ScheduledTasksPanel = lazy(() => import('../ScheduledTasksPanel'));
+const SchedulerSettingsCard = lazy(() => import('../SchedulerSettingsCard'));
 
 type SchedulerProps = React.ComponentProps<typeof SchedulerSettingsCard>;
 type ExtensionProps = React.ComponentProps<typeof LoadedExtensionsPanel>;
@@ -55,16 +55,18 @@ const SystemSecuritySection: React.FC<SystemSecuritySectionProps> = (props) => {
   if (props.activeView === 'runtime') {
     return (
       <>
-        <SchedulerSettingsCard
-          items={props.items}
-          disabled={props.disabled}
-          issueByKey={props.issueByKey}
-          statusRefreshToken={props.schedulerStatusRefreshToken}
-          onSchedulerStateChange={props.onSchedulerStateChange}
-          onChange={props.onChange}
-          t={props.t}
-          language={props.language}
-        />
+        <Suspense fallback={null}>
+          <SchedulerSettingsCard
+            items={props.items}
+            disabled={props.disabled}
+            issueByKey={props.issueByKey}
+            statusRefreshToken={props.schedulerStatusRefreshToken}
+            onSchedulerStateChange={props.onSchedulerStateChange}
+            onChange={props.onChange}
+            t={props.t}
+            language={props.language}
+          />
+        </Suspense>
         <Suspense fallback={null}>
           <ScheduledTasksPanel disabled={props.disabled} t={props.t} language={props.language} />
         </Suspense>

@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Bell, Clock, Play, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { scheduledTasksApi } from '../../api/scheduledTasks';
 import { systemConfigApi } from '../../api/systemConfig';
+import { useScheduledTasksOverlapQuery } from '../../hooks/useScheduledTasksOverlapQuery';
 import { useSchedulerStatusQuery } from '../../hooks/useSchedulerStatusQuery';
 import type {
   ConfigValidationIssue,
@@ -222,14 +222,15 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     enabled: hasSchedulerSettings,
     refreshToken: statusRefreshToken,
   });
+  const { hasEnabledVersionedTasks } = useScheduledTasksOverlapQuery({
+    enabled: hasSchedulerSettings,
+    refreshToken: statusRefreshToken,
+  });
   const [isRunningNow, setIsRunningNow] = useState(false);
   const [runNowError, setRunNowError] = useState<ParsedApiError | null>(null);
   const [trackedRun, setTrackedRun] = useState<TrackedRun | null>(null);
   const [scheduleEnabledOverride, setScheduleEnabledOverride] = useState<boolean | null>(null);
   const [isAddingTime, setIsAddingTime] = useState(false);
-  // Live probe: true only when list(enabled=true) succeeds with ≥1 item.
-  // null = not yet known / probe failed — never invent an overlap state.
-  const [hasEnabledVersionedTasks, setHasEnabledVersionedTasks] = useState<boolean | null>(null);
   const mountedRef = useRef(true);
   const runNowRequestRef = useRef(0);
   const navigate = useNavigate();
@@ -241,35 +242,12 @@ const SchedulerSettingsCard: React.FC<SchedulerSettingsCardProps> = ({
     };
   }, []);
 
-  const refreshVersionedTaskOverlap = useCallback(async () => {
-    try {
-      const response = await scheduledTasksApi.list({ enabled: true, limit: 1 });
-      const hasItems = (response.items?.length ?? 0) > 0;
-      const hasTotal = (response.total ?? 0) > 0;
-      if (mountedRef.current) {
-        setHasEnabledVersionedTasks(hasItems || hasTotal);
-      }
-    } catch {
-      // Fail soft: missing versioned-task probe must not block legacy controls.
-      if (mountedRef.current) {
-        setHasEnabledVersionedTasks(null);
-      }
-    }
-  }, []);
-
   useEffect(() => {
     if (!status) {
       return;
     }
     setTrackedRun((current) => deriveTrackedRun(current, status));
   }, [status]);
-
-  useEffect(() => {
-    if (!hasSchedulerSettings) {
-      return;
-    }
-    void refreshVersionedTaskOverlap();
-  }, [hasSchedulerSettings, refreshVersionedTaskOverlap, statusRefreshToken]);
 
   // While analysis is running in this process, poll status so run-now stays trackable
   // (accepted → running → idle with last success/error) without showing only a task id.
