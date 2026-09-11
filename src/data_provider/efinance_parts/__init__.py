@@ -12,5 +12,6 @@ Owned domains:
 - ``market_boards`` — main indices, market statistics, and sector rankings
 - ``history`` — stock-path daily fetch/normalize methods
 - ``info`` — per-symbol base info, belong-board, and enhanced-data orchestration
+- ``rate_limit`` — UA rotation, request pacing, and history-failure formatting
 - ``facade_bind`` — ADR-006 clone/bind helpers
 """

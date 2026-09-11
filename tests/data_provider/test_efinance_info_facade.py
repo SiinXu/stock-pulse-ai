@@ -198,8 +198,11 @@ def test_fetcher_instantiates_with_patch_disabled() -> None:
 
 def test_rate_limit_helpers_stay_on_the_facade() -> None:
     for helper in ("_set_random_user_agent", "_enforce_rate_limit"):
-        assert helper in EfinanceFetcher.__dict__, helper
-        assert inspect.isfunction(EfinanceFetcher.__dict__[helper])
+        method = EfinanceFetcher.__dict__[helper]
+        assert callable(getattr(EfinanceFetcher, helper)), helper
+        assert method.__module__ == "src.data_provider.efinance_fetcher", helper
+        assert method.__qualname__ == f"EfinanceFetcher.{helper}", helper
+        assert method.__globals__ is vars(efinance_mod), helper
 
 
 def test_get_base_info_series_becomes_dict() -> None:

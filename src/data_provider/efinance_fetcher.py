@@ -295,65 +295,13 @@ class EfinanceFetcher(BaseFetcher):
         if get_config().enable_eastmoney_patch:
             eastmoney_patch()
 
-    @staticmethod
-    def _build_history_failure_message(
-        stock_code: str,
-        beg_date: str,
-        end_date: str,
-        exc: Exception,
-        elapsed: float,
-        is_etf: bool = False,
-    ) -> Tuple[str, str]:
-        category, detail = _classify_eastmoney_error(exc)
-        instrument_type = "ETF" if is_etf else "stock"
-        message = (
-            "Eastmoney 历史K线接口失败: "
-            f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
-            f"market_type={instrument_type}, range={beg_date}~{end_date}, "
-            f"category={category}, error_type={type(exc).__name__}, elapsed={elapsed:.2f}s, detail={detail}"
-        )
-        return category, message
+    # Rebound from efinance_parts.rate_limit after the class is built.
+    _build_history_failure_message = None
 
-    def _set_random_user_agent(self) -> None:
-        """
-        设置随机 User-Agent
-        
-        通过修改 requests Session 的 headers 实现
-        这是关键的反爬策略之一
-        """
-        try:
-            random_ua = random.choice(USER_AGENTS)
-            logger.debug(f"设置 User-Agent: {random_ua[:50]}...")
-        except Exception as e:
-            log_safe_exception(
-                logger,
-                "Efinance user agent selection failed",
-                e,
-                error_code="efinance_user_agent_selection_failed",
-                level=logging.DEBUG,
-            )
-    
-    def _enforce_rate_limit(self) -> None:
-        """
-        强制执行速率限制
-        
-        策略：
-        1. 检查距离上次请求的时间间隔
-        2. 如果间隔不足，补充休眠时间
-        3. 然后再执行随机 jitter 休眠
-        """
-        if self._last_request_time is not None:
-            elapsed = time.time() - self._last_request_time
-            min_interval = self.sleep_min
-            if elapsed < min_interval:
-                additional_sleep = min_interval - elapsed
-                logger.debug(f"补充休眠 {additional_sleep:.2f} 秒")
-                time.sleep(additional_sleep)
-        
-        # Apply a random jitter delay
-        self.random_sleep(self.sleep_min, self.sleep_max)
-        self._last_request_time = time.time()
-    
+    _set_random_user_agent = None
+
+    _enforce_rate_limit = None
+
     # Rebound from efinance_parts.history after the class is built.
     _fetch_raw_data = None
 
@@ -462,7 +410,7 @@ if __name__ == "__main__":
 
 # Keep ``src.data_provider.efinance_fetcher.EfinanceFetcher`` as the ADR-006
 # compatibility facade while ``efinance_parts`` owns ETF, stock-path history,
-# stock realtime, market board, and per-symbol info bodies.
+# stock realtime, market board, per-symbol info, and rate-limit helper bodies.
 # Rebinding preserves method globals so existing patches against this module
 # continue to intercept moved implementations.
 from .efinance_parts import etf as _etf_module  # noqa: E402
@@ -470,11 +418,13 @@ from .efinance_parts import history as _history_module  # noqa: E402
 from .efinance_parts import realtime as _realtime_module  # noqa: E402
 from .efinance_parts import market_boards as _market_boards_module  # noqa: E402
 from .efinance_parts import info as _info_module  # noqa: E402
+from .efinance_parts import rate_limit as _rate_limit_module  # noqa: E402
 from .efinance_parts.etf import _EtfMethods  # noqa: E402
 from .efinance_parts.history import _HistoryMethods  # noqa: E402
 from .efinance_parts.realtime import _RealtimeMethods  # noqa: E402
 from .efinance_parts.market_boards import _MarketBoardsMethods  # noqa: E402
 from .efinance_parts.info import _InfoMethods  # noqa: E402
+from .efinance_parts.rate_limit import _RateLimitMethods  # noqa: E402
 from .efinance_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
 
@@ -505,12 +455,13 @@ def _apply_history_retry(name: str, bound):
 def _assemble_efinance_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods, _InfoMethods
+    global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods, _InfoMethods, _RateLimitMethods
     _EtfMethods = _etf_module._EtfMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
     _InfoMethods = _info_module._InfoMethods
+    _RateLimitMethods = _rate_limit_module._RateLimitMethods
     bind_methods_from_class(
         _HistoryMethods,
         EfinanceFetcher,
@@ -542,6 +493,12 @@ def _assemble_efinance_fetcher_facade() -> None:
         globals(),
         expected_names=_info_module.EXPECTED_INFO_METHOD_NAMES,
     )
+    bind_methods_from_class(
+        _RateLimitMethods,
+        EfinanceFetcher,
+        globals(),
+        expected_names=_rate_limit_module.EXPECTED_RATE_LIMIT_METHOD_NAMES,
+    )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy
     # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
@@ -571,7 +528,7 @@ _assemble_efinance_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind all five owner modules."""
+    """Keep an owner reload able to rebuild and rebind all six owner modules."""
 
     for module in (
         _etf_module,
@@ -579,6 +536,7 @@ def _install_part_reload_hooks() -> None:
         _realtime_module,
         _market_boards_module,
         _info_module,
+        _rate_limit_module,
     ):
         module._FACADE_RELOAD_HOOK = _assemble_efinance_fetcher_facade  # type: ignore[attr-defined]
 

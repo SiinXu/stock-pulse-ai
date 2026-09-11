@@ -1,0 +1,1 @@
+- [Changed] Move efinance UA rotation, request pacing, and history-failure formatting (`_set_random_user_agent`, `_enforce_rate_limit`, `_build_history_failure_message`) into `src/data_provider/efinance_parts/rate_limit.py` behind the ADR-006 facade, keeping `EfinanceFetcher` method names, signatures, staticmethod kind, and patch targets unchanged (Refs #1068).
