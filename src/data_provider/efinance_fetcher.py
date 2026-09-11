@@ -379,151 +379,13 @@ class EfinanceFetcher(BaseFetcher):
     _calc_market_stats = None
 
     get_sector_rankings = None
-    
-    def get_base_info(self, stock_code: str) -> Optional[Dict[str, Any]]:
-        """
-        获取股票基本信息
-        
-        数据来源：ef.stock.get_base_info()
-        包含：市盈率、市净率、所处行业、总市值、流通市值、ROE、净利率等
-        
-        Args:
-            stock_code: 股票代码
-            
-        Returns:
-            包含基本信息的字典，获取失败返回 None
-        """
-        import efinance as ef
-        
-        try:
-            # Anti-ban strategy
-            self._set_random_user_agent()
-            self._enforce_rate_limit()
-            
-            logger.info(f"[API调用] ef.stock.get_base_info(stock_codes={stock_code}) 获取基本信息...")
-            import time as _time
-            api_start = _time.time()
-            
-            info = _ef_call_with_timeout(ef.stock.get_base_info, stock_code)
-            
-            api_elapsed = _time.time() - api_start
-            logger.info(f"[API返回] ef.stock.get_base_info 成功, 耗时 {api_elapsed:.2f}s")
-            
-            if info is None:
-                logger.warning(f"[API返回] 未获取到 {stock_code} 的基本信息")
-                return None
-            
-            # Convert to Dictionary
-            if isinstance(info, pd.Series):
-                return info.to_dict()
-            elif isinstance(info, pd.DataFrame):
-                if not info.empty:
-                    return info.iloc[0].to_dict()
-            
-            return None
-            
-        except Exception as e:
-            log_safe_exception(
-                logger,
-                "Efinance stock base information fetch failed",
-                e,
-                error_code="efinance_stock_base_info_failed",
-                level=logging.ERROR,
-                context={"symbol": stock_code},
-            )
-            return None
-    
-    def get_belong_board(self, stock_code: str) -> Optional[pd.DataFrame]:
-        """
-        获取股票所属板块
-        
-        数据来源：ef.stock.get_belong_board()
-        
-        Args:
-            stock_code: 股票代码
-            
-        Returns:
-            所属板块 DataFrame，获取失败返回 None
-        """
-        import efinance as ef
-        
-        try:
-            # Anti-ban strategy
-            self._set_random_user_agent()
-            self._enforce_rate_limit()
-            
-            logger.info(f"[API调用] ef.stock.get_belong_board(stock_code={stock_code}) 获取所属板块...")
-            import time as _time
-            api_start = _time.time()
-            
-            df = _ef_call_with_timeout(ef.stock.get_belong_board, stock_code)
-            
-            api_elapsed = _time.time() - api_start
-            
-            if df is not None and not df.empty:
-                logger.info(f"[API返回] ef.stock.get_belong_board 成功: 返回 {len(df)} 个板块, 耗时 {api_elapsed:.2f}s")
-                return df
-            else:
-                logger.warning(f"[API返回] 未获取到 {stock_code} 的板块信息")
-                return None
-            
-        except FuturesTimeoutError:
-            logger.warning(f"[超时] ef.stock.get_belong_board({stock_code}) 超过 {_EF_CALL_TIMEOUT}s，跳过")
-            return None
-        except Exception as e:
-            log_safe_exception(
-                logger,
-                "Efinance stock board membership fetch failed",
-                e,
-                error_code="efinance_stock_board_membership_failed",
-                level=logging.ERROR,
-                context={"symbol": stock_code},
-            )
-            return None
-    
-    def get_enhanced_data(self, stock_code: str, days: int = 60) -> Dict[str, Any]:
-        """
-        获取增强数据（历史K线 + 实时行情 + 基本信息）
-        
-        Args:
-            stock_code: 股票代码
-            days: 历史数据天数
-            
-        Returns:
-            包含所有数据的字典
-        """
-        result = {
-            'code': stock_code,
-            'daily_data': None,
-            'realtime_quote': None,
-            'base_info': None,
-            'belong_board': None,
-        }
-        
-        # Get daily line data
-        try:
-            df = self.get_daily_data(stock_code, days=days)
-            result['daily_data'] = df
-        except Exception as e:
-            log_safe_exception(
-                logger,
-                "Efinance daily data fetch failed",
-                e,
-                error_code="efinance_daily_data_failed",
-                level=logging.ERROR,
-                context={"symbol": stock_code},
-            )
-        
-        # Get real-time quotes
-        result['realtime_quote'] = self.get_realtime_quote(stock_code)
-        
-        # Get basic information
-        result['base_info'] = self.get_base_info(stock_code)
-        
-        # Get sector
-        result['belong_board'] = self.get_belong_board(stock_code)
-        
-        return result
+
+    # Rebound from efinance_parts.info after the class is built.
+    get_base_info = None
+
+    get_belong_board = None
+
+    get_enhanced_data = None
 
 
 if __name__ == "__main__":
@@ -600,17 +462,19 @@ if __name__ == "__main__":
 
 # Keep ``src.data_provider.efinance_fetcher.EfinanceFetcher`` as the ADR-006
 # compatibility facade while ``efinance_parts`` owns ETF, stock-path history,
-# stock realtime, and market board bodies.
+# stock realtime, market board, and per-symbol info bodies.
 # Rebinding preserves method globals so existing patches against this module
 # continue to intercept moved implementations.
 from .efinance_parts import etf as _etf_module  # noqa: E402
 from .efinance_parts import history as _history_module  # noqa: E402
 from .efinance_parts import realtime as _realtime_module  # noqa: E402
 from .efinance_parts import market_boards as _market_boards_module  # noqa: E402
+from .efinance_parts import info as _info_module  # noqa: E402
 from .efinance_parts.etf import _EtfMethods  # noqa: E402
 from .efinance_parts.history import _HistoryMethods  # noqa: E402
 from .efinance_parts.realtime import _RealtimeMethods  # noqa: E402
 from .efinance_parts.market_boards import _MarketBoardsMethods  # noqa: E402
+from .efinance_parts.info import _InfoMethods  # noqa: E402
 from .efinance_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
 
@@ -641,11 +505,12 @@ def _apply_history_retry(name: str, bound):
 def _assemble_efinance_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods
+    global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods, _InfoMethods
     _EtfMethods = _etf_module._EtfMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
+    _InfoMethods = _info_module._InfoMethods
     bind_methods_from_class(
         _HistoryMethods,
         EfinanceFetcher,
@@ -670,6 +535,12 @@ def _assemble_efinance_fetcher_facade() -> None:
         EfinanceFetcher,
         globals(),
         expected_names=_market_boards_module.EXPECTED_MARKET_BOARD_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _InfoMethods,
+        EfinanceFetcher,
+        globals(),
+        expected_names=_info_module.EXPECTED_INFO_METHOD_NAMES,
     )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy
@@ -700,9 +571,15 @@ _assemble_efinance_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind all four owner modules."""
+    """Keep an owner reload able to rebuild and rebind all five owner modules."""
 
-    for module in (_etf_module, _history_module, _realtime_module, _market_boards_module):
+    for module in (
+        _etf_module,
+        _history_module,
+        _realtime_module,
+        _market_boards_module,
+        _info_module,
+    ):
         module._FACADE_RELOAD_HOOK = _assemble_efinance_fetcher_facade  # type: ignore[attr-defined]
 
 

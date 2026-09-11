@@ -11,5 +11,6 @@ Owned domains:
 - ``realtime`` — stock-path realtime quote method
 - ``market_boards`` — main indices, market statistics, and sector rankings
 - ``history`` — stock-path daily fetch/normalize methods
+- ``info`` — per-symbol base info, belong-board, and enhanced-data orchestration
 - ``facade_bind`` — ADR-006 clone/bind helpers
 """

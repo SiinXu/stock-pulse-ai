@@ -7,7 +7,7 @@ Method bodies are rebound onto ``EfinanceFetcher`` by the compatibility facade
 ``akshare_parts.market_boards``.
 
 Per-symbol lookups such as ``get_belong_board`` are not market-wide aggregates
-and stay on the facade for a later slice. No module-level helper moves; the
+and live in ``efinance_parts.info``. No module-level helper moves; the
 rebind resolves free names from the facade globals at call time.
 """
 

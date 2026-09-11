@@ -1,0 +1,1 @@
+- [Changed] Move efinance per-symbol info lookups and enhanced-data orchestration (`get_base_info`, `get_belong_board`, `get_enhanced_data`) into `src/data_provider/efinance_parts/info.py` behind the ADR-006 facade, keeping `EfinanceFetcher` method names, signatures, and patch targets unchanged (Refs #1068).
