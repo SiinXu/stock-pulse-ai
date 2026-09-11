@@ -141,7 +141,6 @@
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"a0af82c117e461dcdd00ecf7e3711f4abfc275825e7b971d4f1fee4f8994edd2"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"bbfa99a4443d2c073b6e01afb8852bffc606fe27900bc6e8d9dee5542aa4ce7b"},
     {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>","caught":["Exception"],"digest":"ea9d1510a48fa7f4845ad959ec58b46990a492b235b585ded630222e79a490e9"},
-    {"path":"src/data_provider/efinance_fetcher.py","scope":"<module>.EfinanceFetcher._set_random_user_agent","caught":["Exception"],"digest":"8f0af97cda4e804db932e9af45c6891fe5da12f474435a6810d95b940b88ba8c"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"2ce4dd372ce91d9e8fcb7924d0db740875da9ba7f061eae836c407a51f1a0f85"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"3d08df0ccaec74c4a07839c0c63d2cbe287f9b3dd3340ffbb13733fda3af3304"},
     {"path":"src/data_provider/longbridge_fetcher.py","scope":"<module>.LongbridgeFetcher._get_ctx","caught":["Exception"],"digest":"81b93f82bf1e64a360b083d053e6d61e86f8c3737c1021c1dce0abd3df49a651"},

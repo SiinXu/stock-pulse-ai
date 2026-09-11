@@ -144,7 +144,11 @@ def test_per_symbol_lookup_is_rebound_not_a_class_body() -> None:
 
 def test_rate_limit_helpers_stay_on_the_facade() -> None:
     for helper in ("_enforce_rate_limit", "_set_random_user_agent"):
-        assert helper in EfinanceFetcher.__dict__, helper
+        method = EfinanceFetcher.__dict__[helper]
+        assert callable(getattr(EfinanceFetcher, helper)), helper
+        assert method.__module__ == "src.data_provider.efinance_fetcher", helper
+        assert method.__qualname__ == f"EfinanceFetcher.{helper}", helper
+        assert method.__globals__ is vars(efinance_mod), helper
 
 
 def test_moved_bodies_still_reach_a_patched_facade_helper() -> None:

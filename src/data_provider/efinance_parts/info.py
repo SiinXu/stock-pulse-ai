@@ -5,8 +5,8 @@ Method bodies are rebound onto ``EfinanceFetcher`` by the compatibility facade
 (ADR-006) so free-name lookups and test patches stay on
 ``src.data_provider.efinance_fetcher``.
 
-UA/rate-limit helpers stay on the facade; rebound bodies reach them through
-``self``. Module-level timeout helpers stay on the facade so already-extracted
+UA/rate-limit helpers remain reachable through ``self`` after rebind.
+Module-level timeout helpers stay on the facade so already-extracted
 owners keep resolving them from facade globals.
 """
 

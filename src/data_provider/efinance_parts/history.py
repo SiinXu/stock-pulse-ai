@@ -6,10 +6,10 @@ Method bodies are rebound onto ``EfinanceFetcher`` by the compatibility facade
 ``src.data_provider.efinance_fetcher``. Tenacity retry is re-applied on the
 facade after bind, only for ``_fetch_raw_data``.
 
-UA/rate-limit helpers and ``_build_history_failure_message`` stay on the
-facade; rebound bodies reach them through ``self`` or facade globals. ETF
-history remains in ``efinance_parts.etf``; this cluster only owns the stock
-path plus the daily orchestrator that dispatches to ETF vs stock.
+UA/rate-limit helpers and ``_build_history_failure_message`` remain
+reachable through ``self`` after rebind. ETF history remains in
+``efinance_parts.etf``; this cluster only owns the stock path plus the
+daily orchestrator that dispatches to ETF vs stock.
 """
 
 from __future__ import annotations
