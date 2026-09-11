@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings scheduled-task getStatus fan-out through TanStack Query (Refs #789).
