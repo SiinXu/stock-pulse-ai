@@ -1,11 +1,10 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import type React from 'react';
 import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react';
-import { getParsedApiError, type ParsedApiError } from '../../api/error';
-import { scheduledTasksApi } from '../../api/scheduledTasks';
-import type { ScheduledTaskRunItem, ScheduledTaskRunStatus } from '../../types/scheduledTasks';
+import { useScheduledTaskRunHistoryQuery } from '../../hooks/useScheduledTaskRunHistoryQuery';
+import type { ScheduledTaskRunStatus } from '../../types/scheduledTasks';
 import type { UiLanguage, UiTextKey } from '../../i18n/uiText';
 import { getUiLocale } from '../../utils/uiLocale';
 import { ApiErrorAlert, Badge, Button, EmptyState, IconButton, StatePanel } from '../common';
@@ -77,51 +76,14 @@ const ScheduledTaskRunHistory: React.FC<ScheduledTaskRunHistoryProps> = ({
   t,
   language,
 }) => {
-  const requestSequence = useRef(0);
-  const activeTaskId = useRef(taskId);
   const [isOpen, setIsOpen] = useState(false);
-  const [runs, setRuns] = useState<ScheduledTaskRunItem[]>([]);
-  const [total, setTotal] = useState(0);
-  const [limit, setLimit] = useState(INITIAL_LIMIT);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<ParsedApiError | null>(null);
+  const [openTaskId, setOpenTaskId] = useState(taskId);
+  const { runs, total, limit, isLoading, error, load } = useScheduledTaskRunHistoryQuery(taskId);
 
-  useEffect(() => {
-    if (activeTaskId.current === taskId) {
-      return;
-    }
-    activeTaskId.current = taskId;
-    requestSequence.current += 1;
+  if (openTaskId !== taskId) {
+    setOpenTaskId(taskId);
     setIsOpen(false);
-    setRuns([]);
-    setTotal(0);
-    setLimit(INITIAL_LIMIT);
-    setError(null);
-  }, [taskId]);
-
-  const load = async (requestedLimit: number) => {
-    const requestId = requestSequence.current + 1;
-    requestSequence.current = requestId;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await scheduledTasksApi.listRuns(taskId, { limit: requestedLimit });
-      if (requestSequence.current !== requestId) {
-        return;
-      }
-      setRuns(response.items);
-      setTotal(response.total);
-      setLimit(requestedLimit);
-    } catch (loadError: unknown) {
-      if (requestSequence.current === requestId) {
-        setError(getParsedApiError(loadError));
-      }
-    } finally {
-      if (requestSequence.current === requestId) {
-        setIsLoading(false);
-      }
-    }
-  };
+  }
 
   const toggle = () => {
     const nextOpen = !isOpen;

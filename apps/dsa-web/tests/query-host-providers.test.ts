@@ -494,4 +494,40 @@ describe('Query consumer hosts', () => {
     expect(harnessSource).toContain('NotificationChannelsPanel');
     expect(harnessSource).toContain("source.includes('NotificationChannelsPanel')");
   });
+
+  it('wraps scheduled-task run history hook tests with the production retry-free client', () => {
+    expect(read('src/components/settings/__tests__/ScheduledTasksPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/ScheduledTasksPanel.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useScheduledTaskRunHistoryQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useScheduledTaskRunHistoryQuery.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings scheduled-task run history GET on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useScheduledTaskRunHistoryQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const historySource = read('src/components/settings/ScheduledTaskRunHistory.tsx');
+    const panelSource = read('src/components/settings/ScheduledTasksPanel.tsx');
+    const sectionSource = read('src/components/settings/sections/SystemSecuritySection.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const editorSource = read('src/components/settings/LLMChannelEditor.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['scheduled-tasks', 'runs'");
+    expect(hookSource).toContain('listRuns');
+    expect(hookSource).not.toContain("['scheduled-tasks', 'list']");
+    expect(hookSource).not.toContain('getStatus');
+    expect(hookSource).not.toContain('.create(');
+    expect(hookSource).not.toContain('.enable(');
+    expect(hookSource).not.toContain('.disable(');
+    expect(barrelSource).not.toContain('useScheduledTaskRunHistoryQuery');
+    expect(historySource).toContain('useScheduledTaskRunHistoryQuery');
+    expect(panelSource).not.toContain('useScheduledTaskRunHistoryQuery');
+    expect(sectionSource).toContain("lazy(() => import('../ScheduledTasksPanel'))");
+    expect(sectionSource).toContain('Suspense');
+    expect(sectionSource).not.toContain('useScheduledTaskRunHistoryQuery');
+    expect(settingsPageSource).not.toContain('useScheduledTaskRunHistoryQuery');
+    expect(editorSource).toContain('getGenerationBackendStatus()');
+  });
 });
