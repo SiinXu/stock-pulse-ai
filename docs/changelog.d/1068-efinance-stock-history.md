@@ -1,0 +1,1 @@
+- [Changed] Move efinance stock-path daily fetch/normalize (`_fetch_raw_data`, `_fetch_stock_data`, `_normalize_data`) into `src/data_provider/efinance_parts/history.py` behind the ADR-006 facade, keeping `EfinanceFetcher` method names, signatures, retry wrapping, and patch targets unchanged (Refs #1068).

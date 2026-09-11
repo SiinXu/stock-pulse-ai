@@ -10,5 +10,6 @@ Owned domains:
 - ``etf`` — ETF history fetch and ETF realtime-quote orchestration methods
 - ``realtime`` — stock-path realtime quote method
 - ``market_boards`` — main indices, market statistics, and sector rankings
+- ``history`` — stock-path daily fetch/normalize methods
 - ``facade_bind`` — ADR-006 clone/bind helpers
 """
