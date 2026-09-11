@@ -213,6 +213,8 @@ describe('Query consumer hosts', () => {
     expect(read('src/components/settings/__tests__/SchedulerSettingsCard.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useSchedulerStatusQuery.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/hooks/__tests__/useSchedulerStatusQuery.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useScheduledTasksOverlapQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useScheduledTasksOverlapQuery.test.tsx')).toContain('QueryClientProvider');
   });
 
   it('keeps Settings scheduler status on an imperative fetchQuery recipe without a barrel export', () => {
@@ -282,7 +284,7 @@ describe('Query consumer hosts', () => {
     expect(sectionSource).not.toContain('useScheduledTasksListQuery');
     expect(settingsPageSource).not.toContain('useScheduledTasksListQuery');
     expect(schedulerCardSource).not.toContain('useScheduledTasksListQuery');
-    expect(schedulerCardSource).toContain('list({ enabled: true, limit: 1 })');
+    expect(schedulerCardSource).not.toContain('list({ enabled: true, limit: 1 })');
   });
 
   it('wraps ConfigPresetsPanel tests with the production retry-free client', () => {
@@ -529,5 +531,41 @@ describe('Query consumer hosts', () => {
     expect(sectionSource).not.toContain('useScheduledTaskRunHistoryQuery');
     expect(settingsPageSource).not.toContain('useScheduledTaskRunHistoryQuery');
     expect(editorSource).toContain('getGenerationBackendStatus()');
+  });
+
+  it('wraps Settings scheduler overlap probe tests with the production retry-free client', () => {
+    expect(read('src/hooks/__tests__/useScheduledTasksOverlapQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useScheduledTasksOverlapQuery.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/components/settings/__tests__/SchedulerSettingsCard.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/SchedulerSettingsCard.test.tsx')).toContain('QueryClientProvider');
+  });
+
+  it('keeps Settings scheduler overlap probe on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useScheduledTasksOverlapQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const cardSource = read('src/components/settings/SchedulerSettingsCard.tsx');
+    const sectionSource = read('src/components/settings/sections/SystemSecuritySection.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['scheduled-tasks', 'overlap']");
+    expect(hookSource).toContain('list({ enabled: true, limit: 1 })');
+    expect(hookSource).not.toContain('list({ limit: 200 })');
+    expect(hookSource).not.toContain('listRuns');
+    expect(hookSource).not.toContain('getStatus');
+    expect(hookSource).not.toContain('.create(');
+    expect(hookSource).not.toContain('.enable(');
+    expect(hookSource).not.toContain('.disable(');
+    expect(hookSource).not.toContain('getSchedulerStatus');
+    expect(hookSource).not.toContain('runSchedulerNow');
+    expect(barrelSource).not.toContain('useScheduledTasksOverlapQuery');
+    expect(cardSource).toContain('useScheduledTasksOverlapQuery');
+    expect(cardSource).not.toContain('list({ enabled: true, limit: 1 })');
+    expect(sectionSource).toContain("lazy(() => import('../SchedulerSettingsCard'))");
+    expect(sectionSource).toContain('Suspense');
+    expect(sectionSource).not.toContain('useScheduledTasksOverlapQuery');
+    expect(settingsPageSource).not.toContain('useScheduledTasksOverlapQuery');
   });
 });

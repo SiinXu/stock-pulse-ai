@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings scheduler overlap probe GET through TanStack Query (Refs #789).
