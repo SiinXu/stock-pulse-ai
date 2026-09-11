@@ -500,4 +500,125 @@ describe('ScheduledTasksPanel', () => {
     expect(await screen.findByText(/refresh failed/i)).toBeInTheDocument();
     expect(screen.getByText('AAPL risk check')).toBeInTheDocument();
   });
+
+  it('keeps last-good history rows on HTTP error and retries with the last successful limit', async () => {
+    vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 1, items: [scheduledTask] });
+    vi.mocked(scheduledTasksApi.listRuns)
+      .mockResolvedValueOnce({ total: 1, items: [buildRun('run-1')] })
+      .mockRejectedValueOnce(
+        createParsedApiError({
+          title: 'Unavailable',
+          message: 'run history unavailable',
+          status: 500,
+          code: 'internal',
+          category: 'http_error',
+        }),
+      )
+      .mockResolvedValueOnce({ total: 1, items: [buildRun('run-1')] });
+
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
+
+    expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-1'));
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-1',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', {
+      name: 'Refresh run history for “AAPL risk check”',
+    }));
+    expect(await screen.findByText(/run history unavailable/i)).toBeInTheDocument();
+    expect(screen.getByTestId('settings-scheduled-task-run-run-1')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: UI_TEXT.en['common.retry'] }));
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenLastCalledWith(
+      'task-1',
+      { limit: 10 },
+    ));
+  }, HISTORY_FLOW_TIMEOUT_MS);
+
+  it('does not flash a history alert onto a newer generation after unmount', async () => {
+    const pending = createDeferred<{ total: number; items: ReturnType<typeof buildRun>[] }>();
+    vi.mocked(scheduledTasksApi.list).mockResolvedValue({ total: 1, items: [scheduledTask] });
+    vi.mocked(scheduledTasksApi.listRuns).mockReturnValueOnce(pending.promise);
+
+    const { unmount } = renderPanel(<ScheduledTasksPanel t={t} language="en" />);
+    expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-1'));
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenCalledWith(
+      'task-1',
+      { limit: 10 },
+    ));
+
+    unmount();
+    await act(async () => {
+      pending.reject(
+        createParsedApiError({
+          title: 'Unavailable',
+          message: 'run history unavailable',
+          status: 500,
+          code: 'internal',
+          category: 'http_error',
+        }),
+      );
+      await pending.promise.catch(() => undefined);
+    });
+    expect(screen.queryByText(/run history unavailable/i)).not.toBeInTheDocument();
+  }, HISTORY_FLOW_TIMEOUT_MS);
+
+  it('expanding a second task does not cancel the first task in-flight history GET', async () => {
+    const first = createDeferred<{ total: number; items: ReturnType<typeof buildRun>[] }>();
+    const second = createDeferred<{ total: number; items: ReturnType<typeof buildRun>[] }>();
+    const scheduledTaskTwo = {
+      ...scheduledTask,
+      id: 'task-2',
+      name: 'MSFT risk check',
+    };
+    vi.mocked(scheduledTasksApi.list).mockResolvedValue({
+      total: 2,
+      items: [scheduledTask, scheduledTaskTwo],
+    });
+    vi.mocked(scheduledTasksApi.listRuns).mockImplementation((taskId: string) => {
+      if (taskId === 'task-1') return first.promise;
+      if (taskId === 'task-2') return second.promise;
+      return Promise.resolve({ total: 0, items: [] });
+    });
+
+    renderPanel(<ScheduledTasksPanel t={t} language="en" />);
+    expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
+    expect(await screen.findByText('MSFT risk check')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-1'));
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenCalledWith(
+      'task-1',
+      { limit: 10 },
+    ));
+    fireEvent.click(screen.getByTestId('settings-scheduled-task-history-toggle-task-2'));
+    await waitFor(() => expect(scheduledTasksApi.listRuns).toHaveBeenCalledWith(
+      'task-2',
+      { limit: 10 },
+    ));
+
+    await act(async () => {
+      second.resolve({ total: 1, items: [buildRun('run-2', { taskId: 'task-2' })] });
+    });
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-2',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
+    expect(screen.queryByTestId('settings-scheduled-task-run-run-1')).not.toBeInTheDocument();
+
+    await act(async () => {
+      first.resolve({ total: 1, items: [buildRun('run-1')] });
+    });
+    expect(await screen.findByTestId(
+      'settings-scheduled-task-run-run-1',
+      undefined,
+      { timeout: HISTORY_ASSERT_TIMEOUT_MS },
+    )).toBeInTheDocument();
+    expect(screen.getByTestId('settings-scheduled-task-run-run-2')).toBeInTheDocument();
+  }, HISTORY_FLOW_TIMEOUT_MS);
 });

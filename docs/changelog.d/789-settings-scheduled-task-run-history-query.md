@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings scheduled-task run history GET through TanStack Query (Refs #789).
