@@ -10,11 +10,13 @@ import {
 } from '../../utils/configConditions';
 import { Collapsible, EmptyState } from '../common';
 import type { FieldGroupDescriptor } from './settingsFieldGroupDisclosure';
-// Import via the settings barrel so SettingsPage.testHarness mocks apply.
+import { SettingsLoading } from './SettingsLoading';
+// Import via the settings barrel so SettingsPage.testHarness mocks apply
+// for DataProvidersPanel / field helpers. NotificationChannelsPanel is a
+// lazy file import so the Query hook is not billed to frozen Settings gzip families.
 import {
   SettingsField,
   SettingsSectionCard,
-  NotificationChannelsPanel,
   DataProvidersPanel,
   isNotificationChannelKey,
 } from './index';
@@ -30,6 +32,7 @@ import type { SettingsSaveStatus } from './autosaveMachine';
 export type { FieldGroupDescriptor };
 
 const SettingsFieldGroups = lazy(() => import('./SettingsFieldGroupPanel'));
+const NotificationChannelsPanel = lazy(() => import('./NotificationChannelsPanel'));
 
 export type SettingsActiveConfigPanelProps = {
   panelKey: string;
@@ -158,29 +161,31 @@ const SettingsActiveConfigPanel: React.FC<SettingsActiveConfigPanelProps> = ({
   const content = (
     <>
       {isNotificationChannelsSub ? (
-        <NotificationChannelsPanel
-          items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
-          configuredChannels={configuredNotificationChannels}
-          disabled={isSaving}
-          onChange={setDraftValue}
-          issueByKey={issueByKey}
-          eventRoutes={notificationEventRoutes}
-          draftEventRoutes={draftNotificationEventRoutes}
-          hasPendingRoutes={hasPendingNotificationRoutes}
-          saveStatus={activeSaveStatus}
-          persistedValuesByKey={persistedValuesByKey}
-          configVersion={configVersion}
-          onBindEvents={(routingValue, kinds) => {
-            for (const update of buildNotificationEventBindingUpdates(
-              allValuesByKey,
-              routingValue,
-              kinds,
-            )) {
-              setDraftValue(update.key, update.value);
-            }
-          }}
-          maskToken={maskToken}
-        />
+        <Suspense fallback={<SettingsLoading />}>
+          <NotificationChannelsPanel
+            items={visibleActiveItems.filter((item) => isNotificationChannelKey(item.key))}
+            configuredChannels={configuredNotificationChannels}
+            disabled={isSaving}
+            onChange={setDraftValue}
+            issueByKey={issueByKey}
+            eventRoutes={notificationEventRoutes}
+            draftEventRoutes={draftNotificationEventRoutes}
+            hasPendingRoutes={hasPendingNotificationRoutes}
+            saveStatus={activeSaveStatus}
+            persistedValuesByKey={persistedValuesByKey}
+            configVersion={configVersion}
+            onBindEvents={(routingValue, kinds) => {
+              for (const update of buildNotificationEventBindingUpdates(
+                allValuesByKey,
+                routingValue,
+                kinds,
+              )) {
+                setDraftValue(update.key, update.value);
+              }
+            }}
+            maskToken={maskToken}
+          />
+        </Suspense>
       ) : isDataProvidersSub ? (
         <DataProvidersPanel
           items={subFilteredItems}
