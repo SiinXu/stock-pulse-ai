@@ -120,8 +120,8 @@ def test_bodies_no_longer_live_in_the_facade_class() -> None:
         assert name not in defined, name
 
 
-def test_per_symbol_lookup_stays_on_the_facade() -> None:
-    """``get_belong_board`` is a per-symbol lookup, not a market-wide aggregate."""
+def test_per_symbol_lookup_is_rebound_not_a_class_body() -> None:
+    """``get_belong_board`` is a per-symbol lookup rebound from ``efinance_parts.info``."""
 
     tree = ast.parse(FACADE_PATH.read_text(encoding="utf-8"))
     cls = next(
@@ -134,7 +134,12 @@ def test_per_symbol_lookup_stays_on_the_facade() -> None:
         for node in cls.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert "get_belong_board" in defined
+    assert "get_belong_board" not in defined
+    method = EfinanceFetcher.__dict__["get_belong_board"]
+    assert callable(method)
+    assert method.__module__ == "src.data_provider.efinance_fetcher"
+    assert method.__qualname__ == "EfinanceFetcher.get_belong_board"
+    assert method.__globals__ is vars(efinance_mod)
 
 
 def test_rate_limit_helpers_stay_on_the_facade() -> None:

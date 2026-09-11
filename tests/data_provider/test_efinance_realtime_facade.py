@@ -44,9 +44,7 @@ MOVED = ("get_realtime_quote",)
 # ``test_efinance_market_boards_facade`` now.
 # ``_fetch_raw_data``, ``_fetch_stock_data``, and ``_normalize_data`` moved
 # with the stock-path history slice into ``efinance_parts.history``.
-UNMOVED_FACADE_METHODS = (
-    "get_base_info",
-)
+# ``get_base_info`` moved with the info slice into ``efinance_parts.info``.
 
 
 def _descriptor_function(descriptor):
@@ -185,8 +183,6 @@ def test_bodies_no_longer_live_in_the_facade_class() -> None:
     }
     for name in MOVED:
         assert name not in defined, name
-    for name in UNMOVED_FACADE_METHODS:
-        assert name in defined, name
 
 
 def test_module_level_helpers_and_cache_stay_on_the_facade() -> None:
