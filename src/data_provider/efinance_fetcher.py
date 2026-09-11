@@ -354,214 +354,17 @@ class EfinanceFetcher(BaseFetcher):
         self.random_sleep(self.sleep_min, self.sleep_max)
         self._last_request_time = time.time()
     
-    @retry(
-        stop=stop_after_attempt(1),  # Reduce to 1 time, avoid triggering rate limits
-        wait=wait_exponential(multiplier=1, min=4, max=60),  # Maintain waiting time settings
-        retry=retry_if_exception_type((
-            ConnectionError,
-            TimeoutError,
-            requests.exceptions.RequestException,
-            requests.exceptions.ConnectionError,
-            requests.exceptions.ChunkedEncodingError
-        )),
-        before_sleep=safe_before_sleep_log(
-            logger,
-            logging.WARNING,
-            event="Efinance daily data retry scheduled",
-            error_code="efinance_daily_data_retry",
-        ),
-    )
-    def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """
-        从 efinance 获取原始数据
-        
-        根据代码类型自动选择 API：
-        - 美股：不支持，抛出异常让 DataFetcherManager 切换到其他数据源
-        - 普通股票：使用 ef.stock.get_quote_history()
-        - ETF 基金：使用 ef.stock.get_quote_history()（ETF 是交易所证券，使用股票 K 线接口）
-        
-        流程：
-        1. 判断代码类型（美股/股票/ETF）
-        2. 设置随机 User-Agent
-        3. 执行速率限制（随机休眠）
-        4. 调用对应的 efinance API
-        5. 处理返回数据
-        """
-        # U.S. Stocks are not supported, throwing an exception to switch DataFetcherManager to AkshareFetcher/YfinanceFetcher
-        if _is_us_code(stock_code):
-            raise DataFetchError(f"EfinanceFetcher 不支持美股 {stock_code}，请使用 AkshareFetcher 或 YfinanceFetcher")
+    # Rebound from efinance_parts.history after the class is built.
+    _fetch_raw_data = None
 
-        # The historical K-line interface for efinance may return unexpected market data on Hong Kong stock codes.
-        # Explicitly skip and pass to AkShare/Tushare/YFinance/Longbridge etc. Hong Kong stock paths as fallback.
-        if _is_hk_market(stock_code):
-            raise DataFetchError(f"EfinanceFetcher 不支持港股日线 {stock_code}，请使用 AkshareFetcher 或其他港股数据源")
-        
-        # Choose different retrieval methods based on code type:
-        if _is_etf_code(stock_code):
-            return self._fetch_etf_data(stock_code, start_date, end_date)
-        else:
-            return self._fetch_stock_data(stock_code, start_date, end_date)
-    
-    def _fetch_stock_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """
-        获取普通 A 股历史数据
-        
-        数据来源：ef.stock.get_quote_history()
-        
-        API 参数说明：
-        - stock_codes: 股票代码
-        - beg: 开始日期，格式 'YYYYMMDD'
-        - end: 结束日期，格式 'YYYYMMDD'
-        - klt: 周期，101=日线
-        - fqt: 复权方式，1=前复权
-        """
-        import efinance as ef
-        
-        # Anti-ban strategy 1: Random User-Agent
-        self._set_random_user_agent()
-        
-        # Anti-ban strategy 2: Forced sleep
-        self._enforce_rate_limit()
-        
-        # Format date (efinance uses YYYYMMDD format)
-        beg_date = start_date.replace('-', '')
-        end_date_fmt = end_date.replace('-', '')
-        
-        logger.info(f"[API调用] ef.stock.get_quote_history(stock_codes={stock_code}, "
-                   f"beg={beg_date}, end={end_date_fmt}, klt=101, fqt=1)")
-        
-        api_start = time.time()
-        try:
-            # Call efinance to get A-shares daily data
-            # klt=101 get daily line data
-            # fqt=1 get forward-adjusted
-            df = _ef_call_with_timeout(
-                ef.stock.get_quote_history,
-                stock_codes=stock_code,
-                beg=beg_date,
-                end=end_date_fmt,
-                klt=101,  # Daily line
-                fqt=1,    # forward-adjusted.
-                timeout=60,
-            )
-            
-            api_elapsed = time.time() - api_start
-            
-            # Record the data summary
-            if df is not None and not df.empty:
-                logger.info(
-                    "[API返回] Eastmoney 历史K线成功: "
-                    f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
-                    f"range={beg_date}~{end_date_fmt}, rows={len(df)}, elapsed={api_elapsed:.2f}s"
-                )
-                logger.info(f"[API返回] 列名: {list(df.columns)}")
-                if '日期' in df.columns:
-                    logger.info(f"[API返回] 日期范围: {df['日期'].iloc[0]} ~ {df['日期'].iloc[-1]}")
-                logger.debug(f"[API返回] 最新3条数据:\n{df.tail(3).to_string()}")
-            else:
-                logger.warning(
-                    "[API返回] Eastmoney 历史K线为空: "
-                    f"endpoint={EASTMONEY_HISTORY_ENDPOINT}, stock_code={stock_code}, "
-                    f"range={beg_date}~{end_date_fmt}, elapsed={api_elapsed:.2f}s"
-                )
-            
-            return df
-            
-        except Exception as e:
-            api_elapsed = time.time() - api_start
-            category, failure_message = self._build_history_failure_message(
-                stock_code=stock_code,
-                beg_date=beg_date,
-                end_date=end_date_fmt,
-                exc=e,
-                elapsed=api_elapsed,
-            )
+    _fetch_stock_data = None
 
-            if category == "rate_limit_or_anti_bot":
-                log_safe_exception(
-                    logger,
-                    "Efinance rate limit detected",
-                    e,
-                    error_code="efinance_rate_limit_detected",
-                    level=logging.WARNING,
-                    context={
-                        "symbol": stock_code,
-                        "endpoint": EASTMONEY_HISTORY_ENDPOINT,
-                        "category": category,
-                    },
-                )
-                raise RateLimitError(f"efinance 可能被限流: {failure_message}") from e
-
-            log_safe_exception(
-                logger,
-                "Efinance historical data fetch failed",
-                e,
-                error_code="efinance_history_fetch_failed",
-                level=logging.ERROR,
-                context={
-                    "symbol": stock_code,
-                    "endpoint": EASTMONEY_HISTORY_ENDPOINT,
-                    "category": category,
-                },
-            )
-            raise DataFetchError(f"efinance 获取数据失败: {failure_message}") from e
-    
     # Rebound from efinance_parts.etf after the class is built.
     _fetch_etf_data = None
-    
-    def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
-        """
-        标准化 efinance 数据
-        
-        efinance 返回的列名（中文）：
-        股票名称, 股票代码, 日期, 开盘, 收盘, 最高, 最低, 成交量, 成交额, 振幅, 涨跌幅, 涨跌额, 换手率
-        
-        需要映射到标准列名：
-        date, open, high, low, close, volume, amount, pct_chg
-        """
-        df = df.copy()
-        
-        # Column mapping (efinance Chinese column names -> standard English column names)
-        column_mapping = {
-            '日期': 'date',
-            '开盘': 'open',
-            '收盘': 'close',
-            '最高': 'high',
-            '最低': 'low',
-            '成交量': 'volume',
-            '成交额': 'amount',
-            '涨跌幅': 'pct_chg',
-            '股票代码': 'code',
-            '股票名称': 'name',
-        }
-        
-        # Rename column.
-        df = df.rename(columns=column_mapping)
-        
-        # Fallback: if OHLC columns are missing (e.g. very old data path), fill from close
-        if 'close' in df.columns and 'open' not in df.columns:
-            df['open'] = df['close']
-            df['high'] = df['close']
-            df['low'] = df['close']
-            
-        # Fill volume and amount if missing
-        if 'volume' not in df.columns:
-            df['volume'] = 0
-        if 'amount' not in df.columns:
-            df['amount'] = 0
 
-        
-        # If there is no 'code' column, manually add it
-        if 'code' not in df.columns:
-            df['code'] = stock_code
-        
-        # Keep only required columns.
-        keep_cols = ['code'] + STANDARD_COLUMNS
-        existing_cols = [col for col in keep_cols if col in df.columns]
-        df = df[existing_cols]
-        
-        return df
-    
+    # Rebound from efinance_parts.history after the class is built.
+    _normalize_data = None
+
     # Rebound from efinance_parts.realtime after the class is built.
     get_realtime_quote = None
 
@@ -796,26 +599,60 @@ if __name__ == "__main__":
 
 
 # Keep ``src.data_provider.efinance_fetcher.EfinanceFetcher`` as the ADR-006
-# compatibility facade while ``efinance_parts`` owns ETF, stock realtime, and
-# market board bodies.
+# compatibility facade while ``efinance_parts`` owns ETF, stock-path history,
+# stock realtime, and market board bodies.
 # Rebinding preserves method globals so existing patches against this module
 # continue to intercept moved implementations.
 from .efinance_parts import etf as _etf_module  # noqa: E402
+from .efinance_parts import history as _history_module  # noqa: E402
 from .efinance_parts import realtime as _realtime_module  # noqa: E402
 from .efinance_parts import market_boards as _market_boards_module  # noqa: E402
 from .efinance_parts.etf import _EtfMethods  # noqa: E402
+from .efinance_parts.history import _HistoryMethods  # noqa: E402
 from .efinance_parts.realtime import _RealtimeMethods  # noqa: E402
 from .efinance_parts.market_boards import _MarketBoardsMethods  # noqa: E402
 from .efinance_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
 
+def _apply_history_retry(name: str, bound):
+    """Re-apply the historical tenacity policy after facade cloning."""
+
+    if name != "_fetch_raw_data":
+        return bound
+    return retry(
+        stop=stop_after_attempt(1),  # Reduce to 1 time, avoid triggering rate limits
+        wait=wait_exponential(multiplier=1, min=4, max=60),  # Maintain waiting time settings
+        retry=retry_if_exception_type((
+            ConnectionError,
+            TimeoutError,
+            requests.exceptions.RequestException,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.ChunkedEncodingError
+        )),
+        before_sleep=safe_before_sleep_log(
+            logger,
+            logging.WARNING,
+            event="Efinance daily data retry scheduled",
+            error_code="efinance_daily_data_retry",
+        ),
+    )(bound)
+
+
 def _assemble_efinance_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _EtfMethods, _RealtimeMethods, _MarketBoardsMethods
+    global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods
     _EtfMethods = _etf_module._EtfMethods
+    _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
+    bind_methods_from_class(
+        _HistoryMethods,
+        EfinanceFetcher,
+        globals(),
+        expected_names=_history_module.EXPECTED_HISTORY_METHOD_NAMES,
+        post_bind=_apply_history_retry,
+    )
     bind_methods_from_class(
         _EtfMethods,
         EfinanceFetcher,
@@ -834,15 +671,38 @@ def _assemble_efinance_fetcher_facade() -> None:
         globals(),
         expected_names=_market_boards_module.EXPECTED_MARKET_BOARD_METHOD_NAMES,
     )
+    # Rebound methods are assigned after class body evaluation; clear ABC
+    # abstracts that are now implemented so instantiation matches the legacy
+    # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
+    abstracts = set(getattr(EfinanceFetcher, "__abstractmethods__", ()))
+    if abstracts:
+        abstracts.difference_update(
+            {
+                name
+                for name in (
+                    "_fetch_raw_data",
+                    "_normalize_data",
+                    "get_daily_data",
+                )
+                if callable(getattr(EfinanceFetcher, name, None))
+            }
+        )
+        abstracts = {
+            name
+            for name in abstracts
+            if name not in EfinanceFetcher.__dict__
+            or getattr(EfinanceFetcher.__dict__[name], "__isabstractmethod__", False)
+        }
+        EfinanceFetcher.__abstractmethods__ = frozenset(abstracts)
 
 
 _assemble_efinance_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind all three owner modules."""
+    """Keep an owner reload able to rebuild and rebind all four owner modules."""
 
-    for module in (_etf_module, _realtime_module, _market_boards_module):
+    for module in (_etf_module, _history_module, _realtime_module, _market_boards_module):
         module._FACADE_RELOAD_HOOK = _assemble_efinance_fetcher_facade  # type: ignore[attr-defined]
 
 

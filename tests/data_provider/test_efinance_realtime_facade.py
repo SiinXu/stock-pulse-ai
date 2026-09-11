@@ -42,10 +42,9 @@ MOVED = ("get_realtime_quote",)
 # ``efinance_parts.market_boards``, matching the domain that
 # ``akshare_parts.market_boards`` already owns. They are asserted from
 # ``test_efinance_market_boards_facade`` now.
+# ``_fetch_raw_data``, ``_fetch_stock_data``, and ``_normalize_data`` moved
+# with the stock-path history slice into ``efinance_parts.history``.
 UNMOVED_FACADE_METHODS = (
-    "_fetch_raw_data",
-    "_fetch_stock_data",
-    "_normalize_data",
     "get_base_info",
 )
 
