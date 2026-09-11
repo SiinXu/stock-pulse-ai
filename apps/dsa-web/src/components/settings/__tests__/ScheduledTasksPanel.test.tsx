@@ -456,6 +456,7 @@ describe('ScheduledTasksPanel', () => {
 
     expect(await screen.findByText('AAPL risk check')).toBeInTheDocument();
     expect(scheduledTasksApi.list).toHaveBeenCalledWith({ limit: 200 });
+    await waitFor(() => expect(scheduledTasksApi.getStatus).toHaveBeenCalledWith('task-1'));
     expect(screen.getByTestId('settings-scheduled-tasks-create')).toBeDisabled();
     expect(screen.getByRole('button', { name: UI_TEXT.en['settings.scheduledTasksRefresh'] })).toBeDisabled();
     expect(screen.getByRole('switch', { name: /Enable or disable AAPL risk check/i })).toBeDisabled();
@@ -499,6 +500,7 @@ describe('ScheduledTasksPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: UI_TEXT.en['settings.scheduledTasksRefresh'] }));
     expect(await screen.findByText(/refresh failed/i)).toBeInTheDocument();
     expect(screen.getByText('AAPL risk check')).toBeInTheDocument();
+    expect(scheduledTasksApi.getStatus).toHaveBeenCalledTimes(1);
   });
 
   it('keeps last-good history rows on HTTP error and retries with the last successful limit', async () => {

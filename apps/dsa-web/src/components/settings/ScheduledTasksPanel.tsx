@@ -5,6 +5,7 @@ import type React from 'react';
 import { Plus, RefreshCw } from 'lucide-react';
 import { getParsedApiError, type ParsedApiError } from '../../api/error';
 import { scheduledTasksApi } from '../../api/scheduledTasks';
+import { useScheduledTaskLatestRunsQuery } from '../../hooks/useScheduledTaskLatestRunsQuery';
 import { useScheduledTasksListQuery } from '../../hooks/useScheduledTasksListQuery';
 import type {
   ScheduledTaskCalendarMarket,
@@ -12,7 +13,6 @@ import type {
   ScheduledTaskDefinitionSummary,
   ScheduledTaskNonTradingDayPolicy,
   ScheduledTaskReportType,
-  ScheduledTaskRunItem,
   ScheduledTaskRunStatus,
   ScheduledTaskSupportedType,
   ScheduledTaskType,
@@ -214,7 +214,6 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
   const timeFieldId = useId();
   const timezoneFieldId = useId();
   const maxAttemptsFieldId = useId();
-  const statusRequestSeq = useRef(0);
   const didInitialFanout = useRef(false);
 
   const {
@@ -225,7 +224,11 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
     load,
     setItems,
   } = useScheduledTasksListQuery();
-  const [latestRuns, setLatestRuns] = useState<Record<string, ScheduledTaskRunItem | null>>({});
+  const {
+    latestRuns,
+    loadLatestRuns,
+    refreshLatestRun,
+  } = useScheduledTaskLatestRunsQuery();
   const [actionError, setActionError] = useState<ParsedApiError | null>(null);
   const [actionSuccess, setActionSuccess] = useState('');
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -260,37 +263,6 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
     { value: 'skip', label: t('settings.scheduledTasksPolicySkip') },
     { value: 'run', label: t('settings.scheduledTasksPolicyRun') },
   ]), [t]);
-
-  const loadLatestRuns = useCallback(async (definitions: ScheduledTaskDefinitionSummary[]) => {
-    const requestId = statusRequestSeq.current + 1;
-    statusRequestSeq.current = requestId;
-
-    if (definitions.length === 0) {
-      if (statusRequestSeq.current === requestId) {
-        setLatestRuns({});
-      }
-      return;
-    }
-
-    const results = await Promise.allSettled(
-      definitions.map(async (task) => {
-        const status = await scheduledTasksApi.getStatus(task.id);
-        return [task.id, status.latestRun] as const;
-      }),
-    );
-    if (statusRequestSeq.current !== requestId) {
-      return;
-    }
-
-    const next: Record<string, ScheduledTaskRunItem | null> = {};
-    for (const result of results) {
-      if (result.status === 'fulfilled') {
-        const [taskId, latestRun] = result.value;
-        next[taskId] = latestRun;
-      }
-    }
-    setLatestRuns(next);
-  }, []);
 
   const loadTasks = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     setActionError(null);
@@ -378,14 +350,7 @@ const ScheduledTasksPanel: React.FC<ScheduledTasksPanelProps> = ({
           ? t('settings.scheduledTasksEnabledSuccess', { name: task.name })
           : t('settings.scheduledTasksDisabledSuccess', { name: task.name }),
       );
-      void scheduledTasksApi.getStatus(task.id).then((status) => {
-        setLatestRuns((current) => ({
-          ...current,
-          [task.id]: status.latestRun,
-        }));
-      }).catch(() => {
-        // Fail-soft: list and enable/disable remain authoritative.
-      });
+      void refreshLatestRun(task.id);
     } catch (error: unknown) {
       setActionError(getParsedApiError(error));
     } finally {

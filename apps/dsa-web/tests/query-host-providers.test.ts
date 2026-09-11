@@ -540,6 +540,13 @@ describe('Query consumer hosts', () => {
     expect(read('src/components/settings/__tests__/SchedulerSettingsCard.test.tsx')).toContain('QueryClientProvider');
   });
 
+  it('wraps Settings scheduled-task getStatus fan-out tests with the production retry-free client', () => {
+    expect(read('src/hooks/__tests__/useScheduledTaskLatestRunsQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useScheduledTaskLatestRunsQuery.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/components/settings/__tests__/ScheduledTasksPanel.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/ScheduledTasksPanel.test.tsx')).toContain('QueryClientProvider');
+  });
+
   it('keeps Settings scheduler overlap probe on an imperative fetchQuery recipe without a barrel export', () => {
     const hookSource = read('src/hooks/useScheduledTasksOverlapQuery.ts');
     const barrelSource = read('src/hooks/index.ts');
@@ -567,5 +574,40 @@ describe('Query consumer hosts', () => {
     expect(sectionSource).toContain('Suspense');
     expect(sectionSource).not.toContain('useScheduledTasksOverlapQuery');
     expect(settingsPageSource).not.toContain('useScheduledTasksOverlapQuery');
+  });
+
+  it('keeps Settings scheduled-task getStatus fan-out on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useScheduledTaskLatestRunsQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/ScheduledTasksPanel.tsx');
+    const sectionSource = read('src/components/settings/sections/SystemSecuritySection.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const historySource = read('src/components/settings/ScheduledTaskRunHistory.tsx');
+    const cardSource = read('src/components/settings/SchedulerSettingsCard.tsx');
+    const editorSource = read('src/components/settings/LLMChannelEditor.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['scheduled-tasks', 'latest-runs']");
+    expect(hookSource).toContain('getStatus');
+    expect(hookSource).toContain('allSettled');
+    expect(hookSource).not.toContain('list({ limit: 200 })');
+    expect(hookSource).not.toContain('list({ enabled: true, limit: 1 })');
+    expect(hookSource).not.toContain('listRuns');
+    expect(hookSource).not.toContain('.create(');
+    expect(hookSource).not.toContain('.enable(');
+    expect(hookSource).not.toContain('.disable(');
+    expect(hookSource).not.toContain('getSchedulerStatus');
+    expect(barrelSource).not.toContain('useScheduledTaskLatestRunsQuery');
+    expect(panelSource).toContain('useScheduledTaskLatestRunsQuery');
+    expect(panelSource).not.toContain('scheduledTasksApi.getStatus');
+    expect(sectionSource).toContain("lazy(() => import('../ScheduledTasksPanel'))");
+    expect(sectionSource).toContain('Suspense');
+    expect(sectionSource).not.toContain('useScheduledTaskLatestRunsQuery');
+    expect(settingsPageSource).not.toContain('useScheduledTaskLatestRunsQuery');
+    expect(historySource).not.toContain('useScheduledTaskLatestRunsQuery');
+    expect(cardSource).not.toContain('useScheduledTaskLatestRunsQuery');
+    expect(editorSource).toContain('getGenerationBackendStatus()');
   });
 });
