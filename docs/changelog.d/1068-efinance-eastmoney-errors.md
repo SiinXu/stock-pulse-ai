@@ -1,0 +1,1 @@
+- [Changed] Move efinance Eastmoney request-failure classifier (`_classify_eastmoney_error`) into `src/data_provider/efinance_parts/eastmoney_errors.py` behind the ADR-006 facade, keeping the `src.data_provider.efinance_fetcher._classify_eastmoney_error` patch target, signature, keyword categories, and `requests` exception lookup unchanged (Refs #1068).
