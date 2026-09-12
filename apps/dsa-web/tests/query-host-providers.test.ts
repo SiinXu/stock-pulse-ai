@@ -433,6 +433,8 @@ describe('Query consumer hosts', () => {
     expect(read('src/components/settings/__tests__/IntelligenceSourcesPanel.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useIntelligenceSourcesQuery.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/hooks/__tests__/useIntelligenceSourcesQuery.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useIntelligenceItemsQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useIntelligenceItemsQuery.test.tsx')).toContain('QueryClientProvider');
   });
 
   it('keeps Settings intelligence sources list GET and templates list GET on an imperative fetchQuery recipe without a barrel export', () => {
@@ -459,6 +461,41 @@ describe('Query consumer hosts', () => {
     expect(settingsPageSource).toContain('Suspense');
     expect(settingsPageSource).not.toContain('useIntelligenceSourcesQuery');
     expect(settingsBarrelSource).not.toContain('IntelligenceSourcesPanel');
+  });
+
+  it('keeps Settings intelligence items list GET on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useIntelligenceItemsQuery.ts');
+    const sourcesHookSource = read('src/hooks/useIntelligenceSourcesQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/IntelligenceSourcesPanel.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const settingsBarrelSource = read('src/components/settings/index.ts');
+    const editorSource = read('src/components/settings/LLMChannelEditor.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['intelligence', 'items', 'list']");
+    expect(hookSource).toContain('listItems');
+    expect(hookSource).toContain('pageSize: 20');
+    expect(hookSource).not.toContain('listSources');
+    expect(hookSource).not.toContain('listTemplates');
+    expect(hookSource).not.toContain('createSource');
+    expect(hookSource).not.toContain('testSource');
+    expect(hookSource).not.toContain('fetchSource');
+    expect(hookSource).not.toContain('fetchEnabledSources');
+    expect(hookSource).not.toContain('createDefaultSources');
+    expect(hookSource).not.toContain('getParsedApiError');
+    expect(sourcesHookSource).not.toContain('listItems');
+    expect(barrelSource).not.toContain('useIntelligenceItemsQuery');
+    expect(panelSource).toContain('useIntelligenceItemsQuery');
+    expect(panelSource).not.toContain('intelligenceApi.listItems');
+    expect(settingsPageSource).toContain("lazy(() => import('../components/settings/IntelligenceSourcesPanel'))");
+    expect(settingsPageSource).toContain('Suspense');
+    expect(settingsPageSource).not.toContain('useIntelligenceItemsQuery');
+    expect(settingsBarrelSource).not.toContain('IntelligenceSourcesPanel');
+    expect(settingsBarrelSource).not.toContain('useIntelligenceItemsQuery');
+    expect(editorSource).toContain('getGenerationBackendStatus()');
   });
 
   it('wraps NotificationChannelsPanel tests with the production retry-free client', () => {
