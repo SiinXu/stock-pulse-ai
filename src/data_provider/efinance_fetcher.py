@@ -190,27 +190,8 @@ def _is_us_code(stock_code: str) -> bool:
     return bool(re.match(r'^[A-Z]{1,5}(\.[A-Z])?$', code))
 
 
-def _ef_call_with_timeout(func, *args, timeout=None, **kwargs):
-    """Run an efinance library call in a thread with a timeout.
-
-    efinance internally uses requests/urllib3 with no timeout, so when
-    eastmoney hosts are unreachable the call can hang for many minutes.
-    This helper caps the *calling thread's* wait time.  Note: Python threads
-    cannot be forcibly killed, so the worker thread may continue running in
-    the background until the OS-level TCP timeout fires or the process exits.
-    This is acceptable — the calling thread returns promptly on timeout.
-    """
-    if timeout is None:
-        timeout = _EF_CALL_TIMEOUT
-    # Do NOT use 'with ThreadPoolExecutor(...)' here: the context manager calls
-    # shutdown(wait=True) on __exit__, which would re-block on the hung thread.
-    executor = ThreadPoolExecutor(max_workers=1)
-    try:
-        future = executor.submit(func, *args, **kwargs)
-        return future.result(timeout=timeout)
-    finally:
-        # wait=False: calling thread returns immediately; worker cleans up later
-        executor.shutdown(wait=False)
+# Rebound from efinance_parts.timeout_client after the module is assembled.
+_ef_call_with_timeout = None
 
 
 def _classify_eastmoney_error(exc: Exception) -> Tuple[str, str]:
@@ -410,22 +391,37 @@ if __name__ == "__main__":
 
 # Keep ``src.data_provider.efinance_fetcher.EfinanceFetcher`` as the ADR-006
 # compatibility facade while ``efinance_parts`` owns ETF, stock-path history,
-# stock realtime, market board, per-symbol info, and rate-limit helper bodies.
-# Rebinding preserves method globals so existing patches against this module
-# continue to intercept moved implementations.
+# stock realtime, market board, per-symbol info, rate-limit helper, and
+# timeout-client bodies. Rebinding preserves method globals so existing
+# patches against this module continue to intercept moved implementations.
 from .efinance_parts import etf as _etf_module  # noqa: E402
 from .efinance_parts import history as _history_module  # noqa: E402
 from .efinance_parts import realtime as _realtime_module  # noqa: E402
 from .efinance_parts import market_boards as _market_boards_module  # noqa: E402
 from .efinance_parts import info as _info_module  # noqa: E402
 from .efinance_parts import rate_limit as _rate_limit_module  # noqa: E402
+from .efinance_parts import timeout_client as _timeout_client_module  # noqa: E402
 from .efinance_parts.etf import _EtfMethods  # noqa: E402
 from .efinance_parts.history import _HistoryMethods  # noqa: E402
 from .efinance_parts.realtime import _RealtimeMethods  # noqa: E402
 from .efinance_parts.market_boards import _MarketBoardsMethods  # noqa: E402
 from .efinance_parts.info import _InfoMethods  # noqa: E402
 from .efinance_parts.rate_limit import _RateLimitMethods  # noqa: E402
-from .efinance_parts.facade_bind import bind_methods_from_class  # noqa: E402
+from .efinance_parts.facade_bind import (  # noqa: E402
+    _clone_facade_function,
+    bind_methods_from_class,
+)
+
+
+def _bind_timeout_client_facade() -> None:
+    """Clone the timeout helper so patches on this module intercept it."""
+
+    global _ef_call_with_timeout
+    _ef_call_with_timeout = _clone_facade_function(
+        _timeout_client_module._ef_call_with_timeout,
+        globals(),
+        qualname="_ef_call_with_timeout",
+    )
 
 
 def _apply_history_retry(name: str, bound):
@@ -456,6 +452,7 @@ def _assemble_efinance_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
     global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods, _InfoMethods, _RateLimitMethods
+    _bind_timeout_client_facade()
     _EtfMethods = _etf_module._EtfMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
@@ -528,9 +525,10 @@ _assemble_efinance_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind all six owner modules."""
+    """Keep an owner reload able to rebuild and rebind all seven owner modules."""
 
     for module in (
+        _timeout_client_module,
         _etf_module,
         _history_module,
         _realtime_module,

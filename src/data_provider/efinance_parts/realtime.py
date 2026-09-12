@@ -5,10 +5,10 @@ Method bodies are rebound onto ``EfinanceFetcher`` by the compatibility facade
 (ADR-006) so free-name lookups and test patches stay on
 ``src.data_provider.efinance_fetcher``.
 
-No module-level helper moves with this slice. ``_realtime_cache`` and the
-timeout / circuit-breaker helpers stay on the facade so ``get_market_stats``
-and the moved quote path share the same objects. ETF codes still dispatch
-through ``self._get_etf_realtime_quote``.
+No module-level helper moves with this slice. The timeout helper remains
+reachable through facade globals; ``_realtime_cache`` still stays on the
+facade so ``get_market_stats`` and the moved quote path share the same
+objects. ETF codes still dispatch through ``self._get_etf_realtime_quote``.
 """
 
 from __future__ import annotations

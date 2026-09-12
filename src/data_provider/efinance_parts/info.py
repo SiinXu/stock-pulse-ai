@@ -6,8 +6,8 @@ Method bodies are rebound onto ``EfinanceFetcher`` by the compatibility facade
 ``src.data_provider.efinance_fetcher``.
 
 UA/rate-limit helpers remain reachable through ``self`` after rebind.
-Module-level timeout helpers stay on the facade so already-extracted
-owners keep resolving them from facade globals.
+The timeout helper is no longer a live facade ``FunctionDef``; it remains
+reachable through facade globals after clone.
 """
 
 from __future__ import annotations
