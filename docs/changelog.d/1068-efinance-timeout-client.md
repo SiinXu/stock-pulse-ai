@@ -1,0 +1,1 @@
+- [Changed] Move efinance bounded-wait SDK wrapper (`_ef_call_with_timeout`) into `src/data_provider/efinance_parts/timeout_client.py` behind the ADR-006 facade, keeping the `src.data_provider.efinance_fetcher._ef_call_with_timeout` patch target, signature, thread/`shutdown(wait=False)` contract, and `EFINANCE_CALL_TIMEOUT` default lookup unchanged (Refs #1068).

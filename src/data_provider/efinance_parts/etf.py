@@ -6,9 +6,9 @@ Method bodies are rebound onto ``EfinanceFetcher`` by the compatibility facade
 ``src.data_provider.efinance_fetcher``.
 
 No module-level helper moves with this slice. The rebind resolves free names
-from the facade globals at call time, so ``_ef_call_with_timeout`` (7 call
-sites on the stock path against 2 here), ``_build_eastmoney_etf_secid``, and
-``_is_etf_code`` all stay where they are.
+from the facade globals at call time, so ``_ef_call_with_timeout`` remains a
+facade-global clone rather than a body owned by ``etf.py``, while
+``_build_eastmoney_etf_secid`` and ``_is_etf_code`` stay on the facade.
 """
 
 from __future__ import annotations

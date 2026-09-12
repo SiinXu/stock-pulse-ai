@@ -13,5 +13,6 @@ Owned domains:
 - ``history`` — stock-path daily fetch/normalize methods
 - ``info`` — per-symbol base info, belong-board, and enhanced-data orchestration
 - ``rate_limit`` — UA rotation, request pacing, and history-failure formatting
+- ``timeout_client`` — bounded-wait SDK wrapper (``_ef_call_with_timeout``)
 - ``facade_bind`` — ADR-006 clone/bind helpers
 """
