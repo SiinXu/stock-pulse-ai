@@ -28,7 +28,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List
 
 import pandas as pd
 import requests  # Use requests to capture exceptions
@@ -193,50 +193,8 @@ def _is_us_code(stock_code: str) -> bool:
 # Rebound from efinance_parts.timeout_client after the module is assembled.
 _ef_call_with_timeout = None
 
-
-def _classify_eastmoney_error(exc: Exception) -> Tuple[str, str]:
-    """
-    Classify Eastmoney request failures into stable log categories.
-    """
-    message = str(exc).strip()
-    lowered = message.lower()
-
-    remote_disconnect_keywords = (
-        'remotedisconnected',
-        'remote end closed connection without response',
-        'connection aborted',
-        'connection broken',
-        'protocolerror',
-    )
-    timeout_keywords = (
-        'timeout',
-        'timed out',
-        'readtimeout',
-        'connecttimeout',
-    )
-    rate_limit_keywords = (
-        'banned',
-        'blocked',
-        '频率',
-        'rate limit',
-        'too many requests',
-        '429',
-        '限制',
-        'forbidden',
-        '403',
-    )
-
-    if any(keyword in lowered for keyword in remote_disconnect_keywords):
-        return "remote_disconnect", message
-    if isinstance(exc, (TimeoutError, requests.exceptions.Timeout)) or any(
-        keyword in lowered for keyword in timeout_keywords
-    ):
-        return "timeout", message
-    if any(keyword in lowered for keyword in rate_limit_keywords):
-        return "rate_limit_or_anti_bot", message
-    if isinstance(exc, requests.exceptions.RequestException):
-        return "request_error", message
-    return "unknown_request_error", message
+# Rebound from efinance_parts.eastmoney_errors after the module is assembled.
+_classify_eastmoney_error = None
 
 
 class EfinanceFetcher(BaseFetcher):
@@ -391,9 +349,10 @@ if __name__ == "__main__":
 
 # Keep ``src.data_provider.efinance_fetcher.EfinanceFetcher`` as the ADR-006
 # compatibility facade while ``efinance_parts`` owns ETF, stock-path history,
-# stock realtime, market board, per-symbol info, rate-limit helper, and
-# timeout-client bodies. Rebinding preserves method globals so existing
-# patches against this module continue to intercept moved implementations.
+# stock realtime, market board, per-symbol info, rate-limit helper,
+# timeout-client, and Eastmoney error-classifier bodies. Rebinding preserves
+# method globals so existing patches against this module continue to intercept
+# moved implementations.
 from .efinance_parts import etf as _etf_module  # noqa: E402
 from .efinance_parts import history as _history_module  # noqa: E402
 from .efinance_parts import realtime as _realtime_module  # noqa: E402
@@ -401,6 +360,7 @@ from .efinance_parts import market_boards as _market_boards_module  # noqa: E402
 from .efinance_parts import info as _info_module  # noqa: E402
 from .efinance_parts import rate_limit as _rate_limit_module  # noqa: E402
 from .efinance_parts import timeout_client as _timeout_client_module  # noqa: E402
+from .efinance_parts import eastmoney_errors as _eastmoney_errors_module  # noqa: E402
 from .efinance_parts.etf import _EtfMethods  # noqa: E402
 from .efinance_parts.history import _HistoryMethods  # noqa: E402
 from .efinance_parts.realtime import _RealtimeMethods  # noqa: E402
@@ -421,6 +381,17 @@ def _bind_timeout_client_facade() -> None:
         _timeout_client_module._ef_call_with_timeout,
         globals(),
         qualname="_ef_call_with_timeout",
+    )
+
+
+def _bind_eastmoney_errors_facade() -> None:
+    """Clone the Eastmoney classifier so patches on this module intercept it."""
+
+    global _classify_eastmoney_error
+    _classify_eastmoney_error = _clone_facade_function(
+        _eastmoney_errors_module._classify_eastmoney_error,
+        globals(),
+        qualname="_classify_eastmoney_error",
     )
 
 
@@ -453,6 +424,7 @@ def _assemble_efinance_fetcher_facade() -> None:
 
     global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods, _InfoMethods, _RateLimitMethods
     _bind_timeout_client_facade()
+    _bind_eastmoney_errors_facade()
     _EtfMethods = _etf_module._EtfMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
@@ -525,10 +497,11 @@ _assemble_efinance_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind all seven owner modules."""
+    """Keep an owner reload able to rebuild and rebind all eight owner modules."""
 
     for module in (
         _timeout_client_module,
+        _eastmoney_errors_module,
         _etf_module,
         _history_module,
         _realtime_module,

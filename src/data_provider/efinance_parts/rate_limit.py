@@ -7,8 +7,9 @@ Method bodies are rebound onto ``EfinanceFetcher`` by the compatibility facade
 stays a ``staticmethod``; ``_set_random_user_agent`` keeps the choose-and-log
 contract and does not write request headers.
 
-The timeout helper remains reachable through facade globals after clone;
-code classifiers and ``USER_AGENTS`` still stay on the facade.
+The timeout helper and error classifier remain reachable through facade
+globals after clone; code classifiers and ``USER_AGENTS`` still stay on
+the facade.
 """
 
 from __future__ import annotations

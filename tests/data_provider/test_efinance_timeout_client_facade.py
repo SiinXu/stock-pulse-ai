@@ -30,7 +30,6 @@ UNMOVED_MODULE_FUNCTIONS = (
     "_is_etf_code",
     "_build_eastmoney_etf_secid",
     "_is_us_code",
-    "_classify_eastmoney_error",
 )
 
 
