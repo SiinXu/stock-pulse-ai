@@ -1,6 +1,6 @@
 // Copyright (c) 2026 SiinXu / StockPulse contributors
 // SPDX-License-Identifier: AGPL-3.0-only
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useUiLanguage } from '../../contexts/UiLanguageContext';
 import { SETTINGS_INTELLIGENCE_TEXT } from '../../locales/settingsIntelligence';
@@ -11,6 +11,10 @@ import {
   type IntelligenceSource,
   type IntelligenceSourceTemplate,
 } from '../../api/intelligence';
+import {
+  isIntelligenceItemsCancelledError,
+  useIntelligenceItemsQuery,
+} from '../../hooks/useIntelligenceItemsQuery';
 import {
   isIntelligenceSourcesCancelledError,
   useIntelligenceSourcesQuery,
@@ -69,6 +73,8 @@ export function IntelligenceSourcesPanel() {
   const [actionError, setActionError] = useState<ParsedApiError | null>(null);
 
   const { loadSources, loadTemplates } = useIntelligenceSourcesQuery();
+  const { loadItems } = useIntelligenceItemsQuery();
+  const itemsRequestIdRef = useRef(0);
 
   const load = useCallback(async () => {
     setPhase('loading');
@@ -197,17 +203,24 @@ export function IntelligenceSourcesPanel() {
   }, [runAction, text]);
 
   const handleLoadItems = useCallback(async () => {
+    const requestId = itemsRequestIdRef.current + 1;
+    itemsRequestIdRef.current = requestId;
     setBusy('items');
     setActionError(null);
     try {
-      const result = await intelligenceApi.listItems({ pageSize: 20 });
+      const result = await loadItems();
+      if (itemsRequestIdRef.current !== requestId) return;
       setItems(result.items);
     } catch (error: unknown) {
+      if (isIntelligenceItemsCancelledError(error)) return;
+      if (itemsRequestIdRef.current !== requestId) return;
       setActionError(getParsedApiError(error, language));
     } finally {
-      setBusy(null);
+      if (itemsRequestIdRef.current === requestId) {
+        setBusy(null);
+      }
     }
-  }, [language]);
+  }, [language, loadItems]);
 
   if (phase === 'loading') {
     return <StatePanel state="loading" title={text.loading} />;

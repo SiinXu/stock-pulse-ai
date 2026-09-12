@@ -1,0 +1,1 @@
+- [Changed] Schedule the Settings intelligence items list GET through TanStack Query (Refs #789).
