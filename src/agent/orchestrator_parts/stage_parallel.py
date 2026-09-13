@@ -528,6 +528,20 @@ def maybe_run_technical_intel_wave(
     technical_ok = technical_result.status == StageStatus.COMPLETED
     intel_ok = intel_result.status == StageStatus.COMPLETED
     commit_intel = technical_ok and intel_ok
+    # User/API cancel outranks commit. Probe the original cancelled_check, not
+    # cancel_event: technical failure already sets cancel_event so siblings
+    # stop, and that path must stay fail-fast unless the user probe is also true.
+    user_cancelled = cancelled_check is not None and cancelled_check()
+    if user_cancelled:
+        cancel_event.set()
+
+    if user_cancelled and technical_ok:
+        _record_stage_outputs(stats, all_tool_calls, models_used, technical_result)
+        _record_stage_outputs(stats, all_tool_calls, models_used, intel_result)
+        _emit_wave_dones(progress_callback, results)
+        return orchestrator._build_cancelled_result(
+            stats, all_tool_calls, models_used, time.time() - t0, ctx=ctx,
+        )
 
     if technical_ok:
         technical_ctx = staged.get("technical")
@@ -565,7 +579,7 @@ def maybe_run_technical_intel_wave(
     _record_stage_outputs(stats, all_tool_calls, models_used, intel_result)
     _emit_wave_dones(progress_callback, results)
 
-    if cancelled_check is not None and cancelled_check():
+    if user_cancelled:
         return orchestrator._build_cancelled_result(
             stats, all_tool_calls, models_used, time.time() - t0, ctx=ctx,
         )
