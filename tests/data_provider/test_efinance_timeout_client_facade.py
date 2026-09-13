@@ -26,11 +26,7 @@ FACADE_PATH = REPO_ROOT / "src" / "data_provider" / "efinance_fetcher.py"
 OWNER_PATH = REPO_ROOT / "src" / "data_provider" / "efinance_parts" / "timeout_client.py"
 
 MOVED = ("_ef_call_with_timeout",)
-UNMOVED_MODULE_FUNCTIONS = (
-    "_is_etf_code",
-    "_build_eastmoney_etf_secid",
-    "_is_us_code",
-)
+UNMOVED_MODULE_FUNCTIONS = ()
 
 
 def _facade_class_methods() -> set:

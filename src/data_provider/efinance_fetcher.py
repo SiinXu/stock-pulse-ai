@@ -148,46 +148,12 @@ _etf_realtime_cache: Dict[str, Any] = {
 _ETF_SH_PREFIXES = ('51', '52', '56', '58')
 _ETF_SZ_PREFIXES = ('15', '16', '18')
 
+# Rebound from efinance_parts.symbols after the module is assembled.
+_is_etf_code = None
 
-def _is_etf_code(stock_code: str) -> bool:
-    """
-    判断代码是否为 ETF 基金
-    
-    ETF 代码规则：
-    - 上交所 ETF: 51xxxx, 52xxxx, 56xxxx, 58xxxx
-    - 深交所 ETF: 15xxxx, 16xxxx, 18xxxx
-    
-    Args:
-        stock_code: 股票/基金代码
-        
-    Returns:
-        True 表示是 ETF 代码，False 表示是普通股票代码
-    """
-    return _is_a_share_etf_code(stock_code)
+_build_eastmoney_etf_secid = None
 
-
-def _build_eastmoney_etf_secid(stock_code: str) -> str:
-    """Build Eastmoney secid for A-share ETF historical K-line queries."""
-    code = normalize_stock_code(stock_code)
-    if not _is_etf_code(code):
-        raise DataFetchError(f"无法识别 ETF 代码 {stock_code}")
-    if code.startswith(_ETF_SH_PREFIXES):
-        return f"1.{code}"
-    if code.startswith(_ETF_SZ_PREFIXES):
-        return f"0.{code}"
-    raise DataFetchError(f"无法确定 ETF {stock_code} 的 Eastmoney 市场前缀")
-
-
-def _is_us_code(stock_code: str) -> bool:
-    """
-    判断代码是否为美股
-    
-    美股代码规则：
-    - 1-5个大写字母，如 'AAPL', 'TSLA'
-    - 可能包含 '.'，如 'BRK.B'
-    """
-    code = stock_code.strip().upper()
-    return bool(re.match(r'^[A-Z]{1,5}(\.[A-Z])?$', code))
+_is_us_code = None
 
 
 # Rebound from efinance_parts.timeout_client after the module is assembled.
@@ -350,9 +316,9 @@ if __name__ == "__main__":
 # Keep ``src.data_provider.efinance_fetcher.EfinanceFetcher`` as the ADR-006
 # compatibility facade while ``efinance_parts`` owns ETF, stock-path history,
 # stock realtime, market board, per-symbol info, rate-limit helper,
-# timeout-client, and Eastmoney error-classifier bodies. Rebinding preserves
-# method globals so existing patches against this module continue to intercept
-# moved implementations.
+# timeout-client, Eastmoney error-classifier, and symbol-classifier bodies.
+# Rebinding preserves method globals so existing patches against this module
+# continue to intercept moved implementations.
 from .efinance_parts import etf as _etf_module  # noqa: E402
 from .efinance_parts import history as _history_module  # noqa: E402
 from .efinance_parts import realtime as _realtime_module  # noqa: E402
@@ -361,6 +327,7 @@ from .efinance_parts import info as _info_module  # noqa: E402
 from .efinance_parts import rate_limit as _rate_limit_module  # noqa: E402
 from .efinance_parts import timeout_client as _timeout_client_module  # noqa: E402
 from .efinance_parts import eastmoney_errors as _eastmoney_errors_module  # noqa: E402
+from .efinance_parts import symbols as _symbols_module  # noqa: E402
 from .efinance_parts.etf import _EtfMethods  # noqa: E402
 from .efinance_parts.history import _HistoryMethods  # noqa: E402
 from .efinance_parts.realtime import _RealtimeMethods  # noqa: E402
@@ -395,6 +362,27 @@ def _bind_eastmoney_errors_facade() -> None:
     )
 
 
+def _bind_symbols_facade() -> None:
+    """Clone the symbol classifiers so patches on this module intercept them."""
+
+    global _is_etf_code, _build_eastmoney_etf_secid, _is_us_code
+    _is_etf_code = _clone_facade_function(
+        _symbols_module._is_etf_code,
+        globals(),
+        qualname="_is_etf_code",
+    )
+    _build_eastmoney_etf_secid = _clone_facade_function(
+        _symbols_module._build_eastmoney_etf_secid,
+        globals(),
+        qualname="_build_eastmoney_etf_secid",
+    )
+    _is_us_code = _clone_facade_function(
+        _symbols_module._is_us_code,
+        globals(),
+        qualname="_is_us_code",
+    )
+
+
 def _apply_history_retry(name: str, bound):
     """Re-apply the historical tenacity policy after facade cloning."""
 
@@ -425,6 +413,7 @@ def _assemble_efinance_fetcher_facade() -> None:
     global _EtfMethods, _HistoryMethods, _RealtimeMethods, _MarketBoardsMethods, _InfoMethods, _RateLimitMethods
     _bind_timeout_client_facade()
     _bind_eastmoney_errors_facade()
+    _bind_symbols_facade()
     _EtfMethods = _etf_module._EtfMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
@@ -497,11 +486,12 @@ _assemble_efinance_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind all eight owner modules."""
+    """Keep an owner reload able to rebuild and rebind all nine owner modules."""
 
     for module in (
         _timeout_client_module,
         _eastmoney_errors_module,
+        _symbols_module,
         _etf_module,
         _history_module,
         _realtime_module,

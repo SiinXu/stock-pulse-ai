@@ -1,0 +1,1 @@
+- [Changed] Move efinance symbol classifiers (`_is_etf_code`, `_build_eastmoney_etf_secid`, `_is_us_code`) into `src/data_provider/efinance_parts/symbols.py` behind the ADR-006 facade, keeping the `src.data_provider.efinance_fetcher` patch targets, signatures, base ETF wrap, US regex including index-like tickers, and Eastmoney secid mapping unchanged (Refs #1068).
