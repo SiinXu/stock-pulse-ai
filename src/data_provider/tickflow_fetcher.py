@@ -743,102 +743,6 @@ class TickFlowFetcher(BaseFetcher):
         except Exception:
             return 600
 
-    def get_stock_name(self, stock_code: str) -> Optional[str]:
-        symbol = self._to_tickflow_symbol(stock_code)
-        quote = self._get_cached_quote(symbol) if symbol else None
-        name = self._extract_name(quote or {}) if quote else ""
-        if name:
-            return name
-
-        client = self._get_client()
-        if client is None or not symbol:
-            return None
-
-        try:
-            quotes = client.quotes.get(symbols=[symbol])
-            self._store_quotes(quotes)
-            cached = self._get_cached_quote(symbol)
-            name = self._extract_name(cached or {})
-            if name:
-                return name
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "TickFlow quote name lookup failed",
-                exc,
-                error_code="tickflow_quote_name_lookup_failed",
-                level=logging.DEBUG,
-                context={"symbol": symbol},
-            )
-
-        try:
-            instrument = client.instruments.get(symbol)
-            return self._extract_instrument_name(instrument)
-        except Exception as exc:
-            log_safe_exception(
-                logger,
-                "TickFlow instrument lookup failed",
-                exc,
-                error_code="tickflow_instrument_lookup_failed",
-                level=logging.DEBUG,
-                context={"symbol": symbol},
-            )
-        return None
-
-    @staticmethod
-    def _extract_instrument_name(instrument: Any) -> Optional[str]:
-        if isinstance(instrument, list):
-            if not instrument:
-                return None
-            instrument = instrument[0]
-        if not isinstance(instrument, dict):
-            return None
-        name = (
-            instrument.get("name")
-            or instrument.get("short_name")
-            or instrument.get("display_name")
-            or (instrument.get("ext") or {}).get("name")
-        )
-        return str(name).strip() if name else None
-
-    def get_stock_list(self) -> pd.DataFrame:
-        client = self._get_client()
-        if client is None:
-            return pd.DataFrame(columns=["code", "name", "industry", "area", "market"])
-
-        try:
-            universe = client.universes.get(_CN_UNIVERSE_ID)
-            entries = self._extract_universe_entries(universe)
-        except Exception as exc:
-            if self._is_universe_permission_error(exc):
-                logger.info("[TickFlowFetcher] universe list is not available for current plan")
-                return pd.DataFrame(columns=["code", "name", "industry", "area", "market"])
-            log_safe_exception(
-                logger,
-                "TickFlow stock universe lookup failed",
-                exc,
-                error_code="tickflow_stock_universe_lookup_failed",
-                level=logging.WARNING,
-                context={"universe": _CN_UNIVERSE_ID},
-            )
-            return pd.DataFrame(columns=["code", "name", "industry", "area", "market"])
-
-        rows = []
-        for entry in entries:
-            symbol = entry["symbol"]
-            if not self._is_cn_equity_symbol(symbol):
-                continue
-            rows.append(
-                {
-                    "code": normalize_stock_code(symbol),
-                    "name": entry.get("name", ""),
-                    "industry": "",
-                    "area": "",
-                    "market": symbol.rsplit(".", 1)[-1],
-                }
-            )
-        return pd.DataFrame(rows, columns=["code", "name", "industry", "area", "market"])
-
     @staticmethod
     def _extract_universe_entries(universe: Any) -> List[Dict[str, str]]:
         if universe is None:
@@ -873,6 +777,13 @@ class TickFlowFetcher(BaseFetcher):
     def _extract_universe_symbols(universe: Any) -> List[str]:
         return [entry["symbol"] for entry in TickFlowFetcher._extract_universe_entries(universe)]
 
+    # Rebound from tickflow_parts.stock_identity after the class is built.
+    get_stock_name = None
+
+    _extract_instrument_name = None
+
+    get_stock_list = None
+
     # Rebound from tickflow_parts.market_boards after the class is built.
     get_main_indices = None
 
@@ -895,25 +806,28 @@ class TickFlowFetcher(BaseFetcher):
 
 # Keep ``src.data_provider.tickflow_fetcher.TickFlowFetcher`` as the ADR-006
 # compatibility facade while ``tickflow_parts`` owns market-board, daily
-# history, and realtime-quote bodies. Rebinding preserves method globals so
-# existing patches against this module continue to intercept moved
-# implementations.
+# history, realtime-quote, and stock-identity bodies. Rebinding preserves
+# method globals so existing patches against this module continue to intercept
+# moved implementations.
 from .tickflow_parts import history as _history_module  # noqa: E402
 from .tickflow_parts import market_boards as _market_boards_module  # noqa: E402
 from .tickflow_parts import realtime as _realtime_module  # noqa: E402
+from .tickflow_parts import stock_identity as _stock_identity_module  # noqa: E402
 from .tickflow_parts.history import _HistoryMethods  # noqa: E402
 from .tickflow_parts.market_boards import _MarketBoardsMethods  # noqa: E402
 from .tickflow_parts.realtime import _RealtimeMethods  # noqa: E402
+from .tickflow_parts.stock_identity import _StockIdentityMethods  # noqa: E402
 from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
 
 def _assemble_tickflow_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _HistoryMethods, _MarketBoardsMethods, _RealtimeMethods
+    global _HistoryMethods, _MarketBoardsMethods, _RealtimeMethods, _StockIdentityMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
+    _StockIdentityMethods = _stock_identity_module._StockIdentityMethods
     bind_methods_from_class(
         _MarketBoardsMethods,
         TickFlowFetcher,
@@ -931,6 +845,12 @@ def _assemble_tickflow_fetcher_facade() -> None:
         TickFlowFetcher,
         globals(),
         expected_names=_realtime_module.EXPECTED_REALTIME_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _StockIdentityMethods,
+        TickFlowFetcher,
+        globals(),
+        expected_names=_stock_identity_module.EXPECTED_STOCK_IDENTITY_METHOD_NAMES,
     )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy
@@ -963,7 +883,12 @@ _assemble_tickflow_fetcher_facade()
 def _install_part_reload_hooks() -> None:
     """Keep an owner reload able to rebuild and rebind both sides of the seam."""
 
-    for module in (_market_boards_module, _history_module, _realtime_module):
+    for module in (
+        _market_boards_module,
+        _history_module,
+        _realtime_module,
+        _stock_identity_module,
+    ):
         module._FACADE_RELOAD_HOOK = _assemble_tickflow_fetcher_facade  # type: ignore[attr-defined]
 
 
