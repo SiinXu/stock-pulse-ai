@@ -563,10 +563,13 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 
 `POST /api/v1/alerts/rules/compile-nl` 将白名单内自然语言编译为 Alert 创建载荷。
 结果：`success` | `need_clarification` | `rejected`。禁止任意代码执行。
+该接口是预览：不持久化规则、不发送通知、不入队分析。调用方如需落库，再把返回的
+`rule` 交给现有 `POST /api/v1/alerts/rules`。
 企业事件编译始终包含 `event_categories` / `lookback_hours` / `min_items`，防止编辑丢字段回归。
 
-成功编译会产出结构化 IR：`symbol` / `metric` / `comparator` / `threshold` / 可选
-`cooldown`（秒）。`cooldown 30 minutes` / `冷却 1 小时` 这类子句会先从短语中剥离，
+HTTP 响应包含结构化 `ir` 字段（与编译器内部 IR 相同）：`symbol` / `metric` /
+`comparator` / `threshold` / 可选 `cooldown`（秒）。澄清或拒绝时 `ir` 为 `null`。
+`cooldown 30 minutes` / `冷却 1 小时` 这类子句会先从短语中剥离，
 再写入 `cooldown_policy.cooldown_seconds`，避免冷却数字被当成阈值。冷却被提到但
 无法解析时长时返回 `need_clarification`。非正冷却时长会被拒绝。编译器不会把输入
 当代码执行。

@@ -188,6 +188,16 @@ class AlertRuleNlCompileRequest(BaseModel):
     )
 
 
+class AlertRuleNlCompileIr(BaseModel):
+    """Structured IR already produced by the NL compiler."""
+
+    symbol: str
+    metric: str
+    comparator: str
+    threshold: Optional[Any] = None
+    cooldown: Optional[int] = None
+
+
 class AlertRuleNlCompileResponse(BaseModel):
     outcome: Literal["success", "need_clarification", "rejected"]
     message: str = ""
@@ -196,6 +206,13 @@ class AlertRuleNlCompileResponse(BaseModel):
     clarifications: List[str] = Field(default_factory=list)
     rejected_reason: Optional[str] = None
     rule: Optional[Dict[str, Any]] = None
+    ir: Optional[AlertRuleNlCompileIr] = Field(
+        None,
+        description=(
+            "Structured compiler IR with symbol, metric, comparator, threshold, "
+            "and optional cooldown seconds. Null for clarification or rejection."
+        ),
+    )
 
 
 class AlertTriggerListResponse(BaseModel):

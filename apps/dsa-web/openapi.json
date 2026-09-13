@@ -1361,6 +1361,50 @@
         "title": "AlertRuleListResponse",
         "type": "object"
       },
+      "AlertRuleNlCompileIr": {
+        "description": "Structured IR already produced by the NL compiler.",
+        "properties": {
+          "comparator": {
+            "title": "Comparator",
+            "type": "string"
+          },
+          "cooldown": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cooldown"
+          },
+          "metric": {
+            "title": "Metric",
+            "type": "string"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          },
+          "threshold": {
+            "anyOf": [
+              {},
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Threshold"
+          }
+        },
+        "required": [
+          "symbol",
+          "metric",
+          "comparator"
+        ],
+        "title": "AlertRuleNlCompileIr",
+        "type": "object"
+      },
       "AlertRuleNlCompileRequest": {
         "properties": {
           "auto_analysis": {
@@ -1411,6 +1455,17 @@
             },
             "title": "Clarifications",
             "type": "array"
+          },
+          "ir": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AlertRuleNlCompileIr"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Structured compiler IR with symbol, metric, comparator, threshold, and optional cooldown seconds. Null for clarification or rejection."
           },
           "matched_metric": {
             "anyOf": [
