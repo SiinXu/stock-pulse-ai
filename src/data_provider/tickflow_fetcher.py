@@ -174,73 +174,6 @@ class TickFlowFetcher(BaseFetcher):
                 self._client = self._build_client()
             return self._client
 
-    def _fetch_raw_data(
-        self, stock_code: str, start_date: str, end_date: str
-    ) -> pd.DataFrame:
-        symbol = self._to_tickflow_symbol(stock_code)
-        if not symbol:
-            raise DataFetchError("TickFlowFetcher only supports A-share/ETF symbols")
-
-        cache_key = self._daily_cache_key(symbol, start_date, end_date)
-        cached = self._get_daily_cache(cache_key)
-        if cached is not None:
-            return cached
-
-        client = self._get_client()
-        if client is None:
-            raise DataFetchError("TickFlow API key is not configured")
-
-        request_count = self._daily_kline_count(start_date, end_date)
-        try:
-            df = client.klines.get(
-                symbol,
-                period="1d",
-                count=request_count,
-                start_time=self._date_to_ms(start_date),
-                end_time=self._date_to_ms(end_date, end_of_day=True),
-                adjust=self.kline_adjust,
-                as_dataframe=True,
-            )
-        except Exception as exc:
-            raise DataFetchError(f"TickFlow daily K-line request failed: {exc}") from exc
-
-        raw_df = self._prepare_daily_frame(
-            df,
-            symbol=symbol,
-            start_date=start_date,
-            end_date=end_date,
-            count=request_count,
-            context="single",
-        )
-        self._set_daily_cache(cache_key, raw_df)
-        return raw_df.copy()
-
-    def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
-        raw = self._coerce_frame(df)
-        if raw.empty:
-            return pd.DataFrame(columns=["code", *STANDARD_COLUMNS])
-
-        normalized = pd.DataFrame()
-        normalized["date"] = self._extract_date_series(raw)
-        normalized["code"] = normalize_stock_code(stock_code)
-        for column in ("open", "high", "low", "close", "amount"):
-            normalized[column] = pd.to_numeric(raw.get(column), errors="coerce")
-
-        # TickFlow daily volume is in lots for A-shares; project standard is shares.
-        normalized["volume"] = self._cn_lots_to_shares(raw.get("volume"))
-
-        if "pct_chg" in raw.columns:
-            normalized["pct_chg"] = pd.to_numeric(raw["pct_chg"], errors="coerce")
-        elif "change_pct" in raw.columns:
-            normalized["pct_chg"] = self._ratio_series_to_percent(raw["change_pct"])
-        else:
-            close = pd.to_numeric(normalized["close"], errors="coerce")
-            normalized["pct_chg"] = close.pct_change().fillna(0.0) * 100.0
-
-        normalized = normalized.dropna(subset=["date", "close", "volume"])
-        normalized = normalized.sort_values("date", ascending=True).reset_index(drop=True)
-        return normalized[["code", *STANDARD_COLUMNS]]
-
     @staticmethod
     def _safe_float(value: Any) -> Optional[float]:
         if value in (None, "", "-"):
@@ -1040,12 +973,19 @@ class TickFlowFetcher(BaseFetcher):
 
     get_sector_rankings = None
 
+    # Rebound from tickflow_parts.history after the class is built.
+    _fetch_raw_data = None
+
+    _normalize_data = None
+
 
 # Keep ``src.data_provider.tickflow_fetcher.TickFlowFetcher`` as the ADR-006
-# compatibility facade while ``tickflow_parts`` owns market-board bodies.
-# Rebinding preserves method globals so existing patches against this module
-# continue to intercept moved implementations.
+# compatibility facade while ``tickflow_parts`` owns market-board and daily
+# history bodies. Rebinding preserves method globals so existing patches
+# against this module continue to intercept moved implementations.
+from .tickflow_parts import history as _history_module  # noqa: E402
 from .tickflow_parts import market_boards as _market_boards_module  # noqa: E402
+from .tickflow_parts.history import _HistoryMethods  # noqa: E402
 from .tickflow_parts.market_boards import _MarketBoardsMethods  # noqa: E402
 from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
@@ -1053,14 +993,44 @@ from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 def _assemble_tickflow_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _MarketBoardsMethods
+    global _HistoryMethods, _MarketBoardsMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
+    _HistoryMethods = _history_module._HistoryMethods
     bind_methods_from_class(
         _MarketBoardsMethods,
         TickFlowFetcher,
         globals(),
         expected_names=_market_boards_module.EXPECTED_MARKET_BOARD_METHOD_NAMES,
     )
+    bind_methods_from_class(
+        _HistoryMethods,
+        TickFlowFetcher,
+        globals(),
+        expected_names=_history_module.EXPECTED_HISTORY_METHOD_NAMES,
+    )
+    # Rebound methods are assigned after class body evaluation; clear ABC
+    # abstracts that are now implemented so instantiation matches the legacy
+    # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
+    abstracts = set(getattr(TickFlowFetcher, "__abstractmethods__", ()))
+    if abstracts:
+        abstracts.difference_update(
+            {
+                name
+                for name in (
+                    "_fetch_raw_data",
+                    "_normalize_data",
+                    "get_daily_data",
+                )
+                if callable(getattr(TickFlowFetcher, name, None))
+            }
+        )
+        abstracts = {
+            name
+            for name in abstracts
+            if name not in TickFlowFetcher.__dict__
+            or getattr(TickFlowFetcher.__dict__[name], "__isabstractmethod__", False)
+        }
+        TickFlowFetcher.__abstractmethods__ = frozenset(abstracts)
 
 
 _assemble_tickflow_fetcher_facade()
@@ -1069,7 +1039,7 @@ _assemble_tickflow_fetcher_facade()
 def _install_part_reload_hooks() -> None:
     """Keep an owner reload able to rebuild and rebind both sides of the seam."""
 
-    for module in (_market_boards_module,):
+    for module in (_market_boards_module, _history_module):
         module._FACADE_RELOAD_HOOK = _assemble_tickflow_fetcher_facade  # type: ignore[attr-defined]
 
 

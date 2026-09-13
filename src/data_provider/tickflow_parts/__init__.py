@@ -8,5 +8,6 @@ surfaces and test patch targets stay stable (ADR-006 / Issue #1068).
 
 Owned domains:
 - ``market_boards`` — main indices, market statistics, and sector rankings
+- ``history`` — daily fetch (``_fetch_raw_data``) and normalize (``_normalize_data``)
 - ``facade_bind`` — re-export of ``src.data_provider._facade_bind``
 """

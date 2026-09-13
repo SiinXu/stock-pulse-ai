@@ -1,0 +1,1 @@
+- [Changed] Move TickFlow daily history helpers (`_fetch_raw_data`, `_normalize_data`) into `src/data_provider/tickflow_parts/history.py` behind the ADR-006 facade, keeping `TickFlowFetcher` method names, signatures, A-share/ETF convert-and-fetch behavior, US/HK rejects, cache/truncate seams, and patch targets unchanged (Refs #1068).
