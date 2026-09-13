@@ -182,6 +182,12 @@ describe('fallback model settings help', () => {
     const copy = JSON.stringify(content);
     expect(copy).toContain('decision_type');
     expect(copy).toMatch(/Chat/i);
+    expect(copy).toMatch(/full/i);
+    expect(copy).toMatch(/specialist/i);
+    expect(copy).not.toMatch(/ctx\.meta/);
+    expect(copy).not.toMatch(/request override/i);
+    expect(copy).not.toMatch(/\bHTTP\b/);
+    expect(copy).not.toMatch(/\bCLI\b/);
     if (language !== 'en' && language !== 'zh') {
       expect(content?.title).not.toBe(
         getSettingsHelpContent('settings.agent.AGENT_RED_TEAM_ENABLED', undefined, 'en')?.title,
