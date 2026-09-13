@@ -1016,7 +1016,7 @@ def test_append_failure_does_not_change_calibration_return(isolated_db) -> None:
         )
 
     with patch(
-        "src.agent.evolution.adapters.log_safe_exception",
+        "src.services.evolution_event_append.log_safe_exception",
     ) as safe_log:
         adjusted, meta = calibrate_confidence(
             raw,
@@ -1038,3 +1038,20 @@ def test_append_failure_does_not_change_calibration_return(isolated_db) -> None:
     assert isinstance(safe_log.call_args.args[2], RepositoryError)
     assert safe_log.call_args.kwargs["error_code"] == "adapter_calibrate_event_append_failed"
     assert safe_log.call_args.kwargs["level"] == logging.WARNING
+
+
+def test_adapters_do_not_import_src_repositories() -> None:
+    from pathlib import Path
+
+    from scripts.check_import_layers import classify_import_modules, collect_violations
+
+    root = Path(__file__).resolve().parents[3]
+    placement = classify_import_modules(root, root / "src/agent/evolution/adapters.py")
+    imported = (*placement.import_time, *placement.function_local)
+    assert all(
+        not module.startswith("src.repositories") for module in imported
+    ), imported
+    assert any(
+        module.startswith("src.services.evolution_event_append") for module in imported
+    ), imported
+    assert collect_violations(root, root / "scripts/import_layer_baseline.json") == []

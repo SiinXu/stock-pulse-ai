@@ -1,1 +1,2 @@
 - [Added] Online adapter calibration appends one system EvolutionEvent when a factor actually applies; identity and append failures do not change the prediction outcome (Refs #1106).
+- [Fixed] Adapter EvolutionEvent append uses a services helper so src.agent does not import src.repositories (Refs #1106).

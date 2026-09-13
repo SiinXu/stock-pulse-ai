@@ -5,11 +5,12 @@ Wraps existing ``AgentMemory`` calibration. Tool ranking and route preference
 are explicit identity stubs. Default-off. ``BaseAgent`` applies
 ``calibrate_confidence`` when ``AGENT_ONLINE_ADAPTERS_ENABLED`` is true.
 When calibration actually applies, this module appends one system
-``adapter.calibrate`` EvolutionEvent. Identity paths emit nothing. Append
-failure is logged and does not change the returned confidence. This module
-does not edit Soul, ToolSurface, episode storage, or orchestrator route,
-does not implement real tool ranking or route preference, and does not
-expose HTTP list or auto-promote.
+``adapter.calibrate`` EvolutionEvent through an injected or services-layer
+writer. Identity paths emit nothing. Append failure is logged and does not
+change the returned confidence. This module does not import
+``src.repositories``, edit Soul, ToolSurface, episode storage, or
+orchestrator route, does not implement real tool ranking or route preference,
+and does not expose HTTP list or auto-promote.
 """
 
 from __future__ import annotations
@@ -18,11 +19,9 @@ import logging
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from pydantic import ValidationError
-from sqlalchemy.exc import SQLAlchemyError
 
 from src.agent.memory import AgentMemory
 from src.agent.protocols import AgentContext
-from src.repositories.base import RepositoryError
 from src.schemas.evolution_event import EvolutionEventCreate, EvolutionEventReasonRefs
 from src.utils.sanitize import log_safe_exception
 
@@ -73,12 +72,6 @@ def _normalize_reason_refs(reason_refs: Any) -> EvolutionEventReasonRefs:
     return EvolutionEventReasonRefs.model_validate(reason_refs)
 
 
-def _default_append_evolution_event(event: EvolutionEventCreate) -> Any:
-    from src.repositories.agent_evolution_event_repo import AgentEvolutionEventRepository
-
-    return AgentEvolutionEventRepository().append(event)
-
-
 def _emit_applied_calibration_event(
     *,
     factor: float,
@@ -110,18 +103,15 @@ def _emit_applied_calibration_event(
         )
         return
 
-    writer = append_event if append_event is not None else _default_append_evolution_event
-    try:
-        writer(payload)
-    except (RepositoryError, ValidationError, SQLAlchemyError) as exc:
-        log_safe_exception(
-            logger,
-            "Online adapter calibration event append failed",
-            exc,
-            error_code="adapter_calibrate_event_append_failed",
-            level=logging.WARNING,
-            context={"event_type": ADAPTER_CALIBRATE_EVENT_TYPE, "samples": int(samples)},
-        )
+    from src.services.evolution_event_append import append_evolution_event_fail_soft
+
+    append_evolution_event_fail_soft(
+        payload,
+        append_event=append_event,
+        samples=samples,
+        event_type=ADAPTER_CALIBRATE_EVENT_TYPE,
+        log=logger,
+    )
 
 
 def _coerce_float(value: Any, default: float) -> float:
