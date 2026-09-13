@@ -7,6 +7,7 @@
     "pred-missing-actuals-no-hit",
     "pred-unstructured-prose-rejected",
     "pred-seeded-miss-lesson",
-    "pred-trajectory-tool-discipline"
+    "pred-trajectory-tool-discipline",
+    "pred-tool-failure-unavailable"
   ]
 }

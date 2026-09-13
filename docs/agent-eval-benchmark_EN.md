@@ -46,7 +46,7 @@ python scripts/run_agent_benchmark.py \
 python -m pytest -m benchmark tests/agent/benchmark -q
 ```
 
-The blocking backend gate uses `pytest -m "not network and not benchmark"`, so this suite is **non-blocking** by design (V0).
+The blocking pytest invocation still uses `pytest -m "not network and not benchmark"`, so the `@benchmark`-marked panel stays out of unmarked pytest. The merge-blocking GitHub context is still `backend-gate`, which additionally runs `python scripts/run_agent_benchmark.py --strict-baseline --quiet`. Job `agent-eval-gate` runs the same command but is **not** a new required check name.
 
 A focused unmarked test in `tests/agent/test_agent_trajectory_eval.py` feeds a real `observe_case` tool log into `evaluate_agent_trajectory` and asserts `sample_size > 0` with a non-null `tool_selection_precision`, so that producer join stays visible to the blocking offline gate. The rest of the panel remains behind the `benchmark` marker.
 
@@ -162,7 +162,9 @@ payload, so identical identities always serialize identically.
 | Score drop vs committed baseline | **Visible** in the markdown report; default CLI exit code stays 0 |
 | Hard-fail on drop | Only with `--strict-baseline` (opt-in) |
 
-Score drops remain diagnostics unless `--strict-baseline` is used. Issue [#1092](https://github.com/SiinXu/stock-pulse-ai/issues/1092) adds a **blocking** CI job `agent-eval-gate` that runs `python scripts/run_agent_benchmark.py --strict-baseline` and enforces the offline prediction-verification suite with regression threshold **0.0** (deterministic frozen fixtures; do not relax the threshold to keep CI green). Anti-tests inject degradation and assert the gate fails.
+Score drops remain diagnostics unless `--strict-baseline` is used. The default CLI without that flag still exits 0 on score DROP. Hosted CI already hard-fails via required context `backend-gate` running `python scripts/run_agent_benchmark.py --strict-baseline --quiet`. Job `agent-eval-gate` runs the same command and the unmarked anti-tests; do not add `agent-eval-gate` as a ninth required GitHub context. Prompt / skill / router PRs must attach `python scripts/run_agent_benchmark.py --strict-baseline` output, or commit a justified baseline refresh.
+
+Eval fails closed when a replayed LLM call lacks canonical Agent Soul or a replayed tool handler runs outside ToolSurface authorization (infrastructure failure; non-zero even without `--strict-baseline`). Stage markers are not a Soul proof. Prediction fixtures labeled `tool_failure` must contain at least one trajectory item with `success is False`. Fabricated hits stay forbidden when required actuals are unavailable, using the existing resolver (`provider_failure_is_data_unavailable` / `never_fabricated_hit_without_actuals`). A nonessential failed tool may coexist with an independently supported outcome; eval does not adopt a blanket “any failed tool forbids a hit” rule. Production budgets and stage parallelism stay with #1121 / #1290. This eval does not edit Soul, ToolSurface, budgets, parallelism, or CI workflow YAML.
 
 ## Refreshing the baseline
 
@@ -204,7 +206,8 @@ Commit `tests/agent/benchmark/baselines/v0.json` with an English changelog note 
 | #617 / analysis quality panel | Complementary: report trust vs agent-run discipline |
 | AR-01 agent_runtime fixtures | Read-only source transcripts for replay |
 | Output-quality eval service | [agent-eval-dimensions_EN.md](agent-eval-dimensions_EN.md) scores single output artifacts (`agent_eval_service`) and is invoked by this canonical runner in a separate score bucket |
-| CI merge queue / workflow ownership | Do not wire scheduled jobs into `.github/workflows/**` in this PR |
+| CI merge queue / workflow ownership | Do not edit `.github/workflows/**`; the required context remains `backend-gate` |
+| #1121 / #1290 | Owners of production budgets and stage parallelism; this eval only observes existing Soul / ToolSurface composition |
 
 
 ## Prediction verification offline suite (#1092 / #1107)
@@ -213,10 +216,10 @@ Integrated into the same runner as `prediction_verification_evaluation`:
 
 | Path | Role |
 | --- | --- |
-| `tests/fixtures/prediction_eval/` | Frozen integrity fixtures (success, provider failure, missing data, overclaim, seeded miss lessons, tool discipline) |
+| `tests/fixtures/prediction_eval/` | Frozen integrity fixtures (success, provider failure, missing data, overclaim, seeded miss lessons, tool discipline, honest tool_failure) |
 | `src/services/prediction_eval_service.py` | Deterministic integrity + trajectory replay via owned `evaluate_agent_trajectory` |
 | `tests/agent/benchmark/baselines/prediction_v0.json` | Committed baseline (threshold 0.0) |
 
-Provider failure fixtures must resolve to `data_unavailable` and never a fabricated hit.
+Provider failure / missing actuals must resolve to `data_unavailable` and never a fabricated hit. `tool_failure` fixtures must include a failed tool; keep successful required-tool trajectories as `tool_discipline`.
 
 The committed prediction baseline freezes the exact case IDs and per-case check counts in addition to finite scores. Missing/extra cases, removed checks, malformed totals, NaN/Infinity, schema/engine drift, or any threshold other than `0.0` fail closed. When A5 `ClaimScorer` is installed, the same typed A1 fixtures are scored through it; an installed-but-broken scorer fails the gate instead of being silently skipped.

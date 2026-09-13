@@ -1,6 +1,6 @@
 {
   "id": "pred-trajectory-tool-discipline",
-  "profile": "tool_failure",
+  "profile": "tool_discipline",
   "claims": [
     {
       "claim_id": "c1",
