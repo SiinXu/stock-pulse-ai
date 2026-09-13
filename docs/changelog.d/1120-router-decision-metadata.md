@@ -1,0 +1,1 @@
+- [Added] Record the secret-free AgentRouter decision on dashboard run-local metadata (ctx.meta and AgentResult.planning_metadata) without persisting episodes (Refs #1120).

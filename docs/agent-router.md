@@ -1,6 +1,6 @@
 # Agent 深度路由规则库
 
-**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一至三切片（规则库 + 结构化事实投影 + `AgentOrchestrator.run()` 应用）。Chat、factory、native adapter、Analyze、API、CLI、Bot、MCP 仍**未接线**。
+**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一至四切片（规则库 + 结构化事实投影 + `AgentOrchestrator.run()` 应用 + run-local 决策元数据）。Chat、factory、native adapter、Analyze、API、CLI、Bot、MCP 仍**未接线**。
 
 **English**: [agent-router_EN.md](agent-router_EN.md)
 
@@ -10,13 +10,13 @@
 
 - **不会**解析原始 prompt / 用户消息、provider 载荷或工具结果。
 - **不会**改写 Settings/env `AGENT_ORCHESTRATOR_MODE`、Soul、ToolSurface、factory / native adapter、Chat/API/OpenAPI/Web/Desktop/CLI/Bot/MCP。
-- **不会**写入 episode / trace 公共元数据、EvolutionEvent 或 memory admission。
+- **不会**写入 episode / trace 公共元数据、EvolutionEvent 或 memory admission。第四切片只把 secret-free 决策记入 run-local 的 `ctx.meta["router_decision"]` 与 `AgentResult.planning_metadata["router_decision"]`。
 - **不会**调用或扩展 `prefer_route`；miss-rate 证据在通过校验后**零路由影响**（身份中立，直至 #1091 / #1106）。
 - **不会**把进程级 Settings/env `AGENT_ORCHESTRATOR_MODE` 复制为 `user_mode_override`。
 - **不会**把 `report_type` 或 `skills` / `selected_skill_ids` 映射为路由器 mode。
-- **不会**关闭 #1120：Chat incremental 真正跳过 `_execute_pipeline`（AC3）与运行元数据可见决策（AC4）仍属后续切片。factory / Chat / Analyze / CLI / Bot / MCP 仍未接线。
+- **不会**关闭 #1120：Chat incremental 真正跳过 `_execute_pipeline`（AC3）仍属后续切片。factory / Chat / Analyze / CLI / Bot / MCP 仍未接线。
 
-仪表盘 `run()` 失败关闭：投影或路由被拒绝时返回 `AgentResult(success=False)` 与公开执行失败文案，**不会**回退到构造时 mode。当 run context 没有显式 `user_mode_override` 时，`run()` 把构造时 `self.mode`（factory/Settings `AGENT_ORCHESTRATOR_MODE`）作为用户 mode 传给路由器，从而保留 `quick` / `standard` / `full` / `specialist` 深度。显式 per-run context 覆盖仍然优先。没有用户 mode 时的 compare / 多标的 floor 仍是库行为，**不会**在仪表盘 `run()` 上抬高构造时深度。构造时配置的 mode 与 mode-budget limits 在成功、拒绝和所有异常路径上由 `finally` 恢复。Chat 仍始终调用 `_execute_pipeline`，仍使用构造时 mode。
+仪表盘 `run()` 失败关闭：投影或路由被拒绝时返回 `AgentResult(success=False)` 与公开执行失败文案，并附带 secret-free 的 `planning_metadata["router_decision"]`，**不会**回退到构造时 mode。当 run context 没有显式 `user_mode_override` 时，`run()` 把构造时 `self.mode`（factory/Settings `AGENT_ORCHESTRATOR_MODE`）作为用户 mode 传给路由器，从而保留 `quick` / `standard` / `full` / `specialist` 深度。显式 per-run context 覆盖仍然优先。没有用户 mode 时的 compare / 多标的 floor 仍是库行为，**不会**在仪表盘 `run()` 上抬高构造时深度。构造时配置的 mode 与 mode-budget limits 在成功、拒绝和所有异常路径上由 `finally` 恢复。Chat 仍始终调用 `_execute_pipeline`，仍使用构造时 mode。
 
 ## 输入
 
@@ -150,15 +150,25 @@ assert orch.mode == "quick"  # 构造时 mode 已恢复；本次 pipeline 也使
 
 投影/路由拒绝时不调用 `_execute_pipeline`。Chat 行为不变。
 
+## 仪表盘 run 元数据（第四切片）
+
+接受路由后，`run()` 在 `_execute_pipeline` 之前把 `AgentRouterDecision.to_dict()` 写入 `ctx.meta["router_decision"]`，并在 reflection 之后把同一字典合并进 `AgentResult.planning_metadata["router_decision"]`，保留已有 bag 键。投影或路由拒绝仍返回公开执行失败文案，并附带 `planning_metadata={"router_decision": ...}`，不回显原始覆盖值或未知字段名。Chat 不记录该键。不写入 episode。
+
+```python
+result = orch.run("analyze", {"stock_code": "600519"})
+assert result.planning_metadata["router_decision"]["accepted"] is True
+assert result.planning_metadata["router_decision"]["mode"] == "quick"
+```
+
 ## 剩余工作（#1120 保持开放）
 
-已落地：第一切片规则库；第二切片结构化事实投影；第三切片仪表盘 `run()` 应用（失败关闭，构造时 mode 恢复）。
+已落地：第一切片规则库；第二切片结构化事实投影；第三切片仪表盘 `run()` 应用（失败关闭，构造时 mode 恢复）；第四切片 secret-free run-local 决策元数据。
 
 仍待后续：
 
 - 将投影器 + 路由器接入 factory / native adapter / analysis 与 Chat 入口（每 run 决策，而不是进程级 mode）。
 - Chat `incremental_tool` 必须真正避免 `_execute_pipeline`（AC3）。Chat 仍未接线，仍始终重新跑 pipeline。
-- 将 secret-free 决策写入 run-local 元数据（AC4）；episode 持久化需避开与 #1511 冲突。
+- 将决策持久化到 episode（需避开与 #1511 memory-write admission 冲突）。
 - 基于 miss-rate 的 outcome bias 归 #1091 / #1106，且须有样本阈值。
 
 回滚：先回退 `run()` 应用，再删除本库模块、测试、changelog fragment 与本文档即可；无迁移、无配置键。

@@ -40,6 +40,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger("src.agent.orchestrator")
 
+_ROUTER_DECISION_META_KEY = "router_decision"
+
 _HARD_BUDGET_FAILURE_REASONS = frozenset({
     "budget_turns",
     "budget_tools",
@@ -148,6 +150,38 @@ def _build_dashboard_run_router_facts(
     return facts
 
 
+def _public_router_decision(
+    *,
+    decision: Any = None,
+    projection: Any = None,
+) -> Dict[str, Any]:
+    """Build the secret-free router payload for run-local metadata (#1120 AC4)."""
+    if decision is not None:
+        return dict(decision.to_dict())
+    explain: Dict[str, Any] = {}
+    error_field = getattr(projection, "error_field", None)
+    if error_field is not None:
+        explain["error_field"] = error_field
+    return {
+        "accepted": False,
+        "mode": None,
+        "chat_path": None,
+        "reason_code": getattr(projection, "reason_code", None),
+        "error": getattr(projection, "error", None),
+        "explain": explain,
+    }
+
+
+def _attach_router_decision(
+    target_meta: Optional[Dict[str, Any]],
+    payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    """Merge ``router_decision`` onto a planning-metadata bag without dropping keys."""
+    metadata = dict(target_meta or {})
+    metadata[_ROUTER_DECISION_META_KEY] = dict(payload)
+    return metadata
+
+
 def _attach_run_local_reflection(
     orchestrator: Any,
     orch_result: Any,
@@ -214,11 +248,19 @@ class _ChatMethods:
         Applies the structured-fact projector and AgentRouter once per run.
         Constructor/factory depth is the default user mode unless the run
         context supplies an explicit override. Constructor mode is restored
-        in ``finally``. Chat is unchanged.
+        in ``finally``. The secret-free decision is recorded on
+        ``ctx.meta["router_decision"]`` and
+        ``AgentResult.planning_metadata["router_decision"]``. Chat is unchanged.
 
         Returns an ``AgentResult`` (same type as ``AgentExecutor.run``).
         """
         from src.agent.executor import AgentResult
+        from src.agent.orchestrator_parts.chat import (
+            _ROUTER_DECISION_META_KEY,
+            _attach_router_decision,
+            _attach_run_local_reflection,
+            _public_router_decision,
+        )
         from src.agent.runtime.agent_router import AgentRouter
         from src.agent.runtime.agent_router_facts import project_router_request
         from src.agent.runtime.mode_budget import resolve_mode_budget_limits
@@ -239,6 +281,9 @@ class _ChatMethods:
                 return AgentResult(
                     success=False,
                     error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                    planning_metadata=_attach_router_decision(
+                        None, _public_router_decision(projection=projection)
+                    ),
                 )
 
             decision = AgentRouter().route(projection.request)
@@ -247,15 +292,20 @@ class _ChatMethods:
                 return AgentResult(
                     success=False,
                     error=AGENT_EXECUTION_FAILURE_MESSAGE,
+                    planning_metadata=_attach_router_decision(
+                        None, _public_router_decision(decision=decision)
+                    ),
                 )
 
             self.mode = decision.mode
             self.mode_budget_limits = resolve_mode_budget_limits(
                 self.config, mode=decision.mode
             )
+            payload = _public_router_decision(decision=decision)
 
             ctx = self._build_context(task, scope_resolution.effective_context)
             ctx.meta["response_mode"] = "dashboard"
+            ctx.meta[_ROUTER_DECISION_META_KEY] = payload
             if scope_resolution.stock_scope is not None:
                 ctx.meta["stock_scope"] = scope_resolution.stock_scope
             orch_result = self._execute_pipeline(
@@ -263,15 +313,16 @@ class _ChatMethods:
             )
             # Imported locally: facade-bound methods resolve globals from
             # ``src.agent.orchestrator``, not this module.
-            from src.agent.orchestrator_parts.chat import (
-                _attach_run_local_reflection,
-            )
 
             _attach_run_local_reflection(
                 self,
                 orch_result,
                 ctx,
                 scope_resolution.effective_context,
+            )
+            orch_result.planning_metadata = _attach_router_decision(
+                getattr(orch_result, "planning_metadata", None),
+                payload,
             )
 
             return _public_agent_result(orch_result)
