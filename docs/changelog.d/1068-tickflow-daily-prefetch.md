@@ -1,0 +1,1 @@
+- [Changed] Move TickFlow daily K-line prefetch (`prefetch_daily_klines`, `_iter_batch_frames`) into `src/data_provider/tickflow_parts/prefetch.py` behind the ADR-006 facade, keeping client, capability, history helpers, `prefetch_realtime_quotes`, quote-cache/TTL, `_dedupe_symbols`, and universe parse on the facade (Refs #1068).

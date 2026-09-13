@@ -514,122 +514,6 @@ class TickFlowFetcher(BaseFetcher):
             self._capability_supported[capability] = supported
             self._capability_checked_at[capability] = monotonic()
 
-    def prefetch_daily_klines(
-        self,
-        stock_codes: Iterable[str],
-        *,
-        days: int = 30,
-        start_date: Optional[str] = None,
-        end_date: Optional[str] = None,
-    ) -> int:
-        """Batch-prefetch daily K-lines into the per-process raw cache.
-
-        Args:
-            stock_codes: Project stock codes to prefetch.
-            days: Target trading days to cover. When start_date is omitted,
-                up to days * 2 calendar days are fetched, capped at 730 days.
-            start_date: Optional YYYY-MM-DD lower bound.
-            end_date: Optional YYYY-MM-DD upper bound.
-        """
-        if not self.batch_daily_enabled or not self._capability_available("batch_daily"):
-            return 0
-
-        try:
-            requested_days = int(days)
-        except (TypeError, ValueError):
-            logger.info(
-                "[TickFlowFetcher] skip daily K-line prefetch because days is invalid: %r",
-                days,
-            )
-            return 0
-        if requested_days <= 0:
-            logger.info(
-                "[TickFlowFetcher] skip daily K-line prefetch because days must be positive: %r",
-                days,
-            )
-            return 0
-
-        client = self._get_client()
-        if client is None:
-            return 0
-
-        if end_date is None:
-            end_date = datetime.now().strftime("%Y-%m-%d")
-        if start_date is None:
-            lookback_days = min(requested_days * 2, _MAX_DAILY_PREFETCH_LOOKBACK_DAYS)
-            start_dt = datetime.strptime(end_date, "%Y-%m-%d") - timedelta(days=lookback_days)
-            start_date = start_dt.strftime("%Y-%m-%d")
-
-        symbols = self._dedupe_symbols(stock_codes)
-        if not symbols:
-            return 0
-
-        batch_count = (len(symbols) + self.batch_size - 1) // self.batch_size
-        cached_count = 0
-        for offset in range(0, len(symbols), self.batch_size):
-            batch_symbols = symbols[offset : offset + self.batch_size]
-            try:
-                request_count = self._daily_kline_count(start_date, end_date)
-                batch_result = client.klines.batch(
-                    batch_symbols,
-                    period="1d",
-                    count=request_count,
-                    start_time=self._date_to_ms(start_date),
-                    end_time=self._date_to_ms(end_date, end_of_day=True),
-                    adjust=self.kline_adjust,
-                    as_dataframe=True,
-                )
-                self._mark_capability("batch_daily", True)
-            except Exception as exc:
-                if self._is_permission_error(exc):
-                    self._mark_capability("batch_daily", False)
-                    logger.info(
-                        "[TickFlowFetcher] batch daily K-line is not available; fallback to single requests"
-                    )
-                    logger.info(
-                        "[TickFlowFetcher] batch daily prefetch complete: cached=%d total=%d batches=%d",
-                        cached_count,
-                        len(symbols),
-                        batch_count,
-                    )
-                    return cached_count
-                log_safe_exception(
-                    logger,
-                    "TickFlow batch daily K-line request failed",
-                    exc,
-                    error_code="tickflow_batch_daily_kline_failed",
-                    level=logging.WARNING,
-                )
-                continue
-
-            for symbol, df in self._iter_batch_frames(batch_result):
-                if not symbol:
-                    continue
-                cache_key = self._daily_cache_key(symbol, start_date, end_date)
-                try:
-                    frame = self._prepare_daily_frame(
-                        df,
-                        symbol=symbol,
-                        start_date=start_date,
-                        end_date=end_date,
-                        count=request_count,
-                        context="batch",
-                    )
-                except DataFetchError:
-                    continue
-                if frame.empty:
-                    continue
-                self._set_daily_cache(cache_key, frame)
-                cached_count += 1
-
-        logger.info(
-            "[TickFlowFetcher] batch daily prefetch complete: cached=%d total=%d batches=%d",
-            cached_count,
-            len(symbols),
-            batch_count,
-        )
-        return cached_count
-
     @classmethod
     def _dedupe_symbols(cls, stock_codes: Iterable[str]) -> List[str]:
         symbols: List[str] = []
@@ -641,32 +525,6 @@ class TickFlowFetcher(BaseFetcher):
             seen.add(symbol)
             symbols.append(symbol)
         return symbols
-
-    @staticmethod
-    def _iter_batch_frames(batch_result: Any) -> Iterable[Tuple[str, Any]]:
-        if isinstance(batch_result, dict):
-            for symbol, df in batch_result.items():
-                yield str(symbol).upper(), df
-            return
-
-        if isinstance(batch_result, pd.DataFrame):
-            if "symbol" not in batch_result.columns:
-                return
-            for symbol, group in batch_result.groupby("symbol"):
-                yield str(symbol).upper(), group.reset_index(drop=True)
-            return
-
-        if isinstance(batch_result, list):
-            grouped: Dict[str, List[Dict[str, Any]]] = {}
-            for item in batch_result:
-                if not isinstance(item, dict):
-                    continue
-                symbol = str(item.get("symbol") or "").upper()
-                if not symbol:
-                    continue
-                grouped.setdefault(symbol, []).append(item)
-            for symbol, rows in grouped.items():
-                yield symbol, pd.DataFrame(rows)
 
     def prefetch_realtime_quotes(
         self,
@@ -784,6 +642,11 @@ class TickFlowFetcher(BaseFetcher):
 
     get_stock_list = None
 
+    # Rebound from tickflow_parts.prefetch after the class is built.
+    prefetch_daily_klines = None
+
+    _iter_batch_frames = None
+
     # Rebound from tickflow_parts.market_boards after the class is built.
     get_main_indices = None
 
@@ -806,15 +669,17 @@ class TickFlowFetcher(BaseFetcher):
 
 # Keep ``src.data_provider.tickflow_fetcher.TickFlowFetcher`` as the ADR-006
 # compatibility facade while ``tickflow_parts`` owns market-board, daily
-# history, realtime-quote, and stock-identity bodies. Rebinding preserves
-# method globals so existing patches against this module continue to intercept
-# moved implementations.
+# history, realtime-quote, stock-identity, and daily-prefetch bodies. Rebinding
+# preserves method globals so existing patches against this module continue to
+# intercept moved implementations.
 from .tickflow_parts import history as _history_module  # noqa: E402
 from .tickflow_parts import market_boards as _market_boards_module  # noqa: E402
+from .tickflow_parts import prefetch as _prefetch_module  # noqa: E402
 from .tickflow_parts import realtime as _realtime_module  # noqa: E402
 from .tickflow_parts import stock_identity as _stock_identity_module  # noqa: E402
 from .tickflow_parts.history import _HistoryMethods  # noqa: E402
 from .tickflow_parts.market_boards import _MarketBoardsMethods  # noqa: E402
+from .tickflow_parts.prefetch import _PrefetchMethods  # noqa: E402
 from .tickflow_parts.realtime import _RealtimeMethods  # noqa: E402
 from .tickflow_parts.stock_identity import _StockIdentityMethods  # noqa: E402
 from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
@@ -823,11 +688,12 @@ from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 def _assemble_tickflow_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _HistoryMethods, _MarketBoardsMethods, _RealtimeMethods, _StockIdentityMethods
+    global _HistoryMethods, _MarketBoardsMethods, _PrefetchMethods, _RealtimeMethods, _StockIdentityMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
     _StockIdentityMethods = _stock_identity_module._StockIdentityMethods
+    _PrefetchMethods = _prefetch_module._PrefetchMethods
     bind_methods_from_class(
         _MarketBoardsMethods,
         TickFlowFetcher,
@@ -851,6 +717,12 @@ def _assemble_tickflow_fetcher_facade() -> None:
         TickFlowFetcher,
         globals(),
         expected_names=_stock_identity_module.EXPECTED_STOCK_IDENTITY_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _PrefetchMethods,
+        TickFlowFetcher,
+        globals(),
+        expected_names=_prefetch_module.EXPECTED_PREFETCH_METHOD_NAMES,
     )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy
@@ -888,6 +760,7 @@ def _install_part_reload_hooks() -> None:
         _history_module,
         _realtime_module,
         _stock_identity_module,
+        _prefetch_module,
     ):
         module._FACADE_RELOAD_HOOK = _assemble_tickflow_fetcher_facade  # type: ignore[attr-defined]
 
