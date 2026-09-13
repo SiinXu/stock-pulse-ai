@@ -15,5 +15,6 @@ Owned domains:
 - ``rate_limit`` — UA rotation, request pacing, and history-failure formatting
 - ``timeout_client`` — bounded-wait SDK wrapper (``_ef_call_with_timeout``)
 - ``eastmoney_errors`` — Eastmoney request-failure classifier (``_classify_eastmoney_error``)
+- ``symbols`` — ETF/US classifiers and Eastmoney ETF secid mapping
 - ``facade_bind`` — ADR-006 clone/bind helpers
 """
