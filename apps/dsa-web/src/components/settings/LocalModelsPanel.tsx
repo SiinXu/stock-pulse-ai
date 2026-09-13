@@ -33,6 +33,10 @@ import {
   isLocalModelsCatalogCancelledError,
   useLocalModelsCatalogQuery,
 } from '../../hooks/useLocalModelsCatalogQuery';
+import {
+  isLocalModelsRuntimeCancelledError,
+  useLocalModelsRuntimeQuery,
+} from '../../hooks/useLocalModelsRuntimeQuery';
 import { UI_LANGUAGE_METADATA, prefersChineseContent } from '../../i18n/uiLanguages';
 import { SETTINGS_LOCAL_MODELS_TEXT } from '../../locales/settingsLocalModels';
 import type {
@@ -196,6 +200,7 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
   const text = SETTINGS_LOCAL_MODELS_TEXT[language];
   const transport = useMemo<LocalModelTransport>(() => createLocalModelTransport(), []);
   const { loadCatalog } = useLocalModelsCatalogQuery();
+  const { loadRuntime } = useLocalModelsRuntimeQuery(transport.getRuntime);
   const { copyText, copyError, clearCopyError } = useClipboard();
   const [models, setModels] = useState<LocalModelCatalogEntry[]>([]);
   const [runtime, setRuntime] = useState<LocalModelRuntimeState | null>(null);
@@ -226,32 +231,37 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     try {
       const [catalog, nextRuntime] = await Promise.all([
         loadCatalog(),
-        transport.getRuntime(),
+        loadRuntime(),
       ]);
       if (!stillActive()) return;
       setModels(catalog.models);
       setRuntime(nextRuntime);
     } catch (error) {
-      if (!stillActive() || isLocalModelsCatalogCancelledError(error)) return;
+      if (
+        !stillActive()
+        || isLocalModelsCatalogCancelledError(error)
+        || isLocalModelsRuntimeCancelledError(error)
+      ) return;
       setCatalogFailed(true);
     } finally {
       if (stillActive()) {
         setIsLoading(false);
       }
     }
-  }, [loadCatalog, transport]);
+  }, [loadCatalog, loadRuntime]);
 
   const refreshRuntime = useCallback(async () => {
     setActionError('');
     try {
-      const nextRuntime = await transport.getRuntime();
+      const nextRuntime = await loadRuntime();
       setRuntime(nextRuntime);
       return nextRuntime;
-    } catch {
+    } catch (error) {
+      if (isLocalModelsRuntimeCancelledError(error)) return null;
       setActionError(text.actionFailed);
       return null;
     }
-  }, [text.actionFailed, transport]);
+  }, [loadRuntime, text.actionFailed]);
 
   useEffect(() => {
     void load();
