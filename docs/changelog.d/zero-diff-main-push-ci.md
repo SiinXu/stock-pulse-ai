@@ -1,0 +1,1 @@
+- [Fixed] Fail-close push-to-main CI when Change Detection sees zero files so empty follow-up commits still run the required full 3.11/3.10 shards and docker-build.

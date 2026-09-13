@@ -32,13 +32,16 @@ jobs:
       # shared runtime/config contracts change (provider templates, help copy,
       # public assets consumed outside the SPA). merge_group fail-closes to
       # true so a frontend-only queue group cannot skip the full 3.11/3.10
-      # shard gates. PR and push keep the path-selective backend skip.
-      backend: ${{ github.event_name == 'merge_group' || steps.backend-filter.outputs.backend_non_web == 'true' || steps.filter.outputs.backend_web_contract == 'true' }}
+      # shard gates. A push to main with zero detected files is unknown, not
+      # "no backend change", and fail-closes backend plus docker so the tip
+      # still gets the required 3.11/3.10 shards and docker-build. Nonempty
+      # PR and push diffs keep path-selective skips, including changelog-only.
+      backend: ${{ github.event_name == 'merge_group' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.any != 'true') || steps.backend-filter.outputs.backend_non_web == 'true' || steps.filter.outputs.backend_web_contract == 'true' }}
       # Fail closed to the sharded full suite when the planner did not write
       # an explicit false. Empty output must not schedule the 45-minute
       # selective job, which cannot run the unsharded offline suite in time.
       backend_full: ${{ steps.backend-selection.outputs.full || 'true' }}
-      docker: ${{ steps.filter.outputs.docker }}
+      docker: ${{ steps.filter.outputs.docker == 'true' || (github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.filter.outputs.any != 'true') }}
       frontend: ${{ steps.filter.outputs.frontend }}
       web_e2e: ${{ steps.filter.outputs.web_e2e }}
       ocr_extractor: ${{ steps.filter.outputs.ocr_extractor }}
@@ -55,6 +58,11 @@ jobs:
         uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
+            # Any changed path. False only when the compare range is empty.
+            # Distinguishes an empty push-to-main follow-up from a nonempty
+            # changelog-only diff, which must keep skipping backend/docker.
+            any:
+              - '**'
             # Shared web/runtime contracts that still require backend validation.
             backend_web_contract:
               - 'apps/dsa-web/public/**'
