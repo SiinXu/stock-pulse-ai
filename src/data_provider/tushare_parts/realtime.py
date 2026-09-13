@@ -6,9 +6,11 @@ Method bodies are rebound onto ``TushareFetcher`` by the compatibility facade
 ``src.data_provider.tushare_fetcher``. Same domain split as the efinance
 stock realtime owner.
 
-No sibling method moves. Chip distribution stays on the facade.
-Trade-calendar helpers are rebound from ``tushare_parts.trade_time`` onto
-the facade and are reached through ``self`` at call time. The rate-limited
+No sibling method moves. Chip distribution is rebound from
+``tushare_parts.chip`` onto the facade and is reached through ``self``
+at call time. Trade-calendar helpers are rebound from
+``tushare_parts.trade_time`` onto the facade and are reached through
+``self`` at call time. The rate-limited
 API client (``_api``, ``_check_rate_limit``, ``_call_api_with_rate_limit``)
 and the symbol converters (``_detect_exchange_hint``, ``_convert_stock_code``)
 are reached through ``self`` / ``cls`` at call time.
