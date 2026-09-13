@@ -12,8 +12,9 @@ import type {
 import { LocalModelsPanel } from '../LocalModelsPanel';
 import type { LocalModelTransport } from '../localModelTransport';
 
-const { getCatalog, createTransport } = vi.hoisted(() => ({
+const { getCatalog, getRuntime, createTransport } = vi.hoisted(() => ({
   getCatalog: vi.fn(),
+  getRuntime: vi.fn(),
   createTransport: vi.fn(),
 }));
 
@@ -106,7 +107,7 @@ function transport(overrides: Partial<LocalModelTransport> = {}): LocalModelTran
     installAction: 'download',
     installPlatform: 'macos',
     canControlRuntime: false,
-    getRuntime: vi.fn().mockResolvedValue(RUNTIME),
+    getRuntime,
     pull: vi.fn(),
     importPack: vi.fn(),
     remove: vi.fn(),
@@ -147,12 +148,14 @@ function hostFrom(container: HTMLElement, testId: string): HTMLElement {
   return within(container).getByTestId(testId);
 }
 
-describe('LocalModelsPanel dual-mount catalog ownership', () => {
+describe('LocalModelsPanel dual-mount catalog and runtime ownership', () => {
   beforeEach(() => {
     cleanup();
     vi.clearAllMocks();
     getCatalog.mockReset();
+    getRuntime.mockReset();
     createTransport.mockReset();
+    getRuntime.mockResolvedValue(RUNTIME);
   });
 
   afterEach(() => {
@@ -163,17 +166,18 @@ describe('LocalModelsPanel dual-mount catalog ownership', () => {
     const catalogPending = createDeferred<LocalModelCatalogResponse>();
     const runtimePending = createDeferred<LocalModelRuntimeState>();
     getCatalog.mockReturnValue(catalogPending.promise);
-    createTransport.mockImplementation(() => transport({
-      getRuntime: vi.fn().mockReturnValue(runtimePending.promise),
-    }));
+    getRuntime.mockReturnValue(runtimePending.promise);
+    createTransport.mockImplementation(() => transport());
     const client = createAppQueryClient();
     const view = render(<DualPanels client={client} showSettings showWizard={false} />);
     await waitFor(() => expect(getCatalog).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getRuntime).toHaveBeenCalledTimes(1));
     expect(classifyHost(hostFrom(view.container, 'host-settings')).state).toBe('loading');
 
     view.rerender(<DualPanels client={client} showSettings showWizard />);
     await waitFor(() => expect(within(view.container).getByTestId('host-wizard')).toBeInTheDocument());
     expect(getCatalog).toHaveBeenCalledTimes(1);
+    expect(getRuntime).toHaveBeenCalledTimes(1);
     expect(classifyHost(hostFrom(view.container, 'host-settings')).state).toBe('loading');
     expect(classifyHost(hostFrom(view.container, 'host-wizard')).state).toBe('loading');
 
@@ -193,16 +197,17 @@ describe('LocalModelsPanel dual-mount catalog ownership', () => {
     const catalogPending = createDeferred<LocalModelCatalogResponse>();
     const runtimePending = createDeferred<LocalModelRuntimeState>();
     getCatalog.mockReturnValue(catalogPending.promise);
-    createTransport.mockImplementation(() => transport({
-      getRuntime: vi.fn().mockReturnValue(runtimePending.promise),
-    }));
+    getRuntime.mockReturnValue(runtimePending.promise);
+    createTransport.mockImplementation(() => transport());
     const client = createAppQueryClient();
     const view = render(<DualPanels client={client} showSettings showWizard={false} />);
     await waitFor(() => expect(getCatalog).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getRuntime).toHaveBeenCalledTimes(1));
 
     view.rerender(<DualPanels client={client} showSettings showWizard />);
     await waitFor(() => expect(within(view.container).getByTestId('host-wizard')).toBeInTheDocument());
     expect(getCatalog).toHaveBeenCalledTimes(1);
+    expect(getRuntime).toHaveBeenCalledTimes(1);
 
     view.rerender(<DualPanels client={client} showSettings showWizard={false} />);
     expect(within(view.container).queryByTestId('host-wizard')).toBeNull();
@@ -225,15 +230,16 @@ describe('LocalModelsPanel dual-mount catalog ownership', () => {
     const catalogPending = createDeferred<LocalModelCatalogResponse>();
     const runtimePending = createDeferred<LocalModelRuntimeState>();
     getCatalog.mockReturnValue(catalogPending.promise);
-    createTransport.mockImplementation(() => transport({
-      getRuntime: vi.fn().mockReturnValue(runtimePending.promise),
-    }));
+    getRuntime.mockReturnValue(runtimePending.promise);
+    createTransport.mockImplementation(() => transport());
     const client = createAppQueryClient();
     const view = render(<DualPanels client={client} showSettings showWizard={false} />);
     await waitFor(() => expect(getCatalog).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(getRuntime).toHaveBeenCalledTimes(1));
 
     view.rerender(<DualPanels client={client} showSettings showWizard />);
     await waitFor(() => expect(within(view.container).getByTestId('host-wizard')).toBeInTheDocument());
+    expect(getRuntime).toHaveBeenCalledTimes(1);
 
     view.rerender(<DualPanels client={client} showSettings={false} showWizard />);
     expect(within(view.container).queryByTestId('host-settings')).toBeNull();

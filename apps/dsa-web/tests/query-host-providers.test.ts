@@ -359,6 +359,8 @@ describe('Query consumer hosts', () => {
     expect(read('src/components/settings/__tests__/LocalModelsPanel.dualMount.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/hooks/__tests__/useLocalModelsRuntimeQuery.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/hooks/__tests__/useLocalModelsRuntimeQuery.test.tsx')).toContain('QueryClientProvider');
   });
 
   it('keeps Settings local-models catalog GET on an imperative fetchQuery recipe without a barrel export', () => {
@@ -392,6 +394,51 @@ describe('Query consumer hosts', () => {
     expect(settingsPageSource).not.toContain('useLocalModelsCatalogQuery');
     expect(onboardingSource).toContain('FirstRunWizard');
     expect(onboardingSource).not.toContain('useLocalModelsCatalogQuery');
+    expect(harnessSource).toContain('local-models-with-kronos');
+    expect(harnessSource).toContain('FirstRunWizard');
+  });
+
+  it('keeps Settings local-models runtime GET on an imperative fetchQuery recipe without a barrel export', () => {
+    const hookSource = read('src/hooks/useLocalModelsRuntimeQuery.ts');
+    const catalogHookSource = read('src/hooks/useLocalModelsCatalogQuery.ts');
+    const barrelSource = read('src/hooks/index.ts');
+    const panelSource = read('src/components/settings/LocalModelsPanel.tsx');
+    const withKronosSource = read('src/components/settings/LocalModelsWithKronos.tsx');
+    const wizardSource = read('src/components/settings/FirstRunWizard.tsx');
+    const settingsPageSource = read('src/pages/SettingsPage.tsx');
+    const onboardingSource = read('src/components/onboarding/SettingsOnboardingHosts.tsx');
+    const settingsBarrelSource = read('src/components/settings/index.ts');
+    const editorSource = read('src/components/settings/LLMChannelEditor.tsx');
+    const harnessSource = read('src/pages/__tests__/SettingsPage.testHarness.tsx');
+    expect(hookSource).toContain('fetchQuery');
+    expect(hookSource).not.toMatch(/\buseQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseInfiniteQuery\s*\(/);
+    expect(hookSource).not.toMatch(/\buseMutation\s*\(/);
+    expect(hookSource).toContain("['local-models', 'runtime']");
+    expect(hookSource).not.toContain('getCatalog()');
+    expect(hookSource).not.toContain('startPull');
+    expect(hookSource).not.toContain('.assign(');
+    expect(hookSource).not.toContain('deleteModel');
+    expect(hookSource).not.toContain('importPack');
+    expect(hookSource).not.toContain("from '../api/localModels'");
+    expect(hookSource).not.toContain('localModelTransport');
+    expect(catalogHookSource).not.toContain('getRuntime(');
+    expect(barrelSource).not.toContain('useLocalModelsRuntimeQuery');
+    expect(panelSource).toContain('useLocalModelsRuntimeQuery');
+    expect(panelSource).toContain('loadRuntime()');
+    expect(panelSource).toContain('Promise.all([');
+    expect(withKronosSource).toContain("lazy(() => import('./LocalModelsPanel'))");
+    expect(withKronosSource).toContain('Suspense');
+    expect(withKronosSource).not.toContain('useLocalModelsRuntimeQuery');
+    expect(wizardSource).toContain("lazy(() => import('./LocalModelsPanel'))");
+    expect(wizardSource).toContain('Suspense');
+    expect(wizardSource).not.toContain('useLocalModelsRuntimeQuery');
+    expect(settingsPageSource).not.toContain('useLocalModelsRuntimeQuery');
+    expect(onboardingSource).toContain('FirstRunWizard');
+    expect(onboardingSource).not.toContain('useLocalModelsRuntimeQuery');
+    expect(settingsBarrelSource).not.toContain('useLocalModelsRuntimeQuery');
+    expect(editorSource).toContain('getRuntime()');
+    expect(editorSource).toContain('getGenerationBackendStatus()');
     expect(harnessSource).toContain('local-models-with-kronos');
     expect(harnessSource).toContain('FirstRunWizard');
   });
