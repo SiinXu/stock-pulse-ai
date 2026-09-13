@@ -1408,7 +1408,7 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
 
     "AGENT_DEEP_RESEARCH_BUDGET": {
         "title": "Deep Research Token Budget",
-        "description": "Maximum token budget for Deep Research planning, follow-up research, and final synthesis.",
+        "description": "Deep Research token ceiling on the shared specialist mode_budget account (planning, sub-questions, and synthesis). Exceeding it terminates with budget_tokens and success=false.",
         "category": "agent",
         "data_type": "integer",
         "ui_control": "number",

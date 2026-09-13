@@ -29737,6 +29737,29 @@
       },
       "ResearchResponse": {
         "properties": {
+          "budget_snapshot": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Budget Snapshot"
+          },
+          "cancelled": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cancelled"
+          },
           "content": {
             "title": "Content",
             "type": "string"
@@ -29751,6 +29774,17 @@
               }
             ],
             "title": "Error"
+          },
+          "failure_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failure Reason"
           },
           "sources": {
             "items": {

@@ -15608,10 +15608,18 @@ export interface components {
         };
         /** ResearchResponse */
         ResearchResponse: {
+            /** Budget Snapshot */
+            budget_snapshot?: {
+                [key: string]: unknown;
+            } | null;
+            /** Cancelled */
+            cancelled?: boolean | null;
             /** Content */
             content: string;
             /** Error */
             error?: string | null;
+            /** Failure Reason */
+            failure_reason?: string | null;
             /** Sources */
             sources?: string[];
             /** Success */

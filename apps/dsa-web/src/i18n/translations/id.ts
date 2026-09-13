@@ -3561,6 +3561,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.usage": "AGENT_DEEP_RESEARCH_BUDGET menetapkan anggaran token maksimum;AGENT_DEEP_RESEARCH_TIMEOUT Mengatur batas waktu dalam hitungan detik.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.0": "Anggaran tersebut mencakup perencanaan, penelitian tindak lanjut, dan sintesis akhir.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.1": "Anggaran yang lebih tinggi memungkinkan penelitian yang lebih dalam tetapi meningkatkan biaya.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.2": "When mode budgets are enabled, specialist turn/tool/cost defaults also apply.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.impact.0": "Memengaruhi deteksi pemberitahuan latar belakang dan pengiriman pemberitahuan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.notes.0": "Ini adalah metode konfigurasi lama. Untuk aturan lanjutan, gunakan pusat notifikasi.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.summary": "Mengonfigurasi aturan pemberitahuan harga dan volume dasar melalui JSON array.",

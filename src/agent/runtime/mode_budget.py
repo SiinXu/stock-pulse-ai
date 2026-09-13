@@ -190,6 +190,66 @@ class ModeBudgetAccount:
                 return None
             return max(0, int(self.limits.max_tool_calls) - int(self.tool_calls))
 
+    def remaining_llm_turns(self) -> Optional[int]:
+        with self._lock:
+            if not self.limits.enabled or self.limits.max_llm_turns <= 0:
+                return None
+            return max(0, int(self.limits.max_llm_turns) - int(self.llm_turns))
+
+    def remaining_tokens(self) -> Optional[int]:
+        with self._lock:
+            if not self.limits.enabled or self.limits.max_tokens <= 0:
+                return None
+            return max(0, int(self.limits.max_tokens) - int(self.tokens))
+
+    def probe_next_llm_turn(self) -> Optional[BudgetBreach]:
+        """Return a breach when the next LLM entry would exceed remaining capacity.
+
+        ``check()`` only fires after a counter has already passed its limit.
+        Research probes before decompose, each sub-question loop, and
+        synthesis so a spent turn/token/tool budget cannot start another call.
+        """
+        with self._lock:
+            existing = self._evaluate_locked()
+            if existing is not None:
+                return existing
+            if not self.limits.enabled:
+                return None
+            if self.limits.max_llm_turns > 0 and self.llm_turns >= self.limits.max_llm_turns:
+                return self._set_breach_locked(
+                    reason="budget_turns",
+                    dimension="llm_turns",
+                    used=float(self.llm_turns),
+                    limit=float(self.limits.max_llm_turns),
+                    message=(
+                        f"Mode '{self.limits.mode}' LLM turn budget exceeded: "
+                        f"{self.llm_turns}/{self.limits.max_llm_turns}"
+                    ),
+                )
+            if self.limits.max_tokens > 0 and self.tokens >= self.limits.max_tokens:
+                return self._set_breach_locked(
+                    reason="budget_tokens",
+                    dimension="tokens",
+                    used=float(self.tokens),
+                    limit=float(self.limits.max_tokens),
+                    message=(
+                        f"Mode '{self.limits.mode}' token budget exceeded: "
+                        f"{self.tokens}/{self.limits.max_tokens}"
+                    ),
+                )
+            if self.limits.max_tool_calls > 0 and self.tool_calls >= self.limits.max_tool_calls:
+                return self._set_breach_locked(
+                    reason="budget_tools",
+                    dimension="tool_calls",
+                    used=float(self.tool_calls),
+                    limit=float(self.limits.max_tool_calls),
+                    message=(
+                        f"Mode '{self.limits.mode}' tool-call budget exceeded: "
+                        f"{self.tool_calls}/{self.limits.max_tool_calls}"
+                    ),
+                )
+            return None
+
     def snapshot(self) -> Dict[str, Any]:
         with self._lock:
             return {
@@ -351,6 +411,60 @@ def create_mode_budget_account(
 ) -> ModeBudgetAccount:
     resolved = limits or resolve_mode_budget_limits(config, mode=mode, chat=chat)
     return ModeBudgetAccount(limits=resolved)
+
+
+def resolve_research_mode_budget_limits(
+    config: Any = None, *, token_budget: int = 0
+) -> ModeBudgetLimits:
+    """Specialist mode-budget profile with the Deep Research token ceiling.
+
+    Deep Research reuses specialist turn/tool/cost defaults and global
+    ``AGENT_MODE_BUDGET_MAX_*`` tighteners. ``AGENT_DEEP_RESEARCH_BUDGET``
+    (or the constructor ``token_budget``) is the research token ceiling on
+    that same account. The specialist built-in ``max_tokens=0`` must not
+    disable that ceiling.
+
+    When ``AGENT_MODE_BUDGET_ENABLED`` is false, turn/tool/cost caps are
+    dropped so operators restore the previous research token-only stop, but
+    the token ceiling still fail-closes. Snapshot ``enabled`` is true in
+    that token-only profile because token enforcement remains active.
+    """
+    base = resolve_mode_budget_limits(config, mode="specialist")
+    research_tokens = _read_nonneg_int(token_budget, default=0)
+    if research_tokens <= 0 and config is not None:
+        research_tokens = _read_nonneg_int(
+            getattr(config, "agent_deep_research_budget", None), default=0
+        )
+    max_tokens = int(base.max_tokens)
+    if research_tokens > 0:
+        max_tokens = (
+            min(max_tokens, research_tokens) if max_tokens > 0 else research_tokens
+        )
+    if not base.enabled:
+        return ModeBudgetLimits(
+            mode=base.mode,
+            enabled=True,
+            max_llm_turns=0,
+            max_tool_calls=0,
+            max_cost_usd=0.0,
+            max_tokens=max_tokens,
+        )
+    return ModeBudgetLimits(
+        mode=base.mode,
+        enabled=True,
+        max_llm_turns=base.max_llm_turns,
+        max_tool_calls=base.max_tool_calls,
+        max_cost_usd=base.max_cost_usd,
+        max_tokens=max_tokens,
+    )
+
+
+def create_research_mode_budget_account(
+    config: Any = None, *, token_budget: int = 0
+) -> ModeBudgetAccount:
+    return ModeBudgetAccount(
+        limits=resolve_research_mode_budget_limits(config, token_budget=token_budget)
+    )
 
 
 def get_or_create_context_budget_account(
@@ -541,9 +655,11 @@ __all__ = [
     "ModeBudgetLimits",
     "budget_breach_from_max_steps",
     "create_mode_budget_account",
+    "create_research_mode_budget_account",
     "estimate_usage_cost_usd",
     "get_or_create_context_budget_account",
     "normalize_budget_mode",
     "resolve_mode_budget_limits",
+    "resolve_research_mode_budget_limits",
     "store_budget_snapshot",
 ]

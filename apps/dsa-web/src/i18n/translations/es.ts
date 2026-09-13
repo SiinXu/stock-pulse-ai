@@ -3561,6 +3561,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.usage": "AGENT_DEEP_RESEARCH_BUDGET establece el presupuesto máximo de tokens;AGENT_DEEP_RESEARCH_TIMEOUT establece el tiempo muerto en segundos.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.0": "El presupuesto cubre la planificación, la investigación de seguimiento y la síntesis final.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.1": "Presupuestos más altos permiten una investigación más profunda pero aumentan el coste.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.2": "When mode budgets are enabled, specialist turn/tool/cost defaults also apply.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.impact.0": "Afecta la detección de alertas en segundo plano y la entrega de notificaciones.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.notes.0": "Este es un método de configuración heredado. Para reglas avanzadas, usa el centro de alertas.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.summary": "Configura reglas básicas de alerta de precio y volumen mediante un JSON Arreglo.",

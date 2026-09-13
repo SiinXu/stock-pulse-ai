@@ -149,6 +149,9 @@ const researchResponseSchema = z.object({
   sources: z.array(z.string()).optional(),
   token_usage: z.number().finite(),
   error: z.string().nullable().optional(),
+  failure_reason: z.string().nullable().optional(),
+  cancelled: z.boolean().optional(),
+  budget_snapshot: z.unknown().optional(),
 }).passthrough();
 
 const skillInfoSchema = z.object({

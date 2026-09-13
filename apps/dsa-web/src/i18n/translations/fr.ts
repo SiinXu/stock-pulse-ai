@@ -3561,6 +3561,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.usage": "AGENT_DEEP_RESEARCH_BUDGET fixe le budget maximal des jetons ;AGENT_DEEP_RESEARCH_TIMEOUT Fixe le délai en quelques secondes.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.0": "Le budget couvre la planification, la recherche de suivi et la synthèse finale.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.1": "Des budgets plus élevés permettent une recherche plus approfondie mais augmentent les coûts.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.2": "When mode budgets are enabled, specialist turn/tool/cost defaults also apply.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.impact.0": "Affecte la détection des alertes en arrière-plan et la livraison des notifications.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.notes.0": "C’est une méthode de configuration héritée. Pour des règles avancées, utilisez le centre d’alerte.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.summary": "Configure des règles d’alerte de base sur les prix et le volume via un JSON Array.",

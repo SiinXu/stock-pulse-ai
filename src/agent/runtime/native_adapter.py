@@ -74,7 +74,7 @@ class NativeRuntimeAdapter:
 
         def _worker() -> None:
             try:
-                result = self._dispatch(context, _emit)
+                result = self._dispatch(context, _emit, execution)
             except Exception as exc:  # recorded as FAILED and re-raised via execute()
                 execution.finish(
                     ExecutionState.FAILED,
@@ -123,6 +123,7 @@ class NativeRuntimeAdapter:
         self,
         context: ExecutionContext,
         progress_callback: Optional[ProgressCallback],
+        execution: AgentExecution,
     ) -> Any:
         request_context = deep_thaw(context.request_context) or None
         if context.mode is ExecutionMode.RUN:
@@ -137,7 +138,9 @@ class NativeRuntimeAdapter:
                 context=request_context,
             )
         if context.mode is ExecutionMode.RESEARCH:
-            return self._run_research(context, progress_callback, request_context)
+            return self._run_research(
+                context, progress_callback, request_context, execution
+            )
         raise ValueError(f"unsupported execution mode: {context.mode}")
 
     def _run_research(
@@ -145,24 +148,27 @@ class NativeRuntimeAdapter:
         context: ExecutionContext,
         progress_callback: Optional[ProgressCallback],
         request_context: Optional[dict],
+        execution: AgentExecution,
     ) -> Any:
         from src.agent.runtime_assembly import get_tool_registry
         from src.agent.llm_adapter import LLMToolAdapter
-        from src.agent.research import ResearchAgent
+        from src.agent.research import ResearchAgent, research_token_budget_from_config
 
         config = self._resolve_config()
         agent = ResearchAgent(
             tool_registry=get_tool_registry(),
             llm_adapter=LLMToolAdapter(config),
-            token_budget=getattr(
-                config, "agent_deep_research_budget", _DEFAULT_RESEARCH_TOKEN_BUDGET
+            token_budget=research_token_budget_from_config(
+                config, default=_DEFAULT_RESEARCH_TOKEN_BUDGET
             ),
+            config=config,
         )
         return agent.research(
             context.prompt,
             context=request_context,
             progress_callback=progress_callback,
             timeout_seconds=context.timeout_seconds,
+            cancelled_check=lambda: execution.cancel_requested,
         )
 
     def _resolve_config(self) -> Any:

@@ -3561,6 +3561,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.usage": "AGENT_DEEP_RESEARCH_BUDGET 최대 토큰 예산을 설정합니다;AGENT_DEEP_RESEARCH_TIMEOUT 타임아웃을 몇 초 만에 설정합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.0": "예산은 계획, 후속 연구, 최종 종합을 포함합니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.1": "예산이 많아지면 더 깊은 연구가 가능하지만 비용이 증가합니다.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.2": "When mode budgets are enabled, specialist turn/tool/cost defaults also apply.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.impact.0": "백그라운드 알림 감지 및 알림 전달에 영향을 미칩니다.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.notes.0": "이것은 레거시 구성 방식입니다. 고급 규칙은 알림 센터를 이용하세요.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.summary": "기본 가격 및 거래량 알림 규칙을 다음과 같이 설정합니다. JSON 배열.",

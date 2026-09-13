@@ -3561,6 +3561,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.usage": "AGENT_DEEP_RESEARCH_BUDGET menetapkan belanjawan token maksimum;AGENT_DEEP_RESEARCH_TIMEOUT Menetapkan tamat masa dalam beberapa saat.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.0": "Belanjawan meliputi perancangan, penyelidikan susulan dan sintesis akhir.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.1": "Belanjawan yang lebih tinggi membolehkan penyelidikan yang lebih mendalam tetapi meningkatkan kos.",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.2": "When mode budgets are enabled, specialist turn/tool/cost defaults also apply.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.impact.0": "Mempengaruhi pengesanan makluman latar belakang dan penghantaran pemberitahuan.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.notes.0": "Ini ialah kaedah konfigurasi warisan. Untuk peraturan lanjutan, gunakan pusat amaran.",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.summary": "Mengkonfigurasi peraturan amaran harga dan volum asas melalui JSON susususunan.",

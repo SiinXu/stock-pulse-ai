@@ -3561,6 +3561,7 @@ export const translations = {
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.usage": "AGENT_DEEP_RESEARCH_BUDGET 設定最大 token 預算；AGENT_DEEP_RESEARCH_TIMEOUT 設定超時秒數。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.0": "預算覆蓋規劃、後續研究和最終綜合所有階段。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.1": "預算越高，研究越深入，但消耗也越大。",
+  "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.DEEP_RESEARCH.valueNotes.2": "開啟模式預算時，specialist 的輪次/工具/成本預設值同樣生效。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.impact.0": "影響後臺告警檢測和通知推送。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.notes.0": "該欄位為 Legacy 配置方式，高階規則請使用告警中心。",
   "locales.settingsHelp.SETTINGS_HELP_MAPS.settings.agent.EVENT_ALERT_RULES_JSON.summary": "透過 JSON 陣列配置基礎價格和成交量告警規則。",

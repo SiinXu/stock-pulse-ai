@@ -1623,13 +1623,14 @@ const settingsHelpZhCN: SettingsHelpSourceMap = {
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
-    summary: '控制 Deep Research 的 token 预算和超时。',
-    usage: 'AGENT_DEEP_RESEARCH_BUDGET 设定最大 token 预算；AGENT_DEEP_RESEARCH_TIMEOUT 设定超时秒数。',
+    summary: '控制 Deep Research 在共享 mode_budget 账户上的 token 上限和超时。',
+    usage: 'AGENT_DEEP_RESEARCH_BUDGET 设定 specialist mode_budget 账户上的研究 token 上限；AGENT_DEEP_RESEARCH_TIMEOUT 设定超时秒数。',
     valueNotes: [
-      '预算覆盖规划、后续研究和最终综合所有阶段。',
-      '预算越高，研究越深入，但消耗也越大。',
+      '该 token 上限覆盖同一次研究的规划、子问题和最终综合。',
+      '超限时以 success=false 和 budget_tokens 终止，残留 markdown 不算完成报告。',
+      '开启模式预算时，specialist 的轮次/工具/成本默认值同样生效。',
     ],
-    impact: ['影响 Deep Research 功能的深度和耗时。'],
+    impact: ['影响 Deep Research 的深度、耗时和硬停止行为。'],
     notes: ['Deep Research 在 Agent 模式下可用。'],
   },
   'settings.agent.AGENT_MEMORY_ENABLED': {

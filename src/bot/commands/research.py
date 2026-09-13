@@ -87,18 +87,19 @@ class ResearchCommand(BotCommand):
 
         # Run the research agent
         try:
-            from src.agent.research import ResearchAgent
+            from src.agent.research import ResearchAgent, research_token_budget_from_config
             from src.agent.factory import get_tool_registry
             from src.agent.llm_adapter import LLMToolAdapter
 
             registry = get_tool_registry()
             llm_adapter = LLMToolAdapter(config)
-            budget = getattr(config, "agent_deep_research_budget", 30000)
+            budget = research_token_budget_from_config(config)
 
             agent = ResearchAgent(
                 tool_registry=registry,
                 llm_adapter=llm_adapter,
                 token_budget=budget,
+                config=config,
             )
 
             research_timeout = getattr(config, "agent_deep_research_timeout", 180)
@@ -138,12 +139,14 @@ class ResearchCommand(BotCommand):
                     report = report[:max_len] + "\n\n... (report truncated, full report available via API)"
 
                 return BotResponse.markdown_response(report)
-            else:
-                return BotResponse.text_response(
-                    f"⚠️ Research did not complete successfully.\n"
-                    f"Partial results: {result.findings_count} findings collected.\n"
-                    f"Time: {duration}s"
-                )
+
+            reason = getattr(result, "failure_reason", None)
+            reason_line = f"\nReason: {reason}" if reason else ""
+            return BotResponse.text_response(
+                f"⚠️ Research did not complete successfully.{reason_line}\n"
+                f"Partial results: {result.findings_count} findings collected.\n"
+                f"Time: {duration}s"
+            )
 
         except Exception as exc:
             # broad-exception: fallback_recorded - bot command boundary must not leak a traceback; the failure is safe-logged and mapped to a stable public reply.

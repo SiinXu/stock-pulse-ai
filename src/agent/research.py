@@ -25,6 +25,12 @@ from typing import Any, Callable, Dict, List, Optional
 
 from src.agent.llm_adapter import LLMToolAdapter
 from src.agent.runner import RunLoopResult, run_agent_loop
+from src.agent.runtime.mode_budget import (
+    BudgetBreach,
+    ModeBudgetAccount,
+    create_research_mode_budget_account,
+    estimate_usage_cost_usd,
+)
 from src.agent.stock_scope import StockScope, resolve_stock_scope
 from src.agent.tools.registry import ToolRegistry
 from src.utils.sanitize import log_safe_exception
@@ -35,6 +41,50 @@ logger = logging.getLogger(__name__)
 _DEFAULT_TOKEN_BUDGET = 30000
 _SYNTHESIS_RESERVE_SECONDS = 60.0
 _MAX_TOOL_EVIDENCE_CHARS = 16000
+_HARD_BUDGET_REASONS = frozenset({
+    "budget_turns",
+    "budget_tools",
+    "budget_cost",
+    "budget_tokens",
+})
+
+
+class _ResearchControl(Exception):
+    """Internal stop for cancel or a mode-budget breach (not a public API)."""
+
+    def __init__(
+        self,
+        *,
+        cancelled: bool = False,
+        breach: Optional[BudgetBreach] = None,
+    ):
+        self.cancelled = bool(cancelled)
+        self.breach = breach
+
+
+def research_token_budget_from_config(
+    config: Any, default: int = _DEFAULT_TOKEN_BUDGET
+) -> int:
+    """Return the Config-derived Deep Research token ceiling.
+
+    API, bot, and Native RESEARCH constructors must share this helper so the
+    same ``AGENT_DEEP_RESEARCH_BUDGET`` value is minted into the account.
+    """
+    if config is None:
+        return default
+    raw = getattr(config, "agent_deep_research_budget", default)
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return default
+    return value if value >= 0 else default
+
+
+def _failure_reason_value(reason: Any) -> Optional[str]:
+    value = getattr(reason, "value", reason)
+    if isinstance(value, str) and value in _HARD_BUDGET_REASONS:
+        return value
+    return None
 
 
 class ResearchAgent:
@@ -65,11 +115,13 @@ class ResearchAgent:
         llm_adapter: LLMToolAdapter,
         token_budget: int = _DEFAULT_TOKEN_BUDGET,
         max_sub_questions: int = 5,
+        config: Any = None,
     ):
         self.tool_registry = tool_registry
         self.llm_adapter = llm_adapter
         self.token_budget = token_budget
         self.max_sub_questions = max_sub_questions
+        self.config = config
 
     def research(
         self,
@@ -77,6 +129,7 @@ class ResearchAgent:
         context: Optional[Dict[str, Any]] = None,
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         timeout_seconds: Optional[float] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> ResearchResult:
         """Execute a deep research task.
 
@@ -91,156 +144,193 @@ class ResearchAgent:
             A :class:`ResearchResult` containing the report and metadata.
         """
         started_at = time.monotonic()
+        account = create_research_mode_budget_account(
+            self.config, token_budget=self.token_budget
+        )
         tokens_used = 0
         all_findings: List[Dict[str, Any]] = []
         questions: List[str] = [query]
         scope_resolution = resolve_stock_scope(query, context)
         effective_context = scope_resolution.effective_context
 
-        # Phase 1: Decompose
-        if self._is_timed_out(started_at, timeout_seconds):
+        def _tokens_used() -> int:
+            return int(tokens_used)
+
+        def _timeout_result(*, findings_count: int) -> ResearchResult:
             return self._build_timeout_result(
                 query=query,
                 questions=questions,
-                findings_count=0,
-                total_tokens=tokens_used,
+                findings_count=findings_count,
+                total_tokens=_tokens_used(),
                 duration_s=round(time.monotonic() - started_at, 2),
                 timeout_seconds=timeout_seconds,
+                account=account,
             )
-        if progress_callback:
-            progress_callback({"type": "research_phase", "phase": "decompose", "message": "Decomposing research query..."})
 
-        sub_questions = self._decompose_query(
-            query,
-            effective_context,
-            timeout_seconds=self._remaining_timeout_seconds(started_at, timeout_seconds),
-        )
-        tokens_used += sub_questions.get("tokens", 0)
-
-        questions = sub_questions.get("questions", [query])[:self.max_sub_questions]
-        if sub_questions.get("timed_out"):
-            return self._build_timeout_result(
-                query=query,
-                questions=questions,
-                findings_count=0,
-                total_tokens=tokens_used,
-                duration_s=round(time.monotonic() - started_at, 2),
-                timeout_seconds=timeout_seconds,
-            )
-        logger.info("[ResearchAgent] decomposed into %d sub-questions", len(questions))
-
-        initial_collection_timeout = self._allocate_sub_question_timeout(
-            self._remaining_timeout_seconds(started_at, timeout_seconds),
-            len(questions),
-        )
-
-        # Phase 2: Research each sub-question
-        for i, question in enumerate(questions):
+        try:
+            self._raise_if_cancelled(cancelled_check)
             if self._is_timed_out(started_at, timeout_seconds):
-                return self._build_timeout_result(
-                    query=query,
-                    questions=questions,
-                    findings_count=len(all_findings),
-                    total_tokens=tokens_used,
-                    duration_s=round(time.monotonic() - started_at, 2),
-                    timeout_seconds=timeout_seconds,
-                )
-            if tokens_used >= self.token_budget:
-                logger.warning("[ResearchAgent] token budget exceeded (%d/%d), stopping", tokens_used, self.token_budget)
-                break
+                return _timeout_result(findings_count=0)
+            self._raise_if_budget_blocks(account)
 
             if progress_callback:
                 progress_callback({
                     "type": "research_phase",
-                    "phase": "search",
-                    "message": f"Researching ({i + 1}/{len(questions)}): {question[:60]}...",
-                    "progress": (i + 1) / len(questions),
+                    "phase": "decompose",
+                    "message": "Decomposing research query...",
                 })
 
-            remaining_timeout = self._remaining_timeout_seconds(
-                started_at,
-                timeout_seconds,
-            )
-            sub_question_timeout = self._allocate_sub_question_timeout(
-                remaining_timeout,
-                len(questions) - i,
-            )
-            if (
-                sub_question_timeout is not None
-                and initial_collection_timeout is not None
-            ):
-                sub_question_timeout = min(
-                    sub_question_timeout,
-                    initial_collection_timeout,
-                )
-            if sub_question_timeout is not None and sub_question_timeout <= 0:
-                logger.warning(
-                    "[ResearchAgent] stopping sub-question collection to preserve synthesis budget"
-                )
-                break
-
-            finding = self._research_sub_question(
-                question,
-                effective_context,
-                tokens_used,
-                stock_scope=scope_resolution.stock_scope,
-                timeout_seconds=sub_question_timeout,
-            )
-            tokens_used += finding.get("tokens", 0)
-            if finding.get("timed_out"):
-                logger.warning(
-                    "[ResearchAgent] sub-question %d/%d reached its bounded budget; preserving gathered evidence",
-                    i + 1,
-                    len(questions),
-                )
-            if finding.get("content") or not finding.get("timed_out"):
-                all_findings.append(finding)
-
-        # Phase 3: Synthesise
-        if self._is_timed_out(started_at, timeout_seconds):
-            return self._build_timeout_result(
-                query=query,
-                questions=questions,
-                findings_count=len(all_findings),
-                total_tokens=tokens_used,
-                duration_s=round(time.monotonic() - started_at, 2),
-                timeout_seconds=timeout_seconds,
-            )
-        if progress_callback:
-            progress_callback({"type": "research_phase", "phase": "synthesize", "message": "Synthesising research report..."})
-
-        report = (
-            self._synthesise_report(
+            sub_questions = self._decompose_query(
                 query,
-                all_findings,
                 effective_context,
                 timeout_seconds=self._remaining_timeout_seconds(started_at, timeout_seconds),
+                account=account,
+                cancelled_check=cancelled_check,
             )
-            if all_findings
-            else {"content": "No findings gathered.", "tokens": 0}
-        )
-        tokens_used += report.get("tokens", 0)
-        if report.get("timed_out"):
-            return self._build_timeout_result(
+            tokens_used += int(sub_questions.get("tokens", 0) or 0)
+            questions = sub_questions.get("questions", [query])[:self.max_sub_questions]
+            if sub_questions.get("timed_out"):
+                return _timeout_result(findings_count=0)
+            if account.breach is not None:
+                raise _ResearchControl(breach=account.breach)
+            logger.info("[ResearchAgent] decomposed into %d sub-questions", len(questions))
+
+            self._raise_if_cancelled(cancelled_check)
+            self._raise_if_budget_blocks(account)
+
+            initial_collection_timeout = self._allocate_sub_question_timeout(
+                self._remaining_timeout_seconds(started_at, timeout_seconds),
+                len(questions),
+            )
+
+            for i, question in enumerate(questions):
+                self._raise_if_cancelled(cancelled_check)
+                if self._is_timed_out(started_at, timeout_seconds):
+                    return _timeout_result(findings_count=len(all_findings))
+                self._raise_if_budget_blocks(account)
+
+                if progress_callback:
+                    progress_callback({
+                        "type": "research_phase",
+                        "phase": "search",
+                        "message": (
+                            f"Researching ({i + 1}/{len(questions)}): {question[:60]}..."
+                        ),
+                        "progress": (i + 1) / len(questions),
+                    })
+
+                remaining_timeout = self._remaining_timeout_seconds(
+                    started_at,
+                    timeout_seconds,
+                )
+                sub_question_timeout = self._allocate_sub_question_timeout(
+                    remaining_timeout,
+                    len(questions) - i,
+                )
+                if (
+                    sub_question_timeout is not None
+                    and initial_collection_timeout is not None
+                ):
+                    sub_question_timeout = min(
+                        sub_question_timeout,
+                        initial_collection_timeout,
+                    )
+                if sub_question_timeout is not None and sub_question_timeout <= 0:
+                    logger.warning(
+                        "[ResearchAgent] stopping sub-question collection to preserve synthesis budget"
+                    )
+                    break
+
+                finding = self._research_sub_question(
+                    question,
+                    effective_context,
+                    _tokens_used(),
+                    stock_scope=scope_resolution.stock_scope,
+                    timeout_seconds=sub_question_timeout,
+                    account=account,
+                    cancelled_check=cancelled_check,
+                )
+                tokens_used += int(finding.get("tokens", 0) or 0)
+                if finding.get("cancelled"):
+                    raise _ResearchControl(cancelled=True)
+                budget_reason = finding.get("budget_reason")
+                if budget_reason in _HARD_BUDGET_REASONS:
+                    if finding.get("content") or not finding.get("timed_out"):
+                        all_findings.append(finding)
+                    raise _ResearchControl(breach=account.breach)
+                if finding.get("timed_out"):
+                    logger.warning(
+                        "[ResearchAgent] sub-question %d/%d reached its bounded budget; preserving gathered evidence",
+                        i + 1,
+                        len(questions),
+                    )
+                if finding.get("content") or not finding.get("timed_out"):
+                    all_findings.append(finding)
+                if account.breach is not None:
+                    raise _ResearchControl(breach=account.breach)
+
+            self._raise_if_cancelled(cancelled_check)
+            if self._is_timed_out(started_at, timeout_seconds):
+                return _timeout_result(findings_count=len(all_findings))
+            self._raise_if_budget_blocks(account)
+
+            if progress_callback:
+                progress_callback({
+                    "type": "research_phase",
+                    "phase": "synthesize",
+                    "message": "Synthesising research report...",
+                })
+
+            report = (
+                self._synthesise_report(
+                    query,
+                    all_findings,
+                    effective_context,
+                    timeout_seconds=self._remaining_timeout_seconds(
+                        started_at, timeout_seconds
+                    ),
+                    account=account,
+                    cancelled_check=cancelled_check,
+                )
+                if all_findings
+                else {"content": "No findings gathered.", "tokens": 0}
+            )
+            tokens_used += int(report.get("tokens", 0) or 0)
+            if report.get("timed_out"):
+                return _timeout_result(findings_count=len(all_findings))
+            if account.breach is not None:
+                raise _ResearchControl(breach=account.breach)
+
+            return ResearchResult(
+                success=not report.get("error"),
+                report=report.get("content", ""),
+                sub_questions=questions,
+                findings_count=len(all_findings),
+                total_tokens=_tokens_used(),
+                duration_s=round(time.monotonic() - started_at, 2),
+                error=report.get("error"),
+                budget_snapshot=account.snapshot(),
+            )
+        except _ResearchControl as stop:
+            if stop.cancelled:
+                return self._build_cancelled_result(
+                    query=query,
+                    questions=questions,
+                    findings_count=len(all_findings),
+                    total_tokens=_tokens_used(),
+                    duration_s=round(time.monotonic() - started_at, 2),
+                    account=account,
+                    findings=all_findings,
+                )
+            return self._build_budget_result(
                 query=query,
                 questions=questions,
                 findings_count=len(all_findings),
-                total_tokens=tokens_used,
+                total_tokens=_tokens_used(),
                 duration_s=round(time.monotonic() - started_at, 2),
-                timeout_seconds=timeout_seconds,
+                account=account,
+                findings=all_findings,
             )
-
-        duration = round(time.monotonic() - started_at, 2)
-
-        return ResearchResult(
-            success=not report.get("error"),
-            report=report.get("content", ""),
-            sub_questions=questions,
-            findings_count=len(all_findings),
-            total_tokens=tokens_used,
-            duration_s=duration,
-            error=report.get("error"),
-        )
 
     @staticmethod
     def _remaining_timeout_seconds(started_at: float, timeout_seconds: Optional[float]) -> Optional[float]:
@@ -254,6 +344,30 @@ class ResearchAgent:
         """Return whether the overall research deadline has been exceeded."""
         remaining = ResearchAgent._remaining_timeout_seconds(started_at, timeout_seconds)
         return remaining is not None and remaining <= 0
+
+    @staticmethod
+    def _raise_if_cancelled(cancelled_check: Optional[Callable[[], bool]]) -> None:
+        if cancelled_check is not None and cancelled_check():
+            raise _ResearchControl(cancelled=True)
+
+    @staticmethod
+    def _raise_if_budget_blocks(account: ModeBudgetAccount) -> None:
+        breach = account.probe_next_llm_turn()
+        if breach is not None:
+            raise _ResearchControl(breach=breach)
+
+    @staticmethod
+    def _partial_findings_report(findings: Optional[List[Dict[str, Any]]]) -> str:
+        if not findings:
+            return ""
+        sections = []
+        for finding in findings:
+            content = str(finding.get("content") or "").strip()
+            if not content:
+                continue
+            question = str(finding.get("question") or "").strip()
+            sections.append(f"### {question}\n{content}" if question else content)
+        return "\n\n".join(sections)
 
     @staticmethod
     def _allocate_sub_question_timeout(
@@ -301,6 +415,7 @@ class ResearchAgent:
         total_tokens: int,
         duration_s: float,
         timeout_seconds: Optional[float],
+        account: Optional[ModeBudgetAccount] = None,
     ) -> ResearchResult:
         """Build a structured timeout result without leaving detached work behind."""
         timeout_label = f"{timeout_seconds}s" if timeout_seconds is not None else "the configured limit"
@@ -314,6 +429,61 @@ class ResearchAgent:
             duration_s=duration_s,
             error=f"Deep research timed out after {timeout_label}",
             timed_out=True,
+            budget_snapshot=account.snapshot() if account is not None else None,
+        )
+
+    @staticmethod
+    def _build_cancelled_result(
+        *,
+        query: str,
+        questions: List[str],
+        findings_count: int,
+        total_tokens: int,
+        duration_s: float,
+        account: Optional[ModeBudgetAccount] = None,
+        findings: Optional[List[Dict[str, Any]]] = None,
+    ) -> ResearchResult:
+        logger.info("[ResearchAgent] cancelled for query: %s", query[:120])
+        return ResearchResult(
+            success=False,
+            report=ResearchAgent._partial_findings_report(findings),
+            sub_questions=questions,
+            findings_count=findings_count,
+            total_tokens=total_tokens,
+            duration_s=duration_s,
+            error="Deep research cancelled",
+            cancelled=True,
+            budget_snapshot=account.snapshot() if account is not None else None,
+        )
+
+    @staticmethod
+    def _build_budget_result(
+        *,
+        query: str,
+        questions: List[str],
+        findings_count: int,
+        total_tokens: int,
+        duration_s: float,
+        account: ModeBudgetAccount,
+        findings: Optional[List[Dict[str, Any]]] = None,
+    ) -> ResearchResult:
+        breach = account.breach
+        reason = breach.reason if breach is not None else "budget_tokens"
+        logger.warning(
+            "[ResearchAgent] mode budget exceeded (%s) for query: %s",
+            reason,
+            query[:120],
+        )
+        return ResearchResult(
+            success=False,
+            report=ResearchAgent._partial_findings_report(findings),
+            sub_questions=questions,
+            findings_count=findings_count,
+            total_tokens=total_tokens,
+            duration_s=duration_s,
+            error=breach.message if breach is not None else "Deep research exceeded its mode budget",
+            failure_reason=reason,
+            budget_snapshot=account.snapshot(),
         )
 
     def _call_text_completion(
@@ -323,19 +493,33 @@ class ResearchAgent:
         temperature: float,
         max_tokens: int,
         timeout: int,
+        account: Optional[ModeBudgetAccount] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
         """Run a text-only LLM completion via the shared adapter."""
+        self._raise_if_cancelled(cancelled_check)
+        if account is not None:
+            self._raise_if_budget_blocks(account)
         response = self.llm_adapter.call_text(
             messages,
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout,
         )
+        usage = response.usage or {}
+        tokens = int(usage.get("total_tokens", 0) or 0)
+        if account is not None:
+            model = str(getattr(response, "model", "") or getattr(response, "provider", "") or "")
+            account.record_llm_turn(
+                tokens=tokens,
+                cost_usd=estimate_usage_cost_usd(usage, model),
+                model=model,
+            )
         if response.provider == "error":
             raise RuntimeError(response.content or "LLM completion failed")
         return {
             "content": (response.content or "").strip(),
-            "tokens": response.usage.get("total_tokens", 0),
+            "tokens": tokens,
         }
 
     def _decompose_query(
@@ -343,6 +527,8 @@ class ResearchAgent:
         query: str,
         context: Optional[Dict[str, Any]],
         timeout_seconds: Optional[float] = None,
+        account: Optional[ModeBudgetAccount] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
         """Use LLM to decompose a research query into sub-questions."""
         stock_hint = ""
@@ -372,6 +558,8 @@ Return a JSON object:
                     temperature=0.3,
                     max_tokens=max_tokens,
                     timeout=step_timeout,
+                    account=account,
+                    cancelled_check=cancelled_check,
                 )
                 raw = completion["content"]
                 tokens += completion["tokens"]
@@ -395,6 +583,8 @@ Return a JSON object:
                         "tokens": tokens,
                     }
             raise ValueError("Research decomposition returned no usable questions")
+        except _ResearchControl:
+            raise
         except Exception as exc:  # broad-exception: fallback_recorded - Fall back to the original query when decomposition fails.
             log_safe_exception(
                 logger,
@@ -442,8 +632,30 @@ Return a JSON object:
         *,
         stock_scope: Optional[StockScope],
         timeout_seconds: Optional[float] = None,
+        account: Optional[ModeBudgetAccount] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
         """Research a single sub-question using the agent loop."""
+        if cancelled_check is not None and cancelled_check():
+            return {
+                "question": question,
+                "content": "",
+                "tokens": 0,
+                "success": False,
+                "cancelled": True,
+                "error": "Deep research cancelled",
+            }
+        if account is not None:
+            breach = account.probe_next_llm_turn()
+            if breach is not None:
+                return {
+                    "question": question,
+                    "content": "",
+                    "tokens": 0,
+                    "success": False,
+                    "budget_reason": breach.reason,
+                    "error": breach.message,
+                }
         if timeout_seconds is not None and timeout_seconds <= 0:
             return {
                 "question": question,
@@ -453,7 +665,10 @@ Return a JSON object:
                 "timed_out": True,
                 "error": "Deep research timed out before sub-question execution",
             }
-        remaining_budget = self.token_budget - current_tokens
+        if account is not None and account.limits.max_tokens > 0:
+            remaining_budget = max(0, int(account.limits.max_tokens) - int(account.tokens))
+        else:
+            remaining_budget = self.token_budget - current_tokens
         effective_context = dict(context or {})
 
         system = f"""\
@@ -477,18 +692,42 @@ Token budget remaining: ~{remaining_budget}
 
         try:
             registry = self._filtered_registry()
+            max_steps = 4
+            if account is not None:
+                max_steps = account.limits.effective_max_steps(4)
             result: RunLoopResult = run_agent_loop(
                 messages=messages,
                 tool_registry=registry,
                 llm_adapter=self.llm_adapter,
-                max_steps=4,
+                max_steps=max_steps,
                 max_wall_clock_seconds=timeout_seconds,
                 tool_call_timeout_seconds=timeout_seconds,
                 stock_scope=stock_scope,
+                cancelled_check=cancelled_check,
+                mode_budget_account=account,
             )
             evidence = result.content or self._extract_tool_evidence(
                 getattr(result, "messages", None)
             )
+            if getattr(result, "cancelled", False):
+                return {
+                    "question": question,
+                    "content": evidence,
+                    "tokens": result.total_tokens,
+                    "success": False,
+                    "cancelled": True,
+                    "error": result.error,
+                }
+            budget_reason = _failure_reason_value(getattr(result, "failure_reason", None))
+            if budget_reason is not None:
+                return {
+                    "question": question,
+                    "content": evidence,
+                    "tokens": result.total_tokens,
+                    "success": False,
+                    "budget_reason": budget_reason,
+                    "error": result.error,
+                }
             if not result.success and self._looks_like_timeout_error(result.error):
                 return {
                     "question": question,
@@ -504,6 +743,8 @@ Token budget remaining: ~{remaining_budget}
                 "tokens": result.total_tokens,
                 "success": result.success,
             }
+        except _ResearchControl:
+            raise
         except Exception as exc:  # broad-exception: fallback_recorded - Preserve the bounded research result contract for one failed sub-question.
             log_safe_exception(
                 logger,
@@ -552,6 +793,8 @@ Token budget remaining: ~{remaining_budget}
         findings: List[Dict[str, Any]],
         context: Optional[Dict[str, Any]],
         timeout_seconds: Optional[float] = None,
+        account: Optional[ModeBudgetAccount] = None,
+        cancelled_check: Optional[Callable[[], bool]] = None,
     ) -> Dict[str, Any]:
         """Synthesise all findings into a coherent research report."""
         findings_text = "\n\n".join(
@@ -621,6 +864,8 @@ budget is reached.
                     temperature=0.3,
                     max_tokens=max_tokens,
                     timeout=step_timeout,
+                    account=account,
+                    cancelled_check=cancelled_check,
                 )
                 tokens += completion["tokens"]
                 content = completion["content"]
@@ -635,6 +880,8 @@ budget is reached.
                 "tokens": tokens,
                 "error": "Research synthesis returned an empty final report",
             }
+        except _ResearchControl:
+            raise
         except Exception as exc:  # broad-exception: fallback_recorded - synthesis failure is logged and returns an explicit bounded fallback
             log_safe_exception(
                 logger,
@@ -669,3 +916,6 @@ class ResearchResult:
     duration_s: float = 0.0
     error: Optional[str] = None
     timed_out: bool = False
+    cancelled: bool = False
+    failure_reason: Optional[str] = None
+    budget_snapshot: Optional[Dict[str, Any]] = None
