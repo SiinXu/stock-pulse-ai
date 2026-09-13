@@ -3499,6 +3499,228 @@ test('createWindow startup routes a pending deep link after restore and backend 
   });
 });
 
+async function bootPackagedCreateWindow(t, { queueDeepLink } = {}) {
+  const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'dsa-desktop-first-run-'));
+  const appDir = path.join(tempRoot, 'app');
+  const userDataDir = path.join(tempRoot, 'userData');
+  const exePath = path.join(appDir, 'Daily Stock Analysis.exe');
+  const uninstallPath = path.join(appDir, 'Uninstall Daily Stock Analysis.exe');
+  const loadedFiles = [];
+  const loadedUrls = [];
+  let startupError;
+  const originalResourcesPathDescriptor = Object.getOwnPropertyDescriptor(process, 'resourcesPath');
+  const resourcesPath = path.join(tempRoot, 'resources');
+
+  function fakeBrowserWindow() {
+    return {
+      isDestroyed: () => false,
+      setBackgroundColor: () => undefined,
+      once: () => undefined,
+      webContents: {
+        on: () => undefined,
+        setWindowOpenHandler: () => undefined,
+        send: () => undefined,
+      },
+      loadFile: async (file) => {
+        loadedFiles.push(file);
+        return undefined;
+      },
+      loadURL: async (url) => {
+        loadedUrls.push(url);
+        return undefined;
+      },
+    };
+  }
+
+  const fakeBackendProcess = new EventEmitter();
+  fakeBackendProcess.pid = 12345;
+  fakeBackendProcess.exitCode = null;
+  fakeBackendProcess.signalCode = null;
+  fakeBackendProcess.stdout = new EventEmitter();
+  fakeBackendProcess.stderr = new EventEmitter();
+
+  const fakeWhenReady = () => ({
+    then: (handler) => {
+      return Promise.resolve()
+        .then(() => handler())
+        .catch((error) => {
+          startupError = error;
+        });
+    },
+  });
+
+  const fakeNet = {
+    createServer: () => {
+      const server = new EventEmitter();
+      server.once = (event, handler) => {
+        server.on(event, handler);
+        return server;
+      };
+      server.listen = () => {
+        process.nextTick(() => {
+          server.emit('listening');
+        });
+        return server;
+      };
+      server.close = (callback) => {
+        if (callback) {
+          process.nextTick(callback);
+        }
+      };
+      return server;
+    },
+  };
+
+  const fakeHttp = {
+    get: (_url, onResponse) => {
+      const request = new EventEmitter();
+      const response = new EventEmitter();
+      request.setTimeout = () => undefined;
+      request.destroy = () => undefined;
+      response.statusCode = 200;
+      response.resume = () => undefined;
+      process.nextTick(() => {
+        onResponse(response);
+      });
+      return request;
+    },
+    request: (url, _options, onResponse) => {
+      const req = new EventEmitter();
+      req.destroyed = false;
+      req.setTimeout = () => undefined;
+      req.destroy = () => {
+        req.destroyed = true;
+      };
+      req.end = () => {
+        process.nextTick(() => {
+          const response = new EventEmitter();
+          const isLocalOnlyStatus = String(url).includes('/api/v1/security/local-only');
+          response.statusCode = isLocalOnlyStatus ? 200 : 404;
+          response.complete = true;
+          onResponse(response);
+          response.emit(
+            'data',
+            Buffer.from(JSON.stringify(isLocalOnlyStatus
+              ? { enabled: false, env_key: 'LOCAL_ONLY_MODE' }
+              : {}))
+          );
+          response.emit('end');
+        });
+      };
+      return req;
+    },
+  };
+
+  if (originalResourcesPathDescriptor) {
+    Object.defineProperty(process, 'resourcesPath', {
+      ...originalResourcesPathDescriptor,
+      value: resourcesPath,
+    });
+  } else {
+    process.resourcesPath = resourcesPath;
+  }
+
+  fs.mkdirSync(appDir, { recursive: true });
+  fs.mkdirSync(userDataDir, { recursive: true });
+  fs.mkdirSync(path.join(resourcesPath, 'backend', 'stock_analysis'), { recursive: true });
+  fs.writeFileSync(exePath, '');
+  fs.writeFileSync(uninstallPath, '');
+  fs.writeFileSync(path.join(resourcesPath, 'backend', 'stock_analysis', 'stock_analysis.exe'), '');
+  assert.equal(fs.existsSync(path.join(appDir, '.env')), false);
+
+  const mainModule = loadMainModule(t, {
+    platform: 'win32',
+    browserWindow: fakeBrowserWindow,
+    http: fakeHttp,
+    net: fakeNet,
+    childProcess: {
+      spawn: () => fakeBackendProcess,
+    },
+    app: {
+      isPackaged: true,
+      getVersion: () => '3.12.0',
+      getPath: (name) => {
+        if (name === 'exe') {
+          return exePath;
+        }
+        return userDataDir;
+      },
+      whenReady: fakeWhenReady,
+      on: () => undefined,
+      quit: () => undefined,
+    },
+    electronUpdater: {
+      autoDownload: true,
+      autoInstallOnAppQuit: false,
+      on: () => undefined,
+      checkForUpdates: async () => undefined,
+    },
+  });
+
+  if (queueDeepLink) {
+    assert.equal(mainModule.queueDesktopDeepLink(queueDeepLink), true);
+  }
+
+  await new Promise((resolve) => {
+    setTimeout(resolve, 80);
+  });
+
+  t.after(() => {
+    if (originalResourcesPathDescriptor) {
+      Object.defineProperty(process, 'resourcesPath', originalResourcesPathDescriptor);
+    } else {
+      delete process.resourcesPath;
+    }
+    fs.rmSync(tempRoot, { recursive: true, force: true });
+  });
+
+  return {
+    appDir,
+    loadedFiles,
+    loadedUrls,
+    startupError,
+    mainModule,
+  };
+}
+
+test('createWindow missing .env after health opens the first-run settings route', async (t) => {
+  const { appDir, loadedFiles, loadedUrls, startupError, mainModule } = await bootPackagedCreateWindow(t);
+
+  assert.equal(startupError, undefined);
+  assert.equal(loadedFiles.length >= 1, true);
+  assert.equal(loadedUrls.length >= 1, true);
+  const loadedMainPageUrl = new URL(loadedUrls[0]);
+  assert.match(loadedMainPageUrl.origin, /^http:\/\/127\.0\.0\.1:\d+$/);
+  assert.equal(
+    `${loadedMainPageUrl.pathname}?${loadedMainPageUrl.searchParams.toString()}`.startsWith(
+      mainModule.DESKTOP_FIRST_RUN_SETTINGS_ROUTE
+    ) || (
+      loadedMainPageUrl.pathname === '/settings'
+      && loadedMainPageUrl.searchParams.get('section') === 'overview'
+      && loadedMainPageUrl.searchParams.get('view') === 'readiness'
+      && loadedMainPageUrl.searchParams.get('from') === 'onboarding'
+    ),
+    true,
+  );
+  assert.equal(loadedMainPageUrl.searchParams.get('section'), 'overview');
+  assert.equal(loadedMainPageUrl.searchParams.get('view'), 'readiness');
+  assert.equal(loadedMainPageUrl.searchParams.get('from'), 'onboarding');
+  assert.equal(fs.existsSync(path.join(appDir, '.env')), true);
+});
+
+test('createWindow missing .env still prefers a queued deep link over first-run', async (t) => {
+  const { loadedUrls, startupError } = await bootPackagedCreateWindow(t, {
+    queueDeepLink: 'stockpulse://app/portfolio?account=7',
+  });
+
+  assert.equal(startupError, undefined);
+  assert.equal(loadedUrls.length >= 1, true);
+  const loadedMainPageUrl = new URL(loadedUrls[0]);
+  assert.equal(loadedMainPageUrl.pathname, '/portfolio');
+  assert.equal(loadedMainPageUrl.searchParams.get('account'), '7');
+  assert.equal(loadedMainPageUrl.searchParams.get('from'), null);
+});
+
 test('stopBackend waits for backend process exit', async (t) => {
   const mainModule = loadMainModule(t, { platform: 'linux' });
   const killSignals = [];

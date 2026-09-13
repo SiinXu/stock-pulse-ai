@@ -49,6 +49,14 @@ vi.mock('../LocalModelsPanel', () => {
         >
           simulate ready local model
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            void onConfigurationChanged?.();
+          }}
+        >
+          simulate registered-only local model
+        </button>
       </div>
     );
   }
@@ -284,6 +292,31 @@ describe('FirstRunWizard', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Running tasks' }));
     expect(onStartFirstAnalysis).toHaveBeenCalledTimes(1);
     expect(onStartFirstAnalysis.mock.calls[0][0]).toContain('wizard-smoke-task');
+  });
+
+  it('keeps Next disabled when the local panel only registers a model without making it primary', () => {
+    vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
+      taskId: 'wizard-smoke-task',
+      status: 'accepted',
+    } as never);
+    render(
+      <FirstRunWizard
+        onComplete={okComplete()}
+        onClose={() => {}}
+        isSaving={false}
+        language="en"
+        providers={BILINGUAL_CATALOG}
+        firstAnalysisStockCode="600519"
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Local model/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    fireEvent.click(screen.getByRole('button', { name: 'simulate registered-only local model' }));
+
+    expect(screen.getByRole('button', { name: 'Next' })).toBeDisabled();
+    expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
+    expect(screen.queryByRole('button', { name: 'Complete setup' })).not.toBeInTheDocument();
   });
 
   it('surfaces a failed first analysis instead of a success state', async () => {

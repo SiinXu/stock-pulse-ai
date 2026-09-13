@@ -229,6 +229,40 @@ describe('LocalModelsPanel', () => {
 
     await vi.waitFor(() => {
       expect(assign).toHaveBeenCalledWith('qwen3:4b', 'auto');
+    });
+    expect(onModelReady).not.toHaveBeenCalled();
+    expect(screen.getAllByRole('button', { name: 'Set as primary' }).length).toBeGreaterThan(0);
+  });
+
+  it('marks an installed model ready when auto-assign becomes the primary route', async () => {
+    const assign = vi.fn().mockResolvedValue({
+      ...AVAILABLE_RUNTIME.configuration,
+      configVersion: 'config-2',
+      registeredModels: ['qwen3:4b'],
+      primaryModel: 'ollama/qwen3:4b',
+    });
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        installedModels: ['qwen3:4b'],
+        configuration: {
+          ...AVAILABLE_RUNTIME.configuration,
+          primaryModel: '',
+        },
+      }),
+      assign,
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({
+      onModelReady,
+      selectModelLabel: 'Select model',
+      selectedModelLabel: 'Selected model',
+    });
+    fireEvent.click(await screen.findByRole('button', { name: 'Select model' }));
+
+    await vi.waitFor(() => {
+      expect(assign).toHaveBeenCalledWith('qwen3:4b', 'auto');
       expect(onModelReady).toHaveBeenCalledWith('qwen3:4b');
     });
   });
@@ -276,8 +310,8 @@ describe('LocalModelsPanel', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
 
     expect(await screen.findByText('qwen3:8b is downloaded and registered.')).toBeInTheDocument();
-    expect(onModelReady).toHaveBeenCalledTimes(1);
-    expect(onModelReady).toHaveBeenCalledWith('qwen3:8b');
+    expect(screen.getByText(/current primary model was preserved/)).toBeInTheDocument();
+    expect(onModelReady).not.toHaveBeenCalled();
   });
 
   it('shows a non-destructive warning when deletion finalization is unconfirmed', async () => {
@@ -340,6 +374,7 @@ describe('LocalModelsPanel', () => {
       configuration: {
         ...AVAILABLE_RUNTIME.configuration,
         registeredModels: ['qwen3:4b', 'qwen3:8b'],
+        primaryModel: 'ollama/qwen3:8b',
       },
     };
     const removedRuntime: LocalModelRuntimeState = {
@@ -422,7 +457,141 @@ describe('LocalModelsPanel', () => {
 
     expect(await screen.findByText('qwen3:4b is downloaded and registered.')).toBeInTheDocument();
     expect(screen.getByText(/current primary model was preserved/)).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: 'Set as primary' }).length).toBeGreaterThan(0);
     expect(onConfigurationChanged).toHaveBeenCalled();
+    expect(onModelReady).not.toHaveBeenCalled();
+  });
+
+  it('marks a downloaded model ready only after Set as primary replaces the cloud route', async () => {
+    const readyRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['qwen3:4b'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        configVersion: 'config-2',
+        registeredModels: ['qwen3:4b'],
+      },
+    };
+    const assign = vi.fn().mockResolvedValue({
+      ...readyRuntime.configuration,
+      configVersion: 'config-3',
+      primaryModel: 'ollama/qwen3:4b',
+    });
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn()
+        .mockResolvedValueOnce(AVAILABLE_RUNTIME)
+        .mockResolvedValue(readyRuntime),
+      pull: vi.fn().mockResolvedValue({
+        modelId: 'qwen3:4b',
+        activated: true,
+        selectedPrimary: false,
+      }),
+      assign,
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({ onModelReady });
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
+
+    expect(await screen.findByText(/current primary model was preserved/)).toBeInTheDocument();
+    expect(onModelReady).not.toHaveBeenCalled();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Set as primary' })[0]);
+
+    await vi.waitFor(() => {
+      expect(assign).toHaveBeenCalledWith('qwen3:4b', 'primary');
+      expect(onModelReady).toHaveBeenCalledWith('qwen3:4b');
+    });
+  });
+
+  it('does not treat agent-only assignment as first-run primary ready', async () => {
+    const installedRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['qwen3:4b'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        registeredModels: ['qwen3:4b'],
+      },
+    };
+    const assign = vi.fn().mockResolvedValue({
+      ...installedRuntime.configuration,
+      configVersion: 'config-2',
+      agentModel: 'ollama/qwen3:4b',
+    });
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue(installedRuntime),
+      assign,
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({ onModelReady });
+    fireEvent.click(await screen.findByRole('button', { name: 'Set as Agent model' }));
+
+    await vi.waitFor(() => {
+      expect(assign).toHaveBeenCalledWith('qwen3:4b', 'agent');
+    });
+    expect(onModelReady).not.toHaveBeenCalled();
+  });
+
+  it('clears first-run readiness when the selected model is no longer primary', async () => {
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn().mockResolvedValue({
+        ...AVAILABLE_RUNTIME,
+        installedModels: ['qwen3:4b'],
+        configuration: {
+          ...AVAILABLE_RUNTIME.configuration,
+          registeredModels: ['qwen3:4b'],
+        },
+      }),
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({
+      selectedModelId: 'qwen3:4b',
+      selectModelLabel: 'Select model',
+      selectedModelLabel: 'Selected model',
+      onModelReady,
+    });
+
+    await screen.findByTestId('local-model-qwen3-4b');
+    await vi.waitFor(() => {
+      expect(onModelReady).toHaveBeenCalledWith('');
+    });
+  });
+
+  it('marks a downloaded model ready when it becomes the primary route', async () => {
+    const readyRuntime: LocalModelRuntimeState = {
+      ...AVAILABLE_RUNTIME,
+      installedModels: ['qwen3:4b'],
+      configuration: {
+        ...AVAILABLE_RUNTIME.configuration,
+        configVersion: 'config-2',
+        registeredModels: ['qwen3:4b'],
+        primaryModel: 'ollama/qwen3:4b',
+      },
+    };
+    createTransport.mockReturnValue(transport({
+      getRuntime: vi.fn()
+        .mockResolvedValueOnce({
+          ...AVAILABLE_RUNTIME,
+          configuration: {
+            ...AVAILABLE_RUNTIME.configuration,
+            primaryModel: '',
+          },
+        })
+        .mockResolvedValue(readyRuntime),
+      pull: vi.fn().mockResolvedValue({
+        modelId: 'qwen3:4b',
+        activated: true,
+        selectedPrimary: true,
+      }),
+    }));
+    const onModelReady = vi.fn();
+
+    renderPanel({ onModelReady });
+    fireEvent.click(await screen.findByRole('button', { name: 'Download' }));
+
+    expect(await screen.findByText('qwen3:4b is downloaded and registered.')).toBeInTheDocument();
+    expect(screen.queryByText(/current primary model was preserved/)).not.toBeInTheDocument();
     expect(onModelReady).toHaveBeenCalledWith('qwen3:4b');
   });
 
@@ -608,7 +777,8 @@ describe('LocalModelsPanel', () => {
       importPack,
     }));
 
-    const view = renderPanel();
+    const onModelReady = vi.fn();
+    const view = renderPanel({ onModelReady });
     await screen.findByRole('button', { name: 'Import Model Pack' });
     const input = view.container.querySelector('input[type="file"]');
     const file = new File(['pack'], 'finance.modelpack', { type: 'application/zip' });
@@ -618,6 +788,8 @@ describe('LocalModelsPanel', () => {
       'licensed/finance:q4 was verified, created, and registered.',
     )).toBeInTheDocument();
     expect(screen.getByText('Import completed, but 1 undeclared files were ignored.')).toBeInTheDocument();
+    expect(screen.getByText(/current primary model was preserved/)).toBeInTheDocument();
+    expect(onModelReady).not.toHaveBeenCalled();
     const imported = screen.getByTestId('local-model-imported-licensed/finance:q4');
     expect(within(imported).getByText('Licensed Finance Q4')).toBeInTheDocument();
     expect(within(imported).getByText('LicenseRef-Finance')).toBeInTheDocument();
