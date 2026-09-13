@@ -129,11 +129,15 @@ Quiet hours for alert **delivery** continue to use `NOTIFICATION_QUIET_HOURS` /
 
 `POST /api/v1/alerts/rules/compile-nl` compiles whitelist-bounded natural-language
 phrases into Alert create payloads. Outcomes: `success` | `need_clarification` |
-`rejected`. No arbitrary code execution. Corporate-event compiles always include
+`rejected`. No arbitrary code execution. The endpoint is preview-only: it does not
+persist a rule, send a notification, or enqueue analysis. Callers that want to
+store a successful compile POST the returned `rule` to the existing
+`POST /api/v1/alerts/rules`. Corporate-event compiles always include
 `event_categories`, `lookback_hours`, and `min_items` to prevent field-loss regressions.
 
-Successful compiles produce a structured IR with `symbol`, `metric`, `comparator`,
-`threshold`, and optional `cooldown` (seconds). An explicit clause such as
+The HTTP body includes a structured `ir` field with the same compiler IR shape:
+`symbol`, `metric`, `comparator`, `threshold`, and optional `cooldown` (seconds).
+`ir` is `null` for clarification or rejection. An explicit clause such as
 `cooldown 30 minutes` / `冷却 1 小时` is stripped before threshold parsing and
 written to `cooldown_policy.cooldown_seconds`. Ambiguous cooldown mentions return
 `need_clarification`. Non-positive cooldown durations are rejected. The compiler

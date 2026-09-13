@@ -1,0 +1,2 @@
+- [Added] compile-nl HTTP responses include the existing compiler structured IR (symbol, metric, comparator, threshold, cooldown) (Refs #1133).
+- [Docs] Document compile-nl as a preview-only no-persist endpoint that returns `ir` (Refs #1133).

@@ -4865,6 +4865,22 @@ export interface components {
             /** Total */
             total: number;
         };
+        /**
+         * AlertRuleNlCompileIr
+         * @description Structured IR already produced by the NL compiler.
+         */
+        AlertRuleNlCompileIr: {
+            /** Comparator */
+            comparator: string;
+            /** Cooldown */
+            cooldown?: number | null;
+            /** Metric */
+            metric: string;
+            /** Symbol */
+            symbol: string;
+            /** Threshold */
+            threshold?: unknown | null;
+        };
         /** AlertRuleNlCompileRequest */
         AlertRuleNlCompileRequest: {
             /**
@@ -4890,6 +4906,8 @@ export interface components {
         AlertRuleNlCompileResponse: {
             /** Clarifications */
             clarifications?: string[];
+            /** @description Structured compiler IR with symbol, metric, comparator, threshold, and optional cooldown seconds. Null for clarification or rejection. */
+            ir?: components["schemas"]["AlertRuleNlCompileIr"] | null;
             /** Matched Metric */
             matched_metric?: string | null;
             /** Matched Symbols */
