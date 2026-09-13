@@ -150,6 +150,14 @@ function modelIsAssigned(value: string, modelId: string): boolean {
   return runtimeRoute(value) === modelRoute(modelId);
 }
 
+function isConfiguredPrimary(
+  primaryModel: string,
+  modelId: string,
+  selectedPrimary = false,
+): boolean {
+  return selectedPrimary || modelIsAssigned(primaryModel, modelId);
+}
+
 function browserMemoryGb(): number | null {
   const memory = (navigator as Navigator & { deviceMemory?: unknown }).deviceMemory;
   return typeof memory === 'number' && Number.isFinite(memory) && memory > 0 ? memory : null;
@@ -357,32 +365,22 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
         tag
         && tag.toLowerCase() === selected.toLowerCase()
         && installedModels.has(tag.toLowerCase())
-        && (
-          registeredModels.has(tag.toLowerCase())
-          || modelIsAssigned(configuration.primaryModel, tag)
-          || modelIsAssigned(configuration.agentModel, tag)
-        ),
+        && modelIsAssigned(configuration.primaryModel, tag)
       );
     }) || unknownImportedModels.some((model) => (
       model.modelId.toLowerCase() === selected.toLowerCase()
       && installedModels.has(model.modelId.toLowerCase())
-      && (
-        registeredModels.has(model.modelId.toLowerCase())
-        || modelIsAssigned(configuration.primaryModel, model.modelId)
-        || modelIsAssigned(configuration.agentModel, model.modelId)
-      )
+      && modelIsAssigned(configuration.primaryModel, model.modelId)
     ));
     if (!selectedReady) onModelReady?.('');
   }, [
     activeOperation,
-    configuration.agentModel,
     configuration.primaryModel,
     installedModels,
     importedIds,
     isLoading,
     models,
     onModelReady,
-    registeredModels,
     runtime,
     selectedModelId,
     unknownImportedModels,
@@ -414,12 +412,13 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       await onConfigurationChanged?.();
       setReadyModel(modelId);
       setReadyKind('download');
-      onModelReady?.(modelId);
-      if (
-        result.selectedPrimary
-        || Boolean(nextRuntime && modelIsAssigned(nextRuntime.configuration.primaryModel, modelId))
-      ) {
+      if (isConfiguredPrimary(
+        nextRuntime?.configuration.primaryModel ?? '',
+        modelId,
+        result.selectedPrimary,
+      )) {
         setPrimaryPromptModel('');
+        onModelReady?.(modelId);
       } else {
         setPrimaryPromptModel(modelId);
       }
@@ -459,15 +458,16 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
       await onConfigurationChanged?.();
       setReadyModel(result.modelId);
       setReadyKind('import');
-      onModelReady?.(result.modelId);
       if (result.warnings.length > 0) {
         setActionWarning(formatUiText(text.importWarnings, { count: result.warnings.length }));
       }
-      if (
-        result.selectedPrimary
-        || Boolean(nextRuntime && modelIsAssigned(nextRuntime.configuration.primaryModel, result.modelId))
-      ) {
+      if (isConfiguredPrimary(
+        nextRuntime?.configuration.primaryModel ?? '',
+        result.modelId,
+        result.selectedPrimary,
+      )) {
         setPrimaryPromptModel('');
+        onModelReady?.(result.modelId);
       } else {
         setPrimaryPromptModel(result.modelId);
       }
@@ -520,11 +520,15 @@ export const LocalModelsPanel: React.FC<LocalModelsPanelProps> = ({
     setActiveOperation({ kind: 'select', modelId });
     setActionError('');
     try {
+      let primaryModel = configuration.primaryModel;
       if (!ready) {
         const result = await transport.assign(modelId, 'auto');
         await updateConfiguration(result);
+        primaryModel = result.primaryModel;
       }
-      onModelReady?.(modelId);
+      if (modelIsAssigned(primaryModel, modelId)) {
+        onModelReady?.(modelId);
+      }
     } catch {
       setActionError(text.actionFailed);
     } finally {

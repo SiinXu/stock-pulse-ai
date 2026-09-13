@@ -357,6 +357,8 @@ describe('Query consumer hosts', () => {
     expect(read('src/components/settings/__tests__/LocalModelsPanel.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/components/settings/__tests__/LocalModelsPanel.dualMount.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/components/settings/__tests__/LocalModelsPanel.dualMount.test.tsx')).toContain('QueryClientProvider');
+    expect(read('src/components/settings/__tests__/FirstRunWizard.localPrimary.test.tsx')).toContain('createAppQueryClient');
+    expect(read('src/components/settings/__tests__/FirstRunWizard.localPrimary.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('createAppQueryClient');
     expect(read('src/hooks/__tests__/useLocalModelsCatalogQuery.test.tsx')).toContain('QueryClientProvider');
     expect(read('src/hooks/__tests__/useLocalModelsRuntimeQuery.test.tsx')).toContain('createAppQueryClient');

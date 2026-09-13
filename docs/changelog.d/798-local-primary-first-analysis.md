@@ -1,0 +1,1 @@
+- [Fixed] First-run local setup starts analysis only after the selected model is the primary route (Refs #798).
