@@ -1,0 +1,2 @@
+- [Fixed] Notification and WeChat red-team sections render missing evidence and typed unavailable/skipped status without replacing the primary decision (Refs #1135).
+- [Docs] AGENT_RED_TEAM_ENABLED help no longer implies a public per-request HTTP override (Refs #1135).

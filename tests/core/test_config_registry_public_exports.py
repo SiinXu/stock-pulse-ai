@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "5a3289e35f36eda755c1b7509eb295c7d03f240acb2d41c580ef232c3e10bfe6"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "fe63c31aab0e5ab45e9ed5b834df8ea2fc430d28214f9297b2dea26395383d02"
+    "3a83399f4aa7744e5afce250a03163ffd0be9b389063d5c4f971e436722ce2bd"
 )
 
 
@@ -104,10 +104,9 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Combined live snapshot after adding visible AGENT_STAGE_PARALLEL_ENABLED
-    # (Web settings switch, not hidden). Both the registered-keys digest and
-    # the schema digest change because the field is included in
-    # build_schema_response.
+    # Registered-keys digest stays on the AGENT_STAGE_PARALLEL_ENABLED
+    # inventory. Schema digest follows the AGENT_RED_TEAM_ENABLED
+    # description correction (no public HTTP/CLI override claim).
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

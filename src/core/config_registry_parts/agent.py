@@ -719,8 +719,8 @@ AGENT_FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
             "Runs one tool-free LLM turn after the primary decision, writes independent "
             "challenges and evidence gaps, and never replaces decision_type, confidence_level, "
             "or operation_advice. Existing data_limitations keep the 12 product slots first; "
-            "red-team overflow stays on dashboard.red_team. Default off. Chat, quick, and "
-            "standard runs skip unless an explicit request override is set."
+            "red-team overflow stays on dashboard.red_team. Default off. Chat never runs it; "
+            "quick and standard skip this stage."
         ),
         "category": "agent",
         "data_type": "boolean",
