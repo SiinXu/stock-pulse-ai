@@ -41,8 +41,19 @@ def test_suite_covers_required_profiles() -> None:
         "overclaim_temptation",
         "seeded_failure",
         "tool_failure",
+        "tool_discipline",
     }:
         assert required in profiles
+    tool_failure_cases = [
+        case for case in cases if str(case.get("profile") or "") == "tool_failure"
+    ]
+    assert tool_failure_cases
+    for case in tool_failure_cases:
+        trajectory = (case.get("episode") or {}).get("trajectory_summary") or []
+        assert any(
+            isinstance(item, dict) and item.get("success") is False
+            for item in trajectory
+        )
 
 
 def test_suite_passes_on_committed_fixtures() -> None:
@@ -174,6 +185,53 @@ def test_eval_not_bypassable_by_soul_skip_flag() -> None:
     assert REGRESSION_THRESHOLD == 0.0
     report = run_prediction_eval_suite()
     assert report["aggregate"]["checks_total"] >= 6
+
+
+def test_tool_failure_profile_requires_failed_tool() -> None:
+    cases = {case["id"]: case for case in load_prediction_eval_cases()}
+    case = copy.deepcopy(cases["pred-trajectory-tool-discipline"])
+    case["profile"] = "tool_failure"
+
+    scored = evaluate_prediction_case(case)
+
+    assert scored["score"] < 1.0
+    failed_ids = {item["id"] for item in scored["failed_checks"]}
+    assert "tool_failure_profile_has_failed_tool" in failed_ids
+
+
+def test_tool_failure_missing_evidence_rejects_fabricated_hit() -> None:
+    cases = {case["id"]: case for case in load_prediction_eval_cases()}
+    case = copy.deepcopy(cases["pred-tool-failure-unavailable"])
+    case["resolution"]["outcome"] = "hit"
+
+    scored = evaluate_prediction_case(case)
+
+    assert scored["score"] < 1.0
+    failed_ids = {item["id"] for item in scored["failed_checks"]}
+    assert "never_fabricated_hit_without_actuals" in failed_ids
+    assert "provider_failure_is_data_unavailable" in failed_ids
+
+
+def test_nonessential_failed_tool_does_not_forbid_independently_supported_hit() -> None:
+    cases = {case["id"]: case for case in load_prediction_eval_cases()}
+    case = copy.deepcopy(cases["pred-direction-hit"])
+    trajectory = list(case["episode"]["trajectory_summary"])
+    trajectory.append(
+        {
+            "step": 2,
+            "tool": "search_stock_news",
+            "success": False,
+            "argument_fingerprint": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee",
+        }
+    )
+    case["episode"]["trajectory_summary"] = trajectory
+
+    scored = evaluate_prediction_case(case)
+
+    failed_ids = {item["id"] for item in scored["failed_checks"]}
+    assert scored["score"] == 1.0
+    assert "never_fabricated_hit_without_actuals" not in failed_ids
+    assert "provider_failure_is_data_unavailable" not in failed_ids
 
 
 def test_missing_prediction_baseline_does_not_skip_acceptance_freeze(

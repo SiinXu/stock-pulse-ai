@@ -1,0 +1,42 @@
+{
+  "id": "pred-tool-failure-unavailable",
+  "profile": "tool_failure",
+  "claims": [
+    {
+      "claim_id": "c1",
+      "type": "direction",
+      "confidence": 0.7,
+      "payload": {"direction": "up"}
+    }
+  ],
+  "actuals": {
+    "provider_failed": true,
+    "unavailable": true,
+    "unavailable_reason": "get_daily_history_handler_error"
+  },
+  "resolution": {
+    "outcome": "data_unavailable",
+    "reason": "required_history_tool_failed"
+  },
+  "expected": {
+    "outcome": "data_unavailable",
+    "require_trajectory": true
+  },
+  "episode": {
+    "run_id": "run-pred-tool-fail-1",
+    "symbol": "600519",
+    "market": "cn",
+    "success": false,
+    "soul_version": "v1",
+    "soul_hash": "abcdef0123456789",
+    "trajectory_summary": [
+      {
+        "step": 1,
+        "tool": "get_daily_history",
+        "success": false,
+        "duration_ms": 45,
+        "argument_fingerprint": "dddddddddddddddddddddddddddddddd"
+      }
+    ]
+  }
+}

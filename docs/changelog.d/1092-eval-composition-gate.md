@@ -1,0 +1,3 @@
+- [Fixed] Fail the offline agent eval gate when Soul composition is skipped or a replayed tool bypasses ToolSurface (Refs #1092).
+- [Fixed] Require prediction-eval tool_failure fixtures to include a failed tool; fabricated hits stay forbidden when required actuals are unavailable (Refs #1092).
+- [Docs] Require prompt/skill PRs to attach offline eval delta from run_agent_benchmark.py --strict-baseline (Refs #1092).

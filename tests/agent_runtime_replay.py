@@ -19,7 +19,10 @@ Only the LLM adapter is replaced, and it is deliberately *strict*:
   tool schemas offered for that call (unless the entry explicitly marks the
   tool as intentionally unregistered);
 * when a transcript entry declares ``allowed_stage`` the incoming system
-  prompt must belong to that stage.
+  prompt must belong to that stage;
+* every LLM call must carry canonical Agent Soul (stage markers are not a
+  Soul proof);
+* every synthetic replay handler must run inside ToolSurface authorization.
 
 Fixtures live in ``tests/fixtures/agent_runtime/`` and are described by
 ``manifest.json``.  The ``expected`` block of every fixture is *recorded*
@@ -51,12 +54,14 @@ except ModuleNotFoundError:  # pragma: no cover
 from src.agent import factory as factory_module
 from src.agent import llm_adapter as llm_adapter_module
 from src.agent.llm_adapter import LLMResponse, ToolCall
+from src.agent.soul import has_canonical_agent_soul
 from src.agent.tools.registry import (
     ToolDefinition,
     ToolParameter,
     ToolPolicy,
     ToolRegistry,
 )
+from src.agent.tools.surface import tool_surface_dispatch_authorized
 from tests.security_audit_test_utils import SecurityAuditRecorderStub
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures" / "agent_runtime"
@@ -111,6 +116,7 @@ class ReplayLLMAdapter:
         self._config = config
         self.calls: List[Dict[str, Any]] = []
         self.observed_stages: List[str] = []
+        self.observed_soul_composed: List[bool] = []
 
     @property
     def consumed(self) -> int:
@@ -138,13 +144,19 @@ class ReplayLLMAdapter:
         if messages and messages[0].get("role") == "system":
             system_text = str(messages[0].get("content") or "")
         stage = detect_stage(system_text)
+        soul_composed = has_canonical_agent_soul(system_text)
         self.observed_stages.append(stage)
+        self.observed_soul_composed.append(soul_composed)
 
         allowed_stage = entry.get("allowed_stage")
         if allowed_stage is not None and stage != allowed_stage:
             raise AssertionError(
                 f"Transcript entry #{self._index} expected stage "
                 f"'{allowed_stage}' but was called from stage '{stage}'"
+            )
+        if not soul_composed:
+            raise AssertionError(
+                f"Transcript entry #{self._index} is missing canonical Agent Soul composition"
             )
 
         raise_error = entry.get("raise_error")
@@ -177,6 +189,7 @@ class ReplayLLMAdapter:
         self.calls.append(
             {
                 "stage": stage,
+                "soul_composed": soul_composed,
                 "message_count": len(messages),
                 "tools_offered": sorted(name for name in offered if name),
                 "timeout": timeout,
@@ -229,6 +242,10 @@ def build_replay_tool_registry(
 
     def _register(name: str, description: str, parameters: List[ToolParameter], handler):
         def wrapped(**kwargs: Any) -> Any:
+            if not tool_surface_dispatch_authorized():
+                raise AssertionError(
+                    f"Replay tool {name!r} executed outside ToolSurface authorization"
+                )
             log.append({"tool": name, "arguments": dict(kwargs)})
             return handler(**kwargs)
 

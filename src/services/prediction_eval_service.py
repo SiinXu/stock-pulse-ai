@@ -6,6 +6,7 @@ Reuses the owned agent trajectory evaluator for compact episode trajectories
 and applies deterministic resolution-integrity rules for the prediction loop:
 
 * provider failure / missing actuals => ``data_unavailable`` (never a hit)
+* ``profile=tool_failure`` cases must contain a failed tool (honest label)
 * non-parseable prose must not become fabricated verifiable claims
 * typed lessons must use known kinds
 * Soul charter text must not appear in episode payloads
@@ -249,6 +250,21 @@ def evaluate_prediction_case(case: Mapping[str, Any]) -> Dict[str, Any]:
             )
 
     trajectory = episode.get("trajectory_summary")
+    profile = str(case.get("profile") or "").strip()
+    if profile == "tool_failure":
+        items = trajectory if isinstance(trajectory, list) else []
+        has_failed_tool = any(
+            isinstance(item, Mapping) and item.get("success") is False
+            for item in items
+        )
+        checks.append(
+            _check(
+                "trajectory",
+                "tool_failure_profile_has_failed_tool",
+                has_failed_tool,
+                "tool_failure profile requires at least one trajectory item with success is False",
+            )
+        )
     if isinstance(trajectory, list) and trajectory:
         tool_calls = []
         for item in trajectory:

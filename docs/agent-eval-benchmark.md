@@ -33,7 +33,7 @@
 
 ## CI 回归门（#1092）
 
-CI job `agent-eval-gate` 以 `--strict-baseline` 运行离线评测，并包含预测核验套件（阈值固定 0.0，不得为绿放宽）。详见英文版。
+Required GitHub context `backend-gate` 以 `--strict-baseline --quiet` 运行离线评测；job `agent-eval-gate` 运行同一命令，但不是新的 required check 名称。预测核验阈值固定 0.0，不得为绿放宽。
 
 预测基线同时冻结 case ID、每个 case 的 check 数和有限分数；删 case/check、NaN/Infinity、schema/engine 漂移或放宽阈值都会 fail-closed。A5 `ClaimScorer` 可用时，门禁会直接消费同一组 A1 typed fixtures；已安装但损坏的 scorer 不得静默跳过。
 
@@ -52,7 +52,7 @@ python scripts/run_agent_benchmark.py \
 python -m pytest -m benchmark tests/agent/benchmark -q
 ```
 
-阻塞性 backend gate 使用 `pytest -m "not network and not benchmark"`，因此本套件在 V0 默认**不阻塞合入**。
+阻塞性 pytest 仍使用 `pytest -m "not network and not benchmark"`，因此带 `benchmark` 标记的面板测试不进入 unmarked pytest。合入硬门禁改由 required GitHub context `backend-gate` 额外运行 `python scripts/run_agent_benchmark.py --strict-baseline --quiet`。Job `agent-eval-gate` 运行同一命令，但**不是**新的 required check 名称。
 
 `tests/agent/test_agent_trajectory_eval.py` 中有一条未标记 `benchmark` 的契约测试：把真实 `observe_case` 工具日志送入 `evaluate_agent_trajectory`，并断言 `sample_size > 0` 且 `tool_selection_precision` 非空，使这条生产者衔接对阻塞性 offline gate 可见。其余面板仍留在 `benchmark` 标记之后。
 
@@ -152,7 +152,9 @@ duration、缓存状态、失败分类、因果分类、时间戳）、完整度
 | 相对已提交基线分数下降 | Markdown 报告中**可见**；CLI 默认仍 exit 0 |
 | 下降即硬失败 | 仅 `--strict-baseline`（可选） |
 
-分数下降供维护者诊断，V0 **不是**必需 CI gate。`.github/workflows/**` 的定时任务接线为本 PR 的**后续事项**（CI 工作流另有归属）。
+默认 CLI（不加 `--strict-baseline`）在分数 DROP 时仍 exit 0。CI 硬门禁是 `backend-gate` 运行 `--strict-baseline --quiet`；`agent-eval-gate` 同样运行该命令，但不要把它加成第九个 required GitHub context。Prompt / skill / router PR 必须在 PR 正文附上 `python scripts/run_agent_benchmark.py --strict-baseline` 输出，或提交有说明的 baseline 刷新。
+
+离线回放若跳过 Soul 合成，或回放工具在 ToolSurface 授权之外执行 handler，评测 fail-closed（基础设施失败，即使不加 `--strict-baseline` 也非零退出）。阶段标记不是 Soul 证明。`profile=tool_failure` 必须含至少一条 `success is False` 的轨迹；虚构 hit 仍按既有 resolver 在缺失 actuals / provider failure 时拒绝。非必要工具失败可以与独立成立的 outcome 共存，评测不把「任意失败工具 ⇒ 禁止 hit」写成总规则。生产执行预算与阶段并行由 #1121 / #1290 拥有，本评测不改 Soul / ToolSurface / budgets / 并行或 CI workflow YAML。
 
 ## 刷新基线
 
@@ -194,4 +196,17 @@ python scripts/run_agent_benchmark.py --write-baseline
 | #617 / 分析质量面板 | 互补：报告信任 vs Agent 运行纪律 |
 | AR-01 agent_runtime fixtures | 只读转写源 |
 | 输出质量评估服务 | [agent-eval-dimensions.md](agent-eval-dimensions.md) 对单次输出产物打分（`agent_eval_service`），由本统一 runner 调用并单独计分 |
-| CI merge queue / workflow 归属 | 本 PR 不改 `.github/workflows/**` |
+| CI merge queue / workflow 归属 | 不改 `.github/workflows/**`；required context 仍是 `backend-gate` |
+| #1121 / #1290 | 生产预算与阶段并行的所有者；本评测只观察既有 Soul / ToolSurface 合成 |
+
+## 预测核验离线套件（#1092 / #1107）
+
+由同一 runner 以 `prediction_verification_evaluation` 输出：
+
+| 路径 | 作用 |
+| --- | --- |
+| `tests/fixtures/prediction_eval/` | 冻结完整性夹具（success、provider failure、missing data、overclaim、seeded miss、tool discipline、诚实的 tool_failure） |
+| `src/services/prediction_eval_service.py` | 确定性完整性 + 经已有 `evaluate_agent_trajectory` 的轨迹检查 |
+| `tests/agent/benchmark/baselines/prediction_v0.json` | 已提交 baseline（阈值 0.0） |
+
+Provider failure / 缺失 actuals 必须解析为 `data_unavailable`，不得虚构 hit。`tool_failure` 画像必须包含失败工具；成功的必用工具轨迹保留为 `tool_discipline`。已提交预测 baseline 冻结 case ID、每案 check 数和有限分数；删 case/check、NaN/Infinity、schema/engine 漂移或放宽阈值都会 fail-closed。
