@@ -1,0 +1,1 @@
+- [Changed] Move TickFlow realtime quote mapping (`get_realtime_quote`, `_quote_to_unified_quote`, `_format_provider_timestamp`) into `src/data_provider/tickflow_parts/realtime.py` behind the ADR-006 facade, keeping `TickFlowFetcher` method names, signatures, A-share convert-and-cache behavior, US/HK rejects, fail-open quote errors, and patch targets unchanged (Refs #1068).

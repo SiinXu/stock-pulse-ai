@@ -734,36 +734,6 @@ class TickFlowFetcher(BaseFetcher):
                 return None
             return dict(quote)
 
-    def get_realtime_quote(self, stock_code: str) -> Optional[UnifiedRealtimeQuote]:
-        symbol = self._to_tickflow_symbol(stock_code)
-        if not symbol:
-            return None
-
-        quote_ttl = self._get_realtime_cache_ttl()
-        quote = self._get_cached_quote(symbol, quote_ttl)
-        if quote is None:
-            client = self._get_client()
-            if client is None:
-                return None
-            try:
-                quotes = client.quotes.get(symbols=[symbol])
-            except Exception as exc:
-                log_safe_exception(
-                    logger,
-                    "TickFlow realtime quote request failed",
-                    exc,
-                    error_code="tickflow_realtime_quote_failed",
-                    level=logging.WARNING,
-                    context={"symbol": symbol},
-                )
-                return None
-            self._store_quotes(quotes)
-            quote = self._get_cached_quote(symbol, quote_ttl)
-
-        if not quote:
-            return None
-        return self._quote_to_unified_quote(stock_code, quote)
-
     @staticmethod
     def _get_realtime_cache_ttl() -> int:
         try:
@@ -772,69 +742,6 @@ class TickFlowFetcher(BaseFetcher):
             return int(get_config().realtime_cache_ttl)
         except Exception:
             return 600
-
-    def _quote_to_unified_quote(
-        self,
-        stock_code: str,
-        quote: Dict[str, Any],
-    ) -> Optional[UnifiedRealtimeQuote]:
-        symbol = str(quote.get("symbol") or self._to_tickflow_symbol(stock_code) or "").upper()
-        code = normalize_stock_code(stock_code or symbol)
-        current = self._safe_float(quote.get("last_price"))
-        if current is None:
-            current = self._safe_float(quote.get("price"))
-        if current is None:
-            return None
-
-        ext = quote.get("ext") or {}
-        prev_close = self._safe_float(quote.get("prev_close"))
-        open_price = self._safe_float(quote.get("open"))
-        high = self._safe_float(quote.get("high"))
-        low = self._safe_float(quote.get("low"))
-        volume = self._cn_lots_to_shares(quote.get("volume"), default=0)
-        amount = self._safe_float(quote.get("amount")) or 0.0
-        change_amount = self._safe_float(ext.get("change_amount"))
-        if change_amount is None and prev_close is not None:
-            change_amount = current - prev_close
-
-        change_pct = self._ratio_to_percent(ext.get("change_pct"))
-        if change_pct is None and prev_close and prev_close > 0:
-            change_pct = (current - prev_close) / prev_close * 100.0
-
-        timestamp = quote.get("timestamp") or quote.get("time") or quote.get("ts")
-        provider_timestamp = self._format_provider_timestamp(timestamp)
-
-        return UnifiedRealtimeQuote(
-            code=code,
-            name=self._extract_name(quote),
-            price=current,
-            change_pct=change_pct,
-            change_amount=change_amount,
-            volume=volume,
-            amount=amount,
-            open_price=open_price,
-            high=high,
-            low=low,
-            pre_close=prev_close,
-            source=RealtimeSource.TICKFLOW,
-            provider_timestamp=provider_timestamp,
-            turnover_rate=self._ratio_to_percent(ext.get("turnover_rate")),
-            amplitude=self._ratio_to_percent(ext.get("amplitude")),
-        )
-
-    @staticmethod
-    def _format_provider_timestamp(value: Any) -> Optional[str]:
-        if value in (None, ""):
-            return None
-        try:
-            numeric = float(value)
-        except (TypeError, ValueError):
-            return str(value)
-        if numeric <= 0:
-            return None
-        if numeric > 10_000_000_000:
-            numeric = numeric / 1000.0
-        return datetime.fromtimestamp(numeric, timezone.utc).isoformat()
 
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         symbol = self._to_tickflow_symbol(stock_code)
@@ -978,24 +885,35 @@ class TickFlowFetcher(BaseFetcher):
 
     _normalize_data = None
 
+    # Rebound from tickflow_parts.realtime after the class is built.
+    get_realtime_quote = None
+
+    _quote_to_unified_quote = None
+
+    _format_provider_timestamp = None
+
 
 # Keep ``src.data_provider.tickflow_fetcher.TickFlowFetcher`` as the ADR-006
-# compatibility facade while ``tickflow_parts`` owns market-board and daily
-# history bodies. Rebinding preserves method globals so existing patches
-# against this module continue to intercept moved implementations.
+# compatibility facade while ``tickflow_parts`` owns market-board, daily
+# history, and realtime-quote bodies. Rebinding preserves method globals so
+# existing patches against this module continue to intercept moved
+# implementations.
 from .tickflow_parts import history as _history_module  # noqa: E402
 from .tickflow_parts import market_boards as _market_boards_module  # noqa: E402
+from .tickflow_parts import realtime as _realtime_module  # noqa: E402
 from .tickflow_parts.history import _HistoryMethods  # noqa: E402
 from .tickflow_parts.market_boards import _MarketBoardsMethods  # noqa: E402
+from .tickflow_parts.realtime import _RealtimeMethods  # noqa: E402
 from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 
 
 def _assemble_tickflow_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _HistoryMethods, _MarketBoardsMethods
+    global _HistoryMethods, _MarketBoardsMethods, _RealtimeMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
     _HistoryMethods = _history_module._HistoryMethods
+    _RealtimeMethods = _realtime_module._RealtimeMethods
     bind_methods_from_class(
         _MarketBoardsMethods,
         TickFlowFetcher,
@@ -1007,6 +925,12 @@ def _assemble_tickflow_fetcher_facade() -> None:
         TickFlowFetcher,
         globals(),
         expected_names=_history_module.EXPECTED_HISTORY_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _RealtimeMethods,
+        TickFlowFetcher,
+        globals(),
+        expected_names=_realtime_module.EXPECTED_REALTIME_METHOD_NAMES,
     )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy
@@ -1039,7 +963,7 @@ _assemble_tickflow_fetcher_facade()
 def _install_part_reload_hooks() -> None:
     """Keep an owner reload able to rebuild and rebind both sides of the seam."""
 
-    for module in (_market_boards_module, _history_module):
+    for module in (_market_boards_module, _history_module, _realtime_module):
         module._FACADE_RELOAD_HOOK = _assemble_tickflow_fetcher_facade  # type: ignore[attr-defined]
 
 
