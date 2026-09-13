@@ -1,5 +1,7 @@
 """Guard the hosted CI contract for two-tier and minimum Python gates."""
 
+import ast
+import json
 import re
 from fnmatch import fnmatch
 from pathlib import Path
@@ -82,6 +84,34 @@ def _workflow() -> dict:
     return yaml.safe_load(WORKFLOW_PATH.read_text(encoding="utf-8"))
 
 
+def _eval_github_bool(expr: str, context: dict[str, str]) -> bool:
+    """Evaluate a small GitHub Actions boolean expression against string context."""
+
+    inner = expr.strip()
+    if inner.startswith("${{") and inner.endswith("}}"):
+        inner = inner[3:-2].strip()
+    inner = inner.replace("always()", "True")
+    for key in sorted(context, key=len, reverse=True):
+        inner = inner.replace(key, json.dumps(context[key]))
+    stripped = re.sub(r'"([^"\\]|\\.)*"', '""', inner)
+    stripped = re.sub(r"'([^'\\]|\\.)*'", "''", stripped)
+    leftover = [
+        token
+        for token in re.findall(r"[A-Za-z_][A-Za-z0-9_.]*", stripped)
+        if token not in {"True", "False", "and", "or"}
+    ]
+    if leftover:
+        raise AssertionError(f"unbound identifiers {leftover} in {inner}")
+    inner = inner.replace("&&", " and ").replace("||", " or ")
+    tree = ast.parse(inner, mode="eval")
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name) and node.id in {"True", "False"}:
+            continue
+        if isinstance(node, (ast.Call, ast.Attribute, ast.Name, ast.Subscript)):
+            raise AssertionError(f"disallowed node {type(node).__name__} in {inner}")
+    return bool(eval(compile(tree, "<expr>", "eval"), {"__builtins__": {}}, {}))
+
+
 def _assert_job_fail_closed(job: dict) -> None:
     assert job.get("continue-on-error", False) is False
     assert all(step.get("continue-on-error", False) is False for step in job["steps"])
@@ -123,6 +153,22 @@ FULL_BACKEND_EVENT_CONDITION = (
     "github.event_name == 'merge_group' || "
     "(github.event_name == 'pull_request' && "
     "needs.changes.outputs.backend_full == 'true'))"
+)
+EMPTY_PUSH_FAIL_CLOSE = (
+    "(github.event_name == 'push' && "
+    "github.ref == 'refs/heads/main' && "
+    "steps.filter.outputs.any != 'true')"
+)
+BACKEND_OUTPUT_EXPRESSION = (
+    "${{ github.event_name == 'merge_group' || "
+    f"{EMPTY_PUSH_FAIL_CLOSE} || "
+    "steps.backend-filter.outputs.backend_non_web == 'true' || "
+    "steps.filter.outputs.backend_web_contract == 'true' }}"
+)
+DOCKER_OUTPUT_EXPRESSION = (
+    "${{ steps.filter.outputs.docker == 'true' || "
+    + EMPTY_PUSH_FAIL_CLOSE
+    + " }}"
 )
 
 
@@ -720,13 +766,222 @@ def _path_backend_filter_flags(path: str) -> tuple[bool, bool]:
 
 
 def test_changes_backend_fail_closes_true_on_merge_group_only() -> None:
+    """merge_group still fail-closes; empty push-to-main is the extra unknown case."""
+
     expr = _workflow()["jobs"]["changes"]["outputs"]["backend"]
-    assert expr == (
-        "${{ github.event_name == 'merge_group' || "
-        "steps.backend-filter.outputs.backend_non_web == 'true' || "
-        "steps.filter.outputs.backend_web_contract == 'true' }}"
-    )
+    assert expr == BACKEND_OUTPUT_EXPRESSION
+    assert "github.event_name == 'merge_group'" in expr
+    assert EMPTY_PUSH_FAIL_CLOSE in expr
     assert "github.event.pull_request" not in expr
+
+
+def test_empty_push_to_main_fail_closes_required_full_gates() -> None:
+    """Zero-file push-to-main must schedule 3.11/3.10 shards plus docker-build.
+
+    Hosted counterexample: main run 34749011624 on empty follow-up
+    49a54ffeb compared f7b6e26ce..49a54ffeb, detected 0 files, and skipped
+    backend-gate, python-minimum, and docker-build. Changelog-only and
+    frontend-only nonempty pushes must keep their path-selective skips.
+    """
+
+    workflow = _workflow()
+    changes = workflow["jobs"]["changes"]
+    filters = _path_filters()
+    assert filters["any"] == ["**"]
+    assert "any" not in changes["outputs"]
+    assert changes["outputs"]["backend"] == BACKEND_OUTPUT_EXPRESSION
+    assert changes["outputs"]["docker"] == DOCKER_OUTPUT_EXPRESSION
+    assert EMPTY_PUSH_FAIL_CLOSE not in changes["outputs"]["frontend"]
+    assert EMPTY_PUSH_FAIL_CLOSE not in changes["outputs"]["web_e2e"]
+    assert EMPTY_PUSH_FAIL_CLOSE not in changes["outputs"]["ocr_extractor"]
+    assert EMPTY_PUSH_FAIL_CLOSE not in changes["outputs"]["desktop"]
+    assert "merge_group" not in changes["outputs"]["docker"]
+
+    for path in (
+        "docs/CHANGELOG.md",
+        "docs/changelog.d/zero-diff-main-push-ci.md",
+        "apps/dsa-web/src/api/auth.ts",
+        "src/api/app.py",
+        ".github/workflows/ci.yml",
+    ):
+        assert _path_filter_covers(path, set(filters["any"])), path
+
+    cases = (
+        # event, ref, any, non_web, contract, docker_filter
+        # -> backend, docker, shards, py310, docker-build, pr-selective, web-e2e
+        (
+            "push",
+            "refs/heads/main",
+            "false",
+            "false",
+            "false",
+            "false",
+            True,
+            True,
+            True,
+            True,
+            True,
+            False,
+            False,
+        ),
+        (
+            "push",
+            "refs/heads/main",
+            "true",
+            "false",
+            "false",
+            "false",
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+        ),
+        (
+            "push",
+            "refs/heads/main",
+            "true",
+            "true",
+            "false",
+            "true",
+            True,
+            True,
+            True,
+            True,
+            True,
+            False,
+            False,
+        ),
+        (
+            "push",
+            "refs/heads/main",
+            "true",
+            "false",
+            "false",
+            "true",
+            False,
+            True,
+            False,
+            False,
+            True,
+            False,
+            False,
+        ),
+        (
+            "pull_request",
+            "refs/heads/feature",
+            "false",
+            "false",
+            "false",
+            "false",
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+            False,
+        ),
+        (
+            "merge_group",
+            "refs/heads/gh-readonly-queue/main/pr-1-merge",
+            "false",
+            "false",
+            "false",
+            "false",
+            True,
+            False,
+            True,
+            True,
+            False,
+            False,
+            False,
+        ),
+        (
+            "merge_group",
+            "refs/heads/gh-readonly-queue/main/pr-1-merge",
+            "true",
+            "false",
+            "false",
+            "false",
+            True,
+            False,
+            True,
+            True,
+            False,
+            False,
+            False,
+        ),
+    )
+    for (
+        event_name,
+        ref,
+        any_files,
+        non_web,
+        contract,
+        docker_filter,
+        expect_backend,
+        expect_docker,
+        expect_shards,
+        expect_py310,
+        expect_docker_build,
+        expect_pr_selective,
+        expect_web_e2e,
+    ) in cases:
+        filter_ctx = {
+            "github.event_name": event_name,
+            "github.ref": ref,
+            "steps.filter.outputs.any": any_files,
+            "steps.backend-filter.outputs.backend_non_web": non_web,
+            "steps.filter.outputs.backend_web_contract": contract,
+            "steps.filter.outputs.docker": docker_filter,
+        }
+        backend = _eval_github_bool(changes["outputs"]["backend"], filter_ctx)
+        docker = _eval_github_bool(changes["outputs"]["docker"], filter_ctx)
+        assert backend is expect_backend, (event_name, any_files, non_web)
+        assert docker is expect_docker, (event_name, any_files, docker_filter)
+
+        job_ctx = {
+            "github.event_name": event_name,
+            "github.ref": ref,
+            "needs.changes.outputs.backend": "true" if backend else "false",
+            "needs.changes.outputs.docker": "true" if docker else "false",
+            "needs.changes.outputs.backend_full": "true",
+            "needs.changes.outputs.web_e2e": "false",
+        }
+        assert (
+            _eval_github_bool(workflow["jobs"]["backend-tests"]["if"], job_ctx)
+            is expect_shards
+        ), event_name
+        assert (
+            _eval_github_bool(workflow["jobs"]["backend-gate-main"]["if"], job_ctx)
+            is expect_shards
+        ), event_name
+        assert (
+            _eval_github_bool(workflow["jobs"]["python-minimum-tests"]["if"], job_ctx)
+            is expect_py310
+        ), event_name
+        assert (
+            _eval_github_bool(workflow["jobs"]["python-minimum"]["if"], job_ctx)
+            is expect_backend
+        ), event_name
+        assert (
+            _eval_github_bool(workflow["jobs"]["docker-build"]["if"], job_ctx)
+            is expect_docker_build
+        ), event_name
+        assert (
+            _eval_github_bool(workflow["jobs"]["backend-gate"]["if"], job_ctx)
+            is expect_pr_selective
+        ), event_name
+        assert (
+            _eval_github_bool(workflow["jobs"]["web-e2e"]["if"], job_ctx)
+            is expect_web_e2e
+        ), event_name
+        assert _eval_github_bool(
+            workflow["jobs"]["api-real-client"]["if"], job_ctx
+        ) is (event_name == "push")
 
 
 def test_merge_group_path_filters_before_event_override() -> None:
