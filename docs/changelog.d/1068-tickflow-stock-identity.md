@@ -1,0 +1,1 @@
+- [Changed] Move TickFlow stock identity (`get_stock_name`, `_extract_instrument_name`, `get_stock_list`) into `src/data_provider/tickflow_parts/stock_identity.py` behind the ADR-006 facade, keeping quote-cache identity, hardcoded name-lookup TTL, US/HK rejects, universe permission fail-open, patch targets, and market-boards universe helpers on the facade (Refs #1068).
