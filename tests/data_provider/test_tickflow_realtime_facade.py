@@ -196,6 +196,16 @@ def test_other_bound_methods_stay_bound_and_are_not_live_function_defs(name) -> 
     assert name not in _facade_class_methods(), name
 
 
+def test_owner_module_does_not_trip_sibling_realtime_import_greps() -> None:
+    """Sibling production-import guards substring-match these tokens."""
+
+    text = OWNER_PATH.read_text(encoding="utf-8")
+    assert "tushare_parts.realtime" not in text
+    assert "efinance_parts.realtime" not in text
+    assert "longbridge_parts.realtime" not in text
+    assert "yfinance_parts.realtime" not in text
+
+
 def test_owner_module_does_not_import_the_facade() -> None:
     tree = ast.parse(OWNER_PATH.read_text(encoding="utf-8"))
     imported = set()

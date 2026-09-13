@@ -3,8 +3,8 @@
 
 Method bodies are rebound onto ``TickFlowFetcher`` by the compatibility facade
 (ADR-006) so free-name lookups and test patches stay on
-``src.data_provider.tickflow_fetcher``. Mirrors the domain split of
-``yfinance_parts.realtime`` and ``tushare_parts.realtime``.
+``src.data_provider.tickflow_fetcher``. Mirrors the yfinance and Tushare
+realtime owner split without importing those packages.
 
 No tenacity wrapper and no sibling method moves. Symbol conversion, quote
 cache helpers, ``_get_realtime_cache_ttl``, client access, and mapping
