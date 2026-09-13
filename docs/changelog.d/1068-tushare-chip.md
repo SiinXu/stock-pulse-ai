@@ -1,0 +1,1 @@
+- [Changed] Move Tushare chip helpers (`get_chip_distribution`, `compute_cyq_metrics`) into `src/data_provider/tushare_parts/chip.py` behind the ADR-006 facade, keeping `TushareFetcher` method names, signatures, US/ETF/HK skips, Chinese metric keys, and patch targets unchanged (Refs #1068).

@@ -5,11 +5,12 @@ Method bodies are rebound onto ``TushareFetcher`` by the compatibility facade
 (ADR-006) so free-name lookups and test patches stay on
 ``src.data_provider.tushare_fetcher``.
 
-No sibling method moves. Chip distribution, identity/availability helpers,
-and the ``date_list`` / ``_date_list_end`` instance cache stay on the facade.
-The rate-limited API client (``_api``, ``_call_api_with_rate_limit``) is
-reached through ``self`` at call time. ``_pick_trade_date`` remains a
-``staticmethod``.
+No sibling method moves. Chip distribution is rebound from
+``tushare_parts.chip`` onto the facade and is reached through ``self``
+at call time. Identity/availability helpers and the ``date_list`` /
+``_date_list_end`` instance cache stay on the facade. The rate-limited
+API client (``_api``, ``_call_api_with_rate_limit``) is reached through
+``self`` at call time. ``_pick_trade_date`` remains a ``staticmethod``.
 """
 
 from __future__ import annotations

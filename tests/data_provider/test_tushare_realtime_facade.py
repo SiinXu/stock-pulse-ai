@@ -36,10 +36,8 @@ METHOD_SIGNATURES = {
     "get_realtime_quote": ["self", "stock_code"],
 }
 
-# Reached through `self` by the moved bodies; chip stays on the facade class body.
+# Reached through `self` by the moved bodies; availability helpers stay on the facade class body.
 FACADE_SIBLINGS = (
-    "get_chip_distribution",
-    "compute_cyq_metrics",
     "is_available",
     "_determine_priority",
 )
@@ -51,6 +49,7 @@ PRE_EXISTING_BOUND = (
     "get_main_indices",
     "get_stock_name",
     "get_trade_time",
+    "get_chip_distribution",
 )
 
 

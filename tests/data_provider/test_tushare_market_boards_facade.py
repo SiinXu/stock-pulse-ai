@@ -40,17 +40,20 @@ METHOD_SIGNATURES = {
     "get_sector_rankings": ["self", "n"],
 }
 
-# Reached through `self` by the moved bodies; chip stays on the facade class body.
+# Reached through `self` by the moved bodies; availability helpers stay on the facade class body.
 # Trade-calendar helpers are rebound from tushare_parts.trade_time, not this owner.
 FACADE_SIBLINGS = (
-    "get_chip_distribution",
-    "compute_cyq_metrics",
     "is_available",
     "_determine_priority",
 )
 
 # Domains this package already owned before the slice; binding must still work.
-PRE_EXISTING_BOUND = ("get_daily_data", "_convert_stock_code", "get_trade_time")
+PRE_EXISTING_BOUND = (
+    "get_daily_data",
+    "_convert_stock_code",
+    "get_trade_time",
+    "get_chip_distribution",
+)
 
 
 @pytest.mark.parametrize("name", MOVED)

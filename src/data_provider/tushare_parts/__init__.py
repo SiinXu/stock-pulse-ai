@@ -14,5 +14,6 @@ Owned domains:
 - ``market_boards`` — main indices, market statistics, and sector rankings
 - ``realtime`` — Pro realtime quote and legacy-symbol fallback
 - ``trade_time`` — China clock, trade-calendar cache, and trade-date pick
+- ``chip`` — chip distribution fetch and CYQ metric parser
 - ``facade_bind`` — ADR-006 clone/bind helpers
 """

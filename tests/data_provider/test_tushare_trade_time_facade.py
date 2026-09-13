@@ -42,8 +42,6 @@ METHOD_SIGNATURES = {
 
 # Stay on the facade class body; the moved bodies must not pull them along.
 FACADE_SIBLINGS = (
-    "get_chip_distribution",
-    "compute_cyq_metrics",
     "is_available",
     "_determine_priority",
 )
@@ -55,6 +53,7 @@ PRE_EXISTING_BOUND = (
     "get_main_indices",
     "get_stock_name",
     "get_realtime_quote",
+    "get_chip_distribution",
 )
 
 
