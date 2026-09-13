@@ -155,6 +155,52 @@ def test_disabled_switch_keeps_token_only_fail_closed_profile():
     assert limits.max_tokens == 111
 
 
+def _tool_loop_response(n: int) -> _FakeResponse:
+    return _FakeResponse(
+        tool_calls=[
+            ToolCall(
+                id=f"c{n}",
+                name="get_stock_info",
+                arguments={"message": f"lookup-{n}"},
+            )
+        ],
+        content="need tools",
+    )
+
+
+def _sub_question_final_response() -> _FakeResponse:
+    return _FakeResponse(content="Sub-question findings.")
+
+
+def _four_step_sub_question_fill(start: int) -> List[_FakeResponse]:
+    return [
+        _tool_loop_response(start),
+        _tool_loop_response(start + 1),
+        _tool_loop_response(start + 2),
+        _sub_question_final_response(),
+    ]
+
+
+def test_remaining_max_steps_clamps_to_unused_turns_not_absolute_cap():
+    from src.agent.runtime.mode_budget import create_research_mode_budget_account
+
+    account = create_research_mode_budget_account(
+        _cfg(agent_mode_budget_specialist_max_llm_turns=12),
+        token_budget=30000,
+    )
+    assert account.remaining_max_steps(4) == 4
+    account.llm_turns = 10
+    assert account.remaining_max_steps(4) == 2
+    account.llm_turns = 12
+    assert account.remaining_max_steps(4) == 0
+
+    token_only = create_research_mode_budget_account(
+        _cfg(agent_mode_budget_enabled=False, agent_deep_research_budget=111),
+        token_budget=111,
+    )
+    assert token_only.remaining_max_steps(4) == 4
+
+
 def test_r1_decompose_turn_blocks_subquestions_and_synthesis():
     adapter = _FakeResearchAdapter(
         text_responses=[
@@ -360,6 +406,58 @@ def test_r8_constructors_share_config_derived_token_ceiling():
     )
     result = _agent(adapter, cfg, token_budget=12345).research("q")
     assert result.budget_snapshot["limits"]["max_tokens"] == 12345
+
+
+def test_r9_three_turn_cap_does_not_bill_a_fourth_subquestion_step():
+    adapter = _FakeResearchAdapter(
+        text_responses=[
+            _FakeResponse(content='{"questions":["Q1","Q2"]}'),
+            _FakeResponse(content="should not synthesise"),
+        ],
+        tool_responses=[_tool_loop_response(i) for i in range(8)],
+    )
+    result = _agent(
+        adapter,
+        _cfg(agent_mode_budget_specialist_max_llm_turns=3),
+    ).research("Analyse 600519")
+
+    assert result.success is False
+    assert result.failure_reason == "budget_turns"
+    assert result.timed_out is False
+    assert result.cancelled is False
+    assert result.budget_snapshot["used"]["llm_turns"] <= 3
+    assert result.budget_snapshot["limits"]["max_llm_turns"] == 3
+    assert adapter.text_calls == 1
+    assert adapter.tool_calls <= 2
+    assert adapter.text_calls + adapter.tool_calls <= 3
+
+
+def test_r10_default_specialist_twelve_turn_cap_does_not_bill_a_thirteenth_call():
+    adapter = _FakeResearchAdapter(
+        text_responses=[
+            _FakeResponse(content='{"questions":["Q1","Q2","Q3","Q4"]}'),
+            _FakeResponse(content="should not synthesise"),
+        ],
+        tool_responses=(
+            _four_step_sub_question_fill(1)
+            + _four_step_sub_question_fill(5)
+            + [_tool_loop_response(i) for i in range(20, 28)]
+        ),
+    )
+    result = _agent(adapter, _cfg()).research("Analyse 600519")
+
+    assert result.success is False
+    assert result.failure_reason == "budget_turns"
+    assert result.timed_out is False
+    assert result.cancelled is False
+    used = int(result.budget_snapshot["used"]["llm_turns"])
+    assert used <= 12
+    assert result.budget_snapshot["limits"]["max_llm_turns"] == 12
+    assert adapter.text_calls == 1
+    assert adapter.text_calls + adapter.tool_calls <= 12
+    assert "remaining_max_steps" in inspect.getsource(
+        ResearchAgent._research_sub_question
+    )
 
 
 def test_api_maps_budget_failure_to_success_false_with_stable_error():

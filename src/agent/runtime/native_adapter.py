@@ -28,6 +28,7 @@ from src.agent.runtime.contract import (
 )
 from src.agent.runtime.lifecycle import classify_terminal_state
 from src.agent.public_contract import sanitize_agent_diagnostic
+from src.utils.sanitize import log_safe_exception
 
 logger = logging.getLogger(__name__)
 
@@ -75,7 +76,13 @@ class NativeRuntimeAdapter:
         def _worker() -> None:
             try:
                 result = self._dispatch(context, _emit, execution)
-            except Exception as exc:  # recorded as FAILED and re-raised via execute()
+            except Exception as exc:  # broad-exception: fallback_recorded - Native worker exceptions are recorded as FAILED and re-raised via execute().
+                log_safe_exception(
+                    logger,
+                    "Native runtime worker failed",
+                    exc,
+                    error_code="agent_native_runtime_worker_failed",
+                )
                 execution.finish(
                     ExecutionState.FAILED,
                     error=sanitize_agent_diagnostic(str(exc) or exc.__class__.__name__),

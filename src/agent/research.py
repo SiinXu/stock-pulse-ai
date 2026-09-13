@@ -694,7 +694,28 @@ Token budget remaining: ~{remaining_budget}
             registry = self._filtered_registry()
             max_steps = 4
             if account is not None:
-                max_steps = account.limits.effective_max_steps(4)
+                max_steps = account.remaining_max_steps(4)
+                if max_steps <= 0:
+                    breach = account.probe_next_llm_turn()
+                    if breach is None:
+                        breach = account.check()
+                    if breach is not None:
+                        return {
+                            "question": question,
+                            "content": "",
+                            "tokens": 0,
+                            "success": False,
+                            "budget_reason": breach.reason,
+                            "error": breach.message,
+                        }
+                    return {
+                        "question": question,
+                        "content": "",
+                        "tokens": 0,
+                        "success": False,
+                        "budget_reason": "budget_turns",
+                        "error": "Deep research has no remaining LLM turns",
+                    }
             result: RunLoopResult = run_agent_loop(
                 messages=messages,
                 tool_registry=registry,

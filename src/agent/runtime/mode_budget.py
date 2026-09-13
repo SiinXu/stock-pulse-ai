@@ -196,6 +196,25 @@ class ModeBudgetAccount:
                 return None
             return max(0, int(self.limits.max_llm_turns) - int(self.llm_turns))
 
+    def remaining_max_steps(self, configured_max_steps: int) -> int:
+        """Clamp a loop's ``max_steps`` to remaining LLM turns.
+
+        ``ModeBudgetLimits.effective_max_steps`` uses the absolute cap, so a
+        4-step specialist loop would still be allowed when only 1–3 turns
+        remain. Deep Research must use this remaining clamp for every
+        sub-question ``run_agent_loop``. When turn budgets are disabled
+        (including the research token-only profile), returns the configured
+        value unchanged. Returns 0 when no turns remain so callers skip
+        starting another loop instead of relying on post-call ``>`` evaluation.
+
+        Chat/Multi/classic callers keep ``effective_max_steps`` (absolute cap).
+        """
+        configured = max(0, int(configured_max_steps or 0))
+        remaining = self.remaining_llm_turns()
+        if remaining is None:
+            return configured
+        return min(configured, remaining)
+
     def remaining_tokens(self) -> Optional[int]:
         with self._lock:
             if not self.limits.enabled or self.limits.max_tokens <= 0:
