@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import inspect
 import logging
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from typing import Any, Dict, List, Optional
 from unittest.mock import MagicMock, patch
@@ -12,6 +13,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.agent.evolution.adapters import (
+    ADAPTER_CALIBRATE_EVENT_TYPE,
     ADAPTER_INFLUENCE_META_KEY,
     calibrate_confidence,
     is_online_adapters_enabled,
@@ -19,6 +21,10 @@ from src.agent.evolution.adapters import (
     rank_tools,
     record_adapter_influence,
 )
+from src.config import Config
+from src.repositories.agent_evolution_event_repo import AgentEvolutionEventRepository
+from src.repositories.base import RepositoryError
+from src.storage import DatabaseManager
 from src.agent.evolution.guards import (
     snapshot_soul_identity,
     snapshot_tool_surface_denials,
@@ -32,6 +38,28 @@ from src.agent.tools.surface import ToolSurface
 from src.schemas.agent_episode import AgentEpisodeCreate
 
 _TEST_CAPABILITY = "analysis_context:read"
+
+
+def _list_calibrate_events(db: DatabaseManager) -> list[Any]:
+    return AgentEvolutionEventRepository(db).list_events(
+        occurred_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        occurred_to=datetime(2100, 1, 1, tzinfo=timezone.utc),
+        event_type=ADAPTER_CALIBRATE_EVENT_TYPE,
+    )
+
+
+@pytest.fixture()
+def isolated_db(tmp_path, monkeypatch):
+    db_path = tmp_path / "adapter-evolution-event.db"
+    monkeypatch.setenv("DATABASE_PATH", str(db_path))
+    Config.reset_instance()
+    DatabaseManager.reset_instance()
+    db = DatabaseManager.get_instance()
+    try:
+        yield db
+    finally:
+        DatabaseManager.reset_instance()
+        Config.reset_instance()
 
 
 def _config(*, enabled: bool = False, min_samples: int = 30) -> SimpleNamespace:
@@ -873,3 +901,140 @@ def test_episode_schema_has_no_adapter_field_and_tests_do_not_update_episodes() 
     repo = MagicMock(name="agent_episode_repo")
     repo.update.assert_not_called()
     repo.save.assert_not_called()
+
+
+def test_applied_calibration_appends_one_system_event(isolated_db) -> None:
+    memory = _memory(enabled=True, samples=40, accuracy=0.0, avg_confidence=0.4)
+    raw = 0.6
+    adjusted, meta = calibrate_confidence(
+        raw,
+        memory=memory,
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+    events = _list_calibrate_events(isolated_db)
+    assert meta["applied"] is True
+    assert adjusted == pytest.approx(0.3)
+    assert len(events) == 1
+    event = events[0]
+    assert event.event_type == ADAPTER_CALIBRATE_EVENT_TYPE
+    assert event.actor == "system"
+    assert event.before == {"applied": False, "factor": 1.0}
+    assert event.after["applied"] is True
+    assert event.after["factor"] == pytest.approx(meta["factor"])
+    assert event.after["samples"] == 40
+    assert event.before != event.after
+    assert event.reason_refs.prediction_ids == []
+    assert event.reason_refs.run_ids == []
+
+
+def test_applied_unit_factor_still_mutates_event_payload(isolated_db) -> None:
+    memory = _memory(enabled=True, samples=40, accuracy=0.5, avg_confidence=0.5)
+    adjusted, meta = calibrate_confidence(
+        0.6,
+        memory=memory,
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+    events = _list_calibrate_events(isolated_db)
+    assert meta["applied"] is True
+    assert meta["factor"] == pytest.approx(1.0)
+    assert adjusted == pytest.approx(0.6)
+    assert len(events) == 1
+    assert events[0].before != events[0].after
+    assert events[0].after["applied"] is True
+    assert events[0].after["factor"] == pytest.approx(1.0)
+
+
+def test_identity_calibration_paths_emit_zero_events(isolated_db) -> None:
+    raw = 0.7
+    off_value, off_meta = calibrate_confidence(
+        raw,
+        memory=_memory(enabled=True, samples=80, accuracy=0.2, avg_confidence=0.9),
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=False),
+    )
+    memory_off_value, memory_off_meta = calibrate_confidence(
+        raw,
+        memory=_memory(enabled=False, samples=80, accuracy=0.1, avg_confidence=0.95),
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+    below_value, below_meta = calibrate_confidence(
+        raw,
+        memory=_memory(enabled=True, samples=29, accuracy=0.1, avg_confidence=0.95),
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+    uncal_result = CalibrationResult(
+        agent_name="technical",
+        total_samples=40,
+        historical_accuracy=0.0,
+        avg_confidence=0.4,
+        calibrated=False,
+        calibration_factor=0.5,
+    )
+    uncal_value, uncal_meta = calibrate_confidence(
+        raw,
+        memory=_memory_with_result(uncal_result),
+        agent_name="technical",
+        stock_code="600519",
+        min_samples=30,
+        config=_config(enabled=True),
+    )
+    assert off_value == raw and off_meta["applied"] is False
+    assert memory_off_value == raw and memory_off_meta["applied"] is False
+    assert below_value == raw and below_meta["applied"] is False
+    assert uncal_value == raw and uncal_meta["applied"] is False
+    assert _list_calibrate_events(isolated_db) == []
+
+
+def test_rank_tools_and_prefer_route_emit_zero_events(isolated_db) -> None:
+    assert rank_tools(["news", "quote"]) == ["news", "quote"]
+    assert prefer_route("quick") == "quick"
+    assert _list_calibrate_events(isolated_db) == []
+
+
+def test_append_failure_does_not_change_calibration_return(isolated_db) -> None:
+    memory = _memory(enabled=True, samples=40, accuracy=0.0, avg_confidence=0.4)
+    raw = 0.6
+
+    def _boom(_event: Any) -> None:
+        raise RepositoryError(
+            "evolution event append failed",
+            error_code="evolution_event_append_conflict",
+        )
+
+    with patch(
+        "src.agent.evolution.adapters.log_safe_exception",
+    ) as safe_log:
+        adjusted, meta = calibrate_confidence(
+            raw,
+            memory=memory,
+            agent_name="technical",
+            stock_code="600519",
+            min_samples=30,
+            config=_config(enabled=True),
+            append_event=_boom,
+        )
+
+    assert adjusted == pytest.approx(0.3)
+    assert meta["applied"] is True
+    assert meta["factor"] == pytest.approx(0.5)
+    assert meta["samples"] == 40
+    assert _list_calibrate_events(isolated_db) == []
+    safe_log.assert_called_once()
+    assert safe_log.call_args.args[1] == "Online adapter calibration event append failed"
+    assert isinstance(safe_log.call_args.args[2], RepositoryError)
+    assert safe_log.call_args.kwargs["error_code"] == "adapter_calibrate_event_append_failed"
+    assert safe_log.call_args.kwargs["level"] == logging.WARNING

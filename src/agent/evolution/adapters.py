@@ -1,24 +1,38 @@
 # -*- coding: utf-8 -*-
-"""Gated online evolution adapters (Issue #1091).
+"""Gated online evolution adapters (Issue #1091 / #1106).
 
 Wraps existing ``AgentMemory`` calibration. Tool ranking and route preference
 are explicit identity stubs. Default-off. ``BaseAgent`` applies
 ``calibrate_confidence`` when ``AGENT_ONLINE_ADAPTERS_ENABLED`` is true.
-This module does not edit Soul, ToolSurface, episode storage, or orchestrator
-route, and does not implement real tool ranking or route preference.
+When calibration actually applies, this module appends one system
+``adapter.calibrate`` EvolutionEvent. Identity paths emit nothing. Append
+failure is logged and does not change the returned confidence. This module
+does not edit Soul, ToolSurface, episode storage, or orchestrator route,
+does not implement real tool ranking or route preference, and does not
+expose HTTP list or auto-promote.
 """
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Sequence, Tuple
+import logging
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+
+from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from src.agent.memory import AgentMemory
 from src.agent.protocols import AgentContext
+from src.repositories.base import RepositoryError
+from src.schemas.evolution_event import EvolutionEventCreate, EvolutionEventReasonRefs
+from src.utils.sanitize import log_safe_exception
 
 ADAPTER_INFLUENCE_META_KEY = "adapter_influence"
 DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES = 30
+ADAPTER_CALIBRATE_EVENT_TYPE = "adapter.calibrate"
 _MIN_CALIBRATION_FACTOR = 0.5
 _MAX_CALIBRATION_FACTOR = 1.5
+
+logger = logging.getLogger(__name__)
 
 _STUB_NEUTRAL = "stub_neutral"
 _REASON_ADAPTERS_DISABLED = "adapters_disabled"
@@ -51,6 +65,65 @@ def _clamp_confidence(value: float) -> float:
     return max(0.0, min(1.0, float(value)))
 
 
+def _normalize_reason_refs(reason_refs: Any) -> EvolutionEventReasonRefs:
+    if reason_refs is None:
+        return EvolutionEventReasonRefs()
+    if isinstance(reason_refs, EvolutionEventReasonRefs):
+        return reason_refs
+    return EvolutionEventReasonRefs.model_validate(reason_refs)
+
+
+def _default_append_evolution_event(event: EvolutionEventCreate) -> Any:
+    from src.repositories.agent_evolution_event_repo import AgentEvolutionEventRepository
+
+    return AgentEvolutionEventRepository().append(event)
+
+
+def _emit_applied_calibration_event(
+    *,
+    factor: float,
+    samples: int,
+    reason_refs: Any = None,
+    append_event: Optional[Callable[[EvolutionEventCreate], Any]] = None,
+) -> None:
+    """Append one system calibration event. Fail-soft: never raise to callers."""
+    try:
+        payload = EvolutionEventCreate(
+            event_type=ADAPTER_CALIBRATE_EVENT_TYPE,
+            actor="system",
+            reason_refs=_normalize_reason_refs(reason_refs),
+            before={"applied": False, "factor": 1.0},
+            after={
+                "applied": True,
+                "factor": float(factor),
+                "samples": int(samples),
+            },
+        )
+    except ValidationError as exc:
+        log_safe_exception(
+            logger,
+            "Online adapter calibration event payload was rejected",
+            exc,
+            error_code="adapter_calibrate_event_invalid",
+            level=logging.WARNING,
+            context={"samples": int(samples)},
+        )
+        return
+
+    writer = append_event if append_event is not None else _default_append_evolution_event
+    try:
+        writer(payload)
+    except (RepositoryError, ValidationError, SQLAlchemyError) as exc:
+        log_safe_exception(
+            logger,
+            "Online adapter calibration event append failed",
+            exc,
+            error_code="adapter_calibrate_event_append_failed",
+            level=logging.WARNING,
+            context={"event_type": ADAPTER_CALIBRATE_EVENT_TYPE, "samples": int(samples)},
+        )
+
+
 def _coerce_float(value: Any, default: float) -> float:
     """Parse a numeric field. Preserve 0.0; do not treat it as missing."""
     if value is None:
@@ -79,13 +152,17 @@ def calibrate_confidence(
     stock_code: Optional[str],
     min_samples: int,
     config: Any = None,
+    reason_refs: Any = None,
+    append_event: Optional[Callable[[EvolutionEventCreate], Any]] = None,
 ) -> Tuple[float, Dict[str, Any]]:
     """Wrap AgentMemory.get_calibration.
 
     Identity if adapters off, memory off, samples < min, or not calibrated.
     When applied, multiplies ``raw`` by the stored ``calibration_factor``
     (AgentMemory already clamps ``historical_accuracy / avg_confidence``
-    to ``0.5..1.5``, including ``historical_accuracy=0.0``).
+    to ``0.5..1.5``, including ``historical_accuracy=0.0``) and appends one
+    ``adapter.calibrate`` EvolutionEvent. Append failure does not change the
+    returned ``(adjusted, meta)``. Do not invent prediction ids for reason_refs.
     """
     if not is_online_adapters_enabled(config):
         return float(raw), _identity_confidence(reason=_REASON_ADAPTERS_DISABLED)
@@ -111,12 +188,19 @@ def calibrate_confidence(
         _coerce_float(getattr(cal, "calibration_factor", 1.0), default=1.0)
     )
     adjusted = _clamp_confidence(float(raw) * factor)
-    return adjusted, {
+    meta = {
         "applied": True,
         "factor": factor,
         "samples": samples,
         "reason": _REASON_APPLIED,
     }
+    _emit_applied_calibration_event(
+        factor=factor,
+        samples=samples,
+        reason_refs=reason_refs,
+        append_event=append_event,
+    )
+    return adjusted, meta
 
 
 def rank_tools(

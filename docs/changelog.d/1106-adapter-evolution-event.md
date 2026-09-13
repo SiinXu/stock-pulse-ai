@@ -1,0 +1,1 @@
+- [Added] Online adapter calibration appends one system EvolutionEvent when a factor actually applies; identity and append failures do not change the prediction outcome (Refs #1106).
