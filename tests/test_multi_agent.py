@@ -3729,6 +3729,9 @@ class TestAgentResearchEndpoint(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.sources, [])
         self.assertEqual(response.token_usage, 0)
         self.assertEqual(response.error, "agent_research_failed")
+        self.assertIsNone(response.failure_reason)
+        self.assertFalse(response.cancelled)
+        self.assertIsNone(response.budget_snapshot)
 
     async def test_cancelled_http_wait_keeps_research_and_persists_result(self):
         from src.api.v1.endpoints.agent import ResearchRequest, agent_research

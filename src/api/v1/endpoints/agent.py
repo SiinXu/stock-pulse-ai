@@ -514,6 +514,35 @@ def _research_budget_snapshot(result: Any) -> Optional[Dict[str, Any]]:
     return snapshot if isinstance(snapshot, dict) else None
 
 
+def _research_failure_response(
+    *,
+    cancelled: bool = False,
+    failure_reason: Optional[str] = None,
+    content: str = "",
+    sources: Optional[List[str]] = None,
+    token_usage: int = 0,
+    budget_snapshot: Optional[Dict[str, Any]] = None,
+) -> "ResearchResponse":
+    """Public research failure envelope.
+
+    Generic/timeout failures keep empty content, empty sources, and
+    ``token_usage=0`` so internal reports are not leaked. Budget/cancel
+    failures may include leftover markdown, token usage, and a snapshot.
+    Additive fields are always present: ``failure_reason``, ``cancelled``,
+    and ``budget_snapshot``.
+    """
+    return ResearchResponse(
+        success=False,
+        content=content,
+        sources=list(sources or []),
+        token_usage=int(token_usage or 0),
+        error=AGENT_RESEARCH_FAILED,
+        failure_reason=failure_reason,
+        cancelled=bool(cancelled),
+        budget_snapshot=budget_snapshot,
+    )
+
+
 def _map_research_failure_response(result: Any) -> Optional["ResearchResponse"]:
     """Map cancel/budget/empty research failures onto the public payload."""
     cancelled = bool(getattr(result, "cancelled", False))
@@ -527,21 +556,23 @@ def _map_research_failure_response(result: Any) -> Optional["ResearchResponse"]:
     include_partial = cancelled or failure_reason is not None
     report = getattr(result, "report", "")
     content = report if include_partial and isinstance(report, str) else ""
-    sources = []
+    sources: List[str] = []
     if include_partial:
         sources = [
             f"Sub-question {i + 1}: {q}"
             for i, q in enumerate(getattr(result, "sub_questions", None) or [])
         ]
-    return ResearchResponse(
-        success=False,
+    return _research_failure_response(
+        cancelled=cancelled,
+        failure_reason=failure_reason,
         content=content,
         sources=sources,
-        token_usage=int(getattr(result, "total_tokens", 0) or 0),
-        error=AGENT_RESEARCH_FAILED,
-        failure_reason=failure_reason,
-        cancelled=cancelled,
-        budget_snapshot=_research_budget_snapshot(result),
+        token_usage=(
+            int(getattr(result, "total_tokens", 0) or 0) if include_partial else 0
+        ),
+        budget_snapshot=(
+            _research_budget_snapshot(result) if include_partial else None
+        ),
     )
 
 
@@ -642,13 +673,7 @@ async def agent_research(
             if request.session_id:
                 session_service.record_research_failure(session_id=request.session_id)
                 research_terminal_recorded = True
-            return ResearchResponse(
-                success=False,
-                content="",
-                sources=[],
-                token_usage=0,
-                error=AGENT_RESEARCH_FAILED,
-            )
+            return _research_failure_response()
         except asyncio.CancelledError:
             if request.session_id:
                 research_task.add_done_callback(
@@ -668,14 +693,7 @@ async def agent_research(
             if request.session_id:
                 session_service.record_research_failure(session_id=request.session_id)
                 research_terminal_recorded = True
-            return ResearchResponse(
-                success=False,
-                content="",
-                sources=[],
-                token_usage=0,
-                error=AGENT_RESEARCH_FAILED,
-                cancelled=False,
-            )
+            return _research_failure_response()
 
         mapped_failure = _map_research_failure_response(result)
         if mapped_failure is not None:

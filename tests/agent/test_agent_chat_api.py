@@ -548,6 +548,9 @@ def test_agent_research_failure_does_not_expose_internal_result(tmp_path: Path) 
         "sources": [],
         "token_usage": 0,
         "error": "agent_research_failed",
+        "failure_reason": None,
+        "cancelled": False,
+        "budget_snapshot": None,
     }
     assert "super-secret" not in response.text
     assert "private.example" not in response.text
@@ -590,6 +593,9 @@ def test_agent_research_rejects_a_successful_result_with_an_empty_report(
         "sources": [],
         "token_usage": 0,
         "error": "agent_research_failed",
+        "failure_reason": None,
+        "cancelled": False,
+        "budget_snapshot": None,
     }
 
 
@@ -679,6 +685,9 @@ def test_agent_research_timeout_does_not_expose_internal_result(tmp_path: Path) 
         "sources": [],
         "token_usage": 0,
         "error": "agent_research_failed",
+        "failure_reason": None,
+        "cancelled": False,
+        "budget_snapshot": None,
     }
     assert "super-secret" not in response.text
     assert "private.example" not in response.text
