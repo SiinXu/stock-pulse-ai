@@ -28,6 +28,11 @@ class AlertRuleCreateRequest(BaseModel):
     parameters: Dict[str, Any] = Field(default_factory=dict)
     severity: SeverityValue = "warning"
     enabled: bool = True
+    source: Optional[str] = Field(
+        None,
+        max_length=16,
+        description="Optional rule source. Allowed: api, nl_compiler. Omitted defaults to api.",
+    )
     cooldown_policy: Optional[Dict[str, Any]] = None
     notification_policy: Optional[Dict[str, Any]] = None
 
@@ -181,10 +186,13 @@ class AlertTriggerItem(BaseModel):
 class AlertRuleNlCompileRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=500)
     default_severity: SeverityValue = "warning"
-    default_enabled: bool = True
+    default_enabled: bool = False
     auto_analysis: Optional[bool] = Field(
         None,
-        description="When true, attach notification_policy.auto_analysis=true to a successful compile.",
+        description=(
+            "When true, attach notification_policy.auto_analysis=true to a successful compile. "
+            "Phrases do not infer this flag."
+        ),
     )
 
 

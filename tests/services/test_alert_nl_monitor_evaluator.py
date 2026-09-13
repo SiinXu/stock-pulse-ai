@@ -74,7 +74,7 @@ class AlertNlMonitorEvaluatorTestCase(unittest.TestCase):
         return notifier
 
     def _persist_compiled(self, text: str) -> dict:
-        compiled = compile_alert_rule_nl(text)
+        compiled = compile_alert_rule_nl(text, default_enabled=True)
         self.assertEqual(compiled.outcome, "success")
         self.assertIsNotNone(compiled.rule)
         return self.service.create_rule(compiled.rule)

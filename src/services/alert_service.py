@@ -89,6 +89,7 @@ SYMBOL_ALERT_TYPES = LEGACY_RUNTIME_ALERT_TYPES | TECHNICAL_ALERT_TYPES | EVENT_
 SUPPORTED_ALERT_TYPES = SYMBOL_ALERT_TYPES | PORTFOLIO_ALERT_TYPES | MARKET_ALERT_TYPES
 SUPPORTED_TARGET_SCOPES = frozenset({"single_symbol", "watchlist", "portfolio_holdings", "portfolio_account", "market"})
 SUPPORTED_SEVERITIES = frozenset({"info", "warning", "critical"})
+CREATE_RULE_SOURCES = frozenset({"api", "nl_compiler"})
 NULLABLE_RULE_UPDATE_FIELDS = frozenset({"cooldown_policy", "notification_policy"})
 
 logger = logging.getLogger(__name__)
@@ -120,7 +121,14 @@ class AlertService:
         self.repo = AlertRepository(self.db)
 
     def create_rule(self, payload: Dict[str, Any]) -> Dict[str, Any]:
-        fields = self._normalize_rule_payload(payload)
+        source = payload.get("source")
+        if source is None or str(source).strip() == "":
+            normalized_source = "api"
+        else:
+            normalized_source = str(source).strip()
+        if normalized_source not in CREATE_RULE_SOURCES:
+            raise AlertServiceError(f"unsupported source: {normalized_source}")
+        fields = self._normalize_rule_payload(payload, source=normalized_source)
         return self._serialize_rule(self.repo.create_rule(fields))
 
     def get_rule(self, rule_id: int) -> Dict[str, Any]:

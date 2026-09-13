@@ -4804,6 +4804,11 @@ export interface components {
              * @enum {string}
              */
             severity: "info" | "warning" | "critical";
+            /**
+             * Source
+             * @description Optional rule source. Allowed: api, nl_compiler. Omitted defaults to api.
+             */
+            source?: string | null;
             /** Target */
             target: string;
             /**
@@ -4885,12 +4890,12 @@ export interface components {
         AlertRuleNlCompileRequest: {
             /**
              * Auto Analysis
-             * @description When true, attach notification_policy.auto_analysis=true to a successful compile.
+             * @description When true, attach notification_policy.auto_analysis=true to a successful compile. Phrases do not infer this flag.
              */
             auto_analysis?: boolean | null;
             /**
              * Default Enabled
-             * @default true
+             * @default false
              */
             default_enabled: boolean;
             /**

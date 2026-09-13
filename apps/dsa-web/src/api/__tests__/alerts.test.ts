@@ -165,6 +165,40 @@ describe('alertsApi', () => {
     expect(created.parameters.changePct).toBe(3);
   });
 
+  it('forwards optional source on create so compiled rules keep nl_compiler', async () => {
+    post.mockResolvedValueOnce({
+      data: {
+        id: 9,
+        name: 'compiled',
+        target_scope: 'single_symbol',
+        target: 'AAPL',
+        alert_type: 'price_cross',
+        parameters: { direction: 'above', price: 200 },
+        severity: 'warning',
+        enabled: false,
+        source: 'nl_compiler',
+      },
+    });
+
+    const created = await alertsApi.createRule({
+      name: 'compiled',
+      targetScope: 'single_symbol',
+      target: 'AAPL',
+      alertType: 'price_cross',
+      parameters: { direction: 'above', price: 200 },
+      severity: 'warning',
+      enabled: false,
+      source: 'nl_compiler',
+    });
+
+    expect(post).toHaveBeenCalledWith('/api/v1/alerts/rules', expect.objectContaining({
+      source: 'nl_compiler',
+      enabled: false,
+    }));
+    expect(created.source).toBe('nl_compiler');
+    expect(created.enabled).toBe(false);
+  });
+
   it('round-trips corporate-event parameters and server trigger cursors', async () => {
     post.mockResolvedValueOnce({
       data: {

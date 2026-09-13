@@ -1173,6 +1173,19 @@
             "title": "Severity",
             "type": "string"
           },
+          "source": {
+            "anyOf": [
+              {
+                "maxLength": 16,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Optional rule source. Allowed: api, nl_compiler. Omitted defaults to api.",
+            "title": "Source"
+          },
           "target": {
             "maxLength": 64,
             "minLength": 1,
@@ -1416,11 +1429,11 @@
                 "type": "null"
               }
             ],
-            "description": "When true, attach notification_policy.auto_analysis=true to a successful compile.",
+            "description": "When true, attach notification_policy.auto_analysis=true to a successful compile. Phrases do not infer this flag.",
             "title": "Auto Analysis"
           },
           "default_enabled": {
-            "default": true,
+            "default": false,
             "title": "Default Enabled",
             "type": "boolean"
           },

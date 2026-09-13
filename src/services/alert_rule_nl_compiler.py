@@ -167,7 +167,7 @@ def compile_alert_rule_nl(
     *,
     default_target_scope: str = "single_symbol",
     default_severity: str = "warning",
-    default_enabled: bool = True,
+    default_enabled: bool = False,
     auto_analysis: Optional[bool] = None,
 ) -> AlertRuleCompileResult:
     source = " ".join(str(text or "").strip().split())
@@ -278,7 +278,7 @@ def compile_alert_rule_nl(
         rule["cooldown_policy"] = {"cooldown_seconds": cooldown.cooldown_seconds}
 
     notification_policy: Dict[str, Any] = {}
-    if auto_analysis is True or (auto_analysis is None and _wants_auto_analysis(lowered)):
+    if auto_analysis is True:
         notification_policy["auto_analysis"] = True
     if notification_policy:
         rule["notification_policy"] = notification_policy
@@ -430,6 +430,7 @@ def _first_positive(numbers: Sequence[float]) -> Optional[float]:
 
 
 def _wants_auto_analysis(lowered: str) -> bool:
+    """Phrase cues kept for reference; compile attaches auto_analysis only when the request flag is True."""
     cues = ("deep analysis", "auto analysis", "trigger analysis", "深度分析", "自动分析", "触发分析", "跑一遍分析")
     return any(cue in lowered for cue in cues)
 
