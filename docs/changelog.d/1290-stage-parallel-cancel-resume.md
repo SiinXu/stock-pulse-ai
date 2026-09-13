@@ -1,0 +1,1 @@
+- [Fixed] Honor user cancel before committing the Technical/Intel wave and restore a completed technical_intel checkpoint without re-running those stages (Refs #1290).

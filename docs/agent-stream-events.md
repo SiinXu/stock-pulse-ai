@@ -57,7 +57,9 @@ When `AGENT_STAGE_PARALLEL_ENABLED=true` and a Native Multi `standard` /
 `full` / `specialist` run opens the Technical ∥ Intel wave, both `stage_start`
 events are emitted first in declaration order (`technical` then `intel`).
 `stage_done` is also emitted in that declaration order even if Intel finishes
-first. In-wave `thinking` / `tool_start` / `tool_done` events may interleave
+first. A cancelled wave still emits those declaration-order `stage_done`
+events, does not start Decision, and leaves `done` / `error` unchanged.
+In-wave `thinking` / `tool_start` / `tool_done` events may interleave
 but always include `stage`. Default-off serial runs keep the existing
 start-then-done pairing. Unknown event types should still be ignored or
 displayed with a generic fallback.
