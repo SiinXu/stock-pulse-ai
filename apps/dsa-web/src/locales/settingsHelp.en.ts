@@ -1580,13 +1580,14 @@ const settingsHelpEnUS: SettingsHelpSourceMap = {
   },
   'settings.agent.DEEP_RESEARCH': {
     title: 'Deep Research',
-    summary: 'Controls the token budget and timeout for Deep Research.',
-    usage: 'AGENT_DEEP_RESEARCH_BUDGET sets the maximum token budget; AGENT_DEEP_RESEARCH_TIMEOUT sets the timeout in seconds.',
+    summary: 'Controls the token ceiling and timeout for Deep Research on the shared mode_budget account.',
+    usage: 'AGENT_DEEP_RESEARCH_BUDGET sets the research token ceiling on the specialist mode_budget account; AGENT_DEEP_RESEARCH_TIMEOUT sets the timeout in seconds.',
     valueNotes: [
-      'The budget covers planning, follow-up research, and final synthesis.',
-      'Higher budgets enable deeper research but increase cost.',
+      'The token ceiling covers planning, sub-questions, and final synthesis on one shared account.',
+      'Exceeding the ceiling returns success=false with budget_tokens; leftover markdown is not a finished report.',
+      'When mode budgets are enabled, specialist turn/tool/cost defaults also apply.',
     ],
-    impact: ['Affects Deep Research depth and duration.'],
+    impact: ['Affects Deep Research depth, duration, and hard-stop behaviour.'],
     notes: ['Deep Research is available in Agent mode.'],
   },
   'settings.agent.AGENT_MEMORY_ENABLED': {

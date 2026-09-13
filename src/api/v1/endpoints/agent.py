@@ -486,8 +486,93 @@ def _research_result_has_report(result: Any) -> bool:
     return bool(
         getattr(result, "success", False)
         and not getattr(result, "timed_out", False)
+        and not getattr(result, "cancelled", False)
+        and _research_failure_reason(result) is None
         and isinstance(report, str)
         and report.strip()
+    )
+
+
+_HARD_BUDGET_REASONS = frozenset({
+    "budget_turns",
+    "budget_tools",
+    "budget_cost",
+    "budget_tokens",
+})
+
+
+def _research_failure_reason(result: Any) -> Optional[str]:
+    raw = getattr(result, "failure_reason", None)
+    value = getattr(raw, "value", raw)
+    if isinstance(value, str) and value in _HARD_BUDGET_REASONS:
+        return value
+    return None
+
+
+def _research_budget_snapshot(result: Any) -> Optional[Dict[str, Any]]:
+    snapshot = getattr(result, "budget_snapshot", None)
+    return snapshot if isinstance(snapshot, dict) else None
+
+
+def _research_failure_response(
+    *,
+    cancelled: bool = False,
+    failure_reason: Optional[str] = None,
+    content: str = "",
+    sources: Optional[List[str]] = None,
+    token_usage: int = 0,
+    budget_snapshot: Optional[Dict[str, Any]] = None,
+) -> "ResearchResponse":
+    """Public research failure envelope.
+
+    Generic/timeout failures keep empty content, empty sources, and
+    ``token_usage=0`` so internal reports are not leaked. Budget/cancel
+    failures may include leftover markdown, token usage, and a snapshot.
+    Additive fields are always present: ``failure_reason``, ``cancelled``,
+    and ``budget_snapshot``.
+    """
+    return ResearchResponse(
+        success=False,
+        content=content,
+        sources=list(sources or []),
+        token_usage=int(token_usage or 0),
+        error=AGENT_RESEARCH_FAILED,
+        failure_reason=failure_reason,
+        cancelled=bool(cancelled),
+        budget_snapshot=budget_snapshot,
+    )
+
+
+def _map_research_failure_response(result: Any) -> Optional["ResearchResponse"]:
+    """Map cancel/budget/empty research failures onto the public payload."""
+    cancelled = bool(getattr(result, "cancelled", False))
+    failure_reason = None if cancelled else _research_failure_reason(result)
+    if (
+        not cancelled
+        and failure_reason is None
+        and _research_result_has_report(result)
+    ):
+        return None
+    include_partial = cancelled or failure_reason is not None
+    report = getattr(result, "report", "")
+    content = report if include_partial and isinstance(report, str) else ""
+    sources: List[str] = []
+    if include_partial:
+        sources = [
+            f"Sub-question {i + 1}: {q}"
+            for i, q in enumerate(getattr(result, "sub_questions", None) or [])
+        ]
+    return _research_failure_response(
+        cancelled=cancelled,
+        failure_reason=failure_reason,
+        content=content,
+        sources=sources,
+        token_usage=(
+            int(getattr(result, "total_tokens", 0) or 0) if include_partial else 0
+        ),
+        budget_snapshot=(
+            _research_budget_snapshot(result) if include_partial else None
+        ),
     )
 
 
@@ -506,12 +591,16 @@ class ResearchRequest(BaseModel):
         pattern=r"^\S(?:.*\S)?$",
     )
 
+
 class ResearchResponse(BaseModel):
     success: bool
     content: str
     sources: List[str] = Field(default_factory=list)
     token_usage: int = 0
     error: Optional[str] = None
+    failure_reason: Optional[str] = None
+    cancelled: Optional[bool] = None
+    budget_snapshot: Optional[Dict[str, Any]] = None
 
 
 @router.post("/research", response_model=ResearchResponse)
@@ -545,18 +634,19 @@ async def agent_research(
             )
             research_started = True
 
-        from src.agent.research import ResearchAgent
+        from src.agent.research import ResearchAgent, research_token_budget_from_config
         from src.agent.factory import get_tool_registry
         from src.agent.llm_adapter import LLMToolAdapter
 
         registry = get_tool_registry()
         llm_adapter = LLMToolAdapter(config)
-        budget = getattr(config, "agent_deep_research_budget", 30000)
+        budget = research_token_budget_from_config(config)
 
         agent = ResearchAgent(
             tool_registry=registry,
             llm_adapter=llm_adapter,
             token_budget=budget,
+            config=config,
         )
 
         research_timeout = getattr(config, "agent_deep_research_timeout", 180)
@@ -583,13 +673,7 @@ async def agent_research(
             if request.session_id:
                 session_service.record_research_failure(session_id=request.session_id)
                 research_terminal_recorded = True
-            return ResearchResponse(
-                success=False,
-                content="",
-                sources=[],
-                token_usage=0,
-                error=AGENT_RESEARCH_FAILED,
-            )
+            return _research_failure_response()
         except asyncio.CancelledError:
             if request.session_id:
                 research_task.add_done_callback(
@@ -609,31 +693,22 @@ async def agent_research(
             if request.session_id:
                 session_service.record_research_failure(session_id=request.session_id)
                 research_terminal_recorded = True
-            return ResearchResponse(
-                success=False,
-                content="",
-                sources=[],
-                token_usage=0,
-                error=AGENT_RESEARCH_FAILED,
-            )
+            return _research_failure_response()
 
-        if not _research_result_has_report(result):
+        mapped_failure = _map_research_failure_response(result)
+        if mapped_failure is not None:
             logger.error(
-                "Agent research API failed: diagnostic=%s",
+                "Agent research API failed: diagnostic=%s failure_reason=%s cancelled=%s",
                 sanitize_agent_diagnostic(
                     result.error or "Research completed without a final report"
                 ),
+                mapped_failure.failure_reason,
+                bool(mapped_failure.cancelled),
             )
             if request.session_id:
                 session_service.record_research_failure(session_id=request.session_id)
                 research_terminal_recorded = True
-            return ResearchResponse(
-                success=False,
-                content="",
-                sources=[],
-                token_usage=0,
-                error=AGENT_RESEARCH_FAILED,
-            )
+            return mapped_failure
 
         if request.session_id:
             session_service.record_research_success(

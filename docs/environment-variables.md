@@ -107,7 +107,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_CRITIC_MAX_ITERS` | `1` | 是 | 模板中注释; Controlled revision rounds after Critic findings (default 1, hard cap 2); only an explicit recheck pass marks converg... |
 | `AGENT_DATA_TOOL_TIMEOUT_S` | `0` | 是 | 模板中注释; Optional per-category tool-call caps in seconds (0 = no category cap; defers to AGENT_TOOL_TIMEOUT_S and remaining or... |
 | `AGENT_DECISION_AGENT_TIMEOUT_S` | `0` | 是 | 模板中注释 |
-| `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep-research tool token budget and timeout (seconds) for Agent analysis paths that enable deep research. |
+| `AGENT_DEEP_RESEARCH_BUDGET` | `30000` | 是 | 模板中注释; Deep Research token ceiling on the shared specialist mode_budget account |
 | `AGENT_DEEP_RESEARCH_TIMEOUT` | `180` | 是 | 模板中注释 |
 | `AGENT_DISAGREEMENT_HANDLING` | `false` | 是 | 模板中注释; Structured disagreement handling: record points, dual-layer cross-validation, and split-verdict escalation (conservat... |
 | `AGENT_DISAGREEMENT_HIGH_CONFIDENCE_THRESHOLD` | `0.7` | 是 | 模板中注释 |

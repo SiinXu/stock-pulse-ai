@@ -67,7 +67,7 @@ EXPECTED_REGISTERED_KEYS_SHA256 = (
     "5a3289e35f36eda755c1b7509eb295c7d03f240acb2d41c580ef232c3e10bfe6"
 )
 EXPECTED_SCHEMA_SHA256 = (
-    "3a83399f4aa7744e5afce250a03163ffd0be9b389063d5c4f971e436722ce2bd"
+    "536c9114b1767a8975f066b2151b0a6e39e012a0d68887b19e262e69cefd5001"
 )
 
 
@@ -104,9 +104,10 @@ def test_config_registry_module_annotations_are_stable():
 
 
 def test_config_registry_contract_snapshot_is_stable():
-    # Registered-keys digest stays on the AGENT_STAGE_PARALLEL_ENABLED
-    # inventory. Schema digest follows the AGENT_RED_TEAM_ENABLED
-    # description correction (no public HTTP/CLI override claim).
+    # Registered-keys digest is unchanged: AGENT_DEEP_RESEARCH_BUDGET already
+    # existed. Schema digest is the live combined registry after this PR's
+    # Deep Research mode_budget help rewrite plus main's AGENT_RED_TEAM_ENABLED
+    # description correction.
     assert (
         _json_sha256(registry.get_registered_field_keys())
         == EXPECTED_REGISTERED_KEYS_SHA256

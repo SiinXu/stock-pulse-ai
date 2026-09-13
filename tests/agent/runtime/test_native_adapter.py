@@ -229,10 +229,12 @@ def test_research_dispatch_builds_agent_and_maps_success():
 
     assert handle.state is ExecutionState.SUCCEEDED
     assert handle.result is result
+    config = _research_config()
     research_cls.assert_called_once_with(
         tool_registry=registry,
         llm_adapter=llm_adapter,
         token_budget=12345,
+        config=config,
     )
     # The caller passed no callback, but the adapter still supplies a wrapper
     # so research progress is captured on the live handle's event stream.
@@ -242,6 +244,7 @@ def test_research_dispatch_builds_agent_and_maps_success():
     assert research_call.kwargs["context"] is None
     assert research_call.kwargs["timeout_seconds"] == 90
     assert callable(research_call.kwargs["progress_callback"])
+    assert callable(research_call.kwargs["cancelled_check"])
 
 
 def test_research_timed_out_maps_to_timed_out_state():

@@ -80,6 +80,29 @@ describe('agentApi.research', () => {
     });
   });
 
+  it('exposes additive budget fields on unsuccessful research payloads', async () => {
+    mockPost.mockResolvedValue({
+      data: {
+        success: false,
+        content: 'partial markdown',
+        sources: ['Q1'],
+        token_usage: 40,
+        error: 'agent_research_failed',
+        failure_reason: 'budget_turns',
+        cancelled: false,
+        budget_snapshot: { used: { llm_turns: 12 }, breach: { reason: 'budget_turns' } },
+      },
+    });
+    const result = await agentApi.research({ question: 'Q' });
+    expect(result.success).toBe(false);
+    expect(result.failure_reason).toBe('budget_turns');
+    expect(result.cancelled).toBe(false);
+    expect(result.budget_snapshot).toEqual({
+      used: { llm_turns: 12 },
+      breach: { reason: 'budget_turns' },
+    });
+  });
+
   it('defaults optional sources to [] when omitted', async () => {
     mockPost.mockResolvedValue({
       data: { success: true, content: 'ok', token_usage: 0 },

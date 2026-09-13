@@ -26,6 +26,9 @@ type _AssertSessionsFields = keyof OpenApiSessionsResponse;
 type _AssertMessagesFields = keyof OpenApiSessionMessagesResponse;
 const _chatFieldAnchor: _AssertChatFields = 'session_id';
 const _researchFieldAnchor: _AssertResearchFields = 'token_usage';
+const _researchFailureReasonAnchor: _AssertResearchFields = 'failure_reason';
+const _researchCancelledAnchor: _AssertResearchFields = 'cancelled';
+const _researchBudgetSnapshotAnchor: _AssertResearchFields = 'budget_snapshot';
 const _skillsFieldAnchor: _AssertSkillsFields = 'default_skill_id';
 const _sessionsFieldAnchor: _AssertSessionsFields = 'sessions';
 const _messagesFieldAnchor: _AssertMessagesFields = 'messages';
@@ -34,6 +37,9 @@ const _agentModelsFieldAnchor: keyof OpenApiAgentModelsResponse = 'models';
 const _agentModelFieldAnchor: keyof OpenApiAgentModelDeployment = 'deployment_id';
 void _chatFieldAnchor;
 void _researchFieldAnchor;
+void _researchFailureReasonAnchor;
+void _researchCancelledAnchor;
+void _researchBudgetSnapshotAnchor;
 void _skillsFieldAnchor;
 void _sessionsFieldAnchor;
 void _messagesFieldAnchor;
@@ -120,6 +126,9 @@ export interface ResearchResponse {
   sources: string[];
   token_usage: number;
   error?: string | null;
+  failure_reason?: string | null;
+  cancelled?: boolean | null;
+  budget_snapshot?: Record<string, unknown> | null;
 }
 
 export type AgentModelDeployment = OpenApiAgentModelDeployment;
@@ -149,6 +158,9 @@ const researchResponseSchema = z.object({
   sources: z.array(z.string()).optional(),
   token_usage: z.number().finite(),
   error: z.string().nullable().optional(),
+  failure_reason: z.string().nullable().optional(),
+  cancelled: z.boolean().optional(),
+  budget_snapshot: z.unknown().optional(),
 }).passthrough();
 
 const skillInfoSchema = z.object({

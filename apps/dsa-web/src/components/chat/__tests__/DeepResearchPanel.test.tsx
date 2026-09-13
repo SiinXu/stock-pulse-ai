@@ -169,6 +169,27 @@ describe('DeepResearchPanel', () => {
     expect(onRunInBackground).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps leftover markdown as an error when success is false', async () => {
+    researchMock.mockResolvedValue({
+      success: false,
+      content: 'Partial findings that must not look finished.',
+      sources: ['Sub-question 1: Q'],
+      token_usage: 40,
+      error: 'agent_research_failed',
+      failure_reason: 'budget_turns',
+    });
+    renderPanel();
+
+    fireEvent.change(screen.getByLabelText('Research question'), { target: { value: 'Q' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Start research' }));
+
+    await waitFor(() => expect(screen.getByText('Research failed')).toBeTruthy());
+    expect(screen.getByText('Deep research could not finish. Try again later.')).toBeTruthy();
+    expect(screen.queryByText('Research result')).not.toBeInTheDocument();
+    expect(screen.queryByText('Partial findings that must not look finished.')).not.toBeInTheDocument();
+    expect(screen.queryByText('Sub-question 1: Q')).not.toBeInTheDocument();
+  });
+
   it('surfaces an error when the research response is unsuccessful', async () => {
     researchMock.mockResolvedValue({ success: false, content: '', sources: [], token_usage: 0, error: 'agent_research_failed' });
     renderPanel();

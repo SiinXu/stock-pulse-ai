@@ -1,0 +1,4 @@
+- [Changed] Deep Research now shares the specialist `mode_budget` account, so the default 12-turn / 64-tool / $1.50 caps apply when mode budgets are enabled (Refs #1121).
+- [Fixed] Exceeding `AGENT_DEEP_RESEARCH_BUDGET` terminates Deep Research with `budget_tokens` and `success=false` instead of warning and synthesising a successful report (Refs #1121).
+- [Fixed] Deep Research sub-question loops now clamp to remaining specialist LLM turns so a default 12-turn cap cannot bill a 13th call (Refs #1121).
+- [Docs] Document that production `/research` (API, bot, Native RESEARCH) charges one shared account and that disabling `AGENT_MODE_BUDGET_ENABLED` keeps the token fail-closed contract (Refs #1121).
