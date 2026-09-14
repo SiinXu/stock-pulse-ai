@@ -526,39 +526,6 @@ class TickFlowFetcher(BaseFetcher):
             symbols.append(symbol)
         return symbols
 
-    def prefetch_realtime_quotes(
-        self,
-        stock_codes: Iterable[str],
-        *,
-        batch_size: Optional[int] = None,
-    ) -> int:
-        """Batch-prefetch realtime quotes into the quote cache."""
-        client = self._get_client()
-        if client is None:
-            return 0
-
-        symbols = self._dedupe_symbols(stock_codes)
-        if not symbols:
-            return 0
-
-        effective_batch_size = max(1, int(batch_size or self.batch_size))
-        cached_count = 0
-        for offset in range(0, len(symbols), effective_batch_size):
-            batch_symbols = symbols[offset : offset + effective_batch_size]
-            try:
-                quotes = client.quotes.get(symbols=batch_symbols)
-            except Exception as exc:
-                log_safe_exception(
-                    logger,
-                    "TickFlow batch realtime quote request failed",
-                    exc,
-                    error_code="tickflow_batch_realtime_quote_failed",
-                    level=logging.WARNING,
-                )
-                continue
-            cached_count += self._store_quotes(quotes)
-        return cached_count
-
     def _store_quotes(self, quotes: Any) -> int:
         if not quotes:
             return 0
@@ -647,6 +614,8 @@ class TickFlowFetcher(BaseFetcher):
 
     _iter_batch_frames = None
 
+    prefetch_realtime_quotes = None
+
     # Rebound from tickflow_parts.market_boards after the class is built.
     get_main_indices = None
 
@@ -669,7 +638,7 @@ class TickFlowFetcher(BaseFetcher):
 
 # Keep ``src.data_provider.tickflow_fetcher.TickFlowFetcher`` as the ADR-006
 # compatibility facade while ``tickflow_parts`` owns market-board, daily
-# history, realtime-quote, stock-identity, and daily-prefetch bodies. Rebinding
+# history, realtime-quote, stock-identity, and prefetch bodies. Rebinding
 # preserves method globals so existing patches against this module continue to
 # intercept moved implementations.
 from .tickflow_parts import history as _history_module  # noqa: E402
@@ -680,6 +649,7 @@ from .tickflow_parts import stock_identity as _stock_identity_module  # noqa: E4
 from .tickflow_parts.history import _HistoryMethods  # noqa: E402
 from .tickflow_parts.market_boards import _MarketBoardsMethods  # noqa: E402
 from .tickflow_parts.prefetch import _PrefetchMethods  # noqa: E402
+from .tickflow_parts.prefetch import _RealtimePrefetchMethods  # noqa: E402
 from .tickflow_parts.realtime import _RealtimeMethods  # noqa: E402
 from .tickflow_parts.stock_identity import _StockIdentityMethods  # noqa: E402
 from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
@@ -688,12 +658,13 @@ from .tickflow_parts.facade_bind import bind_methods_from_class  # noqa: E402
 def _assemble_tickflow_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
-    global _HistoryMethods, _MarketBoardsMethods, _PrefetchMethods, _RealtimeMethods, _StockIdentityMethods
+    global _HistoryMethods, _MarketBoardsMethods, _PrefetchMethods, _RealtimePrefetchMethods, _RealtimeMethods, _StockIdentityMethods
     _MarketBoardsMethods = _market_boards_module._MarketBoardsMethods
     _HistoryMethods = _history_module._HistoryMethods
     _RealtimeMethods = _realtime_module._RealtimeMethods
     _StockIdentityMethods = _stock_identity_module._StockIdentityMethods
     _PrefetchMethods = _prefetch_module._PrefetchMethods
+    _RealtimePrefetchMethods = _prefetch_module._RealtimePrefetchMethods
     bind_methods_from_class(
         _MarketBoardsMethods,
         TickFlowFetcher,
@@ -723,6 +694,12 @@ def _assemble_tickflow_fetcher_facade() -> None:
         TickFlowFetcher,
         globals(),
         expected_names=_prefetch_module.EXPECTED_PREFETCH_METHOD_NAMES,
+    )
+    bind_methods_from_class(
+        _RealtimePrefetchMethods,
+        TickFlowFetcher,
+        globals(),
+        expected_names=_prefetch_module.EXPECTED_REALTIME_PREFETCH_METHOD_NAMES,
     )
     # Rebound methods are assigned after class body evaluation; clear ABC
     # abstracts that are now implemented so instantiation matches the legacy

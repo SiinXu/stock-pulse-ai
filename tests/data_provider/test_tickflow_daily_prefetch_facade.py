@@ -58,7 +58,6 @@ FACADE_SIBLINGS = (
     "_prepare_daily_frame",
     "_daily_cache_key",
     "_set_daily_cache",
-    "prefetch_realtime_quotes",
 )
 
 BOARDS_BOUND = (
@@ -82,6 +81,10 @@ IDENTITY_BOUND = (
     "get_stock_name",
     "_extract_instrument_name",
     "get_stock_list",
+)
+
+REALTIME_PREFETCH_BOUND = (
+    "prefetch_realtime_quotes",
 )
 
 FREE_NAMES = (
@@ -236,7 +239,8 @@ def test_sibling_helpers_stay_on_the_facade(sibling) -> None:
 
 
 @pytest.mark.parametrize(
-    "name", BOARDS_BOUND + HISTORY_BOUND + REALTIME_BOUND + IDENTITY_BOUND
+    "name",
+    BOARDS_BOUND + HISTORY_BOUND + REALTIME_BOUND + IDENTITY_BOUND + REALTIME_PREFETCH_BOUND,
 )
 def test_other_bound_methods_stay_bound_and_are_not_live_function_defs(name) -> None:
     assert callable(getattr(TickFlowFetcher, name)), name
