@@ -1,0 +1,1 @@
+- [Added] Add authenticated `GET /api/v1/agent/evolution-events` for inclusive UTC time-range and exact-type EvolutionEvent listing (Refs #1113).

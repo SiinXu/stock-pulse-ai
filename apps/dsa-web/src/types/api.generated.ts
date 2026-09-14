@@ -150,6 +150,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agent/evolution-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List EvolutionEvent rows by time range and exact type
+         * @description Read-only list of append-only EvolutionEvent rows. occurred_from and occurred_to are required timezone-aware UTC instants and are inclusive. event_type is an optional exact match; omit it to skip the type filter. Blank event_type is rejected. limit defaults to 100 and is capped at 200. This route does not append or mutate events.
+         */
+        get: operations["listAgentEvolutionEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/agent/models": {
         parameters: {
             query?: never;
@@ -8908,6 +8928,65 @@ export interface components {
              * @enum {string}
              */
             status: "present" | "missing" | "partial";
+        };
+        /**
+         * EvolutionEvent
+         * @description Persisted EvolutionEvent row returned by the store.
+         */
+        EvolutionEvent: {
+            /**
+             * Actor
+             * @enum {string}
+             */
+            actor: "system" | "user" | "operator";
+            /** After */
+            after?: {
+                [key: string]: unknown;
+            };
+            /** Before */
+            before?: {
+                [key: string]: unknown;
+            };
+            /** Event Id */
+            event_id?: string;
+            /** Event Type */
+            event_type: string;
+            /** Id */
+            id: number;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at?: string;
+            reason_refs?: components["schemas"]["EvolutionEventReasonRefs"];
+            /**
+             * Schema Version
+             * @default evolution-event-v1
+             * @constant
+             */
+            schema_version: "evolution-event-v1";
+        };
+        /**
+         * EvolutionEventListResponse
+         * @description Bounded EvolutionEvent page. No total count or cursor in this slice.
+         */
+        EvolutionEventListResponse: {
+            /** Items */
+            items: components["schemas"]["EvolutionEvent"][];
+            /** Limit */
+            limit: number;
+            /** Returned */
+            returned: number;
+        };
+        /**
+         * EvolutionEventReasonRefs
+         * @description Structured correlation ids for later adapter/overlay producers.
+         */
+        EvolutionEventReasonRefs: {
+            /** Prediction Ids */
+            prediction_ids?: string[];
+            /** Run Ids */
+            run_ids?: string[];
         };
         /**
          * ExportSystemConfigResponse
@@ -20191,6 +20270,67 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    listAgentEvolutionEvents: {
+        parameters: {
+            query: {
+                occurred_from: string;
+                occurred_to: string;
+                event_type?: string | null;
+                limit?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EvolutionEventListResponse"];
+                };
+            };
+            /** @description Invalid time range, type, or limit */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Missing or invalid administrator session when ADMIN_AUTH_ENABLED=true */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Query parameter validation failed */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Evolution event storage is unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

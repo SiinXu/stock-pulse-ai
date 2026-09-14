@@ -27,6 +27,7 @@ from src.api.v1.endpoints import (
     config_profiles,
     decision_signals,
     evidence_pack,
+    evolution_events,
     health,
     history,
     investment_framework,
@@ -86,6 +87,12 @@ router.include_router(
 
 router.include_router(
     agent_predictions.router,
+    prefix="/agent",
+    tags=["Agent"]
+)
+
+router.include_router(
+    evolution_events.router,
     prefix="/agent",
     tags=["Agent"]
 )
