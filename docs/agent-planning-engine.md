@@ -11,8 +11,9 @@
 1. **提案基础** — 生成并校验有界 `AgentPlan`（`PlanningEngine`）。
 2. **执行闭环** — 可选的 `execute_plan_loop`，在硬预算下运行 plan → act → observe → replan。
 3. **生产 RUN 路径** — 当 `AGENT_PLANNING_ENABLED=true` 时，`AgentExecutor.run`（Agent 分析编排入口）调用 `try_run_with_planning`，经 `BoundToolSession` 真实执行 plan → act → observe，再做仪表盘综合。
+4. **生产 Chat 可选路径** — 同一开关经 `try_gather_with_planning` 在 `AgentExecutor.chat` 与单标的 `AgentOrchestrator.chat` 上收集证据，再以 `parse_dashboard=False` 综合自由文本。`chat_path=incremental_tool` 同时跳过完整 pipeline 与 planning gather。Compare 多标的 Chat 仍走经典路径。
 
-默认仍为**关闭**：开关为 false 时经典 ReAct RUN 路径不变。Chat、Research、多 Agent orchestrator 与耐久产品 UI 在本切片仍未完全 mode-aware。
+默认仍为**关闭**：开关为 false 时经典 ReAct RUN/Chat 路径不变。Research、耐久产品 UI 与 compare-chat planning 仍属剩余范围。
 
 ## 提案契约
 
@@ -99,7 +100,7 @@ print(result.success, result.status, result.to_metadata())
 
 ## #199 剩余范围
 
-- Chat / Research / 多 Agent 的 mode-aware 策略（RUN 已接入；Chat/Research 仍为经典路径）；
+- Research `agent.research` / 深度研究规划，以及 compare 多标的 Chat planning；
 - 计划/动作/observation 的耐久审计持久化、tenant identity、脱敏/retention 与更完整产品 UI；
 - 超出 BoundToolSession 安全审计与 observability emit 的统一 UsageRecorder owner；
 - 超出聚焦离线生产路径测试的真实网络多步验收证据。

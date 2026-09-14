@@ -487,3 +487,116 @@ def test_disabled_run_path_does_not_enter_planning(monkeypatch: pytest.MonkeyPat
     assert result.planning_metadata is None
     assert result.content == "classic"
     run_loop.assert_called_once()
+
+
+def test_chat_sources_gate_on_try_gather_with_planning() -> None:
+    from src.agent.executor_parts.chat import _ChatMethods as ExecChat
+    from src.agent.orchestrator_parts.chat import _ChatMethods as OrchChat
+
+    exec_src = inspect.getsource(ExecChat.chat)
+    orch_src = inspect.getsource(OrchChat.chat)
+    assert "try_gather_with_planning" in exec_src
+    assert "try_gather_with_planning" in orch_src
+    assert "try_run_with_planning" not in orch_src
+    assert "parse_dashboard=True" not in exec_src
+    assert "parse_dashboard=False" in exec_src
+    assert "incremental_tool" in orch_src
+    multi_src = inspect.getsource(OrchChat._execute_multi_symbol_chat)
+    assert "try_gather_with_planning" not in multi_src
+    assert "try_run_with_planning" not in multi_src
+
+
+def test_native_chat_uses_planning_gather_when_enabled() -> None:
+    tools = ["get_realtime_quote", "get_daily_history", "analyze_trend"]
+    executor = AgentExecutor(_registry_with_tools(tools), MagicMock(), max_steps=3)
+    synth = AgentResult(success=True, content="free-form", total_steps=1, total_tokens=4)
+
+    with patch(
+        "src.agent.planning.product._resolve_config",
+        return_value=_enabled_config(),
+    ), patch(
+        "src.agent.planning.product._open_plan_tool_session",
+        return_value=_SuccessfulSession(),
+    ), patch.object(executor, "_run_loop", return_value=synth) as run_loop:
+        with patch("src.agent.conversation.conversation_manager.get_or_create"):
+            with patch("src.agent.conversation.conversation_manager.add_user_message"):
+                with patch("src.agent.conversation.conversation_manager.add_message"):
+                    result = executor.chat(
+                        "What is the quote for 600519?",
+                        "session-1",
+                        context={"stock_code": "600519"},
+                    )
+
+    run_loop.assert_called_once()
+    assert run_loop.call_args.kwargs.get("parse_dashboard") is False
+    messages = run_loop.call_args.args[0]
+    assert any(
+        m.get("role") == "user" and "Plan execution evidence" in (m.get("content") or "")
+        for m in messages
+    )
+    assert result.planning_metadata is not None
+    assert result.planning_metadata.get("product_path") == "agent_executor_chat"
+    assert result.planning_metadata.get("product_path") != "agent_executor_run"
+    assert result.success is True
+    assert result.content == "free-form"
+
+
+def test_native_chat_disabled_does_not_enter_plan_loop() -> None:
+    executor = AgentExecutor(
+        _registry_with_tools(["get_realtime_quote"]),
+        MagicMock(),
+        max_steps=2,
+    )
+    classic = AgentResult(success=True, content="classic-chat", total_steps=1)
+
+    with patch(
+        "src.agent.planning.product._resolve_config",
+        return_value=SimpleNamespace(agent_planning_enabled=False),
+    ), patch(
+        "src.agent.planning.loop.execute_plan_loop",
+    ) as plan_loop, patch.object(executor, "_run_loop", return_value=classic):
+        with patch("src.agent.conversation.conversation_manager.get_or_create"):
+            with patch("src.agent.conversation.conversation_manager.add_user_message"):
+                with patch("src.agent.conversation.conversation_manager.add_message"):
+                    result = executor.chat("hello", "session-1")
+
+    plan_loop.assert_not_called()
+    assert result.content == "classic-chat"
+    assert result.planning_metadata is None
+
+
+def test_native_chat_plan_failure_is_not_fail_open() -> None:
+    from src.agent.planning.product import PlanningGatherResult
+
+    executor = AgentExecutor(
+        _registry_with_tools(["get_realtime_quote"]),
+        MagicMock(),
+        max_steps=2,
+    )
+    failed = PlanningGatherResult(
+        success=False,
+        product_path="agent_executor_chat",
+        error="Planning failed: cancelled",
+        cancelled=False,
+        planning_metadata={
+            "product_path": "agent_executor_chat",
+            "phase": "proposal",
+        },
+    )
+    with patch(
+        "src.agent.planning.product.try_gather_with_planning",
+        return_value=failed,
+    ), patch.object(executor, "_run_loop") as run_loop:
+        with patch("src.agent.conversation.conversation_manager.get_or_create"):
+            with patch("src.agent.conversation.conversation_manager.add_user_message"):
+                with patch(
+                    "src.agent.conversation.conversation_manager.add_message"
+                ) as add_msg:
+                    result = executor.chat("hello", "session-1")
+
+    run_loop.assert_not_called()
+    assert result.success is False
+    assert result.error and "Planning failed" in result.error
+    assert "{" not in (result.content or "")
+    assert result.planning_metadata["product_path"] == "agent_executor_chat"
+    assert add_msg.called

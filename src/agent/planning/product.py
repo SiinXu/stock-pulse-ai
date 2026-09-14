@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
-"""Production wiring: plan → act → observe → replan on the Agent RUN path.
+"""Production wiring: plan → act → observe → replan on RUN and Chat paths.
 
 Default-off. When ``Config.agent_planning_enabled`` is true, ``AgentExecutor.run``
-invokes this module so the planning loop participates in the real analysis
-orchestration path. Tools dispatch through ``BoundToolSession`` (same authority
-as the native runner). Failures terminate with explicit reasons; nothing here
-claims success after a failed plan step or exhausted budget.
+calls ``try_run_with_planning`` (dashboard synthesis) and Chat callers use
+``try_gather_with_planning`` (evidence only, ``parse_dashboard=False``).
+Tools dispatch through ``BoundToolSession``. Failures terminate with explicit
+reasons; nothing here claims success after a failed plan step or exhausted budget.
 
 Config is constructor/parameter injected (or resolved via the composition root).
 This module does not call bare ``get_config()``.
@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
+from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from src.agent.planning.config import (
@@ -46,6 +47,51 @@ logger = logging.getLogger(__name__)
 
 CancelledCheck = Callable[[], bool]
 ReflectionComplete = Callable[[str, str], str]
+
+RUN_PRODUCT_PATH = "agent_executor_run"
+CHAT_PRODUCT_PATH = "agent_executor_chat"
+ORCH_CHAT_PRODUCT_PATH = "agent_orchestrator_chat"
+PLAN_EVIDENCE_HEADER = (
+    "[Plan execution evidence — already gathered under planning budgets; "
+    "prefer these results and call tools only for remaining gaps]"
+)
+
+
+@dataclass
+class PlanningGatherResult:
+    """Plan→act→observe gather without dashboard/chat synthesis."""
+
+    success: bool
+    product_path: str
+    evidence: str = ""
+    planning_metadata: Dict[str, Any] = field(default_factory=dict)
+    plan_tool_log: List[Dict[str, Any]] = field(default_factory=list)
+    error: Optional[str] = None
+    cancelled: bool = False
+    timed_out: bool = False
+    total_tokens: int = 0
+    total_steps: int = 0
+    stock_scope: Any = None
+    synthesis_context: Dict[str, Any] = field(default_factory=dict)
+
+    def to_agent_result(self) -> Any:
+        from src.agent.executor import AgentResult
+
+        return AgentResult(
+            success=self.success,
+            error=None if self.success else self.error,
+            tool_calls_log=list(self.plan_tool_log),
+            total_steps=self.total_steps,
+            total_tokens=self.total_tokens,
+            cancelled=self.cancelled,
+            timed_out=self.timed_out,
+            planning_metadata=dict(self.planning_metadata),
+        )
+
+
+def planning_evidence_block(evidence: str) -> str:
+    """Prompt block injected into Chat/RUN synthesis after a successful gather."""
+    return f"{PLAN_EVIDENCE_HEADER}\n{evidence}"
 
 
 def _resolve_config(config: Any = None) -> Any:
@@ -132,32 +178,48 @@ def try_run_with_planning(
     )
 
 
-def run_with_planning(
-    executor: Any,
+def try_gather_with_planning(
+    owner: Any,
     *,
     task: str,
     context: Optional[Dict[str, Any]] = None,
     cancelled_check: Optional[CancelledCheck] = None,
     config: Any = None,
-) -> Any:
-    """Plan, execute tools under BoundToolSession, then synthesize the dashboard.
+    product_path: str = CHAT_PRODUCT_PATH,
+) -> Optional[PlanningGatherResult]:
+    """Gather plan evidence without dashboard synthesis, or ``None`` when disabled.
 
-    Returns an ``AgentResult``. Planning/execution failures set ``success=False``
-    with an explicit error; they never fail-open as a successful analysis.
+    Chat callers must not pass an orchestrator into ``try_run_with_planning``
+    (that helper synthesizes via ``build_run_messages`` / ``_run_loop``).
     """
-    # Local import keeps the optional product path off the module import graph
-    # for pure library consumers of ``src.agent.planning``.
-    from src.agent.executor import AgentResult
-
     cfg = _resolve_config(config)
-    started = time.perf_counter()
+    if not is_agent_planning_enabled(cfg):
+        return None
+    return gather_with_planning(
+        owner,
+        task=task,
+        context=context,
+        cancelled_check=cancelled_check,
+        config=cfg,
+        product_path=product_path,
+    )
+
+
+def gather_with_planning(
+    owner: Any,
+    *,
+    task: str,
+    context: Optional[Dict[str, Any]] = None,
+    cancelled_check: Optional[CancelledCheck] = None,
+    config: Any = None,
+    product_path: str = RUN_PRODUCT_PATH,
+) -> PlanningGatherResult:
+    """Plan and execute tools under BoundToolSession. No LLM dashboard synthesis."""
+    cfg = _resolve_config(config)
     scope_resolution = resolve_stock_scope(task, context)
     effective_context = dict(scope_resolution.effective_context or {})
-    # Bind the resolved product Config so multi-level reflection (Issue #1094)
-    # can read enable flags on the real AgentExecutor planning path. Without
-    # this, step critique stays library-only even when AGENT_STEP_CRITIQUE_* is on.
     effective_context["config"] = cfg
-    available_tools = list(executor.tool_registry.list_names())
+    available_tools = list(owner.tool_registry.list_names())
 
     try:
         planning_settings, execution_settings = resolve_planning_settings(cfg)
@@ -169,19 +231,23 @@ def run_with_planning(
             error_code="agent_planning_invalid_config",
             level=logging.ERROR,
         )
-        return AgentResult(
+        return PlanningGatherResult(
             success=False,
+            product_path=product_path,
             error=f"Planning configuration invalid: {exc}",
             planning_metadata={
                 "enabled": True,
                 "applied": False,
                 "fallback_reason": "invalid_config",
                 "error_code": "invalid_config",
+                "product_path": product_path,
             },
+            stock_scope=scope_resolution.stock_scope,
+            synthesis_context=effective_context,
         )
 
     llm_for_planner = (
-        executor.llm_adapter if planning_settings.strategy == "llm" else None
+        owner.llm_adapter if planning_settings.strategy == "llm" else None
     )
     engine = PlanningEngine(planning_settings, llm_adapter=llm_for_planner)
     proposal = engine.plan(
@@ -193,22 +259,25 @@ def run_with_planning(
     proposal_meta = proposal.to_metadata()
     if not proposal.applied or proposal.plan is None:
         reason = proposal.fallback_reason or proposal.error_code or "planning_failed"
-        return AgentResult(
+        return PlanningGatherResult(
             success=False,
+            product_path=product_path,
             error=f"Planning failed: {reason}",
             cancelled=reason == "cancelled",
             total_tokens=int(proposal.planning_tokens or 0),
             planning_metadata={
                 **proposal_meta,
-                "product_path": "agent_executor_run",
+                "product_path": product_path,
                 "phase": "proposal",
             },
+            stock_scope=scope_resolution.stock_scope,
+            synthesis_context=effective_context,
         )
 
     session: Optional[BoundToolSession] = None
     try:
         session = _open_plan_tool_session(
-            executor,
+            owner,
             available_tools=available_tools,
             stock_scope=scope_resolution.stock_scope,
             cancelled_check=cancelled_check,
@@ -238,18 +307,21 @@ def run_with_planning(
             error_code="agent_planning_product_path_failed",
             level=logging.ERROR,
         )
-        return AgentResult(
+        return PlanningGatherResult(
             success=False,
+            product_path=product_path,
             error="Plan execution failed unexpectedly",
             planning_metadata={
                 **proposal_meta,
-                "product_path": "agent_executor_run",
+                "product_path": product_path,
                 "phase": "execution",
                 "success": False,
                 "status": "failed",
                 "reason": "loop_error",
                 "error_code": "loop_error",
             },
+            stock_scope=scope_resolution.stock_scope,
+            synthesis_context=effective_context,
         )
     finally:
         if session is not None:
@@ -268,66 +340,102 @@ def run_with_planning(
     planning_metadata: Dict[str, Any] = {
         **proposal_meta,
         **exec_meta,
-        "product_path": "agent_executor_run",
+        "product_path": product_path,
         "phase": "execution",
         "proposal_applied": True,
     }
-    # Harvest multi-level reflection artifacts written onto context during replan.
     _merge_reflection_context(planning_metadata, effective_context)
     plan_tool_log = _tool_calls_log_from_execution(exec_result)
-
-    if not exec_result.success:
-        reason = exec_result.reason or exec_result.status or "plan_execution_failed"
-        _maybe_attach_end_of_run_reflection(
-            planning_metadata,
-            executor=executor,
-            config=cfg,
-            context=effective_context,
-            success=False,
-            tool_calls_log=plan_tool_log,
-        )
-        result = AgentResult(
-            success=False,
-            error=f"Plan execution terminated: {reason}",
-            tool_calls_log=plan_tool_log,
-            total_steps=len(exec_result.step_observations),
-            total_tokens=int(exec_result.planning_tokens or 0)
-            + int(proposal.planning_tokens or 0),
-            cancelled=bool(exec_result.cancelled),
-            timed_out=bool(exec_result.timed_out),
-            planning_metadata=planning_metadata,
-        )
-        _apply_live_mode_budget_snapshot(
-            result,
-            executor=executor,
-            context=effective_context,
-            planning_metadata=planning_metadata,
-        )
-        return result
-
-    # Successful plan: inject observation evidence and run LLM synthesis.
-    evidence = compact_observation_summary(exec_result.step_observations)
+    total_tokens = int(exec_result.planning_tokens or 0) + int(
+        proposal.planning_tokens or 0
+    )
     synthesis_context = dict(effective_context)
-    # Keep full trace_events on AgentResult.planning_metadata; omit the dense list
-    # from synthesis context (not prompt keys today, avoids accidental growth).
     synthesis_context["planning_execution_metadata"] = {
         key: value
         for key, value in planning_metadata.items()
         if key != "trace_events"
     }
+    evidence = compact_observation_summary(exec_result.step_observations)
     if evidence:
         synthesis_context["plan_execution_evidence"] = evidence
 
+    if not exec_result.success:
+        reason = exec_result.reason or exec_result.status or "plan_execution_failed"
+        return PlanningGatherResult(
+            success=False,
+            product_path=product_path,
+            error=f"Plan execution terminated: {reason}",
+            planning_metadata=planning_metadata,
+            plan_tool_log=plan_tool_log,
+            cancelled=bool(exec_result.cancelled),
+            timed_out=bool(exec_result.timed_out),
+            total_tokens=total_tokens,
+            total_steps=len(exec_result.step_observations),
+            stock_scope=scope_resolution.stock_scope,
+            synthesis_context=synthesis_context,
+        )
+
+    return PlanningGatherResult(
+        success=True,
+        product_path=product_path,
+        evidence=evidence,
+        planning_metadata=planning_metadata,
+        plan_tool_log=plan_tool_log,
+        total_tokens=total_tokens,
+        total_steps=len(exec_result.step_observations),
+        stock_scope=scope_resolution.stock_scope,
+        synthesis_context=synthesis_context,
+    )
+
+
+def run_with_planning(
+    executor: Any,
+    *,
+    task: str,
+    context: Optional[Dict[str, Any]] = None,
+    cancelled_check: Optional[CancelledCheck] = None,
+    config: Any = None,
+) -> Any:
+    """Plan, execute tools under BoundToolSession, then synthesize the dashboard.
+
+    Returns an ``AgentResult``. Planning/execution failures set ``success=False``
+    with an explicit error; they never fail-open as a successful analysis.
+    """
+    cfg = _resolve_config(config)
+    started = time.perf_counter()
+    gathered = gather_with_planning(
+        executor,
+        task=task,
+        context=context,
+        cancelled_check=cancelled_check,
+        config=cfg,
+        product_path=RUN_PRODUCT_PATH,
+    )
+    if not gathered.success:
+        _maybe_attach_end_of_run_reflection(
+            gathered.planning_metadata,
+            executor=executor,
+            config=cfg,
+            context=gathered.synthesis_context,
+            success=False,
+            tool_calls_log=gathered.plan_tool_log,
+        )
+        result = gathered.to_agent_result()
+        _apply_live_mode_budget_snapshot(
+            result,
+            executor=executor,
+            context=gathered.synthesis_context,
+            planning_metadata=gathered.planning_metadata,
+        )
+        return result
+
     system_prompt, user_message, tool_decls = executor.build_run_messages(
         task,
-        synthesis_context,
+        gathered.synthesis_context,
     )
-    if evidence:
+    if gathered.evidence:
         user_message = (
-            f"{user_message}\n\n"
-            "[Plan execution evidence — already gathered under planning budgets; "
-            "prefer these results and call tools only for remaining gaps]\n"
-            f"{evidence}"
+            f"{user_message}\n\n{planning_evidence_block(gathered.evidence)}"
         )
     messages: List[Dict[str, Any]] = [
         {"role": "system", "content": system_prompt},
@@ -337,16 +445,15 @@ def run_with_planning(
         messages,
         tool_decls,
         parse_dashboard=True,
-        stock_scope=scope_resolution.stock_scope,
+        stock_scope=gathered.stock_scope,
         cancelled_check=cancelled_check,
     )
-    # Prepend plan-loop tool audit trail so diagnostics see real tool work.
-    result.tool_calls_log = list(plan_tool_log) + list(result.tool_calls_log or [])
-    result.total_tokens = int(result.total_tokens or 0) + int(
-        exec_result.planning_tokens or 0
-    ) + int(proposal.planning_tokens or 0)
+    result.tool_calls_log = list(gathered.plan_tool_log) + list(
+        result.tool_calls_log or []
+    )
+    result.total_tokens = int(result.total_tokens or 0) + int(gathered.total_tokens or 0)
     result.planning_metadata = {
-        **planning_metadata,
+        **gathered.planning_metadata,
         "synthesis_success": bool(result.success),
         "product_duration_ms": max(0, int((time.perf_counter() - started) * 1000)),
     }
@@ -354,14 +461,14 @@ def run_with_planning(
         result.planning_metadata,
         executor=executor,
         config=cfg,
-        context=effective_context,
+        context=gathered.synthesis_context,
         success=bool(result.success),
         tool_calls_log=result.tool_calls_log,
     )
     _apply_live_mode_budget_snapshot(
         result,
         executor=executor,
-        context=effective_context,
+        context=gathered.synthesis_context,
         planning_metadata=result.planning_metadata,
     )
     return result
@@ -442,6 +549,22 @@ def _apply_live_mode_budget_snapshot(
     )
 
 
+def _owner_call_timeout_seconds(owner: Any) -> Optional[float]:
+    timeout = getattr(owner, "timeout_seconds", None)
+    if timeout is None and hasattr(owner, "_get_timeout_seconds"):
+        try:
+            timeout = owner._get_timeout_seconds()
+        except Exception:  # broad-exception: fallback_recorded - timeout is optional
+            timeout = None
+    if timeout is None:
+        return None
+    try:
+        value = float(timeout)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
 def _open_plan_tool_session(
     executor: Any,
     *,
@@ -458,12 +581,7 @@ def _open_plan_tool_session(
         allowed_tools=list(available_tools),
         derive_granted_permissions=True,
         stock_scope=stock_scope,
-        call_timeout_seconds=(
-            float(executor.timeout_seconds)
-            if getattr(executor, "timeout_seconds", None) is not None
-            and float(executor.timeout_seconds) > 0
-            else None
-        ),
+        call_timeout_seconds=_owner_call_timeout_seconds(executor),
         deadline_monotonic=deadline_monotonic,
         cancelled_check=cancelled_check,
         backend="plan-loop",

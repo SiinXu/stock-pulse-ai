@@ -10,6 +10,7 @@ from src.agent.planning.loop import default_argument_builder, execute_plan_loop
 from src.agent.planning.product import (
     is_agent_planning_enabled,
     resolve_planning_settings,
+    try_gather_with_planning,
     try_run_with_planning,
 )
 from src.agent.planning.observations import (
@@ -41,6 +42,7 @@ __all__ = [
     "prepare_run_with_planning",
     "reconstruct_planning_run",
     "resolve_planning_settings",
+    "try_gather_with_planning",
     "try_run_with_planning",
     "validate_plan_payload",
     "validate_planning_trace_event",

@@ -120,7 +120,7 @@ EXPECTED_DASHBOARD_METHODS = (
 # ``_PipelineMethods`` last changed for #131: critic phase-start emit plus commit_critic_stage_result.
 # ``_DashboardMethods`` last changed for #131: additive dashboard.critic appendix on finalize.
 EXPECTED_AST_HASHES = {
-    '_ChatMethods': '10260804f0fb27517e4b2e3c1778d7ef41d80f107f4c80a9b15d912880bdb8d7',
+    '_ChatMethods': '3969a2440c5f95348a8e36ca441a3724b7f75128074b6b56e3382c379efb1abb',
     '_DashboardMethods': '6609d7691c083bb3f512f0a2130a22ea9f6d1764b03c85b01587349ca909f63d',
     '_ExecutionMethods': '29c0b1c7e692209dfd1d3da4f6f26ac6b5eca9377fc4ae59ab0a4b92fd189854',
     '_PipelineMethods': '52d9530c538d5b11fc427ee9f63f31db3c38318cf00e8db932f7ce8894b6d788',

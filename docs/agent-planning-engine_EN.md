@@ -11,8 +11,9 @@
 1. **Proposal foundation** — produce and validate a bounded `AgentPlan` (`PlanningEngine`).
 2. **Execution loop** — optional `execute_plan_loop` that runs plan → act → observe → replan under hard budgets.
 3. **Production RUN path** — when `AGENT_PLANNING_ENABLED=true`, `AgentExecutor.run` (used by agent-mode analysis orchestration) calls `try_run_with_planning` so plan → act → observe really runs with `BoundToolSession` tool dispatch, then LLM synthesis for the decision dashboard.
+4. **Production Chat opt-in** — the same flag gathers evidence through `try_gather_with_planning` on `AgentExecutor.chat` and single-symbol `AgentOrchestrator.chat`, then synthesizes a free-form answer (`parse_dashboard=False`). `chat_path=incremental_tool` skips both the full pipeline and the planning gather. Compare multi-symbol Chat stays classic.
 
-Default remains **off**: classic ReAct RUN is byte-stable when the switch is false. Chat, Research, multi-agent orchestrator, and durable product UI are still not fully mode-aware in this slice.
+Default remains **off**: classic ReAct RUN/Chat is byte-stable when the switch is false. Research, durable product UI, and compare-chat planning are still remaining.
 
 ## Proposal contracts
 
@@ -107,7 +108,7 @@ Flow when enabled:
 
 ## Remaining #199 scope
 
-- mode-aware Chat / Research / multi-agent policy (RUN is wired; Chat/Research still classic paths);
+- Research `agent.research` / deep-research planning, and compare multi-symbol Chat planning;
 - durable plan/action/observation audit persistence, tenant identity, redaction/retention ownership, and richer product UI beyond Settings knobs;
 - deeper shared UsageRecorder ownership beyond BoundToolSession security audit + observability emit;
 - broader real-network multi-step acceptance evidence beyond focused offline production-path tests.
