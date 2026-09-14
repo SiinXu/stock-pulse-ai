@@ -1,0 +1,1 @@
+- [Added] Gated route preference steps one richer mode when forecast miss-rate meets sample and miss-rate thresholds, and appends one system adapter.route_preference EvolutionEvent (Refs #1106).

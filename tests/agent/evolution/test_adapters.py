@@ -15,6 +15,8 @@ import pytest
 from src.agent.evolution.adapters import (
     ADAPTER_CALIBRATE_EVENT_TYPE,
     ADAPTER_INFLUENCE_META_KEY,
+    ADAPTER_ROUTE_EVENT_TYPE,
+    DEFAULT_ROUTE_PREFERENCE_MISS_RATE,
     calibrate_confidence,
     is_online_adapters_enabled,
     prefer_route,
@@ -40,12 +42,24 @@ from src.schemas.agent_episode import AgentEpisodeCreate
 _TEST_CAPABILITY = "analysis_context:read"
 
 
-def _list_calibrate_events(db: DatabaseManager) -> list[Any]:
+def _list_events(db: DatabaseManager, event_type: Optional[str] = None) -> list[Any]:
     return AgentEvolutionEventRepository(db).list_events(
         occurred_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
         occurred_to=datetime(2100, 1, 1, tzinfo=timezone.utc),
-        event_type=ADAPTER_CALIBRATE_EVENT_TYPE,
+        event_type=event_type,
     )
+
+
+def _list_calibrate_events(db: DatabaseManager) -> list[Any]:
+    return _list_events(db, ADAPTER_CALIBRATE_EVENT_TYPE)
+
+
+def _list_route_events(db: DatabaseManager) -> list[Any]:
+    return _list_events(db, ADAPTER_ROUTE_EVENT_TYPE)
+
+
+def _applied_route_stats(*, samples: int = 40, miss_rate: float = 0.8) -> Dict[str, Any]:
+    return {"samples": samples, "miss_rate": miss_rate, "used": True}
 
 
 @pytest.fixture()
@@ -716,14 +730,14 @@ def test_base_agent_flag_on_applies_adapter_once_without_double_multiply() -> No
                 wraps=rank_tools,
             ) as rank_spy:
                 with patch(
-                    "src.agent.evolution.adapters.prefer_route",
+                    "src.agent.agents.base_agent.prefer_route",
                     wraps=prefer_route,
                 ) as route_spy:
                     agent._apply_memory_calibration(ctx, opinion, result)
 
     assert calibrate_spy.call_count == 1
     rank_spy.assert_not_called()
-    route_spy.assert_not_called()
+    assert route_spy.call_count == 1
     assert opinion.confidence == pytest.approx(0.3)
     assert opinion.confidence != pytest.approx(double_multiplied)
     assert opinion.confidence != pytest.approx(inverted)
@@ -876,7 +890,7 @@ def test_base_agent_does_not_hook_tool_route_overlay_or_events() -> None:
     assert "calibrate_confidence" in gated_source
     assert "record_adapter_influence" in gated_source
     assert "rank_tools" not in module_source
-    assert "prefer_route" not in module_source
+    assert "prefer_route" in gated_source
     assert "outcome_ingest" not in module_source
     assert "apply_forecast_outcome_calibration" not in module_source
     assert "EvolutionEvent" not in module_source
@@ -1003,6 +1017,102 @@ def test_rank_tools_and_prefer_route_emit_zero_events(isolated_db) -> None:
     assert rank_tools(["news", "quote"]) == ["news", "quote"]
     assert prefer_route("quick") == "quick"
     assert _list_calibrate_events(isolated_db) == []
+    assert _list_route_events(isolated_db) == []
+
+
+def test_prefer_route_identity_when_flag_off_or_below_threshold(isolated_db) -> None:
+    stats = _applied_route_stats()
+    assert prefer_route("quick") == "quick"
+    assert prefer_route("quick", config=_config(enabled=False), stats=stats) == "quick"
+    assert prefer_route(
+        "quick",
+        config=_config(enabled=True),
+        stats={"samples": 29, "miss_rate": 0.9, "used": False},
+    ) == "quick"
+    assert prefer_route(
+        "quick",
+        config=_config(enabled=True),
+        stats={"samples": 40, "miss_rate": DEFAULT_ROUTE_PREFERENCE_MISS_RATE - 0.1, "used": True},
+    ) == "quick"
+    assert prefer_route("full", config=_config(enabled=True), stats=stats) == "full"
+    assert _list_route_events(isolated_db) == []
+
+
+def test_prefer_route_applied_quick_emits_one_system_event(isolated_db) -> None:
+    preferred = prefer_route(
+        "quick",
+        config=_config(enabled=True),
+        stats=_applied_route_stats(samples=40, miss_rate=0.8),
+    )
+    events = _list_route_events(isolated_db)
+    assert preferred == "standard"
+    assert len(events) == 1
+    event = events[0]
+    assert event.event_type == ADAPTER_ROUTE_EVENT_TYPE
+    assert event.actor == "system"
+    assert event.before == {"applied": False, "mode": "quick"}
+    assert event.after["applied"] is True
+    assert event.after["mode"] == "standard"
+    assert event.after["samples"] == 40
+    assert event.after["miss_rate"] == pytest.approx(0.8)
+    assert event.before != event.after
+    assert _list_calibrate_events(isolated_db) == []
+
+
+def test_prefer_route_standard_steps_to_full(isolated_db) -> None:
+    preferred = prefer_route(
+        "standard",
+        config=_config(enabled=True),
+        stats=_applied_route_stats(),
+    )
+    events = _list_route_events(isolated_db)
+    assert preferred == "full"
+    assert len(events) == 1
+    assert events[0].after["mode"] == "full"
+
+
+def test_prefer_route_append_failure_does_not_change_mode(isolated_db) -> None:
+    def _boom(_event: Any) -> None:
+        raise RepositoryError(
+            "evolution event append failed",
+            error_code="evolution_event_append_conflict",
+        )
+
+    with patch(
+        "src.services.evolution_event_append.log_safe_exception",
+    ) as safe_log:
+        preferred = prefer_route(
+            "quick",
+            config=_config(enabled=True),
+            stats=_applied_route_stats(),
+            append_event=_boom,
+        )
+    assert preferred == "standard"
+    assert safe_log.called
+    assert _list_route_events(isolated_db) == []
+
+
+def test_record_adapter_influence_keeps_applied_route_preference() -> None:
+    ctx = AgentContext(stock_code="600519")
+    record_adapter_influence(
+        ctx,
+        {
+            "confidence": {"applied": True, "factor": 0.8, "samples": 40, "reason": "applied"},
+            "route_preference": {
+                "applied": True,
+                "mode": "standard",
+                "reason": "applied",
+                "samples": 40,
+                "miss_rate": 0.8,
+            },
+        },
+        config=_config(enabled=True),
+    )
+    route = ctx.meta[ADAPTER_INFLUENCE_META_KEY]["route_preference"]
+    assert route["applied"] is True
+    assert route["mode"] == "standard"
+    assert route["samples"] == 40
+    assert route["miss_rate"] == pytest.approx(0.8)
 
 
 def test_append_failure_does_not_change_calibration_return(isolated_db) -> None:

@@ -182,6 +182,69 @@ def forecast_calibration_stats(
     }
 
 
+def forecast_route_stats(
+    rows: Sequence[Any],
+    *,
+    min_samples: int,
+) -> Dict[str, Any]:
+    """Bounded miss-rate from the same scored forecast rows as calibration.
+
+    ``miss_rate`` is ``1 - accuracy`` using ``OUTCOME_NUMERIC_SCORE``
+    (hit=1.0, partial=0.5, miss=0.0), clamped to ``[0, 1]``.
+    """
+    calibration = forecast_calibration_stats(rows, min_samples=min_samples)
+    total = int(calibration["total"])
+    miss_rate = 0.0 if total == 0 else max(0.0, min(1.0, 1.0 - float(calibration["accuracy"])))
+    return {
+        "samples": total,
+        "miss_rate": miss_rate,
+        "used": bool(calibration["used"]),
+    }
+
+
+def load_route_preference_stats(
+    *,
+    stock_code: Optional[str],
+    min_samples: int,
+    repo: Any = None,
+) -> Dict[str, Any]:
+    """Load scored forecast rows and return route miss-rate stats.
+
+    Store failures and missing scope return unused empty stats. This helper
+    does not append audit rows.
+    """
+    empty = {"samples": 0, "miss_rate": 0.0, "used": False}
+    code = str(stock_code or "").strip()
+    if not code:
+        return empty
+    from src.repositories.agent_prediction_repo import AgentPredictionRepository
+    from src.repositories.base import RepositoryError
+    from sqlalchemy.exc import SQLAlchemyError
+
+    store = repo if repo is not None else None
+    try:
+        if store is None:
+            store = AgentPredictionRepository()
+        market = detect_market(code)
+        rows = load_scored_forecast_rows(
+            store,
+            symbol=code,
+            market=market,
+            limit=FORECAST_OUTCOME_LIST_LIMIT,
+        )
+    except (RepositoryError, SQLAlchemyError, TypeError, ValueError, OSError) as exc:
+        log_safe_exception(
+            logger,
+            "Route preference overlay store lookup failed",
+            exc,
+            error_code="route_preference_overlay_store_failed",
+            level=logging.DEBUG,
+            context={"stock_code": code},
+        )
+        return empty
+    return forecast_route_stats(rows, min_samples=min_samples)
+
+
 class ForecastOutcomeMemory(AgentMemory):
     """AgentMemory subclass that serves forecast stats, not backtests.
 

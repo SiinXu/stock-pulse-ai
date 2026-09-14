@@ -16,6 +16,8 @@ from src.agent.evolution import outcome_ingest as overlay_mod
 from src.agent.evolution.adapters import (
     ADAPTER_CALIBRATE_EVENT_TYPE,
     ADAPTER_INFLUENCE_META_KEY,
+    ADAPTER_ROUTE_EVENT_TYPE,
+    prefer_route,
     rank_tools,
 )
 from src.repositories.agent_evolution_event_repo import AgentEvolutionEventRepository
@@ -28,6 +30,8 @@ from src.agent.evolution.outcome_ingest import (
     ForecastOutcomeMemory,
     apply_forecast_outcome_calibration,
     forecast_calibration_stats,
+    forecast_route_stats,
+    load_route_preference_stats,
     load_scored_forecast_rows,
 )
 from src.agent.memory import AgentMemory
@@ -860,5 +864,45 @@ def test_overlay_applied_path_emits_one_calibrate_event(isolated_db) -> None:
     assert events[0].actor == "system"
     assert events[0].after["applied"] is True
     assert events[0].after["factor"] == pytest.approx(meta["factor"])
+    route_events = AgentEvolutionEventRepository(isolated_db).list_events(
+        occurred_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        occurred_to=datetime(2100, 1, 1, tzinfo=timezone.utc),
+        event_type=ADAPTER_ROUTE_EVENT_TYPE,
+    )
+    assert route_events == []
     assert overlay_mod.apply_forecast_outcome_calibration is apply_forecast_outcome_calibration
     assert "EvolutionEvent" not in inspect.getsource(overlay_mod)
+
+
+def test_forecast_route_stats_and_prefer_route_emit_one_event(isolated_db) -> None:
+    rows = [_record(label="miss", mean_confidence=0.9) for _ in range(40)]
+    stats = forecast_route_stats(rows, min_samples=30)
+    assert stats["samples"] == 40
+    assert stats["used"] is True
+    assert stats["miss_rate"] == pytest.approx(1.0)
+    loaded = load_route_preference_stats(
+        stock_code="600519",
+        min_samples=30,
+        repo=_FakeRepo(rows),
+    )
+    assert loaded["miss_rate"] == pytest.approx(1.0)
+    preferred = prefer_route(
+        "quick",
+        config=_config(enabled=True),
+        stats=loaded,
+    )
+    events = AgentEvolutionEventRepository(isolated_db).list_events(
+        occurred_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        occurred_to=datetime(2100, 1, 1, tzinfo=timezone.utc),
+        event_type=ADAPTER_ROUTE_EVENT_TYPE,
+    )
+    calibrate_events = AgentEvolutionEventRepository(isolated_db).list_events(
+        occurred_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        occurred_to=datetime(2100, 1, 1, tzinfo=timezone.utc),
+        event_type=ADAPTER_CALIBRATE_EVENT_TYPE,
+    )
+    assert preferred == "standard"
+    assert len(events) == 1
+    assert events[0].actor == "system"
+    assert events[0].after["mode"] == "standard"
+    assert calibrate_events == []
