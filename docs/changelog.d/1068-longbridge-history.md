@@ -1,0 +1,1 @@
+- [Changed] Move Longbridge daily history (`_fetch_raw_data` / `_normalize_data`) into `src/data_provider/longbridge_parts/history.py` behind the ADR-006 facade, keeping `_get_ctx` / connection helpers on the facade (Refs #1068).
