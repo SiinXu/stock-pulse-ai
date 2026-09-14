@@ -63,7 +63,7 @@ class _PipelineMethods:
     # Pipeline execution
     # -----------------------------------------------------------------
 
-    def _execute_pipeline(
+    def _run_pipeline_stages(
         self,
         ctx: AgentContext,
         parse_dashboard: bool = True,

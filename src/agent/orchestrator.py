@@ -139,6 +139,7 @@ from src.agent.orchestrator_parts.pipeline import (
     _select_specialist_skill_ids,
     _skill_instructions_for_run,
 )
+from src.agent.orchestrator_parts.pipeline_episode import _PipelineEpisodeMethods
 
 if TYPE_CHECKING:
     from src.agent.executor import AgentResult
@@ -351,6 +352,9 @@ _CHAT_METHOD_NAMES = _bind_facade_methods(
 )
 _PIPELINE_METHOD_NAMES = _bind_facade_methods(
     AgentOrchestrator, _PipelineMethods, globals()
+)
+_PIPELINE_EPISODE_METHOD_NAMES = _bind_facade_methods(
+    AgentOrchestrator, _PipelineEpisodeMethods, globals()
 )
 _DASHBOARD_METHOD_NAMES = _bind_facade_methods(
     AgentOrchestrator, _DashboardMethods, globals()

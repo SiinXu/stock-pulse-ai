@@ -1,6 +1,6 @@
 # Agent Router Rules Library
 
-**Status**: Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) slices 1–5 (rules library + structured fact projection + dashboard `run()` apply + run-local decision metadata + Chat `incremental_tool` skip of `_execute_pipeline`). Factory, native adapter, Analyze, API, CLI, Bot, and MCP remain **not wired**.
+**Status**: Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) slices 1–5 plus pipeline episode persist of a secret-free `router_decision` subset. Factory, native adapter, Analyze, API, CLI, Bot, and MCP remain **not wired**. Incremental-tool and rejected pre-pipeline episode rows remain open.
 
 **Chinese**: [agent-router.md](agent-router.md)
 
@@ -10,11 +10,11 @@
 
 - Do **not** parse raw prompts / user messages, provider payloads, or tool results.
 - Do **not** change Settings/env `AGENT_ORCHESTRATOR_MODE`, Soul, ToolSurface, factory / native adapter, API/OpenAPI/Web/Desktop/CLI/Bot/MCP.
-- Do **not** write episode / trace public metadata, EvolutionEvents, or memory admission. Slice 4 records a secret-free decision on run-local `ctx.meta["router_decision"]` and `AgentResult.planning_metadata["router_decision"]` only.
+- Do **not** write EvolutionEvents, traces, or a new env key. Slice 4 still records the secret-free decision on run-local `ctx.meta["router_decision"]` and `AgentResult.planning_metadata["router_decision"]`. When `AGENT_EPISODE_LOG_ENABLED` admits a pipeline episode, a bounded copy (`accepted` / `mode` / `chat_path` / `reason_code` only) is nested under existing `outcome_labels_json`. `error` / `explain` stay run-local.
 - Do **not** call or expand `prefer_route`. Valid miss-rate evidence has **zero routing influence** (identity-neutral until #1091 / #1106).
 - Do **not** copy process-wide Settings/env `AGENT_ORCHESTRATOR_MODE` into `user_mode_override`.
 - Do **not** map `report_type` or `skills` / `selected_skill_ids` onto router mode.
-- Do **not** close #1120: factory / Analyze / CLI / Bot / MCP remain not wired. Episode persistence of the decision remains a later slice.
+- Do **not** close #1120: factory / Analyze / CLI / Bot / MCP remain not wired. Incremental-tool Chat and rejected pre-pipeline episode rows still need `chat.py` (after #199).
 
 Dashboard `run()` is fail-closed: a rejected projection or route returns `AgentResult(success=False)` with the public execution failure message, attaches secret-free `planning_metadata["router_decision"]`, and does **not** fall back to the constructor mode. When the run context has no explicit `user_mode_override`, `run()` passes the constructor-configured `self.mode` (factory/Settings `AGENT_ORCHESTRATOR_MODE`) into the router as the user mode so `quick` / `standard` / `full` / `specialist` stay the pipeline depth. An explicit per-run context override still wins. Compare / multi-symbol floors without a user mode remain library behavior and do **not** raise constructor depth on dashboard `run()`. The constructor-configured mode and mode-budget limits are restored in a `finally` block on success, rejection, and every exception path. Chat wires the projector + router once per turn. `chat_path=incremental_tool` skips `_execute_pipeline` and `_execute_multi_symbol_chat` and uses `run_agent_loop` instead. Omitted `tool_suitable`, switch, compare, and `full` / `specialist` overrides stay `full_repipeline`. Chat does not mutate constructor `self.mode`.
 
@@ -152,7 +152,7 @@ Rejected projection/route does not call `_execute_pipeline`.
 
 ## Dashboard run metadata (slice 4)
 
-Accepted `run()` writes `AgentRouterDecision.to_dict()` to `ctx.meta["router_decision"]` before `_execute_pipeline`, then merges the same dict onto `AgentResult.planning_metadata["router_decision"]` after reflection so preexisting bag keys are kept. Rejected projection or route still returns the public execution failure message and attaches `planning_metadata={"router_decision": ...}` without echoing raw overrides or unknown field names. Episode persistence stays out.
+Accepted `run()` writes `AgentRouterDecision.to_dict()` to `ctx.meta["router_decision"]` before `_execute_pipeline`, then merges the same dict onto `AgentResult.planning_metadata["router_decision"]` after reflection so preexisting bag keys are kept. Rejected projection or route still returns the public execution failure message and attaches `planning_metadata={"router_decision": ...}` without echoing raw overrides or unknown field names. Pipeline `_execute_pipeline` fail-soft-persists the bounded subset onto the episode `outcome_labels` when the existing episode-log flag is on. Missing decisions omit the router fields (they are not invented). Incremental-tool Chat and rejected pre-pipeline returns do not write an episode row.
 
 ```python
 result = orch.run("analyze", {"stock_code": "600519"})
@@ -177,12 +177,12 @@ assert result.planning_metadata["router_decision"]["chat_path"] == "incremental_
 
 ## Remaining work (#1120 stays open)
 
-Landed: slice 1 rules library; slice 2 structured fact projection; slice 3 dashboard `run()` apply; slice 4 secret-free run-local decision metadata; slice 5 Chat `incremental_tool` skip of `_execute_pipeline`.
+Landed: slice 1 rules library; slice 2 structured fact projection; slice 3 dashboard `run()` apply; slice 4 secret-free run-local decision metadata; slice 5 Chat `incremental_tool` skip of `_execute_pipeline`; pipeline episode persist of the bounded `router_decision` subset under `outcome_labels_json`.
 
 Still remaining:
 
 - Wire the projector + router into factory / native adapter / analysis (per-run decisions, not process-wide mode).
-- Episode persistence of the decision (must not collide with #1511 memory-write admission).
+- Incremental-tool Chat and rejected pre-pipeline episode rows (`chat.py`, after #199).
 - Outcome bias from miss rates belongs to #1091 / #1106 and must stay threshold-gated.
 
 Rollback: revert the `run()` apply, then delete the library modules, tests, changelog fragment, and these pages. No migration and no config keys.

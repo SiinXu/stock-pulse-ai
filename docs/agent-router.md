@@ -1,6 +1,6 @@
 # Agent 深度路由规则库
 
-**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一至五切片（规则库 + 结构化事实投影 + 仪表盘 `run()` 应用 + run-local 决策元数据 + Chat `incremental_tool` 跳过 `_execute_pipeline`）。factory、native adapter、Analyze、API、CLI、Bot、MCP 仍**未接线**。
+**状态**：Issue [#1120](https://github.com/SiinXu/stock-pulse-ai/issues/1120) 第一至五切片，外加 pipeline episode 持久化 secret-free `router_decision` 子集。factory、native adapter、Analyze、API、CLI、Bot、MCP 仍**未接线**。incremental-tool 与拒绝路径的 episode 行仍开放。
 
 **English**: [agent-router_EN.md](agent-router_EN.md)
 
@@ -10,11 +10,11 @@
 
 - **不会**解析原始 prompt / 用户消息、provider 载荷或工具结果。
 - **不会**改写 Settings/env `AGENT_ORCHESTRATOR_MODE`、Soul、ToolSurface、factory / native adapter、API/OpenAPI/Web/Desktop/CLI/Bot/MCP。
-- **不会**写入 episode / trace 公共元数据、EvolutionEvent 或 memory admission。第四切片只把 secret-free 决策记入 run-local 的 `ctx.meta["router_decision"]` 与 `AgentResult.planning_metadata["router_decision"]`。
+- **不会**写入 EvolutionEvent、trace 或新的环境变量。第四切片仍把 secret-free 决策记入 run-local 的 `ctx.meta["router_decision"]` 与 `AgentResult.planning_metadata["router_decision"]`。当 `AGENT_EPISODE_LOG_ENABLED` 允许写入 pipeline episode 时，只把有界字段（`accepted` / `mode` / `chat_path` / `reason_code`）嵌进既有 `outcome_labels_json`。`error` / `explain` 仍只留在 run-local。
 - **不会**调用或扩展 `prefer_route`；miss-rate 证据在通过校验后**零路由影响**（身份中立，直至 #1091 / #1106）。
 - **不会**把进程级 Settings/env `AGENT_ORCHESTRATOR_MODE` 复制为 `user_mode_override`。
 - **不会**把 `report_type` 或 `skills` / `selected_skill_ids` 映射为路由器 mode。
-- **不会**关闭 #1120：factory / Analyze / CLI / Bot / MCP 仍未接线。决策的 episode 持久化仍属后续切片。
+- **不会**关闭 #1120：factory / Analyze / CLI / Bot / MCP 仍未接线。incremental-tool Chat 与拒绝路径的 episode 行仍需 `chat.py`（#199 之后）。
 
 仪表盘 `run()` 失败关闭：投影或路由被拒绝时返回 `AgentResult(success=False)` 与公开执行失败文案，并附带 secret-free 的 `planning_metadata["router_decision"]`，**不会**回退到构造时 mode。当 run context 没有显式 `user_mode_override` 时，`run()` 把构造时 `self.mode`（factory/Settings `AGENT_ORCHESTRATOR_MODE`）作为用户 mode 传给路由器，从而保留 `quick` / `standard` / `full` / `specialist` 深度。显式 per-run context 覆盖仍然优先。没有用户 mode 时的 compare / 多标的 floor 仍是库行为，**不会**在仪表盘 `run()` 上抬高构造时深度。构造时配置的 mode 与 mode-budget limits 在成功、拒绝和所有异常路径上由 `finally` 恢复。Chat 每轮投影并路由一次。`chat_path=incremental_tool` 时跳过 `_execute_pipeline` 与 `_execute_multi_symbol_chat`，改走 `run_agent_loop`。缺省 `tool_suitable`、switch、compare 以及 `full` / `specialist` 覆盖仍为 `full_repipeline`。Chat 不改写构造时 `self.mode`。
 
@@ -152,7 +152,7 @@ assert orch.mode == "quick"  # 构造时 mode 已恢复；本次 pipeline 也使
 
 ## 仪表盘 run 元数据（第四切片）
 
-接受路由后，`run()` 在 `_execute_pipeline` 之前把 `AgentRouterDecision.to_dict()` 写入 `ctx.meta["router_decision"]`，并在 reflection 之后把同一字典合并进 `AgentResult.planning_metadata["router_decision"]`，保留已有 bag 键。投影或路由拒绝仍返回公开执行失败文案，并附带 `planning_metadata={"router_decision": ...}`，不回显原始覆盖值或未知字段名。不写入 episode。
+接受路由后，`run()` 在 `_execute_pipeline` 之前把 `AgentRouterDecision.to_dict()` 写入 `ctx.meta["router_decision"]`，并在 reflection 之后把同一字典合并进 `AgentResult.planning_metadata["router_decision"]`，保留已有 bag 键。投影或路由拒绝仍返回公开执行失败文案，并附带 `planning_metadata={"router_decision": ...}`，不回显原始覆盖值或未知字段名。`_execute_pipeline` 在既有 episode-log 开关打开时 fail-soft 把有界子集写入 episode 的 `outcome_labels`。缺失决策时省略这些字段，不发明 `standard`。incremental-tool Chat 与 pipeline 之前的拒绝路径不写 episode 行。
 
 ```python
 result = orch.run("analyze", {"stock_code": "600519"})
@@ -177,12 +177,12 @@ assert result.planning_metadata["router_decision"]["chat_path"] == "incremental_
 
 ## 剩余工作（#1120 保持开放）
 
-已落地：第一切片规则库；第二切片结构化事实投影；第三切片仪表盘 `run()` 应用；第四切片 secret-free run-local 决策元数据；第五切片 Chat `incremental_tool` 跳过 `_execute_pipeline`。
+已落地：第一切片规则库；第二切片结构化事实投影；第三切片仪表盘 `run()` 应用；第四切片 secret-free run-local 决策元数据；第五切片 Chat `incremental_tool` 跳过 `_execute_pipeline`；pipeline episode 把有界 `router_decision` 子集写入 `outcome_labels_json`。
 
 仍待后续：
 
 - 将投影器 + 路由器接入 factory / native adapter / analysis（每 run 决策，而不是进程级 mode）。
-- 将决策持久化到 episode（需避开与 #1511 memory-write admission 冲突）。
+- incremental-tool Chat 与拒绝路径的 episode 行（需 `chat.py`，#199 之后）。
 - 基于 miss-rate 的 outcome bias 归 #1091 / #1106，且须有样本阈值。
 
 回滚：先回退 `run()` 应用，再删除本库模块、测试、changelog fragment 与本文档即可；无迁移、无配置键。
