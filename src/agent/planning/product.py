@@ -106,7 +106,7 @@ def _resolve_config(config: Any = None) -> Any:
 def is_agent_planning_enabled(config: Any = None) -> bool:
     """Return whether the production planning path is opted in."""
     cfg = _resolve_config(config)
-    return bool(getattr(cfg, "agent_planning_enabled", False))
+    return getattr(cfg, "agent_planning_enabled", False) is True
 
 
 def resolve_planning_settings(

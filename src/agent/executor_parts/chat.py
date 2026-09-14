@@ -236,7 +236,7 @@ class _ChatMethods:
             task=message,
             context=context,
             cancelled_check=cancelled_check,
-            config=getattr(self, "config", None) or config,
+            config=getattr(self, "config", None),
             product_path=CHAT_PRODUCT_PATH,
         )
         try:

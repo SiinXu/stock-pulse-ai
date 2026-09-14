@@ -17,6 +17,7 @@ from src.agent.executor_parts.run import _RunMethods
 from src.agent.planning.product import (
     is_agent_planning_enabled,
     resolve_planning_settings,
+    try_gather_with_planning,
     try_run_with_planning,
 )
 from src.agent.runtime.mode_budget import ModeBudgetAccount, ModeBudgetLimits
@@ -96,6 +97,8 @@ def test_default_config_keeps_planning_disabled() -> None:
     cfg = SimpleNamespace(agent_planning_enabled=False)
     assert is_agent_planning_enabled(cfg) is False
     assert try_run_with_planning(MagicMock(), task="x", config=cfg) is None
+    assert is_agent_planning_enabled(MagicMock()) is False
+    assert try_gather_with_planning(MagicMock(), task="x", config=MagicMock()) is None
 
 
 def test_run_source_gates_on_try_run_with_planning() -> None:
