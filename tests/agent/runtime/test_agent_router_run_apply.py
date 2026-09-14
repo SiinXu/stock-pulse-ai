@@ -12,7 +12,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from src.agent.orchestrator import AgentOrchestrator, OrchestratorResult
-from src.agent.orchestrator_parts.chat import _build_dashboard_run_router_facts
+from src.agent.orchestrator_parts.chat import (
+    _ROUTER_DECISION_META_KEY,
+    _build_dashboard_run_router_facts,
+)
 from src.agent.public_contract import AGENT_EXECUTION_FAILURE_MESSAGE
 from src.agent.runtime.agent_router import AgentRouter
 from src.agent.runtime.agent_router_facts import (
@@ -300,6 +303,147 @@ def test_run_restores_constructor_mode_after_projection_exception():
     assert orch.mode == "full"
 
 
+def _router_decision(result_or_meta):
+    if isinstance(result_or_meta, dict):
+        return result_or_meta.get(_ROUTER_DECISION_META_KEY)
+    metadata = getattr(result_or_meta, "planning_metadata", None) or {}
+    return metadata.get(_ROUTER_DECISION_META_KEY)
+
+
+def test_run_records_secret_free_decision_on_ctx_meta_and_result():
+    orch = _orchestrator("quick")
+    captured = {}
+
+    def fake_execute(ctx, **_kwargs):
+        captured["mode"] = orch.mode
+        captured["decision"] = dict(ctx.meta[_ROUTER_DECISION_META_KEY])
+        return OrchestratorResult(success=True, content="ok")
+
+    with patch.object(orch, "_execute_pipeline", side_effect=fake_execute) as pipeline:
+        result = orch.run("analyze", {"stock_code": "600519"})
+
+    assert pipeline.call_count == 1
+    assert captured["mode"] == "quick"
+    assert orch.mode == "quick"
+    decision = captured["decision"]
+    assert decision["accepted"] is True
+    assert decision["mode"] == "quick"
+    assert decision["chat_path"] == "full_repipeline"
+    assert decision["reason_code"] == "explicit_override"
+    assert "miss_rate" not in decision
+    assert "miss_rate" not in decision["explain"]
+    assert _router_decision(result) == decision
+
+
+def test_run_explicit_override_records_applied_specialist_decision():
+    orch = _orchestrator("standard")
+    captured = {}
+
+    def fake_execute(ctx, **_kwargs):
+        captured["decision"] = dict(ctx.meta[_ROUTER_DECISION_META_KEY])
+        return OrchestratorResult(success=True)
+
+    with patch.object(orch, "_execute_pipeline", side_effect=fake_execute):
+        result = orch.run(
+            "analyze",
+            {"stock_code": "600519", "user_mode_override": "specialist"},
+        )
+
+    decision = captured["decision"]
+    assert decision["mode"] == "specialist"
+    assert decision["reason_code"] == "explicit_override"
+    assert decision["explain"]["override_present"] is True
+    assert _router_decision(result) == decision
+    assert orch.mode == "standard"
+
+
+def test_run_invalid_override_attaches_rejected_decision_without_leaking_raw_value():
+    orch = _orchestrator("quick")
+    with patch.object(orch, "_execute_pipeline") as pipeline:
+        result = orch.run(
+            "analyze",
+            {"stock_code": "600519", "user_mode_override": "not-a-mode"},
+        )
+
+    assert pipeline.call_count == 0
+    assert result.success is False
+    assert result.error == AGENT_EXECUTION_FAILURE_MESSAGE
+    decision = _router_decision(result)
+    assert decision["accepted"] is False
+    assert decision["reason_code"] == "invalid_override"
+    assert decision["mode"] is None
+    assert decision["chat_path"] is None
+    dumped = repr(result.planning_metadata)
+    assert "not-a-mode" not in dumped
+    assert "not-a-mode" not in (result.error or "")
+
+
+def test_run_projection_unknown_field_attaches_rejected_decision_without_key_names():
+    orch = _orchestrator("full")
+    rejected = RouterFactProjection(
+        accepted=False,
+        request=None,
+        reason_code="unknown_field",
+        error="Request contains unknown classification fields.",
+        error_field="request",
+    )
+    with patch(
+        "src.agent.runtime.agent_router_facts.project_router_request",
+        return_value=rejected,
+    ):
+        with patch.object(orch, "_execute_pipeline") as pipeline:
+            result = orch.run("analyze", {"stock_code": "600519"})
+
+    assert pipeline.call_count == 0
+    assert result.error == AGENT_EXECUTION_FAILURE_MESSAGE
+    decision = _router_decision(result)
+    assert decision["accepted"] is False
+    assert decision["reason_code"] == "unknown_field"
+    assert decision["explain"]["error_field"] == "request"
+    dumped = repr(result.planning_metadata)
+    assert "stock_code" not in dumped
+    assert "unknown_field" not in (result.error or "")
+
+
+def test_run_merges_router_decision_onto_preexisting_planning_metadata():
+    orch = _orchestrator("quick")
+
+    def fake_execute(_ctx, **_kwargs):
+        return OrchestratorResult(
+            success=True,
+            planning_metadata={"preexisting": True},
+        )
+
+    with patch.object(orch, "_execute_pipeline", side_effect=fake_execute):
+        result = orch.run("analyze", {"stock_code": "600519"})
+
+    metadata = result.planning_metadata or {}
+    assert metadata["preexisting"] is True
+    assert metadata[_ROUTER_DECISION_META_KEY]["accepted"] is True
+    assert metadata[_ROUTER_DECISION_META_KEY]["mode"] == "quick"
+
+
+def test_run_compare_scope_records_applied_constructor_mode_not_library_floor():
+    orch = _orchestrator("quick")
+    captured = {}
+
+    def fake_execute(ctx, **_kwargs):
+        captured["decision"] = dict(ctx.meta[_ROUTER_DECISION_META_KEY])
+        return OrchestratorResult(success=True)
+
+    with patch.object(orch, "_execute_pipeline", side_effect=fake_execute):
+        result = orch.run(
+            "compare 600519 and 000001",
+            {"stock_code": "600519"},
+        )
+
+    decision = captured["decision"]
+    assert decision["mode"] == "quick"
+    assert decision["mode"] != "full"
+    assert _router_decision(result)["mode"] == "quick"
+    assert orch.mode == "quick"
+
+
 def test_chat_skips_router_and_still_executes_pipeline():
     orch = _orchestrator("quick")
     with patch.object(
@@ -328,3 +472,4 @@ def test_chat_skips_router_and_still_executes_pipeline():
     assert pipeline.call_count == 1
     assert orch.mode == "quick"
     assert result.success is True
+    assert _router_decision(result) is None
