@@ -1,15 +1,14 @@
 # -*- coding: utf-8 -*-
-"""TickFlow daily K-line prefetch methods.
+"""TickFlow daily K-line and realtime quote prefetch methods.
 
 Method bodies are rebound onto ``TickFlowFetcher`` by the compatibility facade
 (ADR-006) so free-name lookups and test patches stay on
 ``src.data_provider.tickflow_fetcher``.
 
 No tenacity wrapper and no sibling method moves. Client access, capability
-helpers, daily-cache/history helpers, ``prefetch_realtime_quotes``,
-quote-cache/TTL, ``_dedupe_symbols``, and universe parse stay on the facade;
-the rebind resolves free names from the facade globals and sibling methods
-through ``self`` at call time.
+helpers, daily-cache/history helpers, quote-cache/TTL, ``_dedupe_symbols``,
+and universe parse stay on the facade; the rebind resolves free names from
+the facade globals and sibling methods through ``self`` at call time.
 """
 
 from __future__ import annotations
@@ -179,9 +178,50 @@ class _PrefetchMethods:
                 yield symbol, pd.DataFrame(rows)
 
 
+class _RealtimePrefetchMethods:
+    """Realtime quote prefetch descriptors rebound onto ``TickFlowFetcher``."""
+
+    def prefetch_realtime_quotes(
+        self,
+        stock_codes: Iterable[str],
+        *,
+        batch_size: Optional[int] = None,
+    ) -> int:
+        """Batch-prefetch realtime quotes into the quote cache."""
+        client = self._get_client()
+        if client is None:
+            return 0
+
+        symbols = self._dedupe_symbols(stock_codes)
+        if not symbols:
+            return 0
+
+        effective_batch_size = max(1, int(batch_size or self.batch_size))
+        cached_count = 0
+        for offset in range(0, len(symbols), effective_batch_size):
+            batch_symbols = symbols[offset : offset + effective_batch_size]
+            try:
+                quotes = client.quotes.get(symbols=batch_symbols)
+            except Exception as exc:
+                log_safe_exception(
+                    logger,
+                    "TickFlow batch realtime quote request failed",
+                    exc,
+                    error_code="tickflow_batch_realtime_quote_failed",
+                    level=logging.WARNING,
+                )
+                continue
+            cached_count += self._store_quotes(quotes)
+        return cached_count
+
+
 EXPECTED_PREFETCH_METHOD_NAMES: Tuple[str, ...] = (
     "prefetch_daily_klines",
     "_iter_batch_frames",
+)
+
+EXPECTED_REALTIME_PREFETCH_METHOD_NAMES: Tuple[str, ...] = (
+    "prefetch_realtime_quotes",
 )
 
 
@@ -196,6 +236,20 @@ def bind_prefetch_methods_facade(
         target_class,
         global_namespace,
         expected_names=EXPECTED_PREFETCH_METHOD_NAMES,
+    )
+
+
+def bind_realtime_prefetch_methods_facade(
+    target_class: Type[Any],
+    global_namespace: Dict[str, Any],
+) -> Tuple[str, ...]:
+    """Bind realtime-prefetch descriptors without changing the fetcher API."""
+
+    return bind_methods_from_class(
+        _RealtimePrefetchMethods,
+        target_class,
+        global_namespace,
+        expected_names=EXPECTED_REALTIME_PREFETCH_METHOD_NAMES,
     )
 
 

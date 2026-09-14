@@ -24,6 +24,7 @@ import pytest
 import src.data_provider._facade_bind as shared_bind
 import src.data_provider.tickflow_fetcher as tickflow_mod
 import src.data_provider.tickflow_parts.facade_bind as tickflow_bind
+import src.data_provider.tickflow_parts.prefetch as prefetch_mod
 import src.data_provider.tickflow_parts.realtime as realtime_mod
 from src.data_provider.realtime_types import RealtimeSource
 from src.data_provider.tickflow_fetcher import TickFlowFetcher
@@ -60,7 +61,6 @@ FACADE_SIBLINGS = (
     "_cn_lots_to_shares",
     "_ratio_to_percent",
     "_extract_name",
-    "prefetch_realtime_quotes",
 )
 
 BOARDS_BOUND = (
@@ -72,6 +72,21 @@ BOARDS_BOUND = (
 HISTORY_BOUND = (
     "_fetch_raw_data",
     "_normalize_data",
+)
+
+IDENTITY_BOUND = (
+    "get_stock_name",
+    "_extract_instrument_name",
+    "get_stock_list",
+)
+
+DAILY_PREFETCH_BOUND = (
+    "prefetch_daily_klines",
+    "_iter_batch_frames",
+)
+
+REALTIME_PREFETCH_BOUND = (
+    "prefetch_realtime_quotes",
 )
 
 FREE_NAMES = (
@@ -190,10 +205,51 @@ def test_sibling_helpers_stay_on_the_facade(sibling) -> None:
     assert sibling in _facade_class_methods(), sibling
 
 
-@pytest.mark.parametrize("name", BOARDS_BOUND + HISTORY_BOUND)
+@pytest.mark.parametrize(
+    "name",
+    BOARDS_BOUND
+    + HISTORY_BOUND
+    + IDENTITY_BOUND
+    + DAILY_PREFETCH_BOUND
+    + REALTIME_PREFETCH_BOUND,
+)
 def test_other_bound_methods_stay_bound_and_are_not_live_function_defs(name) -> None:
     assert callable(getattr(TickFlowFetcher, name)), name
     assert name not in _facade_class_methods(), name
+
+
+def test_realtime_prefetch_is_rebound_from_the_prefetch_owner() -> None:
+    method = _descriptor_function(TickFlowFetcher.__dict__["prefetch_realtime_quotes"])
+    source = _descriptor_function(
+        vars(prefetch_mod._RealtimePrefetchMethods)["prefetch_realtime_quotes"]
+    )
+    assert method is not source
+    assert method.__code__ is source.__code__
+    assert method.__module__ == "src.data_provider.tickflow_fetcher"
+    assert method.__qualname__ == "TickFlowFetcher.prefetch_realtime_quotes"
+    assert method.__globals__ is vars(tickflow_mod)
+    signature = inspect.signature(TickFlowFetcher.prefetch_realtime_quotes)
+    assert list(signature.parameters) == ["self", "stock_codes", "batch_size"]
+    assert signature.parameters["batch_size"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert signature.parameters["batch_size"].default is None
+    assert prefetch_mod.EXPECTED_REALTIME_PREFETCH_METHOD_NAMES == REALTIME_PREFETCH_BOUND
+    tree = ast.parse(
+        (REPO_ROOT / "src" / "data_provider" / "tickflow_parts" / "prefetch.py").read_text(
+            encoding="utf-8"
+        )
+    )
+    defined = {
+        node.name
+        for cls in tree.body
+        if isinstance(cls, ast.ClassDef) and cls.name == "_RealtimePrefetchMethods"
+        for node in cls.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    }
+    assert defined == {"prefetch_realtime_quotes"}
+    assert prefetch_mod.EXPECTED_PREFETCH_METHOD_NAMES == (
+        "prefetch_daily_klines",
+        "_iter_batch_frames",
+    )
 
 
 def test_owner_module_does_not_trip_sibling_realtime_import_greps() -> None:
@@ -255,6 +311,9 @@ def _run_reload_contract(body: str) -> None:
                     "realtime_names = realtime.EXPECTED_REALTIME_METHOD_NAMES",
                     "boards_names = ('get_main_indices', 'get_market_stats', 'get_sector_rankings')",
                     "history_names = ('_fetch_raw_data', '_normalize_data')",
+                    "identity_names = ('get_stock_name', '_extract_instrument_name', 'get_stock_list')",
+                    "daily_prefetch_names = ('prefetch_daily_klines', '_iter_batch_frames')",
+                    "realtime_prefetch_names = ('prefetch_realtime_quotes',)",
                     "",
                     "def descriptor_function(descriptor):",
                     "    if isinstance(descriptor, (staticmethod, classmethod)):",
@@ -279,7 +338,8 @@ def _run_reload_contract(body: str) -> None:
                     "        assert bound[name].__qualname__ == (",
                     "            f'TickFlowFetcher.{name}'",
                     "        )",
-                    "    for name in boards_names + history_names:",
+                    "    sibling = boards_names + history_names + identity_names + daily_prefetch_names + realtime_prefetch_names",
+                    "    for name in sibling:",
                     "        assert callable(getattr(facade.TickFlowFetcher, name))",
                     "    return source, bound",
                     "",
@@ -308,10 +368,59 @@ for name in realtime_names:
     assert after_bound[name].__code__ is after_source[name].__code__
     assert after_bound[name].__globals__ is vars(facade)
     assert after_bound[name].__module__ == 'src.data_provider.tickflow_fetcher'
-for name in boards_names + history_names:
+sibling = boards_names + history_names + identity_names + daily_prefetch_names + realtime_prefetch_names
+for name in sibling:
     assert callable(getattr(facade.TickFlowFetcher, name))
 """
     )
+
+
+def test_reloading_prefetch_rebinds_realtime_prefetch() -> None:
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "\n".join(
+                (
+                    "import importlib",
+                    "import src.data_provider.tickflow_fetcher as facade",
+                    "import src.data_provider.tickflow_parts.prefetch as prefetch",
+                    "",
+                    "def descriptor_function(descriptor):",
+                    "    if isinstance(descriptor, (staticmethod, classmethod)):",
+                    "        descriptor = descriptor.__func__",
+                    "    return descriptor",
+                    "",
+                    "name = 'prefetch_realtime_quotes'",
+                    "before_source = descriptor_function(",
+                    "    vars(prefetch._RealtimePrefetchMethods)[name]",
+                    ")",
+                    "before_bound = descriptor_function(",
+                    "    vars(facade.TickFlowFetcher)[name]",
+                    ")",
+                    "prefetch = importlib.reload(prefetch)",
+                    "after_source = descriptor_function(",
+                    "    vars(prefetch._RealtimePrefetchMethods)[name]",
+                    ")",
+                    "after_bound = descriptor_function(",
+                    "    vars(facade.TickFlowFetcher)[name]",
+                    ")",
+                    "assert after_source is not before_source",
+                    "assert after_bound is not before_bound",
+                    "assert after_bound.__code__ is after_source.__code__",
+                    "assert after_bound.__globals__ is vars(facade)",
+                    "assert after_bound.__module__ == 'src.data_provider.tickflow_fetcher'",
+                    "assert callable(facade.TickFlowFetcher.prefetch_daily_klines)",
+                    "assert callable(facade.TickFlowFetcher.get_stock_name)",
+                    "assert callable(facade.TickFlowFetcher.get_realtime_quote)",
+                )
+            ),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
 
 
 def test_expected_names_mismatch_is_an_import_error() -> None:
@@ -559,6 +668,34 @@ def test_prefetch_realtime_quotes_swallows_batch_exceptions() -> None:
         assert fetcher.prefetch_realtime_quotes(["600519"]) == 0
     logged.assert_called_once()
     assert logged.call_args.kwargs["error_code"] == "tickflow_batch_realtime_quote_failed"
+
+
+def test_prefetch_realtime_quotes_missing_client_returns_zero() -> None:
+    fetcher = _make_fetcher()
+    with patch.object(fetcher, "_get_client", return_value=None) as get_client:
+        with patch.object(fetcher, "_store_quotes") as store:
+            assert fetcher.prefetch_realtime_quotes(["600519"]) == 0
+    get_client.assert_called_once_with()
+    store.assert_not_called()
+
+
+def test_prefetch_realtime_quotes_empty_dedupe_returns_zero() -> None:
+    fetcher = _make_fetcher()
+    fetcher._client = _FakeClient(symbols_data=[_quote("600519.SH")])
+    with patch.object(fetcher, "_dedupe_symbols", return_value=[]) as dedupe:
+        with patch.object(fetcher, "_store_quotes") as store:
+            assert fetcher.prefetch_realtime_quotes(["600519"]) == 0
+    dedupe.assert_called_once()
+    store.assert_not_called()
+    assert fetcher._client.quotes.calls == []
+
+
+def test_prefetch_realtime_quotes_store_quotes_patch_is_visible() -> None:
+    fetcher = _make_fetcher()
+    fetcher._client = _FakeClient(symbols_data=[_quote("600519.SH")])
+    with patch.object(fetcher, "_store_quotes", return_value=7) as store:
+        assert fetcher.prefetch_realtime_quotes(["600519"]) == 7
+    store.assert_called_once()
 
 
 def test_get_stock_name_reads_and_writes_the_same_quote_cache() -> None:

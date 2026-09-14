@@ -1,0 +1,1 @@
+- [Changed] Move TickFlow realtime quote prefetch (`prefetch_realtime_quotes`) into `src/data_provider/tickflow_parts/prefetch.py` behind the ADR-006 facade, keeping quote-cache/TTL, `_dedupe_symbols`, and client access on the facade (Refs #1068).
