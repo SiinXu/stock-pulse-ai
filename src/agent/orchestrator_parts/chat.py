@@ -150,6 +150,94 @@ def _build_dashboard_run_router_facts(
     return facts
 
 
+_CHAT_ROUTER_OPTIONAL_KEYS = (
+    "tool_suitable",
+    "need_news",
+    "need_risk",
+    "intent_category",
+    "user_mode_override",
+)
+
+
+def _build_chat_router_facts(
+    scope_resolution: Any,
+    context: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Project already-structured Chat facts. Does not parse the user message."""
+    facts: Dict[str, Any] = {"entry_kind": "chat"}
+    stock_scope = getattr(scope_resolution, "stock_scope", None)
+    if stock_scope is not None:
+        facts["scope_mode"] = stock_scope.mode
+        allowed = tuple(sorted(stock_scope.allowed_stock_codes))
+        if allowed:
+            facts["allowed_stock_codes"] = allowed
+        expected = stock_scope.expected_stock_code
+        if expected:
+            facts["expected_stock_code"] = expected
+    else:
+        effective = getattr(scope_resolution, "effective_context", None) or {}
+        stock_code = effective.get("stock_code") if isinstance(effective, dict) else None
+        if type(stock_code) is str and stock_code:
+            facts["symbol_codes"] = (stock_code,)
+    if isinstance(context, dict):
+        for key in _CHAT_ROUTER_OPTIONAL_KEYS:
+            if key in context and context[key] is not None:
+                facts[key] = context[key]
+    return facts
+
+
+def _run_incremental_chat_loop(
+    orchestrator: Any,
+    ctx: AgentContext,
+    *,
+    message: str,
+    progress_callback: Optional[Callable] = None,
+    cancelled_check: Optional[Callable[[], bool]] = None,
+) -> "OrchestratorResult":
+    """Single-agent tool loop for ``chat_path=incremental_tool`` (no pipeline)."""
+    from src.agent.orchestrator import OrchestratorResult
+
+    history = list(ctx.meta.get("conversation_history") or [])
+    messages = list(history)
+    messages.append({"role": "user", "content": message})
+    limits = getattr(orchestrator, "mode_budget_limits", None)
+    configured_steps = getattr(orchestrator, "max_steps", 10)
+    max_steps = (
+        limits.effective_max_steps(configured_steps)
+        if limits is not None and hasattr(limits, "effective_max_steps")
+        else max(1, int(configured_steps or 10))
+    )
+    timeout_s = orchestrator._get_timeout_seconds()
+    loop_result = run_agent_loop(
+        messages=messages,
+        tool_registry=orchestrator._tool_registry_for_context(ctx),
+        llm_adapter=orchestrator.llm_adapter,
+        max_steps=max_steps,
+        progress_callback=progress_callback,
+        max_wall_clock_seconds=timeout_s if timeout_s and timeout_s > 0 else None,
+        stock_scope=ctx.meta.get("stock_scope"),
+        emit_stage_events=False,
+        cancelled_check=cancelled_check,
+        runtime_guard_policy=getattr(orchestrator, "runtime_guard_policy", None),
+    )
+    return OrchestratorResult(
+        success=loop_result.success,
+        content=loop_result.content,
+        tool_calls_log=list(loop_result.tool_calls_log or []),
+        total_steps=loop_result.total_steps,
+        total_tokens=loop_result.total_tokens,
+        provider=loop_result.provider,
+        model=loop_result.model,
+        error=loop_result.error,
+        cancelled=loop_result.cancelled,
+        timed_out=loop_result.timed_out,
+        budget_snapshot=getattr(loop_result, "budget_snapshot", None),
+        failure_reason=_failure_reason_value(
+            getattr(loop_result, "failure_reason", None)
+        ),
+    )
+
+
 def _public_router_decision(
     *,
     decision: Any = None,
@@ -340,9 +428,18 @@ class _ChatMethods:
         selected_skill_ids: Optional[List[str]] = None,
         turn_id: Optional[str] = None,
     ) -> "AgentResult":
-        """Run the pipeline in chat mode (free-form answer, no dashboard parse)."""
+        """Run chat, routing incremental_tool away from the full pipeline."""
         from src.agent.executor import AgentResult
         from src.agent.conversation import conversation_manager
+        from src.agent.orchestrator_parts.chat import (
+            _ROUTER_DECISION_META_KEY,
+            _attach_router_decision,
+            _build_chat_router_facts,
+            _public_router_decision,
+            _run_incremental_chat_loop,
+        )
+        from src.agent.runtime.agent_router import AgentRouter
+        from src.agent.runtime.agent_router_facts import project_router_request
 
         session = conversation_manager.get_or_create(session_id)
         stored_context = session.get_market_context()
@@ -392,9 +489,61 @@ class _ChatMethods:
                 "message_id": str(user_message_id),
             })
 
+        projection = project_router_request(
+            _build_chat_router_facts(scope_resolution, context)
+        )
+        if not projection.accepted or projection.request is None:
+            conversation_manager.add_message(
+                session_id,
+                "assistant",
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+            )
+            return AgentResult(
+                success=False,
+                content="",
+                error=AGENT_CHAT_FAILURE_MESSAGE,
+                planning_metadata=_attach_router_decision(
+                    None, _public_router_decision(projection=projection)
+                ),
+            )
+
+        decision = AgentRouter().route(projection.request)
+        if not decision.accepted or decision.chat_path is None:
+            conversation_manager.add_message(
+                session_id,
+                "assistant",
+                AGENT_CHAT_FAILURE_HISTORY_SENTINEL,
+            )
+            return AgentResult(
+                success=False,
+                content="",
+                error=AGENT_CHAT_FAILURE_MESSAGE,
+                planning_metadata=_attach_router_decision(
+                    None, _public_router_decision(decision=decision)
+                ),
+            )
+
+        payload = _public_router_decision(decision=decision)
         try:
             stock_scope = scope_resolution.stock_scope
-            if (
+            if decision.chat_path == "incremental_tool":
+                ctx = self._build_chat_pipeline_context(
+                    message=message,
+                    session_id=session_id,
+                    context=scope_resolution.effective_context,
+                    stock_scope=stock_scope,
+                    history=history,
+                    market_context=market_context,
+                )
+                ctx.meta[_ROUTER_DECISION_META_KEY] = payload
+                orch_result = _run_incremental_chat_loop(
+                    self,
+                    ctx,
+                    message=message,
+                    progress_callback=progress_callback,
+                    cancelled_check=cancelled_check,
+                )
+            elif (
                 stock_scope is not None
                 and stock_scope.mode == "compare"
                 and len(stock_scope.allowed_stock_codes) > 1
@@ -419,6 +568,7 @@ class _ChatMethods:
                     history=history,
                     market_context=market_context,
                 )
+                ctx.meta[_ROUTER_DECISION_META_KEY] = payload
                 orch_result = self._execute_pipeline(
                     ctx,
                     parse_dashboard=False,
@@ -443,6 +593,11 @@ class _ChatMethods:
                 content="",
                 error=AGENT_CHAT_FAILURE_MESSAGE,
             )
+
+        orch_result.planning_metadata = _attach_router_decision(
+            getattr(orch_result, "planning_metadata", None),
+            payload,
+        )
 
         # Final-action authority runs before response/history publication.
         from src.agent.risk_override import (

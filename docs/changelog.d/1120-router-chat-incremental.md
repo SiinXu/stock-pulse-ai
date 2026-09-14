@@ -1,0 +1,1 @@
+- [Added] Wire AgentRouter into AgentOrchestrator.chat and skip the full pipeline when chat_path is incremental_tool (Refs #1120).
