@@ -22,6 +22,8 @@ from src.schemas.agent_episode import (
     EpisodeLesson,
     EpisodeOutcomeLabels,
     TrajectoryStepSummary,
+    bounded_router_outcome_labels,
+    router_decision_from_planning_metadata,
 )
 from src.schemas.memory_consolidate_policy import (
     EpisodeConsolidateResult,
@@ -136,6 +138,18 @@ class AgentEpisodeService:
                     soul_version = soul_version or meta.get("soul_version")
                     soul_hash = soul_hash or meta.get("soul_hash")
             trajectory = compact_trajectory_summary(getattr(result, "tool_calls_log", None) or [])
+            labels_map: Dict[str, Any] = {}
+            if isinstance(outcome_labels, Mapping):
+                labels_map = dict(outcome_labels)
+            elif outcome_labels is not None and callable(getattr(outcome_labels, "model_dump", None)):
+                dumped = outcome_labels.model_dump(mode="python", exclude_none=True)
+                if isinstance(dumped, dict):
+                    labels_map = dumped
+            bounded = bounded_router_outcome_labels(
+                router_decision_from_planning_metadata(result)
+            )
+            if bounded:
+                labels_map.update(bounded)
             payload: Dict[str, Any] = {
                 "episode_id": f"ep-{uuid.uuid4().hex}",
                 "run_id": resolved_run_id,
@@ -149,7 +163,7 @@ class AgentEpisodeService:
                 "soul_hash": soul_hash,
                 "trajectory_summary": trajectory,
                 "lessons": list(lessons or []),
-                "outcome_labels": outcome_labels,
+                "outcome_labels": labels_map or None,
             }
             return self.record_episode(payload, config=cfg)
         except Exception as exc:  # broad-exception: fallback_recorded - result projection must never fail analysis

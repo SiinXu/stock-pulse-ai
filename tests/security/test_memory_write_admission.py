@@ -167,6 +167,45 @@ def test_episode_soul_control_and_actuals_keys_rejected_at_append(isolated_db) -
     assert repo.get_by_episode_id("ep-admit-extra") is None
 
 
+def test_episode_router_enums_admitted_and_soul_text_rejected(isolated_db) -> None:
+    repo = AgentEpisodeRepository(isolated_db)
+    stored = repo.append(
+        AgentEpisodeCreate.model_validate(
+            _compact_episode_payload(
+                episode_id="ep-admit-router",
+                outcome_labels={
+                    "router_accepted": True,
+                    "router_mode": "quick",
+                    "router_chat_path": "full_repipeline",
+                    "router_reason_code": "explicit_override",
+                },
+            )
+        )
+    )
+    assert stored.outcome_labels is not None
+    assert stored.outcome_labels.router_accepted is True
+    assert stored.outcome_labels.router_mode == "quick"
+    assert stored.outcome_labels.router_chat_path == "full_repipeline"
+    assert stored.outcome_labels.router_reason_code == "explicit_override"
+
+    soul = AgentEpisodeCreate.model_validate(
+        _compact_episode_payload(
+            episode_id="ep-admit-router-soul",
+            outcome_labels={
+                "router_accepted": True,
+                "router_mode": "quick",
+                "router_chat_path": "full_repipeline",
+                "router_reason_code": "explicit_override",
+            },
+        )
+    )
+    assert soul.outcome_labels is not None
+    soul.outcome_labels.router_mode = AGENT_SOUL_MARKER
+    with pytest.raises(MemoryWriteRejectedError, match="Soul boundary"):
+        repo.append(soul)
+    assert repo.get_by_episode_id("ep-admit-router-soul") is None
+
+
 def test_prediction_resolve_allows_system_actuals_and_rejects_user_notes(
     isolated_db,
 ) -> None:

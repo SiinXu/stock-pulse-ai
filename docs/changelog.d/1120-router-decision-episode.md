@@ -1,0 +1,1 @@
+- [Added] Persist a secret-free AgentRouter decision subset on evolution episode outcome labels for pipeline runs (Refs #1120).

@@ -10,12 +10,15 @@ Agent Soul charter text; only ``soul_version`` / ``soul_hash`` may be stored.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Mapping, Optional, Tuple
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from src.schemas.memory_fact_opinion import FACT_FIELD_NAMES
-from src.schemas.memory_write_guard import reject_memory_write_text
+from src.schemas.memory_write_guard import (
+    MemoryWriteRejectedError,
+    reject_memory_write_text,
+)
 
 AGENT_EPISODE_SCHEMA_VERSION: Literal["agent-episode-v1"] = "agent-episode-v1"
 
@@ -36,6 +39,33 @@ _MODE_PATTERN = r"^[a-z][a-z0-9_.-]{0,31}$"
 _ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$"
 _SYMBOL_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,31}$"
 _HASH_PATTERN = r"^(?:sha256:)?[a-f0-9]{8,128}$"
+
+# Secret-free router subset persisted under outcome_labels_json (#1120).
+# error / explain / raw overrides are intentionally absent.
+EPISODE_ROUTER_MODES: Tuple[str, ...] = ("quick", "standard", "full", "specialist")
+EPISODE_ROUTER_CHAT_PATHS: Tuple[str, ...] = ("incremental_tool", "full_repipeline")
+EPISODE_ROUTER_REASON_CODES: Tuple[str, ...] = (
+    "explicit_override",
+    "default_standard",
+    "quick_eligible",
+    "floor_need_risk",
+    "floor_compare",
+    "floor_multi_symbol",
+    "floor_need_news",
+    "invalid_override",
+    "invalid_intent",
+    "invalid_symbol_count",
+    "invalid_flag",
+    "invalid_entry_kind",
+    "invalid_miss_rate",
+    "invalid_request",
+    "unknown_field",
+    "inconsistent_facts",
+)
+_EPISODE_ROUTER_MODE_SET = frozenset(EPISODE_ROUTER_MODES)
+_EPISODE_ROUTER_CHAT_PATH_SET = frozenset(EPISODE_ROUTER_CHAT_PATHS)
+_EPISODE_ROUTER_REASON_SET = frozenset(EPISODE_ROUTER_REASON_CODES)
+_ROUTER_DECISION_SOURCE_KEY = "router_decision"
 
 
 class _StrictEpisodeModel(BaseModel):
@@ -91,6 +121,10 @@ class EpisodeOutcomeLabels(_StrictEpisodeModel):
     manual_grade: Optional[str] = Field(default=None, max_length=64)
     prediction_outcome: Optional[str] = Field(default=None, max_length=64)
     prediction_id: Optional[str] = Field(default=None, max_length=128)
+    router_accepted: Optional[bool] = None
+    router_mode: Optional[Literal["quick", "standard", "full", "specialist"]] = None
+    router_chat_path: Optional[Literal["incremental_tool", "full_repipeline"]] = None
+    router_reason_code: Optional[str] = Field(default=None, min_length=1, max_length=64)
     extra: Dict[str, str] = Field(default_factory=dict)
 
     @field_validator("user_feedback")
@@ -101,6 +135,20 @@ class EpisodeOutcomeLabels(_StrictEpisodeModel):
             field_name="user_feedback",
             max_length=AGENT_EPISODE_MAX_STRING,
         )
+
+    @field_validator("router_reason_code")
+    @classmethod
+    def _allowlisted_router_reason(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        reject_memory_write_text(
+            value,
+            field_name="router_reason_code",
+            max_length=64,
+        )
+        if value not in _EPISODE_ROUTER_REASON_SET:
+            raise ValueError("router_reason_code is not an allowed router enum")
+        return value
 
     @field_validator("extra")
     @classmethod
@@ -124,6 +172,25 @@ class EpisodeOutcomeLabels(_StrictEpisodeModel):
         return value
 
 
+def _reject_router_enum_field(
+    value: Any,
+    *,
+    field_name: str,
+    allowed: frozenset[str],
+) -> None:
+    if value is None:
+        return
+    if isinstance(value, str):
+        reject_memory_write_text(
+            value,
+            field_name=field_name,
+            max_length=64,
+        )
+        if value in allowed:
+            return
+    raise MemoryWriteRejectedError(f"{field_name} is not an allowed router enum")
+
+
 def reject_episode_free_text(episode: Any) -> None:
     """Reject Soul markers / illegal controls on persisted episode free-text."""
     labels = getattr(episode, "outcome_labels", None)
@@ -141,6 +208,24 @@ def reject_episode_free_text(episode: Any) -> None:
                     field_name="extra",
                     max_length=AGENT_EPISODE_MAX_STRING,
                 )
+        accepted = getattr(labels, "router_accepted", None)
+        if accepted is not None and type(accepted) is not bool:
+            raise MemoryWriteRejectedError("router_accepted must be a boolean")
+        _reject_router_enum_field(
+            getattr(labels, "router_mode", None),
+            field_name="router_mode",
+            allowed=_EPISODE_ROUTER_MODE_SET,
+        )
+        _reject_router_enum_field(
+            getattr(labels, "router_chat_path", None),
+            field_name="router_chat_path",
+            allowed=_EPISODE_ROUTER_CHAT_PATH_SET,
+        )
+        _reject_router_enum_field(
+            getattr(labels, "router_reason_code", None),
+            field_name="router_reason_code",
+            allowed=_EPISODE_ROUTER_REASON_SET,
+        )
     lessons = getattr(episode, "lessons", None) or []
     for lesson in lessons:
         reject_memory_write_text(
@@ -148,6 +233,35 @@ def reject_episode_free_text(episode: Any) -> None:
             field_name="remedy",
             max_length=AGENT_EPISODE_MAX_REMEDY,
         )
+
+
+def bounded_router_outcome_labels(decision: Any) -> Optional[Dict[str, Any]]:
+    """Copy allowlisted router enums/bools; omit missing keys and secret-bearing fields."""
+    if not isinstance(decision, Mapping):
+        return None
+    labels: Dict[str, Any] = {}
+    accepted = decision.get("accepted")
+    if type(accepted) is bool:
+        labels["router_accepted"] = accepted
+    mode = decision.get("mode")
+    if mode in _EPISODE_ROUTER_MODE_SET:
+        labels["router_mode"] = mode
+    chat_path = decision.get("chat_path")
+    if chat_path in _EPISODE_ROUTER_CHAT_PATH_SET:
+        labels["router_chat_path"] = chat_path
+    reason_code = decision.get("reason_code")
+    if reason_code in _EPISODE_ROUTER_REASON_SET:
+        labels["router_reason_code"] = reason_code
+    return labels or None
+
+
+def router_decision_from_planning_metadata(result: Any) -> Any:
+    """Return ``planning_metadata['router_decision']`` when it is a mapping."""
+    metadata = getattr(result, "planning_metadata", None)
+    if not isinstance(metadata, Mapping):
+        return None
+    decision = metadata.get(_ROUTER_DECISION_SOURCE_KEY)
+    return decision if isinstance(decision, Mapping) else None
 
 
 class AgentEpisodeCreate(_StrictEpisodeModel):
@@ -240,8 +354,13 @@ __all__ = [
     "AgentEpisode",
     "AgentEpisodeCreate",
     "AgentEpisodePage",
+    "EPISODE_ROUTER_CHAT_PATHS",
+    "EPISODE_ROUTER_MODES",
+    "EPISODE_ROUTER_REASON_CODES",
     "EpisodeLesson",
     "EpisodeOutcomeLabels",
     "TrajectoryStepSummary",
+    "bounded_router_outcome_labels",
     "reject_episode_free_text",
+    "router_decision_from_planning_metadata",
 ]

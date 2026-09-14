@@ -16,7 +16,7 @@ from src.agent.soul import AGENT_SOUL_HASH, AGENT_SOUL_VERSION
 from src.repositories.agent_episode_repo import AgentEpisodeRepository
 from src.repositories.agent_episode_tables import agent_episodes_table
 from src.repositories.base import RepositoryError
-from src.schemas.agent_episode import AgentEpisodeCreate
+from src.schemas.agent_episode import AgentEpisodeCreate, EpisodeOutcomeLabels
 from src.services.agent_episode_service import (
     AgentEpisodeService,
     compact_trajectory_summary,
@@ -229,6 +229,89 @@ def test_compact_trajectory_redacts_arguments() -> None:
     assert "argument_fingerprint" in steps[0]
     assert "sk-secret" not in str(steps)
     assert steps[1]["step"] == 2
+
+
+def _enabled_episode_config() -> SimpleNamespace:
+    return SimpleNamespace(
+        agent_episode_log_enabled=True,
+        agent_episode_retention_days=90,
+        agent_episode_max_rows=50000,
+    )
+
+
+def _result_with_router_decision(**decision_overrides):
+    decision = {
+        "accepted": True,
+        "mode": "quick",
+        "chat_path": "full_repipeline",
+        "reason_code": "explicit_override",
+        "error": "must-not-persist",
+        "explain": {"intent_category": "simple"},
+    }
+    decision.update(decision_overrides)
+    return SimpleNamespace(
+        success=True,
+        tool_calls_log=[],
+        runtime_facts=None,
+        planning_metadata={"router_decision": decision},
+    )
+
+
+def test_record_from_agent_result_copies_bounded_router_decision(isolated_db) -> None:
+    stored = AgentEpisodeService(config=_enabled_episode_config()).record_from_agent_result(
+        result=_result_with_router_decision(),
+        run_id="run-router-copy",
+        mode="quick",
+        symbol="600519",
+        config=_enabled_episode_config(),
+    )
+    assert stored is not None
+    assert stored.outcome_labels is not None
+    assert stored.outcome_labels.router_accepted is True
+    assert stored.outcome_labels.router_mode == "quick"
+    assert stored.outcome_labels.router_chat_path == "full_repipeline"
+    assert stored.outcome_labels.router_reason_code == "explicit_override"
+    dumped = stored.outcome_labels.model_dump()
+    assert "error" not in dumped
+    assert "explain" not in dumped
+    assert dumped.get("extra") == {}
+    assert "must-not-persist" not in repr(dumped)
+
+
+def test_record_from_agent_result_omits_router_fields_when_decision_missing(
+    isolated_db,
+) -> None:
+    stored = AgentEpisodeService(config=_enabled_episode_config()).record_from_agent_result(
+        result=SimpleNamespace(success=True, tool_calls_log=[], runtime_facts=None),
+        run_id="run-router-omit",
+        mode="quick",
+        symbol="600519",
+        config=_enabled_episode_config(),
+    )
+    assert stored is not None
+    assert stored.outcome_labels is None
+
+
+def test_outcome_labels_forbid_router_error_and_explain() -> None:
+    with pytest.raises(ValidationError):
+        EpisodeOutcomeLabels.model_validate(
+            {"router_accepted": True, "error": "must-not-persist"}
+        )
+    with pytest.raises(ValidationError):
+        EpisodeOutcomeLabels.model_validate(
+            {"router_accepted": True, "explain": {"intent_category": "simple"}}
+        )
+
+
+def test_record_from_agent_result_flag_off_skips_router_row(isolated_db) -> None:
+    cfg = SimpleNamespace(agent_episode_log_enabled=False)
+    stored = AgentEpisodeService(config=cfg).record_from_agent_result(
+        result=_result_with_router_decision(),
+        run_id="run-router-off",
+        config=cfg,
+    )
+    assert stored is None
+    assert AgentEpisodeRepository().query(limit=10).total == 0
 
 
 def test_record_from_agent_result_fail_soft(isolated_db) -> None:
