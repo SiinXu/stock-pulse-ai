@@ -554,7 +554,14 @@ def _owner_call_timeout_seconds(owner: Any) -> Optional[float]:
     if timeout is None and hasattr(owner, "_get_timeout_seconds"):
         try:
             timeout = owner._get_timeout_seconds()
-        except Exception:  # broad-exception: fallback_recorded - timeout is optional
+        except Exception as exc:  # broad-exception: fallback_recorded - timeout is optional
+            log_safe_exception(
+                logger,
+                "Owner timeout lookup failed",
+                exc,
+                error_code="agent_planning_owner_timeout_unavailable",
+                level=logging.INFO,
+            )
             timeout = None
     if timeout is None:
         return None
