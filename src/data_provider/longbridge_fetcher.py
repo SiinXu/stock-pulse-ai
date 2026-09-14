@@ -746,111 +746,81 @@ class LongbridgeFetcher(BaseFetcher):
     # BaseFetcher abstract methods (historical daily data)
     # ------------------------------------------------------------------
 
-    @provider_retry(
+    # Rebound from longbridge_parts.history after the class is built.
+    # provider_retry is re-applied in _assemble_longbridge_fetcher_facade.
+    _fetch_raw_data = None
+
+    _normalize_data = None
+
+
+# Keep ``src.data_provider.longbridge_fetcher.LongbridgeFetcher`` as the
+# ADR-006 compatibility facade while ``longbridge_parts`` owns realtime and
+# daily-history bodies. Rebinding preserves method globals so existing patches
+# against this module continue to intercept moved implementations.
+from .longbridge_parts import history as _history_module  # noqa: E402
+from .longbridge_parts import realtime as _realtime_module  # noqa: E402
+from .longbridge_parts.history import _HistoryMethods  # noqa: E402
+from .longbridge_parts.realtime import _RealtimeMethods  # noqa: E402
+from .longbridge_parts.facade_bind import bind_methods_from_class  # noqa: E402
+
+
+def _apply_history_retry(name: str, bound):
+    """Re-apply provider_retry after facade cloning so TimeoutError retries survive bind."""
+
+    if name != "_fetch_raw_data":
+        return bound
+    return provider_retry(
         # Intentional deviation: connection errors enter reconnect cooldown and must
         # not thrash retries; only request timeouts are retried.
         retryable=(TimeoutError,),
         target_logger=logger,
         event="Longbridge daily data retry scheduled",
         error_code="longbridge_daily_data_retry",
-    )
-    def _fetch_raw_data(
-        self, stock_code: str, start_date: str, end_date: str
-    ) -> pd.DataFrame:
-        """Fetch historical candlesticks from Longbridge."""
-        if not self.is_available_for_request("daily_data"):
-            raise RuntimeError("Longbridge temporarily unavailable for daily_data")
-
-        symbol = _to_longbridge_symbol(stock_code)
-        if symbol is None:
-            raise ValueError(f"Cannot convert {stock_code} to Longbridge symbol")
-
-        ctx = self._get_ctx()
-        if ctx is None:
-            raise RuntimeError("Longbridge QuoteContext not available")
-
-        from longbridge.openapi import Period, AdjustType
-
-        start_dt = datetime.strptime(start_date, "%Y-%m-%d").date()
-        end_dt = datetime.strptime(end_date, "%Y-%m-%d").date()
-
-        try:
-            candles = call_with_timeout(
-                ctx.history_candlesticks_by_date,
-                symbol,
-                Period.Day,
-                AdjustType.ForwardAdjust,
-                start_dt,
-                end_dt,
-                timeout=self._request_timeout_seconds,
-                call_name="longbridge.history_candlesticks_by_date",
-            )
-        except Exception as e:
-            if self._is_connection_error(e):
-                self._mark_connection_cooldown(e)
-            raise
-
-        if not candles:
-            return pd.DataFrame()
-
-        rows = []
-        for c in candles:
-            ts = getattr(c, "timestamp", None)
-            if ts is None:
-                continue
-            if hasattr(ts, "date"):
-                dt = ts.date()
-            else:
-                dt = datetime.fromtimestamp(int(ts)).date()
-
-            rows.append({
-                "date": dt.strftime("%Y-%m-%d"),
-                "open": safe_float(getattr(c, "open", None)),
-                "high": safe_float(getattr(c, "high", None)),
-                "low": safe_float(getattr(c, "low", None)),
-                "close": safe_float(getattr(c, "close", None)),
-                "volume": int(getattr(c, "volume", 0) or 0),
-                "turnover": safe_float(getattr(c, "turnover", None)),
-            })
-
-        return pd.DataFrame(rows)
-
-    def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
-        """Normalize column names to standard format."""
-        if df.empty:
-            return pd.DataFrame(columns=STANDARD_COLUMNS)
-
-        rename_map = {"turnover": "amount"}
-        df = df.rename(columns=rename_map)
-
-        if "pct_chg" not in df.columns and "close" in df.columns:
-            df["pct_chg"] = df["close"].pct_change() * 100
-
-        for col in STANDARD_COLUMNS:
-            if col not in df.columns:
-                df[col] = None
-
-        return df[STANDARD_COLUMNS]
-
-
-# Keep ``src.data_provider.longbridge_fetcher.LongbridgeFetcher`` as the
-# ADR-006 compatibility facade while ``longbridge_parts`` owns realtime bodies.
-# Rebinding preserves method globals so existing patches against this module
-# continue to intercept moved implementations.
-from .longbridge_parts import realtime as _realtime_module  # noqa: E402
-from .longbridge_parts.realtime import _RealtimeMethods  # noqa: E402
-from .longbridge_parts.facade_bind import bind_methods_from_class  # noqa: E402
+    )(bound)
 
 
 def _assemble_longbridge_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
+    global _RealtimeMethods, _HistoryMethods
+    _RealtimeMethods = _realtime_module._RealtimeMethods
+    _HistoryMethods = _history_module._HistoryMethods
     bind_methods_from_class(
         _RealtimeMethods,
         LongbridgeFetcher,
         globals(),
         expected_names=_realtime_module.EXPECTED_REALTIME_METHOD_NAMES,
     )
+    bind_methods_from_class(
+        _HistoryMethods,
+        LongbridgeFetcher,
+        globals(),
+        expected_names=_history_module.EXPECTED_HISTORY_METHOD_NAMES,
+        post_bind=_apply_history_retry,
+    )
+    # Rebound methods are assigned after class body evaluation; clear ABC
+    # abstracts that are now implemented so instantiation matches the legacy
+    # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
+    abstracts = set(getattr(LongbridgeFetcher, "__abstractmethods__", ()))
+    if abstracts:
+        abstracts.difference_update(
+            {
+                name
+                for name in (
+                    "_fetch_raw_data",
+                    "_normalize_data",
+                    "get_daily_data",
+                )
+                if callable(getattr(LongbridgeFetcher, name, None))
+            }
+        )
+        abstracts = {
+            name
+            for name in abstracts
+            if name not in LongbridgeFetcher.__dict__
+            or getattr(LongbridgeFetcher.__dict__[name], "__isabstractmethod__", False)
+        }
+        LongbridgeFetcher.__abstractmethods__ = frozenset(abstracts)
 
 
 _assemble_longbridge_fetcher_facade()
@@ -859,7 +829,7 @@ _assemble_longbridge_fetcher_facade()
 def _install_part_reload_hooks() -> None:
     """Keep an owner reload able to rebuild and rebind both sides of the seam."""
 
-    for module in (_realtime_module,):
+    for module in (_realtime_module, _history_module):
         module._FACADE_RELOAD_HOOK = _assemble_longbridge_fetcher_facade  # type: ignore[attr-defined]
 
 

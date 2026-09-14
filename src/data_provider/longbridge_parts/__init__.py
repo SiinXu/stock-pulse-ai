@@ -8,4 +8,5 @@ surfaces and test patch targets stay stable (ADR-006 / Issue #1068).
 
 Owned domains:
 - ``realtime`` — realtime quote, static info cache, and volume-ratio computation
+- ``history`` — daily candlestick fetch (``_fetch_raw_data``) and normalize
 """
