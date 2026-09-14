@@ -1,0 +1,2 @@
+- [Changed] compile-nl defaults compiled rules to disabled and sets auto_analysis only from an explicit request flag (Refs #1133).
+- [Fixed] Persisting an NL-compiled rule keeps source=nl_compiler instead of rewriting it to api (Refs #1133).

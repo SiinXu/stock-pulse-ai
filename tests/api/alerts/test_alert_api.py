@@ -141,6 +141,35 @@ class AlertApiTestCase(unittest.TestCase):
         missing_resp = self.client.get(f"/api/v1/alerts/rules/{rule_id}")
         self.assertEqual(missing_resp.status_code, 404)
 
+    def test_create_rule_persists_nl_compiler_source(self) -> None:
+        created = self._create_rule({"source": "nl_compiler", "enabled": False})
+        self.assertEqual(created["source"], "nl_compiler")
+        self.assertFalse(created["enabled"])
+
+        listed = self.client.get("/api/v1/alerts/rules")
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertEqual(listed.json()["items"][0]["source"], "nl_compiler")
+
+    def test_create_rule_rejects_unknown_source(self) -> None:
+        body = {
+            "name": "Moutai breakout",
+            "target_scope": "single_symbol",
+            "target": "600519",
+            "alert_type": "price_cross",
+            "parameters": {"direction": "above", "price": 1800},
+            "severity": "warning",
+            "enabled": True,
+        }
+        for source in ("llm", "tickflow"):
+            resp = self.client.post("/api/v1/alerts/rules", json={**body, "source": source})
+            self.assertEqual(resp.status_code, 400, resp.text)
+            self.assertEqual(resp.json()["error"], "validation_error")
+            self.assertIn(source, resp.json()["message"])
+
+        listed = self.client.get("/api/v1/alerts/rules")
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertEqual(listed.json()["total"], 0)
+
     def test_rule_response_includes_server_cooldown_active_flag(self) -> None:
         created = self._create_rule()
         repo = AlertRepository(self.db)

@@ -301,6 +301,7 @@ export type AlertRuleCreateRequest = Override<CamelizeKeys<OpenApiCreate>, {
   name?: string;
   targetScope?: AlertTargetScope;
   enabled?: boolean;
+  source?: 'api' | 'nl_compiler' | null;
   alertType: AlertType;
   parameters: AlertRuleParameters;
   severity: AlertSeverity;

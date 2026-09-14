@@ -120,7 +120,7 @@ def test_compile_nl_success_returns_ir_fields_and_cooldown(compile_nl_client) ->
     assert payload["rule"]["alert_type"] == "price_cross"
     assert payload["rule"]["parameters"]["price"] == 200.0
     assert payload["rule"]["cooldown_policy"] == {"cooldown_seconds": 1800}
-    assert payload["rule"]["enabled"] is True
+    assert payload["rule"]["enabled"] is False
     assert payload["rule"]["source"] == "nl_compiler"
     _assert_no_compile_side_effects(compile_nl_client)
 
@@ -138,8 +138,60 @@ def test_compile_nl_success_without_cooldown_keeps_null_ir_cooldown(compile_nl_c
         "cooldown": None,
     }
     assert "cooldown_policy" not in payload["rule"]
-    assert payload["rule"]["enabled"] is True
+    assert payload["rule"]["enabled"] is False
+    assert payload["rule"]["source"] == "nl_compiler"
     _assert_no_compile_side_effects(compile_nl_client)
+
+
+def test_compile_nl_omitted_default_enabled_stays_disabled(compile_nl_client) -> None:
+    response = _compile(compile_nl_client, {"text": "AAPL price above 200"})
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["outcome"] == "success"
+    assert payload["rule"]["enabled"] is False
+    assert payload["rule"]["source"] == "nl_compiler"
+    _assert_no_compile_side_effects(compile_nl_client)
+
+
+def test_compile_nl_explicit_default_enabled_true_opts_in(compile_nl_client) -> None:
+    response = _compile(
+        compile_nl_client,
+        {"text": "AAPL price above 200", "default_enabled": True},
+    )
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["outcome"] == "success"
+    assert payload["rule"]["enabled"] is True
+    assert payload["rule"]["source"] == "nl_compiler"
+    _assert_no_compile_side_effects(compile_nl_client)
+
+
+def test_compile_nl_phrase_without_flag_does_not_set_auto_analysis(compile_nl_client) -> None:
+    response = _compile(compile_nl_client, {"text": "600519 财报公告触发深度分析"})
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    assert payload["outcome"] == "success"
+    assert payload["ir"]["symbol"] == "600519"
+    assert payload["ir"]["metric"] == "corporate_event"
+    policy = payload["rule"].get("notification_policy") or {}
+    assert "auto_analysis" not in policy
+    _assert_no_compile_side_effects(compile_nl_client)
+
+
+def test_persist_compiled_rule_keeps_nl_compiler_source(compile_nl_client) -> None:
+    compiled = _compile(compile_nl_client, {"text": "AAPL price above 200"})
+    assert compiled.status_code == 200, compiled.text
+    rule = compiled.json()["rule"]
+    created = compile_nl_client.post("/api/v1/alerts/rules", json=rule)
+    assert created.status_code == 200, created.text
+    body = created.json()
+    assert body["source"] == "nl_compiler"
+    assert body["enabled"] is False
+    listed = compile_nl_client.get("/api/v1/alerts/rules")
+    assert listed.status_code == 200, listed.text
+    assert listed.json()["total"] == 1
+    assert listed.json()["items"][0]["source"] == "nl_compiler"
+    assert listed.json()["items"][0]["enabled"] is False
 
 
 @pytest.mark.parametrize(

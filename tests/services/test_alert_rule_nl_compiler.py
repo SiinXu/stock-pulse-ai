@@ -22,6 +22,7 @@ class TestAlertRuleNlCompiler:
         assert "lookback_hours" in params
         assert "min_items" in params
         assert result.rule["notification_policy"]["auto_analysis"] is True
+        assert result.rule["enabled"] is False
         assert result.ir == {
             "symbol": "600519",
             "metric": "corporate_event",
@@ -30,12 +31,24 @@ class TestAlertRuleNlCompiler:
             "cooldown": None,
         }
 
+    def test_compile_phrase_without_flag_does_not_set_auto_analysis(self) -> None:
+        result = compile_alert_rule_nl("600519 财报公告触发深度分析")
+        assert result.outcome == "success"
+        assert result.rule is not None
+        assert result.rule["alert_type"] == "corporate_event"
+        policy = result.rule.get("notification_policy") or {}
+        assert "auto_analysis" not in policy
+        assert result.rule["enabled"] is False
+        assert result.rule["source"] == "nl_compiler"
+
     def test_compile_price_cross(self) -> None:
         result = compile_alert_rule_nl("AAPL price above 200")
         assert result.outcome == "success"
         assert result.rule["alert_type"] == "price_cross"
         assert result.rule["parameters"]["direction"] == "above"
         assert result.rule["parameters"]["price"] == 200.0
+        assert result.rule["enabled"] is False
+        assert result.rule["source"] == "nl_compiler"
         assert result.ir == {
             "symbol": "AAPL",
             "metric": "price_cross",
@@ -44,6 +57,13 @@ class TestAlertRuleNlCompiler:
             "cooldown": None,
         }
         assert "cooldown_policy" not in result.rule
+        assert "notification_policy" not in result.rule
+
+    def test_compile_explicit_default_enabled_true(self) -> None:
+        result = compile_alert_rule_nl("AAPL price above 200", default_enabled=True)
+        assert result.outcome == "success"
+        assert result.rule["enabled"] is True
+        assert result.rule["source"] == "nl_compiler"
 
     def test_compile_volume_spike(self) -> None:
         result = compile_alert_rule_nl("300750 成交量异动 2.5倍")

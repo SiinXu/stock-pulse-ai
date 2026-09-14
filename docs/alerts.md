@@ -563,8 +563,13 @@ English summary of this section is maintained in [alerts_EN.md](alerts_EN.md).
 
 `POST /api/v1/alerts/rules/compile-nl` 将白名单内自然语言编译为 Alert 创建载荷。
 结果：`success` | `need_clarification` | `rejected`。禁止任意代码执行。
-该接口是预览：不持久化规则、不发送通知、不入队分析。调用方如需落库，再把返回的
-`rule` 交给现有 `POST /api/v1/alerts/rules`。
+该接口是预览：不持久化规则、不发送通知、不入队分析。成功编译的 `rule.enabled`
+默认 `false`，避免预览后直接落库就进入 worker；调用方需显式传 `default_enabled=true`
+才会得到启用态载荷。`notification_policy.auto_analysis` 只在请求显式
+`auto_analysis=true` 时写入，短语（如「触发深度分析」）不会自行推断。
+调用方如需落库，再把返回的 `rule` 交给现有 `POST /api/v1/alerts/rules`；
+该创建接口会保留 `source=nl_compiler`，未知 `source` 返回 400。省略 `source`
+时仍默认为 `api`。激活继续走显式 `POST /api/v1/alerts/rules/{id}/enable`。
 企业事件编译始终包含 `event_categories` / `lookback_hours` / `min_items`，防止编辑丢字段回归。
 
 HTTP 响应包含结构化 `ir` 字段（与编译器内部 IR 相同）：`symbol` / `metric` /
