@@ -53,7 +53,7 @@ EXPECTED_LOOP_METHODS = (
 # ``_RunMethods`` last changed in #1089: the classic ``run()`` return path now
 # calls the shared end-of-run reflection attach point (default-off).
 EXPECTED_AST_HASHES = {
-    '_ChatMethods': '5206e932b842c4381c7d6e5e29829eb833fe74a033078cc848059283449a4b07',
+    '_ChatMethods': 'c5893c9e96d714f4078b860dc145aa79ba2a2bfbdc25d0f01d4c742317a79bbf',
     '_LoopMethods': 'a9268921dc6f084c0edc22b22a4121ecee760124648eccf57fcbabe8be256ee0',
     '_RunMethods': '2d42e9ace1ccf858273ca3ee16af579095cf9b88f282661c5425b54b9c6e5005',
 }

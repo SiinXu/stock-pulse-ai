@@ -1,0 +1,1 @@
+- [Added] Opt in Chat planning behind AGENT_PLANNING_ENABLED via try_gather_with_planning, keeping incremental_tool free of the plan gather and full pipeline (Refs #199).

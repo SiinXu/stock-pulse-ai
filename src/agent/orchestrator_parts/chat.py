@@ -524,6 +524,12 @@ class _ChatMethods:
             )
 
         payload = _public_router_decision(decision=decision)
+        from src.agent.planning.product import (
+            ORCH_CHAT_PRODUCT_PATH,
+            planning_evidence_block,
+            try_gather_with_planning,
+        )
+
         try:
             stock_scope = scope_resolution.stock_scope
             if decision.chat_path == "incremental_tool":
@@ -560,21 +566,64 @@ class _ChatMethods:
                     cancelled_check=cancelled_check,
                 )
             else:
-                ctx = self._build_chat_pipeline_context(
-                    message=message,
-                    session_id=session_id,
+                gathered = try_gather_with_planning(
+                    self,
+                    task=message,
                     context=scope_resolution.effective_context,
-                    stock_scope=stock_scope,
-                    history=history,
-                    market_context=market_context,
-                )
-                ctx.meta[_ROUTER_DECISION_META_KEY] = payload
-                orch_result = self._execute_pipeline(
-                    ctx,
-                    parse_dashboard=False,
-                    progress_callback=progress_callback,
                     cancelled_check=cancelled_check,
+                    config=config,
+                    product_path=ORCH_CHAT_PRODUCT_PATH,
                 )
+                if gathered is not None and not gathered.success:
+                    from src.agent.orchestrator import OrchestratorResult
+
+                    orch_result = OrchestratorResult(
+                        success=False,
+                        content="",
+                        error=gathered.error,
+                        cancelled=gathered.cancelled,
+                        timed_out=gathered.timed_out,
+                        tool_calls_log=list(gathered.plan_tool_log),
+                        total_steps=gathered.total_steps,
+                        total_tokens=gathered.total_tokens,
+                        planning_metadata=dict(gathered.planning_metadata),
+                    )
+                else:
+                    pipeline_message = message
+                    if (
+                        gathered is not None
+                        and gathered.success
+                        and gathered.evidence
+                    ):
+                        pipeline_message = (
+                            f"{message}\n\n"
+                            f"{planning_evidence_block(gathered.evidence)}"
+                        )
+                    ctx = self._build_chat_pipeline_context(
+                        message=pipeline_message,
+                        session_id=session_id,
+                        context=scope_resolution.effective_context,
+                        stock_scope=stock_scope,
+                        history=history,
+                        market_context=market_context,
+                    )
+                    ctx.meta[_ROUTER_DECISION_META_KEY] = payload
+                    orch_result = self._execute_pipeline(
+                        ctx,
+                        parse_dashboard=False,
+                        progress_callback=progress_callback,
+                        cancelled_check=cancelled_check,
+                    )
+                    if gathered is not None:
+                        orch_result.tool_calls_log = list(
+                            gathered.plan_tool_log
+                        ) + list(orch_result.tool_calls_log or [])
+                        orch_result.total_tokens = int(
+                            orch_result.total_tokens or 0
+                        ) + int(gathered.total_tokens or 0)
+                        metadata = dict(orch_result.planning_metadata or {})
+                        metadata.update(gathered.planning_metadata)
+                        orch_result.planning_metadata = metadata
         except Exception as exc:  # broad-exception: fallback_recorded - Safe logging and the failure sentinel preserve the Chat boundary.
             log_safe_exception(
                 logger,

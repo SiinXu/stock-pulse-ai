@@ -541,6 +541,64 @@ def test_chat_incremental_tool_skips_pipeline_and_multi_symbol():
     assert result.content == "quote"
 
 
+def test_chat_incremental_skips_planning_gather_when_planning_enabled():
+    orch = _orchestrator("quick")
+    orch.config = SimpleNamespace(agent_planning_enabled=True)
+    scope = StockScope(
+        expected_stock_code="600519",
+        allowed_stock_codes={"600519"},
+        mode="maintain",
+    )
+    resolution = StockScopeResolution(
+        effective_context={"stock_code": "600519"},
+        stock_scope=scope,
+    )
+    loop_result = SimpleNamespace(
+        success=True,
+        content="quote",
+        tool_calls_log=[],
+        total_steps=1,
+        total_tokens=0,
+        provider="",
+        model="",
+        error=None,
+        cancelled=False,
+        timed_out=False,
+        budget_snapshot=None,
+        failure_reason=None,
+    )
+    pipeline, history, session, add_user, add_msg = _chat_patches(orch)
+    with pipeline as pipeline_mock:
+        with patch(
+            "src.agent.orchestrator.resolve_stock_scope",
+            return_value=resolution,
+        ):
+            with patch(
+                "src.agent.orchestrator_parts.chat.run_agent_loop",
+                return_value=loop_result,
+            ):
+                with patch(
+                    "src.agent.planning.product.try_gather_with_planning"
+                ) as gather:
+                    with patch(
+                        "src.agent.planning.loop.execute_plan_loop"
+                    ) as plan_loop:
+                        with history, session, add_user, add_msg:
+                            result = orch.chat(
+                                "price?",
+                                "session-1",
+                                context={
+                                    "stock_code": "600519",
+                                    "tool_suitable": True,
+                                },
+                            )
+
+    assert gather.call_count == 0
+    assert plan_loop.call_count == 0
+    assert pipeline_mock.call_count == 0
+    assert _router_decision(result)["chat_path"] == "incremental_tool"
+
+
 def test_chat_full_override_repipelines_even_when_tool_suitable():
     orch = _orchestrator("quick")
     scope = StockScope(
