@@ -4,9 +4,9 @@
 
 **Chinese**: [evolution-events_CN.md](evolution-events_CN.md)
 
-This document describes the append-only `EvolutionEvent` persistence and typed query foundation. It is **not** the privileged-operation security audit trail, not episode storage, not curator-grade ingest, and not the prediction-resolver process logger named `EvolutionEventSink`.
+This document describes the append-only `EvolutionEvent` persistence, typed repository query, and authenticated HTTP list. It is **not** the privileged-operation security audit trail, not episode storage, not curator-grade ingest, and not the prediction-resolver process logger named `EvolutionEventSink`.
 
-This slice does **not** close #1113. Automatic adapter mutations are not yet emitted (acceptance criterion 1 remains open). Issues #1113, #1107, #1091, #1106, and #1093 stay open.
+This slice does **not** close #1113. Calibrate-apply emission is on main (`adapter.calibrate`, Refs #1106). Tool-rank, route-bias, experimental-flag producers, and Web UI remain open. Issues #1113, #1107, #1091, #1106, and #1093 stay open.
 
 ## Purpose
 
@@ -29,8 +29,11 @@ Persist inspectable records of automatic evolution so later producers can answer
 | `src/repositories/agent_evolution_event_tables.py` | SQLAlchemy table projection |
 | `src/repositories/agent_evolution_event_repo.py` | Append and inclusive UTC time/type query only |
 | `src/migrations/versions/v202608250003_agent_evolution_event_schema.py` | Table, indexes, append-only UPDATE/DELETE triggers |
+| `src/services/evolution_event_query.py` | Thin read-only wrapper around `list_events` for HTTP |
+| `src/api/v1/endpoints/evolution_events.py` | Authenticated `GET /api/v1/agent/evolution-events` |
+| `src/api/v1/schemas/evolution_events.py` | HTTP `{items, limit, returned}` list response |
 
-There is no public HTTP, OpenAPI, Web, Desktop, or CLI query in this slice. There is no configuration flag.
+There is no configuration flag. There is still no Web, Desktop, or CLI query. The HTTP list does not append events.
 
 ## Append-only database boundary
 
@@ -48,26 +51,38 @@ There is no public HTTP, OpenAPI, Web, Desktop, or CLI query in this slice. Ther
 
 Naive timestamps and invalid limits are rejected.
 
+## HTTP list
+
+`GET /api/v1/agent/evolution-events` is the public read path. It uses the same window, exact-type, and limit contract as the repository:
+
+- Required timezone-aware `occurred_from` and `occurred_to` (inclusive). Naive timestamps and `from > to` return `400 validation_error`.
+- Optional exact `event_type`. Omitting the parameter skips the filter. Blank or whitespace returns `400` so a malformed filter cannot silently list every row.
+- Optional `limit` (default 100, maximum 200). `0` or `201` return `400`.
+- Extra query keys are rejected (`422`).
+- Empty windows return `200` with `items: []`. Response shape is `{items, limit, returned}` with no total count.
+- Authentication matches other agent reads (`AdminSessionCookie`). When `ADMIN_AUTH_ENABLED=true`, missing or invalid session returns `401`. When auth is off, local reads are allowed. This path is not in `EXEMPT_PATHS` and is not the security-audit 403-when-auth-disabled rule.
+- The route is GET-only. It does not call `append`.
+
 ## Privacy
 
 Snapshots and `reason_refs` are JSON-safe and size-bounded. The schema rejects secrets, full system prompts, raw provider payloads, Agent Soul charter text, and non-finite numbers. Snapshot keys are canonicalized from camelCase, hyphen, and dotted names (`accessToken`, `system-prompt`, `provider.payload`) before matching the forbidden set. Do not persist API keys, tokens, `system_prompt`, `provider_payload`, or equivalent keys.
 
-## Future producer policy (not wired here)
+## Producer policy
 
-Later slices may append `actor=system` rows when a real adapter or overlay mutation applies (`applied=True`). Identity stubs, flag-off paths, and insufficient samples must not invent rows.
+Gated confidence calibration appends one `actor=system` `adapter.calibrate` row when a factor actually applies (Refs #1106). Identity stubs, flag-off paths, and insufficient samples must not invent rows. Episode forget/consolidate already write metadata-only events in the same delete transaction.
 
-**Event-write failures must be logged and must not alter prediction `status` / `outcome_json` or adapter return values.** Future producers should catch `AgentEvolutionEventRepository.append` failures, log a sanitized warning, and continue. They must not add update/delete APIs, must not change adapter return values, and must not write prediction rows from the event path. Repository `append` itself stays fail-closed.
+**Event-write failures must be logged and must not alter prediction `status` / `outcome_json` or adapter return values.** Producers catch append failures, log a sanitized warning, and continue. They must not add update/delete APIs, must not change adapter return values, and must not write prediction rows from the event path. Repository `append` itself stays fail-closed. The HTTP list is read-only and does not emit.
 
-This policy is documented now. This slice does not hook `calibrate_confidence`, `apply_forecast_outcome_calibration`, BaseAgent, planner, router, tool-rank, route-bias, experimental skill flags, or replace resolver `EvolutionEventSink`. There is no extra service wrapper because no producer is wired yet.
+Tool-rank, route-bias, experimental skill flags, and Web UI remain later leftovers. This HTTP slice does not replace resolver `EvolutionEventSink`.
 
 ## Out of scope
 
-- Live adapter / overlay event emission (later #1113 slice; depends on this store)
 - Tool-rank / route-bias / experimental-flag mutations (#1091 / #1106 / #1093 leftovers)
-- Public query API, OpenAPI, Web, Desktop, CLI
+- Web, Desktop, or CLI query UI
 - Config-registry keys or README homepage changes
 - Reuse of `security_audit_events`
+- POST / PATCH / DELETE EvolutionEvent HTTP
 
 ## Rollback
 
-Revert this change set. `downgrade` drops `agent_evolution_events` only. Existing prediction actuals and append-only episodes stay in place.
+Revert the HTTP-list change set. No migration. Existing `agent_evolution_events` rows stay in place.

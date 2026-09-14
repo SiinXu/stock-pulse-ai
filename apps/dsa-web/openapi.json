@@ -12255,6 +12255,124 @@
         "title": "EvidenceItem",
         "type": "object"
       },
+      "EvolutionEvent": {
+        "additionalProperties": false,
+        "description": "Persisted EvolutionEvent row returned by the store.",
+        "properties": {
+          "actor": {
+            "enum": [
+              "system",
+              "user",
+              "operator"
+            ],
+            "title": "Actor",
+            "type": "string"
+          },
+          "after": {
+            "additionalProperties": true,
+            "title": "After",
+            "type": "object"
+          },
+          "before": {
+            "additionalProperties": true,
+            "title": "Before",
+            "type": "object"
+          },
+          "event_id": {
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:@/-]{0,127}$",
+            "title": "Event Id",
+            "type": "string"
+          },
+          "event_type": {
+            "maxLength": 64,
+            "minLength": 1,
+            "title": "Event Type",
+            "type": "string"
+          },
+          "id": {
+            "minimum": 1.0,
+            "title": "Id",
+            "type": "integer"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "reason_refs": {
+            "$ref": "#/components/schemas/EvolutionEventReasonRefs"
+          },
+          "schema_version": {
+            "const": "evolution-event-v1",
+            "default": "evolution-event-v1",
+            "title": "Schema Version",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_type",
+          "actor",
+          "id"
+        ],
+        "title": "EvolutionEvent",
+        "type": "object"
+      },
+      "EvolutionEventListResponse": {
+        "additionalProperties": false,
+        "description": "Bounded EvolutionEvent page. No total count or cursor in this slice.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/EvolutionEvent"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "limit": {
+            "maximum": 200.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "returned": {
+            "maximum": 200.0,
+            "minimum": 0.0,
+            "title": "Returned",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "limit",
+          "returned"
+        ],
+        "title": "EvolutionEventListResponse",
+        "type": "object"
+      },
+      "EvolutionEventReasonRefs": {
+        "additionalProperties": false,
+        "description": "Structured correlation ids for later adapter/overlay producers.",
+        "properties": {
+          "prediction_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Prediction Ids",
+            "type": "array"
+          },
+          "run_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 32,
+            "title": "Run Ids",
+            "type": "array"
+          }
+        },
+        "title": "EvolutionEventReasonRefs",
+        "type": "object"
+      },
       "ExportSystemConfigResponse": {
         "description": "Export payload for raw `.env` backups.",
         "properties": {
@@ -40612,6 +40730,127 @@
           }
         },
         "summary": "Agent Chat Stream",
+        "tags": [
+          "Agent"
+        ]
+      }
+    },
+    "/api/v1/agent/evolution-events": {
+      "get": {
+        "description": "Read-only list of append-only EvolutionEvent rows. occurred_from and occurred_to are required timezone-aware UTC instants and are inclusive. event_type is an optional exact match; omit it to skip the type filter. Blank event_type is rejected. limit defaults to 100 and is capped at 200. This route does not append or mutate events.",
+        "operationId": "listAgentEvolutionEvents",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "occurred_from",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Occurred From",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "occurred_to",
+            "required": true,
+            "schema": {
+              "format": "date-time",
+              "title": "Occurred To",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "event_type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Event Type"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvolutionEventListResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid time range, type, or limit"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Missing or invalid administrator session when ADMIN_AUTH_ENABLED=true"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Query parameter validation failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Evolution event storage is unavailable"
+          }
+        },
+        "security": [
+          {
+            "AdminSessionCookie": []
+          }
+        ],
+        "summary": "List EvolutionEvent rows by time range and exact type",
         "tags": [
           "Agent"
         ]
