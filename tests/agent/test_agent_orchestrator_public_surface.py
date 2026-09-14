@@ -69,7 +69,7 @@ EXPECTED_CHAT_METHODS = (
 )
 
 EXPECTED_PIPELINE_METHODS = (
-    '_execute_pipeline',
+    '_run_pipeline_stages',
     '_tool_registry_for_context',
     '_trim_agent_tool_names',
     '_build_agent_chain',
@@ -92,6 +92,11 @@ EXPECTED_PIPELINE_METHODS = (
     '_record_degraded_event',
     '_record_pipeline_termination',
     '_is_non_critical_stage',
+)
+
+EXPECTED_PIPELINE_EPISODE_METHODS = (
+    '_execute_pipeline',
+    '_try_record_pipeline_episode',
 )
 
 EXPECTED_DASHBOARD_METHODS = (
@@ -117,13 +122,15 @@ EXPECTED_DASHBOARD_METHODS = (
 
 # Refresh a hash only for an intentional behavior change to the moved methods.
 # ``_ExecutionMethods`` last changed for #1290: sealed-key commit plus Technical ∥ Intel wave wrappers.
-# ``_PipelineMethods`` last changed for #131: critic phase-start emit plus commit_critic_stage_result.
+# ``_PipelineMethods`` last changed for #1120: episode persist extracted to pipeline_episode.
+# ``_PipelineEpisodeMethods`` last changed for #1120: fail-soft router_decision episode persist.
 # ``_DashboardMethods`` last changed for #131: additive dashboard.critic appendix on finalize.
 EXPECTED_AST_HASHES = {
     '_ChatMethods': '10260804f0fb27517e4b2e3c1778d7ef41d80f107f4c80a9b15d912880bdb8d7',
     '_DashboardMethods': '6609d7691c083bb3f512f0a2130a22ea9f6d1764b03c85b01587349ca909f63d',
     '_ExecutionMethods': '29c0b1c7e692209dfd1d3da4f6f26ac6b5eca9377fc4ae59ab0a4b92fd189854',
-    '_PipelineMethods': '52d9530c538d5b11fc427ee9f63f31db3c38318cf00e8db932f7ce8894b6d788',
+    '_PipelineEpisodeMethods': '6ac5dffb97626def53d33ee7ee9b32dd22c5e3c82d7297171a407e305880456a',
+    '_PipelineMethods': 'ae0a962e5ad1567b66d700f5907247c057dcbe186704da81893ab9e283a9403a',
 }
 
 
@@ -198,6 +205,7 @@ def test_orchestrator_moved_method_asts_match_pre_split_snapshot():
         module._ExecutionMethods,
         module._ChatMethods,
         module._PipelineMethods,
+        module._PipelineEpisodeMethods,
         module._DashboardMethods,
     )
     assert {
@@ -214,6 +222,11 @@ def test_orchestrator_extracted_descriptors_preserve_facade_contract():
         ("_EXECUTION_METHOD_NAMES", "_ExecutionMethods", EXPECTED_EXECUTION_METHODS),
         ("_CHAT_METHOD_NAMES", "_ChatMethods", EXPECTED_CHAT_METHODS),
         ("_PIPELINE_METHOD_NAMES", "_PipelineMethods", EXPECTED_PIPELINE_METHODS),
+        (
+            "_PIPELINE_EPISODE_METHOD_NAMES",
+            "_PipelineEpisodeMethods",
+            EXPECTED_PIPELINE_EPISODE_METHODS,
+        ),
         ("_DASHBOARD_METHOD_NAMES", "_DashboardMethods", EXPECTED_DASHBOARD_METHODS),
     )
 
@@ -250,6 +263,7 @@ def test_orchestrator_type_hint_resolution_matches_pre_split_contract():
         EXPECTED_EXECUTION_METHODS
         + EXPECTED_CHAT_METHODS
         + EXPECTED_PIPELINE_METHODS
+        + EXPECTED_PIPELINE_EPISODE_METHODS
         + EXPECTED_DASHBOARD_METHODS
     )
     unresolved = set()
