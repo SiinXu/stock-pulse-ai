@@ -19,6 +19,7 @@ from src.agent.evolution.adapters import (
     DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES,
     calibrate_confidence,
     is_online_adapters_enabled,
+    prefer_route,
     record_adapter_influence,
 )
 from src.agent.llm_adapter import LLMToolAdapter
@@ -408,9 +409,10 @@ class BaseAgent(ABC):
         """Adjust confidence using historical calibration when enabled.
 
         When ``AGENT_ONLINE_ADAPTERS_ENABLED`` is true, apply
-        ``calibrate_confidence`` exactly once and record run-local
-        ``adapter_influence``. Flag off or missing keeps today's
-        AgentMemory multiply and does not write adapter metadata.
+        ``calibrate_confidence`` exactly once, apply threshold-gated
+        ``prefer_route``, and record run-local ``adapter_influence``.
+        Flag off or missing keeps today's AgentMemory multiply and does
+        not write adapter metadata.
         """
         config = self._resolve_online_adapter_config()
         if is_online_adapters_enabled(config):
@@ -442,9 +444,29 @@ class BaseAgent(ABC):
             config=config,
         )
         opinion.confidence = adjusted
+        incoming_mode = "quick"
+        ctx_meta = getattr(ctx, "meta", None)
+        if isinstance(ctx_meta, dict):
+            decision = ctx_meta.get("router_decision")
+            if isinstance(decision, dict):
+                raw_mode = decision.get("mode")
+                if isinstance(raw_mode, str) and raw_mode.strip():
+                    incoming_mode = raw_mode.strip()
+        preferred_mode = prefer_route(
+            incoming_mode,
+            config=config,
+            stock_code=ctx.stock_code or None,
+            min_samples=raw_min,
+        )
         record_adapter_influence(
             ctx,
-            {"confidence": confidence_meta},
+            {
+                "confidence": confidence_meta,
+                "route_preference": {
+                    "applied": preferred_mode != incoming_mode,
+                    "mode": preferred_mode,
+                },
+            },
             config=config,
         )
 

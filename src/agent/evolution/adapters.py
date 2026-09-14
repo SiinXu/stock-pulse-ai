@@ -6,11 +6,12 @@ are explicit identity stubs. Default-off. ``BaseAgent`` applies
 ``calibrate_confidence`` when ``AGENT_ONLINE_ADAPTERS_ENABLED`` is true.
 When calibration actually applies, this module appends one system
 ``adapter.calibrate`` EvolutionEvent through an injected or services-layer
-writer. Identity paths emit nothing. Append failure is logged and does not
-change the returned confidence. This module does not import
-``src.repositories``, edit Soul, ToolSurface, episode storage, or
-orchestrator route, does not implement real tool ranking or route preference,
-and does not expose HTTP list or auto-promote.
+writer. When gated route preference actually steps to a richer mode, it
+appends one ``adapter.route_preference`` event. Identity paths emit nothing.
+Append failure is logged and does not change the returned confidence or mode.
+This module does not import ``src.repositories``, edit Soul, ToolSurface,
+episode storage, or AgentRouter, does not implement real tool ranking, and
+does not expose HTTP list or auto-promote.
 """
 
 from __future__ import annotations
@@ -28,8 +29,11 @@ from src.utils.sanitize import log_safe_exception
 ADAPTER_INFLUENCE_META_KEY = "adapter_influence"
 DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES = 30
 ADAPTER_CALIBRATE_EVENT_TYPE = "adapter.calibrate"
+ADAPTER_ROUTE_EVENT_TYPE = "adapter.route_preference"
+DEFAULT_ROUTE_PREFERENCE_MISS_RATE = 0.5
 _MIN_CALIBRATION_FACTOR = 0.5
 _MAX_CALIBRATION_FACTOR = 1.5
+_ROUTE_RICHER = {"quick": "standard", "standard": "full"}
 
 logger = logging.getLogger(__name__)
 
@@ -110,6 +114,51 @@ def _emit_applied_calibration_event(
         append_event=append_event,
         samples=samples,
         event_type=ADAPTER_CALIBRATE_EVENT_TYPE,
+        log=logger,
+    )
+
+
+def _emit_applied_route_event(
+    *,
+    incoming: str,
+    preferred: str,
+    samples: int,
+    miss_rate: float,
+    reason_refs: Any = None,
+    append_event: Optional[Callable[[EvolutionEventCreate], Any]] = None,
+) -> None:
+    """Append one system route-preference event. Fail-soft: never raise to callers."""
+    try:
+        payload = EvolutionEventCreate(
+            event_type=ADAPTER_ROUTE_EVENT_TYPE,
+            actor="system",
+            reason_refs=_normalize_reason_refs(reason_refs),
+            before={"applied": False, "mode": incoming},
+            after={
+                "applied": True,
+                "mode": preferred,
+                "samples": int(samples),
+                "miss_rate": float(miss_rate),
+            },
+        )
+    except ValidationError as exc:
+        log_safe_exception(
+            logger,
+            "Online adapter route preference event payload was rejected",
+            exc,
+            error_code="adapter_route_event_invalid",
+            level=logging.WARNING,
+            context={"samples": int(samples), "miss_rate": float(miss_rate)},
+        )
+        return
+
+    from src.services.evolution_event_append import append_evolution_event_fail_soft
+
+    append_evolution_event_fail_soft(
+        payload,
+        append_event=append_event,
+        samples=samples,
+        event_type=ADAPTER_ROUTE_EVENT_TYPE,
         log=logger,
     )
 
@@ -208,9 +257,71 @@ def rank_tools(
     return incoming
 
 
-def prefer_route(mode: str) -> str:
-    """Slice-1 stub: return the same mode. Do not write AGENT_ORCHESTRATOR_MODE."""
-    return mode
+def prefer_route(
+    mode: str,
+    *,
+    config: Any = None,
+    stock_code: Optional[str] = None,
+    min_samples: Optional[int] = None,
+    repo: Any = None,
+    stats: Optional[Dict[str, Any]] = None,
+    reason_refs: Any = None,
+    append_event: Optional[Callable[[EvolutionEventCreate], Any]] = None,
+) -> str:
+    """Return a one-rung-richer mode when gated miss-rate thresholds apply.
+
+    Identity (incoming mode, zero events) when adapters are off, config is
+    missing, samples are below min, miss-rate is below
+    ``DEFAULT_ROUTE_PREFERENCE_MISS_RATE``, or there is no richer rung.
+    ``quick`` may become ``standard`` and ``standard`` may become ``full``.
+    Never invents ``chat``, never writes ``AGENT_ORCHESTRATOR_MODE``, and
+    never calls AgentRouter. Append failure does not change the returned mode.
+    """
+    incoming = str(mode or "").strip() or "quick"
+    if not is_online_adapters_enabled(config):
+        return incoming
+
+    raw_min = min_samples
+    if raw_min is None:
+        raw_min = getattr(config, "agent_online_adapters_min_samples", DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES)
+    if raw_min is None:
+        raw_min = DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES
+    try:
+        threshold = max(1, int(raw_min))
+    except (TypeError, ValueError):
+        threshold = DEFAULT_ONLINE_ADAPTERS_MIN_SAMPLES
+
+    richer = _ROUTE_RICHER.get(incoming)
+    if richer is None or richer == incoming:
+        return incoming
+
+    loaded = stats if isinstance(stats, dict) else None
+    if loaded is None:
+        from src.agent.evolution.outcome_ingest import load_route_preference_stats
+
+        loaded = load_route_preference_stats(
+            stock_code=stock_code,
+            min_samples=threshold,
+            repo=repo,
+        )
+
+    samples = _coerce_int(loaded.get("samples"), default=0)
+    miss_rate = max(0.0, min(1.0, _coerce_float(loaded.get("miss_rate"), default=0.0)))
+    used = bool(loaded.get("used", False))
+    if not used or samples < threshold:
+        return incoming
+    if miss_rate < DEFAULT_ROUTE_PREFERENCE_MISS_RATE:
+        return incoming
+
+    _emit_applied_route_event(
+        incoming=incoming,
+        preferred=richer,
+        samples=samples,
+        miss_rate=miss_rate,
+        reason_refs=reason_refs,
+        append_event=append_event,
+    )
+    return richer
 
 
 def _bounded_confidence(payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -246,16 +357,40 @@ def _bounded_mode(payload: Dict[str, Any]) -> str:
     return mode if isinstance(mode, str) else ""
 
 
+def _bounded_route_preference(payload: Dict[str, Any]) -> Dict[str, Any]:
+    source = payload if isinstance(payload, dict) else {}
+    raw = source.get("route_preference")
+    if not isinstance(raw, dict):
+        return {
+            "applied": False,
+            "reason": _STUB_NEUTRAL,
+            "mode": _bounded_mode(source),
+        }
+    applied = bool(raw.get("applied", False))
+    reason = raw.get("reason")
+    if not isinstance(reason, str) or not reason:
+        reason = _REASON_APPLIED if applied else _STUB_NEUTRAL
+    mode = raw.get("mode")
+    if not isinstance(mode, str):
+        mode = _bounded_mode(source)
+    bounded: Dict[str, Any] = {
+        "applied": applied,
+        "reason": reason,
+        "mode": mode if isinstance(mode, str) else "",
+    }
+    if "samples" in raw:
+        bounded["samples"] = _coerce_int(raw.get("samples"), default=0)
+    if "miss_rate" in raw:
+        bounded["miss_rate"] = max(0.0, min(1.0, _coerce_float(raw.get("miss_rate"), default=0.0)))
+    return bounded
+
+
 def _bounded_influence(payload: Dict[str, Any]) -> Dict[str, Any]:
     source = payload if isinstance(payload, dict) else {}
     return {
         "confidence": _bounded_confidence(source),
         "tool_effectiveness": {"applied": False, "reason": _STUB_NEUTRAL},
-        "route_preference": {
-            "applied": False,
-            "reason": _STUB_NEUTRAL,
-            "mode": _bounded_mode(source),
-        },
+        "route_preference": _bounded_route_preference(source),
     }
 
 
