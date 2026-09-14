@@ -13,7 +13,12 @@ import pytest
 
 from src.agent.evolution import adapters as adapters_mod
 from src.agent.evolution import outcome_ingest as overlay_mod
-from src.agent.evolution.adapters import ADAPTER_INFLUENCE_META_KEY, rank_tools
+from src.agent.evolution.adapters import (
+    ADAPTER_CALIBRATE_EVENT_TYPE,
+    ADAPTER_INFLUENCE_META_KEY,
+    rank_tools,
+)
+from src.repositories.agent_evolution_event_repo import AgentEvolutionEventRepository
 from src.agent.evolution.guards import (
     snapshot_soul_identity,
     snapshot_tool_surface_denials,
@@ -830,3 +835,30 @@ def test_apply_queries_list_by_symbol_market_only_with_limit_500() -> None:
     ]
     assert all(call[0] == "list_by_symbol_market" for call in repo.calls)
     assert all(call[3] <= 500 for call in repo.calls)
+
+
+def test_overlay_applied_path_emits_one_calibrate_event(isolated_db) -> None:
+    rows = [_record(label="miss", mean_confidence=0.9) for _ in range(40)]
+    repo = _FakeRepo(rows)
+    ctx = AgentContext(stock_code="600519")
+    adjusted, meta = apply_forecast_outcome_calibration(
+        0.6,
+        ctx=ctx,
+        config=_config(enabled=True),
+        repo=repo,
+        agent_name="technical",
+        stock_code="600519",
+    )
+    events = AgentEvolutionEventRepository(isolated_db).list_events(
+        occurred_from=datetime(2000, 1, 1, tzinfo=timezone.utc),
+        occurred_to=datetime(2100, 1, 1, tzinfo=timezone.utc),
+        event_type=ADAPTER_CALIBRATE_EVENT_TYPE,
+    )
+    assert meta["applied"] is True
+    assert adjusted == pytest.approx(0.3)
+    assert len(events) == 1
+    assert events[0].actor == "system"
+    assert events[0].after["applied"] is True
+    assert events[0].after["factor"] == pytest.approx(meta["factor"])
+    assert overlay_mod.apply_forecast_outcome_calibration is apply_forecast_outcome_calibration
+    assert "EvolutionEvent" not in inspect.getsource(overlay_mod)
