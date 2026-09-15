@@ -1,0 +1,1 @@
+- [Added] Opt in Deep Research sub-question gather behind `AGENT_PLANNING_ENABLED` via `try_gather_with_planning` (`product_path=agent_research`), keeping `_decompose_query` / `_synthesise_report` and default-off classic `run_agent_loop` (Refs #199).

@@ -716,6 +716,50 @@ Token budget remaining: ~{remaining_budget}
                         "budget_reason": "budget_turns",
                         "error": "Deep research has no remaining LLM turns",
                     }
+            remaining_tools = (
+                account.remaining_tool_calls() if account is not None else None
+            )
+            if remaining_tools is not None and remaining_tools <= 0:
+                breach = account.probe_next_llm_turn() if account is not None else None
+                if breach is None and account is not None:
+                    breach = account.check()
+                if breach is not None:
+                    return {
+                        "question": question,
+                        "content": "",
+                        "tokens": 0,
+                        "success": False,
+                        "budget_reason": breach.reason,
+                        "error": breach.message,
+                    }
+                return {
+                    "question": question,
+                    "content": "",
+                    "tokens": 0,
+                    "success": False,
+                    "budget_reason": "budget_tools",
+                    "error": "Deep research has no remaining tool calls",
+                }
+            from src.agent.planning.product import (
+                RESEARCH_PRODUCT_PATH,
+                try_gather_with_planning,
+            )
+
+            gathered = try_gather_with_planning(
+                self,
+                task=f"Research question: {question}{stock_context}",
+                context=effective_context,
+                cancelled_check=cancelled_check,
+                config=self.config,
+                product_path=RESEARCH_PRODUCT_PATH,
+                available_tools=list(registry.list_names()),
+                max_total_tool_calls=remaining_tools,
+                timeout_seconds=timeout_seconds,
+            )
+            if gathered is not None:
+                return self._sub_question_from_planning_gather(
+                    question, gathered, account
+                )
             result: RunLoopResult = run_agent_loop(
                 messages=messages,
                 tool_registry=registry,
@@ -784,6 +828,62 @@ Token budget remaining: ~{remaining_budget}
                     "error": str(exc),
                 }
             return {"question": question, "content": "", "tokens": 0, "success": False, "error": str(exc)}
+
+    def _sub_question_from_planning_gather(
+        self,
+        question: str,
+        gathered: Any,
+        account: Optional[ModeBudgetAccount],
+    ) -> Dict[str, Any]:
+        """Map a planning gather onto the sub-question envelope. Fail-closed."""
+        tokens = int(getattr(gathered, "total_tokens", 0) or 0)
+        evidence = str(getattr(gathered, "evidence", "") or "")
+        if account is not None:
+            breach = account.record_llm_turn(tokens=tokens)
+            tool_log = list(getattr(gathered, "plan_tool_log", None) or [])
+            tool_breach = account.record_tool_calls(len(tool_log))
+            breach = breach or tool_breach
+            if breach is not None:
+                return {
+                    "question": question,
+                    "content": evidence,
+                    "tokens": tokens,
+                    "success": False,
+                    "budget_reason": breach.reason,
+                    "error": breach.message,
+                }
+        if getattr(gathered, "cancelled", False):
+            return {
+                "question": question,
+                "content": evidence,
+                "tokens": tokens,
+                "success": False,
+                "cancelled": True,
+                "error": getattr(gathered, "error", None),
+            }
+        if getattr(gathered, "timed_out", False):
+            return {
+                "question": question,
+                "content": evidence,
+                "tokens": tokens,
+                "success": False,
+                "timed_out": True,
+                "error": getattr(gathered, "error", None),
+            }
+        if not getattr(gathered, "success", False):
+            return {
+                "question": question,
+                "content": evidence,
+                "tokens": tokens,
+                "success": False,
+                "error": getattr(gathered, "error", None) or "Planning gather failed",
+            }
+        return {
+            "question": question,
+            "content": evidence,
+            "tokens": tokens,
+            "success": True,
+        }
 
     @staticmethod
     def _extract_tool_evidence(messages: Any) -> str:

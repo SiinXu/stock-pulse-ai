@@ -147,7 +147,7 @@ python scripts/check_config_doc_consistency.py --fail-on all
 | `AGENT_ONLINE_ADAPTERS_MIN_SAMPLES` | `30` | 是 | 模板中注释 |
 | `AGENT_ORCHESTRATOR_MODE` | `standard` | 是 | 模板中注释; Multi-agent orchestration mode (applies only when AGENT_ARCH=multi) quick: technical analysis -> decision (fastest, a... |
 | `AGENT_ORCHESTRATOR_TIMEOUT_S` | `600` | 是 | 模板中注释; Agent execution timeout budget in seconds (0 disables it; single-agent uses it for the full loop, multi-agent for col... |
-| `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on the Agent analysis RUN path (AgentExecutor.run) |
+| `AGENT_PLANNING_ENABLED` | `false` | 是 | 模板中注释; Opt-in plan→act→observe→replan on Agent analysis RUN, Chat gather, and Deep Research sub-question gather |
 | `AGENT_PLANNING_EXEC_TIMEOUT_SECONDS` | `60` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_OBSERVATION_REPLANS` | `1` | 是 | 模板中注释 |
 | `AGENT_PLANNING_MAX_PLAN_STEPS` | `8` | 是 | 模板中注释 |

@@ -509,6 +509,23 @@ def test_chat_sources_gate_on_try_gather_with_planning() -> None:
     assert "try_run_with_planning" not in multi_src
 
 
+def test_research_source_gates_on_try_gather_with_planning() -> None:
+    from src.agent.orchestrator_parts.chat import _ChatMethods as OrchChat
+    from src.agent.research import ResearchAgent
+
+    research_src = inspect.getsource(ResearchAgent._research_sub_question)
+    decompose_src = inspect.getsource(ResearchAgent._decompose_query)
+    synthesise_src = inspect.getsource(ResearchAgent._synthesise_report)
+    assert "try_gather_with_planning" in research_src
+    assert "RESEARCH_PRODUCT_PATH" in research_src
+    assert "try_gather_with_planning" not in decompose_src
+    assert "try_gather_with_planning" not in synthesise_src
+    assert "execute_plan_loop" not in decompose_src
+    multi_src = inspect.getsource(OrchChat._execute_multi_symbol_chat)
+    assert "try_gather_with_planning" not in multi_src
+    assert "try_run_with_planning" not in multi_src
+
+
 def test_native_chat_uses_planning_gather_when_enabled() -> None:
     tools = ["get_realtime_quote", "get_daily_history", "analyze_trend"]
     executor = AgentExecutor(_registry_with_tools(tools), MagicMock(), max_steps=3)
