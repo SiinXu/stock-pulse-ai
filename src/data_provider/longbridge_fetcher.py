@@ -43,6 +43,7 @@ from src.data_provider.retry_policy import (
     call_with_timeout,
     provider_retry,
 )
+# Cloned ``_is_us_code`` resolves these from facade globals (ADR-006).
 from .us_index_mapping import is_us_stock_code, is_us_index_code
 
 logger = logging.getLogger(__name__)
@@ -413,54 +414,12 @@ def _has_oauth_credentials(creds: Dict[str, Optional[str]]) -> bool:
     return bool(creds.get("oauth_client_id"))
 
 
-def _is_us_code(stock_code: str) -> bool:
-    normalized = stock_code.strip().upper()
-    return is_us_stock_code(normalized) or is_us_index_code(normalized)
+# Rebound from longbridge_parts.symbols after the module is assembled.
+_is_us_code = None
 
+_is_hk_code = None
 
-def _is_hk_code(stock_code: str) -> bool:
-    """Return whether a symbol follows the shared Hong Kong code contract."""
-    normalized = (stock_code or "").strip().upper()
-    if normalized.startswith("HK"):
-        digits = normalized[2:]
-        return digits.isdigit() and 1 <= len(digits) <= 5
-    if normalized.endswith(".HK"):
-        base = normalized[:-3]
-        return base.isdigit() and 1 <= len(base) <= 5
-    if normalized.isdigit() and 4 <= len(normalized) <= 5:
-        return True
-    return False
-
-
-def _to_longbridge_symbol(stock_code: str) -> Optional[str]:
-    """Convert internal stock code to Longbridge symbol format.
-
-    Examples:
-        AAPL      -> AAPL.US
-        HK00700   -> 0700.HK
-        00700     -> 0700.HK (5-digit pure number treated as HK)
-    """
-    code = stock_code.strip()
-    upper = code.upper()
-
-    if upper.endswith(".US"):
-        return upper
-    if upper.endswith(".HK"):
-        return upper
-
-    if _is_us_code(code):
-        return f"{upper}.US"
-
-    if _is_hk_code(code):
-        upper = code.upper()
-        if upper.startswith("HK"):
-            digits = upper[2:]
-        else:
-            digits = upper
-        digits = digits.lstrip("0") or "0"
-        return f"{digits.zfill(4)}.HK"
-
-    return None
+_to_longbridge_symbol = None
 
 
 class LongbridgeFetcher(BaseFetcher):
@@ -754,14 +713,19 @@ class LongbridgeFetcher(BaseFetcher):
 
 
 # Keep ``src.data_provider.longbridge_fetcher.LongbridgeFetcher`` as the
-# ADR-006 compatibility facade while ``longbridge_parts`` owns realtime and
-# daily-history bodies. Rebinding preserves method globals so existing patches
-# against this module continue to intercept moved implementations.
+# ADR-006 compatibility facade while ``longbridge_parts`` owns realtime,
+# daily-history, and symbol-helper bodies. Rebinding preserves method globals
+# so existing patches against this module continue to intercept moved
+# implementations.
 from .longbridge_parts import history as _history_module  # noqa: E402
 from .longbridge_parts import realtime as _realtime_module  # noqa: E402
+from .longbridge_parts import symbols as _symbols_module  # noqa: E402
 from .longbridge_parts.history import _HistoryMethods  # noqa: E402
 from .longbridge_parts.realtime import _RealtimeMethods  # noqa: E402
-from .longbridge_parts.facade_bind import bind_methods_from_class  # noqa: E402
+from .longbridge_parts.facade_bind import (  # noqa: E402
+    _clone_facade_function,
+    bind_methods_from_class,
+)
 
 
 def _apply_history_retry(name: str, bound):
@@ -779,10 +743,32 @@ def _apply_history_retry(name: str, bound):
     )(bound)
 
 
+def _bind_symbols_facade() -> None:
+    """Clone the symbol classifiers so patches on this module intercept them."""
+
+    global _is_us_code, _is_hk_code, _to_longbridge_symbol
+    _is_us_code = _clone_facade_function(
+        _symbols_module._is_us_code,
+        globals(),
+        qualname="_is_us_code",
+    )
+    _is_hk_code = _clone_facade_function(
+        _symbols_module._is_hk_code,
+        globals(),
+        qualname="_is_hk_code",
+    )
+    _to_longbridge_symbol = _clone_facade_function(
+        _symbols_module._to_longbridge_symbol,
+        globals(),
+        qualname="_to_longbridge_symbol",
+    )
+
+
 def _assemble_longbridge_fetcher_facade() -> None:
     """Bind capability-domain method bodies onto the public fetcher class."""
 
     global _RealtimeMethods, _HistoryMethods
+    _bind_symbols_facade()
     _RealtimeMethods = _realtime_module._RealtimeMethods
     _HistoryMethods = _history_module._HistoryMethods
     bind_methods_from_class(
@@ -827,9 +813,9 @@ _assemble_longbridge_fetcher_facade()
 
 
 def _install_part_reload_hooks() -> None:
-    """Keep an owner reload able to rebuild and rebind both sides of the seam."""
+    """Keep an owner reload able to rebuild and rebind every owner module."""
 
-    for module in (_realtime_module, _history_module):
+    for module in (_symbols_module, _realtime_module, _history_module):
         module._FACADE_RELOAD_HOOK = _assemble_longbridge_fetcher_facade  # type: ignore[attr-defined]
 
 

@@ -1,0 +1,1 @@
+- [Changed] Move Longbridge symbol helpers (`_is_us_code` / `_is_hk_code` / `_to_longbridge_symbol`) into `src/data_provider/longbridge_parts/symbols.py` behind the ADR-006 facade, keeping `_get_ctx` / connection helpers on the facade (Refs #1068).
