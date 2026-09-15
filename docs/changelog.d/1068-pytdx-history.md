@@ -1,0 +1,1 @@
+- [Changed] Move Pytdx daily history (`_fetch_raw_data` / `_normalize_data`) into `src/data_provider/pytdx_parts/history.py` behind the ADR-006 facade, keeping session, market-code, stock-name, and realtime on the facade (Refs #1068).
