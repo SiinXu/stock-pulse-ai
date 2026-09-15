@@ -8,6 +8,7 @@ from src.agent.planning.config import PlanExecutionSettings, PlanningSettings
 from src.agent.planning.engine import PlanningEngine, prepare_run_with_planning
 from src.agent.planning.loop import default_argument_builder, execute_plan_loop
 from src.agent.planning.product import (
+    RESEARCH_PRODUCT_PATH,
     is_agent_planning_enabled,
     resolve_planning_settings,
     try_gather_with_planning,
@@ -34,6 +35,7 @@ __all__ = [
     "PlanningOutcome",
     "PlanningSettings",
     "PlanningTraceRecorder",
+    "RESEARCH_PRODUCT_PATH",
     "StepObservation",
     "ToolCallObservation",
     "default_argument_builder",

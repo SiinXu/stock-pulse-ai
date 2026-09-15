@@ -1,11 +1,13 @@
 # -*- coding: utf-8 -*-
-"""Production wiring: plan → act → observe → replan on RUN and Chat paths.
+"""Production wiring: plan → act → observe → replan on RUN, Chat, and Research.
 
 Default-off. When ``Config.agent_planning_enabled`` is true, ``AgentExecutor.run``
-calls ``try_run_with_planning`` (dashboard synthesis) and Chat callers use
-``try_gather_with_planning`` (evidence only, ``parse_dashboard=False``).
-Tools dispatch through ``BoundToolSession``. Failures terminate with explicit
-reasons; nothing here claims success after a failed plan step or exhausted budget.
+calls ``try_run_with_planning`` (dashboard synthesis), Chat callers use
+``try_gather_with_planning`` (evidence only, ``parse_dashboard=False``), and
+Deep Research sub-question gather uses ``try_gather_with_planning`` with
+``product_path=agent_research``. Tools dispatch through ``BoundToolSession``.
+Failures terminate with explicit reasons; nothing here claims success after a
+failed plan step or exhausted budget.
 
 Config is constructor/parameter injected (or resolved via the composition root).
 This module does not call bare ``get_config()``.
@@ -16,7 +18,7 @@ from __future__ import annotations
 import logging
 import time
 import uuid
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 from src.agent.planning.config import (
@@ -51,6 +53,7 @@ ReflectionComplete = Callable[[str, str], str]
 RUN_PRODUCT_PATH = "agent_executor_run"
 CHAT_PRODUCT_PATH = "agent_executor_chat"
 ORCH_CHAT_PRODUCT_PATH = "agent_orchestrator_chat"
+RESEARCH_PRODUCT_PATH = "agent_research"
 PLAN_EVIDENCE_HEADER = (
     "[Plan execution evidence — already gathered under planning budgets; "
     "prefer these results and call tools only for remaining gaps]"
@@ -186,11 +189,16 @@ def try_gather_with_planning(
     cancelled_check: Optional[CancelledCheck] = None,
     config: Any = None,
     product_path: str = CHAT_PRODUCT_PATH,
+    available_tools: Optional[Sequence[str]] = None,
+    max_total_tool_calls: Optional[int] = None,
+    timeout_seconds: Optional[float] = None,
 ) -> Optional[PlanningGatherResult]:
     """Gather plan evidence without dashboard synthesis, or ``None`` when disabled.
 
     Chat callers must not pass an orchestrator into ``try_run_with_planning``
     (that helper synthesizes via ``build_run_messages`` / ``_run_loop``).
+    ``available_tools`` defaults to the owner's full registry so Chat/RUN stay
+    identical; Research must pass the filtered research tool names.
     """
     cfg = _resolve_config(config)
     if not is_agent_planning_enabled(cfg):
@@ -202,6 +210,9 @@ def try_gather_with_planning(
         cancelled_check=cancelled_check,
         config=cfg,
         product_path=product_path,
+        available_tools=available_tools,
+        max_total_tool_calls=max_total_tool_calls,
+        timeout_seconds=timeout_seconds,
     )
 
 
@@ -213,16 +224,43 @@ def gather_with_planning(
     cancelled_check: Optional[CancelledCheck] = None,
     config: Any = None,
     product_path: str = RUN_PRODUCT_PATH,
+    available_tools: Optional[Sequence[str]] = None,
+    max_total_tool_calls: Optional[int] = None,
+    timeout_seconds: Optional[float] = None,
 ) -> PlanningGatherResult:
     """Plan and execute tools under BoundToolSession. No LLM dashboard synthesis."""
     cfg = _resolve_config(config)
     scope_resolution = resolve_stock_scope(task, context)
     effective_context = dict(scope_resolution.effective_context or {})
     effective_context["config"] = cfg
-    available_tools = list(owner.tool_registry.list_names())
+    if available_tools is None:
+        resolved_tools = list(owner.tool_registry.list_names())
+    else:
+        resolved_tools = list(available_tools)
 
     try:
         planning_settings, execution_settings = resolve_planning_settings(cfg)
+        execution_settings = _tighten_execution_settings(
+            execution_settings,
+            max_total_tool_calls=max_total_tool_calls,
+            timeout_seconds=timeout_seconds,
+        )
+    except _PlanningTimeoutTooSmall:
+        return PlanningGatherResult(
+            success=False,
+            product_path=product_path,
+            error="Planning execution timeout exhausted",
+            timed_out=True,
+            planning_metadata={
+                "enabled": True,
+                "applied": False,
+                "fallback_reason": "execution_timeout",
+                "error_code": "execution_timeout",
+                "product_path": product_path,
+            },
+            stock_scope=scope_resolution.stock_scope,
+            synthesis_context=effective_context,
+        )
     except ValueError as exc:
         log_safe_exception(
             logger,
@@ -252,7 +290,7 @@ def gather_with_planning(
     engine = PlanningEngine(planning_settings, llm_adapter=llm_for_planner)
     proposal = engine.plan(
         task,
-        available_tools=available_tools,
+        available_tools=resolved_tools,
         context=effective_context,
         cancelled_check=cancelled_check,
     )
@@ -278,10 +316,11 @@ def gather_with_planning(
     try:
         session = _open_plan_tool_session(
             owner,
-            available_tools=available_tools,
+            available_tools=resolved_tools,
             stock_scope=scope_resolution.stock_scope,
             cancelled_check=cancelled_check,
             deadline_seconds=execution_settings.timeout_seconds,
+            call_timeout_seconds=timeout_seconds,
         )
 
         def invoker(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
@@ -291,7 +330,7 @@ def gather_with_planning(
         exec_result = execute_plan_loop(
             plan=proposal.plan,
             tool_invoker=invoker,
-            available_tools=available_tools,
+            available_tools=resolved_tools,
             task=task,
             context=effective_context,
             settings=execution_settings,
@@ -572,6 +611,42 @@ def _owner_call_timeout_seconds(owner: Any) -> Optional[float]:
     return value if value > 0 else None
 
 
+class _PlanningTimeoutTooSmall(ValueError):
+    """Remaining wall-clock is below PlanExecutionSettings' 0.1s floor."""
+
+
+def _tighten_execution_settings(
+    execution_settings: PlanExecutionSettings,
+    *,
+    max_total_tool_calls: Optional[int],
+    timeout_seconds: Optional[float],
+) -> PlanExecutionSettings:
+    """Tighten planning execution caps without expanding Chat/RUN defaults."""
+    updates: Dict[str, Any] = {}
+    if max_total_tool_calls is not None:
+        try:
+            remaining = int(max_total_tool_calls)
+        except (TypeError, ValueError):
+            remaining = execution_settings.max_total_tool_calls
+        if remaining >= 1:
+            updates["max_total_tool_calls"] = min(
+                execution_settings.max_total_tool_calls, remaining
+            )
+    if timeout_seconds is not None:
+        try:
+            remaining_timeout = float(timeout_seconds)
+        except (TypeError, ValueError):
+            remaining_timeout = execution_settings.timeout_seconds
+        if remaining_timeout < 0.1:
+            raise _PlanningTimeoutTooSmall("timeout_seconds below planning floor")
+        updates["timeout_seconds"] = min(
+            execution_settings.timeout_seconds, remaining_timeout
+        )
+    if not updates:
+        return execution_settings
+    return replace(execution_settings, **updates)
+
+
 def _open_plan_tool_session(
     executor: Any,
     *,
@@ -579,16 +654,22 @@ def _open_plan_tool_session(
     stock_scope: Any,
     cancelled_check: Optional[CancelledCheck],
     deadline_seconds: float,
+    call_timeout_seconds: Optional[float] = None,
 ) -> BoundToolSession:
     """Open a BoundToolSession matching the native runner's security contract."""
     deadline_monotonic = time.monotonic() + float(deadline_seconds)
+    resolved_call_timeout = (
+        float(call_timeout_seconds)
+        if call_timeout_seconds is not None
+        else _owner_call_timeout_seconds(executor)
+    )
     return BoundToolSession(
         executor.tool_registry,
         execution_id=str(uuid.uuid4()),
         allowed_tools=list(available_tools),
         derive_granted_permissions=True,
         stock_scope=stock_scope,
-        call_timeout_seconds=_owner_call_timeout_seconds(executor),
+        call_timeout_seconds=resolved_call_timeout,
         deadline_monotonic=deadline_monotonic,
         cancelled_check=cancelled_check,
         backend="plan-loop",

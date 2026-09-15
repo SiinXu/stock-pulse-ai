@@ -12,8 +12,9 @@
 2. **Execution loop** — optional `execute_plan_loop` that runs plan → act → observe → replan under hard budgets.
 3. **Production RUN path** — when `AGENT_PLANNING_ENABLED=true`, `AgentExecutor.run` (used by agent-mode analysis orchestration) calls `try_run_with_planning` so plan → act → observe really runs with `BoundToolSession` tool dispatch, then LLM synthesis for the decision dashboard.
 4. **Production Chat opt-in** — the same flag gathers evidence through `try_gather_with_planning` on `AgentExecutor.chat` and single-symbol `AgentOrchestrator.chat`, then synthesizes a free-form answer (`parse_dashboard=False`). `chat_path=incremental_tool` skips both the full pipeline and the planning gather. Compare multi-symbol Chat stays classic.
+5. **Production Research opt-in** — the same flag gathers Deep Research sub-question evidence through `try_gather_with_planning` (`product_path=agent_research`) with the filtered research tool set. Outer `_decompose_query` / `_synthesise_report` stay unchanged. Gather failure is fail-closed (no classic `run_agent_loop` fallback for that sub-question). HTTP `ResearchResponse` fields are unchanged.
 
-Default remains **off**: classic ReAct RUN/Chat is byte-stable when the switch is false. Research, durable product UI, and compare-chat planning are still remaining.
+Default remains **off**: classic ReAct RUN/Chat/Research is byte-stable when the switch is false. Compare-chat planning and durable product UI are still remaining.
 
 ## Proposal contracts
 
@@ -87,7 +88,7 @@ The library does not persist anything by itself. Observability emit is best-effo
 
 | Env / Config field | Default | Role |
 | --- | --- | --- |
-| `AGENT_PLANNING_ENABLED` | `false` | Master switch for `AgentExecutor.run` |
+| `AGENT_PLANNING_ENABLED` | `false` | Master switch for `AgentExecutor.run`, Chat gather, and Deep Research sub-question gather |
 | `AGENT_PLANNING_STRATEGY` | `template` | `template` or `llm` |
 | `AGENT_PLANNING_MAX_PLAN_STEPS` | `8` | Proposal step cap (1–16) |
 | `AGENT_PLANNING_MAX_REPLANS` | `1` | Proposal retries (0–3) |
@@ -108,7 +109,7 @@ Flow when enabled:
 
 ## Remaining #199 scope
 
-- Research `agent.research` / deep-research planning, and compare multi-symbol Chat planning;
+- Compare multi-symbol Chat planning (`_execute_multi_symbol_chat`);
 - durable plan/action/observation audit persistence, tenant identity, redaction/retention ownership, and richer product UI beyond Settings knobs;
 - deeper shared UsageRecorder ownership beyond BoundToolSession security audit + observability emit;
 - broader real-network multi-step acceptance evidence beyond focused offline production-path tests.
