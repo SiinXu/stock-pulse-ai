@@ -331,128 +331,12 @@ class PytdxFetcher(BaseFetcher):
 
                 start += self.SECURITY_LIST_PAGE_SIZE
     
-    @provider_retry(
-        target_logger=logger,
-        event="Pytdx daily data retry scheduled",
-        error_code="pytdx_daily_data_retry",
-    )
-    def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """
-        从通达信获取原始数据
-        
-        使用 get_security_bars() 获取日线数据
-        
-        流程：
-        1. 检查是否为美股（不支持）
-        2. 使用上下文管理器管理连接
-        3. 判断市场代码
-        4. 调用 API 获取 K 线数据 (bounded by request timeout)
-        """
-        # U.S. stocks are not supported, Throw an exception to allow DataFetcherManager Switch to another data source
-        if _is_us_code(stock_code):
-            raise DataFetchError(f"PytdxFetcher 不支持美股 {stock_code}，请使用 AkshareFetcher 或 YfinanceFetcher")
+    # Rebound from pytdx_parts.history after the class is built.
+    # provider_retry is re-applied in _assemble_pytdx_fetcher_facade.
+    _fetch_raw_data = None
 
-        # Hong Kong stocks are not supported, Raise an exception to allow DataFetcherManager Switch to another data source
-        if _is_hk_market(stock_code):
-            raise DataFetchError(f"PytdxFetcher 不支持港股 {stock_code}，请使用 AkshareFetcher")
+    _normalize_data = None
 
-        # Beijing Stock Exchange is not supported, throwing an exception to switch DataFetcherManager to other data sources
-        if is_bse_code(stock_code):
-            raise DataFetchError(
-                f"PytdxFetcher 不支持北交所 {stock_code}，将自动切换其他数据源"
-            )
-        
-        market, code = self._get_market_code(stock_code)
-        
-        # Calculate the estimated number of trading days to obtain
-        from datetime import datetime as dt
-        start_dt = dt.strptime(start_date, '%Y-%m-%d')
-        end_dt = dt.strptime(end_date, '%Y-%m-%d')
-        days = (end_dt - start_dt).days
-        count = min(max(days * 5 // 7 + 10, 30), 800)  # Estimate the trading day, up to 800 entries
-        
-        logger.debug(f"调用 Pytdx get_security_bars(market={market}, code={code}, count={count})")
-
-        def _query() -> pd.DataFrame:
-            with self._pytdx_session() as api:
-                # Get daily K-line data
-                # category: 9-day line, 0-5 minutes, 1-15 minutes, 2-30 minutes, 3-1 hour
-                data = api.get_security_bars(
-                    category=9,  # Daily line
-                    market=market,
-                    code=code,
-                    start=0,  # From latest.
-                    count=count
-                )
-
-                if data is None or len(data) == 0:
-                    raise DataFetchError(f"Pytdx 未查询到 {stock_code} 的数据")
-
-                # Convert to DataFrame
-                df = api.to_df(data)
-
-                # Filter date range
-                df['datetime'] = pd.to_datetime(df['datetime'])
-                df = df[(df['datetime'] >= start_date) & (df['datetime'] <= end_date)]
-
-                return df
-
-        try:
-            return call_with_timeout(
-                _query,
-                timeout=self._request_timeout_seconds,
-                call_name="pytdx.get_security_bars",
-            )
-        except DEFAULT_RETRYABLE_EXCEPTIONS:
-            # Preserve retryable exceptions for provider_retry; do not wrap.
-            raise
-        except DataFetchError:
-            raise
-        except Exception as e:  # broad-exception: fallback_recorded - Map library failures to DataFetchError for manager fallback.
-            log_safe_exception(
-                logger,
-                "Pytdx raw data fetch failed",
-                e,
-                error_code="pytdx_raw_data_fetch_failed",
-                level=logging.DEBUG,
-            )
-            raise DataFetchError(f"Pytdx 获取数据失败: {e}") from e
-    
-    def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
-        """
-        标准化 Pytdx 数据
-        
-        Pytdx 返回的列名：
-        datetime, open, high, low, close, vol, amount
-        
-        需要映射到标准列名：
-        date, open, high, low, close, volume, amount, pct_chg
-        """
-        df = df.copy()
-        
-        # Column name mapping
-        column_mapping = {
-            'datetime': 'date',
-            'vol': 'volume',
-        }
-        
-        df = df.rename(columns=column_mapping)
-        
-        # Calculate Percentage Change (pytdx does not return percentage change, need to calculate it yourself)
-        if 'pct_chg' not in df.columns and 'close' in df.columns:
-            df['pct_chg'] = df['close'].pct_change() * 100
-            df['pct_chg'] = df['pct_chg'].fillna(0).round(2)
-        
-        # Add stock code column
-        df['code'] = stock_code
-        
-        # Keep only required columns.
-        keep_cols = ['code'] + STANDARD_COLUMNS
-        existing_cols = [col for col in keep_cols if col in df.columns]
-        df = df[existing_cols]
-        
-        return df
-    
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         """
         获取股票名称
@@ -550,6 +434,76 @@ class PytdxFetcher(BaseFetcher):
             )
         
         return None
+
+
+# Keep ``src.data_provider.pytdx_fetcher.PytdxFetcher`` as the ADR-006
+# compatibility facade while ``pytdx_parts`` owns daily-history bodies.
+# Rebinding preserves method globals so existing patches against this
+# module continue to intercept moved implementations.
+from .pytdx_parts import history as _history_module  # noqa: E402
+from .pytdx_parts.history import _HistoryMethods  # noqa: E402
+from .pytdx_parts.facade_bind import bind_methods_from_class  # noqa: E402
+
+
+def _apply_history_retry(name: str, bound):
+    """Re-apply provider_retry after facade cloning so timeout retries survive bind."""
+
+    if name != "_fetch_raw_data":
+        return bound
+    return provider_retry(
+        target_logger=logger,
+        event="Pytdx daily data retry scheduled",
+        error_code="pytdx_daily_data_retry",
+    )(bound)
+
+
+def _assemble_pytdx_fetcher_facade() -> None:
+    """Bind capability-domain method bodies onto the public fetcher class."""
+
+    global _HistoryMethods
+    _HistoryMethods = _history_module._HistoryMethods
+    bind_methods_from_class(
+        _HistoryMethods,
+        PytdxFetcher,
+        globals(),
+        expected_names=_history_module.EXPECTED_HISTORY_METHOD_NAMES,
+        post_bind=_apply_history_retry,
+    )
+    # Rebound methods are assigned after class body evaluation; clear ABC
+    # abstracts that are now implemented so instantiation matches the legacy
+    # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
+    abstracts = set(getattr(PytdxFetcher, "__abstractmethods__", ()))
+    if abstracts:
+        abstracts.difference_update(
+            {
+                name
+                for name in (
+                    "_fetch_raw_data",
+                    "_normalize_data",
+                    "get_daily_data",
+                )
+                if callable(getattr(PytdxFetcher, name, None))
+            }
+        )
+        abstracts = {
+            name
+            for name in abstracts
+            if name not in PytdxFetcher.__dict__
+            or getattr(PytdxFetcher.__dict__[name], "__isabstractmethod__", False)
+        }
+        PytdxFetcher.__abstractmethods__ = frozenset(abstracts)
+
+
+_assemble_pytdx_fetcher_facade()
+
+
+def _install_part_reload_hooks() -> None:
+    """Keep an owner reload able to rebuild and rebind every owner module."""
+
+    _history_module._FACADE_RELOAD_HOOK = _assemble_pytdx_fetcher_facade  # type: ignore[attr-defined]
+
+
+_install_part_reload_hooks()
 
 
 if __name__ == "__main__":
