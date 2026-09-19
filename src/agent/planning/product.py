@@ -97,6 +97,44 @@ def planning_evidence_block(evidence: str) -> str:
     return f"{PLAN_EVIDENCE_HEADER}\n{evidence}"
 
 
+def attach_chat_mode_budget_account(owner: Any, config: Any = None) -> Any:
+    """Mint or reuse a chat-profile ``ModeBudgetAccount`` on the owner."""
+    from src.agent.runtime.mode_budget import ModeBudgetAccount, create_mode_budget_account
+
+    existing = getattr(owner, "mode_budget_account", None)
+    if isinstance(existing, ModeBudgetAccount):
+        return existing
+    cfg = config if config is not None else getattr(owner, "config", None)
+    account = create_mode_budget_account(cfg, mode="chat", chat=True)
+    owner.mode_budget_account = account
+    return account
+
+
+def charge_planning_gather(account: Any, gathered: Any) -> Any:
+    """Record one planning gather onto the shared account. Returns breach or None."""
+    if account is None:
+        return None
+    tokens = int(getattr(gathered, "total_tokens", 0) or 0)
+    breach = account.record_llm_turn(tokens=tokens)
+    tool_log = list(getattr(gathered, "plan_tool_log", None) or [])
+    tool_breach = account.record_tool_calls(len(tool_log))
+    return breach or tool_breach
+
+
+def apply_planning_gather_budget(
+    result: Any, account: Any, breach: Any = None
+) -> Any:
+    """Copy the live snapshot onto ``result`` and fail-close on a hard breach."""
+    if account is None:
+        return result
+    result.budget_snapshot = account.snapshot()
+    if breach is not None and not bool(getattr(result, "cancelled", False)):
+        result.success = False
+        result.error = breach.message
+        result.failure_reason = breach.failure_reason.value
+    return result
+
+
 def _resolve_config(config: Any = None) -> Any:
     """Prefer injected Config; fall back to composition-root access."""
     if config is not None:
@@ -442,6 +480,7 @@ def run_with_planning(
     """
     cfg = _resolve_config(config)
     started = time.perf_counter()
+    account = attach_chat_mode_budget_account(executor, cfg)
     gathered = gather_with_planning(
         executor,
         task=task,
@@ -449,8 +488,10 @@ def run_with_planning(
         cancelled_check=cancelled_check,
         config=cfg,
         product_path=RUN_PRODUCT_PATH,
+        max_total_tool_calls=account.remaining_tool_calls(),
     )
-    if not gathered.success:
+    breach = charge_planning_gather(account, gathered)
+    if gathered.cancelled or breach is not None or not gathered.success:
         _maybe_attach_end_of_run_reflection(
             gathered.planning_metadata,
             executor=executor,
@@ -460,6 +501,7 @@ def run_with_planning(
             tool_calls_log=gathered.plan_tool_log,
         )
         result = gathered.to_agent_result()
+        apply_planning_gather_budget(result, account, breach)
         _apply_live_mode_budget_snapshot(
             result,
             executor=executor,

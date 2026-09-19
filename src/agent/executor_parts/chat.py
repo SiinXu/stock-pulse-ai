@@ -227,30 +227,69 @@ class _ChatMethods:
 
         from src.agent.planning.product import (
             CHAT_PRODUCT_PATH,
+            apply_planning_gather_budget,
+            attach_chat_mode_budget_account,
+            charge_planning_gather,
+            is_agent_planning_enabled,
             planning_evidence_block,
             try_gather_with_planning,
         )
 
+        chat_config = getattr(self, "config", None)
+        account = None
+        remaining_tools = None
+        if is_agent_planning_enabled(chat_config):
+            account = attach_chat_mode_budget_account(self, chat_config)
+            remaining_tools = account.remaining_tool_calls()
         gathered = try_gather_with_planning(
             self,
             task=message,
             context=context,
             cancelled_check=cancelled_check,
-            config=getattr(self, "config", None),
+            config=chat_config,
             product_path=CHAT_PRODUCT_PATH,
+            max_total_tool_calls=remaining_tools,
         )
         try:
-            if gathered is not None and not gathered.success:
-                result = gathered.to_agent_result()
-                result.runtime_facts = soul_runtime_facts
+            if gathered is not None:
+                if account is None:
+                    account = attach_chat_mode_budget_account(self, chat_config)
+                breach = charge_planning_gather(account, gathered)
+                if gathered.cancelled or breach is not None or not gathered.success:
+                    result = gathered.to_agent_result()
+                    apply_planning_gather_budget(result, account, breach)
+                    result.runtime_facts = soul_runtime_facts
+                else:
+                    if gathered.success and gathered.evidence:
+                        messages.append(
+                            {
+                                "role": "user",
+                                "content": planning_evidence_block(gathered.evidence),
+                            }
+                        )
+                    registry_token = _CHAT_TOOL_REGISTRY.set(chat_tool_registry)
+                    try:
+                        result = self._run_loop(
+                            messages,
+                            tool_decls,
+                            parse_dashboard=False,
+                            progress_callback=progress_callback,
+                            stock_scope=scope_resolution.stock_scope,
+                            cancelled_check=cancelled_check,
+                        )
+                        result.runtime_facts = soul_runtime_facts
+                        result.tool_calls_log = list(gathered.plan_tool_log) + list(
+                            result.tool_calls_log or []
+                        )
+                        result.total_tokens = int(result.total_tokens or 0) + int(
+                            gathered.total_tokens or 0
+                        )
+                        metadata = dict(result.planning_metadata or {})
+                        metadata.update(gathered.planning_metadata)
+                        result.planning_metadata = metadata
+                    finally:
+                        _CHAT_TOOL_REGISTRY.reset(registry_token)
             else:
-                if gathered is not None and gathered.success and gathered.evidence:
-                    messages.append(
-                        {
-                            "role": "user",
-                            "content": planning_evidence_block(gathered.evidence),
-                        }
-                    )
                 registry_token = _CHAT_TOOL_REGISTRY.set(chat_tool_registry)
                 try:
                     result = self._run_loop(
@@ -262,16 +301,6 @@ class _ChatMethods:
                         cancelled_check=cancelled_check,
                     )
                     result.runtime_facts = soul_runtime_facts
-                    if gathered is not None:
-                        result.tool_calls_log = list(gathered.plan_tool_log) + list(
-                            result.tool_calls_log or []
-                        )
-                        result.total_tokens = int(result.total_tokens or 0) + int(
-                            gathered.total_tokens or 0
-                        )
-                        metadata = dict(result.planning_metadata or {})
-                        metadata.update(gathered.planning_metadata)
-                        result.planning_metadata = metadata
                 finally:
                     _CHAT_TOOL_REGISTRY.reset(registry_token)
         except Exception as exc:  # broad-exception: fallback_recorded - Safe logging and the failure sentinel preserve the Chat boundary.

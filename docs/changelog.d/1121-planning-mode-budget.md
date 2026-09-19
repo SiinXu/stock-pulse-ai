@@ -1,0 +1,1 @@
+- [Fixed] Opt-in RUN and single-agent Chat planning gather now charge the shared chat-profile mode-budget account and fail-close on `budget_*` before synthesis (Refs #1121).
