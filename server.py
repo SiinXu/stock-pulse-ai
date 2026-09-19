@@ -1,5 +1,17 @@
 # -*- coding: utf-8 -*-
-"""FastAPI service entrypoint with a fail-closed network bind guard.
+"""HTTP/ASGI entry facade: bind parse, composition root, export app (Issue #1084).
+
+This module is bootstrap-only (Issue #1084):
+
+- Resolve fail-closed HTTP bind policy for direct ``python server.py`` and
+  uvicorn CLI launches.
+- Install ``ApplicationServices`` and export the FastAPI ``app``.
+- Do **not** add product API routes, analysis, Bot stream, or notification
+  branches here.
+
+Application factory and routes live in ``src/api/app.py``. Reviewer checklist:
+reject new product helpers landed as live ``FunctionDef``s in this file; keep
+bind helpers as the allowed entry surface.
 
 Local development::
 

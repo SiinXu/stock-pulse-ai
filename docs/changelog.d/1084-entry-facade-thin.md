@@ -1,0 +1,1 @@
+- [Changed] Pin `main.py` and `server.py` as bootstrap-only entry facades with an Issue #1084 marker, AST live-def allowlists, and corrected architecture-overview ownership text (Refs #1084).

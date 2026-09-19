@@ -1,25 +1,25 @@
 # -*- coding: utf-8 -*-
-"""
-===================================
-A股自选股智能分析系统 - 主调度程序
-===================================
+"""Process bootstrap and composition-root entry facade (Issue #1084).
 
-职责：
-1. 协调各模块完成股票分析流程
-2. 实现低并发的线程池调度
-3. 全局异常处理，确保单股失败不影响整体
-4. 提供命令行入口
+This module is bootstrap-only (Issue #1084):
 
-使用方式：
-    python main.py              # 正常运行
-    python main.py --debug      # 调试模式
-    python main.py --dry-run    # 仅获取数据不分析
+- Parse CLI args, set up process env/logging, install ``ApplicationServices``,
+  and dispatch through rebound owners.
+- Re-export compatibility names (analysis / runtime / CLI) via
+  ``clone_facade_function`` without owning those product bodies.
+- Do **not** add analysis, scheduling, data-source, report, or notification
+  product branches here.
 
-交易理念（已融入分析）：
-- 严进策略：不追高，乖离率 > 5% 不买入
-- 趋势交易：只做 MA5>MA10>MA20 多头排列
-- 效率优先：关注筹码集中度好的股票
-- 买点偏好：缩量回踩 MA5/MA10 支撑
+Business logic lives in ``src/app/analysis.py``, ``src/app/runtime.py``,
+``src/app/cli.py``, ``src/core/stages``, services, and plugins. Reviewer
+checklist: reject new product helpers landed as live ``FunctionDef``s in this
+file; prefer the existing rebound owners.
+
+Usage::
+
+    python main.py              # normal run
+    python main.py --debug      # debug mode
+    python main.py --dry-run    # fetch data without LLM analysis
 """
 from __future__ import annotations
 
