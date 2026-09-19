@@ -198,125 +198,12 @@ class BaostockFetcher(BaseFetcher):
         else:
             logger.warning(f"无法确定股票 {code} 的市场，默认使用深市")
             return f"sz.{code}"
-    
-    @provider_retry(
-        target_logger=logger,
-        event="Baostock daily data retry scheduled",
-        error_code="baostock_daily_data_retry",
-    )
-    def _fetch_raw_data(self, stock_code: str, start_date: str, end_date: str) -> pd.DataFrame:
-        """
-        从 Baostock 获取原始数据
-        
-        使用 query_history_k_data_plus() 获取日线数据
-        
-        流程：
-        1. 检查是否为美股（不支持）
-        2. 使用上下文管理器管理连接
-        3. 转换股票代码格式
-        4. 调用 API 查询数据 (bounded by request timeout)
-        5. 将结果转换为 DataFrame
-        """
-        # U.S. stocks are not supported, Throw an exception to allow DataFetcherManager Switch to another data source
-        if _is_us_code(stock_code):
-            raise DataFetchError(f"BaostockFetcher 不支持美股 {stock_code}，请使用 AkshareFetcher 或 YfinanceFetcher")
 
-        # Hong Kong stocks are not supported, Raise an exception to allow DataFetcherManager Switch to another data source
-        if _is_hk_market(stock_code):
-            raise DataFetchError(f"BaostockFetcher 不支持港股 {stock_code}，请使用 AkshareFetcher")
+    # Rebound from baostock_parts.history after the class is built.
+    # provider_retry is re-applied in _assemble_baostock_fetcher_facade.
+    _fetch_raw_data = None
 
-        # Beijing Stock Exchange is not supported, throwing an exception to switch DataFetcherManager to other data sources
-        if is_bse_code(stock_code):
-            raise DataFetchError(
-                f"BaostockFetcher 不支持北交所 {stock_code}，将自动切换其他数据源"
-            )
-        
-        # Convert Code Format
-        bs_code = self._convert_stock_code(stock_code)
-        
-        logger.debug(f"调用 Baostock query_history_k_data_plus({bs_code}, {start_date}, {end_date})")
-
-        def _query() -> pd.DataFrame:
-            with self._baostock_session() as bs:
-                # Query daily data
-                # adjustflag: 1-backward-adjusted, 2-forward-adjusted, 3-unadjusted
-                rs = bs.query_history_k_data_plus(
-                    code=bs_code,
-                    fields="date,open,high,low,close,volume,amount,pctChg",
-                    start_date=start_date,
-                    end_date=end_date,
-                    frequency="d",  # Daily line
-                    adjustflag="2"  # forward-adjusted.
-                )
-
-                if rs.error_code != '0':
-                    raise DataFetchError(f"Baostock 查询失败: {rs.error_msg}")
-
-                # Convert to DataFrame
-                data_list = []
-                while rs.next():
-                    data_list.append(rs.get_row_data())
-
-                if not data_list:
-                    raise DataFetchError(f"Baostock 未查询到 {stock_code} 的数据")
-
-                return pd.DataFrame(data_list, columns=rs.fields)
-
-        try:
-            return call_with_timeout(
-                _query,
-                timeout=self._request_timeout_seconds,
-                call_name="baostock.query_history_k_data_plus",
-            )
-        except DEFAULT_RETRYABLE_EXCEPTIONS:
-            # Preserve retryable exceptions for provider_retry; do not wrap.
-            raise
-        except DataFetchError:
-            raise
-        except Exception as e:  # broad-exception: fallback_recorded - Map library failures to DataFetchError for manager fallback.
-            log_safe_exception(
-                logger,
-                "Baostock raw data fetch failed",
-                e,
-                error_code="baostock_raw_data_fetch_failed",
-                level=logging.DEBUG,
-            )
-            raise DataFetchError(f"Baostock 获取数据失败: {e}") from e
-    
-    def _normalize_data(self, df: pd.DataFrame, stock_code: str) -> pd.DataFrame:
-        """
-        标准化 Baostock 数据
-        
-        Baostock 返回的列名：
-        date, open, high, low, close, volume, amount, pctChg
-        
-        需要映射到标准列名：
-        date, open, high, low, close, volume, amount, pct_chg
-        """
-        df = df.copy()
-        
-        # Column name mapping (only process pctChg)
-        column_mapping = {
-            'pctChg': 'pct_chg',
-        }
-        
-        df = df.rename(columns=column_mapping)
-        
-        # Numeric type conversion (Baostock returns are all strings)
-        numeric_cols = ['open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
-        for col in numeric_cols:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        # Add stock code column
-        df['code'] = stock_code
-        
-        # Keep only required columns.
-        keep_cols = ['code'] + STANDARD_COLUMNS
-        existing_cols = [col for col in keep_cols if col in df.columns]
-        df = df[existing_cols]
-        
-        return df
+    _normalize_data = None
 
     def get_stock_name(self, stock_code: str) -> Optional[str]:
         """
@@ -417,6 +304,76 @@ class BaostockFetcher(BaseFetcher):
             )
         
         return None
+
+
+# Keep ``src.data_provider.baostock_fetcher.BaostockFetcher`` as the ADR-006
+# compatibility facade while ``baostock_parts`` owns daily-history bodies.
+# Rebinding preserves method globals so existing patches against this
+# module continue to intercept moved implementations.
+from .baostock_parts import history as _history_module  # noqa: E402
+from .baostock_parts.history import _HistoryMethods  # noqa: E402
+from .baostock_parts.facade_bind import bind_methods_from_class  # noqa: E402
+
+
+def _apply_history_retry(name: str, bound):
+    """Re-apply provider_retry after facade cloning so timeout retries survive bind."""
+
+    if name != "_fetch_raw_data":
+        return bound
+    return provider_retry(
+        target_logger=logger,
+        event="Baostock daily data retry scheduled",
+        error_code="baostock_daily_data_retry",
+    )(bound)
+
+
+def _assemble_baostock_fetcher_facade() -> None:
+    """Bind capability-domain method bodies onto the public fetcher class."""
+
+    global _HistoryMethods
+    _HistoryMethods = _history_module._HistoryMethods
+    bind_methods_from_class(
+        _HistoryMethods,
+        BaostockFetcher,
+        globals(),
+        expected_names=_history_module.EXPECTED_HISTORY_METHOD_NAMES,
+        post_bind=_apply_history_retry,
+    )
+    # Rebound methods are assigned after class body evaluation; clear ABC
+    # abstracts that are now implemented so instantiation matches the legacy
+    # monofile class (BaseFetcher marks _fetch_raw_data / _normalize_data).
+    abstracts = set(getattr(BaostockFetcher, "__abstractmethods__", ()))
+    if abstracts:
+        abstracts.difference_update(
+            {
+                name
+                for name in (
+                    "_fetch_raw_data",
+                    "_normalize_data",
+                    "get_daily_data",
+                )
+                if callable(getattr(BaostockFetcher, name, None))
+            }
+        )
+        abstracts = {
+            name
+            for name in abstracts
+            if name not in BaostockFetcher.__dict__
+            or getattr(BaostockFetcher.__dict__[name], "__isabstractmethod__", False)
+        }
+        BaostockFetcher.__abstractmethods__ = frozenset(abstracts)
+
+
+_assemble_baostock_fetcher_facade()
+
+
+def _install_part_reload_hooks() -> None:
+    """Keep an owner reload able to rebuild and rebind every owner module."""
+
+    _history_module._FACADE_RELOAD_HOOK = _assemble_baostock_fetcher_facade  # type: ignore[attr-defined]
+
+
+_install_part_reload_hooks()
 
 
 if __name__ == "__main__":

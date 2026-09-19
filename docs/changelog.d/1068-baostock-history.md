@@ -1,0 +1,1 @@
+- [Changed] Move Baostock daily history (`_fetch_raw_data` / `_normalize_data`) into `src/data_provider/baostock_parts/history.py` behind the ADR-006 facade, keeping session, code conversion, stock-name, and stock-list on the facade (Refs #1068).
