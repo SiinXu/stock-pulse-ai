@@ -505,7 +505,7 @@ def test_chat_sources_gate_on_try_gather_with_planning() -> None:
     assert "parse_dashboard=False" in exec_src
     assert "incremental_tool" in orch_src
     multi_src = inspect.getsource(OrchChat._execute_multi_symbol_chat)
-    assert "try_gather_with_planning" not in multi_src
+    assert "try_gather_with_planning" in multi_src
     assert "try_run_with_planning" not in multi_src
 
 
@@ -522,7 +522,7 @@ def test_research_source_gates_on_try_gather_with_planning() -> None:
     assert "try_gather_with_planning" not in synthesise_src
     assert "execute_plan_loop" not in decompose_src
     multi_src = inspect.getsource(OrchChat._execute_multi_symbol_chat)
-    assert "try_gather_with_planning" not in multi_src
+    assert "try_gather_with_planning" in multi_src
     assert "try_run_with_planning" not in multi_src
 
 

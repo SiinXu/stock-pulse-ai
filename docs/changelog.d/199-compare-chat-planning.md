@@ -1,0 +1,1 @@
+- [Added] Opt in compare multi-symbol Chat planning behind AGENT_PLANNING_ENABLED via per-leg try_gather_with_planning in _execute_multi_symbol_chat, keeping default-off classic pipelines and fail-closed gather (Refs #199).

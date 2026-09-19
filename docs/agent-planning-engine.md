@@ -11,10 +11,10 @@
 1. **提案基础** — 生成并校验有界 `AgentPlan`（`PlanningEngine`）。
 2. **执行闭环** — 可选的 `execute_plan_loop`，在硬预算下运行 plan → act → observe → replan。
 3. **生产 RUN 路径** — 当 `AGENT_PLANNING_ENABLED=true` 时，`AgentExecutor.run`（Agent 分析编排入口）调用 `try_run_with_planning`，经 `BoundToolSession` 真实执行 plan → act → observe，再做仪表盘综合。
-4. **生产 Chat 可选路径** — 同一开关经 `try_gather_with_planning` 在 `AgentExecutor.chat` 与单标的 `AgentOrchestrator.chat` 上收集证据，再以 `parse_dashboard=False` 综合自由文本。`chat_path=incremental_tool` 同时跳过完整 pipeline 与 planning gather。Compare 多标的 Chat 仍走经典路径。
+4. **生产 Chat 可选路径** — 同一开关经 `try_gather_with_planning` 在 `AgentExecutor.chat` 与单标的 `AgentOrchestrator.chat` 上收集证据，再以 `parse_dashboard=False` 综合自由文本。`chat_path=incremental_tool` 同时跳过完整 pipeline 与 planning gather。Compare 多标的 Chat 在 `_execute_multi_symbol_chat` 内对每个标的收集证据（`product_path=agent_orchestrator_chat`），成功后再跑该腿 `_execute_pipeline` 与 `_synthesize_multi_symbol_chat`。收集失败对该腿 fail-closed（不额外做经典工具收集），其余腿仍综合。
 5. **生产 Research 可选路径** — 同一开关经 `try_gather_with_planning`（`product_path=agent_research`）在深度研究子问题收集阶段使用过滤后的研究工具集。外层 `_decompose_query` / `_synthesise_report` 不变。收集失败对该子问题 fail-closed（不回退到经典 `run_agent_loop`）。HTTP `ResearchResponse` 字段不变。
 
-默认仍为**关闭**：开关为 false 时经典 ReAct RUN/Chat/Research 路径不变。compare-chat planning 与耐久产品 UI 仍属剩余范围。
+默认仍为**关闭**：开关为 false 时经典 ReAct RUN/Chat/Research 路径不变。耐久产品 UI 仍属剩余范围。
 
 ## 提案契约
 
@@ -86,7 +86,7 @@ print(result.success, result.status, result.to_metadata())
 
 | 环境变量 / Config 字段 | 默认 | 作用 |
 | --- | --- | --- |
-| `AGENT_PLANNING_ENABLED` | `false` | `AgentExecutor.run` 总开关 |
+| `AGENT_PLANNING_ENABLED` | `false` | `AgentExecutor.run`、Chat gather（含 compare-chat 各腿）与 Deep Research 子问题收集总开关 |
 | `AGENT_PLANNING_STRATEGY` | `template` | `template` 或 `llm` |
 | `AGENT_PLANNING_MAX_PLAN_STEPS` | `8` | 提案步数上限（1–16） |
 | `AGENT_PLANNING_MAX_REPLANS` | `1` | 提案重试（0–3） |
@@ -101,7 +101,6 @@ print(result.success, result.status, result.to_metadata())
 
 ## #199 剩余范围
 
-- Compare 多标的 Chat planning（`_execute_multi_symbol_chat`）；
 - 计划/动作/observation 的耐久审计持久化、tenant identity、脱敏/retention 与更完整产品 UI；
 - 超出 BoundToolSession 安全审计与 observability emit 的统一 UsageRecorder owner；
 - 超出聚焦离线生产路径测试的真实网络多步验收证据。

@@ -837,6 +837,12 @@ class _ChatMethods:
         cancelled_check: Optional[Callable[[], bool]],
     ) -> OrchestratorResult:
         """Run one guarded specialist pipeline per comparison symbol."""
+        from src.agent.planning.product import (
+            ORCH_CHAT_PRODUCT_PATH,
+            planning_evidence_block,
+            try_gather_with_planning,
+        )
+
         allowed = set(stock_scope.allowed_stock_codes)
         stock_codes = [
             code for code in market_context.stock_codes if code in allowed
@@ -893,11 +899,56 @@ class _ChatMethods:
                 symbol_scope,
                 report_language,
             )
+            leg_message = (
+                f"Analyze {stock_code} as one isolated leg of a later comparison. "
+                "Return a standalone evidence-based analysis for this symbol only."
+            )
+            gathered = try_gather_with_planning(
+                self,
+                task=leg_message,
+                context=symbol_context,
+                cancelled_check=cancelled_check,
+                config=getattr(self, "config", None),
+                product_path=ORCH_CHAT_PRODUCT_PATH,
+                timeout_seconds=remaining_timeout,
+            )
+            if gathered is not None and not gathered.success:
+                from src.agent.orchestrator import OrchestratorResult
+
+                result = OrchestratorResult(
+                    success=False,
+                    content="",
+                    error=gathered.error,
+                    cancelled=gathered.cancelled,
+                    timed_out=gathered.timed_out,
+                    tool_calls_log=list(gathered.plan_tool_log),
+                    total_steps=gathered.total_steps,
+                    total_tokens=gathered.total_tokens,
+                    planning_metadata=dict(gathered.planning_metadata),
+                )
+                per_symbol_results.append((stock_code, result))
+                if result.cancelled:
+                    return self._build_multi_symbol_cancelled_result(
+                        per_symbol_results,
+                        error=result.error,
+                    )
+                if cancelled_check is not None and cancelled_check():
+                    return self._build_multi_symbol_cancelled_result(
+                        per_symbol_results
+                    )
+                continue
+            pipeline_message = leg_message
+            if (
+                gathered is not None
+                and gathered.success
+                and gathered.evidence
+            ):
+                pipeline_message = (
+                    f"{leg_message}\n\n"
+                    f"{planning_evidence_block(gathered.evidence)}"
+                )
             ctx = self._build_chat_pipeline_context(
-                message=(
-                    f"Analyze {stock_code} as one isolated leg of a later comparison. "
-                    "Return a standalone evidence-based analysis for this symbol only."
-                ),
+                message=pipeline_message,
                 session_id=session_id,
                 context=symbol_context,
                 stock_scope=symbol_scope,
@@ -912,6 +963,16 @@ class _ChatMethods:
                 cancelled_check=cancelled_check,
                 timeout_seconds=remaining_timeout,
             )
+            if gathered is not None:
+                result.tool_calls_log = list(gathered.plan_tool_log) + list(
+                    result.tool_calls_log or []
+                )
+                result.total_tokens = int(result.total_tokens or 0) + int(
+                    gathered.total_tokens or 0
+                )
+                metadata = dict(result.planning_metadata or {})
+                metadata.update(gathered.planning_metadata)
+                result.planning_metadata = metadata
             per_symbol_results.append((stock_code, result))
             if result.cancelled:
                 return self._build_multi_symbol_cancelled_result(
