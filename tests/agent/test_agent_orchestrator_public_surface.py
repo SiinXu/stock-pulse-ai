@@ -121,12 +121,13 @@ EXPECTED_DASHBOARD_METHODS = (
 )
 
 # Refresh a hash only for an intentional behavior change to the moved methods.
+# ``_ChatMethods`` last changed for #199: compare-chat per-leg try_gather_with_planning.
 # ``_ExecutionMethods`` last changed for #1290: sealed-key commit plus Technical ∥ Intel wave wrappers.
 # ``_PipelineMethods`` last changed for #1120: episode persist extracted to pipeline_episode.
 # ``_PipelineEpisodeMethods`` last changed for #1120: fail-soft router_decision episode persist.
 # ``_DashboardMethods`` last changed for #131: additive dashboard.critic appendix on finalize.
 EXPECTED_AST_HASHES = {
-    '_ChatMethods': '3969a2440c5f95348a8e36ca441a3724b7f75128074b6b56e3382c379efb1abb',
+    '_ChatMethods': 'a9739afcec0c4972f317e295b29b9e3bc6448e4abcc00ccbdee35178d0670222',
     '_DashboardMethods': '6609d7691c083bb3f512f0a2130a22ea9f6d1764b03c85b01587349ca909f63d',
     '_ExecutionMethods': '29c0b1c7e692209dfd1d3da4f6f26ac6b5eca9377fc4ae59ab0a4b92fd189854',
     '_PipelineEpisodeMethods': '6ac5dffb97626def53d33ee7ee9b32dd22c5e3c82d7297171a407e305880456a',
